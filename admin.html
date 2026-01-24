@@ -243,21 +243,71 @@
                 });
             });
         }
-        function loadWorks() {
-             db.collection("works").orderBy("timestamp", "desc").limit(50).onSnapshot((snapshot) => {
-                const tbody = document.querySelector("#worksTable tbody");
-                tbody.innerHTML = "";
-                snapshot.forEach(doc => {
-                    const w = doc.data();
-                    const id = doc.id;
-                    tbody.innerHTML += `<tr><td>${w.timestamp?w.timestamp.toDate().toLocaleString('th-TH'):'..'}</td><td>${w.displayName}</td><td>${w.title}</td><td><a href="${w.link}" target="_blank" class="btn btn-sm btn-secondary">เปิด</a></td>
-                    <td><select onchange="updateStatus('${id}', this.value)"><option ${w.status==='รอตรวจ'?'selected':''}>รอตรวจ</option><option ${w.status==='ตรวจแล้ว'?'selected':''}>ตรวจแล้ว</option><option ${w.status==='แก้ไข'?'selected':''}>แก้ไข</option></select></td>
-                    <td><button class="btn btn-sm btn-danger" onclick="deleteWork('${id}', '${w.title}')">🗑️</button></td></tr>`;
-                });
-            });
+        // --- แก้ไข: เพิ่มปุ่ม Feedback และแสดงข้อความล่าสุด ---
+function loadWorks() {
+    db.collection("works").orderBy("timestamp", "desc").limit(50).onSnapshot((snapshot) => {
+        const tbody = document.querySelector("#worksTable tbody");
+        
+        // แก้ไขหัวตาราง (Header) ให้มีช่อง Feedback
+        const thead = document.querySelector("#worksTable thead tr");
+        if (thead.cells.length === 6) { // เช็คว่ายังไม่เคยเพิ่ม
+             thead.insertCell(5).outerHTML = "<th>คอมเมนต์</th>";
+        }
+
+        tbody.innerHTML = "";
+        
+        snapshot.forEach(doc => {
+            const w = doc.data();
+            const id = doc.id;
+            const statusColor = w.status === 'ตรวจแล้ว' ? '#d4edda' : w.status === 'แก้ไข' ? '#f8d7da' : '#fff3cd';
+            const date = w.timestamp ? w.timestamp.toDate().toLocaleString('th-TH', { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit'}) : "..";
+            
+            // ดึงข้อความ Feedback เดิมมาแสดง (ถ้ามี)
+            const feedbackText = w.feedback ? `<div style="font-size:0.8em; color:#007bff; margin-top:5px;">💬 "${w.feedback}"</div>` : "";
+            const feedbackBtn = `<button class="btn btn-sm" style="background:#17a2b8; color:white;" onclick="addFeedback('${id}', '${w.feedback || ''}')">📝 เขียน</button>`;
+
+            tbody.innerHTML += `
+                <tr>
+                    <td style="font-size:0.85em; color:#666;">${date}</td>
+                    <td>${w.displayName}</td>
+                    <td>${w.title}</td>
+                    <td><a href="${w.link}" target="_blank" class="btn btn-sm btn-secondary">เปิด</a></td>
+                    <td>
+                        <select class="status-select" onchange="updateStatus('${id}', this.value)" style="background:${statusColor}">
+                            <option value="รอตรวจ" ${w.status === 'รอตรวจ' ? 'selected' : ''}>รอตรวจ</option>
+                            <option value="ตรวจแล้ว" ${w.status === 'ตรวจแล้ว' ? 'selected' : ''}>ตรวจแล้ว</option>
+                            <option value="แก้ไข" ${w.status === 'แก้ไข' ? 'selected' : ''}>แก้ไข</option>
+                        </select>
+                    </td>
+                    <td>
+                        ${feedbackBtn}
+                        ${feedbackText}
+                    </td>
+                    <td><button class="btn btn-sm btn-danger btn-icon" onclick="deleteWork('${id}', '${w.title}')">🗑️</button></td>
+                </tr>`;
+        });
+    });
+}
         }
         // Helper functions
         async function deleteWork(docId, title) { if(confirm(`ลบงาน "${title}"?`)) try { await db.collection("works").doc(docId).delete(); } catch(e) { alert(e.message); } }
+        // --- ฟังก์ชันใหม่: บันทึก Feedback ---
+async function addFeedback(docId, oldFeedback) {
+    // เด้งหน้าต่างให้พิมพ์ข้อความ
+    const newFeedback = prompt("พิมพ์ข้อความถึงน้องฝึกงาน:", oldFeedback);
+    
+    // ถ้ากด OK (ไม่กด Cancel)
+    if (newFeedback !== null) {
+        try {
+            await db.collection("works").doc(docId).update({
+                feedback: newFeedback // บันทึกลง database
+            });
+            // ไม่ต้อง alert เพราะหน้าจอจะอัปเดตเองแบบ Real-time
+        } catch(e) {
+            alert("Error: " + e.message);
+        }
+    }
+}
         async function deleteUser(uid, name) { if (confirm(`ลบ User "${name}"?`)) try { await db.collection("users").doc(uid).delete(); } catch (e) { alert(e.message); } }
         async function adjScore(uid, val) { try { await db.collection("users").doc(uid).update({ score: firebase.firestore.FieldValue.increment(val) }); } catch(e) { alert(e.message); } }
         async function setScore(uid) { let val = prompt("คะแนนใหม่:"); if(val) await db.collection("users").doc(uid).update({ score: parseInt(val) }); }
@@ -267,4 +317,5 @@
     </script>
 </body>
 </html>
+
 
