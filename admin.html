@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP-INTERN-PORT-DASHBOARD</title>
+    <title>MLP-INTERN-PORT</title>
+    
     <link rel="stylesheet" href="style.css">
     
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -62,13 +63,14 @@
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20">
                 เข้าสู่ระบบด้วย Google
             </button>
+            <p id="login-status" style="margin-top: 10px; font-size: 0.8em; color: #666;"></p>
         </div>
     </div>
 
     <div id="dashboard-container" class="container" style="max-width: 1000px; padding-top: 20px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap: wrap; gap: 10px;">
             <h2>👨‍💻 Admin Dashboard</h2>
-            <div style="display: flex; gap: 10px; align-items: center;">
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <span id="admin-email" style="font-size: 0.9em; color: #666;"></span>
                 <button class="btn btn-sm btn-danger" onclick="logout()">Logout</button>
                 <button class="btn btn-sm btn-secondary" onclick="location.reload()">🔄 Refresh</button>
@@ -116,44 +118,52 @@
 
     <script src="firebase-config.js"></script>
     <script>
-        // 🔒 CONFIG: เมล Admin ที่อนุญาต (แก้ตรงนี้ถ้าต้องการเปลี่ยน)
+        // 🔒 CONFIG: เมล Admin ที่อนุญาต
         const ALLOWED_EMAIL = "medlifeplus@gmail.com";
-        
-        // LIFF ID เดิม
-        const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; 
+        const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; // ใส่ LIFF ID เดิมของคุณ
 
-        // --- Auth Logic (หัวใจสำคัญ) ---
+        // --- Auth Logic (Updated for Redirect) ---
         const auth = firebase.auth();
         const provider = new firebase.auth.GoogleAuthProvider();
 
+        // ฟังก์ชัน Login (ใช้ Redirect แก้ปัญหา Popup)
+        function loginGoogle() {
+            document.getElementById('login-status').innerText = "กำลังเปลี่ยนหน้าไปที่ Google...";
+            auth.signInWithRedirect(provider);
+        }
+
+        // ตรวจสอบผลการ Redirect (จับ Error)
+        auth.getRedirectResult().then((result) => {
+            if (result.credential) {
+                // Login สำเร็จ (จะไปเข้า onAuthStateChanged ต่อเอง)
+                console.log("Redirect Login Success");
+            }
+        }).catch((error) => {
+            console.error(error);
+            alert("Login Failed: " + error.message);
+            document.getElementById('login-status').innerText = "";
+        });
+
+        // ตรวจสอบสถานะ User ปัจจุบัน
         auth.onAuthStateChanged((user) => {
             if (user) {
-                // เช็คว่าใช่เมลที่อนุญาตไหม?
                 if (user.email === ALLOWED_EMAIL) {
-                    // ✅ ผ่าน: แสดง Dashboard
+                    // ✅ ผ่าน
                     document.getElementById('login-screen').style.display = 'none';
                     document.getElementById('dashboard-container').style.display = 'block';
                     document.getElementById('admin-email').innerText = user.email;
-                    
-                    // เริ่มโหลดข้อมูล
                     initSystem();
                 } else {
-                    // ❌ ไม่ผ่าน: เตะออก
-                    alert(`ขออภัย! เมล ${user.email} ไม่มีสิทธิ์เข้าถึงหน้านี้ครับ`);
+                    // ❌ ไม่ผ่าน
+                    alert(`เมล ${user.email} ไม่ได้รับอนุญาตครับ`);
                     auth.signOut();
                 }
             } else {
-                // ยังไม่ Login: โชว์หน้า Login
+                // ยังไม่ Login
                 document.getElementById('login-screen').style.display = 'flex';
                 document.getElementById('dashboard-container').style.display = 'none';
             }
         });
-
-        function loginGoogle() {
-            auth.signInWithPopup(provider).catch((error) => {
-                alert("Login Error: " + error.message);
-            });
-        }
 
         function logout() {
             if(confirm("ต้องการออกจากระบบ?")) {
@@ -161,20 +171,16 @@
             }
         }
 
-        // --- System Logic (เหมือนเดิมแต่หุ้มฟังก์ชันไว้) ---
+        // --- System Logic ---
         let isInit = false;
         async function initSystem() {
-            if(isInit) return; // ป้องกันโหลดซ้ำ
+            if(isInit) return;
             isInit = true;
-
             try { await liff.init({ liffId: ADMIN_LIFF_ID }); } catch(e) {}
-            
             loadUsers();
             loadWorks();
         }
 
-        // ... (ฟังก์ชัน Tab, Filter, Adjust Score เดิมทั้งหมดอยู่ด้านล่างนี้) ...
-        
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -282,5 +288,3 @@
     </script>
 </body>
 </html>
-
-
