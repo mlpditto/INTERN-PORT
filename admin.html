@@ -3,16 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard</title>
-    
+    <title>Admin Dashboard (Secured)</title>
     <link rel="stylesheet" href="style.css">
     
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     
     <style>
-        /* CSS เฉพาะหน้า Admin */
+        /* CSS เพิ่มเติมสำหรับ Login Screen */
+        #login-screen {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; background: #f0f2f5;
+        }
+        #dashboard-container { display: none; } /* ซ่อน Dashboard ไว้ก่อน */
+        
+        .login-card {
+            background: white; padding: 40px; border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;
+            max-width: 400px; width: 90%;
+        }
+        .google-btn {
+            background: white; border: 1px solid #ddd; border-radius: 4px;
+            padding: 10px 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            gap: 10px; width: 100%; margin-top: 20px; font-weight: bold; color: #555;
+            transition: 0.2s;
+        }
+        .google-btn:hover { background: #f8f9fa; }
+        
+        /* CSS เดิมของ Admin */
         .tab-nav { display: flex; border-bottom: 2px solid #eee; margin-bottom: 20px; overflow-x: auto; }
         .tab-btn { padding: 15px 20px; cursor: pointer; border: none; background: none; font-weight: 600; color: var(--gray); white-space: nowrap; }
         .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
@@ -27,18 +47,33 @@
         .search-box { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px; }
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
         .action-group { display: flex; gap: 5px; }
         .btn-icon { padding: 5px 10px; font-size: 14px; }
     </style>
 </head>
 <body>
-    <div class="container" style="max-width: 1000px;">
+
+    <div id="login-screen">
+        <div class="login-card">
+            <h2>🔐 Admin Access</h2>
+            <p style="color: #666; margin-bottom: 20px;">เฉพาะผู้ได้รับอนุญาตเท่านั้น</p>
+            <p style="font-size: 0.9em; color: #888;">(Login with medlifeplus@gmail.com)</p>
+            
+            <button class="google-btn" onclick="loginGoogle()">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20">
+                เข้าสู่ระบบด้วย Google
+            </button>
+        </div>
+    </div>
+
+    <div id="dashboard-container" class="container" style="max-width: 1000px; padding-top: 20px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap: wrap; gap: 10px;">
             <h2>👨‍💻 Admin Dashboard</h2>
-            <div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <span id="admin-email" style="font-size: 0.9em; color: #666;"></span>
+                <button class="btn btn-sm btn-danger" onclick="logout()">Logout</button>
                 <button class="btn btn-sm btn-secondary" onclick="location.reload()">🔄 Refresh</button>
-                <button class="btn btn-sm" style="background-color: #00B900; color: white;" onclick="shareLeaderboard()">📤 แชร์ผลลงกลุ่ม LINE</button>
+                <button class="btn btn-sm" style="background-color: #00B900; color: white;" onclick="shareLeaderboard()">📤 แชร์ผล</button>
             </div>
         </div>
 
@@ -54,14 +89,7 @@
                 <div style="overflow-x:auto;">
                     <table id="usersTable">
                         <thead>
-                            <tr>
-                                <th>รูป</th>
-                                <th>ชื่อ</th>
-                                <th>Level</th>
-                                <th>คะแนน</th>
-                                <th>จัดการคะแนน</th>
-                                <th>ลบ</th>
-                            </tr>
+                            <tr><th>รูป</th><th>ชื่อ</th><th>Level</th><th>คะแนน</th><th>จัดการคะแนน</th><th>ลบ</th></tr>
                         </thead>
                         <tbody></tbody>
                     </table>
@@ -74,13 +102,7 @@
                 <div style="overflow-x:auto;">
                     <table id="worksTable">
                         <thead>
-                            <tr>
-                                <th>เวลา</th>
-                                <th>ชื่อ</th>
-                                <th>หัวข้อ</th>
-                                <th>ลิงก์</th>
-                                <th>สถานะ</th>
-                                <th>ลบ</th> </tr>
+                            <tr><th>เวลา</th><th>ชื่อ</th><th>หัวข้อ</th><th>ลิงก์</th><th>สถานะ</th><th>ลบ</th></tr>
                         </thead>
                         <tbody></tbody>
                     </table>
@@ -89,22 +111,71 @@
         </div>
 
         <div id="tab-leaderboard" class="tab-content">
-            <div class="grid-container" id="leaderboardGrid">
-                </div>
+            <div class="grid-container" id="leaderboardGrid"></div>
         </div>
     </div>
 
     <script src="firebase-config.js"></script>
     <script>
-        // ⚠️ ใส่ LIFF ID เดิมของคุณที่นี่ (ใช้สำหรับแชร์)
+        // 🔒 CONFIG: เมล Admin ที่อนุญาต (แก้ตรงนี้ถ้าต้องการเปลี่ยน)
+        const ALLOWED_EMAIL = "medlifeplus@gmail.com";
+        
+        // LIFF ID เดิม
         const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; 
 
-        async function initAdmin() {
-            try { await liff.init({ liffId: ADMIN_LIFF_ID }); } 
-            catch (err) { console.log("LIFF Init failed:", err); }
-        }
-        initAdmin();
+        // --- Auth Logic (หัวใจสำคัญ) ---
+        const auth = firebase.auth();
+        const provider = new firebase.auth.GoogleAuthProvider();
 
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                // เช็คว่าใช่เมลที่อนุญาตไหม?
+                if (user.email === ALLOWED_EMAIL) {
+                    // ✅ ผ่าน: แสดง Dashboard
+                    document.getElementById('login-screen').style.display = 'none';
+                    document.getElementById('dashboard-container').style.display = 'block';
+                    document.getElementById('admin-email').innerText = user.email;
+                    
+                    // เริ่มโหลดข้อมูล
+                    initSystem();
+                } else {
+                    // ❌ ไม่ผ่าน: เตะออก
+                    alert(`ขออภัย! เมล ${user.email} ไม่มีสิทธิ์เข้าถึงหน้านี้ครับ`);
+                    auth.signOut();
+                }
+            } else {
+                // ยังไม่ Login: โชว์หน้า Login
+                document.getElementById('login-screen').style.display = 'flex';
+                document.getElementById('dashboard-container').style.display = 'none';
+            }
+        });
+
+        function loginGoogle() {
+            auth.signInWithPopup(provider).catch((error) => {
+                alert("Login Error: " + error.message);
+            });
+        }
+
+        function logout() {
+            if(confirm("ต้องการออกจากระบบ?")) {
+                auth.signOut().then(() => location.reload());
+            }
+        }
+
+        // --- System Logic (เหมือนเดิมแต่หุ้มฟังก์ชันไว้) ---
+        let isInit = false;
+        async function initSystem() {
+            if(isInit) return; // ป้องกันโหลดซ้ำ
+            isInit = true;
+
+            try { await liff.init({ liffId: ADMIN_LIFF_ID }); } catch(e) {}
+            
+            loadUsers();
+            loadWorks();
+        }
+
+        // ... (ฟังก์ชัน Tab, Filter, Adjust Score เดิมทั้งหมดอยู่ด้านล่างนี้) ...
+        
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -112,167 +183,102 @@
             event.target.classList.add('active');
         }
 
-        // --- 1. Users Logic ---
+        // --- Load Users ---
         let allUsers = [];
-        db.collection("users").orderBy("score", "desc").onSnapshot((snapshot) => {
-            const userTable = document.querySelector("#usersTable tbody");
-            const leaderboard = document.getElementById("leaderboardGrid");
-            userTable.innerHTML = ""; leaderboard.innerHTML = "";
-            allUsers = [];
+        function loadUsers() {
+            db.collection("users").orderBy("score", "desc").onSnapshot((snapshot) => {
+                const userTable = document.querySelector("#usersTable tbody");
+                const leaderboard = document.getElementById("leaderboardGrid");
+                userTable.innerHTML = ""; leaderboard.innerHTML = "";
+                allUsers = [];
 
-            let rank = 1;
-            snapshot.forEach(doc => {
-                const u = doc.data();
-                const uid = doc.id;
-                const level = Math.floor(u.score / 10) + 1;
-                allUsers.push({ uid, ...u, level });
+                let rank = 1;
+                snapshot.forEach(doc => {
+                    const u = doc.data();
+                    const uid = doc.id;
+                    const level = Math.floor(u.score / 10) + 1;
+                    allUsers.push({ uid, ...u, level });
 
-                // Render User Table
-                userTable.innerHTML += `
-                    <tr class="user-row">
-                        <td><img src="${u.pictureUrl}" style="width:30px; border-radius:50%"></td>
-                        <td class="u-name">${u.displayName}</td>
-                        <td><span class="badge" style="background:#eee">Lv.${level}</span></td>
-                        <td style="font-weight:bold;">${u.score}</td>
-                        <td>
-                            <div class="action-group">
-                                <button class="btn btn-sm btn-primary btn-icon" onclick="adjScore('${uid}', 1)">+1</button>
-                                <button class="btn btn-sm btn-danger btn-icon" onclick="adjScore('${uid}', -1)">-1</button>
-                                <button class="btn btn-sm btn-secondary btn-icon" onclick="setScore('${uid}')">Set</button>
-                            </div>
-                        </td>
-                        <td>
-                            <button class="btn btn-sm btn-danger btn-icon" onclick="deleteUser('${uid}', '${u.displayName}')">🗑️</button>
-                        </td>
-                    </tr>`;
+                    userTable.innerHTML += `
+                        <tr class="user-row">
+                            <td><img src="${u.pictureUrl}" style="width:30px; border-radius:50%"></td>
+                            <td class="u-name">${u.displayName}</td>
+                            <td><span class="badge" style="background:#eee">Lv.${level}</span></td>
+                            <td style="font-weight:bold;">${u.score}</td>
+                            <td>
+                                <div class="action-group">
+                                    <button class="btn btn-sm btn-primary btn-icon" onclick="adjScore('${uid}', 1)">+1</button>
+                                    <button class="btn btn-sm btn-danger btn-icon" onclick="adjScore('${uid}', -1)">-1</button>
+                                    <button class="btn btn-sm btn-secondary btn-icon" onclick="setScore('${uid}')">Set</button>
+                                </div>
+                            </td>
+                            <td><button class="btn btn-sm btn-danger btn-icon" onclick="deleteUser('${uid}', '${u.displayName}')">🗑️</button></td>
+                        </tr>`;
 
-                // Render Leaderboard
-                if (rank <= 10) {
-                    leaderboard.innerHTML += `
-                        <div class="card text-center" style="margin-bottom:0">
-                            <div style="font-size:2em;">${rank === 1 ? '🥇' : rank === 2 ? '🥈' : '#' + rank}</div>
-                            <img src="${u.pictureUrl}" style="width:50px; border-radius:50%; margin:10px auto;">
-                            <h4>${u.displayName}</h4>
-                            <div class="badge badge-gold" style="margin-top:5px;">${u.score} แต้ม</div>
-                        </div>`;
-                }
-                rank++;
-            });
-        });
-
-        // --- 2. Works Logic (เพิ่มปุ่มลบ) ---
-        db.collection("works").orderBy("timestamp", "desc").limit(50).onSnapshot((snapshot) => {
-            const tbody = document.querySelector("#worksTable tbody");
-            tbody.innerHTML = "";
-            snapshot.forEach(doc => {
-                const w = doc.data();
-                const id = doc.id;
-                const statusColor = w.status === 'ตรวจแล้ว' ? '#d4edda' : w.status === 'แก้ไข' ? '#f8d7da' : '#fff3cd';
-                const date = w.timestamp ? w.timestamp.toDate().toLocaleString('th-TH') : "...";
-
-                tbody.innerHTML += `
-                    <tr>
-                        <td style="font-size:0.85em; color:#666;">${date}</td>
-                        <td>${w.displayName}</td>
-                        <td>${w.title}</td>
-                        <td><a href="${w.link}" target="_blank" class="btn btn-sm btn-secondary">เปิด</a></td>
-                        <td>
-                            <select class="status-select" onchange="updateStatus('${id}', this.value)" style="background:${statusColor}">
-                                <option value="รอตรวจ" ${w.status === 'รอตรวจ' ? 'selected' : ''}>รอตรวจ</option>
-                                <option value="ตรวจแล้ว" ${w.status === 'ตรวจแล้ว' ? 'selected' : ''}>ตรวจแล้ว</option>
-                                <option value="แก้ไข" ${w.status === 'แก้ไข' ? 'selected' : ''}>แก้ไข</option>
-                            </select>
-                        </td>
-                        <td>
-                            <button class="btn btn-sm btn-danger btn-icon" onclick="deleteWork('${id}', '${w.title}')" title="ลบงาน">🗑️</button>
-                        </td>
-                    </tr>`;
-            });
-        });
-
-        // --- Functions ---
-        async function deleteWork(docId, title) {
-            if(confirm(`⚠️ ต้องการลบงานหัวข้อ "${title}" ใช่ไหมครับ?`)) {
-                try {
-                    await db.collection("works").doc(docId).delete();
-                    // ไม่ต้อง alert ก็ได้เพราะตารางจะหายไปเอง แต่ถ้าอยากให้มั่นใจก็ใส่ console.log
-                    console.log("Deleted work: " + docId);
-                } catch(e) { alert("ลบไม่สำเร็จ: " + e.message); }
-            }
-        }
-
-        async function deleteUser(uid, name) {
-            if (confirm(`⚠️ ยืนยันการลบ User: "${name}" ?\n(คะแนนจะหายไปถาวร)`)) {
-                try { await db.collection("users").doc(uid).delete(); } 
-                catch (error) { alert("Error: " + error.message); }
-            }
-        }
-
-        async function adjScore(uid, val) {
-            try { await db.collection("users").doc(uid).update({ score: firebase.firestore.FieldValue.increment(val) }); }
-            catch(e) { alert(e.message); }
-        }
-
-        async function setScore(uid) {
-            let val = prompt("กรอกคะแนนใหม่:");
-            if(val) { await db.collection("users").doc(uid).update({ score: parseInt(val) }); }
-        }
-
-        async function updateStatus(docId, newStatus) {
-            try { await db.collection("works").doc(docId).update({ status: newStatus }); }
-            catch(e) { alert(e.message); }
-        }
-
-        function filterUsers() {
-            const term = document.getElementById('userSearch').value.toLowerCase();
-            const rows = document.querySelectorAll('.user-row');
-            rows.forEach(row => {
-                const name = row.querySelector('.u-name').innerText.toLowerCase();
-                row.style.display = name.includes(term) ? '' : 'none';
+                    if (rank <= 10) {
+                        leaderboard.innerHTML += `
+                            <div class="card text-center" style="margin-bottom:0">
+                                <div style="font-size:2em;">${rank === 1 ? '🥇' : rank === 2 ? '🥈' : '#' + rank}</div>
+                                <img src="${u.pictureUrl}" style="width:50px; border-radius:50%; margin:10px auto;">
+                                <h4>${u.displayName}</h4>
+                                <div class="badge badge-gold" style="margin-top:5px;">${u.score} แต้ม</div>
+                            </div>`;
+                    }
+                    rank++;
+                });
             });
         }
 
-        // Share Function
+        // --- Load Works ---
+        function loadWorks() {
+            db.collection("works").orderBy("timestamp", "desc").limit(50).onSnapshot((snapshot) => {
+                const tbody = document.querySelector("#worksTable tbody");
+                tbody.innerHTML = "";
+                snapshot.forEach(doc => {
+                    const w = doc.data();
+                    const id = doc.id;
+                    const statusColor = w.status === 'ตรวจแล้ว' ? '#d4edda' : w.status === 'แก้ไข' ? '#f8d7da' : '#fff3cd';
+                    const date = w.timestamp ? w.timestamp.toDate().toLocaleString('th-TH') : "...";
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td style="font-size:0.85em; color:#666;">${date}</td>
+                            <td>${w.displayName}</td>
+                            <td>${w.title}</td>
+                            <td><a href="${w.link}" target="_blank" class="btn btn-sm btn-secondary">เปิด</a></td>
+                            <td>
+                                <select class="status-select" onchange="updateStatus('${id}', this.value)" style="background:${statusColor}">
+                                    <option value="รอตรวจ" ${w.status === 'รอตรวจ' ? 'selected' : ''}>รอตรวจ</option>
+                                    <option value="ตรวจแล้ว" ${w.status === 'ตรวจแล้ว' ? 'selected' : ''}>ตรวจแล้ว</option>
+                                    <option value="แก้ไข" ${w.status === 'แก้ไข' ? 'selected' : ''}>แก้ไข</option>
+                                </select>
+                            </td>
+                            <td><button class="btn btn-sm btn-danger btn-icon" onclick="deleteWork('${id}', '${w.title}')">🗑️</button></td>
+                        </tr>`;
+                });
+            });
+        }
+
+        // --- Actions ---
+        async function deleteWork(docId, title) { if(confirm(`ลบงาน "${title}"?`)) try { await db.collection("works").doc(docId).delete(); } catch(e) { alert(e.message); } }
+        async function deleteUser(uid, name) { if (confirm(`ลบ User "${name}"?`)) try { await db.collection("users").doc(uid).delete(); } catch (e) { alert(e.message); } }
+        async function adjScore(uid, val) { try { await db.collection("users").doc(uid).update({ score: firebase.firestore.FieldValue.increment(val) }); } catch(e) { alert(e.message); } }
+        async function setScore(uid) { let val = prompt("คะแนนใหม่:"); if(val) await db.collection("users").doc(uid).update({ score: parseInt(val) }); }
+        async function updateStatus(docId, newStatus) { try { await db.collection("works").doc(docId).update({ status: newStatus }); } catch(e) { alert(e.message); } }
+        function filterUsers() { const term = document.getElementById('userSearch').value.toLowerCase(); document.querySelectorAll('.user-row').forEach(row => { row.style.display = row.innerText.toLowerCase().includes(term) ? '' : 'none'; }); }
+
+        // Share (LIFF)
         async function shareLeaderboard() {
             if (!liff.isLoggedIn()) { liff.login(); return; }
             const topUsers = allUsers.slice(0, 3);
-            if (topUsers.length === 0) { alert("ยังไม่มีข้อมูลคะแนนครับ"); return; }
-
-            let ranksContent = [];
-            topUsers.forEach((u, index) => {
-                let rankIcon = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
-                ranksContent.push({
-                    type: "box", layout: "horizontal", margin: "sm",
-                    contents: [
-                        { type: "text", text: `${rankIcon} ${u.displayName}`, flex: 4, size: "sm", color: "#333" },
-                        { type: "text", text: `${u.score} แต้ม`, flex: 2, align: "end", weight: "bold", size: "sm", color: "#06C755" }
-                    ]
-                });
-            });
-
-            const flexMsg = {
-                type: "flex", altText: "ประกาศผลคะแนนล่าสุด! 🏆",
-                contents: {
-                    type: "bubble",
-                    header: {
-                        type: "box", layout: "vertical",
-                        contents: [
-                            { type: "text", text: "🏆 LEADERBOARD", weight: "bold", color: "#1DB446", size: "xxs" },
-                            { type: "text", text: "สรุปคะแนนล่าสุด", weight: "bold", size: "xl", margin: "md" },
-                            { type: "text", text: `ประจำวันที่ ${new Date().toLocaleDateString('th-TH')}`, size: "xs", color: "#aaaaaa" }
-                        ]
-                    },
-                    body: { type: "box", layout: "vertical", contents: ranksContent },
-                    footer: {
-                        type: "box", layout: "vertical",
-                        contents: [{ type: "button", action: { type: "uri", label: "ดูทั้งหมด", uri: `https://liff.line.me/${ADMIN_LIFF_ID}` }, style: "primary", color: "#06C755" }]
-                    }
-                }
-            };
-
-            if (liff.isApiAvailable('shareTargetPicker')) {
-                liff.shareTargetPicker([flexMsg]).catch((err) => alert("แชร์ไม่สำเร็จ: " + err.message));
-            } else { alert("ฟีเจอร์แชร์ต้องเปิดผ่านแอป LINE เท่านั้นครับ"); }
+            if (topUsers.length === 0) { alert("ไม่มีข้อมูล"); return; }
+            let ranksContent = topUsers.map((u, index) => ({
+                type: "box", layout: "horizontal", margin: "sm",
+                contents: [{ type: "text", text: `${index===0?'🥇':index===1?'🥈':'🥉'} ${u.displayName}`, flex: 4, size: "sm" }, { type: "text", text: `${u.score}`, flex: 1, align: "end", weight: "bold", color: "#06C755" }]
+            }));
+            const flexMsg = { type: "flex", altText: "Leaderboard", contents: { type: "bubble", body: { type: "box", layout: "vertical", contents: [ { type: "text", text: "🏆 LEADERBOARD", weight: "bold", size: "xl", color: "#1DB446" }, ...ranksContent ] } } };
+            if (liff.isApiAvailable('shareTargetPicker')) liff.shareTargetPicker([flexMsg]);
+            else alert("เปิดใน LINE เท่านั้น");
         }
     </script>
 </body>
