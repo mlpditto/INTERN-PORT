@@ -52,8 +52,12 @@
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #f8f9fa; color: #555; }
+        
+        .status-select { padding: 5px; border-radius: 4px; border: 1px solid #ddd; }
+        .search-box { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px; }
         .action-group { display: flex; gap: 5px; }
         .btn-icon { padding: 5px 10px; font-size: 14px; }
+        
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
@@ -95,13 +99,36 @@
 
         <div id="tab-users" class="tab-content active">
             <div class="card">
-                <input type="text" id="userSearch" style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ddd; border-radius:8px;" placeholder="🔍 ค้นหา..." onkeyup="filterUsers()">
-                <div style="overflow-x:auto;"><table id="usersTable"><thead><tr><th>รูป</th><th>ชื่อ</th><th>Level</th><th>คะแนน</th><th>จัดการ</th><th>ลบ</th></tr></thead><tbody></tbody></table></div>
+                <input type="text" id="userSearch" class="search-box" placeholder="🔍 ค้นหาชื่อน้องฝึกงาน..." onkeyup="filterUsers()">
+                <div style="overflow-x:auto;">
+                    <table id="usersTable">
+                        <thead><tr><th>รูป</th><th>ชื่อ</th><th>Level</th><th>คะแนน</th><th>จัดการ</th><th>ลบ</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
         </div>
+
         <div id="tab-works" class="tab-content">
-            <div class="card"><div style="overflow-x:auto;"><table id="worksTable"><thead><tr><th>เวลา</th><th>ชื่อ</th><th>หัวข้อ</th><th>ลิงก์</th><th>สถานะ</th><th>ลบ</th></tr></thead><tbody></tbody></table></div></div>
+            <div class="card">
+                <div style="overflow-x:auto;">
+                    <table id="worksTable">
+                        <thead>
+                            <tr>
+                                <th>เวลา</th>
+                                <th>ชื่อ</th>
+                                <th>หัวข้อ</th>
+                                <th>ลิงก์</th>
+                                <th>สถานะ</th>
+                                <th>คอมเมนต์</th> <th>ลบ</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
+
         <div id="tab-leaderboard" class="tab-content">
             <div class="grid-container" id="leaderboardGrid"></div>
         </div>
@@ -111,29 +138,25 @@
     <script>
         // 🔒 CONFIG
         const ALLOWED_EMAIL = "medlifeplus@gmail.com";
-        const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; // ใส่ LIFF ID เดิมของคุณ
+        const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ใส่ LIFF ID ของคุณ
         
-        // ⚠️ ต้องแก้บรรทัดนี้ให้ตรงกับลิงก์หน้า Admin ของคุณเป๊ะๆ
+        // ⚠️ ต้องแก้ลิงก์นี้ให้ตรงกับหน้า Admin ของคุณเป๊ะๆ
         const MY_URL = 'https://mlpditto.github.io/INTERN-PORT/admin.html'; 
 
         const auth = firebase.auth();
 
-        // --- 1. ตรวจสอบว่าเปิดมาจากลิงก์ในอีเมลหรือไม่? ---
+        // --- 1. ตรวจสอบ Magic Link (Login) ---
         if (auth.isSignInWithEmailLink(window.location.href)) {
-            // ถ้าใช่: ให้ทำการ Login อัตโนมัติ
             let email = window.localStorage.getItem('emailForSignIn');
             if (!email) {
-                // กรณีเปลี่ยนเครื่องเปิด หรือ Browser ล้างความจำ ให้ถามเมลอีกรอบ
                 email = window.prompt('เพื่อความปลอดภัย กรุณายืนยันอีเมลของคุณอีกครั้ง:');
             }
-            
             if(email) {
                 document.getElementById('status-msg').innerHTML = "⏳ กำลังยืนยันตัวตน...";
                 auth.signInWithEmailLink(email, window.location.href)
                     .then((result) => {
-                        window.localStorage.removeItem('emailForSignIn'); // ล้างค่าทิ้ง
-                        // redirect เพื่อล้าง URL ที่ยาวๆ ทิ้งไป ให้ดูสะอาดตา
-                        window.location.replace(MY_URL); 
+                        window.localStorage.removeItem('emailForSignIn');
+                        window.location.replace(MY_URL); // ล้าง URL ให้สวยงาม
                     })
                     .catch((error) => {
                         document.getElementById('status-msg').innerHTML = `<span class="error-msg">Error: ${error.message}</span>`;
@@ -141,20 +164,19 @@
             }
         }
 
-        // --- 2. ฟังก์ชันส่งลิงก์ (Magic Link) ---
+        // --- 2. ฟังก์ชันส่งลิงก์ ---
         function sendMagicLink() {
             const email = document.getElementById('email-input').value.trim();
             const btn = document.getElementById('send-btn');
             const status = document.getElementById('status-msg');
 
-            // Gatekeeper: เช็คก่อนส่งเลย เพื่อไม่ให้เสียเวลา
             if (email !== ALLOWED_EMAIL) {
                 status.innerHTML = `<span class="error-msg">⛔ อีเมลนี้ไม่มีสิทธิ์เข้าใช้งานระบบครับ</span>`;
                 return;
             }
 
             const actionCodeSettings = {
-                url: MY_URL, // ลิงก์ที่จะให้เด้งกลับมา
+                url: MY_URL,
                 handleCodeInApp: true
             };
 
@@ -163,14 +185,9 @@
 
             auth.sendSignInLinkToEmail(email, actionCodeSettings)
                 .then(() => {
-                    window.localStorage.setItem('emailForSignIn', email); // จำเมลไว้
-                    status.innerHTML = `
-                        <div class="success-msg">
-                            <b>✅ ส่งลิงก์เรียบร้อย!</b><br>
-                            กรุณาเช็ค Inbox (หรือ Junk) ของอีเมล <b>${email}</b><br>
-                            แล้วกดลิงก์เพื่อเข้าสู่ระบบ
-                        </div>`;
-                    btn.style.display = 'none'; // ซ่อนปุ่ม
+                    window.localStorage.setItem('emailForSignIn', email);
+                    status.innerHTML = `<div class="success-msg"><b>✅ ส่งลิงก์เรียบร้อย!</b><br>กรุณาเช็ค Inbox หรือ Junk ของ <b>${email}</b><br>แล้วกดลิงก์เพื่อเข้าสู่ระบบ</div>`;
+                    btn.style.display = 'none';
                     document.getElementById('login-form').style.display = 'none';
                 })
                 .catch((error) => {
@@ -180,11 +197,10 @@
                 });
         }
 
-        // --- 3. ตรวจสอบสถานะ (เหมือนเดิม) ---
+        // --- 3. ตรวจสอบสถานะ ---
         auth.onAuthStateChanged((user) => {
             if (user) {
                 if (user.email === ALLOWED_EMAIL) {
-                    // ✅ Login ผ่าน
                     document.getElementById('login-screen').style.display = 'none';
                     document.getElementById('dashboard-container').style.display = 'block';
                     document.getElementById('admin-email').innerText = user.email;
@@ -200,13 +216,15 @@
             if(confirm("ออกจากระบบ?")) auth.signOut().then(() => location.reload());
         }
 
-        // --- System & Tab Logic (เหมือนเดิม) ---
+        // --- System Logic ---
         let isInit = false;
         async function initSystem() {
             if(isInit) return; isInit = true;
             try { await liff.init({ liffId: ADMIN_LIFF_ID }); } catch(e) {}
-            loadUsers(); loadWorks();
+            loadUsers(); 
+            loadWorks();
         }
+        
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -214,9 +232,7 @@
             event.target.classList.add('active');
         }
 
-        // (ฟังก์ชัน loadUsers, loadWorks, delete, share เหมือนเดิม ใส่ต่อตรงนี้ได้เลยครับ เพื่อประหยัดพื้นที่)
-        // ... Copy Logic เดิมมาวางต่อตรงนี้ ...
-        
+        // --- Load Users ---
         let allUsers = [];
         function loadUsers() {
              db.collection("users").orderBy("score", "desc").onSnapshot((snapshot) => {
@@ -243,79 +259,61 @@
                 });
             });
         }
-        // --- แก้ไข: เพิ่มปุ่ม Feedback และแสดงข้อความล่าสุด ---
-function loadWorks() {
-    db.collection("works").orderBy("timestamp", "desc").limit(50).onSnapshot((snapshot) => {
-        const tbody = document.querySelector("#worksTable tbody");
-        
-        // แก้ไขหัวตาราง (Header) ให้มีช่อง Feedback
-        const thead = document.querySelector("#worksTable thead tr");
-        if (thead.cells.length === 6) { // เช็คว่ายังไม่เคยเพิ่ม
-             thead.insertCell(5).outerHTML = "<th>คอมเมนต์</th>";
-        }
 
-        tbody.innerHTML = "";
-        
-        snapshot.forEach(doc => {
-            const w = doc.data();
-            const id = doc.id;
-            const statusColor = w.status === 'ตรวจแล้ว' ? '#d4edda' : w.status === 'แก้ไข' ? '#f8d7da' : '#fff3cd';
-            const date = w.timestamp ? w.timestamp.toDate().toLocaleString('th-TH', { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit'}) : "..";
-            
-            // ดึงข้อความ Feedback เดิมมาแสดง (ถ้ามี)
-            const feedbackText = w.feedback ? `<div style="font-size:0.8em; color:#007bff; margin-top:5px;">💬 "${w.feedback}"</div>` : "";
-            const feedbackBtn = `<button class="btn btn-sm" style="background:#17a2b8; color:white;" onclick="addFeedback('${id}', '${w.feedback || ''}')">📝 เขียน</button>`;
+        // --- Load Works (Updated for Feedback) ---
+        function loadWorks() {
+             db.collection("works").orderBy("timestamp", "desc").limit(50).onSnapshot((snapshot) => {
+                const tbody = document.querySelector("#worksTable tbody");
+                tbody.innerHTML = "";
+                snapshot.forEach(doc => {
+                    const w = doc.data();
+                    const id = doc.id;
+                    const statusColor = w.status === 'ตรวจแล้ว' ? '#d4edda' : w.status === 'แก้ไข' ? '#f8d7da' : '#fff3cd';
+                    const date = w.timestamp ? w.timestamp.toDate().toLocaleString('th-TH', { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit'}) : "..";
+                    
+                    // ส่วนแสดงผล Feedback
+                    const feedbackText = w.feedback ? `<div style="font-size:0.8em; color:#007bff; margin-top:5px;">💬 "${w.feedback}"</div>` : "";
+                    const feedbackBtn = `<button class="btn btn-sm" style="background:#17a2b8; color:white; margin-right:5px;" onclick="addFeedback('${id}', '${w.feedback || ''}')">📝</button>`;
 
-            tbody.innerHTML += `
-                <tr>
-                    <td style="font-size:0.85em; color:#666;">${date}</td>
-                    <td>${w.displayName}</td>
-                    <td>${w.title}</td>
-                    <td><a href="${w.link}" target="_blank" class="btn btn-sm btn-secondary">เปิด</a></td>
-                    <td>
-                        <select class="status-select" onchange="updateStatus('${id}', this.value)" style="background:${statusColor}">
-                            <option value="รอตรวจ" ${w.status === 'รอตรวจ' ? 'selected' : ''}>รอตรวจ</option>
-                            <option value="ตรวจแล้ว" ${w.status === 'ตรวจแล้ว' ? 'selected' : ''}>ตรวจแล้ว</option>
-                            <option value="แก้ไข" ${w.status === 'แก้ไข' ? 'selected' : ''}>แก้ไข</option>
-                        </select>
-                    </td>
-                    <td>
-                        ${feedbackBtn}
-                        ${feedbackText}
-                    </td>
-                    <td><button class="btn btn-sm btn-danger btn-icon" onclick="deleteWork('${id}', '${w.title}')">🗑️</button></td>
-                </tr>`;
-        });
-    });
-}
-        }
-        // Helper functions
-        async function deleteWork(docId, title) { if(confirm(`ลบงาน "${title}"?`)) try { await db.collection("works").doc(docId).delete(); } catch(e) { alert(e.message); } }
-        // --- ฟังก์ชันใหม่: บันทึก Feedback ---
-async function addFeedback(docId, oldFeedback) {
-    // เด้งหน้าต่างให้พิมพ์ข้อความ
-    const newFeedback = prompt("พิมพ์ข้อความถึงน้องฝึกงาน:", oldFeedback);
-    
-    // ถ้ากด OK (ไม่กด Cancel)
-    if (newFeedback !== null) {
-        try {
-            await db.collection("works").doc(docId).update({
-                feedback: newFeedback // บันทึกลง database
+                    tbody.innerHTML += `<tr>
+                        <td style="font-size:0.85em; color:#666;">${date}</td>
+                        <td>${w.displayName}</td>
+                        <td>${w.title}</td>
+                        <td><a href="${w.link}" target="_blank" class="btn btn-sm btn-secondary">เปิด</a></td>
+                        <td>
+                            <select class="status-select" onchange="updateStatus('${id}', this.value)" style="background:${statusColor}">
+                                <option value="รอตรวจ" ${w.status==='รอตรวจ'?'selected':''}>รอตรวจ</option>
+                                <option value="ตรวจแล้ว" ${w.status==='ตรวจแล้ว'?'selected':''}>ตรวจแล้ว</option>
+                                <option value="แก้ไข" ${w.status==='แก้ไข'?'selected':''}>แก้ไข</option>
+                            </select>
+                        </td>
+                        <td style="min-width: 150px;">
+                            ${feedbackBtn}
+                            ${feedbackText}
+                        </td>
+                        <td><button class="btn btn-sm btn-danger" onclick="deleteWork('${id}', '${w.title}')">🗑️</button></td>
+                    </tr>`;
+                });
             });
-            // ไม่ต้อง alert เพราะหน้าจอจะอัปเดตเองแบบ Real-time
-        } catch(e) {
-            alert("Error: " + e.message);
         }
-    }
-}
+
+        // --- Helper functions ---
+        async function deleteWork(docId, title) { if(confirm(`ลบงาน "${title}"?`)) try { await db.collection("works").doc(docId).delete(); } catch(e) { alert(e.message); } }
         async function deleteUser(uid, name) { if (confirm(`ลบ User "${name}"?`)) try { await db.collection("users").doc(uid).delete(); } catch (e) { alert(e.message); } }
         async function adjScore(uid, val) { try { await db.collection("users").doc(uid).update({ score: firebase.firestore.FieldValue.increment(val) }); } catch(e) { alert(e.message); } }
         async function setScore(uid) { let val = prompt("คะแนนใหม่:"); if(val) await db.collection("users").doc(uid).update({ score: parseInt(val) }); }
         async function updateStatus(docId, newStatus) { try { await db.collection("works").doc(docId).update({ status: newStatus }); } catch(e) { alert(e.message); } }
         function filterUsers() { const term = document.getElementById('userSearch').value.toLowerCase(); document.querySelectorAll('.user-row').forEach(row => { row.style.display = row.innerText.toLowerCase().includes(term) ? '' : 'none'; }); }
         async function shareLeaderboard() { if (!liff.isLoggedIn()) { liff.login(); return; } if (liff.isApiAvailable('shareTargetPicker')) liff.shareTargetPicker([{type:"text", text:"Share Feature"}]); }
+
+        // ฟังก์ชันบันทึก Feedback
+        async function addFeedback(docId, oldFeedback) {
+            const newFeedback = prompt("พิมพ์ข้อความถึงน้องฝึกงาน:", oldFeedback);
+            if (newFeedback !== null) {
+                try { await db.collection("works").doc(docId).update({ feedback: newFeedback }); } 
+                catch(e) { alert("Error: " + e.message); }
+            }
+        }
     </script>
 </body>
 </html>
-
-
