@@ -13,12 +13,12 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     
     <style>
-        /* CSS เพิ่มเติมสำหรับ Login Screen */
+        /* CSS Login Screen */
         #login-screen {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             height: 100vh; background: #f0f2f5;
         }
-        #dashboard-container { display: none; } /* ซ่อน Dashboard ไว้ก่อน */
+        #dashboard-container { display: none; }
         
         .login-card {
             background: white; padding: 40px; border-radius: 12px;
@@ -33,7 +33,7 @@
         }
         .google-btn:hover { background: #f8f9fa; }
         
-        /* CSS เดิมของ Admin */
+        /* CSS Dashboard */
         .tab-nav { display: flex; border-bottom: 2px solid #eee; margin-bottom: 20px; overflow-x: auto; }
         .tab-btn { padding: 15px 20px; cursor: pointer; border: none; background: none; font-weight: 600; color: var(--gray); white-space: nowrap; }
         .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
@@ -63,7 +63,7 @@
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20">
                 เข้าสู่ระบบด้วย Google
             </button>
-            <p id="login-status" style="margin-top: 10px; font-size: 0.8em; color: #666;"></p>
+            <p id="login-status" style="margin-top: 15px; font-size: 0.85em; color: red;"></p>
         </div>
     </div>
 
@@ -118,44 +118,49 @@
 
     <script src="firebase-config.js"></script>
     <script>
-        // 🔒 CONFIG: เมล Admin ที่อนุญาต
+        // 🔒 CONFIG: เมล Admin
         const ALLOWED_EMAIL = "medlifeplus@gmail.com";
-        const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; // ใส่ LIFF ID เดิมของคุณ
+        const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; // ใส่ LIFF ID ของคุณ
 
-        // --- Auth Logic (Updated for Redirect) ---
+        // --- Auth Logic (Back to Popup for Stability) ---
         const auth = firebase.auth();
         const provider = new firebase.auth.GoogleAuthProvider();
 
-        // ฟังก์ชัน Login (ใช้ Redirect แก้ปัญหา Popup)
         function loginGoogle() {
-    // ต้องเป็นคำสั่งนี้เท่านั้น
-    auth.signInWithRedirect(provider);
-}
+            document.getElementById('login-status').innerText = "กำลังเปิดหน้าต่าง Login...";
+            
+            // ใช้ Popup เพราะเสถียรกว่า Redirect บน GitHub Pages
+            auth.signInWithPopup(provider)
+                .then((result) => {
+                    // Login สำเร็จ -> รอ onAuthStateChanged ทำงาน
+                    console.log("Login Success");
+                    document.getElementById('login-status').innerText = "";
+                })
+                .catch((error) => {
+                    console.error(error);
+                    // แจ้งเตือนภาษาไทยที่เข้าใจง่าย
+                    if (error.code === 'auth/popup-closed-by-user') {
+                        document.getElementById('login-status').innerText = "⚠️ คุณปิดหน้าต่าง Login ก่อนที่จะเสร็จสิ้น กรุณาลองใหม่";
+                    } else if (error.code === 'auth/popup-blocked') {
+                        document.getElementById('login-status').innerText = "⚠️ Browser บล็อกหน้าต่าง Login กรุณากดอนุญาต (Allow Pop-up) ที่แถบ URL ด้านบน";
+                    } else {
+                        document.getElementById('login-status').innerText = "Error: " + error.message;
+                    }
+                });
+        }
 
-        // ตรวจสอบผลการ Redirect (จับ Error)
-        auth.getRedirectResult().then((result) => {
-            if (result.credential) {
-                // Login สำเร็จ (จะไปเข้า onAuthStateChanged ต่อเอง)
-                console.log("Redirect Login Success");
-            }
-        }).catch((error) => {
-            console.error(error);
-            alert("Login Failed: " + error.message);
-            document.getElementById('login-status').innerText = "";
-        });
-
-        // ตรวจสอบสถานะ User ปัจจุบัน
+        // ตรวจสอบสถานะ User
         auth.onAuthStateChanged((user) => {
             if (user) {
                 if (user.email === ALLOWED_EMAIL) {
-                    // ✅ ผ่าน
+                    // ✅ Login ผ่าน
                     document.getElementById('login-screen').style.display = 'none';
                     document.getElementById('dashboard-container').style.display = 'block';
                     document.getElementById('admin-email').innerText = user.email;
                     initSystem();
                 } else {
-                    // ❌ ไม่ผ่าน
-                    alert(`เมล ${user.email} ไม่ได้รับอนุญาตครับ`);
+                    // ❌ เมลผิด
+                    alert(`อีเมล ${user.email} ไม่มีสิทธิ์เข้าใช้งานครับ`);
                     auth.signOut();
                 }
             } else {
@@ -166,7 +171,7 @@
         });
 
         function logout() {
-            if(confirm("ต้องการออกจากระบบ?")) {
+            if(confirm("ออกจากระบบ?")) {
                 auth.signOut().then(() => location.reload());
             }
         }
@@ -180,6 +185,8 @@
             loadUsers();
             loadWorks();
         }
+        
+        // ... (ฟังก์ชัน Tab, Load Data, Delete, Share เหมือนเดิมทุกประการ) ...
 
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -188,7 +195,6 @@
             event.target.classList.add('active');
         }
 
-        // --- Load Users ---
         let allUsers = [];
         function loadUsers() {
             db.collection("users").orderBy("score", "desc").onSnapshot((snapshot) => {
@@ -234,7 +240,6 @@
             });
         }
 
-        // --- Load Works ---
         function loadWorks() {
             db.collection("works").orderBy("timestamp", "desc").limit(50).onSnapshot((snapshot) => {
                 const tbody = document.querySelector("#worksTable tbody");
@@ -264,7 +269,6 @@
             });
         }
 
-        // --- Actions ---
         async function deleteWork(docId, title) { if(confirm(`ลบงาน "${title}"?`)) try { await db.collection("works").doc(docId).delete(); } catch(e) { alert(e.message); } }
         async function deleteUser(uid, name) { if (confirm(`ลบ User "${name}"?`)) try { await db.collection("users").doc(uid).delete(); } catch (e) { alert(e.message); } }
         async function adjScore(uid, val) { try { await db.collection("users").doc(uid).update({ score: firebase.firestore.FieldValue.increment(val) }); } catch(e) { alert(e.message); } }
@@ -272,7 +276,6 @@
         async function updateStatus(docId, newStatus) { try { await db.collection("works").doc(docId).update({ status: newStatus }); } catch(e) { alert(e.message); } }
         function filterUsers() { const term = document.getElementById('userSearch').value.toLowerCase(); document.querySelectorAll('.user-row').forEach(row => { row.style.display = row.innerText.toLowerCase().includes(term) ? '' : 'none'; }); }
 
-        // Share (LIFF)
         async function shareLeaderboard() {
             if (!liff.isLoggedIn()) { liff.login(); return; }
             const topUsers = allUsers.slice(0, 3);
@@ -288,4 +291,3 @@
     </script>
 </body>
 </html>
-
