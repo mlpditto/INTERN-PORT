@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ส่งงานฝึกงาน</title>
+    <link rel="stylesheet" href="style.css">
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+</head>
+<body>
+
+    <div id="loader" class="loader-overlay">
+        <div class="spinner"></div>
+        <p>กำลังโหลดข้อมูล...</p>
+    </div>
+
+    <div class="container">
+        <div class="card text-center">
+            <img id="profileImg" src="https://via.placeholder.com/80" alt="Profile Picture" style="width: 80px; height: 80px; border-radius: 50%; margin-bottom: 10px;">
+            <h2 id="profileName" style="font-size: 1.2rem;">สวัสดี น้องฝึกงาน</h2>
+            
+            <div style="margin-top: 15px;">
+                <span class="badge badge-gold">⭐ <span id="currentScore">0</span> แต้ม</span>
+                <span class="badge" style="background:#eee; color:#555">Level <span id="userLevel">1</span></span>
+            </div>
+
+            <div style="background: #e9ecef; border-radius: 10px; height: 10px; margin-top: 10px; overflow: hidden; position: relative;">
+                <div id="progressBar" style="background: var(--primary); width: 0%; height: 100%; transition: width 0.5s ease;"></div>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--gray); margin-top: 5px;">อีก <span id="pointsToNext">10</span> แต้ม เพื่อขึ้น Level ถัดไป</p>
+        </div>
+
+        <div class="card">
+            <form id="workForm">
+                <h3 style="margin-bottom: 15px;">📝 ส่งงานวันนี้</h3>
+
+                <label for="title">หัวข้องาน <span style="color:red">*</span></label>
+                <input type="text" id="title" placeholder="เช่น สรุปเนื้อหา AI" required aria-label="หัวข้องาน">
+                <div class="error-msg" id="err-title">กรุณากรอกหัวข้องาน</div>
+
+                <label for="link">ลิงก์ไฟล์ (Google Drive) <span style="color:red">*</span></label>
+                <input type="url" id="link" placeholder="https://..." required aria-label="ลิงก์ไฟล์งาน">
+                <div class="error-msg" id="err-link">กรุณาใส่ลิงก์ที่ถูกต้อง (URL)</div>
+
+                <label for="detail">รายละเอียด (ถ้ามี)</label>
+                <textarea id="detail" rows="3" placeholder="อธิบายเพิ่มเติมสั้นๆ..."></textarea>
+
+                <button type="submit" id="submitBtn" class="btn btn-primary">🚀 ส่งงาน (+1 แต้ม)</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script>
+        const YOUR_LIFF_ID = "XXXXXXXX-XXXXXXXX"; // ⚠️ ใส่ LIFF ID ที่นี่
+        let userId = "";
+
+        // UI Helpers
+        const loader = document.getElementById('loader');
+        const showLoader = (msg) => { loader.querySelector('p').innerText = msg; loader.classList.remove('hidden'); }
+        const hideLoader = () => { loader.classList.add('hidden'); }
+
+        async function main() {
+            try {
+                await liff.init({ liffId: YOUR_LIFF_ID });
+                if (!liff.isLoggedIn()) { liff.login(); return; }
+                
+                const profile = await liff.getProfile();
+                userId = profile.userId;
+
+                document.getElementById('profileImg').src = profile.pictureUrl;
+                document.getElementById('profileName').innerText = profile.displayName;
+
+                // Real-time Score & Level Logic
+                db.collection("users").doc(userId).onSnapshot((doc) => {
+                    hideLoader();
+                    let score = 0;
+                    if (doc.exists) { score = doc.data().score || 0; }
+                    else {
+                        // Create user silently
+                        db.collection("users").doc(userId).set({ 
+                            displayName: profile.displayName, 
+                            pictureUrl: profile.pictureUrl, 
+                            score: 0 
+                        });
+                    }
+
+                    // Calculate Gamification
+                    const level = Math.floor(score / 10) + 1; // ทุก 10 แต้มขึ้น 1 เลเวล
+                    const nextLevelScore = level * 10;
+                    const progress = ((score % 10) / 10) * 100;
+
+                    document.getElementById('currentScore').innerText = score;
+                    document.getElementById('userLevel').innerText = level;
+                    document.getElementById('pointsToNext').innerText = nextLevelScore - score;
+                    document.getElementById('progressBar').style.width = `${progress}%`;
+                });
+
+            } catch (err) {
+                alert("LIFF Error: " + err.message);
+                hideLoader();
+            }
+        }
+        main();
+
+        // Form Validation & Submit
+        document.getElementById('workForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Validation
+            const title = document.getElementById('title');
+            const link = document.getElementById('link');
+            let isValid = true;
+
+            if(!title.value.trim()) {
+                document.getElementById('err-title').style.display = 'block';
+                isValid = false;
+            } else { document.getElementById('err-title').style.display = 'none'; }
+
+            if(!link.value.includes('http')) { // Basic URL check
+                document.getElementById('err-link').style.display = 'block';
+                isValid = false;
+            } else { document.getElementById('err-link').style.display = 'none'; }
+
+            if(!isValid) return;
+
+            // Confirmation Dialog
+            if(!confirm("ตรวจสอบความถูกต้องแล้วใช่ไหมครับ?")) return;
+
+            showLoader("กำลังส่งงาน...");
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+
+            try {
+                await db.collection("works").add({
+                    userId: userId,
+                    displayName: document.getElementById('profileName').innerText,
+                    title: title.value,
+                    detail: document.getElementById('detail').value,
+                    link: link.value,
+                    status: "รอตรวจ", // Pending status
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                await db.collection("users").doc(userId).update({
+                    score: firebase.firestore.FieldValue.increment(1)
+                });
+
+                alert("✅ ส่งงานสำเร็จ! รับแต้มเรียบร้อย");
+                liff.closeWindow();
+
+            } catch (err) {
+                alert("Error: " + err.message);
+                hideLoader();
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

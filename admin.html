@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <style>
+        /* Admin Specific Styles */
+        .tab-nav { display: flex; border-bottom: 2px solid #eee; margin-bottom: 20px; overflow-x: auto; }
+        .tab-btn { padding: 15px 20px; cursor: pointer; border: none; background: none; font-weight: 600; color: var(--gray); white-space: nowrap; }
+        .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
+        .tab-content { display: none; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; color: #555; }
+        
+        .status-select { padding: 5px; border-radius: 4px; border: 1px solid #ddd; }
+        .search-box { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        /* Mobile Table Optimization */
+        @media (max-width: 600px) {
+            table { display: block; overflow-x: auto; white-space: nowrap; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" style="max-width: 1000px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h2>👨‍💻 Admin Dashboard</h2>
+            <button class="btn btn-sm btn-secondary" onclick="location.reload()">Refresh</button>
+        </div>
+
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="switchTab('tab-users')">👥 จัดการคะแนน</button>
+            <button class="tab-btn" onclick="switchTab('tab-works')">📄 ตรวจงาน</button>
+            <button class="tab-btn" onclick="switchTab('tab-leaderboard')">🏆 Leaderboard</button>
+        </div>
+
+        <div id="tab-users" class="tab-content active">
+            <div class="card">
+                <input type="text" id="userSearch" class="search-box" placeholder="🔍 ค้นหาชื่อน้องฝึกงาน..." onkeyup="filterUsers()">
+                <div style="overflow-x:auto;">
+                    <table id="usersTable">
+                        <thead><tr><th>รูป</th><th>ชื่อ</th><th>Level</th><th>คะแนน</th><th>Action</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-works" class="tab-content">
+            <div class="card">
+                <table id="worksTable">
+                    <thead><tr><th>เวลา</th><th>ชื่อ</th><th>หัวข้อ</th><th>ลิงก์</th><th>สถานะ</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="tab-leaderboard" class="tab-content">
+            <div class="grid-container" id="leaderboardGrid">
+                </div>
+        </div>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script>
+        // --- Tab Switching Logic ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // --- 1. Users & Leaderboard Logic ---
+        let allUsers = []; // Store for filtering
+
+        db.collection("users").orderBy("score", "desc").onSnapshot((snapshot) => {
+            const userTable = document.querySelector("#usersTable tbody");
+            const leaderboard = document.getElementById("leaderboardGrid");
+            userTable.innerHTML = ""; leaderboard.innerHTML = "";
+            allUsers = [];
+
+            let rank = 1;
+            snapshot.forEach(doc => {
+                const u = doc.data();
+                const uid = doc.id;
+                const level = Math.floor(u.score / 10) + 1;
+                
+                // Store for search
+                allUsers.push({ uid, ...u, level });
+
+                // Render Table (Tab 1)
+                userTable.innerHTML += `
+                    <tr class="user-row">
+                        <td><img src="${u.pictureUrl}" style="width:30px; border-radius:50%"></td>
+                        <td class="u-name">${u.displayName}</td>
+                        <td><span class="badge" style="background:#eee">Lv.${level}</span></td>
+                        <td style="font-weight:bold; font-size:1.1em">${u.score}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="adjScore('${uid}', 1)">+1</button>
+                            <button class="btn btn-sm btn-danger" onclick="adjScore('${uid}', -1)">-1</button>
+                        </td>
+                    </tr>`;
+
+                // Render Leaderboard (Tab 3)
+                if (rank <= 10) {
+                    leaderboard.innerHTML += `
+                        <div class="card text-center" style="margin-bottom:0">
+                            <div style="font-size:2em;">${rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '#' + rank}</div>
+                            <img src="${u.pictureUrl}" style="width:50px; border-radius:50%; margin:10px auto;">
+                            <h4>${u.displayName}</h4>
+                            <div class="badge badge-gold" style="margin-top:5px;">${u.score} แต้ม</div>
+                        </div>`;
+                }
+                rank++;
+            });
+        });
+
+        // Search Function
+        function filterUsers() {
+            const term = document.getElementById('userSearch').value.toLowerCase();
+            const rows = document.querySelectorAll('.user-row');
+            rows.forEach(row => {
+                const name = row.querySelector('.u-name').innerText.toLowerCase();
+                row.style.display = name.includes(term) ? '' : 'none';
+            });
+        }
+
+        // --- 2. Works Logic with Status ---
+        db.collection("works").orderBy("timestamp", "desc").limit(30).onSnapshot((snapshot) => {
+            const tbody = document.querySelector("#worksTable tbody");
+            tbody.innerHTML = "";
+            snapshot.forEach(doc => {
+                const w = doc.data();
+                const id = doc.id;
+                const statusColor = w.status === 'ตรวจแล้ว' ? '#d4edda' : '#fff3cd';
+                const date = w.timestamp ? w.timestamp.toDate().toLocaleString('th-TH') : "...";
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td style="font-size:0.85em; color:#666;">${date}</td>
+                        <td>${w.displayName}</td>
+                        <td>${w.title}</td>
+                        <td><a href="${w.link}" target="_blank" class="btn btn-sm btn-secondary">เปิด</a></td>
+                        <td>
+                            <select class="status-select" onchange="updateStatus('${id}', this.value)" style="background:${statusColor}">
+                                <option value="รอตรวจ" ${w.status === 'รอตรวจ' ? 'selected' : ''}>รอตรวจ</option>
+                                <option value="ตรวจแล้ว" ${w.status === 'ตรวจแล้ว' ? 'selected' : ''}>ตรวจแล้ว</option>
+                                <option value="แก้ไข" ${w.status === 'แก้ไข' ? 'selected' : ''}>แก้ไข</option>
+                            </select>
+                        </td>
+                    </tr>`;
+            });
+        });
+
+        // --- Actions ---
+        async function adjScore(uid, val) {
+            try {
+                await db.collection("users").doc(uid).update({ score: firebase.firestore.FieldValue.increment(val) });
+                // Optional: Show Toast here
+            } catch(e) { alert(e.message); }
+        }
+
+        async function updateStatus(docId, newStatus) {
+            try {
+                await db.collection("works").doc(docId).update({ status: newStatus });
+            } catch(e) { alert(e.message); }
+        }
+    </script>
+</body>
+</html>
