@@ -5,10 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard</title>
     <link rel="stylesheet" href="style.css">
+    
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    
     <style>
-        /* Admin Specific Styles */
+        /* CSS เพิ่มเติมเฉพาะหน้า Admin */
         .tab-nav { display: flex; border-bottom: 2px solid #eee; margin-bottom: 20px; overflow-x: auto; }
         .tab-btn { padding: 15px 20px; cursor: pointer; border: none; background: none; font-weight: 600; color: var(--gray); white-space: nowrap; }
         .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
@@ -23,22 +26,24 @@
         .search-box { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px; }
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        
-        /* Mobile Table Optimization */
-        @media (max-width: 600px) {
-            table { display: block; overflow-x: auto; white-space: nowrap; }
-        }
+
+        /* ปุ่ม Action */
+        .action-group { display: flex; gap: 5px; }
+        .btn-icon { padding: 5px 10px; font-size: 14px; }
     </style>
 </head>
 <body>
     <div class="container" style="max-width: 1000px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap: wrap; gap: 10px;">
             <h2>👨‍💻 Admin Dashboard</h2>
-            <button class="btn btn-sm btn-secondary" onclick="location.reload()">Refresh</button>
+            <div>
+                <button class="btn btn-sm btn-secondary" onclick="location.reload()">🔄 Refresh</button>
+                <button class="btn btn-sm" style="background-color: #00B900; color: white;" onclick="shareLeaderboard()">📤 แชร์ผลลงกลุ่ม LINE</button>
+            </div>
         </div>
 
         <div class="tab-nav">
-            <button class="tab-btn active" onclick="switchTab('tab-users')">👥 จัดการคะแนน</button>
+            <button class="tab-btn active" onclick="switchTab('tab-users')">👥 จัดการคะแนน & ผู้ใช้</button>
             <button class="tab-btn" onclick="switchTab('tab-works')">📄 ตรวจงาน</button>
             <button class="tab-btn" onclick="switchTab('tab-leaderboard')">🏆 Leaderboard</button>
         </div>
@@ -48,7 +53,15 @@
                 <input type="text" id="userSearch" class="search-box" placeholder="🔍 ค้นหาชื่อน้องฝึกงาน..." onkeyup="filterUsers()">
                 <div style="overflow-x:auto;">
                     <table id="usersTable">
-                        <thead><tr><th>รูป</th><th>ชื่อ</th><th>Level</th><th>คะแนน</th><th>Action</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>รูป</th>
+                                <th>ชื่อ</th>
+                                <th>Level</th>
+                                <th>คะแนน</th>
+                                <th>จัดการคะแนน</th>
+                                <th>ลบ</th> </tr>
+                        </thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -71,8 +84,23 @@
     </div>
 
     <script src="firebase-config.js"></script>
+    
     <script>
-        // --- Tab Switching Logic ---
+        // ⚠️ สำคัญ: ใส่ LIFF ID เดิมของคุณที่นี่ (เพื่อใช้ฟีเจอร์แชร์)
+        const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; 
+
+        // --- Init System ---
+        async function initAdmin() {
+            try {
+                // Init LIFF for Sharing feature
+                await liff.init({ liffId: ADMIN_LIFF_ID });
+            } catch (err) {
+                console.log("LIFF Init failed (Normal on desktop browser if not logged in):", err);
+            }
+        }
+        initAdmin();
+
+        // --- Tab Logic ---
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -80,8 +108,8 @@
             event.target.classList.add('active');
         }
 
-        // --- 1. Users & Leaderboard Logic ---
-        let allUsers = []; // Store for filtering
+        // --- 1. Users Logic (เพิ่มปุ่มลบ) ---
+        let allUsers = [];
 
         db.collection("users").orderBy("score", "desc").onSnapshot((snapshot) => {
             const userTable = document.querySelector("#usersTable tbody");
@@ -94,11 +122,9 @@
                 const u = doc.data();
                 const uid = doc.id;
                 const level = Math.floor(u.score / 10) + 1;
-                
-                // Store for search
                 allUsers.push({ uid, ...u, level });
 
-                // Render Table (Tab 1)
+                // Render Table User
                 userTable.innerHTML += `
                     <tr class="user-row">
                         <td><img src="${u.pictureUrl}" style="width:30px; border-radius:50%"></td>
@@ -106,12 +132,18 @@
                         <td><span class="badge" style="background:#eee">Lv.${level}</span></td>
                         <td style="font-weight:bold; font-size:1.1em">${u.score}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary" onclick="adjScore('${uid}', 1)">+1</button>
-                            <button class="btn btn-sm btn-danger" onclick="adjScore('${uid}', -1)">-1</button>
+                            <div class="action-group">
+                                <button class="btn btn-sm btn-primary btn-icon" onclick="adjScore('${uid}', 1)">+1</button>
+                                <button class="btn btn-sm btn-danger btn-icon" onclick="adjScore('${uid}', -1)">-1</button>
+                                <button class="btn btn-sm btn-secondary btn-icon" onclick="setScore('${uid}')">Set</button>
+                            </div>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-danger btn-icon" onclick="deleteUser('${uid}', '${u.displayName}')" title="ลบผู้ใช้">🗑️</button>
                         </td>
                     </tr>`;
 
-                // Render Leaderboard (Tab 3)
+                // Render Leaderboard (Top 10)
                 if (rank <= 10) {
                     leaderboard.innerHTML += `
                         <div class="card text-center" style="margin-bottom:0">
@@ -125,7 +157,93 @@
             });
         });
 
-        // Search Function
+        // --- 2. Delete User Function (New) ---
+        async function deleteUser(uid, name) {
+            if (confirm(`⚠️ ยืนยันการลบข้อมูลของ "${name}" ?\n\nเมื่อลบแล้ว คะแนนจะหายไปจาก Leaderboard ทันที และกู้คืนไม่ได้ครับ`)) {
+                try {
+                    await db.collection("users").doc(uid).delete();
+                    alert(`ลบคุณ ${name} เรียบร้อยแล้วครับ`);
+                } catch (error) {
+                    alert("เกิดข้อผิดพลาดในการลบ: " + error.message);
+                }
+            }
+        }
+
+        // --- 3. Share Function (New) ---
+        async function shareLeaderboard() {
+            if (!liff.isLoggedIn()) {
+                // ถ้ายังไม่ login ให้ login ก่อน (กรณีเปิดบน browser ต้อง login line)
+                liff.login(); 
+                return;
+            }
+
+            // เตรียมข้อมูล Top 3
+            const topUsers = allUsers.slice(0, 3); // ใช้ข้อมูลจากที่ดึงมาแล้ว
+            if (topUsers.length === 0) { alert("ยังไม่มีข้อมูลคะแนนครับ"); return; }
+
+            let ranksContent = [];
+            topUsers.forEach((u, index) => {
+                let rankIcon = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
+                ranksContent.push({
+                    type: "box",
+                    layout: "horizontal",
+                    contents: [
+                        { type: "text", text: `${rankIcon} ${u.displayName}`, flex: 4, size: "sm", color: "#333333" },
+                        { type: "text", text: `${u.score} แต้ม`, flex: 2, align: "end", weight: "bold", size: "sm", color: "#06C755" }
+                    ],
+                    margin: "sm"
+                });
+            });
+
+            // สร้าง Flex Message
+            const flexMsg = {
+                type: "flex",
+                altText: "ประกาศผลคะแนนล่าสุด! 🏆",
+                contents: {
+                    type: "bubble",
+                    header: {
+                        type: "box",
+                        layout: "vertical",
+                        contents: [
+                            { type: "text", text: "🏆 LEADERBOARD", weight: "bold", color: "#1DB446", size: "xxs" },
+                            { type: "text", text: "สรุปคะแนนล่าสุด", weight: "bold", size: "xl", margin: "md" },
+                            { type: "text", text: `ประจำวันที่ ${new Date().toLocaleDateString('th-TH')}`, size: "xs", color: "#aaaaaa", margin: "sm" }
+                        ]
+                    },
+                    body: {
+                        type: "box",
+                        layout: "vertical",
+                        contents: ranksContent
+                    },
+                    footer: {
+                        type: "box",
+                        layout: "vertical",
+                        contents: [
+                            {
+                                type: "button",
+                                action: { type: "uri", label: "ดูตารางทั้งหมด", uri: `https://liff.line.me/${ADMIN_LIFF_ID}` },
+                                style: "primary",
+                                color: "#06C755"
+                            }
+                        ]
+                    }
+                }
+            };
+
+            // เรียก Share Target Picker
+            if (liff.isApiAvailable('shareTargetPicker')) {
+                liff.shareTargetPicker([flexMsg])
+                    .then(() => console.log("Shared successfully"))
+                    .catch((err) => {
+                        console.error("Share failed", err);
+                        alert("แชร์ไม่สำเร็จ: " + err.message);
+                    });
+            } else {
+                alert("⚠️ ฟีเจอร์แชร์ใช้งานได้เฉพาะการเปิดผ่านแอป LINE เท่านั้นครับ\n\n(ลองส่งลิงก์หน้านี้เข้า LINE แล้วกดเปิดจากในนั้นครับ)");
+            }
+        }
+
+        // --- 4. Search & Filter ---
         function filterUsers() {
             const term = document.getElementById('userSearch').value.toLowerCase();
             const rows = document.querySelectorAll('.user-row');
@@ -135,14 +253,14 @@
             });
         }
 
-        // --- 2. Works Logic with Status ---
+        // --- 5. Works Management ---
         db.collection("works").orderBy("timestamp", "desc").limit(30).onSnapshot((snapshot) => {
             const tbody = document.querySelector("#worksTable tbody");
             tbody.innerHTML = "";
             snapshot.forEach(doc => {
                 const w = doc.data();
                 const id = doc.id;
-                const statusColor = w.status === 'ตรวจแล้ว' ? '#d4edda' : '#fff3cd';
+                const statusColor = w.status === 'ตรวจแล้ว' ? '#d4edda' : w.status === 'แก้ไข' ? '#f8d7da' : '#fff3cd';
                 const date = w.timestamp ? w.timestamp.toDate().toLocaleString('th-TH') : "...";
 
                 tbody.innerHTML += `
@@ -162,18 +280,18 @@
             });
         });
 
-        // --- Actions ---
+        // --- Helper Functions ---
         async function adjScore(uid, val) {
-            try {
-                await db.collection("users").doc(uid).update({ score: firebase.firestore.FieldValue.increment(val) });
-                // Optional: Show Toast here
-            } catch(e) { alert(e.message); }
+            try { await db.collection("users").doc(uid).update({ score: firebase.firestore.FieldValue.increment(val) }); }
+            catch(e) { alert(e.message); }
         }
-
+        async function setScore(uid) {
+            let val = prompt("กรอกคะแนนใหม่:");
+            if(val) { await db.collection("users").doc(uid).update({ score: parseInt(val) }); }
+        }
         async function updateStatus(docId, newStatus) {
-            try {
-                await db.collection("works").doc(docId).update({ status: newStatus });
-            } catch(e) { alert(e.message); }
+            try { await db.collection("works").doc(docId).update({ status: newStatus }); }
+            catch(e) { alert(e.message); }
         }
     </script>
 </body>
