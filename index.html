@@ -2,162 +2,220 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ส่งงานฝึกงาน</title>
-    <link rel="stylesheet" href="style.css">
-    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internship Portfolio</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css"> <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <style>
+        /* CSS เฉพาะหน้า Index */
+        body { font-family: 'Kanit', sans-serif; background-color: #f8f9fa; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        
+        .profile-card {
+            background: white; padding: 20px; border-radius: 12px;
+            text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px;
+        }
+        .profile-img { width: 80px; height: 80px; border-radius: 50%; border: 3px solid #06C755; margin-bottom: 10px; }
+        
+        .form-card {
+            background: white; padding: 20px; border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px;
+        }
+        input, button { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; }
+        button { background-color: #06C755; color: white; border: none; font-weight: bold; cursor: pointer; }
+        button:hover { background-color: #05a546; }
+
+        /* --- ✨ ส่วนแสดงงาน และ Feedback --- */
+        .work-card {
+            background: white; padding: 15px; border-radius: 10px;
+            margin-bottom: 15px; border-left: 5px solid #ddd;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .status-badge {
+            display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 0.8em; color: white;
+        }
+        
+        /* กล่อง Feedback ที่เพิ่มใหม่ */
+        .feedback-box {
+            background-color: #e7f3ff; /* สีฟ้าอ่อน */
+            border-left: 4px solid #1877f2; /* ขอบน้ำเงิน */
+            padding: 10px; margin-top: 10px; border-radius: 4px;
+            font-size: 0.9em; color: #333;
+        }
+        .feedback-title { font-weight: bold; color: #1877f2; margin-bottom: 2px; }
+        
+        /* Utility */
+        .hidden { display: none; }
+    </style>
 </head>
 <body>
 
-    <div id="loader" class="loader-overlay">
-        <div class="spinner"></div>
-        <p>กำลังโหลดข้อมูล...</p>
-    </div>
-
     <div class="container">
-        <div class="card text-center">
-            <img id="profileImg" src="https://via.placeholder.com/80" alt="Profile Picture" style="width: 80px; height: 80px; border-radius: 50%; margin-bottom: 10px;">
-            <h2 id="profileName" style="font-size: 1.2rem;">สวัสดี น้องฝึกงาน</h2>
-            
-            <div style="margin-top: 15px;">
-                <span class="badge badge-gold">⭐ <span id="currentScore">0</span> แต้ม</span>
-                <span class="badge" style="background:#eee; color:#555">Level <span id="userLevel">1</span></span>
-            </div>
-
-            <div style="background: #e9ecef; border-radius: 10px; height: 10px; margin-top: 10px; overflow: hidden; position: relative;">
-                <div id="progressBar" style="background: var(--primary); width: 0%; height: 100%; transition: width 0.5s ease;"></div>
-            </div>
-            <p style="font-size: 0.8rem; color: var(--gray); margin-top: 5px;">อีก <span id="pointsToNext">10</span> แต้ม เพื่อขึ้น Level ถัดไป</p>
+        <div id="loading" style="text-align:center; margin-top:50px;">
+            <p>⏳ กำลังโหลดข้อมูล...</p>
         </div>
 
-        <div class="card">
-            <form id="workForm">
-                <h3 style="margin-bottom: 15px;">📝 ส่งงานวันนี้</h3>
+        <div id="main-app" class="hidden">
+            
+            <div class="profile-card">
+                <img id="u-img" class="profile-img" src="">
+                <h3 id="u-name">Name</h3>
+                <p style="color:#666;">คะแนนสะสม: <span id="u-score" style="color:#06C755; font-weight:bold; font-size:1.2em;">0</span> แต้ม</p>
+            </div>
 
-                <label for="title">หัวข้องาน <span style="color:red">*</span></label>
-                <input type="text" id="title" placeholder="เช่น สรุปเนื้อหา AI" required aria-label="หัวข้องาน">
-                <div class="error-msg" id="err-title">กรุณากรอกหัวข้องาน</div>
+            <div class="form-card">
+                <h4>📤 ส่งงานใหม่</h4>
+                <input type="text" id="w-title" placeholder="ชื่อหัวข้อ (เช่น EP.1 สรุป...)">
+                <input type="url" id="w-link" placeholder="วางลิงก์งาน (Google Drive/Canva)">
+                <button onclick="submitWork()">ส่งงาน</button>
+            </div>
 
-                <label for="link">ลิงก์ไฟล์ (Google Drive) <span style="color:red">*</span></label>
-                <input type="url" id="link" placeholder="https://..." required aria-label="ลิงก์ไฟล์งาน">
-                <div class="error-msg" id="err-link">กรุณาใส่ลิงก์ที่ถูกต้อง (URL)</div>
-
-                <label for="detail">รายละเอียด (ถ้ามี)</label>
-                <textarea id="detail" rows="3" placeholder="อธิบายเพิ่มเติมสั้นๆ..."></textarea>
-
-                <button type="submit" id="submitBtn" class="btn btn-primary">🚀 ส่งงาน (+1 แต้ม)</button>
-            </form>
+            <h4 style="margin-left:5px;">📂 ประวัติการส่งงาน</h4>
+            <div id="work-list">
+                </div>
         </div>
     </div>
 
     <script src="firebase-config.js"></script>
     <script>
-        const YOUR_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ใส่ LIFF ID ที่นี่
-        let userId = "";
+        // 🔒 CONFIG: ใส่ LIFF ID ของฝั่ง User (คนละตัวกับ Admin ก็ได้ หรือตัวเดียวกันก็ได้)
+        const USER_LIFF_ID = "2008959998-yjcNpaGt"; 
 
-        // UI Helpers
-        const loader = document.getElementById('loader');
-        const showLoader = (msg) => { loader.querySelector('p').innerText = msg; loader.classList.remove('hidden'); }
-        const hideLoader = () => { loader.classList.add('hidden'); }
+        // ตัวแปรเก็บข้อมูล User
+        let userProfile = null;
+        let userId = "";
 
         async function main() {
             try {
-                await liff.init({ liffId: YOUR_LIFF_ID });
-                if (!liff.isLoggedIn()) { liff.login(); return; }
-                
-                const profile = await liff.getProfile();
-                userId = profile.userId;
+                await liff.init({ liffId: USER_LIFF_ID });
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                } else {
+                    // ดึงข้อมูล User
+                    userProfile = await liff.getProfile();
+                    userId = userProfile.userId;
+                    
+                    // แสดงผลหน้าจอ
+                    document.getElementById('loading').classList.add('hidden');
+                    document.getElementById('main-app').classList.remove('hidden');
+                    
+                    document.getElementById('u-img').src = userProfile.pictureUrl;
+                    document.getElementById('u-name').innerText = userProfile.displayName;
 
-                document.getElementById('profileImg').src = profile.pictureUrl;
-                document.getElementById('profileName').innerText = profile.displayName;
-
-                // Real-time Score & Level Logic
-                db.collection("users").doc(userId).onSnapshot((doc) => {
-                    hideLoader();
-                    let score = 0;
-                    if (doc.exists) { score = doc.data().score || 0; }
-                    else {
-                        // Create user silently
-                        db.collection("users").doc(userId).set({ 
-                            displayName: profile.displayName, 
-                            pictureUrl: profile.pictureUrl, 
-                            score: 0 
-                        });
-                    }
-
-                    // Calculate Gamification
-                    const level = Math.floor(score / 10) + 1; // ทุก 10 แต้มขึ้น 1 เลเวล
-                    const nextLevelScore = level * 10;
-                    const progress = ((score % 10) / 10) * 100;
-
-                    document.getElementById('currentScore').innerText = score;
-                    document.getElementById('userLevel').innerText = level;
-                    document.getElementById('pointsToNext').innerText = nextLevelScore - score;
-                    document.getElementById('progressBar').style.width = `${progress}%`;
-                });
-
+                    // เช็คและสร้างข้อมูล User ใน Database (ถ้ายังไม่มี)
+                    checkAndCreateUser();
+                    
+                    // โหลดงานเก่าๆ
+                    loadMyWorks();
+                }
             } catch (err) {
                 alert("LIFF Error: " + err.message);
-                hideLoader();
             }
         }
         main();
 
-        // Form Validation & Submit
-        document.getElementById('workForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            // Validation
-            const title = document.getElementById('title');
-            const link = document.getElementById('link');
-            let isValid = true;
+        // --- 1. เช็ค User / ดึงคะแนน ---
+        function checkAndCreateUser() {
+            const userRef = db.collection("users").doc(userId);
+            userRef.onSnapshot((doc) => {
+                if (doc.exists) {
+                    // ถ้ามีแล้ว -> อัปเดตคะแนนที่หน้าจอ
+                    document.getElementById('u-score').innerText = doc.data().score || 0;
+                } else {
+                    // ถ้ายังไม่มี -> สร้างใหม่
+                    userRef.set({
+                        displayName: userProfile.displayName,
+                        pictureUrl: userProfile.pictureUrl,
+                        score: 0,
+                        joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+            });
+        }
 
-            if(!title.value.trim()) {
-                document.getElementById('err-title').style.display = 'block';
-                isValid = false;
-            } else { document.getElementById('err-title').style.display = 'none'; }
+        // --- 2. ส่งงาน ---
+        async function submitWork() {
+            const title = document.getElementById('w-title').value;
+            const link = document.getElementById('w-link').value;
 
-            if(!link.value.includes('http')) { // Basic URL check
-                document.getElementById('err-link').style.display = 'block';
-                isValid = false;
-            } else { document.getElementById('err-link').style.display = 'none'; }
-
-            if(!isValid) return;
-
-            // Confirmation Dialog
-            if(!confirm("ตรวจสอบความถูกต้องแล้วใช่ไหมครับ?")) return;
-
-            showLoader("กำลังส่งงาน...");
-            const btn = document.getElementById('submitBtn');
-            btn.disabled = true;
+            if(!title || !link) { alert("กรุณากรอกให้ครบทุกช่องครับ"); return; }
 
             try {
                 await db.collection("works").add({
-                    userId: userId,
-                    displayName: document.getElementById('profileName').innerText,
-                    title: title.value,
-                    detail: document.getElementById('detail').value,
-                    link: link.value,
-                    status: "รอตรวจ", // Pending status
+                    userId: userId, // สำคัญ! ใช้ระบุเจ้าของงาน
+                    displayName: userProfile.displayName,
+                    pictureUrl: userProfile.pictureUrl,
+                    title: title,
+                    link: link,
+                    status: "รอตรวจ",
+                    feedback: "", // เริ่มต้นยังไม่มีคอมเมนต์
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
-
-                await db.collection("users").doc(userId).update({
-                    score: firebase.firestore.FieldValue.increment(1)
-                });
-
-                alert("✅ ส่งงานสำเร็จ! รับแต้มเรียบร้อย");
-                liff.closeWindow();
-
-            } catch (err) {
-                alert("Error: " + err.message);
-                hideLoader();
-                btn.disabled = false;
+                alert("ส่งงานเรียบร้อย! 🎉");
+                document.getElementById('w-title').value = "";
+                document.getElementById('w-link').value = "";
+            } catch(e) {
+                alert("Error: " + e.message);
             }
-        });
+        }
+
+        // --- 3. โหลดประวัติงาน + แสดง Feedback (Highlight) ---
+        function loadMyWorks() {
+            db.collection("works")
+              .where("userId", "==", userId)
+              .orderBy("timestamp", "desc")
+              .onSnapshot((snapshot) => {
+                const list = document.getElementById('work-list');
+                list.innerHTML = "";
+
+                if(snapshot.empty) {
+                    list.innerHTML = "<p style='text-align:center; color:#999;'>ยังไม่มีประวัติการส่งงาน</p>";
+                    return;
+                }
+
+                snapshot.forEach(doc => {
+                    const w = doc.data();
+                    
+                    // สีสถานะ
+                    let badgeColor = "#ffc107"; // รอตรวจ (เหลือง)
+                    if(w.status === "ตรวจแล้ว") badgeColor = "#28a745"; // เขียว
+                    if(w.status === "แก้ไข") badgeColor = "#dc3545"; // แดง
+                    
+                    // ✨ ส่วนแสดง Feedback (ถ้ามี)
+                    let feedbackHtml = "";
+                    if (w.feedback && w.feedback.trim() !== "") {
+                        feedbackHtml = `
+                            <div class="feedback-box">
+                                <div class="feedback-title">💬 Admin คอมเมนต์:</div>
+                                "${w.feedback}"
+                            </div>
+                        `;
+                    }
+
+                    list.innerHTML += `
+                        <div class="work-card" style="border-left-color: ${badgeColor};">
+                            <div style="display:flex; justify-content:space-between; align-items:start;">
+                                <div>
+                                    <h4 style="margin:0 0 5px 0;">${w.title}</h4>
+                                    <span class="status-badge" style="background:${badgeColor}">${w.status}</span>
+                                    <span style="font-size:0.8em; color:#999; margin-left:5px;">
+                                        ${w.timestamp ? w.timestamp.toDate().toLocaleDateString('th-TH') : ''}
+                                    </span>
+                                </div>
+                                <a href="${w.link}" target="_blank" style="font-size:1.5em; text-decoration:none;">🔗</a>
+                            </div>
+                            
+                            ${feedbackHtml}
+                            
+                        </div>
+                    `;
+                });
+            });
+        }
     </script>
 </body>
-
 </html>
