@@ -3,53 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP-Internship Program</title>
+    <title>MLP INTERNSHIP PROGRAM</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css"> <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
     <style>
-        /* CSS เฉพาะหน้า Index */
-        body { font-family: 'Kanit', sans-serif; background-color: #f8f9fa; padding: 20px; }
+        body { font-family: 'Kanit', sans-serif; background-color: #f8f9fa; padding: 20px; color:#333; margin:0; }
         .container { max-width: 600px; margin: 0 auto; }
         
-        .profile-card {
-            background: white; padding: 20px; border-radius: 12px;
-            text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px;
-        }
-        .profile-img { width: 80px; height: 80px; border-radius: 50%; border: 3px solid #06C755; margin-bottom: 10px; }
+        /* Cards */
+        .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         
-        .form-card {
-            background: white; padding: 20px; border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px;
-        }
-        input, button { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; }
-        button { background-color: #06C755; color: white; border: none; font-weight: bold; cursor: pointer; }
+        /* Profile */
+        .profile-section { text-align: center; }
+        .profile-img { width: 80px; height: 80px; border-radius: 50%; border: 3px solid #06C755; }
+        .score-text { color: #06C755; font-weight: bold; font-size: 1.4em; }
+
+        /* Forms */
+        input, textarea { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-family: inherit; }
+        button { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; color: white; background-color: #06C755; transition: 0.2s; }
         button:hover { background-color: #05a546; }
 
-        /* --- ✨ ส่วนแสดงงาน และ Feedback --- */
-        .work-card {
-            background: white; padding: 15px; border-radius: 10px;
-            margin-bottom: 15px; border-left: 5px solid #ddd;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-        .status-badge {
-            display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 0.8em; color: white;
-        }
+        /* 🔥 Quest Card Styles */
+        .quest-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; }
+        .quest-timer { font-size: 0.9em; background: rgba(0,0,0,0.25); padding: 5px 12px; border-radius: 20px; display: inline-block; margin-bottom: 10px; }
+        .quest-points { background: #ffc107; color: black; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; font-weight: bold; }
         
-        /* กล่อง Feedback ที่เพิ่มใหม่ */
-        .feedback-box {
-            background-color: #e7f3ff; /* สีฟ้าอ่อน */
-            border-left: 4px solid #1877f2; /* ขอบน้ำเงิน */
-            padding: 10px; margin-top: 10px; border-radius: 4px;
-            font-size: 0.9em; color: #333;
-        }
-        .feedback-title { font-weight: bold; color: #1877f2; margin-bottom: 2px; }
-        
+        /* 💬 Feedback Box */
+        .feedback-box { background-color: #e7f3ff; border-left: 4px solid #1877f2; padding: 10px; margin-top: 10px; border-radius: 4px; font-size: 0.9em; color: #333; }
+
         /* Utility */
-        .hidden { display: none; }
+        .hidden { display: none !important; }
+        .badge { padding: 4px 8px; border-radius: 4px; color: white; font-size: 0.8em; }
+        .bg-yellow { background: #ffc107; color: black; }
+        .bg-green { background: #28a745; }
+        .bg-red { background: #dc3545; }
+    </script>
     </style>
 </head>
 <body>
@@ -61,72 +53,90 @@
 
         <div id="main-app" class="hidden">
             
-            <div class="profile-card">
+            <div class="card profile-section">
                 <img id="u-img" class="profile-img" src="">
-                <h3 id="u-name">Name</h3>
-                <p style="color:#666;">คะแนนสะสม: <span id="u-score" style="color:#06C755; font-weight:bold; font-size:1.2em;">0</span> แต้ม</p>
+                <h3 id="u-name" style="margin:10px 0 5px;">User</h3>
+                <p>คะแนนสะสม: <span id="u-score" class="score-text">0</span> แต้ม</p>
             </div>
 
-            <div class="form-card">
-                <h4>📤 ส่งงานใหม่</h4>
+            <div id="quest-container" class="card quest-card hidden">
+                <div class="quest-timer">⏰ เหลือเวลา: <span id="q-countdown">--:--</span></div>
+                <h3 style="margin:5px 0;">⚡ ภารกิจวันนี้</h3>
+                <p id="q-text" style="font-size:1.1em; margin-bottom:15px; line-height:1.4;">...</p>
+                
+                <div id="q-input-area">
+                    <textarea id="q-answer" rows="3" placeholder="พิมพ์คำตอบของคุณที่นี่..." style="color:black;"></textarea>
+                    <button onclick="submitQuest()" style="background:#ffc107; color:black;">
+                        🚀 ส่งคำตอบ (รับ <span id="q-points">0</span> แต้ม)
+                    </button>
+                </div>
+
+                <div id="q-status" class="hidden" style="background:rgba(255,255,255,0.2); padding:15px; border-radius:8px; margin-top:10px;">
+                    ✅ <b>ส่งคำตอบแล้ว!</b><br>
+                    <small>รอ Admin ตรวจเพื่อรับคะแนนพิเศษเพิ่ม</small>
+                </div>
+            </div>
+
+            <div class="card">
+                <h4>📤 ส่งงาน / การบ้าน</h4>
                 <input type="text" id="w-title" placeholder="ชื่อหัวข้อ (เช่น EP.1 สรุป...)">
-                <input type="url" id="w-link" placeholder="วางลิงก์งาน (Google Drive/Canva)">
-                <button onclick="submitWork()">ส่งงาน</button>
+                <input type="url" id="w-link" placeholder="ลิงก์งาน (Google Drive / Canva)">
+                <button onclick="submitWork()">ยืนยันส่งงาน</button>
             </div>
 
-            <h4 style="margin-left:5px;">📂 ประวัติการส่งงาน</h4>
+            <h4 style="margin-left:5px; color:#666;">📂 ประวัติการส่งงาน</h4>
             <div id="work-list">
                 </div>
-        </div>
+            
+            <div style="height:50px;"></div> </div>
     </div>
 
     <script src="firebase-config.js"></script>
     <script>
-        // 🔒 CONFIG: ใส่ LIFF ID ของฝั่ง User (คนละตัวกับ Admin ก็ได้ หรือตัวเดียวกันก็ได้)
-        const USER_LIFF_ID = "2008959998-yjcNpaGt"; 
+        // --- 🔒 CONFIG ---
+        const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ใส่ LIFF ID (User) ของคุณ
 
-        // ตัวแปรเก็บข้อมูล User
-        let userProfile = null;
-        let userId = "";
+        // ตัวแปรระบบ
+        let userProfile, userId;
+        let currentQuestId = null, currentQuestDeadline = null, baseScore = 0;
+        let timerInterval = null;
 
+        // --- 1. Main Init ---
         async function main() {
             try {
                 await liff.init({ liffId: USER_LIFF_ID });
                 if (!liff.isLoggedIn()) {
                     liff.login();
-                } else {
-                    // ดึงข้อมูล User
-                    userProfile = await liff.getProfile();
-                    userId = userProfile.userId;
-                    
-                    // แสดงผลหน้าจอ
-                    document.getElementById('loading').classList.add('hidden');
-                    document.getElementById('main-app').classList.remove('hidden');
-                    
-                    document.getElementById('u-img').src = userProfile.pictureUrl;
-                    document.getElementById('u-name').innerText = userProfile.displayName;
-
-                    // เช็คและสร้างข้อมูล User ใน Database (ถ้ายังไม่มี)
-                    checkAndCreateUser();
-                    
-                    // โหลดงานเก่าๆ
-                    loadMyWorks();
+                    return;
                 }
+                userProfile = await liff.getProfile();
+                userId = userProfile.userId;
+
+                // แสดงผลหน้าจอ
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+                document.getElementById('u-img').src = userProfile.pictureUrl;
+                document.getElementById('u-name').innerText = userProfile.displayName;
+
+                // เริ่มทำงาน
+                checkAndCreateUser();
+                loadMyWorks();
+                loadActiveQuest(); // โหลด Quest
+
             } catch (err) {
                 alert("LIFF Error: " + err.message);
+                console.error(err);
             }
         }
-        main();
+        main(); // Run
 
-        // --- 1. เช็ค User / ดึงคะแนน ---
+        // --- 2. User & Score Logic ---
         function checkAndCreateUser() {
             const userRef = db.collection("users").doc(userId);
             userRef.onSnapshot((doc) => {
                 if (doc.exists) {
-                    // ถ้ามีแล้ว -> อัปเดตคะแนนที่หน้าจอ
                     document.getElementById('u-score').innerText = doc.data().score || 0;
                 } else {
-                    // ถ้ายังไม่มี -> สร้างใหม่
                     userRef.set({
                         displayName: userProfile.displayName,
                         pictureUrl: userProfile.pictureUrl,
@@ -137,33 +147,161 @@
             });
         }
 
-        // --- 2. ส่งงาน ---
-        async function submitWork() {
-            const title = document.getElementById('w-title').value;
-            const link = document.getElementById('w-link').value;
+        // --- 3. 🔥 Quest Logic (Robust Version) ---
+        function loadActiveQuest() {
+            // ดึง Quest ล่าสุด (เรียงตามเวลาสร้าง)
+            db.collection("quests")
+              .orderBy("createdAt", "desc")
+              .limit(1)
+              .onSnapshot((snapshot) => {
+                if(snapshot.empty) {
+                    // ไม่มี Quest เลย -> ซ่อนกล่อง
+                    document.getElementById('quest-container').classList.add('hidden');
+                    return;
+                }
 
-            if(!title || !link) { alert("กรุณากรอกให้ครบทุกช่องครับ"); return; }
+                const qData = snapshot.docs[0].data();
+                const qId = snapshot.docs[0].id;
+
+                // เช็คว่ามี deadline ไหม
+                if (!qData.deadline) return;
+
+                const deadlineDate = qData.deadline.toDate();
+                const now = new Date();
+
+                // ถ้าหมดเวลาแล้ว -> ซ่อนกล่อง
+                if (now > deadlineDate) {
+                    document.getElementById('quest-container').classList.add('hidden');
+                    return;
+                }
+
+                // ถ้ายังมีเวลา -> แสดงกล่อง
+                currentQuestId = qId;
+                currentQuestDeadline = deadlineDate;
+                baseScore = qData.baseScore || 0;
+
+                document.getElementById('quest-container').classList.remove('hidden');
+                document.getElementById('q-text').innerText = qData.question;
+                document.getElementById('q-points').innerText = baseScore;
+
+                // เริ่มนับเวลา
+                if(timerInterval) clearInterval(timerInterval);
+                startTimer();
+
+                // เช็คว่า User เคยตอบไปแล้วหรือยัง?
+                checkIfAnswered();
+            }, (error) => {
+                console.error("Quest Error:", error);
+            });
+        }
+
+        function checkIfAnswered() {
+            // เช็คใน collection คำตอบ ว่ามี userId เรา + questId นี้ไหม
+            db.collection("quest_submissions")
+                .where("questId", "==", currentQuestId)
+                .where("userId", "==", userId)
+                .limit(1)
+                .onSnapshot((snap) => {
+                    if (!snap.empty) {
+                        // ตอบแล้ว -> ซ่อนฟอร์ม โชว์สถานะ
+                        document.getElementById('q-input-area').classList.add('hidden');
+                        document.getElementById('q-status').classList.remove('hidden');
+                    } else {
+                        // ยังไม่ตอบ -> โชว์ฟอร์ม
+                        document.getElementById('q-input-area').classList.remove('hidden');
+                        document.getElementById('q-status').classList.add('hidden');
+                    }
+                });
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                const now = new Date();
+                const diff = currentQuestDeadline - now;
+
+                if (diff <= 0) {
+                    document.getElementById('q-countdown').innerText = "หมดเวลา";
+                    document.getElementById('q-input-area').classList.add('hidden');
+                    clearInterval(timerInterval);
+                    return;
+                }
+
+                const hrs = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const secs = Math.floor((diff % (1000 * 60)) / 1000);
+                
+                document.getElementById('q-countdown').innerText = 
+                    `${hrs}:${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+            }, 1000);
+        }
+
+        async function submitQuest() {
+            const answer = document.getElementById('q-answer').value.trim();
+            if (!answer) { alert("กรุณาพิมพ์คำตอบก่อนครับ"); return; }
+
+            if (!currentQuestId) return;
+
+            const now = new Date();
+            const isLate = now > currentQuestDeadline;
+            const earned = isLate ? 0 : baseScore;
+
+            try {
+                const batch = db.batch();
+                
+                // 1. สร้างเอกสารคำตอบ
+                const subRef = db.collection("quest_submissions").doc();
+                batch.set(subRef, {
+                    questId: currentQuestId,
+                    userId: userId,
+                    displayName: userProfile.displayName,
+                    answer: answer,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    isLate: isLate,
+                    earnedScore: earned,
+                    bonusGiven: 0
+                });
+
+                // 2. ถ้าทันเวลา ให้คะแนนเลย
+                if (earned > 0) {
+                    const userRef = db.collection("users").doc(userId);
+                    batch.update(userRef, { score: firebase.firestore.FieldValue.increment(earned) });
+                }
+
+                await batch.commit();
+                alert(`ส่งคำตอบสำเร็จ! ${earned > 0 ? '(+'+earned+' แต้ม)' : ''}`);
+                
+            } catch (e) {
+                alert("Error: " + e.message);
+            }
+        }
+
+        // --- 4. Work Submission Logic ---
+        async function submitWork() {
+            const title = document.getElementById('w-title').value.trim();
+            const link = document.getElementById('w-link').value.trim();
+
+            if (!title || !link) { alert("กรุณากรอกข้อมูลให้ครบถ้วน"); return; }
 
             try {
                 await db.collection("works").add({
-                    userId: userId, // สำคัญ! ใช้ระบุเจ้าของงาน
+                    userId: userId,
                     displayName: userProfile.displayName,
                     pictureUrl: userProfile.pictureUrl,
                     title: title,
                     link: link,
                     status: "รอตรวจ",
-                    feedback: "", // เริ่มต้นยังไม่มีคอมเมนต์
+                    feedback: "",
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                alert("ส่งงานเรียบร้อย! 🎉");
+                alert("ส่งงานเรียบร้อยครับ! 🎉");
                 document.getElementById('w-title').value = "";
                 document.getElementById('w-link').value = "";
-            } catch(e) {
+            } catch (e) {
                 alert("Error: " + e.message);
             }
         }
 
-        // --- 3. โหลดประวัติงาน + แสดง Feedback (Highlight) ---
+        // --- 5. Work History & Feedback Display ---
         function loadMyWorks() {
             db.collection("works")
               .where("userId", "==", userId)
@@ -172,45 +310,44 @@
                 const list = document.getElementById('work-list');
                 list.innerHTML = "";
 
-                if(snapshot.empty) {
-                    list.innerHTML = "<p style='text-align:center; color:#999;'>ยังไม่มีประวัติการส่งงาน</p>";
+                if (snapshot.empty) {
+                    list.innerHTML = "<p style='text-align:center; color:#999; margin-top:20px;'>ยังไม่มีประวัติการส่งงาน</p>";
                     return;
                 }
 
                 snapshot.forEach(doc => {
                     const w = doc.data();
                     
-                    // สีสถานะ
-                    let badgeColor = "#ffc107"; // รอตรวจ (เหลือง)
-                    if(w.status === "ตรวจแล้ว") badgeColor = "#28a745"; // เขียว
-                    if(w.status === "แก้ไข") badgeColor = "#dc3545"; // แดง
-                    
-                    // ✨ ส่วนแสดง Feedback (ถ้ามี)
+                    // กำหนดสีป้ายสถานะ
+                    let badgeClass = "bg-yellow";
+                    if (w.status === "ตรวจแล้ว") badgeClass = "bg-green";
+                    if (w.status === "แก้ไข") badgeClass = "bg-red";
+
+                    // ส่วนแสดง Feedback (ถ้ามี)
                     let feedbackHtml = "";
                     if (w.feedback && w.feedback.trim() !== "") {
                         feedbackHtml = `
                             <div class="feedback-box">
-                                <div class="feedback-title">💬 Admin คอมเมนต์:</div>
-                                "${w.feedback}"
+                                <b>💬 Admin คอมเมนต์:</b><br>
+                                ${w.feedback}
                             </div>
                         `;
                     }
+                    
+                    const dateStr = w.timestamp ? w.timestamp.toDate().toLocaleString('th-TH') : "";
 
                     list.innerHTML += `
-                        <div class="work-card" style="border-left-color: ${badgeColor};">
+                        <div class="card" style="padding:15px; border-left: 5px solid ${w.status === 'ตรวจแล้ว' ? '#28a745' : '#ffc107'};">
                             <div style="display:flex; justify-content:space-between; align-items:start;">
                                 <div>
                                     <h4 style="margin:0 0 5px 0;">${w.title}</h4>
-                                    <span class="status-badge" style="background:${badgeColor}">${w.status}</span>
-                                    <span style="font-size:0.8em; color:#999; margin-left:5px;">
-                                        ${w.timestamp ? w.timestamp.toDate().toLocaleDateString('th-TH') : ''}
-                                    </span>
+                                    <span class="badge ${badgeClass}">${w.status}</span>
+                                    <span style="font-size:0.8em; color:#999; margin-left:5px;">${dateStr}</span>
                                 </div>
-                                <a href="${w.link}" target="_blank" style="font-size:1.5em; text-decoration:none;">🔗</a>
+                                <a href="${w.link}" target="_blank" style="text-decoration:none; font-size:1.5em;">🔗</a>
                             </div>
                             
                             ${feedbackHtml}
-                            
                         </div>
                     `;
                 });
