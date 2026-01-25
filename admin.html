@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP-INTERNSHIP PROGRAM</title>
+    <title>MLP INTERNSHIP V.260125</title>
     
     <link rel="stylesheet" href="style.css">
     
@@ -23,21 +23,28 @@
         .magic-btn { background: #007bff; color: white; border: none; border-radius: 6px; padding: 12px; width: 100%; margin-top: 20px; font-size: 16px; cursor: pointer; transition: 0.2s; font-weight: bold; }
         .magic-btn:hover { background: #0056b3; }
         
-        /* CSS Dashboard */
+        /* Dashboard & Tabs */
         .tab-nav { display: flex; border-bottom: 2px solid #eee; margin-bottom: 20px; overflow-x: auto; }
         .tab-btn { padding: 15px 20px; cursor: pointer; border: none; background: none; font-weight: 600; color: var(--gray); white-space: nowrap; }
         .tab-btn.active { color: #007bff; border-bottom: 3px solid #007bff; }
         .tab-content { display: none; animation: fadeIn 0.3s; }
         .tab-content.active { display: block; }
+        
+        /* Tables & UI */
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #f8f9fa; color: #555; }
         .btn-sm { padding: 5px 10px; border:none; border-radius:4px; cursor:pointer; color:white; font-size:0.9em;}
-        .btn-primary { background:#007bff; } .btn-danger { background:#dc3545; } .btn-secondary { background:#6c757d; }
+        .btn-primary { background:#007bff; } .btn-danger { background:#dc3545; } .btn-secondary { background:#6c757d; } .btn-success { background:#28a745; }
         .badge { padding:4px 8px; border-radius:10px; font-size:0.8em; }
         
-        /* CSS Quest */
+        /* Quest & Leaderboard */
         .quest-create-card { background:#fff3cd; padding:20px; border-radius:8px; border:1px solid #ffeeba; margin-bottom:20px; }
+        .leaderboard-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #ffd700; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
+        .rank-1 { border-left-color: #FFD700; background: #fffbe6; } /* Gold */
+        .rank-2 { border-left-color: #C0C0C0; } /* Silver */
+        .rank-3 { border-left-color: #CD7F32; } /* Bronze */
+        
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
@@ -55,10 +62,12 @@
     </div>
 
     <div id="dashboard-container" class="container" style="max-width: 1000px; padding: 20px; margin:0 auto;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
             <h2>👨‍💻 Admin Dashboard</h2>
-            <div>
-                <span id="admin-email" style="color:#666; font-size:0.9em; margin-right:10px;"></span>
+            <div style="display:flex; gap:5px; align-items:center;">
+                <span id="admin-email" style="color:#666; font-size:0.9em; margin-right:5px;"></span>
+                <button class="btn-sm btn-success" onclick="shareLeaderboard()">📤 แชร์ผลคะแนน</button>
+                <button class="btn-sm btn-secondary" onclick="location.reload()">🔄</button>
                 <button class="btn-sm btn-danger" onclick="logout()">Logout</button>
             </div>
         </div>
@@ -67,6 +76,7 @@
             <button class="tab-btn active" onclick="switchTab('tab-users')">👥 จัดการคะแนน</button>
             <button class="tab-btn" onclick="switchTab('tab-works')">📄 ตรวจงาน</button>
             <button class="tab-btn" onclick="switchTab('tab-quest')">⚡ Daily Quest</button>
+            <button class="tab-btn" onclick="switchTab('tab-leaderboard')">🏆 Leaderboard</button>
         </div>
 
         <div id="tab-users" class="tab-content active">
@@ -79,17 +89,7 @@
         <div id="tab-works" class="tab-content">
             <div style="overflow-x:auto;">
                 <table id="worksTable">
-                    <thead>
-                        <tr>
-                            <th>เวลา</th>
-                            <th>ชื่อ</th>
-                            <th>หัวข้อ</th>
-                            <th>ลิงก์</th>
-                            <th>สถานะ</th>
-                            <th>คอมเมนต์</th>
-                            <th>ลบ</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>เวลา</th><th>ชื่อ</th><th>หัวข้อ</th><th>ลิงก์</th><th>สถานะ</th><th>คอมเมนต์</th><th>ลบ</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -115,13 +115,31 @@
                 <button class="magic-btn" onclick="createQuest()" style="background:#ffc107; color:black; margin-top:15px;">🚀 ประกาศ Quest</button>
             </div>
 
-            <h3>📝 คำตอบจากน้องๆ</h3>
-            <div style="overflow-x:auto;">
-                <table id="questTable">
-                    <thead><tr><th>เวลา</th><th>ชื่อ</th><th>คำตอบ</th><th>สถานะ</th><th>โบนัส</th></tr></thead>
-                    <tbody></tbody>
-                </table>
+            <div style="display:flex; gap:20px; flex-wrap:wrap;">
+                <div style="flex:1; min-width:300px;">
+                    <h3>📝 คำตอบล่าสุด</h3>
+                    <div style="overflow-x:auto;">
+                        <table id="questTable">
+                            <thead><tr><th>ชื่อ</th><th>คำตอบ</th><th>สถานะ</th><th>โบนัส</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div style="flex:1; min-width:300px; border-left:1px solid #eee; padding-left:10px;">
+                    <h3>♻️ คลัง Quest (ใช้ซ้ำ)</h3>
+                    <div style="overflow-x:auto; max-height:400px;">
+                        <table id="questHistoryTable">
+                            <thead><tr><th>โจทย์</th><th>คะแนน</th><th>เลือก</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
+        </div>
+
+        <div id="tab-leaderboard" class="tab-content">
+            <div id="leaderboardList" style="max-width:600px; margin:0 auto;"></div>
         </div>
     </div>
 
@@ -129,12 +147,13 @@
     <script>
         // CONFIG
         const ALLOWED_EMAIL = "medlifeplus@gmail.com";
-        const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ใส่ ID ของคุณ
-        const MY_URL = 'https://mlpditto.github.io/INTERN-PORT/admin.html'; // ⚠️ ใส่ URL ของคุณ
+        const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ใส่ LIFF ID Admin
+        const MY_URL = 'https://mlpditto.github.io/INTERN-PORT/admin.html'; // ⚠️ ใส่ URL Admin
 
         const auth = firebase.auth();
+        let topUsersCache = []; // เก็บข้อมูลไว้แชร์
 
-        // --- Login Logic ---
+        // --- Login ---
         if (auth.isSignInWithEmailLink(window.location.href)) {
             let email = window.localStorage.getItem('emailForSignIn') || window.prompt('ยืนยันอีเมลอีกครั้ง:');
             auth.signInWithEmailLink(email, window.location.href).then(() => {
@@ -142,7 +161,6 @@
                 window.location.replace(MY_URL);
             }).catch((e) => alert(e.message));
         }
-
         function sendMagicLink() {
             const email = document.getElementById('email-input').value;
             if(email !== ALLOWED_EMAIL) return alert("ไม่มีสิทธิ์เข้าถึง");
@@ -150,7 +168,6 @@
                 .then(() => { window.localStorage.setItem('emailForSignIn', email); alert("เช็คอีเมลเพื่อกดลิงก์ Login ครับ"); })
                 .catch(e => alert(e.message));
         }
-
         auth.onAuthStateChanged((user) => {
             if (user && user.email === ALLOWED_EMAIL) {
                 document.getElementById('login-screen').style.display='none';
@@ -161,12 +178,12 @@
         });
         function logout() { auth.signOut().then(() => location.reload()); }
 
-        // --- System Logic ---
+        // --- Init ---
         let isInit = false;
         async function initSystem() {
             if(isInit) return; isInit = true;
             try { await liff.init({ liffId: ADMIN_LIFF_ID }); } catch(e) {}
-            loadUsers(); loadWorks(); loadQuestSubmissions();
+            loadUsers(); loadWorks(); loadQuestSubmissions(); loadQuestHistory();
         }
         function switchTab(id) {
             document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));
@@ -175,51 +192,75 @@
             event.target.classList.add('active');
         }
 
-        // --- Users ---
+        // --- Users & Leaderboard ---
         function loadUsers() {
             db.collection("users").orderBy("score", "desc").onSnapshot(snap => {
-                const tb = document.querySelector("#usersTable tbody"); tb.innerHTML = "";
+                const tb = document.querySelector("#usersTable tbody"); 
+                const lb = document.getElementById("leaderboardList");
+                tb.innerHTML = ""; lb.innerHTML = "";
+                
+                topUsersCache = [];
+                let rank = 1;
+                
                 snap.forEach(doc => {
                     const u = doc.data();
+                    const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : '';
+                    
+                    // Table Row
                     tb.innerHTML += `<tr class="user-row"><td><img src="${u.pictureUrl}" width="30" style="border-radius:50%"></td><td>${u.displayName}</td><td>${u.score}</td>
                     <td><button class="btn-sm btn-primary" onclick="adj('${doc.id}', 1)">+1</button> <button class="btn-sm btn-danger" onclick="adj('${doc.id}', -1)">-1</button></td>
                     <td><button class="btn-sm btn-danger" onclick="delUser('${doc.id}')">ลบ</button></td></tr>`;
+                    
+                    // Leaderboard Card
+                    if (rank <= 10) {
+                        topUsersCache.push(`${rank}. ${u.displayName} (${u.score} คะแนน)`);
+                        lb.innerHTML += `
+                            <div class="leaderboard-card ${rankClass}">
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <h2 style="margin:0; color:#444; width:30px;">#${rank}</h2>
+                                    <img src="${u.pictureUrl}" style="width:40px; height:40px; border-radius:50%;">
+                                    <b>${u.displayName}</b>
+                                </div>
+                                <span class="badge" style="background:${rank===1?'#FFD700':'#eee'}; color:${rank===1?'#000':'#333'}; font-size:1em;">${u.score} ⭐️</span>
+                            </div>
+                        `;
+                    }
+                    rank++;
                 });
             });
         }
-        function filterUsers() { const term = document.getElementById('userSearch').value.toLowerCase(); document.querySelectorAll('.user-row').forEach(row => { row.style.display = row.innerText.toLowerCase().includes(term) ? '' : 'none'; }); }
+        
+        // --- 📤 Share Leaderboard ---
+        async function shareLeaderboard() {
+            if (!liff.isLoggedIn()) { alert("กรุณา Login LIFF ก่อนแชร์"); liff.login(); return; }
+            if (topUsersCache.length === 0) return alert("ไม่มีข้อมูล");
+            
+            const text = "🏆 สรุปคะแนนล่าสุด:\n\n" + topUsersCache.join("\n") + "\n\n(อัปเดต: " + new Date().toLocaleTimeString('th-TH') + ")";
+            
+            if (liff.isApiAvailable('shareTargetPicker')) {
+                try {
+                    await liff.shareTargetPicker([{ type: "text", text: text }]);
+                } catch(e) { alert("แชร์ไม่สำเร็จ: " + e.message); }
+            } else {
+                alert("อุปกรณ์นี้ไม่รองรับการแชร์");
+            }
+        }
 
-        // --- Works (แก้ไขแล้ว: มี Dropdown + Feedback) ---
+        // --- Works ---
         function loadWorks() {
             db.collection("works").orderBy("timestamp", "desc").limit(50).onSnapshot((snapshot) => {
-                const tbody = document.querySelector("#worksTable tbody");
-                tbody.innerHTML = "";
+                const tbody = document.querySelector("#worksTable tbody"); tbody.innerHTML = "";
                 snapshot.forEach(doc => {
-                    const w = doc.data();
-                    const id = doc.id;
+                    const w = doc.data(); const id = doc.id;
                     const statusColor = w.status === 'ตรวจแล้ว' ? '#d4edda' : w.status === 'แก้ไข' ? '#f8d7da' : '#fff3cd';
-                    const date = w.timestamp ? w.timestamp.toDate().toLocaleString('th-TH', { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit'}) : "..";
-
-                    // Feedback Logic
                     const feedbackText = w.feedback ? `<div style="font-size:0.8em; color:#007bff; margin-top:5px;">💬 "${w.feedback}"</div>` : "";
-                    const feedbackBtn = `<button class="btn-sm" style="background:#17a2b8; color:white; margin-right:5px;" onclick="addFeedback('${id}', '${w.feedback || ''}')">📝</button>`;
-
+                    
                     tbody.innerHTML += `<tr>
-                        <td style="font-size:0.85em; color:#666;">${date}</td>
-                        <td>${w.displayName}</td>
-                        <td>${w.title}</td>
+                        <td>${w.timestamp ? w.timestamp.toDate().toLocaleString('th-TH') : ".."}</td>
+                        <td>${w.displayName}</td><td>${w.title}</td>
                         <td><a href="${w.link}" target="_blank" class="btn-sm btn-secondary" style="text-decoration:none;">Link</a></td>
-                        <td>
-                            <select onchange="updateStatus('${id}', this.value)" style="padding:5px; border-radius:4px; border:1px solid #ddd; background:${statusColor}">
-                                <option value="รอตรวจ" ${w.status==='รอตรวจ'?'selected':''}>รอตรวจ</option>
-                                <option value="ตรวจแล้ว" ${w.status==='ตรวจแล้ว'?'selected':''}>ตรวจแล้ว</option>
-                                <option value="แก้ไข" ${w.status==='แก้ไข'?'selected':''}>แก้ไข</option>
-                            </select>
-                        </td>
-                        <td style="min-width: 150px;">
-                            ${feedbackBtn}
-                            ${feedbackText}
-                        </td>
+                        <td><select onchange="updateStatus('${id}', this.value)" style="padding:5px; border-radius:4px; background:${statusColor}"><option value="รอตรวจ" ${w.status==='รอตรวจ'?'selected':''}>รอตรวจ</option><option value="ตรวจแล้ว" ${w.status==='ตรวจแล้ว'?'selected':''}>ตรวจแล้ว</option><option value="แก้ไข" ${w.status==='แก้ไข'?'selected':''}>แก้ไข</option></select></td>
+                        <td><button class="btn-sm btn-primary" onclick="addFeedback('${id}', '${w.feedback||''}')">📝</button>${feedbackText}</td>
                         <td><button class="btn-sm btn-danger" onclick="delWork('${id}', '${w.title}')">ลบ</button></td>
                     </tr>`;
                 });
@@ -233,45 +274,62 @@
             const score = parseInt(document.getElementById('q-score').value);
             if(!text) return alert("ใส่คำถามก่อนครับ");
             const deadline = new Date(); deadline.setHours(deadline.getHours() + hours);
-            if(confirm(`ยืนยันสร้าง Quest?\n"${text}"`)) {
-                try {
-                    await db.collection("quests").add({ question: text, baseScore: score, deadline: firebase.firestore.Timestamp.fromDate(deadline), createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-                    alert("ประกาศ Quest แล้ว!"); document.getElementById('q-text').value = "";
-                } catch(e) { alert(e.message); }
+            if(confirm(`สร้าง Quest: "${text}"?`)) {
+                await db.collection("quests").add({ question: text, baseScore: score, deadline: firebase.firestore.Timestamp.fromDate(deadline), createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                alert("Quest Created!"); document.getElementById('q-text').value = "";
             }
         }
         function loadQuestSubmissions() {
-            db.collection("quest_submissions").orderBy("timestamp", "desc").limit(50).onSnapshot(snapshot => {
+            db.collection("quest_submissions").orderBy("timestamp", "desc").limit(30).onSnapshot(snapshot => {
                 const tbody = document.querySelector("#questTable tbody"); tbody.innerHTML = "";
                 snapshot.forEach(doc => {
                     const d = doc.data();
-                    const date = d.timestamp ? d.timestamp.toDate().toLocaleString('th-TH') : "";
-                    let bonusBtn = `<button class="btn-sm btn-primary" onclick="giveBonus('${doc.id}', '${d.userId}', '${d.displayName}')">+โบนัส</button>`;
-                    if(d.bonusGiven) bonusBtn = `<span class="badge" style="background:#28a745; color:white;">+${d.bonusGiven} แต้ม</span>`;
-                    tbody.innerHTML += `<tr><td style="font-size:0.8em;">${date}</td><td>${d.displayName}</td><td>${d.answer}</td><td><span class="badge" style="background:${d.isLate?'#dc3545':'#28a745'}; color:white;">${d.isLate?'ส่งช้า':'ทันเวลา (+'+d.earnedScore+')'}</span></td><td>${bonusBtn}</td></tr>`;
+                    let bonusBtn = d.bonusGiven ? `<span class="badge" style="background:#28a745;">+${d.bonusGiven}</span>` : `<button class="btn-sm btn-primary" onclick="giveBonus('${doc.id}', '${d.userId}', '${d.displayName}')">+Bonus</button>`;
+                    tbody.innerHTML += `<tr><td>${d.displayName}</td><td>${d.answer}</td><td><span class="badge" style="background:${d.isLate?'#dc3545':'#28a745'}">${d.isLate?'ช้า':'ทัน'}</span></td><td>${bonusBtn}</td></tr>`;
                 });
             });
         }
+        
+        // 🔥 โหลดประวัติ Quest (Reuse)
+        function loadQuestHistory() {
+            db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(snapshot => {
+                const tbody = document.querySelector("#questHistoryTable tbody"); tbody.innerHTML = "";
+                snapshot.forEach(doc => {
+                    const q = doc.data();
+                    tbody.innerHTML += `<tr>
+                        <td style="font-size:0.9em;">${q.question}</td>
+                        <td>${q.baseScore}</td>
+                        <td><button class="btn-sm btn-secondary" onclick="reuseQuest('${q.question}', ${q.baseScore})">♻️</button></td>
+                    </tr>`;
+                });
+            });
+        }
+        
+        function reuseQuest(qText, qScore) {
+            document.getElementById('q-text').value = qText;
+            document.getElementById('q-score').value = qScore;
+            // Scroll to top
+            document.querySelector('.quest-create-card').scrollIntoView({behavior: 'smooth'});
+        }
+
         async function giveBonus(subId, userId, name) {
             const amount = prompt(`ให้คะแนนพิเศษ ${name} เท่าไหร่ดี?`, "5");
             if(amount) {
-                const points = parseInt(amount);
+                const pts = parseInt(amount);
                 const batch = db.batch();
-                batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(points) });
-                batch.update(db.collection("quest_submissions").doc(subId), { bonusGiven: points });
+                batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(pts) });
+                batch.update(db.collection("quest_submissions").doc(subId), { bonusGiven: pts });
                 await batch.commit();
             }
         }
 
         // --- Helpers ---
+        function filterUsers() { const t = document.getElementById('userSearch').value.toLowerCase(); document.querySelectorAll('.user-row').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t)?'':'none'); }
         async function adj(uid, v) { db.collection("users").doc(uid).update({ score: firebase.firestore.FieldValue.increment(v) }); }
         async function delUser(uid) { if(confirm("ลบ?")) db.collection("users").doc(uid).delete(); }
         async function delWork(wid, t) { if(confirm("ลบ "+t+"?")) db.collection("works").doc(wid).delete(); }
-        async function updateStatus(docId, newStatus) { try { await db.collection("works").doc(docId).update({ status: newStatus }); } catch(e) { alert(e.message); } }
-        async function addFeedback(docId, oldFeedback) {
-            const newFeedback = prompt("พิมพ์ข้อความถึงน้องฝึกงาน:", oldFeedback);
-            if (newFeedback !== null) { try { await db.collection("works").doc(docId).update({ feedback: newFeedback }); } catch(e) { alert("Error: " + e.message); } }
-        }
+        async function updateStatus(docId, val) { db.collection("works").doc(docId).update({ status: val }); }
+        async function addFeedback(docId, val) { const f = prompt("Comment:", val); if(f!==null) db.collection("works").doc(docId).update({ feedback: f }); }
 
     </script>
 </body>
