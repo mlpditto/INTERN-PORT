@@ -35,11 +35,12 @@
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #f8f9fa; color: #555; }
         .btn-sm { padding: 5px 10px; border:none; border-radius:4px; cursor:pointer; color:white; font-size:0.9em;}
-        .btn-primary { background:#007bff; } .btn-danger { background:#dc3545; } .btn-secondary { background:#6c757d; } .btn-success { background:#28a745; }
+        .btn-primary { background:#007bff; } .btn-danger { background:#dc3545; } .btn-secondary { background:#6c757d; } .btn-success { background:#28a745; } .btn-warning { background:#ffc107; color:black; }
         .badge { padding:4px 8px; border-radius:10px; font-size:0.8em; }
         
         /* Quest & Leaderboard */
         .quest-create-card { background:#fff3cd; padding:20px; border-radius:8px; border:1px solid #ffeeba; margin-bottom:20px; }
+        .active-quest-card { background:#d4edda; padding:15px; border-radius:8px; border:1px solid #c3e6cb; margin-bottom:20px; } /* สีเขียวสำหรับ Active */
         .leaderboard-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #ffd700; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
         .rank-1 { border-left-color: #FFD700; background: #fffbe6; } 
         .rank-2 { border-left-color: #C0C0C0; } 
@@ -97,7 +98,7 @@
 
         <div id="tab-quest" class="tab-content">
             <div class="quest-create-card">
-                <h3>📢 สร้าง Quest ประจำวัน</h3>
+                <h3>📢 สร้าง Quest ใหม่</h3>
                 <div class="input-group" style="margin-top:0;">
                     <label>คำถาม / โจทย์:</label>
                     <input type="text" id="q-text" placeholder="เช่น วันนี้เรียนรู้อะไรไปบ้าง?">
@@ -125,6 +126,18 @@
                 <button class="magic-btn" onclick="createQuest()" style="background:#ffc107; color:black; margin-top:15px;">🚀 ประกาศ Quest</button>
             </div>
 
+            <div id="active-quest-section" style="display:none;">
+                <div class="active-quest-card">
+                    <h3 style="color:#155724; margin-top:0;">⚡ Quest ที่กำลัง Active (แก้ไขได้)</h3>
+                    <div style="overflow-x:auto;">
+                        <table id="activeQuestTable">
+                            <thead><tr><th>โจทย์</th><th>หมดเขต</th><th>แก้ไข</th><th>หยุด/ลบ</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <div style="display:flex; gap:20px; flex-wrap:wrap;">
                 <div style="flex:1; min-width:300px;">
                     <h3>📝 คำตอบล่าสุด</h3>
@@ -137,7 +150,7 @@
                 </div>
                 
                 <div style="flex:1; min-width:300px; border-left:1px solid #eee; padding-left:10px;">
-                    <h3>♻️ คลัง Quest</h3>
+                    <h3>♻️ คลัง Quest (ประวัติ)</h3>
                     <div style="overflow-x:auto; max-height:400px;">
                         <table id="questHistoryTable">
                             <thead><tr><th>โจทย์</th><th>คะแนน</th><th>จัดการ</th></tr></thead>
@@ -193,7 +206,7 @@
         async function initSystem() {
             if(isInit) return; isInit = true;
             try { await liff.init({ liffId: ADMIN_LIFF_ID }); } catch(e) {}
-            loadUsers(); loadWorks(); loadQuestSubmissions(); loadQuestHistory();
+            loadUsers(); loadWorks(); loadQuestSubmissions(); loadQuestHistory(); loadActiveQuests();
         }
         function switchTab(id) {
             document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));
@@ -202,7 +215,7 @@
             event.target.classList.add('active');
         }
 
-        // --- Users & Leaderboard ---
+        // --- Users ---
         function loadUsers() {
             db.collection("users").orderBy("score", "desc").onSnapshot(snap => {
                 const tb = document.querySelector("#usersTable tbody"); const lb = document.getElementById("leaderboardList");
@@ -220,16 +233,11 @@
                 });
             });
         }
-        
-        // --- 📤 Share ---
         async function shareLeaderboard() {
             if (topUsersCache.length === 0) return alert("⚠️ ยังไม่มีข้อมูล");
             const text = "🏆 สรุปคะแนนล่าสุด:\n\n" + topUsersCache.join("\n") + "\n\n(อัปเดต: " + new Date().toLocaleTimeString('th-TH') + ")";
-            if (liff.isInClient()) {
-                try { await liff.shareTargetPicker([{ type: "text", text: text }]); } catch (e) { alert("Error: " + e.message); }
-            } else {
-                try { await navigator.clipboard.writeText(text); alert("📋 คัดลอกแล้ว! วางใน LINE ได้เลยครับ"); } catch (err) { prompt("Copy ข้อความ:", text); }
-            }
+            if (liff.isInClient()) { try { await liff.shareTargetPicker([{ type: "text", text: text }]); } catch (e) { alert("Error: " + e.message); } }
+            else { try { await navigator.clipboard.writeText(text); alert("📋 คัดลอกแล้ว! วางใน LINE ได้เลยครับ"); } catch (err) { prompt("Copy ข้อความ:", text); } }
         }
 
         // --- Works ---
@@ -245,23 +253,18 @@
             });
         }
 
-        // --- Quest ---
+        // --- Quest System ---
         async function createQuest() {
             const text = document.getElementById('q-text').value;
             const hours = parseInt(document.getElementById('q-hours').value);
             const score = parseInt(document.getElementById('q-score').value);
             const imgUrl = document.getElementById('q-img').value;
             const linkUrl = document.getElementById('q-link').value;
-
             if(!text) return alert("ใส่คำถามก่อนครับ");
-            
             const deadline = new Date(); deadline.setHours(deadline.getHours() + hours);
             if(confirm(`สร้าง Quest: "${text}"?`)) {
                 await db.collection("quests").add({ 
-                    question: text, 
-                    imageUrl: imgUrl, 
-                    questLink: linkUrl,
-                    baseScore: score, 
+                    question: text, imageUrl: imgUrl, questLink: linkUrl, baseScore: score, 
                     deadline: firebase.firestore.Timestamp.fromDate(deadline), 
                     createdAt: firebase.firestore.FieldValue.serverTimestamp() 
                 });
@@ -269,6 +272,69 @@
                 document.getElementById('q-text').value = ""; document.getElementById('q-img').value = ""; document.getElementById('q-link').value = "";
             }
         }
+
+        // 🔥 NEW: โหลด Active Quests
+        function loadActiveQuests() {
+            db.collection("quests").orderBy("createdAt", "desc").onSnapshot(snapshot => {
+                const tb = document.querySelector("#activeQuestTable tbody");
+                const section = document.getElementById("active-quest-section");
+                tb.innerHTML = "";
+                const now = new Date();
+                let hasActive = false;
+
+                snapshot.forEach(doc => {
+                    const q = doc.data();
+                    if(q.deadline && q.deadline.toDate() > now) {
+                        hasActive = true;
+                        
+                        // เตรียมข้อมูลสำหรับแก้ไข (ใส่ใน attribute)
+                        const safeQ = q.question.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+                        const safeImg = (q.imageUrl||"").replace(/'/g, "&#39;");
+                        const safeLink = (q.questLink||"").replace(/'/g, "&#39;");
+
+                        const timeLeft = Math.floor((q.deadline.toDate() - now) / (1000 * 60 * 60)); // ชม.
+
+                        tb.innerHTML += `
+                            <tr>
+                                <td>${q.question}</td>
+                                <td><span class="badge" style="background:#28a745;">เหลือ ${timeLeft} ชม.</span></td>
+                                <td>
+                                    <button class="btn-sm btn-warning" onclick="editActiveQuest('${doc.id}', '${safeQ}', '${safeImg}', '${safeLink}')">✏️ แก้ไข</button>
+                                </td>
+                                <td>
+                                    <button class="btn-sm btn-danger" onclick="deleteQuest('${doc.id}')">🗑️</button>
+                                </td>
+                            </tr>
+                        `;
+                    }
+                });
+                
+                // ถ้ามี Active Quest ให้โชว์กล่องเขียว
+                if(hasActive) section.style.display = "block"; else section.style.display = "none";
+            });
+        }
+
+        // 🔥 NEW: ฟังก์ชันแก้ไข
+        async function editActiveQuest(id, currentQ, currentImg, currentLink) {
+            // ใช้ Prompt ง่ายๆ เพื่อความรวดเร็ว
+            const newQ = prompt("แก้ไขโจทย์:", currentQ);
+            if(newQ === null) return; // กด Cancel
+            
+            const newImg = prompt("แก้ไขลิงก์รูป (ถ้ามี):", currentImg);
+            const newLink = prompt("แก้ไขลิงก์แนบ (ถ้ามี):", currentLink);
+            
+            try {
+                await db.collection("quests").doc(id).update({
+                    question: newQ,
+                    imageUrl: newImg,
+                    questLink: newLink
+                });
+                // ไม่ต้อง Alert เดี๋ยวหน้าจออัปเดตเอง
+            } catch(e) {
+                alert("Error: " + e.message);
+            }
+        }
+
         function loadQuestSubmissions() {
             db.collection("quest_submissions").orderBy("timestamp", "desc").limit(30).onSnapshot(snapshot => {
                 const tbody = document.querySelector("#questTable tbody"); tbody.innerHTML = "";
@@ -280,12 +346,12 @@
             });
         }
         
-        // 🔥 โหลดประวัติ Quest (เพิ่มปุ่มลบ)
         function loadQuestHistory() {
             db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(snapshot => {
                 const tbody = document.querySelector("#questHistoryTable tbody"); tbody.innerHTML = "";
                 snapshot.forEach(doc => {
                     const q = doc.data();
+                    // Escaping for reuse function
                     const safeQ = q.question.replace(/'/g, "\\'");
                     const safeImg = (q.imageUrl || "").replace(/'/g, "\\'");
                     const safeLink = (q.questLink || "").replace(/'/g, "\\'");
@@ -302,27 +368,18 @@
             });
         }
         
-        async function deleteQuest(questId) {
-            if(confirm("ยืนยันลบ Quest นี้จากคลัง?")) {
-                try {
-                    await db.collection("quests").doc(questId).delete();
-                } catch(e) { alert("Error: " + e.message); }
-            }
-        }
+        async function deleteQuest(questId) { if(confirm("ยืนยันลบ Quest นี้?")) { try { await db.collection("quests").doc(questId).delete(); } catch(e) { alert("Error: " + e.message); } } }
         
         function reuseQuest(qText, qScore, qImg, qLink) {
-            document.getElementById('q-text').value = qText;
-            document.getElementById('q-score').value = qScore;
-            document.getElementById('q-img').value = qImg || "";
-            document.getElementById('q-link').value = qLink || "";
+            document.getElementById('q-text').value = qText; document.getElementById('q-score').value = qScore;
+            document.getElementById('q-img').value = qImg || ""; document.getElementById('q-link').value = qLink || "";
             document.querySelector('.quest-create-card').scrollIntoView({behavior: 'smooth'});
         }
 
         async function giveBonus(subId, userId, name) {
             const amount = prompt(`ให้คะแนนพิเศษ ${name} เท่าไหร่ดี?`, "5");
             if(amount) {
-                const pts = parseInt(amount);
-                const batch = db.batch();
+                const pts = parseInt(amount); const batch = db.batch();
                 batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(pts) });
                 batch.update(db.collection("quest_submissions").doc(subId), { bonusGiven: pts });
                 await batch.commit();
