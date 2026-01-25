@@ -4,49 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MLP INTERNSHIP</title>
-    
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-
     <style>
         body { font-family: 'Kanit', sans-serif; background-color: #f8f9fa; padding: 20px; color:#333; margin:0; }
         .container { max-width: 600px; margin: 0 auto; }
-        
         .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .profile-img { width: 80px; height: 80px; border-radius: 50%; border: 3px solid #06C755; }
         .score-text { color: #06C755; font-weight: bold; font-size: 1.4em; }
-
         input, textarea { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-family: inherit; }
         button { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; color: white; background-color: #06C755; transition: 0.2s; }
-        button:hover { background-color: #05a546; }
-        button:disabled { background-color: #ccc; cursor: not-allowed; }
-
-        /* 🔥 Quest Card */
+        button:hover { background-color: #05a546; } button:disabled { background-color: #ccc; }
+        /* Quest */
         .quest-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; margin-bottom: 20px; }
-        .quest-timer { font-size: 0.9em; background: rgba(0,0,0,0.25); padding: 5px 12px; border-radius: 20px; display: inline-block; margin-bottom: 10px; }
-        
-        /* ✅ ปรับ CSS รูปภาพ: กดแล้วรู้ว่ากดได้ + เต็มใบ */
-        .quest-image { 
-            width: 100%; 
-            height: auto; 
-            border-radius: 8px; 
-            margin-bottom: 10px; 
-            border: 2px solid rgba(255,255,255,0.3); 
-            display: block;
-            cursor: pointer; /* เมาส์เป็นรูปมือ */
-            transition: transform 0.2s;
-        }
-        .quest-image:hover { transform: scale(1.02); } /* ลูกเล่นขยายเล็กน้อยเมื่อชี้ */
-        
+        .quest-image { width: 100%; height: auto; border-radius: 8px; margin-bottom: 10px; border: 2px solid rgba(255,255,255,0.3); display: block; cursor: pointer; }
         .quest-link-btn { display: inline-block; background: rgba(255,255,255,0.2); color: white; padding: 8px 15px; border-radius: 20px; text-decoration: none; margin-bottom: 15px; font-size: 0.9em; border: 1px solid rgba(255,255,255,0.4); }
-        
-        /* Check-in */
+        /* Checkin */
         .checkin-card { border-left: 5px solid #17a2b8; }
         .checkin-checkbox { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; cursor: pointer; background: #f1f8ff; padding: 10px; border-radius: 8px; border: 1px solid #cce5ff; }
-        .checkin-checkbox input { width: 20px; height: 20px; margin: 0; cursor: pointer; }
-
+        .checkin-checkbox input { width: 20px; height: 20px; }
+        /* Feedback & Status */
         .feedback-box { background-color: #e7f3ff; border-left: 4px solid #1877f2; padding: 10px; margin-top: 10px; border-radius: 4px; font-size: 0.9em; color: #333; }
         .hidden { display: none !important; }
         .badge { padding: 4px 8px; border-radius: 4px; color: white; font-size: 0.8em; }
@@ -54,176 +33,112 @@
     </style>
 </head>
 <body>
-
     <div class="container">
         <div id="loading" style="text-align:center; margin-top:50px;">⏳ กำลังโหลด...</div>
-
         <div id="main-app" class="hidden">
             <div class="card" style="text-align:center;">
                 <img id="u-img" class="profile-img" src="">
                 <h3 id="u-name" style="margin:10px 0 5px;">User</h3>
                 <p>คะแนนสะสม: <span id="u-score" class="score-text">0</span> แต้ม</p>
             </div>
-
             <div id="checkin-container" class="card checkin-card hidden">
                 <h3 style="margin-top:0;">📅 อย่าลืมอ่าน Daily Quest</h3>
                 <div id="checkin-form">
-                    <label class="checkin-checkbox">
-                        <input type="checkbox" id="chk-checkin" onchange="toggleCheckinBtn()">
-                        <span style="font-weight:bold; color:#0056b3;">รับทราบแล้ว</span>
-                    </label>
+                    <label class="checkin-checkbox"><input type="checkbox" id="chk-checkin" onchange="toggleCheckinBtn()"><span style="font-weight:bold; color:#0056b3;">รับทราบ</span></label>
                     <button id="btn-checkin" onclick="submitCheckIn()" disabled style="background:#17a2b8;">ยืนยันรับแต้ม</button>
                 </div>
-                <div id="checkin-done" class="hidden" style="text-align:center; padding:10px;">
-                    <h2 style="margin:0; font-size:3em;">✅</h2>
-                    <p style="color:#28a745; font-weight:bold;">วันนี้รับ Quest เรียบร้อยแล้ว</p>
-                </div>
+                <div id="checkin-done" class="hidden" style="text-align:center; padding:10px;"><h2 style="margin:0; font-size:3em;">✅</h2><p style="color:#28a745; font-weight:bold;">วันนี้รับ Quest เรียบร้อยแล้ว</p></div>
             </div>
-
             <div id="quest-list-container"></div>
-
             <div class="card">
                 <h4>📤 ส่งงาน / การบ้าน</h4>
                 <input type="text" id="w-title" placeholder="ชื่อหัวข้อ">
                 <input type="url" id="w-link" placeholder="ลิงก์งาน">
                 <button onclick="submitWork()">ยืนยันส่งงาน</button>
             </div>
-
             <h4 style="margin-left:5px; color:#666;">📂 ประวัติการส่งงาน</h4>
             <div id="work-list"></div>
             <div style="height:50px;"></div>
         </div>
     </div>
-
     <script src="firebase-config.js"></script>
     <script>
-        const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ใส่ LIFF ID User
-
-        let userProfile, userId;
-        let submittedQuestIds = new Set();
-
+        const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ID User
+        let userProfile, userId, submittedQuestIds = new Set();
+        
         async function main() {
-            try {
-                await liff.init({ liffId: USER_LIFF_ID });
-                if (!liff.isLoggedIn()) { liff.login(); return; }
-                userProfile = await liff.getProfile();
-                userId = userProfile.userId;
+            try { await liff.init({ liffId: USER_LIFF_ID }); if (!liff.isLoggedIn()) { liff.login(); return; }
+                userProfile = await liff.getProfile(); userId = userProfile.userId;
+                document.getElementById('loading').classList.add('hidden'); document.getElementById('main-app').classList.remove('hidden');
+                document.getElementById('u-img').src = userProfile.pictureUrl; document.getElementById('u-name').innerText = userProfile.displayName;
+                checkUser(); loadMyWorks(); loadQuests();
+            } catch (e) { alert("LIFF Error: "+e.message); }
+        } main();
 
-                document.getElementById('loading').classList.add('hidden');
-                document.getElementById('main-app').classList.remove('hidden');
-                document.getElementById('u-img').src = userProfile.pictureUrl;
-                document.getElementById('u-name').innerText = userProfile.displayName;
-
-                checkAndCreateUser();
-                loadMyWorks();
-                loadQuests();
-            } catch (err) { alert("LIFF Error: " + err.message); }
-        }
-        main();
-
-        // --- User Logic ---
-        function checkAndCreateUser() {
-            const userRef = db.collection("users").doc(userId);
-            userRef.onSnapshot((doc) => {
-                if (doc.exists) {
-                    const d = doc.data();
-                    document.getElementById('u-score').innerText = parseFloat((d.score||0).toFixed(2));
-                    updateCheckInUI(d.lastCheckIn);
-                } else {
-                    userRef.set({ displayName: userProfile.displayName, pictureUrl: userProfile.pictureUrl, score: 0 });
-                }
+        function checkUser() {
+            const r = db.collection("users").doc(userId);
+            r.onSnapshot(doc => {
+                if(doc.exists) { const d=doc.data(); document.getElementById('u-score').innerText = parseFloat((d.score||0).toFixed(2)); updateCheckIn(d.lastCheckIn); }
+                else r.set({ displayName: userProfile.displayName, pictureUrl: userProfile.pictureUrl, score: 0 });
             });
         }
-        function updateCheckInUI(last) {
-            const form = document.getElementById('checkin-form'), done = document.getElementById('checkin-done');
+        function updateCheckIn(last) {
+            const f=document.getElementById('checkin-form'), d=document.getElementById('checkin-done');
             document.getElementById('checkin-container').classList.remove('hidden');
-            if(last && isToday(last.toDate())) { form.classList.add('hidden'); done.classList.remove('hidden'); }
-            else { form.classList.remove('hidden'); done.classList.add('hidden'); }
+            if(last && isToday(last.toDate())) { f.classList.add('hidden'); d.classList.remove('hidden'); } else { f.classList.remove('hidden'); d.classList.add('hidden'); }
         }
-        function isToday(d) { const n = new Date(); return d.getDate()===n.getDate() && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear(); }
+        function isToday(d) { const n=new Date(); return d.getDate()===n.getDate() && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear(); }
         function toggleCheckinBtn() { document.getElementById('btn-checkin').disabled = !document.getElementById('chk-checkin').checked; }
         async function submitCheckIn() {
-            const batch = db.batch();
-            batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(0.1), lastCheckIn: firebase.firestore.FieldValue.serverTimestamp() });
-            batch.set(db.collection("checkin_logs").doc(), { userId, displayName: userProfile.displayName, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
-            await batch.commit(); alert("บันทึกเวลาแล้ว!");
+            const b = db.batch();
+            b.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(0.1), lastCheckIn: firebase.firestore.FieldValue.serverTimestamp() });
+            b.set(db.collection("checkin_logs").doc(), { userId, displayName: userProfile.displayName, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+            await b.commit(); alert("บันทึกเวลาแล้ว!");
         }
 
-        // --- Quest Logic ---
         function loadQuests() {
-            db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(snap => {
-                submittedQuestIds.clear();
-                snap.forEach(doc => submittedQuestIds.add(doc.data().questId));
-                db.collection("quests").orderBy("createdAt", "asc").onSnapshot(renderQuests);
+            db.collection("quest_submissions").where("userId","==",userId).onSnapshot(s => {
+                submittedQuestIds.clear(); s.forEach(d => submittedQuestIds.add(d.data().questId));
+                db.collection("quests").orderBy("createdAt","asc").onSnapshot(renderQuests);
             });
         }
-
-        function renderQuests(snapshot) {
-            const container = document.getElementById('quest-list-container');
-            container.innerHTML = "";
-            const now = new Date();
-
-            snapshot.forEach(doc => {
-                const q = doc.data();
-                const qId = doc.id;
-                if (!q.deadline || now > q.deadline.toDate()) return;
-                if (submittedQuestIds.has(qId)) return;
-
-                const diff = q.deadline.toDate() - now;
-                const h = Math.floor(diff / (1000 * 60 * 60));
-                const m = Math.floor((diff / (1000 * 60)) % 60);
-
-                // ✅ แก้ไข: ทำให้รูปภาพคลิกได้ (เปิด Link เดิมในแท็บใหม่)
-                const imgHtml = q.imageUrl ? 
-                    `<a href="${q.imageUrl}" target="_blank" title="คลิกเพื่อดูรูปเต็ม">
-                        <img src="${q.imageUrl}" class="quest-image">
-                     </a>` 
-                    : "";
-                    
-                const linkHtml = q.questLink ? `<a href="${q.questLink}" target="_blank" class="quest-link-btn">🔗 ดูข้อมูลเพิ่มเติม</a>` : "";
-
-                const card = document.createElement('div');
-                card.className = "card quest-card";
-                card.innerHTML = `
-                    <div class="quest-timer">⏰ เหลือเวลา: ${h} ชม. ${m} นาที</div>
-                    ${imgHtml}
-                    <h3 style="margin:5px 0;">⚡ ภารกิจ</h3>
-                    <p style="font-size:1.1em; margin-bottom:15px; line-height:1.4;">${q.question}</p>
-                    ${linkHtml}
-                    <div>
-                        <textarea id="ans-${qId}" rows="2" placeholder="คำตอบ..." style="color:black;"></textarea>
-                        <button onclick="submitQuest('${qId}', ${q.baseScore})" style="background:#ffc107; color:black;">🚀 ส่งคำตอบ (+${q.baseScore})</button>
-                    </div>
-                `;
-                container.appendChild(card);
+        function renderQuests(snap) {
+            const c = document.getElementById('quest-list-container'); c.innerHTML = ""; const now = new Date();
+            snap.forEach(doc => {
+                const q=doc.data(); if(!q.deadline || now>q.deadline.toDate() || submittedQuestIds.has(doc.id)) return;
+                const h = Math.floor((q.deadline.toDate()-now)/36e5), m = Math.floor(((q.deadline.toDate()-now)%36e5)/6e4);
+                const img = q.imageUrl ? `<a href="${q.imageUrl}" target="_blank"><img src="${q.imageUrl}" class="quest-image"></a>` : "";
+                const lnk = q.questLink ? `<a href="${q.questLink}" target="_blank" class="quest-link-btn">🔗 ข้อมูลเพิ่มเติม</a>` : "";
+                c.innerHTML += `<div class="card quest-card"><div class="quest-timer">⏰ เหลือ ${h} ชม. ${m} นาที</div>${img}<h3 style="margin:5px 0;">⚡ ภารกิจ</h3><p>${q.question}</p>${lnk}
+                <textarea id="ans-${doc.id}" rows="2" placeholder="คำตอบ..."></textarea><button onclick="subQ('${doc.id}',${q.baseScore})">🚀 ส่ง (+${q.baseScore})</button></div>`;
             });
         }
-
-        async function submitQuest(qId, baseScore) {
-            const ans = document.getElementById(`ans-${qId}`).value.trim();
-            if (!ans) return alert("กรุณาพิมพ์คำตอบ");
-            const batch = db.batch();
-            batch.set(db.collection("quest_submissions").doc(), { questId: qId, userId, displayName: userProfile.displayName, answer: ans, timestamp: firebase.firestore.FieldValue.serverTimestamp(), isLate: false, earnedScore: baseScore, bonusGiven: 0 });
-            batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(baseScore) });
-            await batch.commit(); alert(`ส่งแล้ว! (+${baseScore})`);
+        async function subQ(qid, score) {
+            const a = document.getElementById(`ans-${qid}`).value.trim(); if(!a) return alert("พิมพ์คำตอบก่อน");
+            const b = db.batch();
+            // ⚠️ สำคัญ: ส่ง pictureUrl ไปด้วย เพื่อให้ Admin เห็นหน้า
+            b.set(db.collection("quest_submissions").doc(), { questId:qid, userId, displayName:userProfile.displayName, pictureUrl:userProfile.pictureUrl, answer:a, timestamp:firebase.firestore.FieldValue.serverTimestamp(), isLate:false, earnedScore:score, bonusGiven:0 });
+            b.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(score) });
+            await b.commit(); alert("ส่งแล้ว!");
         }
 
-        // --- Works ---
         async function submitWork() {
-            const t=document.getElementById('w-title').value.trim(), l=document.getElementById('w-link').value.trim();
-            if(!t||!l) return alert("กรอกข้อมูลให้ครบ");
-            await db.collection("works").add({ userId, displayName: userProfile.displayName, pictureUrl: userProfile.pictureUrl, title: t, link: l, status: "รอตรวจ", feedback: "", timestamp: firebase.firestore.FieldValue.serverTimestamp() });
-            alert("ส่งงานเรียบร้อย!"); document.getElementById('w-title').value=""; document.getElementById('w-link').value="";
+            const t=document.getElementById('w-title').value.trim(), l=document.getElementById('w-link').value.trim(); if(!t||!l) return alert("กรอกให้ครบ");
+            await db.collection("works").add({ userId, displayName:userProfile.displayName, pictureUrl:userProfile.pictureUrl, title:t, link:l, status:"รอตรวจ", score:0, feedback:"", timestamp:firebase.firestore.FieldValue.serverTimestamp() });
+            alert("ส่งงานแล้ว!"); document.getElementById('w-title').value=""; document.getElementById('w-link').value="";
         }
         function loadMyWorks() {
-            db.collection("works").where("userId", "==", userId).orderBy("timestamp", "desc").onSnapshot((snap) => {
-                const list = document.getElementById('work-list'); list.innerHTML = "";
-                if (snap.empty) { list.innerHTML = "<p style='text-align:center; color:#999;'>ไม่มีประวัติ</p>"; return; }
-                snap.forEach(doc => {
+            db.collection("works").where("userId","==",userId).orderBy("timestamp","desc").onSnapshot(s => {
+                const l = document.getElementById('work-list'); l.innerHTML = "";
+                if(s.empty) { l.innerHTML="<p style='text-align:center; color:#999;'>ไม่มีประวัติ</p>"; return; }
+                s.forEach(doc => {
                     const w = doc.data();
                     let fb = w.feedback ? `<div class="feedback-box"><b>💬 Admin:</b> ${w.feedback}</div>` : "";
                     let badge = w.status==="ตรวจแล้ว"?"bg-green":w.status==="แก้ไข"?"bg-red":"bg-yellow";
-                    list.innerHTML += `<div class="card" style="padding:15px; border-left:5px solid ${w.status==='ตรวจแล้ว'?'#28a745':'#ffc107'}"><div style="display:flex; justify-content:space-between;"><div><h4 style="margin:0;">${w.title}</h4><span class="badge ${badge}">${w.status}</span></div><a href="${w.link}" target="_blank" style="font-size:1.5em; text-decoration:none;">🔗</a></div>${fb}</div>`;
+                    // แสดงคะแนนที่ได้
+                    let scoreBadge = w.score > 0 ? `<span class="badge" style="background:#17a2b8; margin-left:5px;">+${w.score} คะแนน</span>` : "";
+                    l.innerHTML += `<div class="card" style="padding:15px; border-left:5px solid ${w.status==='ตรวจแล้ว'?'#28a745':'#ffc107'}">
+                    <div style="display:flex; justify-content:space-between;"><div><h4 style="margin:0;">${w.title}</h4><span class="badge ${badge}">${w.status}</span>${scoreBadge}</div><a href="${w.link}" target="_blank" style="font-size:1.5em; text-decoration:none;">🔗</a></div>${fb}</div>`;
                 });
             });
         }
