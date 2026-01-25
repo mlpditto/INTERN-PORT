@@ -23,13 +23,12 @@
         button:hover { background-color: #05a546; }
         button:disabled { background-color: #ccc; cursor: not-allowed; }
 
-        /* 🔥 Quest Card (Enhanced) */
-        .quest-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; }
+        /* 🔥 Quest Card (Multiple) */
+        .quest-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; margin-bottom: 20px; }
         .quest-timer { font-size: 0.9em; background: rgba(0,0,0,0.25); padding: 5px 12px; border-radius: 20px; display: inline-block; margin-bottom: 10px; }
         .quest-image { width: 100%; max-height: 250px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; border: 2px solid rgba(255,255,255,0.3); }
         .quest-link-btn { display: inline-block; background: rgba(255,255,255,0.2); color: white; padding: 8px 15px; border-radius: 20px; text-decoration: none; margin-bottom: 15px; font-size: 0.9em; border: 1px solid rgba(255,255,255,0.4); }
-        .quest-link-btn:hover { background: rgba(255,255,255,0.4); }
-
+        
         /* Check-in */
         .checkin-card { border-left: 5px solid #17a2b8; }
         .checkin-checkbox { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; cursor: pointer; background: #f1f8ff; padding: 10px; border-radius: 8px; border: 1px solid #cce5ff; }
@@ -56,12 +55,11 @@
             <div id="checkin-container" class="card checkin-card hidden">
                 <h3 style="margin-top:0;">📅 อย่าลืมอ่าน Daily Quest</h3>
                 <div id="checkin-form">
-                    <p style="font-size:0.9em; color:#666;">รับคะแนน</b></p>
                     <label class="checkin-checkbox">
                         <input type="checkbox" id="chk-checkin" onchange="toggleCheckinBtn()">
                         <span style="font-weight:bold; color:#0056b3;">รับทราบ</span>
                     </label>
-                    <button id="btn-checkin" onclick="submitCheckIn()" disabled style="background:#17a2b8;">ยืนยันการรับแต้ม</button>
+                    <button id="btn-checkin" onclick="submitCheckIn()" disabled style="background:#17a2b8;">ยืนยันรับแต้ม</button>
                 </div>
                 <div id="checkin-done" class="hidden" style="text-align:center; padding:10px;">
                     <h2 style="margin:0; font-size:3em;">✅</h2>
@@ -69,24 +67,8 @@
                 </div>
             </div>
 
-            <div id="quest-container" class="card quest-card hidden">
-                <div class="quest-timer">⏰ เหลือเวลา: <span id="q-countdown">--:--</span></div>
-                
-                <img id="q-image-display" class="quest-image hidden" src="">
-                
-                <h3 style="margin:5px 0;">⚡ ภารกิจวันนี้</h3>
-                <p id="q-text" style="font-size:1.1em; margin-bottom:15px; line-height:1.4;">...</p>
-                
-                <a id="q-link-display" href="#" target="_blank" class="quest-link-btn hidden">🔗 อ่านเพิ่มเติม / ดูลิงก์แนบ</a>
-
-                <div id="q-input-area">
-                    <textarea id="q-answer" rows="3" placeholder="พิมพ์คำตอบของคุณที่นี่..." style="color:black;"></textarea>
-                    <button onclick="submitQuest()" style="background:#ffc107; color:black;">🚀 ส่งคำตอบ (รับ <span id="q-points">0</span> แต้ม)</button>
+            <div id="quest-list-container">
                 </div>
-                <div id="q-status" class="hidden" style="background:rgba(255,255,255,0.2); padding:15px; border-radius:8px; margin-top:10px;">
-                    ✅ <b>ส่งคำตอบแล้ว!</b><br><small>รอ Admin ตรวจเพื่อรับคะแนนพิเศษ</small>
-                </div>
-            </div>
 
             <div class="card">
                 <h4>📤 ส่งงาน / การบ้าน</h4>
@@ -106,8 +88,7 @@
         const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ใส่ LIFF ID User
 
         let userProfile, userId;
-        let currentQuestId = null, currentQuestDeadline = null, baseScore = 0;
-        let timerInterval = null;
+        let submittedQuestIds = new Set(); // เก็บ ID ที่ทำแล้ว
 
         async function main() {
             try {
@@ -123,7 +104,7 @@
 
                 checkAndCreateUser();
                 loadMyWorks();
-                loadActiveQuest();
+                loadQuests(); // โหลด Quest แบบใหม่
             } catch (err) { alert("LIFF Error: " + err.message); }
         }
         main();
@@ -156,67 +137,88 @@
             await batch.commit(); alert("บันทึกเวลาแล้ว!");
         }
 
-        // --- Quest Logic (Updated Media) ---
-        function loadActiveQuest() {
-            db.collection("quests").orderBy("createdAt", "desc").limit(1).onSnapshot((snapshot) => {
-                if(snapshot.empty) { document.getElementById('quest-container').classList.add('hidden'); return; }
-                const q = snapshot.docs[0].data();
-                if (!q.deadline || new Date() > q.deadline.toDate()) { document.getElementById('quest-container').classList.add('hidden'); return; }
-
-                currentQuestId = snapshot.docs[0].id;
-                currentQuestDeadline = q.deadline.toDate();
-                baseScore = q.baseScore || 0;
-
-                // Render Text
-                document.getElementById('quest-container').classList.remove('hidden');
-                document.getElementById('q-text').innerText = q.question;
-                document.getElementById('q-points').innerText = baseScore;
-
-                // Render Image
-                const imgEl = document.getElementById('q-image-display');
-                if (q.imageUrl && q.imageUrl.trim() !== "") {
-                    imgEl.src = q.imageUrl;
-                    imgEl.classList.remove('hidden');
-                } else {
-                    imgEl.classList.add('hidden');
-                }
-
-                // Render Link
-                const linkEl = document.getElementById('q-link-display');
-                if (q.questLink && q.questLink.trim() !== "") {
-                    linkEl.href = q.questLink;
-                    linkEl.classList.remove('hidden');
-                } else {
-                    linkEl.classList.add('hidden');
-                }
-
-                if(timerInterval) clearInterval(timerInterval);
-                startTimer();
-                checkIfAnswered();
+        // --- 🔥 New Quest Logic (Multiple & Sorted) ---
+        function loadQuests() {
+            // 1. โหลดข้อมูลการส่งคำตอบของ User ก่อน (เพื่อกรองอันที่ทำแล้วออก)
+            db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(snap => {
+                submittedQuestIds.clear();
+                snap.forEach(doc => submittedQuestIds.add(doc.data().questId));
+                
+                // 2. โหลด Quest ทั้งหมด เรียงตามเก่า -> ใหม่
+                db.collection("quests").orderBy("createdAt", "asc").onSnapshot(renderQuests);
             });
         }
-        function checkIfAnswered() {
-            db.collection("quest_submissions").where("questId", "==", currentQuestId).where("userId", "==", userId).limit(1).onSnapshot((snap) => {
-                if (!snap.empty) { document.getElementById('q-input-area').classList.add('hidden'); document.getElementById('q-status').classList.remove('hidden'); }
-                else { document.getElementById('q-input-area').classList.remove('hidden'); document.getElementById('q-status').classList.add('hidden'); }
+
+        function renderQuests(snapshot) {
+            const container = document.getElementById('quest-list-container');
+            container.innerHTML = ""; // Clear
+            
+            const now = new Date();
+
+            snapshot.forEach(doc => {
+                const q = doc.data();
+                const qId = doc.id;
+
+                // กรอง 1: หมดเวลาหรือยัง?
+                if (!q.deadline || now > q.deadline.toDate()) return;
+
+                // กรอง 2: ทำไปแล้วหรือยัง?
+                if (submittedQuestIds.has(qId)) return;
+
+                // ถ้าผ่าน แสดงผล (Render Card)
+                const deadlineDate = q.deadline.toDate();
+                const diff = deadlineDate - now;
+                const h = Math.floor(diff / (1000 * 60 * 60));
+                const m = Math.floor((diff / (1000 * 60)) % 60);
+                const timeLeftText = `${h} ชม. ${m} นาที`;
+
+                // HTML Structure
+                const imgHtml = q.imageUrl ? `<img src="${q.imageUrl}" class="quest-image">` : "";
+                const linkHtml = q.questLink ? `<a href="${q.questLink}" target="_blank" class="quest-link-btn">🔗 ดูข้อมูลเพิ่มเติม</a>` : "";
+
+                const card = document.createElement('div');
+                card.className = "card quest-card";
+                card.innerHTML = `
+                    <div class="quest-timer">⏰ เหลือเวลา: ${timeLeftText}</div>
+                    ${imgHtml}
+                    <h3 style="margin:5px 0;">⚡ ภารกิจ</h3>
+                    <p style="font-size:1.1em; margin-bottom:15px; line-height:1.4;">${q.question}</p>
+                    ${linkHtml}
+                    <div id="area-${qId}">
+                        <textarea id="ans-${qId}" rows="2" placeholder="คำตอบ..." style="color:black;"></textarea>
+                        <button onclick="submitQuest('${qId}', ${q.baseScore})" style="background:#ffc107; color:black;">🚀 ส่งคำตอบ (+${q.baseScore})</button>
+                    </div>
+                `;
+                container.appendChild(card);
             });
         }
-        function startTimer() {
-            timerInterval = setInterval(() => {
-                const diff = currentQuestDeadline - new Date();
-                if (diff <= 0) { document.getElementById('quest-container').classList.add('hidden'); clearInterval(timerInterval); return; }
-                const h=Math.floor((diff/(1000*3600))%24), m=Math.floor((diff/(1000*60))%60);
-                document.getElementById('q-countdown').innerText = `${h}:${m.toString().padStart(2,'0')}`;
-            }, 1000);
-        }
-        async function submitQuest() {
-            const ans = document.getElementById('q-answer').value.trim();
+
+        async function submitQuest(qId, baseScore) {
+            const ans = document.getElementById(`ans-${qId}`).value.trim();
             if (!ans) return alert("กรุณาพิมพ์คำตอบ");
-            const earned = (new Date() > currentQuestDeadline) ? 0 : baseScore;
-            const batch = db.batch();
-            batch.set(db.collection("quest_submissions").doc(), { questId: currentQuestId, userId, displayName: userProfile.displayName, answer: ans, timestamp: firebase.firestore.FieldValue.serverTimestamp(), isLate: earned===0, earnedScore: earned, bonusGiven: 0 });
-            if (earned > 0) batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(earned) });
-            await batch.commit(); alert(`ส่งแล้ว! ${earned>0?'+'+earned:''}`);
+            
+            try {
+                const batch = db.batch();
+                // บันทึกคำตอบ
+                batch.set(db.collection("quest_submissions").doc(), { 
+                    questId: qId, 
+                    userId, 
+                    displayName: userProfile.displayName, 
+                    answer: ans, 
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(), 
+                    isLate: false, 
+                    earnedScore: baseScore, 
+                    bonusGiven: 0 
+                });
+                // ให้คะแนน
+                batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(baseScore) });
+                
+                await batch.commit();
+                alert(`ส่งคำตอบเรียบร้อย! (+${baseScore} แต้ม)`);
+                // UI จะอัปเดตอัตโนมัติ (Card จะหายไปเพราะติด filter)
+            } catch(e) {
+                alert("Error: " + e.message);
+            }
         }
 
         // --- Works ---
@@ -241,4 +243,3 @@
     </script>
 </body>
 </html>
-
