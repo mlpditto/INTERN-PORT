@@ -41,9 +41,9 @@
         /* Quest & Leaderboard */
         .quest-create-card { background:#fff3cd; padding:20px; border-radius:8px; border:1px solid #ffeeba; margin-bottom:20px; }
         .leaderboard-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #ffd700; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
-        .rank-1 { border-left-color: #FFD700; background: #fffbe6; } /* Gold */
-        .rank-2 { border-left-color: #C0C0C0; } /* Silver */
-        .rank-3 { border-left-color: #CD7F32; } /* Bronze */
+        .rank-1 { border-left-color: #FFD700; background: #fffbe6; } 
+        .rank-2 { border-left-color: #C0C0C0; } 
+        .rank-3 { border-left-color: #CD7F32; } 
         
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
@@ -102,13 +102,23 @@
                     <label>คำถาม / โจทย์:</label>
                     <input type="text" id="q-text" placeholder="เช่น วันนี้เรียนรู้อะไรไปบ้าง?">
                 </div>
+                
+                <div class="input-group">
+                    <label>ลิงก์รูปภาพ (Optional):</label>
+                    <input type="text" id="q-img" placeholder="วาง URL รูปภาพ (เช่น https://...)">
+                </div>
+                <div class="input-group">
+                    <label>ลิงก์แนบ/บทความ (Optional):</label>
+                    <input type="text" id="q-link" placeholder="วางลิงก์ที่เกี่ยวข้อง">
+                </div>
+
                 <div style="display:flex; gap:10px; margin-top:10px;">
                     <div style="flex:1;">
-                        <label>หมดเขต (ชั่วโมงข้างหน้า):</label>
+                        <label>หมดเขต (ชม.):</label>
                         <input type="number" id="q-hours" value="24" style="width:100%; padding:8px;">
                     </div>
                     <div style="flex:1;">
-                        <label>คะแนนพื้นฐาน:</label>
+                        <label>คะแนน:</label>
                         <input type="number" id="q-score" value="10" style="width:100%; padding:8px;">
                     </div>
                 </div>
@@ -147,11 +157,11 @@
     <script>
         // CONFIG
         const ALLOWED_EMAIL = "medlifeplus@gmail.com";
-        const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ใส่ LIFF ID Admin
+        const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ใส่ ID Admin
         const MY_URL = 'https://mlpditto.github.io/INTERN-PORT/admin.html'; // ⚠️ ใส่ URL Admin
 
         const auth = firebase.auth();
-        let topUsersCache = []; // เก็บข้อมูลไว้แชร์
+        let topUsersCache = [];
 
         // --- Login ---
         if (auth.isSignInWithEmailLink(window.location.href)) {
@@ -195,54 +205,30 @@
         // --- Users & Leaderboard ---
         function loadUsers() {
             db.collection("users").orderBy("score", "desc").onSnapshot(snap => {
-                const tb = document.querySelector("#usersTable tbody"); 
-                const lb = document.getElementById("leaderboardList");
-                tb.innerHTML = ""; lb.innerHTML = "";
-                
-                topUsersCache = [];
-                let rank = 1;
-                
+                const tb = document.querySelector("#usersTable tbody"); const lb = document.getElementById("leaderboardList");
+                tb.innerHTML = ""; lb.innerHTML = ""; topUsersCache = []; let rank = 1;
                 snap.forEach(doc => {
-                    const u = doc.data();
-                    const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : '';
-                    
-                    // Table Row
+                    const u = doc.data(); const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : '';
                     tb.innerHTML += `<tr class="user-row"><td><img src="${u.pictureUrl}" width="30" style="border-radius:50%"></td><td>${u.displayName}</td><td>${u.score}</td>
                     <td><button class="btn-sm btn-primary" onclick="adj('${doc.id}', 1)">+1</button> <button class="btn-sm btn-danger" onclick="adj('${doc.id}', -1)">-1</button></td>
                     <td><button class="btn-sm btn-danger" onclick="delUser('${doc.id}')">ลบ</button></td></tr>`;
-                    
-                    // Leaderboard Card
                     if (rank <= 10) {
-                        topUsersCache.push(`${rank}. ${u.displayName} (${u.score} คะแนน)`);
-                        lb.innerHTML += `
-                            <div class="leaderboard-card ${rankClass}">
-                                <div style="display:flex; align-items:center; gap:10px;">
-                                    <h2 style="margin:0; color:#444; width:30px;">#${rank}</h2>
-                                    <img src="${u.pictureUrl}" style="width:40px; height:40px; border-radius:50%;">
-                                    <b>${u.displayName}</b>
-                                </div>
-                                <span class="badge" style="background:${rank===1?'#FFD700':'#eee'}; color:${rank===1?'#000':'#333'}; font-size:1em;">${u.score} ⭐️</span>
-                            </div>
-                        `;
+                        topUsersCache.push(`${rank}. ${u.displayName} (${u.score})`);
+                        lb.innerHTML += `<div class="leaderboard-card ${rankClass}"><div style="display:flex; align-items:center; gap:10px;"><h2 style="margin:0; color:#444; width:30px;">#${rank}</h2><img src="${u.pictureUrl}" style="width:40px; height:40px; border-radius:50%;"><b>${u.displayName}</b></div><span class="badge" style="background:${rank===1?'#FFD700':'#eee'}; color:${rank===1?'#000':'#333'}; font-size:1em;">${u.score} ⭐️</span></div>`;
                     }
                     rank++;
                 });
             });
         }
         
-        // --- 📤 Share Leaderboard ---
+        // --- 📤 Share ---
         async function shareLeaderboard() {
-            if (!liff.isLoggedIn()) { alert("กรุณา Login LIFF ก่อนแชร์"); liff.login(); return; }
-            if (topUsersCache.length === 0) return alert("ไม่มีข้อมูล");
-            
+            if (topUsersCache.length === 0) return alert("⚠️ ยังไม่มีข้อมูล");
             const text = "🏆 สรุปคะแนนล่าสุด:\n\n" + topUsersCache.join("\n") + "\n\n(อัปเดต: " + new Date().toLocaleTimeString('th-TH') + ")";
-            
-            if (liff.isApiAvailable('shareTargetPicker')) {
-                try {
-                    await liff.shareTargetPicker([{ type: "text", text: text }]);
-                } catch(e) { alert("แชร์ไม่สำเร็จ: " + e.message); }
+            if (liff.isInClient()) {
+                try { await liff.shareTargetPicker([{ type: "text", text: text }]); } catch (e) { alert("Error: " + e.message); }
             } else {
-                alert("อุปกรณ์นี้ไม่รองรับการแชร์");
+                try { await navigator.clipboard.writeText(text); alert("📋 คัดลอกแล้ว! วางใน LINE ได้เลยครับ"); } catch (err) { prompt("Copy ข้อความ:", text); }
             }
         }
 
@@ -254,29 +240,37 @@
                     const w = doc.data(); const id = doc.id;
                     const statusColor = w.status === 'ตรวจแล้ว' ? '#d4edda' : w.status === 'แก้ไข' ? '#f8d7da' : '#fff3cd';
                     const feedbackText = w.feedback ? `<div style="font-size:0.8em; color:#007bff; margin-top:5px;">💬 "${w.feedback}"</div>` : "";
-                    
-                    tbody.innerHTML += `<tr>
-                        <td>${w.timestamp ? w.timestamp.toDate().toLocaleString('th-TH') : ".."}</td>
-                        <td>${w.displayName}</td><td>${w.title}</td>
-                        <td><a href="${w.link}" target="_blank" class="btn-sm btn-secondary" style="text-decoration:none;">Link</a></td>
-                        <td><select onchange="updateStatus('${id}', this.value)" style="padding:5px; border-radius:4px; background:${statusColor}"><option value="รอตรวจ" ${w.status==='รอตรวจ'?'selected':''}>รอตรวจ</option><option value="ตรวจแล้ว" ${w.status==='ตรวจแล้ว'?'selected':''}>ตรวจแล้ว</option><option value="แก้ไข" ${w.status==='แก้ไข'?'selected':''}>แก้ไข</option></select></td>
-                        <td><button class="btn-sm btn-primary" onclick="addFeedback('${id}', '${w.feedback||''}')">📝</button>${feedbackText}</td>
-                        <td><button class="btn-sm btn-danger" onclick="delWork('${id}', '${w.title}')">ลบ</button></td>
-                    </tr>`;
+                    tbody.innerHTML += `<tr><td>${w.timestamp ? w.timestamp.toDate().toLocaleString('th-TH') : ".."}</td><td>${w.displayName}</td><td>${w.title}</td><td><a href="${w.link}" target="_blank" class="btn-sm btn-secondary" style="text-decoration:none;">Link</a></td><td><select onchange="updateStatus('${id}', this.value)" style="padding:5px; border-radius:4px; background:${statusColor}"><option value="รอตรวจ" ${w.status==='รอตรวจ'?'selected':''}>รอตรวจ</option><option value="ตรวจแล้ว" ${w.status==='ตรวจแล้ว'?'selected':''}>ตรวจแล้ว</option><option value="แก้ไข" ${w.status==='แก้ไข'?'selected':''}>แก้ไข</option></select></td><td><button class="btn-sm btn-primary" onclick="addFeedback('${id}', '${w.feedback||''}')">📝</button>${feedbackText}</td><td><button class="btn-sm btn-danger" onclick="delWork('${id}', '${w.title}')">ลบ</button></td></tr>`;
                 });
             });
         }
 
-        // --- Quest ---
+        // --- Quest (อัปเกรด) ---
         async function createQuest() {
             const text = document.getElementById('q-text').value;
             const hours = parseInt(document.getElementById('q-hours').value);
             const score = parseInt(document.getElementById('q-score').value);
+            // รับค่ารูปและลิงก์
+            const imgUrl = document.getElementById('q-img').value;
+            const linkUrl = document.getElementById('q-link').value;
+
             if(!text) return alert("ใส่คำถามก่อนครับ");
+            
             const deadline = new Date(); deadline.setHours(deadline.getHours() + hours);
             if(confirm(`สร้าง Quest: "${text}"?`)) {
-                await db.collection("quests").add({ question: text, baseScore: score, deadline: firebase.firestore.Timestamp.fromDate(deadline), createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-                alert("Quest Created!"); document.getElementById('q-text').value = "";
+                await db.collection("quests").add({ 
+                    question: text, 
+                    imageUrl: imgUrl, 
+                    questLink: linkUrl,
+                    baseScore: score, 
+                    deadline: firebase.firestore.Timestamp.fromDate(deadline), 
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp() 
+                });
+                alert("Quest Created!"); 
+                // Clear fields
+                document.getElementById('q-text').value = "";
+                document.getElementById('q-img').value = "";
+                document.getElementById('q-link').value = "";
             }
         }
         function loadQuestSubmissions() {
@@ -290,25 +284,31 @@
             });
         }
         
-        // 🔥 โหลดประวัติ Quest (Reuse)
+        // 🔥 โหลดประวัติ Quest (Reuse พร้อมรูป/ลิงก์)
         function loadQuestHistory() {
             db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(snapshot => {
                 const tbody = document.querySelector("#questHistoryTable tbody"); tbody.innerHTML = "";
                 snapshot.forEach(doc => {
                     const q = doc.data();
+                    // แปลง object เป็น string เพื่อส่งเข้าฟังก์ชัน reuse
+                    const safeQ = q.question.replace(/'/g, "\\'");
+                    const safeImg = (q.imageUrl || "").replace(/'/g, "\\'");
+                    const safeLink = (q.questLink || "").replace(/'/g, "\\'");
+                    
                     tbody.innerHTML += `<tr>
                         <td style="font-size:0.9em;">${q.question}</td>
                         <td>${q.baseScore}</td>
-                        <td><button class="btn-sm btn-secondary" onclick="reuseQuest('${q.question}', ${q.baseScore})">♻️</button></td>
+                        <td><button class="btn-sm btn-secondary" onclick="reuseQuest('${safeQ}', ${q.baseScore}, '${safeImg}', '${safeLink}')">♻️</button></td>
                     </tr>`;
                 });
             });
         }
         
-        function reuseQuest(qText, qScore) {
+        function reuseQuest(qText, qScore, qImg, qLink) {
             document.getElementById('q-text').value = qText;
             document.getElementById('q-score').value = qScore;
-            // Scroll to top
+            document.getElementById('q-img').value = qImg || "";
+            document.getElementById('q-link').value = qLink || "";
             document.querySelector('.quest-create-card').scrollIntoView({behavior: 'smooth'});
         }
 
