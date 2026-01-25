@@ -137,10 +137,10 @@
                 </div>
                 
                 <div style="flex:1; min-width:300px; border-left:1px solid #eee; padding-left:10px;">
-                    <h3>♻️ คลัง Quest (ใช้ซ้ำ)</h3>
+                    <h3>♻️ คลัง Quest</h3>
                     <div style="overflow-x:auto; max-height:400px;">
                         <table id="questHistoryTable">
-                            <thead><tr><th>โจทย์</th><th>คะแนน</th><th>เลือก</th></tr></thead>
+                            <thead><tr><th>โจทย์</th><th>คะแนน</th><th>จัดการ</th></tr></thead>
                             <tbody></tbody>
                         </table>
                     </div>
@@ -245,12 +245,11 @@
             });
         }
 
-        // --- Quest (อัปเกรด) ---
+        // --- Quest ---
         async function createQuest() {
             const text = document.getElementById('q-text').value;
             const hours = parseInt(document.getElementById('q-hours').value);
             const score = parseInt(document.getElementById('q-score').value);
-            // รับค่ารูปและลิงก์
             const imgUrl = document.getElementById('q-img').value;
             const linkUrl = document.getElementById('q-link').value;
 
@@ -267,10 +266,7 @@
                     createdAt: firebase.firestore.FieldValue.serverTimestamp() 
                 });
                 alert("Quest Created!"); 
-                // Clear fields
-                document.getElementById('q-text').value = "";
-                document.getElementById('q-img').value = "";
-                document.getElementById('q-link').value = "";
+                document.getElementById('q-text').value = ""; document.getElementById('q-img').value = ""; document.getElementById('q-link').value = "";
             }
         }
         function loadQuestSubmissions() {
@@ -284,13 +280,12 @@
             });
         }
         
-        // 🔥 โหลดประวัติ Quest (Reuse พร้อมรูป/ลิงก์)
+        // 🔥 โหลดประวัติ Quest (เพิ่มปุ่มลบ)
         function loadQuestHistory() {
             db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(snapshot => {
                 const tbody = document.querySelector("#questHistoryTable tbody"); tbody.innerHTML = "";
                 snapshot.forEach(doc => {
                     const q = doc.data();
-                    // แปลง object เป็น string เพื่อส่งเข้าฟังก์ชัน reuse
                     const safeQ = q.question.replace(/'/g, "\\'");
                     const safeImg = (q.imageUrl || "").replace(/'/g, "\\'");
                     const safeLink = (q.questLink || "").replace(/'/g, "\\'");
@@ -298,10 +293,21 @@
                     tbody.innerHTML += `<tr>
                         <td style="font-size:0.9em;">${q.question}</td>
                         <td>${q.baseScore}</td>
-                        <td><button class="btn-sm btn-secondary" onclick="reuseQuest('${safeQ}', ${q.baseScore}, '${safeImg}', '${safeLink}')">♻️</button></td>
+                        <td>
+                            <button class="btn-sm btn-secondary" onclick="reuseQuest('${safeQ}', ${q.baseScore}, '${safeImg}', '${safeLink}')" title="ใช้ซ้ำ">♻️</button>
+                            <button class="btn-sm btn-danger" onclick="deleteQuest('${doc.id}')" title="ลบ" style="margin-left:5px;">🗑️</button>
+                        </td>
                     </tr>`;
                 });
             });
+        }
+        
+        async function deleteQuest(questId) {
+            if(confirm("ยืนยันลบ Quest นี้จากคลัง?")) {
+                try {
+                    await db.collection("quests").doc(questId).delete();
+                } catch(e) { alert("Error: " + e.message); }
+            }
         }
         
         function reuseQuest(qText, qScore, qImg, qLink) {
