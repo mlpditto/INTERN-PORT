@@ -23,10 +23,20 @@
         button:hover { background-color: #05a546; }
         button:disabled { background-color: #ccc; cursor: not-allowed; }
 
-        /* 🔥 Quest Card (Multiple) */
+        /* 🔥 Quest Card (Fix Image) */
         .quest-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; margin-bottom: 20px; }
         .quest-timer { font-size: 0.9em; background: rgba(0,0,0,0.25); padding: 5px 12px; border-radius: 20px; display: inline-block; margin-bottom: 10px; }
-        .quest-image { width: 100%; max-height: 250px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; border: 2px solid rgba(255,255,255,0.3); }
+        
+        /* ✅ แก้ไขตรงนี้: ให้ภาพแสดงเต็มใบ ไม่โดนตัด */
+        .quest-image { 
+            width: 100%; 
+            height: auto; /* ปล่อยความสูงอิสระตามสัดส่วนภาพ */
+            border-radius: 8px; 
+            margin-bottom: 10px; 
+            border: 2px solid rgba(255,255,255,0.3); 
+            display: block; /* แก้บั๊กภาพลอย */
+        }
+        
         .quest-link-btn { display: inline-block; background: rgba(255,255,255,0.2); color: white; padding: 8px 15px; border-radius: 20px; text-decoration: none; margin-bottom: 15px; font-size: 0.9em; border: 1px solid rgba(255,255,255,0.4); }
         
         /* Check-in */
@@ -67,8 +77,7 @@
                 </div>
             </div>
 
-            <div id="quest-list-container">
-                </div>
+            <div id="quest-list-container"></div>
 
             <div class="card">
                 <h4>📤 ส่งงาน / การบ้าน</h4>
@@ -85,10 +94,10 @@
 
     <script src="firebase-config.js"></script>
     <script>
-        const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ใส่ LIFF ID User
+        const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ อย่าลืมใส่ LIFF ID
 
         let userProfile, userId;
-        let submittedQuestIds = new Set(); // เก็บ ID ที่ทำแล้ว
+        let submittedQuestIds = new Set();
 
         async function main() {
             try {
@@ -104,7 +113,7 @@
 
                 checkAndCreateUser();
                 loadMyWorks();
-                loadQuests(); // โหลด Quest แบบใหม่
+                loadQuests();
             } catch (err) { alert("LIFF Error: " + err.message); }
         }
         main();
@@ -137,54 +146,42 @@
             await batch.commit(); alert("บันทึกเวลาแล้ว!");
         }
 
-        // --- 🔥 New Quest Logic (Multiple & Sorted) ---
+        // --- Quest Logic ---
         function loadQuests() {
-            // 1. โหลดข้อมูลการส่งคำตอบของ User ก่อน (เพื่อกรองอันที่ทำแล้วออก)
             db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(snap => {
                 submittedQuestIds.clear();
                 snap.forEach(doc => submittedQuestIds.add(doc.data().questId));
-                
-                // 2. โหลด Quest ทั้งหมด เรียงตามเก่า -> ใหม่
                 db.collection("quests").orderBy("createdAt", "asc").onSnapshot(renderQuests);
             });
         }
 
         function renderQuests(snapshot) {
             const container = document.getElementById('quest-list-container');
-            container.innerHTML = ""; // Clear
-            
+            container.innerHTML = "";
             const now = new Date();
 
             snapshot.forEach(doc => {
                 const q = doc.data();
                 const qId = doc.id;
-
-                // กรอง 1: หมดเวลาหรือยัง?
                 if (!q.deadline || now > q.deadline.toDate()) return;
-
-                // กรอง 2: ทำไปแล้วหรือยัง?
                 if (submittedQuestIds.has(qId)) return;
 
-                // ถ้าผ่าน แสดงผล (Render Card)
-                const deadlineDate = q.deadline.toDate();
-                const diff = deadlineDate - now;
+                const diff = q.deadline.toDate() - now;
                 const h = Math.floor(diff / (1000 * 60 * 60));
                 const m = Math.floor((diff / (1000 * 60)) % 60);
-                const timeLeftText = `${h} ชม. ${m} นาที`;
 
-                // HTML Structure
                 const imgHtml = q.imageUrl ? `<img src="${q.imageUrl}" class="quest-image">` : "";
                 const linkHtml = q.questLink ? `<a href="${q.questLink}" target="_blank" class="quest-link-btn">🔗 ดูข้อมูลเพิ่มเติม</a>` : "";
 
                 const card = document.createElement('div');
                 card.className = "card quest-card";
                 card.innerHTML = `
-                    <div class="quest-timer">⏰ เหลือเวลา: ${timeLeftText}</div>
+                    <div class="quest-timer">⏰ เหลือเวลา: ${h} ชม. ${m} นาที</div>
                     ${imgHtml}
                     <h3 style="margin:5px 0;">⚡ ภารกิจ</h3>
                     <p style="font-size:1.1em; margin-bottom:15px; line-height:1.4;">${q.question}</p>
                     ${linkHtml}
-                    <div id="area-${qId}">
+                    <div>
                         <textarea id="ans-${qId}" rows="2" placeholder="คำตอบ..." style="color:black;"></textarea>
                         <button onclick="submitQuest('${qId}', ${q.baseScore})" style="background:#ffc107; color:black;">🚀 ส่งคำตอบ (+${q.baseScore})</button>
                     </div>
@@ -196,29 +193,10 @@
         async function submitQuest(qId, baseScore) {
             const ans = document.getElementById(`ans-${qId}`).value.trim();
             if (!ans) return alert("กรุณาพิมพ์คำตอบ");
-            
-            try {
-                const batch = db.batch();
-                // บันทึกคำตอบ
-                batch.set(db.collection("quest_submissions").doc(), { 
-                    questId: qId, 
-                    userId, 
-                    displayName: userProfile.displayName, 
-                    answer: ans, 
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(), 
-                    isLate: false, 
-                    earnedScore: baseScore, 
-                    bonusGiven: 0 
-                });
-                // ให้คะแนน
-                batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(baseScore) });
-                
-                await batch.commit();
-                alert(`ส่งคำตอบเรียบร้อย! (+${baseScore} แต้ม)`);
-                // UI จะอัปเดตอัตโนมัติ (Card จะหายไปเพราะติด filter)
-            } catch(e) {
-                alert("Error: " + e.message);
-            }
+            const batch = db.batch();
+            batch.set(db.collection("quest_submissions").doc(), { questId: qId, userId, displayName: userProfile.displayName, answer: ans, timestamp: firebase.firestore.FieldValue.serverTimestamp(), isLate: false, earnedScore: baseScore, bonusGiven: 0 });
+            batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(baseScore) });
+            await batch.commit(); alert(`ส่งแล้ว! (+${baseScore})`);
         }
 
         // --- Works ---
