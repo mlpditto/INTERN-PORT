@@ -3,61 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard (Magic Link + Feedback)</title>
-    
+    <title>Admin Dashboard (Quest Edition)</title>
     <link rel="stylesheet" href="style.css">
-    
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    
     <style>
-        /* Login Screen Style */
-        #login-screen {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            min-height: 100vh; background: #f0f2f5; font-family: sans-serif;
-        }
+        /* CSS เดิม */
+        #login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: #f0f2f5; font-family: sans-serif; }
         #dashboard-container { display: none; }
-        
-        .login-card {
-            background: white; padding: 40px; border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center;
-            max-width: 400px; width: 90%;
-        }
+        .login-card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%; }
         .input-group { margin-top: 20px; text-align: left; }
         .input-group label { display: block; margin-bottom: 5px; color: #666; font-size: 0.9em; }
-        .input-group input {
-            width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px;
-            font-size: 16px; box-sizing: border-box;
-        }
-        .magic-btn {
-            background: #007bff; color: white; border: none; border-radius: 6px;
-            padding: 12px; width: 100%; margin-top: 20px; font-size: 16px; cursor: pointer;
-            transition: 0.2s; font-weight: bold;
-        }
+        .input-group input, .input-group textarea { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
+        .magic-btn { background: #007bff; color: white; border: none; border-radius: 6px; padding: 12px; width: 100%; margin-top: 20px; font-size: 16px; cursor: pointer; transition: 0.2s; font-weight: bold; }
         .magic-btn:hover { background: #0056b3; }
-        .magic-btn:disabled { background: #ccc; cursor: not-allowed; }
         
-        #status-msg { margin-top: 15px; font-size: 0.9em; line-height: 1.5; }
-        .success-msg { color: #28a745; background: #d4edda; padding: 10px; border-radius: 4px; }
-        .error-msg { color: #dc3545; }
-
-        /* Dashboard Styles */
+        /* CSS Dashboard */
         .tab-nav { display: flex; border-bottom: 2px solid #eee; margin-bottom: 20px; overflow-x: auto; }
         .tab-btn { padding: 15px 20px; cursor: pointer; border: none; background: none; font-weight: 600; color: var(--gray); white-space: nowrap; }
-        .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
+        .tab-btn.active { color: #007bff; border-bottom: 3px solid #007bff; }
         .tab-content { display: none; animation: fadeIn 0.3s; }
         .tab-content.active { display: block; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #f8f9fa; color: #555; }
+        .btn-sm { padding: 5px 10px; border:none; border-radius:4px; cursor:pointer; color:white; font-size:0.9em;}
+        .btn-primary { background:#007bff; } .btn-danger { background:#dc3545; } .btn-secondary { background:#6c757d; }
+        .badge { padding:4px 8px; border-radius:10px; font-size:0.8em; }
         
-        .status-select { padding: 5px; border-radius: 4px; border: 1px solid #ddd; }
-        .search-box { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px; }
-        .action-group { display: flex; gap: 5px; }
-        .btn-icon { padding: 5px 10px; font-size: 14px; }
-        
+        /* CSS Quest */
+        .quest-create-card { background:#fff3cd; padding:20px; border-radius:8px; border:1px solid #ffeeba; margin-bottom:20px; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
@@ -66,254 +43,218 @@
     <div id="login-screen">
         <div class="login-card">
             <h2>🔐 Admin Access</h2>
-            <p style="color: #666;">ระบบยืนยันตัวตนแบบไร้รหัสผ่าน (Magic Link)</p>
-            
             <div id="login-form">
-                <div class="input-group">
-                    <label>อีเมลผู้ดูแลระบบ</label>
-                    <input type="email" id="email-input" placeholder="medlifeplus@gmail.com" value="medlifeplus@gmail.com">
-                </div>
+                <div class="input-group"><label>Email</label><input type="email" id="email-input" value="medlifeplus@gmail.com"></div>
                 <button class="magic-btn" id="send-btn" onclick="sendMagicLink()">✨ ส่งลิงก์เข้าอีเมล</button>
             </div>
-
-            <div id="status-msg"></div>
+            <div id="status-msg" style="margin-top:15px; color:red;"></div>
         </div>
     </div>
 
-    <div id="dashboard-container" class="container" style="max-width: 1000px; padding-top: 20px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap: wrap; gap: 10px;">
+    <div id="dashboard-container" class="container" style="max-width: 1000px; padding: 20px; margin:0 auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <h2>👨‍💻 Admin Dashboard</h2>
-            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                <span id="admin-email" style="font-size: 0.9em; color: #666;"></span>
-                <button class="btn btn-sm btn-danger" onclick="logout()">Logout</button>
-                <button class="btn btn-sm btn-secondary" onclick="location.reload()">🔄 Refresh</button>
-                <button class="btn btn-sm" style="background-color: #00B900; color: white;" onclick="shareLeaderboard()">📤 แชร์ผล</button>
+            <div>
+                <span id="admin-email" style="color:#666; font-size:0.9em; margin-right:10px;"></span>
+                <button class="btn-sm btn-danger" onclick="logout()">Logout</button>
             </div>
         </div>
 
         <div class="tab-nav">
             <button class="tab-btn active" onclick="switchTab('tab-users')">👥 จัดการคะแนน</button>
             <button class="tab-btn" onclick="switchTab('tab-works')">📄 ตรวจงาน</button>
-            <button class="tab-btn" onclick="switchTab('tab-leaderboard')">🏆 Leaderboard</button>
-        </div>
+            <button class="tab-btn" onclick="switchTab('tab-quest')">⚡ Daily Quest</button> </div>
 
         <div id="tab-users" class="tab-content active">
-            <div class="card">
-                <input type="text" id="userSearch" class="search-box" placeholder="🔍 ค้นหาชื่อน้องฝึกงาน..." onkeyup="filterUsers()">
-                <div style="overflow-x:auto;">
-                    <table id="usersTable">
-                        <thead><tr><th>รูป</th><th>ชื่อ</th><th>Level</th><th>คะแนน</th><th>จัดการ</th><th>ลบ</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
+            <div style="overflow-x:auto;"><table id="usersTable"><thead><tr><th>รูป</th><th>ชื่อ</th><th>คะแนน</th><th>จัดการ</th><th>ลบ</th></tr></thead><tbody></tbody></table></div>
         </div>
 
         <div id="tab-works" class="tab-content">
-            <div class="card">
-                <div style="overflow-x:auto;">
-                    <table id="worksTable">
-                        <thead>
-                            <tr>
-                                <th>เวลา</th>
-                                <th>ชื่อ</th>
-                                <th>หัวข้อ</th>
-                                <th>ลิงก์</th>
-                                <th>สถานะ</th>
-                                <th>คอมเมนต์</th> <th>ลบ</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
+            <div style="overflow-x:auto;"><table id="worksTable"><thead><tr><th>เวลา</th><th>ชื่อ</th><th>หัวข้อ</th><th>สถานะ</th><th>คอมเมนต์</th><th>ลบ</th></tr></thead><tbody></tbody></table></div>
         </div>
 
-        <div id="tab-leaderboard" class="tab-content">
-            <div class="grid-container" id="leaderboardGrid"></div>
+        <div id="tab-quest" class="tab-content">
+            <div class="quest-create-card">
+                <h3>📢 สร้าง Quest ประจำวัน</h3>
+                <div class="input-group" style="margin-top:0;">
+                    <label>คำถาม / โจทย์:</label>
+                    <input type="text" id="q-text" placeholder="เช่น วันนี้เรียนรู้อะไรไปบ้าง?">
+                </div>
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <div style="flex:1;">
+                        <label>หมดเขต (ชั่วโมงข้างหน้า):</label>
+                        <input type="number" id="q-hours" value="24" style="width:100%; padding:8px;">
+                    </div>
+                    <div style="flex:1;">
+                        <label>คะแนนพื้นฐาน (ส่งทันเวลารับเลย):</label>
+                        <input type="number" id="q-score" value="10" style="width:100%; padding:8px;">
+                    </div>
+                </div>
+                <button class="magic-btn" onclick="createQuest()" style="background:#ffc107; color:black; margin-top:15px;">🚀 ประกาศ Quest</button>
+            </div>
+
+            <h3>📝 คำตอบจากน้องๆ</h3>
+            <div style="overflow-x:auto;">
+                <table id="questTable">
+                    <thead><tr><th>เวลา</th><th>ชื่อ</th><th>คำตอบ</th><th>สถานะ</th><th>โบนัส</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
     <script src="firebase-config.js"></script>
     <script>
-        // 🔒 CONFIG
+        // CONFIG
         const ALLOWED_EMAIL = "medlifeplus@gmail.com";
-        const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ใส่ LIFF ID สำหรับ Admin ของคุณที่นี่
-        
-        // ⚠️ ลิงก์นี้สำคัญมาก ต้องตรงกับ URL หน้า Admin ของคุณเป๊ะๆ
-        const MY_URL = 'https://mlpditto.github.io/INTERN-PORT/admin.html'; 
+        const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ใส่ ID Admin ของคุณ
+        const MY_URL = 'https://mlpditto.github.io/INTERN-PORT/admin.html'; // ⚠️ ใส่ URL ของคุณ
 
         const auth = firebase.auth();
 
-        // --- 1. ตรวจสอบ Magic Link (Login) ---
+        // --- Login Logic ---
         if (auth.isSignInWithEmailLink(window.location.href)) {
-            let email = window.localStorage.getItem('emailForSignIn');
-            if (!email) {
-                email = window.prompt('เพื่อความปลอดภัย กรุณายืนยันอีเมลของคุณอีกครั้ง:');
-            }
-            if(email) {
-                document.getElementById('status-msg').innerHTML = "⏳ กำลังยืนยันตัวตน...";
-                auth.signInWithEmailLink(email, window.location.href)
-                    .then((result) => {
-                        window.localStorage.removeItem('emailForSignIn');
-                        window.location.replace(MY_URL); // ล้าง URL ให้สวยงาม
-                    })
-                    .catch((error) => {
-                        document.getElementById('status-msg').innerHTML = `<span class="error-msg">Error: ${error.message}</span>`;
-                    });
-            }
+            let email = window.localStorage.getItem('emailForSignIn') || window.prompt('ยืนยันอีเมลอีกครั้ง:');
+            auth.signInWithEmailLink(email, window.location.href).then(() => {
+                window.localStorage.removeItem('emailForSignIn');
+                window.location.replace(MY_URL);
+            }).catch((e) => alert(e.message));
         }
 
-        // --- 2. ฟังก์ชันส่งลิงก์ ---
         function sendMagicLink() {
-            const email = document.getElementById('email-input').value.trim();
-            const btn = document.getElementById('send-btn');
-            const status = document.getElementById('status-msg');
-
-            if (email !== ALLOWED_EMAIL) {
-                status.innerHTML = `<span class="error-msg">⛔ อีเมลนี้ไม่มีสิทธิ์เข้าใช้งานระบบครับ</span>`;
-                return;
-            }
-
-            const actionCodeSettings = {
-                url: MY_URL,
-                handleCodeInApp: true
-            };
-
-            btn.disabled = true;
-            btn.innerText = "กำลังส่ง...";
-
-            auth.sendSignInLinkToEmail(email, actionCodeSettings)
-                .then(() => {
-                    window.localStorage.setItem('emailForSignIn', email);
-                    status.innerHTML = `<div class="success-msg"><b>✅ ส่งลิงก์เรียบร้อย!</b><br>กรุณาเช็ค Inbox หรือ Junk ของ <b>${email}</b><br>แล้วกดลิงก์เพื่อเข้าสู่ระบบ</div>`;
-                    btn.style.display = 'none';
-                    document.getElementById('login-form').style.display = 'none';
-                })
-                .catch((error) => {
-                    btn.disabled = false;
-                    btn.innerText = "✨ ส่งลิงก์เข้าอีเมล";
-                    status.innerHTML = `<span class="error-msg">ส่งไม่สำเร็จ: ${error.message}</span>`;
-                });
+            const email = document.getElementById('email-input').value;
+            if(email !== ALLOWED_EMAIL) return alert("ไม่มีสิทธิ์เข้าถึง");
+            auth.sendSignInLinkToEmail(email, { url: MY_URL, handleCodeInApp: true })
+                .then(() => { window.localStorage.setItem('emailForSignIn', email); alert("เช็คอีเมลเพื่อกดลิงก์ Login ครับ"); })
+                .catch(e => alert(e.message));
         }
 
-        // --- 3. ตรวจสอบสถานะ ---
         auth.onAuthStateChanged((user) => {
-            if (user) {
-                if (user.email === ALLOWED_EMAIL) {
-                    document.getElementById('login-screen').style.display = 'none';
-                    document.getElementById('dashboard-container').style.display = 'block';
-                    document.getElementById('admin-email').innerText = user.email;
-                    initSystem();
-                } else {
-                    alert(`อีเมล ${user.email} ไม่มีสิทธิ์ครับ`);
-                    auth.signOut();
-                }
+            if (user && user.email === ALLOWED_EMAIL) {
+                document.getElementById('login-screen').style.display='none';
+                document.getElementById('dashboard-container').style.display='block';
+                document.getElementById('admin-email').innerText = user.email;
+                initSystem();
             }
         });
-
-        function logout() {
-            if(confirm("ออกจากระบบ?")) auth.signOut().then(() => location.reload());
-        }
+        function logout() { auth.signOut().then(() => location.reload()); }
 
         // --- System Logic ---
         let isInit = false;
         async function initSystem() {
             if(isInit) return; isInit = true;
-            try { await liff.init({ liffId: ADMIN_LIFF_ID }); } catch(e) {}
-            loadUsers(); 
-            loadWorks();
+            loadUsers(); loadWorks(); loadQuestSubmissions();
         }
-        
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el=>el.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
             event.target.classList.add('active');
         }
 
-        // --- Load Users ---
-        let allUsers = [];
-        function loadUsers() {
-             db.collection("users").orderBy("score", "desc").onSnapshot((snapshot) => {
-                const userTable = document.querySelector("#usersTable tbody");
-                const leaderboard = document.getElementById("leaderboardGrid");
-                userTable.innerHTML = ""; leaderboard.innerHTML = "";
-                allUsers = [];
-                let rank = 1;
-                snapshot.forEach(doc => {
-                    const u = doc.data();
-                    const uid = doc.id;
-                    const level = Math.floor(u.score / 10) + 1;
-                    allUsers.push({ uid, ...u, level });
-                    userTable.innerHTML += `<tr>
-                        <td><img src="${u.pictureUrl}" style="width:30px; border-radius:50%"></td>
-                        <td class="u-name">${u.displayName}</td>
-                        <td><span class="badge" style="background:#eee">Lv.${level}</span></td>
-                        <td style="font-weight:bold;">${u.score}</td>
-                        <td><div class="action-group"><button class="btn btn-sm btn-primary" onclick="adjScore('${uid}', 1)">+1</button><button class="btn btn-sm btn-danger" onclick="adjScore('${uid}', -1)">-1</button><button class="btn btn-sm btn-secondary" onclick="setScore('${uid}')">Set</button></div></td>
-                        <td><button class="btn btn-sm btn-danger" onclick="deleteUser('${uid}', '${u.displayName}')">🗑️</button></td>
-                    </tr>`;
-                    if (rank <= 10) { leaderboard.innerHTML += `<div class="card text-center" style="margin-bottom:0"><h4>#${rank} ${u.displayName}</h4><div class="badge badge-gold">${u.score} แต้ม</div></div>`; }
-                    rank++;
-                });
-            });
-        }
+        // --- Quest Functions (ใหม่) ---
+        async function createQuest() {
+            const text = document.getElementById('q-text').value;
+            const hours = parseInt(document.getElementById('q-hours').value);
+            const score = parseInt(document.getElementById('q-score').value);
+            
+            if(!text) return alert("ใส่คำถามก่อนครับ");
 
-        // --- Load Works (Updated for Feedback) ---
-        function loadWorks() {
-             db.collection("works").orderBy("timestamp", "desc").limit(50).onSnapshot((snapshot) => {
-                const tbody = document.querySelector("#worksTable tbody");
-                tbody.innerHTML = "";
-                snapshot.forEach(doc => {
-                    const w = doc.data();
-                    const id = doc.id;
-                    const statusColor = w.status === 'ตรวจแล้ว' ? '#d4edda' : w.status === 'แก้ไข' ? '#f8d7da' : '#fff3cd';
-                    const date = w.timestamp ? w.timestamp.toDate().toLocaleString('th-TH', { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit'}) : "..";
-                    
-                    // ส่วนแสดงผล Feedback
-                    const feedbackText = w.feedback ? `<div style="font-size:0.8em; color:#007bff; margin-top:5px;">💬 "${w.feedback}"</div>` : "";
-                    const feedbackBtn = `<button class="btn btn-sm" style="background:#17a2b8; color:white; margin-right:5px;" onclick="addFeedback('${id}', '${w.feedback || ''}')">📝</button>`;
+            // คำนวณเวลาหมดเขต
+            const deadline = new Date();
+            deadline.setHours(deadline.getHours() + hours);
 
-                    tbody.innerHTML += `<tr>
-                        <td style="font-size:0.85em; color:#666;">${date}</td>
-                        <td>${w.displayName}</td>
-                        <td>${w.title}</td>
-                        <td><a href="${w.link}" target="_blank" class="btn btn-sm btn-secondary">เปิด</a></td>
-                        <td>
-                            <select class="status-select" onchange="updateStatus('${id}', this.value)" style="background:${statusColor}">
-                                <option value="รอตรวจ" ${w.status==='รอตรวจ'?'selected':''}>รอตรวจ</option>
-                                <option value="ตรวจแล้ว" ${w.status==='ตรวจแล้ว'?'selected':''}>ตรวจแล้ว</option>
-                                <option value="แก้ไข" ${w.status==='แก้ไข'?'selected':''}>แก้ไข</option>
-                            </select>
-                        </td>
-                        <td style="min-width: 150px;">
-                            ${feedbackBtn}
-                            ${feedbackText}
-                        </td>
-                        <td><button class="btn btn-sm btn-danger" onclick="deleteWork('${id}', '${w.title}')">🗑️</button></td>
-                    </tr>`;
-                });
-            });
-        }
-
-        // --- Helper functions ---
-        async function deleteWork(docId, title) { if(confirm(`ลบงาน "${title}"?`)) try { await db.collection("works").doc(docId).delete(); } catch(e) { alert(e.message); } }
-        async function deleteUser(uid, name) { if (confirm(`ลบ User "${name}"?`)) try { await db.collection("users").doc(uid).delete(); } catch (e) { alert(e.message); } }
-        async function adjScore(uid, val) { try { await db.collection("users").doc(uid).update({ score: firebase.firestore.FieldValue.increment(val) }); } catch(e) { alert(e.message); } }
-        async function setScore(uid) { let val = prompt("คะแนนใหม่:"); if(val) await db.collection("users").doc(uid).update({ score: parseInt(val) }); }
-        async function updateStatus(docId, newStatus) { try { await db.collection("works").doc(docId).update({ status: newStatus }); } catch(e) { alert(e.message); } }
-        function filterUsers() { const term = document.getElementById('userSearch').value.toLowerCase(); document.querySelectorAll('.user-row').forEach(row => { row.style.display = row.innerText.toLowerCase().includes(term) ? '' : 'none'; }); }
-        async function shareLeaderboard() { if (!liff.isLoggedIn()) { liff.login(); return; } if (liff.isApiAvailable('shareTargetPicker')) liff.shareTargetPicker([{type:"text", text:"Share Feature"}]); }
-
-        // ฟังก์ชันบันทึก Feedback
-        async function addFeedback(docId, oldFeedback) {
-            const newFeedback = prompt("พิมพ์ข้อความถึงน้องฝึกงาน:", oldFeedback);
-            if (newFeedback !== null) {
-                try { await db.collection("works").doc(docId).update({ feedback: newFeedback }); } 
-                catch(e) { alert("Error: " + e.message); }
+            if(confirm(`ยืนยันสร้าง Quest?\n"${text}"\nคะแนน: ${score}`)) {
+                try {
+                    // สร้าง Quest ใหม่ (และปิดอันเก่าอัตโนมัติ ด้วยการ query หน้าบ้านเอาตัวล่าสุด)
+                    await db.collection("quests").add({
+                        question: text,
+                        baseScore: score,
+                        deadline: firebase.firestore.Timestamp.fromDate(deadline),
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        active: true
+                    });
+                    alert("ประกาศ Quest แล้ว! 🎉");
+                    document.getElementById('q-text').value = "";
+                } catch(e) { alert(e.message); }
             }
         }
+
+        function loadQuestSubmissions() {
+            // โหลดคำตอบ Quest ล่าสุด
+            db.collection("quest_submissions").orderBy("timestamp", "desc").limit(50).onSnapshot(snapshot => {
+                const tbody = document.querySelector("#questTable tbody");
+                tbody.innerHTML = "";
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    const date = d.timestamp ? d.timestamp.toDate().toLocaleString('th-TH') : "";
+                    
+                    // ปุ่มให้คะแนนพิเศษ
+                    let bonusBtn = `<button class="btn-sm btn-primary" onclick="giveBonus('${doc.id}', '${d.userId}', '${d.displayName}')">+ คะแนนพิเศษ</button>`;
+                    if(d.bonusGiven) bonusBtn = `<span class="badge" style="background:#28a745; color:white;">ได้โบนัสแล้ว (+${d.bonusGiven})</span>`;
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td style="font-size:0.8em;">${date}</td>
+                            <td>${d.displayName}</td>
+                            <td>${d.answer}</td>
+                            <td>
+                                <span class="badge" style="background:${d.isLate ? '#dc3545' : '#28a745'}; color:white;">
+                                    ${d.isLate ? 'ส่งช้า (0 แต้ม)' : `ทันเวลา (+${d.earnedScore})`}
+                                </span>
+                            </td>
+                            <td>${bonusBtn}</td>
+                        </tr>
+                    `;
+                });
+            });
+        }
+
+        async function giveBonus(subId, userId, name) {
+            const amount = prompt(`ให้คะแนนพิเศษ ${name} เท่าไหร่ดี?`, "5");
+            if(amount) {
+                const points = parseInt(amount);
+                try {
+                    const batch = db.batch();
+                    // 1. เพิ่มคะแนนให้ User
+                    const userRef = db.collection("users").doc(userId);
+                    batch.update(userRef, { score: firebase.firestore.FieldValue.increment(points) });
+                    // 2. อัปเดตสถานะใน submission ว่าให้แล้ว
+                    const subRef = db.collection("quest_submissions").doc(subId);
+                    batch.update(subRef, { bonusGiven: points });
+                    
+                    await batch.commit();
+                    // ไม่ต้อง alert เพราะหน้าจอจะอัปเดตเอง
+                } catch(e) { alert(e.message); }
+            }
+        }
+
+        // --- Existing Functions (ย่อ) ---
+        function loadUsers() {
+            db.collection("users").orderBy("score", "desc").onSnapshot(snap => {
+                const tb = document.querySelector("#usersTable tbody"); tb.innerHTML = "";
+                snap.forEach(doc => {
+                    const u = doc.data();
+                    tb.innerHTML += `<tr><td><img src="${u.pictureUrl}" width="30"></td><td>${u.displayName}</td><td>${u.score}</td>
+                    <td><button class="btn-sm btn-primary" onclick="adj('${doc.id}', 1)">+1</button> <button class="btn-sm btn-danger" onclick="adj('${doc.id}', -1)">-1</button></td>
+                    <td><button class="btn-sm btn-danger" onclick="delUser('${doc.id}')">ลบ</button></td></tr>`;
+                });
+            });
+        }
+        function loadWorks() {
+             db.collection("works").orderBy("timestamp", "desc").limit(20).onSnapshot(snap => {
+                const tb = document.querySelector("#worksTable tbody"); tb.innerHTML = "";
+                snap.forEach(doc => {
+                    const w = doc.data();
+                    tb.innerHTML += `<tr><td>${w.timestamp?.toDate().toLocaleString()}</td><td>${w.displayName}</td><td>${w.title}</td><td>${w.status}</td><td>${w.feedback||'-'}</td>
+                    <td><button class="btn-sm btn-danger" onclick="delWork('${doc.id}')">ลบ</button></td></tr>`;
+                });
+            });
+        }
+        async function adj(uid, v) { db.collection("users").doc(uid).update({ score: firebase.firestore.FieldValue.increment(v) }); }
+        async function delUser(uid) { if(confirm("ลบ?")) db.collection("users").doc(uid).delete(); }
+        async function delWork(wid) { if(confirm("ลบ?")) db.collection("works").doc(wid).delete(); }
+
     </script>
 </body>
 </html>
