@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP INTERNSHIP V.260125</title>
+    <title>MLP INTERNSHIP V.260125 (V16)</title>
     <link rel="stylesheet" href="style.css">
     
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -12,56 +12,76 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     
     <style>
-        /* CSS เดิม */
-        body{font-family:sans-serif; background:#f0f2f5; margin:0;}
+        /* Base */
+        body{font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f4f6f9; margin:0;}
         #login-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; }
         #dashboard-container { display:none; max-width:1100px; margin:20px auto; padding:20px; }
-        .login-card { background:white; padding:40px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.1); width:90%; max-width:400px; text-align:center; }
-        .input-group { margin-top:15px; text-align:left; } .input-group input { width:100%; padding:10px; border:1px solid #ccc; border-radius:5px; box-sizing:border-box; }
-        .magic-btn { background:#007bff; color:white; border:none; padding:12px; width:100%; border-radius:5px; margin-top:20px; cursor:pointer; font-weight:bold; }
         
-        /* Dashboard Elements */
-        .tab-nav { display:flex; border-bottom:2px solid #ddd; margin-bottom:20px; overflow-x:auto; }
-        .tab-btn { padding:15px 20px; border:none; background:none; cursor:pointer; font-weight:bold; color:#666; white-space:nowrap; }
-        .tab-btn.active { color:#007bff; border-bottom:3px solid #007bff; }
-        .tab-content { display:none; } .tab-content.active { display:block; }
+        /* Login */
+        .login-card { background:white; padding:40px; border-radius:15px; box-shadow:0 10px 25px rgba(0,0,0,0.1); width:90%; max-width:400px; text-align:center; }
+        .input-group input { width:100%; padding:12px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; margin-top:5px; }
+        .magic-btn { background:#4361ee; color:white; border:none; padding:12px; width:100%; border-radius:8px; margin-top:20px; cursor:pointer; font-weight:bold; transition:0.2s; }
+        .magic-btn:hover { background:#3046b5; }
+
+        /* Navigation */
+        .tab-nav { display:flex; border-bottom:2px solid #e0e0e0; margin-bottom:20px; overflow-x:auto; gap:10px; padding-bottom:5px; }
+        .tab-btn { padding:10px 20px; border:none; background:none; cursor:pointer; font-weight:600; color:#777; border-radius:8px; transition:0.2s; white-space:nowrap; }
+        .tab-btn:hover { background:#eef2f6; color:#333; }
+        .tab-btn.active { background:#eef2ff; color:#4361ee; }
+        .tab-content { display:none; animation:fadeIn 0.3s; } .tab-content.active { display:block; }
         
-        /* Tables */
-        table { width:100%; border-collapse:collapse; background:white; border-radius:8px; overflow:hidden; box-shadow:0 2px 5px rgba(0,0,0,0.05); margin-bottom:20px; }
-        th, td { padding:12px; text-align:left; border-bottom:1px solid #eee; vertical-align:middle; }
-        th { background:#f8f9fa; color:#555; font-size:0.9em; }
+        /* Table */
+        table { width:100%; border-collapse:collapse; background:white; border-radius:12px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,0.03); margin-bottom:20px; }
+        th, td { padding:15px; text-align:left; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
+        th { background:#fafafa; color:#555; font-weight:600; font-size:0.9em; text-transform:uppercase; letter-spacing:0.5px; }
+        tr:hover { background-color:#f8f9fa; }
         
-        /* Components */
-        .btn-sm { padding:5px 10px; border-radius:4px; border:none; cursor:pointer; color:white; font-size:0.85em; margin:2px; }
-        .btn-primary { background:#007bff; } .btn-danger { background:#dc3545; } .btn-success { background:#28a745; } .btn-warning { background:#ffc107; color:black; } .btn-dark { background:#343a40; }
-        .badge { padding:4px 8px; border-radius:10px; font-size:0.8em; color:white; }
-        .user-pic { width:35px; height:35px; border-radius:50%; object-fit:cover; border:1px solid #ddd; vertical-align:middle; margin-right:8px; }
+        /* UI Elements */
+        .btn-sm { padding:6px 12px; border-radius:6px; border:none; cursor:pointer; color:white; font-size:0.85em; font-weight:500; transition:0.2s; margin:0 2px; }
+        .btn-primary { background:#4361ee; } .btn-danger { background:#ef233c; } .btn-success { background:#2ec4b6; } .btn-warning { background:#ff9f1c; color:white; } .btn-dark { background:#2b2d42; }
+        .badge { padding:5px 10px; border-radius:20px; font-size:0.75em; font-weight:bold; color:white; display:inline-block; }
+        .user-pic { width:36px; height:36px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 2px 5px rgba(0,0,0,0.1); vertical-align:middle; margin-right:10px; }
         
-        /* Sections */
-        .section-header { display:flex; justify-content:space-between; align-items:center; background:#e9ecef; padding:10px 15px; border-radius:5px 5px 0 0; font-weight:bold; color:#495057; }
-        .quest-create-card, .active-quest-card { background:white; padding:20px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05); margin-bottom:20px; }
-        .active-quest-card { border-left:5px solid #28a745; background:#f4fbf6; }
-        .leaderboard-card { background:white; padding:10px 15px; margin-bottom:10px; border-radius:8px; display:flex; align-items:center; justify-content:space-between; border-left:5px solid #ddd; }
-        .rank-1 { border-color:#ffd700; } .rank-2 { border-color:#c0c0c0; } .rank-3 { border-color:#cd7f32; }
+        /* Leaderboard Specifics */
+        .leaderboard-card { background:white; padding:15px 20px; margin-bottom:12px; border-radius:12px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,0.04); transition:transform 0.2s; border-left:6px solid transparent; }
+        .leaderboard-card:hover { transform:translateY(-2px); }
+        .rank-1 { border-left-color:#FFD700; background:linear-gradient(to right, #fffdf0, #fff); } 
+        .rank-2 { border-left-color:#C0C0C0; background:linear-gradient(to right, #f8f9fa, #fff); } 
+        .rank-3 { border-left-color:#CD7F32; background:linear-gradient(to right, #fffaf5, #fff); }
+        .rank-other { border-left-color:#4361ee; }
+
+        .star-icon { font-size:1.2em; margin-left:5px; }
+        .star-gold { color:#FFD700; text-shadow:0 0 5px rgba(255, 215, 0, 0.5); }
+        .star-silver { color:#C0C0C0; }
+        .star-bronze { color:#CD7F32; }
+        .star-blue { color:#4361ee; opacity:0.7; }
+        
+        .section-header { font-size:1.1em; font-weight:bold; color:#2b2d42; margin:25px 0 15px 0; border-left:4px solid #4361ee; padding-left:10px; }
+        
+        @keyframes fadeIn { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
         <div class="login-card">
-            <h2>🔐 Admin Check</h2>
+            <h2 style="margin-bottom:5px;">🔐 Admin Portal</h2>
+            <p style="color:#888; margin-bottom:20px;">Internship Management System</p>
             <div id="login-form">
-                <div class="input-group"><label>Email</label><input type="email" id="email-input" value="medlifeplus@gmail.com"></div>
+                <div class="input-group"><input type="email" id="email-input" value="medlifeplus@gmail.com" placeholder="Email"></div>
                 <button class="magic-btn" onclick="sendMagicLink()">✨ ส่งลิงก์เข้าอีเมล</button>
             </div>
-            <div id="status-msg" style="margin-top:15px; color:red;"></div>
+            <div id="status-msg" style="margin-top:15px; color:#ef233c;"></div>
         </div>
     </div>
 
     <div id="dashboard-container">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h2>👨‍💻 Admin Dashboard</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
             <div>
+                <h2 style="margin:0; color:#2b2d42;">👨‍💻 Admin Dashboard</h2>
+                <span id="admin-email" style="color:#888; font-size:0.9em;"></span>
+            </div>
+            <div style="display:flex; gap:10px;">
                 <button class="btn-sm btn-success" onclick="shareLeaderboard()">📤 แชร์คะแนน</button>
                 <button class="btn-sm btn-danger" onclick="logout()">Logout</button>
             </div>
@@ -70,12 +90,11 @@
         <div class="tab-nav">
             <button class="tab-btn active" onclick="switchTab('tab-works')">📄 ตรวจงาน & Quest</button>
             <button class="tab-btn" onclick="switchTab('tab-manage-quest')">⚙️ ตั้งค่า Quest</button>
-            <button class="tab-btn" onclick="switchTab('tab-users')">👥 รายชื่อ & คะแนน</button>
+            <button class="tab-btn" onclick="switchTab('tab-users')">👥 รายชื่อ</button>
             <button class="tab-btn" onclick="switchTab('tab-leaderboard')">🏆 Leaderboard</button>
         </div>
 
         <div id="tab-works" class="tab-content active">
-            
             <div class="section-header">📁 งานทั่วไป / การบ้าน</div>
             <div style="overflow-x:auto;">
                 <table id="worksTable">
@@ -84,7 +103,7 @@
                 </table>
             </div>
 
-            <div class="section-header" style="margin-top:30px;">⚡ Quest Submissions (คำตอบประจำวัน)</div>
+            <div class="section-header">⚡ Quest Submissions (คำตอบประจำวัน)</div>
             <div style="overflow-x:auto;">
                 <table id="questTable">
                     <thead><tr><th>เวลา</th><th>ผู้ส่ง</th><th>คำตอบ</th><th>สถานะ</th><th>คะแนนรวม</th><th>จัดการ</th></tr></thead>
@@ -94,28 +113,26 @@
         </div>
 
         <div id="tab-manage-quest" class="tab-content">
-            <div class="quest-create-card">
-                <h3>📢 สร้าง Quest ใหม่</h3>
-                <div class="input-group"><input type="text" id="q-text" placeholder="โจทย์..."></div>
-                <div style="display:flex; gap:10px; margin-top:10px;">
-                    <input type="text" id="q-img" placeholder="ลิงก์รูป (Optional)" style="flex:1;">
-                    <input type="text" id="q-link" placeholder="ลิงก์แนบ (Optional)" style="flex:1;">
+            <div style="background:white; padding:25px; border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,0.05); margin-bottom:25px;">
+                <h3 style="margin-top:0;">📢 สร้าง Quest ใหม่</h3>
+                <input type="text" id="q-text" placeholder="คำถาม / โจทย์..." style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px; margin-bottom:10px;">
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <input type="text" id="q-img" placeholder="ลิงก์รูป (Optional)" style="flex:1; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                    <input type="text" id="q-link" placeholder="ลิงก์แนบ (Optional)" style="flex:1; padding:10px; border:1px solid #ddd; border-radius:8px;">
                 </div>
-                <div style="display:flex; gap:10px; margin-top:10px;">
-                    <input type="number" id="q-hours" value="24" placeholder="ชม." style="width:80px;">
-                    <input type="number" id="q-score" value="10" placeholder="คะแนน" style="width:80px;">
+                <div style="display:flex; gap:10px;">
+                    <input type="number" id="q-hours" value="24" placeholder="ชม." style="width:80px; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                    <input type="number" id="q-score" value="10" placeholder="คะแนน" style="width:80px; padding:10px; border:1px solid #ddd; border-radius:8px;">
                     <button class="btn-sm btn-warning" style="flex:1; font-size:1em;" onclick="createQuest()">🚀 ประกาศ Quest</button>
                 </div>
             </div>
 
-            <div id="active-quest-section" style="display:none;">
-                <div class="active-quest-card">
-                    <h3 style="color:#155724; margin:0 0 10px 0;">🟢 กำลัง Active</h3>
-                    <table id="activeQuestTable" style="margin:0;">
-                        <thead><tr><th>โจทย์</th><th>หมดเขต</th><th>แก้ไข</th><th>ยุติ</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
+            <div id="active-quest-section" style="display:none; background:#d4edda; padding:15px; border-radius:8px; margin-bottom:20px; border:1px solid #c3e6cb;">
+                <h3 style="color:#155724; margin:0 0 10px 0;">🟢 กำลัง Active</h3>
+                <table id="activeQuestTable" style="margin:0; background:transparent; box-shadow:none;">
+                    <thead><tr><th>โจทย์</th><th>หมดเขต</th><th>แก้ไข</th><th>ยุติ</th></tr></thead>
+                    <tbody></tbody>
+                </table>
             </div>
 
             <h3>♻️ ประวัติ Quest</h3>
@@ -126,12 +143,12 @@
         </div>
 
         <div id="tab-users" class="tab-content">
-            <input type="text" id="userSearch" style="width:100%; padding:10px; margin-bottom:10px;" placeholder="🔍 ค้นหาชื่อ..." onkeyup="filterUsers()">
+            <input type="text" id="userSearch" style="width:100%; padding:12px; margin-bottom:15px; border:1px solid #ddd; border-radius:8px;" placeholder="🔍 ค้นหาชื่อ..." onkeyup="filterUsers()">
             <table id="usersTable"><thead><tr><th>ผู้ใช้งาน</th><th>Level</th><th>คะแนนรวม</th><th>ปรับคะแนน</th><th>ลบ</th></tr></thead><tbody></tbody></table>
         </div>
 
         <div id="tab-leaderboard" class="tab-content">
-            <div id="leaderboardList" style="max-width:600px; margin:0 auto;"></div>
+            <div id="leaderboardList" style="max-width:700px; margin:0 auto;"></div>
         </div>
     </div>
 
@@ -161,12 +178,13 @@
             if(user && user.email===ALLOWED_EMAIL) {
                 document.getElementById('login-screen').style.display='none';
                 document.getElementById('dashboard-container').style.display='block';
+                document.getElementById('admin-email').innerText = user.email;
                 initSystem();
             }
         });
         function logout() { auth.signOut().then(() => location.reload()); }
 
-        // --- System ---
+        // --- Init ---
         let isInit = false;
         async function initSystem() {
             if(isInit) return; isInit = true;
@@ -179,31 +197,24 @@
             document.getElementById(id).classList.add('active'); event.target.classList.add('active');
         }
 
-        // --- 1. ตรวจงานทั่วไป (Works) ---
+        // --- Works ---
         function loadWorks() {
             db.collection("works").orderBy("timestamp", "desc").limit(50).onSnapshot(snap => {
                 const tb = document.querySelector("#worksTable tbody"); tb.innerHTML = "";
                 snap.forEach(doc => {
                     const w = doc.data(); const id = doc.id;
                     const statusColor = w.status==='ตรวจแล้ว'?'#d4edda':w.status==='แก้ไข'?'#f8d7da':'#fff3cd';
-                    const scoreVal = w.score || 0;
                     
                     tb.innerHTML += `<tr>
-                        <td style="font-size:0.8em;">${w.timestamp?.toDate().toLocaleString('th-TH')||''}</td>
-                        <td><img src="${w.pictureUrl||'https://via.placeholder.com/35'}" class="user-pic">${w.displayName}</td>
+                        <td style="font-size:0.8em; color:#888;">${w.timestamp?.toDate().toLocaleString('th-TH')||''}</td>
+                        <td><div style="display:flex; align-items:center;"><img src="${w.pictureUrl||'https://via.placeholder.com/35'}" class="user-pic">${w.displayName}</div></td>
                         <td>${w.title}</td>
                         <td><a href="${w.link}" target="_blank" class="btn-sm btn-dark">Link</a></td>
-                        <td>
-                            <select onchange="updateStatus('${id}', this.value)" style="background:${statusColor}; border:none; padding:5px; border-radius:4px;">
-                                <option value="รอตรวจ" ${w.status==='รอตรวจ'?'selected':''}>รอตรวจ</option>
-                                <option value="ตรวจแล้ว" ${w.status==='ตรวจแล้ว'?'selected':''}>ตรวจแล้ว</option>
-                                <option value="แก้ไข" ${w.status==='แก้ไข'?'selected':''}>แก้ไข</option>
-                            </select>
-                        </td>
+                        <td><select onchange="updateStatus('${id}', this.value)" style="background:${statusColor}; border:none; padding:5px; border-radius:4px;"><option value="รอตรวจ" ${w.status==='รอตรวจ'?'selected':''}>รอตรวจ</option><option value="ตรวจแล้ว" ${w.status==='ตรวจแล้ว'?'selected':''}>ตรวจแล้ว</option><option value="แก้ไข" ${w.status==='แก้ไข'?'selected':''}>แก้ไข</option></select></td>
                         <td>
                             <div style="display:flex; align-items:center;">
-                                <input type="number" id="score-w-${id}" value="${scoreVal}" style="width:50px; padding:2px;" placeholder="0">
-                                <button class="btn-sm btn-primary" onclick="saveWorkScore('${id}', '${w.userId}', ${scoreVal})">💾</button>
+                                <input type="number" step="0.1" id="score-w-${id}" value="${w.score||0}" style="width:60px; padding:5px; border:1px solid #ddd; border-radius:4px; text-align:center;">
+                                <button class="btn-sm btn-primary" onclick="saveWorkScore('${id}', '${w.userId}', ${w.score||0})">💾</button>
                             </div>
                         </td>
                         <td><button class="btn-sm btn-primary" onclick="addFeedback('${id}', '${w.feedback||''}')">💬</button>${w.feedback?`<span style="font-size:0.8em; color:blue;"> ✔️</span>`:''}</td>
@@ -212,41 +223,39 @@
                 });
             });
         }
-
         async function saveWorkScore(workId, userId, oldScore) {
             const newScore = parseFloat(document.getElementById(`score-w-${workId}`).value) || 0;
-            if(newScore === oldScore) return; // ไม่เปลี่ยนไม่ต้องทำอะไร
-
+            if(newScore === oldScore) return;
             const diff = newScore - oldScore;
-            try {
-                const batch = db.batch();
-                // อัปเดตคะแนนในงาน
-                batch.update(db.collection("works").doc(workId), { score: newScore, status: "ตรวจแล้ว" }); // ให้คะแนน = ตรวจแล้ว
-                // อัปเดตคะแนนรวม User
-                batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(diff) });
-                
-                await batch.commit();
-                alert(`บันทึกคะแนนเรียบร้อย (${oldScore} -> ${newScore})\nผู้เรียนได้รับคะแนนเพิ่ม ${diff}`);
-            } catch(e) { alert("Error: " + e.message); }
+            const batch = db.batch();
+            batch.update(db.collection("works").doc(workId), { score: newScore, status: "ตรวจแล้ว" });
+            batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(diff) });
+            await batch.commit(); alert(`บันทึกคะแนนแล้ว (+${diff})`);
         }
 
-        // --- 2. ตรวจ Quest (Quest Submissions) ---
+        // --- Quest Submissions ---
         function loadQuestSubmissions() {
             db.collection("quest_submissions").orderBy("timestamp", "desc").limit(50).onSnapshot(snap => {
                 const tb = document.querySelector("#questTable tbody"); tb.innerHTML = "";
                 snap.forEach(doc => {
                     const d = doc.data(); const id = doc.id;
                     const totalScore = (d.earnedScore || 0) + (d.bonusGiven || 0);
-                    const statusBadge = d.isLate ? '<span class="badge" style="background:#dc3545">ส่งช้า</span>' : '<span class="badge" style="background:#28a745">ทันเวลา</span>';
+                    const statusBadge = d.isLate ? '<span class="badge" style="background:#ef233c">ส่งช้า</span>' : '<span class="badge" style="background:#2ec4b6">ทันเวลา</span>';
                     
+                    // ✅ ตรวจจับลิงก์ในคำตอบ
+                    let answerDisplay = d.answer;
+                    if (answerDisplay.startsWith('http')) {
+                        answerDisplay = `<a href="${answerDisplay}" target="_blank" class="btn-sm btn-dark" style="text-decoration:none;">🔗 เปิดลิงก์</a> <span style="font-size:0.8em; color:#888;">(Link)</span>`;
+                    }
+
                     tb.innerHTML += `<tr>
-                        <td style="font-size:0.8em;">${d.timestamp?.toDate().toLocaleString('th-TH')||''}</td>
-                        <td><img src="${d.pictureUrl||'https://via.placeholder.com/35'}" class="user-pic">${d.displayName}</td>
-                        <td>${d.answer}</td>
+                        <td style="font-size:0.8em; color:#888;">${d.timestamp?.toDate().toLocaleString('th-TH')||''}</td>
+                        <td><div style="display:flex; align-items:center;"><img src="${d.pictureUrl||'https://via.placeholder.com/35'}" class="user-pic">${d.displayName}</div></td>
+                        <td>${answerDisplay}</td>
                         <td>${statusBadge}</td>
                         <td>
                             <div style="display:flex; align-items:center;">
-                                <input type="number" id="score-q-${id}" value="${totalScore}" style="width:50px; padding:2px;">
+                                <input type="number" step="0.1" id="score-q-${id}" value="${totalScore}" style="width:60px; padding:5px; border:1px solid #ddd; border-radius:4px; text-align:center;">
                                 <button class="btn-sm btn-warning" onclick="updateQuestScore('${id}', '${d.userId}', ${totalScore}, ${d.earnedScore||0})">แก้</button>
                             </div>
                         </td>
@@ -255,26 +264,20 @@
                 });
             });
         }
-
         async function updateQuestScore(subId, userId, currentTotal, baseEarned) {
-            // เราจะแก้ที่ bonusGiven เพื่อให้ผลรวมได้ตามที่ Admin กรอก
-            // Total = Base + Bonus  =>  Bonus = NewTotal - Base
             const newTotal = parseFloat(document.getElementById(`score-q-${subId}`).value);
             if(isNaN(newTotal)) return;
-
-            const newBonus = newTotal - baseEarned;
-            const diff = newTotal - currentTotal; // ส่วนต่างที่จะไปบวก/ลบ User
-
-            if(confirm(`ยืนยันแก้คะแนนรวมเป็น ${newTotal}?\n(ระบบจะปรับ Bonus เป็น ${newBonus})`)) {
+            const newBonus = parseFloat((newTotal - baseEarned).toFixed(2));
+            const diff = parseFloat((newTotal - currentTotal).toFixed(2));
+            if(confirm(`แก้คะแนนรวมเป็น ${newTotal}?\n(Bonus: ${newBonus})`)) {
                 const batch = db.batch();
                 batch.update(db.collection("quest_submissions").doc(subId), { bonusGiven: newBonus });
                 batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(diff) });
                 await batch.commit();
             }
         }
-
         async function delQuestSub(subId, userId, scoreToRemove) {
-            if(confirm("ลบการส่งงานนี้?\n(คะแนนที่ได้ไปแล้วจะถูกลบออกด้วย)")) {
+            if(confirm("ลบคำตอบนี้? คะแนนจะถูกหักออกด้วย")) {
                 const batch = db.batch();
                 batch.delete(db.collection("quest_submissions").doc(subId));
                 batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(-scoreToRemove) });
@@ -282,14 +285,12 @@
             }
         }
 
-        // --- 3. Manage Quests ---
+        // --- Quests Manage ---
         async function createQuest() {
-            const q={ question:getID('q-text').value, imageUrl:getID('q-img').value, questLink:getID('q-link').value, baseScore:parseInt(getID('q-score').value), deadline: new Date(Date.now() + parseInt(getID('q-hours').value)*3600000), createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+            const q={ question:getID('q-text').value, imageUrl:getID('q-img').value, questLink:getID('q-link').value, baseScore:parseFloat(getID('q-score').value), deadline: new Date(Date.now() + parseFloat(getID('q-hours').value)*3600000), createdAt: firebase.firestore.FieldValue.serverTimestamp() };
             if(!q.question) return alert("ใส่โจทย์ก่อน");
             if(confirm("ประกาศ Quest?")) { await db.collection("quests").add(q); alert("Done!"); getID('q-text').value=""; }
         }
-        function getID(id){ return document.getElementById(id); }
-
         function loadActiveQuests() {
             db.collection("quests").orderBy("createdAt", "desc").onSnapshot(snap => {
                 const tb = document.querySelector("#activeQuestTable tbody"); tb.innerHTML = "";
@@ -309,42 +310,77 @@
         }
         async function stopQ(id) { if(confirm("ยุติ Quest?")) db.collection("quests").doc(id).update({deadline: new Date(Date.now()-1000)}); }
         async function editQ(id,q,i,l) { const nQ=prompt("โจทย์",q), nI=prompt("รูป",i), nL=prompt("ลิงก์",l); if(nQ) db.collection("quests").doc(id).update({question:nQ, imageUrl:nI, questLink:nL}); }
-
         function loadQuestHistory() {
             db.collection("quests").orderBy("createdAt","desc").limit(20).onSnapshot(snap=>{
                 const tb=document.querySelector("#questHistoryTable tbody"); tb.innerHTML="";
-                snap.forEach(doc=>{ const q=doc.data(); tb.innerHTML+=`<tr><td>${q.question}</td><td>${q.baseScore}</td><td><button class="btn-sm btn-secondary" onclick="reuse('${q.question.replace(/'/g,"\\'")}','${q.baseScore}','${(q.imageUrl||"").replace(/'/g,"\\'")}','${(q.questLink||"").replace(/'/g,"\\'")}')">♻️</button> <button class="btn-sm btn-danger" onclick="delQ('${doc.id}')">🗑️</button></td></tr>`; });
+                snap.forEach(doc=>{ const q=doc.data(); tb.innerHTML+=`<tr><td>${q.question}</td><td>${q.baseScore}</td><td><button class="btn-sm btn-success" onclick="reuse('${q.question.replace(/'/g,"\\'")}','${q.baseScore}','${(q.imageUrl||"").replace(/'/g,"\\'")}','${(q.questLink||"").replace(/'/g,"\\'")}')">♻️ ใช้ซ้ำ</button> <button class="btn-sm btn-danger" onclick="delQ('${doc.id}')">🗑️</button></td></tr>`; });
             });
         }
         function reuse(q,s,i,l){ getID('q-text').value=q; getID('q-score').value=s; getID('q-img').value=i; getID('q-link').value=l; document.querySelector('.quest-create-card').scrollIntoView({behavior:'smooth'}); }
         async function delQ(id){ if(confirm("ลบถาวร?")) db.collection("quests").doc(id).delete(); }
 
-        // --- 4. Users ---
+        // --- Users & Leaderboard (Updated Stars) ---
         function loadUsers() {
             db.collection("users").orderBy("score","desc").onSnapshot(snap=>{
                 const tb=document.querySelector("#usersTable tbody"); const lb=document.getElementById("leaderboardList");
                 tb.innerHTML=""; lb.innerHTML=""; topUsersCache=[]; let r=1;
+                
                 snap.forEach(doc=>{
-                    const u=doc.data(); const lv=Math.floor(u.score/10)+1;
-                    tb.innerHTML+=`<tr class="u-row"><td><img src="${u.pictureUrl}" class="user-pic">${u.displayName}</td><td>Lv.${lv}</td><td>${u.score.toFixed(1)}</td>
-                    <td><button class="btn-sm btn-primary" onclick="adj('${doc.id}',1)">+1</button><button class="btn-sm btn-danger" onclick="adj('${doc.id}',-1)">-1</button></td><td><button class="btn-sm btn-danger" onclick="delUser('${doc.id}')">🗑️</button></td></tr>`;
-                    if(r<=10){ topUsersCache.push(`${r}. ${u.displayName} (${u.score.toFixed(1)})`); lb.innerHTML+=`<div class="leaderboard-card rank-${r}"><div style="display:flex; align-items:center;"><b style="width:30px">#${r}</b><img src="${u.pictureUrl}" class="user-pic">${u.displayName}</div><span>${u.score.toFixed(1)} ⭐</span></div>`; } r++;
+                    const u=doc.data(); const score = parseFloat((u.score||0).toFixed(2));
+                    const lv=Math.floor(score/10)+1;
+                    
+                    // Table Row
+                    tb.innerHTML+=`<tr class="u-row">
+                        <td><div style="display:flex; align-items:center;"><img src="${u.pictureUrl}" class="user-pic"><span>${u.displayName}</span></div></td>
+                        <td><span class="badge" style="background:#eee; color:#555">Lv.${lv}</span></td>
+                        <td style="font-weight:bold; color:#4361ee;">${score}</td>
+                        <td><button class="btn-sm btn-primary" onclick="adj('${doc.id}',1)">+1</button><button class="btn-sm btn-danger" onclick="adj('${doc.id}',-1)">-1</button></td>
+                        <td><button class="btn-sm btn-danger" onclick="delUser('${doc.id}')">🗑️</button></td>
+                    </tr>`;
+
+                    // Leaderboard Card
+                    if(r<=20){ // Show top 20
+                        topUsersCache.push(`${r}. ${u.displayName} (${score})`);
+                        
+                        // ✅ กำหนด Class และ Icon ตามอันดับ
+                        let rankClass = 'rank-other';
+                        let starIcon = '<span class="star-icon star-blue">⭐</span>'; // Default Blue Star
+                        
+                        if (r === 1) { rankClass = 'rank-1'; starIcon = '<span class="star-icon star-gold">🌟</span>'; }
+                        else if (r === 2) { rankClass = 'rank-2'; starIcon = '<span class="star-icon star-silver">🥈</span>'; }
+                        else if (r === 3) { rankClass = 'rank-3'; starIcon = '<span class="star-icon star-bronze">🥉</span>'; }
+
+                        lb.innerHTML+=`
+                            <div class="leaderboard-card ${rankClass}">
+                                <div style="display:flex; align-items:center;">
+                                    <b style="width:30px; font-size:1.1em; color:#555;">#${r}</b>
+                                    <img src="${u.pictureUrl}" class="user-pic">
+                                    <span style="font-weight:600; color:#333;">${u.displayName}</span>
+                                </div>
+                                <div style="display:flex; align-items:center;">
+                                    <span style="font-weight:bold; font-size:1.1em; color:#333;">${score}</span>
+                                    ${starIcon}
+                                </div>
+                            </div>
+                        `;
+                    } r++;
                 });
             });
         }
+
+        // Helpers
+        function getID(id){ return document.getElementById(id); }
         function filterUsers(){ const t=getID('userSearch').value.toLowerCase(); document.querySelectorAll('.u-row').forEach(r=>r.style.display=r.innerText.toLowerCase().includes(t)?'':'none'); }
         async function adj(id,v){ db.collection("users").doc(id).update({score:firebase.firestore.FieldValue.increment(v)}); }
         async function delUser(id){ if(confirm("ลบ User?")) db.collection("users").doc(id).delete(); }
-        async function shareLeaderboard(){ 
-            if(!topUsersCache.length) return alert("ไม่มีข้อมูล");
-            const t = "🏆 คะแนนล่าสุด:\n"+topUsersCache.join("\n");
-            if(liff.isInClient()) liff.shareTargetPicker([{type:"text",text:t}]); else navigator.clipboard.writeText(t).then(()=>alert("Copied!")).catch(()=>prompt("Copy:",t));
-        }
-
-        // Helpers
+        async function delWork(id,t){ if(confirm("ลบ "+t+"?")) db.collection("works").doc(id).delete(); }
         async function updateStatus(id,v){ db.collection("works").doc(id).update({status:v}); }
         async function addFeedback(id,v){ const f=prompt("Feedback:",v); if(f!==null) db.collection("works").doc(id).update({feedback:f}); }
-        async function delWork(id,t){ if(confirm("ลบ "+t+"?")) db.collection("works").doc(id).delete(); }
+        async function shareLeaderboard(){ 
+            if(!topUsersCache.length) return alert("ไม่มีข้อมูล");
+            const t = "🏆 สรุปคะแนนล่าสุด:\n"+topUsersCache.slice(0,10).join("\n")+"\n..."; // แชร์แค่ Top 10 พอ
+            if(liff.isInClient()) liff.shareTargetPicker([{type:"text",text:t}]); else navigator.clipboard.writeText(t).then(()=>alert("Copied!")).catch(()=>prompt("Copy:",t));
+        }
 
     </script>
 </body>
