@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP INTERNSHIP V.260127 (V29)</title>
+    <title>MLP INTERNSHIP V.260127 (V31)</title>
     
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -35,12 +36,23 @@
         .btn-success { background: var(--success); } .btn-warning { background: var(--warning); color: black; } .btn-dark { background: var(--dark); }
         .badge { padding: 5px 10px; border-radius: 20px; font-size: 0.75em; font-weight: bold; color: white; display: inline-block; }
         .user-pic { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); vertical-align: middle; margin-right: 10px; }
+        
         .header-row { display: flex; justify-content: space-between; align-items: center; margin-top: 30px; margin-bottom: 15px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; }
         .header-row h3 { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 1.2em; color: var(--text-main); }
-        .filter-pill { display: flex; align-items: center; gap: 8px; background: var(--bg-card); border: 1px solid var(--border-color); padding: 6px 14px; border-radius: 50px; font-size: 0.85em; font-weight: 600; color: var(--text-sub); cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.03); user-select: none; }
+        
+        .filter-pill {
+            display: flex; align-items: center; gap: 8px;
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            padding: 6px 14px; border-radius: 50px;
+            font-size: 0.85em; font-weight: 600; color: var(--text-sub);
+            cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+            user-select: none;
+        }
         .filter-pill:hover { border-color: var(--primary); color: var(--primary); transform: translateY(-1px); }
         .filter-pill input { margin: 0; width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
         .filter-pill.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        /* Kanban */
         .kanban-board { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 20px; align-items: stretch; min-height: 500px; }
         .kanban-col { flex: 1; min-width: 300px; background: var(--col-bg); border-radius: 12px; padding: 15px; display: flex; flex-direction: column; border: 1px solid var(--border-color); }
         .kanban-header { font-weight: bold; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; }
@@ -56,6 +68,15 @@
         .card-desc { display: none; font-size: 0.9em; color: var(--text-sub); margin: 10px 0; border-top: 1px solid var(--border-color); padding-top: 5px; }
         .kanban-card.expanded .card-desc { display: block; }
         .expand-btn { position: absolute; top: 10px; right: 10px; background: none; border: none; color: var(--text-sub); cursor: pointer; }
+
+        /* 🔥 User Answer Box in Kanban */
+        .answer-box {
+            margin-top: 10px; padding: 8px; background: #eef2ff; border-radius: 6px; 
+            font-size: 0.85em; color: #333; border-left: 3px solid #4361ee;
+            word-wrap: break-word;
+        }
+        .answer-box strong { color: #4361ee; display: block; margin-bottom: 3px; }
+
         .search-bar { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); margin-bottom: 15px; }
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
         .modal-content { background-color: var(--bg-card); margin: 10% auto; padding: 20px; border-radius: 12px; width: 90%; max-width: 600px; position: relative; color: var(--text-main); }
@@ -140,7 +161,7 @@
                 <div class="kanban-col"><div class="kanban-header">📌 Backlog <span class="badge" style="background:#6c757d" id="cnt-Backlog">0</span></div><div id="Backlog" class="kanban-list"></div></div>
                 <div class="kanban-col"><div class="kanban-header">🚧 Doing <span class="badge" style="background:#4361ee" id="cnt-Doing">0</span></div><div id="Doing" class="kanban-list"></div></div>
                 <div class="kanban-col"><div class="kanban-header">👀 Review <span class="badge" style="background:#ff9f1c" id="cnt-Review">0</span></div><div id="Review" class="kanban-list"></div></div>
-                <div class="kanban-col"><div class="kanban-header">✅ Done (48h) <span class="badge" style="background:#2ec4b6" id="cnt-Done">0</span></div><div id="Done" class="kanban-list"></div></div>
+                <div class="kanban-col"><div class="kanban-header">✅ Done <span class="badge" style="background:#2ec4b6" id="cnt-Done">0</span></div><div id="Done" class="kanban-list"></div></div>
             </div>
         </div>
 
@@ -191,7 +212,7 @@
         }
         function switchTab(id) { document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active')); document.getElementById(id).classList.add('active'); event.target.classList.add('active'); }
 
-        // --- Works ---
+        // --- Filter & Works ---
         function toggleFilter() { 
             const chk = document.getElementById('hideCompleted');
             chk.parentElement.classList.toggle('active', chk.checked);
@@ -224,103 +245,38 @@
         }
         async function checkQuest(id) { await db.collection("quest_submissions").doc(id).update({ status: 'checked' }); showToast("Checked!"); }
 
-        // --- 🔥 Side Quest (Kanban + Auto Archive) ---
-        function loadSideQuests() { 
-            db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(s => { 
-                const c = { "Backlog": document.getElementById("Backlog"), "Doing": document.getElementById("Doing"), "Review": document.getElementById("Review"), "Done": document.getElementById("Done") }; 
-                Object.values(c).forEach(el => el.innerHTML = ""); 
-                const cnt = { "Backlog": 0, "Doing": 0, "Review": 0, "Done": 0 }; 
-                
-                const now = new Date();
-
-                s.forEach(d => { 
-                    const q = d.data(); 
-                    allSideQuestsCache[d.id] = q; 
-                    
-                    // Logic Auto-Archive (Done > 48h)
-                    if (q.status === 'Done' && q.doneAt) {
-                        const doneTime = q.doneAt.toDate();
-                        const diffMs = now - doneTime;
-                        const diffHrs = diffMs / (1000 * 60 * 60);
-                        
-                        if (diffHrs >= 48) {
-                            // Expired: Archive it (Update status to 'Archived' or Delete)
-                            db.collection("side_quests").doc(d.id).update({ status: 'Archived' });
-                            return; // Don't render
-                        }
-                    }
-
-                    if(c[q.status]) { 
-                        cnt[q.status]++; 
-                        c[q.status].appendChild(createCard(d.id, q)); 
-                    } 
-                }); 
-                Object.keys(cnt).forEach(k => document.getElementById(`cnt-${k}`).innerText = cnt[k]); 
-                initSortable(); 
-            }); 
-        }
-
+        // --- 🔥 Side Quest (Show Answer) ---
+        function loadSideQuests() { db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(s => { const c = { "Backlog": document.getElementById("Backlog"), "Doing": document.getElementById("Doing"), "Review": document.getElementById("Review"), "Done": document.getElementById("Done") }; Object.values(c).forEach(el => el.innerHTML = ""); const cnt = { "Backlog": 0, "Doing": 0, "Review": 0, "Done": 0 }; s.forEach(d => { const q = d.data(); allSideQuestsCache[d.id] = q; if(q.status==='Done'&&q.doneAt){const h=48-Math.floor((new Date()-q.doneAt.toDate())/36e5);if(h<=0){db.collection("side_quests").doc(d.id).update({status:'Archived'});return;}} if(c[q.status]) { cnt[q.status]++; c[q.status].appendChild(createCard(d.id, q)); } }); Object.keys(cnt).forEach(k => document.getElementById(`cnt-${k}`).innerText = cnt[k]); initSortable(); }); }
+        
         function createCard(id, q) { 
-            const d=document.createElement('div'); d.className=`kanban-card card-${q.status}`; d.setAttribute('data-id',id); 
-            d.onclick=(e)=>{if(!e.target.closest('button'))d.classList.toggle('expanded')}; 
+            const d=document.createElement('div'); d.className=`kanban-card card-${q.status}`; d.setAttribute('data-id',id); d.onclick=(e)=>{if(!e.target.closest('button'))d.classList.toggle('expanded')}; 
             
-            // Countdown for Done
-            let timerHtml = "";
-            if (q.status === 'Done' && q.doneAt) {
-                const now = new Date();
-                const doneTime = q.doneAt.toDate();
-                const hoursLeft = 48 - Math.floor((now - doneTime) / (1000 * 60 * 60));
-                timerHtml = `<div style="font-size:0.8em; color:#ef233c; margin-bottom:5px;">⏳ หายใน ${hoursLeft} ชม.</div>`;
-            }
-
-            // User Answer (Sync from Quest)
-            let answerHtml = "";
+            // ✅ Answer Box Logic
+            let ansHtml = "";
             if (q.userAnswer) {
-                answerHtml = `<div style="background:#eef2ff; padding:5px; border-radius:4px; font-size:0.9em; margin-top:5px; color:#4361ee;">💬 ${q.userAnswer}</div>`;
+                let ansText = q.userAnswer;
+                if (ansText.startsWith("http")) ansText = `<a href="${ansText}" target="_blank">🔗 เปิดลิงก์</a>`;
+                ansHtml = `<div class="answer-box"><strong>💬 คำตอบ:</strong> ${ansText}</div>`;
             }
 
+            let timerHtml=""; if(q.status==='Done'&&q.doneAt){const h=48-Math.floor((new Date()-q.doneAt.toDate())/36e5);timerHtml=`<div style="font-size:0.8em;color:#ef233c;">⏳ เหลือ ${h} ชม.</div>`;}
             let as='<div class="assignee-stack">'; if(q.assignees) q.assignees.forEach(u => as+=`<img src="${u.pic}" class="assignee-img" title="${u.name}">`); as+='</div>'; 
-            const safeT = (q.title||"").replace(/'/g,"\\'").replace(/"/g,"&quot;"); const safeD = (q.description||"").replace(/'/g,"\\'").replace(/"/g,"&quot;"); 
+            const safeT=(q.title||"").replace(/'/g,"\\'").replace(/"/g,"&quot;"); const safeD=(q.description||"").replace(/'/g,"\\'").replace(/"/g,"&quot;");
             
-            d.innerHTML=`
-                <div class="card-badges"><span class="badge-pill p-${q.priority}">${q.priority||'Normal'}</span></div>
-                ${timerHtml}
-                <b>${q.title||'No Title'}</b>
-                <button class="expand-btn">⌄</button>
-                <div class="card-desc"><p>${q.description||'-'}</p>
-                <div style="display:flex;justify-content:space-between;margin-top:5px;"><button class="btn-sm btn-warning" onclick="editSideQuest('${id}')">✏️ Edit</button><button class="btn-sm btn-danger" onclick="delSQ('${id}')">🗑️ Del</button></div>
-                ${q.proofLink?`<a href="${q.proofLink}" target="_blank" class="btn-sm btn-dark" style="display:block;text-align:center;margin-top:5px;">📎 ดูงาน</a>`:''}
-                </div>
-                ${answerHtml}
-                ${as}`; 
+            d.innerHTML=`<div class="card-badges"><span class="badge-pill p-${q.priority}">${q.priority||'Normal'}</span></div>${timerHtml}<b>${q.title||'No Title'}</b><button class="expand-btn">⌄</button>
+            <div class="card-desc"><p>${q.description||'-'}</p><div style="display:flex;justify-content:space-between;margin-top:5px;"><button class="btn-sm btn-warning" onclick="editSideQuest('${id}')">✏️ Edit</button><button class="btn-sm btn-danger" onclick="delSQ('${id}')">🗑️ Del</button></div>${q.proofLink?`<a href="${q.proofLink}" target="_blank" class="btn-sm btn-dark" style="display:block;text-align:center;margin-top:5px;">📎 ดูงาน</a>`:''}</div>
+            ${ansHtml} ${as}`; 
             return d; 
         }
 
-        function initSortable() { 
-            ['Backlog','Doing','Review','Done'].forEach(id=>{ 
-                new Sortable(document.getElementById(id),{
-                    group:'shared', animation:150, 
-                    onEnd: e => {
-                        const newStatus = e.to.id;
-                        const updates = { status: newStatus };
-                        if (newStatus === 'Done') {
-                            updates.doneAt = firebase.firestore.FieldValue.serverTimestamp(); // Start Timer
-                        }
-                        db.collection("side_quests").doc(e.item.getAttribute('data-id')).update(updates);
-                    }
-                }) 
-            }) 
-        }
-
-        // Edit & Form
+        // ... (Logic เดิม) ...
         function editSideQuest(id) { const data = allSideQuestsCache[id]; if (!data) return; document.getElementById("edit-id").value = id; document.getElementById("sq-title").value = data.title; document.getElementById("sq-desc").value = data.description; document.getElementById("sq-priority").value = data.priority; document.getElementById("sq-due").value = data.dueDate || ""; document.querySelectorAll('.sq-user-check').forEach(c => { c.checked = (data.assigneeIds || []).includes(c.value); }); document.getElementById("form-header").innerText = "✏️ แก้ไขภารกิจ"; document.getElementById("btn-submit-task").innerText = "💾 Save Change"; document.getElementById("btn-cancel-task").style.display = "inline-block"; const f = document.getElementById("sq-form"); if(f.style.display === "none") f.style.display = "block"; f.scrollIntoView({behavior:"smooth"}); }
         async function saveSideQuest() { const id = document.getElementById("edit-id").value; const t=document.getElementById("sq-title").value, d=document.getElementById("sq-desc").value, p=document.getElementById("sq-priority").value, date=document.getElementById("sq-due").value; const chk=document.querySelectorAll('.sq-user-check:checked'); let u=[]; chk.forEach(c=>u.push({uid:c.value,name:c.dataset.name,pic:c.dataset.pic})); if(!t)return alert("Title?"); const data = {title:t,description:d,priority:p,dueDate:date,assignees:u,assigneeIds:u.map(x=>x.uid)}; if (id) { await db.collection("side_quests").doc(id).update(data); showToast("Updated!"); } else { data.status="Backlog"; data.createdAt=firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").add(data); showToast("Created!"); } resetForm(); }
         function resetForm() { document.getElementById("edit-id").value = ""; document.getElementById("sq-title").value = ""; document.getElementById("sq-desc").value = ""; document.getElementById("sq-due").value = ""; document.querySelectorAll('.sq-user-check').forEach(c => c.checked = false); document.getElementById("form-header").innerText = "➕ สร้างภารกิจใหม่"; document.getElementById("btn-submit-task").innerText = "🚀 Create"; document.getElementById("btn-cancel-task").style.display = "none"; document.getElementById("sq-form").style.display = "none"; }
+        function initSortable() { ['Backlog','Doing','Review','Done'].forEach(id=>{ new Sortable(document.getElementById(id),{group:'shared',animation:150,onEnd:e=>{const ns=e.to.id; const up={status:ns}; if(ns==='Done')up.doneAt=firebase.firestore.FieldValue.serverTimestamp(); db.collection("side_quests").doc(e.item.getAttribute('data-id')).update(up)}}) }) }
         function toggleForm(){const f=document.getElementById("sq-form");f.style.display=f.style.display==="none"?"block":"none"}
         function filterBoard(){const t=document.getElementById("board-search").value.toLowerCase();document.querySelectorAll('.kanban-card').forEach(c=>{c.style.display=c.innerText.toLowerCase().includes(t)?'block':'none'})}
         async function delSQ(id){if(confirm("Del?"))await db.collection("side_quests").doc(id).delete()}
-
-        // --- Users & History ---
         function loadUsers(){ db.collection("users").orderBy("score","desc").onSnapshot(s=>{ const tb=document.querySelector("#usersTable tbody"); const lb=document.getElementById("leaderboardList"); const sel=document.getElementById("sq-user-list"); tb.innerHTML=""; lb.innerHTML=""; sel.innerHTML=""; topUsersCache=[]; let r=1; s.forEach(d=>{ const u=d.data(); const score=parseFloat((u.score||0).toFixed(2)); tb.innerHTML+=`<tr><td><div style="display:flex;align-items:center;"><img src="${u.pictureUrl}" class="user-pic">${u.displayName}</div></td><td><span class="badge" style="background:#eee;color:#555">Lv.${Math.floor(score/10)+1}</span></td><td style="font-weight:bold;color:var(--primary);font-size:1.1em;">${score}</td><td><div style="display:flex;gap:5px;"><input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:80px"><button class="btn-sm btn-success" onclick="adjDec('${d.id}')">💾</button></div></td><td><button class="btn-sm btn-dark" onclick="showHistory('${d.id}','${u.displayName}',${score})">📜</button></td><td><button class="btn-sm btn-danger" onclick="delUser('${d.id}')">🗑️</button></td></tr>`; sel.innerHTML+=`<label style="margin-right:10px;"><input type="checkbox" class="sq-user-check" value="${d.id}" data-name="${u.displayName}" data-pic="${u.pictureUrl}"> ${u.displayName}</label>`; if(r<=20){ topUsersCache.push(`${r}. ${u.displayName} (${score})`); let cls='rank-other',ic='⭐'; if(r===1){cls='rank-1';ic='🌟';}else if(r===2){cls='rank-2';ic='🥈';}else if(r===3){cls='rank-3';ic='🥉';} lb.innerHTML+=`<div class="leaderboard-card ${cls}"><div style="display:flex;align-items:center;"><b style="width:30px">#${r}</b><img src="${u.pictureUrl}" class="user-pic">${u.displayName}</div><div><b>${score}</b> ${ic}</div></div>`; } r++; }); }) }
         async function showHistory(uid,name,total){const m=document.getElementById("historyModal");const l=document.getElementById("history-list");document.getElementById("history-title").innerText=`📜 ${name}`;l.innerHTML="<p>Loading...</p>";m.style.display="block";try{let wS=0,qS=0,stS=0,html="";const ws=await db.collection("works").where("userId","==",uid).get();ws.forEach(d=>{const w=d.data();if(w.score>0){wS+=w.score;html+=`<li class="history-item"><span>📁 ${w.title}</span><span>+${w.score}</span></li>`}});const qs=await db.collection("quest_submissions").where("userId","==",uid).get();qs.forEach(d=>{const q=d.data();const s=(q.earnedScore||0)+(q.bonusGiven||0);if(q.status!=='none')qS+=0.1;if(s>0){qS+=s;html+=`<li class="history-item"><span>⚡ Q</span><span>+${s}</span></li>`}});const ls=await db.collection("checkin_logs").where("userId","==",uid).where("type","==","streak").get();ls.forEach(d=>{const g=d.data();stS+=g.amount;html+=`<li class="history-item bonus"><span>🔥 Streak (${g.count})</span><span>+${g.amount}</span></li>`});const o=total-wS-qS-stS;if(Math.abs(o)>0.05)html=`<li class="history-item" style="color:#666;"><span>❤️ Manual/Other</span><span>${o>0?'+':''}${o.toFixed(2)}</span></li>`+html;document.getElementById("history-summary").innerHTML=`Total: ${total.toFixed(2)} <br><span style="font-size:0.8em;color:#666;">(W:${wS}|Q:${qS.toFixed(1)}|S:${stS.toFixed(1)})</span>`;l.innerHTML=html}catch(e){l.innerHTML="Error"}}
         function closeModal(){document.getElementById("historyModal").style.display="none"}
