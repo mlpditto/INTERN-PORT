@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MLP INTERNSHIP</title>
+    
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     
     <style>
-        /* CSS เดิมทั้งหมด */
         body { font-family: 'Kanit', sans-serif; background-color: #f8f9fa; padding: 20px; color:#333; margin:0; }
         .container { max-width: 600px; margin: 0 auto; position: relative; }
         .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
@@ -19,21 +19,34 @@
         input, textarea { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-family: inherit; }
         button { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; color: white; background-color: #06C755; transition: 0.2s; min-height: 44px; }
         button:hover { background-color: #05a546; } button:disabled { background-color: #ccc; }
+        
         .quest-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; margin-bottom: 20px; }
-        .sq-container { display: flex; overflow-x: auto; gap: 15px; padding-bottom: 20px; scroll-snap-type: x mandatory; }
+        
+        /* Side Quest Scroll */
+        .sq-container { display: flex; overflow-x: auto; gap: 15px; padding-bottom: 20px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
         .sq-col { min-width: 85%; background: #f1f3f5; border-radius: 12px; padding: 15px; scroll-snap-align: center; }
-        .sq-card { background: white; padding: 15px; border-radius: 8px; border-left: 5px solid #4361ee; margin-bottom: 10px; }
+        .sq-card { background: white; padding: 15px; border-radius: 8px; border-left: 5px solid #4361ee; margin-bottom: 10px; position: relative; }
+        
         .report-card { border-left: 5px solid #ef233c; }
         .hidden { display: none !important; }
         .badge { padding: 4px 8px; border-radius: 4px; color: white; font-size: 0.8em; }
         .propose-btn { background: #6f42c1; color: white; border: none; padding: 8px 15px; border-radius: 20px; font-size: 0.9em; float: right; cursor: pointer; }
+        
         .version-tag { text-align: center; font-size: 0.8em; color: #ccc; margin-top: 20px; }
-        .refresh-btn { position: absolute; top: 0; right: 0; background: #fff; color: #333; border: 1px solid #ddd; padding: 5px 10px; border-radius: 20px; font-size: 0.8em; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 5px; }
+        
+        /* Refresh Button */
+        .refresh-btn { 
+            position: absolute; top: 0; right: 0; 
+            background: #fff; color: #333; border: 1px solid #ddd; 
+            padding: 5px 10px; border-radius: 20px; font-size: 0.8em; 
+            cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+            display: flex; align-items: center; gap: 5px; z-index: 99;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <button class="refresh-btn" onclick="location.reload()">🔄 รีเฟรช</button>
+        <button class="refresh-btn" onclick="window.location.reload(true)">🔄 รีเฟรช</button>
         <div id="loading" style="text-align:center; margin-top:50px;">⏳ กำลังโหลด...</div>
         
         <div id="main-app" class="hidden">
@@ -50,10 +63,10 @@
                 <button class="propose-btn" onclick="proposeProject()">💡 เสนอโปรเจกต์</button>
             </div>
             <div class="sq-container" id="sq-scroll">
-                <div class="sq-col" id="col-Backlog"><div id="sq-Backlog"></div></div>
-                <div class="sq-col" id="col-Doing"><div id="sq-Doing"></div></div>
-                <div class="sq-col" id="col-Review"><div id="sq-Review"></div></div>
-                <div class="sq-col" id="col-Done"><div id="sq-Done"></div></div>
+                <div class="sq-col" id="col-Backlog"><div style="border-bottom:1px solid #ddd;margin-bottom:10px;font-weight:bold;">📌 Backlog</div><div id="sq-Backlog"></div></div>
+                <div class="sq-col" id="col-Doing"><div style="border-bottom:1px solid #ddd;margin-bottom:10px;font-weight:bold;">🚧 Doing</div><div id="sq-Doing"></div></div>
+                <div class="sq-col" id="col-Review"><div style="border-bottom:1px solid #ddd;margin-bottom:10px;font-weight:bold;">👀 Review</div><div id="sq-Review"></div></div>
+                <div class="sq-col" id="col-Done"><div style="border-bottom:1px solid #ddd;margin-bottom:10px;font-weight:bold;">✅ Done</div><div id="sq-Done"></div></div>
             </div>
 
             <div id="quest-list-container"></div>
@@ -70,19 +83,19 @@
 
             <div class="card report-card">
                 <h4>🚩 รายงานปัญหา / ติดต่อ Admin</h4>
-                <input type="text" id="rpt-subject" placeholder="หัวข้อเรื่อง">
-                <textarea id="rpt-msg" rows="3" placeholder="รายละเอียด..."></textarea>
+                <input type="text" id="rpt-subject" placeholder="หัวข้อเรื่อง (ห้ามเว้นว่าง)">
+                <textarea id="rpt-msg" rows="3" placeholder="รายละเอียด... (ห้ามเว้นว่าง)"></textarea>
                 <button onclick="sendReport()" style="background:#ef233c;">📧 ส่งรายงาน</button>
             </div>
             
-            <div class="version-tag">System v6.0 (Hidden Streak)</div>
+            <div class="version-tag">System v8.0 (Full Sync)</div>
             <div style="height:50px;"></div>
         </div>
     </div>
 
-    <script src="firebase-config.js?v=6.0"></script>
+    <script src="firebase-config.js?v=8.0"></script>
     <script>
-        const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ID เดิม
+        const USER_LIFF_ID = "2008959998-yjcNpaGt"; 
         let userProfile, userId, myQuestData = {}; 
         
         async function main() {
@@ -103,7 +116,7 @@
 
         function checkUser(){const r=db.collection("users").doc(userId);r.onSnapshot(d=>{if(d.exists){document.getElementById('u-score').innerText=parseFloat((d.data().score||0).toFixed(2))}else{r.set({displayName:userProfile.displayName,pictureUrl:userProfile.pictureUrl,score:0})}})}
 
-        // --- Quest System ---
+        // --- Quest Logic ---
         function loadQuests() {
             db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => {
                 myQuestData = {}; s.forEach(doc => { myQuestData[doc.data().questId] = doc.data(); });
@@ -125,7 +138,6 @@
 
                 let actionHtml = "";
                 if (myStatus === 'none') {
-                    // ปุ่มรับ Quest
                     actionHtml = `<button onclick="receiveQuest('${qId}', '${safeTitle}')" style="background:#ffc107; color:black; width:100%; margin-top:10px;">🚀 กดรับภารกิจ (+0.1 คะแนน)</button>`;
                 } else if (myStatus === 'received') {
                     actionHtml = `<textarea id="ans-${qId}" rows="2" placeholder="พิมพ์คำตอบ..." style="margin-top:10px;"></textarea><button onclick="subQ('${qId}',${q.baseScore})" style="background:#28a745; width:100%;">✉️ ส่งคำตอบ (ลุ้นคะแนนเต็ม)</button>`;
@@ -135,85 +147,67 @@
             });
         }
 
-        // 🔥 Updated: Receive Quest Logic (with Hidden Streak)
+        // 🔥 Logic รับ Quest + Hidden Streak + Create Kanban
         async function receiveQuest(qid, qTitle) {
             const docId = `${qid}_${userId}`;
             const userRef = db.collection("users").doc(userId);
-
             try {
-                // 1. ดึงข้อมูล User เพื่อดูจำนวน Quest ที่เคยรับ
                 const userDoc = await userRef.get();
-                let currentCount = 0;
-                if (userDoc.exists) {
-                    currentCount = userDoc.data().questReceivedCount || 0;
-                }
+                let currentCount = 0; if (userDoc.exists) currentCount = userDoc.data().questReceivedCount || 0;
                 
-                // 2. คำนวณ Streak
                 const newCount = currentCount + 1;
                 let bonus = 0;
-                if (newCount > 0 && newCount % 5 === 0) { // ครบทุก 5 ครั้ง
-                    bonus = 0.1;
-                }
+                if (newCount > 0 && newCount % 5 === 0) bonus = 0.1; // Hidden Streak
 
                 const batch = db.batch();
-                
-                // 3. บันทึกการรับงาน
-                batch.set(db.collection("quest_submissions").doc(docId), {
-                    questId: qid, userId: userId, displayName: userProfile.displayName, pictureUrl: userProfile.pictureUrl,
-                    status: 'received', receivedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                // 4. อัปเดต User (แต้มรับงาน 0.1 + โบนัสลับถ้ามี)
-                batch.update(userRef, { 
-                    score: firebase.firestore.FieldValue.increment(0.1 + bonus),
-                    questReceivedCount: newCount 
-                });
-
-                // 5. สร้างการ์ดใน Kanban
+                // 1. Create Submission
+                batch.set(db.collection("quest_submissions").doc(docId), { questId: qid, userId, displayName: userProfile.displayName, pictureUrl: userProfile.pictureUrl, status: 'received', receivedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                // 2. Add Score
+                batch.update(userRef, { score: firebase.firestore.FieldValue.increment(0.1 + bonus), questReceivedCount: newCount });
+                // 3. Create Kanban Card (Doing)
                 const kanbanRef = db.collection("side_quests").doc();
-                batch.set(kanbanRef, {
-                    title: `[Daily] ${qTitle}`, description: "ภารกิจประจำวัน", assignees: [{ uid: userId, name: userProfile.displayName, pic: userProfile.pictureUrl }],
-                    assigneeIds: [userId], status: 'Doing', priority: 'Medium', isDailyQuest: true, refQuestId: qid, createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                batch.set(kanbanRef, { title: `[Daily] ${qTitle}`, description: "ภารกิจประจำวัน", assignees: [{ uid: userId, name: userProfile.displayName, pic: userProfile.pictureUrl }], assigneeIds: [userId], status: 'Doing', priority: 'Medium', isDailyQuest: true, refQuestId: qid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                // 4. Log Streak (if any)
+                if (bonus > 0) { batch.set(db.collection("checkin_logs").doc(), { userId, type: 'streak', amount: bonus, count: newCount, timestamp: firebase.firestore.FieldValue.serverTimestamp() }); }
 
-                // 6. 🔥 บันทึก Log โบนัส (เพื่อเอาไปโชว์ใน History)
-                if (bonus > 0) {
-                    // ใช้ collection checkin_logs (หรือ bonus_logs) เก็บประวัติ
-                    const logRef = db.collection("checkin_logs").doc();
-                    batch.set(logRef, {
-                        userId: userId,
-                        type: 'streak', // ระบุประเภทว่าเป็น Streak
-                        amount: bonus,
-                        count: newCount,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                }
-
-                await batch.commit(); 
-                alert("🎉 รับภารกิจแล้ว! (เริ่มทำได้เลย)"); 
-                // ไม่บอก User ว่าได้โบนัส (Hidden Surprise)
-
+                await batch.commit(); alert("🎉 รับภารกิจแล้ว! เริ่มทำได้เลย");
             } catch(e) { alert("Error: " + e.message); }
         }
 
-        // Logic อื่นๆ เหมือนเดิม
-        async function subQ(qid, base) {
-            const ans = document.getElementById(`ans-${qid}`).value.trim(); if(!ans) return alert("กรอกคำตอบ"); const docId = `${qid}_${userId}`;
+        // 🔥 Logic ส่งคำตอบ + Sync to Kanban
+        async function subQ(qid, baseScore) {
+            const ans = document.getElementById(`ans-${qid}`).value.trim();
+            if(!ans) return alert("กรอกคำตอบ");
+            const docId = `${qid}_${userId}`;
+            
             try {
-                const snap = await db.collection("quest_submissions").where("questId","==",qid).where("status","in",["submitted","checked"]).get();
-                let score = base - (snap.size * 0.1); if(score<1) score=1;
+                const snapshot = await db.collection("quest_submissions").where("questId", "==", qid).where("status", "in", ["submitted", "checked"]).get();
+                let score = baseScore - (snapshot.size * 0.1); if (score < 1) score = 1;
+                const finalScore = score + 0.1; // Bonus time
+
                 const batch = db.batch();
-                batch.update(db.collection("quest_submissions").doc(docId), { answer:ans, status:'submitted', submittedAt:firebase.firestore.FieldValue.serverTimestamp(), earnedScore:parseFloat(score.toFixed(2)) });
-                batch.update(db.collection("users").doc(userId), { score:firebase.firestore.FieldValue.increment(score+0.1) });
-                await batch.commit(); alert(`ส่งแล้ว! ได้ ${score.toFixed(2)} + 0.1 คะแนน`);
-            } catch(e) { alert(e.message); }
+                // 1. Update Submission
+                batch.update(db.collection("quest_submissions").doc(docId), { answer: ans, status: 'submitted', submittedAt: firebase.firestore.FieldValue.serverTimestamp(), earnedScore: parseFloat(score.toFixed(2)) });
+                // 2. Update User Score
+                batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(finalScore) });
+                
+                // 3. Sync Answer to Kanban
+                const sqSnap = await db.collection("side_quests").where("refQuestId", "==", qid).where("assigneeIds", "array-contains", userId).get();
+                sqSnap.forEach(doc => { batch.update(db.collection("side_quests").doc(doc.id), { userAnswer: ans }); });
+
+                await batch.commit(); alert(`ส่งแล้ว! คุณเป็นคนที่ ${snapshot.size+1}\nได้ ${score.toFixed(2)} + 0.1 คะแนน`);
+            } catch(e) { alert("Error: " + e.message); }
         }
+
+        // --- Side Quest & Others ---
         async function proposeProject() { const t=prompt("ชื่อโปรเจกต์:"); if(!t)return; const d=prompt("รายละเอียด:"); try{await db.collection('side_quests').add({title:t,description:d||"",assignees:[{uid:userId,name:userProfile.displayName,pic:userProfile.pictureUrl}],assigneeIds:[userId],status:'Backlog',priority:'Medium',isProposal:true,createdAt:firebase.firestore.FieldValue.serverTimestamp()});alert("เสนอแล้ว!");}catch(e){alert(e.message)} }
+        
         function loadSideQuests(){db.collection("side_quests").where("assigneeIds","array-contains",userId).onSnapshot(s=>{const cols={"Backlog":document.getElementById("sq-Backlog"),"Doing":document.getElementById("sq-Doing"),"Review":document.getElementById("sq-Review"),"Done":document.getElementById("sq-Done")};Object.values(cols).forEach(c=>c.innerHTML="");s.forEach(d=>{const q=d.data();if(cols[q.status]){let as="";if(q.assignees)q.assignees.forEach(u=>as+=`<img src="${u.pic}" style="width:20px;height:20px;border-radius:50%;">`);let btn="";if(q.status==="Backlog")btn=`<button class="badge" onclick="upSQ('${d.id}','Doing')" style="background:#007bff;border:none;">เริ่ม ▶️</button>`;else if(q.status==="Doing")btn=`<button class="badge" onclick="upSQ('${d.id}','Review')" style="background:#ffc107;color:black;border:none;">ส่ง ▶️</button>`;const c=document.createElement("div");c.className="sq-card";c.innerHTML=`<b>${q.title}</b><br><small>${q.description}</small><div style="margin-top:5px;display:flex;justify-content:space-between;"><div>${as}</div>${btn}</div>`;cols[q.status].appendChild(c)}})})}
+        
         async function upSQ(id,s){if(confirm("เลื่อนสถานะ?"))await db.collection("side_quests").doc(id).update({status:s})}
         async function submitWork(){const t=document.getElementById('w-title').value,l=document.getElementById('w-link').value;if(!t||!l)return;await db.collection("works").add({userId,displayName:userProfile.displayName,pictureUrl:userProfile.pictureUrl,title:t,link:l,status:"รอตรวจ",score:0,timestamp:firebase.firestore.FieldValue.serverTimestamp()});alert("ส่งแล้ว");document.getElementById('w-title').value=""}
         function loadMyWorks(){db.collection("works").where("userId","==",userId).orderBy("timestamp","desc").onSnapshot(s=>{const l=document.getElementById('work-list');l.innerHTML="";s.forEach(d=>{const w=d.data();let sc=w.score>0?`<span class="badge" style="background:#17a2b8">+${w.score}</span>`:"";l.innerHTML+=`<div class="card" style="padding:15px;border-left:5px solid ${w.status==='ตรวจแล้ว'?'#28a745':'#ffc107'}"><b>${w.title}</b> ${sc}<br><small>${w.status}</small></div>`})})}
-        async function sendReport(){const s=document.getElementById('rpt-subject').value,m=document.getElementById('rpt-msg').value;if(!s||!m)return alert("กรอกข้อมูลให้ครบ");window.location.href=`mailto:medlifeplus@gmail.com?subject=${encodeURIComponent(s)}&body=${encodeURIComponent(m)}`;}
+        async function sendReport(){const s=document.getElementById('rpt-subject').value.trim(),m=document.getElementById('rpt-msg').value.trim();if(!s||!m)return alert("กรอกข้อมูลให้ครบ");window.location.href=`mailto:medlifeplus@gmail.com?subject=${encodeURIComponent(s)}&body=${encodeURIComponent(m)}`;}
     </script>
 </body>
 </html>
