@@ -27,6 +27,9 @@
         .hidden { display: none !important; }
         .badge { padding: 4px 8px; border-radius: 4px; color: white; font-size: 0.8em; }
         .propose-btn { background: #6f42c1; color: white; border: none; padding: 8px 15px; border-radius: 20px; font-size: 0.9em; float: right; cursor: pointer; }
+        
+        /* Version Tag */
+        .version-tag { text-align: center; font-size: 0.8em; color: #ccc; margin-top: 20px; }
     </style>
 </head>
 <body>
@@ -69,16 +72,22 @@
                 <textarea id="rpt-msg" rows="3" placeholder="รายละเอียด..."></textarea>
                 <button onclick="sendReport()" style="background:#ef233c;">📧 ส่งรายงาน</button>
             </div>
+            
+            <div class="version-tag">System v3.0</div>
             <div style="height:50px;"></div>
         </div>
     </div>
 
-    <script src="firebase-config.js?v=2.0"></script>
+    <script src="firebase-config.js?v=3.0"></script>
     <script>
-        const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ใส่ ID ของคุณ
+        const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ใส่ ID เดิมของคุณ
         let userProfile, userId, myQuestData = {}; 
         
         async function main() {
+            // 🔥 Force Remove Old Elements (ถ้า Cache เก่าหลุดมา Script นี้จะลบทิ้งให้)
+            const oldCheckin = document.getElementById('checkin-container');
+            if(oldCheckin) oldCheckin.remove();
+
             try { 
                 await liff.init({ liffId: USER_LIFF_ID }); 
                 if (!liff.isLoggedIn()) { liff.login(); return; }
@@ -94,7 +103,7 @@
             } catch (e) { alert("LIFF Error: "+e.message); }
         } main();
 
-        // Load User Score Only (Removed Check-in logic)
+        // Load User Score Only
         function checkUser(){
             const r=db.collection("users").doc(userId);
             r.onSnapshot(d=>{
@@ -107,7 +116,7 @@
             });
         }
 
-        // Quest Logic
+        // Quest Logic (Receive +0.1 / Submit Bonus +0.1)
         function loadQuests() {
             db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => {
                 myQuestData = {};
@@ -166,14 +175,13 @@
                     answer: ans, status: 'submitted', submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     isLate: false, earnedScore: baseScore
                 });
-                // Bonus 0.1 for on-time submission
                 const totalPoints = baseScore + 0.1;
                 batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(totalPoints) });
                 await batch.commit(); alert(`ส่งคำตอบเรียบร้อย! รับเพิ่ม +${totalPoints} คะแนน`);
             } catch(e) { alert("Error: " + e.message); }
         }
 
-        // Side Quest & Others (Same Logic)
+        // Side Quest & Helpers
         async function proposeProject() { const t=prompt("ชื่อโปรเจกต์:"); if(!t)return; const d=prompt("รายละเอียด:"); try{await db.collection('side_quests').add({title:t,description:d||"",assignees:[{uid:userId,name:userProfile.displayName,pic:userProfile.pictureUrl}],assigneeIds:[userId],status:'Backlog',priority:'Medium',isProposal:true,createdAt:firebase.firestore.FieldValue.serverTimestamp()});alert("เสนอแล้ว!");}catch(e){alert(e.message)} }
         function loadSideQuests(){db.collection("side_quests").where("assigneeIds","array-contains",userId).onSnapshot(s=>{const cols={"Backlog":document.getElementById("sq-Backlog"),"Doing":document.getElementById("sq-Doing"),"Review":document.getElementById("sq-Review"),"Done":document.getElementById("sq-Done")};Object.values(cols).forEach(c=>c.innerHTML="");s.forEach(d=>{const q=d.data();if(cols[q.status]){let as="";if(q.assignees)q.assignees.forEach(u=>as+=`<img src="${u.pic}" style="width:20px;height:20px;border-radius:50%;">`);let btn="";if(q.status==="Backlog")btn=`<button class="badge" onclick="upSQ('${d.id}','Doing')" style="background:#007bff;border:none;">เริ่ม ▶️</button>`;else if(q.status==="Doing")btn=`<button class="badge" onclick="upSQ('${d.id}','Review')" style="background:#ffc107;color:black;border:none;">ส่ง ▶️</button>`;const c=document.createElement("div");c.className="sq-card";c.innerHTML=`<b>${q.title}</b><br><small>${q.description}</small><div style="margin-top:5px;display:flex;justify-content:space-between;"><div>${as}</div>${btn}</div>`;cols[q.status].appendChild(c)}})})}
         async function upSQ(id,s){if(confirm("เลื่อนสถานะ?"))await db.collection("side_quests").doc(id).update({status:s})}
