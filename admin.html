@@ -401,7 +401,89 @@
         async function delQ(id) { if (confirm("ลบถาวร?")) await db.collection("quests").doc(id).delete(); }
 
         // --- Other Logic ---
-        function loadUsers(){ db.collection("users").orderBy("score","desc").onSnapshot(s=>{ const tb=document.querySelector("#usersTable tbody"); const lb=document.getElementById("leaderboardList"); const sel=document.getElementById("sq-user-list"); tb.innerHTML=""; lb.innerHTML=""; sel.innerHTML=""; topUsersCache=[]; let r=1; s.forEach(d=>{ const u=d.data(); tb.innerHTML+=`<tr><td><img src="${u.pictureUrl}" class="user-pic">${u.displayName}</td><td>Lv.${Math.floor(u.score/10)+1}</td><td>${u.score.toFixed(1)}</td><td><button class="btn-sm btn-primary" onclick="adj('${d.id}',1)">+1</button></td><td>🗑️</td></tr>`; sel.innerHTML+=`<label style="margin-right:10px; font-size:0.9em;"><input type="checkbox" class="sq-user-check" value="${d.id}" data-name="${u.displayName}" data-pic="${u.pictureUrl}"> ${u.displayName}</label>`; if(r<=20){ topUsersCache.push(`${r}. ${u.displayName} (${u.score.toFixed(1)})`); let cls='rank-other',ic='⭐'; if(r===1){cls='rank-1';ic='🌟';}else if(r===2){cls='rank-2';ic='🥈';}else if(r===3){cls='rank-3';ic='🥉';} lb.innerHTML+=`<div class="leaderboard-card ${cls}"><div style="display:flex; align-items:center;"><b style="width:30px">#${r}</b><img src="${u.pictureUrl}" class="user-pic">${u.displayName}</div><div><b>${u.score.toFixed(1)}</b> ${ic}</div></div>`; } r++; }); }) }
+        function loadUsers() {
+        db.collection("users").orderBy("score", "desc").onSnapshot(snap => {
+            const tb = document.querySelector("#usersTable tbody");
+            const lb = document.getElementById("leaderboardList");
+            const sel = document.getElementById("sq-user-list");
+            
+            tb.innerHTML = ""; 
+            lb.innerHTML = ""; 
+            sel.innerHTML = ""; 
+            
+            let r = 1;
+            topUsersCache = [];
+
+            snap.forEach(doc => {
+                const u = doc.data();
+                const score = parseFloat((u.score || 0).toFixed(2)); // ทศนิยม 2 ตำแหน่ง
+                const lv = Math.floor(score / 10) + 1;
+
+                // 1. ตาราง Users (เพิ่มช่องกรอกทศนิยม)
+                tb.innerHTML += `
+                    <tr class="u-row">
+                        <td>
+                            <div style="display:flex; align-items:center;">
+                                <img src="${u.pictureUrl}" class="user-pic">
+                                <span>${u.displayName}</span>
+                            </div>
+                        </td>
+                        <td><span class="badge" style="background:#eee; color:#555">Lv.${lv}</span></td>
+                        <td style="font-weight:bold; color:#4361ee; font-size:1.1em;">${score}</td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:5px;">
+                                <input type="number" step="0.1" id="adj-${doc.id}" placeholder="0.0" style="width:60px; padding:5px; border:1px solid #ddd; border-radius:5px; text-align:center;">
+                                <button class="btn-sm btn-success" onclick="adjustScoreDecimal('${doc.id}')">💾 ปรับ</button>
+                            </div>
+                        </td>
+                        <td><button class="btn-sm btn-danger" onclick="delUser('${doc.id}')">🗑️</button></td>
+                    </tr>`;
+
+                // 2. Leaderboard Logic (เหมือนเดิม)
+                if (r <= 20) {
+                    topUsersCache.push(`${r}. ${u.displayName} (${score})`);
+                    let cls = 'rank-other', ic = '⭐';
+                    if (r === 1) { cls = 'rank-1'; ic = '🌟'; }
+                    else if (r === 2) { cls = 'rank-2'; ic = '🥈'; }
+                    else if (r === 3) { cls = 'rank-3'; ic = '🥉'; }
+                    
+                    lb.innerHTML += `
+                        <div class="leaderboard-card ${cls}">
+                            <div style="display:flex; align-items:center;">
+                                <b style="width:30px">#${r}</b>
+                                <img src="${u.pictureUrl}" class="user-pic">${u.displayName}
+                            </div>
+                            <div><b>${score}</b> ${ic}</div>
+                        </div>`;
+                }
+                
+                // 3. User Select for Side Quest (เหมือนเดิม)
+                sel.innerHTML += `<label style="margin-right:10px; font-size:0.9em;"><input type="checkbox" class="sq-user-check" value="${doc.id}" data-name="${u.displayName}" data-pic="${u.pictureUrl}"> ${u.displayName}</label>`;
+                
+                r++;
+            });
+        });
+    }
+
+    // ฟังก์ชันปรับคะแนนแบบทศนิยม
+    async function adjustScoreDecimal(userId) {
+        const input = document.getElementById(`adj-${userId}`);
+        const val = parseFloat(input.value);
+        
+        if (isNaN(val) || val === 0) return alert("กรุณากรอกตัวเลข (เช่น 0.5 หรือ -1)");
+        
+        if (confirm(`ยืนยันปรับคะแนน: ${val > 0 ? '+' : ''}${val} แต้ม?`)) {
+            try {
+                await db.collection("users").doc(userId).update({
+                    score: firebase.firestore.FieldValue.increment(val)
+                });
+                input.value = ""; // รีเซ็ตช่อง
+                // ไม่ต้อง alert ก็ได้เพราะตารางจะอัปเดต realtime
+            } catch (e) {
+                alert("Error: " + e.message);
+            }
+        }
+    }
         function loadWorks() { db.collection("works").orderBy("timestamp","desc").limit(50).onSnapshot(s=>{ const t=document.querySelector("#worksTable tbody"); t.innerHTML=""; s.forEach(d=>{ const w=d.data(); t.innerHTML+=`<tr><td>${w.timestamp?.toDate().toLocaleString('th-TH')||''}</td><td><img src="${w.pictureUrl}" class="user-pic">${w.displayName}</td><td>${w.title}</td><td><a href="${w.link}" target="_blank">Link</a></td><td>${w.status}</td><td><input type="number" step="0.1" id="sc-${d.id}" value="${w.score||0}" style="width:50px"><button onclick="svSc('${d.id}','${w.userId}',${w.score||0})">💾</button></td><td><button class="btn-sm btn-danger" onclick="delWork('${d.id}')">🗑️</button></td></tr>`}) }) }
         function loadQuestSubmissions() { db.collection("quest_submissions").orderBy("timestamp","desc").limit(50).onSnapshot(s=>{ const t=document.querySelector("#questTable tbody"); t.innerHTML=""; s.forEach(d=>{ const q=d.data(); let ans=q.answer; if(ans.startsWith('http')) ans=`<a href="${ans}" target="_blank">Link</a>`; t.innerHTML+=`<tr><td>${q.timestamp?.toDate().toLocaleString('th-TH')||''}</td><td><img src="${q.pictureUrl}" class="user-pic">${q.displayName}</td><td>${ans}</td><td>${q.isLate?'ช้า':'ทัน'}</td><td><input type="number" step="0.1" id="qsc-${d.id}" value="${(q.earnedScore||0)+(q.bonusGiven||0)}" style="width:50px"><button onclick="upQSc('${d.id}','${q.userId}',${(q.earnedScore||0)+(q.bonusGiven||0)},${q.earnedScore||0})">แก้</button></td><td><button class="btn-sm btn-danger" onclick="delQSub('${d.id}','${q.userId}',${(q.earnedScore||0)+(q.bonusGiven||0)})">🗑️</button></td></tr>`}) }) }
 
@@ -417,3 +499,4 @@
     </script>
 </body>
 </html>
+
