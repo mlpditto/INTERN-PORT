@@ -89,11 +89,81 @@
         }
         function isToday(d) { const n=new Date(); return d.getDate()===n.getDate() && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear(); }
         function toggleCheckinBtn() { document.getElementById('btn-checkin').disabled = !document.getElementById('chk-checkin').checked; }
+        // 🔥 ฟังก์ชันลงเวลา (Updated: Hidden Streak Bonus)
         async function submitCheckIn() {
-            const b = db.batch();
-            b.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(0.1), lastCheckIn: firebase.firestore.FieldValue.serverTimestamp() });
-            b.set(db.collection("checkin_logs").doc(), { userId, displayName: userProfile.displayName, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
-            await b.commit(); alert("บันทึกเวลาแล้ว!");
+            try {
+                // 1. ดึงข้อมูล User ปัจจุบันมาก่อน เพื่อเช็ควันล่าสุด
+                const userRef = db.collection("users").doc(userId);
+                const doc = await userRef.get();
+                
+                if (!doc.exists) return; // กันเหนียว
+                const data = doc.data();
+
+                const now = new Date();
+                let currentStreak = data.currentStreak || 0;
+                let bonus = 0; // คะแนนพิเศษ (ปกติเป็น 0)
+
+                // 2. คำนวณ Streak
+                if (data.lastCheckIn) {
+                    const lastDate = data.lastCheckIn.toDate();
+                    
+                    // สร้างตัวแปร "เมื่อวาน"
+                    const yesterday = new Date();
+                    yesterday.setDate(now.getDate() - 1);
+
+                    // เช็คว่า วัน/เดือน/ปี ของครั้งล่าสุด ตรงกับ "เมื่อวาน" หรือไม่?
+                    const isYesterday = 
+                        lastDate.getDate() === yesterday.getDate() &&
+                        lastDate.getMonth() === yesterday.getMonth() &&
+                        lastDate.getFullYear() === yesterday.getFullYear();
+
+                    if (isYesterday) {
+                        currentStreak++; // ต่อเนื่อง! เพิ่ม Streak
+                    } else {
+                        currentStreak = 1; // ขาดช่วง! เริ่มนับ 1 ใหม่
+                    }
+                } else {
+                    currentStreak = 1; // เพิ่งเคยลงครั้งแรก
+                }
+
+                // 3. 🎁 เช็คโบนัสลับ (Hidden Bonus)
+                // ถ้า Streak ครบ 5, 10, 15, ... ให้เพิ่ม 0.1
+                if (currentStreak > 0 && currentStreak % 5 === 0) {
+                    bonus = 0.1;
+                    console.log(`🎉 Hidden Streak Bonus Activated! (Streak: ${currentStreak})`);
+                }
+
+                // 4. บันทึกลง Database
+                const batch = db.batch();
+                
+                // อัปเดต User: คะแนนปกติ 0.1 + โบนัส (ถ้ามี)
+                const totalPoints = 0.1 + bonus;
+                
+                batch.update(userRef, { 
+                    score: firebase.firestore.FieldValue.increment(totalPoints), 
+                    lastCheckIn: firebase.firestore.FieldValue.serverTimestamp(),
+                    currentStreak: currentStreak // บันทึกสถิติไว้ด้วย
+                });
+
+                // บันทึก Log
+                batch.set(db.collection("checkin_logs").doc(), { 
+                    userId, 
+                    displayName: userProfile.displayName, 
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    isStreakBonus: bonus > 0 // แอบแปะป้ายไว้ใน Log แอดมินดูได้
+                });
+
+                await batch.commit();
+                
+                // 🤫 แจ้งเตือนปกติ (ไม่บอก User ว่าได้โบนัส)
+                alert("บันทึกเวลาเข้างานเรียบร้อย!"); 
+                
+                // (ถ้าอยากให้ User รู้ทีหลัง ให้เปลี่ยนเป็น alert ข้างล่างแทน)
+                // if(bonus > 0) alert(`สุดยอด! เข้างานต่อเนื่อง ${currentStreak} วัน รับโบนัสพิเศษ +${bonus} แต้ม!`);
+                
+            } catch(e) {
+                alert("Error: " + e.message);
+            }
         }
 
         function loadQuests() {
@@ -145,3 +215,4 @@
     </script>
 </body>
 </html>
+
