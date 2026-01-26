@@ -17,19 +17,23 @@
         input, textarea { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-family: inherit; }
         button { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; color: white; background-color: #06C755; transition: 0.2s; }
         button:hover { background-color: #05a546; } button:disabled { background-color: #ccc; }
-        /* Quest */
         .quest-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; margin-bottom: 20px; }
         .quest-image { width: 100%; height: auto; border-radius: 8px; margin-bottom: 10px; border: 2px solid rgba(255,255,255,0.3); display: block; cursor: pointer; }
         .quest-link-btn { display: inline-block; background: rgba(255,255,255,0.2); color: white; padding: 8px 15px; border-radius: 20px; text-decoration: none; margin-bottom: 15px; font-size: 0.9em; border: 1px solid rgba(255,255,255,0.4); }
-        /* Checkin */
         .checkin-card { border-left: 5px solid #17a2b8; }
         .checkin-checkbox { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; cursor: pointer; background: #f1f8ff; padding: 10px; border-radius: 8px; border: 1px solid #cce5ff; }
         .checkin-checkbox input { width: 20px; height: 20px; }
-        /* Feedback & Status */
         .feedback-box { background-color: #e7f3ff; border-left: 4px solid #1877f2; padding: 10px; margin-top: 10px; border-radius: 4px; font-size: 0.9em; color: #333; }
         .hidden { display: none !important; }
         .badge { padding: 4px 8px; border-radius: 4px; color: white; font-size: 0.8em; }
         .bg-yellow { background: #ffc107; color: black; } .bg-green { background: #28a745; } .bg-red { background: #dc3545; }
+        
+        /* 🔥 Side Quest Styles */
+        .sq-container { display: flex; overflow-x: auto; gap: 15px; padding-bottom: 15px; scroll-snap-type: x mandatory; }
+        .sq-col { min-width: 85%; background: #f1f3f5; border-radius: 12px; padding: 15px; scroll-snap-align: center; }
+        .sq-header { font-weight: bold; margin-bottom: 10px; border-bottom: 2px solid #ddd; padding-bottom: 5px; display:flex; justify-content:space-between; }
+        .sq-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 10px; border-left: 4px solid #4361ee; }
+        .sq-assignee img { width: 20px; height: 20px; border-radius: 50%; margin-right: -5px; border: 2px solid white; }
     </style>
 </head>
 <body>
@@ -41,6 +45,7 @@
                 <h3 id="u-name" style="margin:10px 0 5px;">User</h3>
                 <p>คะแนนสะสม: <span id="u-score" class="score-text">0</span> แต้ม</p>
             </div>
+            
             <div id="checkin-container" class="card checkin-card hidden">
                 <h3 style="margin-top:0;">📅 อย่าลืมอ่าน Daily Quest</h3>
                 <div id="checkin-form">
@@ -49,7 +54,31 @@
                 </div>
                 <div id="checkin-done" class="hidden" style="text-align:center; padding:10px;"><h2 style="margin:0; font-size:3em;">✅</h2><p style="color:#28a745; font-weight:bold;">วันนี้รับ Quest เรียบร้อยแล้ว</p></div>
             </div>
+
+            <h3 style="margin-left:5px; color:#4361ee;">🗺️ ภารกิจ (Side Quest)</h3>
+            <div class="sq-container">
+                <div class="sq-col">
+                    <div class="sq-header">📌 Backlog <span class="badge" style="background:#6c757d" id="sq-c-backlog">0</span></div>
+                    <div id="sq-Backlog"></div>
+                </div>
+                <div class="sq-col">
+                    <div class="sq-header">🚧 Doing <span class="badge" style="background:#007bff" id="sq-c-doing">0</span></div>
+                    <div id="sq-Doing"></div>
+                </div>
+                <div class="sq-col">
+                    <div class="sq-header">👀 Review <span class="badge" style="background:#ffc107; color:black;" id="sq-c-review">0</span></div>
+                    <div id="sq-Review"></div>
+                </div>
+                <div class="sq-col">
+                    <div class="sq-header">✅ Done <span class="badge" style="background:#28a745" id="sq-c-done">0</span></div>
+                    <div id="sq-Done"></div>
+                </div>
+            </div>
+            
+            <div style="height:20px;"></div>
+
             <div id="quest-list-container"></div>
+            
             <div class="card">
                 <h4>📤 ส่งงาน / การบ้าน</h4>
                 <input type="text" id="w-title" placeholder="ชื่อหัวข้อ">
@@ -71,148 +100,58 @@
                 userProfile = await liff.getProfile(); userId = userProfile.userId;
                 document.getElementById('loading').classList.add('hidden'); document.getElementById('main-app').classList.remove('hidden');
                 document.getElementById('u-img').src = userProfile.pictureUrl; document.getElementById('u-name').innerText = userProfile.displayName;
-                checkUser(); loadMyWorks(); loadQuests();
+                checkUser(); loadMyWorks(); loadQuests(); loadSideQuests();
             } catch (e) { alert("LIFF Error: "+e.message); }
         } main();
 
-        function checkUser() {
-            const r = db.collection("users").doc(userId);
-            r.onSnapshot(doc => {
-                if(doc.exists) { const d=doc.data(); document.getElementById('u-score').innerText = parseFloat((d.score||0).toFixed(2)); updateCheckIn(d.lastCheckIn); }
-                else r.set({ displayName: userProfile.displayName, pictureUrl: userProfile.pictureUrl, score: 0 });
-            });
-        }
-        function updateCheckIn(last) {
-            const f=document.getElementById('checkin-form'), d=document.getElementById('checkin-done');
-            document.getElementById('checkin-container').classList.remove('hidden');
-            if(last && isToday(last.toDate())) { f.classList.add('hidden'); d.classList.remove('hidden'); } else { f.classList.remove('hidden'); d.classList.add('hidden'); }
-        }
-        function isToday(d) { const n=new Date(); return d.getDate()===n.getDate() && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear(); }
-        function toggleCheckinBtn() { document.getElementById('btn-checkin').disabled = !document.getElementById('chk-checkin').checked; }
-        // 🔥 ฟังก์ชันลงเวลา (Updated: Hidden Streak Bonus)
-        async function submitCheckIn() {
-            try {
-                // 1. ดึงข้อมูล User ปัจจุบันมาก่อน เพื่อเช็ควันล่าสุด
-                const userRef = db.collection("users").doc(userId);
-                const doc = await userRef.get();
-                
-                if (!doc.exists) return; // กันเหนียว
-                const data = doc.data();
+        // Side Quest Logic
+        function loadSideQuests() {
+            // โหลดเฉพาะงานที่มี ID เราอยู่ใน assigneeIds
+            db.collection("side_quests").where("assigneeIds", "array-contains", userId).onSnapshot(snap => {
+                const cols = { "Backlog": document.getElementById("sq-Backlog"), "Doing": document.getElementById("sq-Doing"), "Review": document.getElementById("sq-Review"), "Done": document.getElementById("sq-Done") };
+                const counts = { "Backlog": 0, "Doing": 0, "Review": 0, "Done": 0 };
+                Object.values(cols).forEach(c => c.innerHTML = "");
 
-                const now = new Date();
-                let currentStreak = data.currentStreak || 0;
-                let bonus = 0; // คะแนนพิเศษ (ปกติเป็น 0)
-
-                // 2. คำนวณ Streak
-                if (data.lastCheckIn) {
-                    const lastDate = data.lastCheckIn.toDate();
+                snap.forEach(doc => {
+                    const q = doc.data();
+                    counts[q.status]++;
                     
-                    // สร้างตัวแปร "เมื่อวาน"
-                    const yesterday = new Date();
-                    yesterday.setDate(now.getDate() - 1);
+                    let assigneesHtml = '<div class="sq-assignee" style="margin-top:5px;">';
+                    if(q.assignees) q.assignees.forEach(u => assigneesHtml += `<img src="${u.pic}">`);
+                    assigneesHtml += '</div>';
 
-                    // เช็คว่า วัน/เดือน/ปี ของครั้งล่าสุด ตรงกับ "เมื่อวาน" หรือไม่?
-                    const isYesterday = 
-                        lastDate.getDate() === yesterday.getDate() &&
-                        lastDate.getMonth() === yesterday.getMonth() &&
-                        lastDate.getFullYear() === yesterday.getFullYear();
+                    // Move Buttons (User can move Backlog -> Doing -> Review)
+                    let btns = "";
+                    if(q.status === "Backlog") btns = `<button class="badge" style="border:none; background:#007bff; cursor:pointer; margin-top:5px;" onclick="upSQ('${doc.id}','Doing')">เริ่มทำ ▶️</button>`;
+                    else if(q.status === "Doing") btns = `<button class="badge" style="border:none; background:#ffc107; color:black; cursor:pointer; margin-top:5px;" onclick="upSQ('${doc.id}','Review')">ส่งตรวจ ▶️</button>`;
+                    else if(q.status === "Review") btns = `<span style="font-size:0.8em; color:#888;">รอตรวจ...</span>`;
 
-                    if (isYesterday) {
-                        currentStreak++; // ต่อเนื่อง! เพิ่ม Streak
-                    } else {
-                        currentStreak = 1; // ขาดช่วง! เริ่มนับ 1 ใหม่
-                    }
-                } else {
-                    currentStreak = 1; // เพิ่งเคยลงครั้งแรก
-                }
-
-                // 3. 🎁 เช็คโบนัสลับ (Hidden Bonus)
-                // ถ้า Streak ครบ 5, 10, 15, ... ให้เพิ่ม 0.1
-                if (currentStreak > 0 && currentStreak % 5 === 0) {
-                    bonus = 0.1;
-                    console.log(`🎉 Hidden Streak Bonus Activated! (Streak: ${currentStreak})`);
-                }
-
-                // 4. บันทึกลง Database
-                const batch = db.batch();
-                
-                // อัปเดต User: คะแนนปกติ 0.1 + โบนัส (ถ้ามี)
-                const totalPoints = 0.1 + bonus;
-                
-                batch.update(userRef, { 
-                    score: firebase.firestore.FieldValue.increment(totalPoints), 
-                    lastCheckIn: firebase.firestore.FieldValue.serverTimestamp(),
-                    currentStreak: currentStreak // บันทึกสถิติไว้ด้วย
+                    const card = document.createElement("div");
+                    card.className = "sq-card";
+                    card.innerHTML = `<b>${q.title}</b><p style="font-size:0.9em; margin:5px 0;">${q.description}</p>${assigneesHtml}<div style="text-align:right;">${btns}</div>`;
+                    
+                    if(cols[q.status]) cols[q.status].appendChild(card);
                 });
-
-                // บันทึก Log
-                batch.set(db.collection("checkin_logs").doc(), { 
-                    userId, 
-                    displayName: userProfile.displayName, 
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    isStreakBonus: bonus > 0 // แอบแปะป้ายไว้ใน Log แอดมินดูได้
-                });
-
-                await batch.commit();
                 
-                // 🤫 แจ้งเตือนปกติ (ไม่บอก User ว่าได้โบนัส)
-                alert("บันทึกเวลาเข้างานเรียบร้อย!"); 
-                
-                // (ถ้าอยากให้ User รู้ทีหลัง ให้เปลี่ยนเป็น alert ข้างล่างแทน)
-                // if(bonus > 0) alert(`สุดยอด! เข้างานต่อเนื่อง ${currentStreak} วัน รับโบนัสพิเศษ +${bonus} แต้ม!`);
-                
-            } catch(e) {
-                alert("Error: " + e.message);
-            }
-        }
-
-        function loadQuests() {
-            db.collection("quest_submissions").where("userId","==",userId).onSnapshot(s => {
-                submittedQuestIds.clear(); s.forEach(d => submittedQuestIds.add(d.data().questId));
-                db.collection("quests").orderBy("createdAt","asc").onSnapshot(renderQuests);
+                Object.keys(counts).forEach(k => document.getElementById(`sq-c-${k.toLowerCase()}`).innerText = counts[k]);
             });
         }
-        function renderQuests(snap) {
-            const c = document.getElementById('quest-list-container'); c.innerHTML = ""; const now = new Date();
-            snap.forEach(doc => {
-                const q=doc.data(); if(!q.deadline || now>q.deadline.toDate() || submittedQuestIds.has(doc.id)) return;
-                const h = Math.floor((q.deadline.toDate()-now)/36e5), m = Math.floor(((q.deadline.toDate()-now)%36e5)/6e4);
-                const img = q.imageUrl ? `<a href="${q.imageUrl}" target="_blank"><img src="${q.imageUrl}" class="quest-image"></a>` : "";
-                const lnk = q.questLink ? `<a href="${q.questLink}" target="_blank" class="quest-link-btn">🔗 ข้อมูลเพิ่มเติม</a>` : "";
-                c.innerHTML += `<div class="card quest-card"><div class="quest-timer">⏰ เหลือ ${h} ชม. ${m} นาที</div>${img}<h3 style="margin:5px 0;">⚡ ภารกิจ</h3><p>${q.question}</p>${lnk}
-                <textarea id="ans-${doc.id}" rows="2" placeholder="คำตอบ..."></textarea><button onclick="subQ('${doc.id}',${q.baseScore})">🚀 ส่ง (+${q.baseScore})</button></div>`;
-            });
-        }
-        async function subQ(qid, score) {
-            const a = document.getElementById(`ans-${qid}`).value.trim(); if(!a) return alert("พิมพ์คำตอบก่อน");
-            const b = db.batch();
-            // ⚠️ สำคัญ: ส่ง pictureUrl ไปด้วย เพื่อให้ Admin เห็นหน้า
-            b.set(db.collection("quest_submissions").doc(), { questId:qid, userId, displayName:userProfile.displayName, pictureUrl:userProfile.pictureUrl, answer:a, timestamp:firebase.firestore.FieldValue.serverTimestamp(), isLate:false, earnedScore:score, bonusGiven:0 });
-            b.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(score) });
-            await b.commit(); alert("ส่งแล้ว!");
-        }
+        async function upSQ(id, st) { if(confirm("เลื่อนสถานะงาน?")) await db.collection("side_quests").doc(id).update({status:st}); }
 
-        async function submitWork() {
-            const t=document.getElementById('w-title').value.trim(), l=document.getElementById('w-link').value.trim(); if(!t||!l) return alert("กรอกให้ครบ");
-            await db.collection("works").add({ userId, displayName:userProfile.displayName, pictureUrl:userProfile.pictureUrl, title:t, link:l, status:"รอตรวจ", score:0, feedback:"", timestamp:firebase.firestore.FieldValue.serverTimestamp() });
-            alert("ส่งงานแล้ว!"); document.getElementById('w-title').value=""; document.getElementById('w-link').value="";
-        }
-        function loadMyWorks() {
-            db.collection("works").where("userId","==",userId).orderBy("timestamp","desc").onSnapshot(s => {
-                const l = document.getElementById('work-list'); l.innerHTML = "";
-                if(s.empty) { l.innerHTML="<p style='text-align:center; color:#999;'>ไม่มีประวัติ</p>"; return; }
-                s.forEach(doc => {
-                    const w = doc.data();
-                    let fb = w.feedback ? `<div class="feedback-box"><b>💬 Admin:</b> ${w.feedback}</div>` : "";
-                    let badge = w.status==="ตรวจแล้ว"?"bg-green":w.status==="แก้ไข"?"bg-red":"bg-yellow";
-                    // แสดงคะแนนที่ได้
-                    let scoreBadge = w.score > 0 ? `<span class="badge" style="background:#17a2b8; margin-left:5px;">+${w.score} คะแนน</span>` : "";
-                    l.innerHTML += `<div class="card" style="padding:15px; border-left:5px solid ${w.status==='ตรวจแล้ว'?'#28a745':'#ffc107'}">
-                    <div style="display:flex; justify-content:space-between;"><div><h4 style="margin:0;">${w.title}</h4><span class="badge ${badge}">${w.status}</span>${scoreBadge}</div><a href="${w.link}" target="_blank" style="font-size:1.5em; text-decoration:none;">🔗</a></div>${fb}</div>`;
-                });
-            });
-        }
+        // ... (User, Quest, Work Logic แบบเดิม - ใช้ Code จาก V11 ได้เลย หรือ Copy ข้างล่างไปแปะ) ...
+        function checkUser() { const r=db.collection("users").doc(userId); r.onSnapshot(d=>{ if(d.exists){ const data=d.data(); document.getElementById('u-score').innerText=parseFloat((data.score||0).toFixed(2)); updateCheckIn(data.lastCheckIn); } else r.set({displayName:userProfile.displayName, pictureUrl:userProfile.pictureUrl, score:0}) }) }
+        function updateCheckIn(last){ const f=document.getElementById('checkin-form'),d=document.getElementById('checkin-done'); document.getElementById('checkin-container').classList.remove('hidden'); if(last&&isToday(last.toDate())){f.classList.add('hidden');d.classList.remove('hidden')}else{f.classList.remove('hidden');d.classList.add('hidden')} }
+        function isToday(d){const n=new Date();return d.getDate()===n.getDate()&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()}
+        function toggleCheckinBtn(){document.getElementById('btn-checkin').disabled=!document.getElementById('chk-checkin').checked}
+        
+        // Hidden Streak Logic Included
+        async function submitCheckIn(){ try{ const r=db.collection("users").doc(userId); const doc=await r.get(); if(!doc.exists)return; const d=doc.data(); const now=new Date(); let streak=d.currentStreak||0; let bonus=0; if(d.lastCheckIn){ const l=d.lastCheckIn.toDate(); const y=new Date(); y.setDate(now.getDate()-1); if(l.getDate()===y.getDate()&&l.getMonth()===y.getMonth()) streak++; else streak=1; } else streak=1; if(streak>0&&streak%5===0) bonus=0.1; const b=db.batch(); b.update(r,{score:firebase.firestore.FieldValue.increment(0.1+bonus), lastCheckIn:firebase.firestore.FieldValue.serverTimestamp(), currentStreak:streak}); b.set(db.collection("checkin_logs").doc(),{userId, displayName:userProfile.displayName, timestamp:firebase.firestore.FieldValue.serverTimestamp(), isStreakBonus:bonus>0}); await b.commit(); alert("บันทึกเวลาแล้ว!"); }catch(e){alert(e.message)} }
+
+        function loadQuests(){ db.collection("quest_submissions").where("userId","==",userId).onSnapshot(s=>{ submittedQuestIds.clear(); s.forEach(d=>submittedQuestIds.add(d.data().questId)); db.collection("quests").orderBy("createdAt","asc").onSnapshot(renderQuests) }) }
+        function renderQuests(snap){ const c=document.getElementById('quest-list-container'); c.innerHTML=""; const now=new Date(); snap.forEach(doc=>{ const q=doc.data(); if(!q.deadline||now>q.deadline.toDate()||submittedQuestIds.has(doc.id))return; const h=Math.floor((q.deadline.toDate()-now)/36e5),m=Math.floor(((q.deadline.toDate()-now)%36e5)/6e4); const img=q.imageUrl?`<a href="${q.imageUrl}" target="_blank"><img src="${q.imageUrl}" class="quest-image"></a>`:""; const lnk=q.questLink?`<a href="${q.questLink}" target="_blank" class="quest-link-btn">🔗 ข้อมูลเพิ่มเติม</a>`:""; c.innerHTML+=`<div class="card quest-card"><div class="quest-timer">⏰ เหลือ ${h} ชม. ${m} นาที</div>${img}<h3 style="margin:5px 0;">⚡ ภารกิจ</h3><p>${q.question}</p>${lnk}<textarea id="ans-${doc.id}" rows="2" placeholder="คำตอบ..."></textarea><button onclick="subQ('${doc.id}',${q.baseScore})">🚀 ส่ง (+${q.baseScore})</button></div>` }) }
+        async function subQ(qid,s){ const a=document.getElementById(`ans-${qid}`).value.trim(); if(!a)return alert("Empty?"); const b=db.batch(); b.set(db.collection("quest_submissions").doc(),{questId:qid, userId, displayName:userProfile.displayName, pictureUrl:userProfile.pictureUrl, answer:a, timestamp:firebase.firestore.FieldValue.serverTimestamp(), isLate:false, earnedScore:s, bonusGiven:0}); b.update(db.collection("users").doc(userId),{score:firebase.firestore.FieldValue.increment(s)}); await b.commit(); alert("Sent!"); }
+        async function submitWork(){ const t=document.getElementById('w-title').value.trim(), l=document.getElementById('w-link').value.trim(); if(!t||!l)return alert("Empty?"); await db.collection("works").add({userId, displayName:userProfile.displayName, pictureUrl:userProfile.pictureUrl, title:t, link:l, status:"รอตรวจ", score:0, feedback:"", timestamp:firebase.firestore.FieldValue.serverTimestamp()}); alert("Sent!"); document.getElementById('w-title').value=""; document.getElementById('w-link').value=""; }
+        function loadMyWorks(){ db.collection("works").where("userId","==",userId).orderBy("timestamp","desc").onSnapshot(s=>{ const l=document.getElementById('work-list'); l.innerHTML=""; if(s.empty){l.innerHTML="<p style='text-align:center; color:#999;'>Empty</p>";return} s.forEach(doc=>{ const w=doc.data(); let fb=w.feedback?`<div class="feedback-box"><b>💬 Admin:</b> ${w.feedback}</div>`:""; let badge=w.status==="ตรวจแล้ว"?"bg-green":w.status==="แก้ไข"?"bg-red":"bg-yellow"; let sb=w.score>0?`<span class="badge" style="background:#17a2b8; margin-left:5px;">+${w.score}</span>`:""; l.innerHTML+=`<div class="card" style="padding:15px; border-left:5px solid ${w.status==='ตรวจแล้ว'?'#28a745':'#ffc107'}"><div style="display:flex; justify-content:space-between;"><div><h4 style="margin:0;">${w.title}</h4><span class="badge ${badge}">${w.status}</span>${sb}</div><a href="${w.link}" target="_blank" style="font-size:1.5em; text-decoration:none;">🔗</a></div>${fb}</div>` }) }) }
     </script>
 </body>
 </html>
-
