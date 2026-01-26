@@ -8,164 +8,161 @@
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
     <style>
+        /* ... (CSS เดิมทั้งหมด) ... */
         body { font-family: 'Kanit', sans-serif; background-color: #f8f9fa; padding: 20px; color:#333; margin:0; }
         .container { max-width: 600px; margin: 0 auto; }
         .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .profile-img { width: 80px; height: 80px; border-radius: 50%; border: 3px solid #06C755; }
         .score-text { color: #06C755; font-weight: bold; font-size: 1.4em; }
-        
         input, textarea { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-family: inherit; }
-        button { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; color: white; background-color: #06C755; transition: 0.2s; min-height: 44px; /* Touch friendly */ }
+        button { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; color: white; background-color: #06C755; transition: 0.2s; min-height: 44px; }
         button:hover { background-color: #05a546; } button:disabled { background-color: #ccc; }
-
-        /* 🔥 Updated Side Quest UI */
-        .sq-container { display: flex; overflow-x: auto; gap: 15px; padding-bottom: 20px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
-        .sq-col { min-width: 85%; background: #f1f3f5; border-radius: 12px; padding: 15px; scroll-snap-align: center; display: flex; flex-direction: column; }
-        .sq-header { font-weight: bold; margin-bottom: 10px; border-bottom: 2px solid #ddd; padding-bottom: 5px; display:flex; justify-content:space-between; }
         
-        .sq-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 10px; border-left: 5px solid #4361ee; position:relative; }
-        .sq-assignee img { width: 25px; height: 25px; border-radius: 50%; margin-right: -8px; border: 2px solid white; }
-        
-        .empty-state { text-align: center; padding: 20px; color: #888; }
-        .empty-state img { width: 60px; opacity: 0.5; margin-bottom: 10px; }
-
-        .priority-badge { font-size: 0.7em; padding: 2px 6px; border-radius: 4px; color: white; display: inline-block; margin-bottom: 5px; }
-        .p-High { background: #ef233c; } .p-Medium { background: #ff9f1c; } .p-Low { background: #2ec4b6; }
-        
-        /* Pagination Dots */
-        .dots-container { text-align: center; margin-top: -15px; margin-bottom: 20px; }
-        .dot { height: 8px; width: 8px; background-color: #bbb; border-radius: 50%; display: inline-block; margin: 0 4px; }
-        .dot.active { background-color: #4361ee; }
-
-        /* Other styles as previous */
+        /* CSS เดิมของ Quest/SideQuest */
+        .quest-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; margin-bottom: 20px; }
+        .sq-container { display: flex; overflow-x: auto; gap: 15px; padding-bottom: 20px; scroll-snap-type: x mandatory; }
+        .sq-col { min-width: 85%; background: #f1f3f5; border-radius: 12px; padding: 15px; scroll-snap-align: center; }
+        .sq-card { background: white; padding: 15px; border-radius: 8px; border-left: 5px solid #4361ee; margin-bottom: 10px; }
+        .checkin-card { border-left: 5px solid #17a2b8; }
         .hidden { display: none !important; }
         .badge { padding: 4px 8px; border-radius: 4px; color: white; font-size: 0.8em; }
-        .checkin-card { border-left: 5px solid #17a2b8; }
+
+        /* 🔥 Styles สำหรับกล่อง Report */
+        .report-card { border-left: 5px solid #ef233c; }
     </style>
 </head>
 <body>
     <div class="container">
         <div id="loading" style="text-align:center; margin-top:50px;">⏳ กำลังโหลด...</div>
+        
         <div id="main-app" class="hidden">
             <div class="card" style="text-align:center;">
-                <img id="u-img" class="profile-img" src="" loading="lazy">
+                <img id="u-img" class="profile-img" src="">
                 <h3 id="u-name" style="margin:10px 0 5px;">User</h3>
                 <p>คะแนนสะสม: <span id="u-score" class="score-text">0</span> แต้ม</p>
             </div>
             
             <div id="checkin-container" class="card checkin-card hidden">
                 <h3>📅 อย่าลืมอ่าน Daily Quest</h3>
-                <button id="btn-checkin" onclick="submitCheckIn()">รับทราบ</button>
+                <div id="checkin-form">
+                    <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                        <input type="checkbox" id="chk-checkin" onchange="toggleCheckinBtn()" style="width:20px;height:20px;"> 
+                        รับทราบ
+                    </label>
+                    <button id="btn-checkin" onclick="submitCheckIn()" disabled style="background:#17a2b8;">ยืนยันรับแต้ม</button>
+                </div>
+                <div id="checkin-done" class="hidden" style="text-align:center;"><h2 style="margin:0;">✅</h2><p>วันนี้รับ Quest เรียบร้อยแล้ว</p></div>
             </div>
 
             <h3 style="margin-left:5px; color:#4361ee;">🗺️ ภารกิจ (Side Quest)</h3>
             <div class="sq-container" id="sq-scroll">
-                <div class="sq-col" id="col-Backlog">
-                    <div class="sq-header">📌 Backlog <span class="badge" style="background:#6c757d" id="sq-c-backlog">0</span></div>
-                    <div id="sq-Backlog"></div>
-                </div>
-                <div class="sq-col" id="col-Doing">
-                    <div class="sq-header">🚧 Doing <span class="badge" style="background:#007bff" id="sq-c-doing">0</span></div>
-                    <div id="sq-Doing"></div>
-                </div>
-                <div class="sq-col" id="col-Review">
-                    <div class="sq-header">👀 Review <span class="badge" style="background:#ffc107; color:black;" id="sq-c-review">0</span></div>
-                    <div id="sq-Review"></div>
-                </div>
-                <div class="sq-col" id="col-Done">
-                    <div class="sq-header">✅ Done <span class="badge" style="background:#28a745" id="sq-c-done">0</span></div>
-                    <div id="sq-Done"></div>
-                </div>
+                <div class="sq-col" id="col-Backlog"><div id="sq-Backlog"></div></div>
+                <div class="sq-col" id="col-Doing"><div id="sq-Doing"></div></div>
+                <div class="sq-col" id="col-Review"><div id="sq-Review"></div></div>
+                <div class="sq-col" id="col-Done"><div id="sq-Done"></div></div>
             </div>
-            <div class="dots-container">
-                <span class="dot active"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
-            </div>
-            
+
             <div id="quest-list-container"></div>
+            
+            <div class="card">
+                <h4>📤 ส่งงาน / การบ้าน</h4>
+                <input type="text" id="w-title" placeholder="ชื่อหัวข้อ">
+                <input type="url" id="w-link" placeholder="ลิงก์งาน">
+                <button onclick="submitWork()">ยืนยันส่งงาน</button>
             </div>
+
+            <h4 style="margin-left:5px; color:#666;">📂 ประวัติการส่งงาน</h4>
+            <div id="work-list"></div>
+
+            <div class="card report-card">
+                <h4>🚩 รายงานปัญหา / ติดต่อ Admin</h4>
+                <p style="font-size:0.9em; color:#666;">ส่งข้อความหรือแจ้งปัญหาการใช้งาน ระบบจะส่งอีเมลหา Admin ทันที</p>
+                <input type="text" id="rpt-subject" placeholder="หัวข้อเรื่อง (เช่น แจ้งลากิจ, คะแนนผิด)">
+                <textarea id="rpt-msg" rows="3" placeholder="รายละเอียด..."></textarea>
+                <button onclick="sendReport()" style="background:#ef233c;">📧 ส่งรายงาน</button>
+            </div>
+
+            <div style="height:50px;"></div>
+        </div>
     </div>
+
     <script src="firebase-config.js"></script>
     <script>
-        const USER_LIFF_ID = "XXXXXXXX-XXXXXXXX";
-        let userProfile, userId;
+        const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ใส่ ID ของคุณ
+        let userProfile, userId, submittedQuestIds = new Set();
         
         async function main() {
-            try { await liff.init({ liffId: USER_LIFF_ID }); if (!liff.isLoggedIn()) { liff.login(); return; }
-                userProfile = await liff.getProfile(); userId = userProfile.userId;
-                document.getElementById('loading').classList.add('hidden'); document.getElementById('main-app').classList.remove('hidden');
-                document.getElementById('u-img').src = userProfile.pictureUrl; document.getElementById('u-name').innerText = userProfile.displayName;
-                checkUser(); loadSideQuests();
+            try { 
+                await liff.init({ liffId: USER_LIFF_ID }); 
+                if (!liff.isLoggedIn()) { liff.login(); return; }
+                userProfile = await liff.getProfile(); 
+                userId = userProfile.userId;
+                
+                document.getElementById('loading').classList.add('hidden'); 
+                document.getElementById('main-app').classList.remove('hidden');
+                document.getElementById('u-img').src = userProfile.pictureUrl; 
+                document.getElementById('u-name').innerText = userProfile.displayName;
+                
+                checkUser(); loadMyWorks(); loadQuests(); loadSideQuests();
             } catch (e) { alert("LIFF Error: "+e.message); }
         } main();
 
-        // Scroll Snap Logic
-        const container = document.getElementById('sq-scroll');
-        const dots = document.querySelectorAll('.dot');
-        container.addEventListener('scroll', () => {
-            const index = Math.round(container.scrollLeft / container.offsetWidth);
-            dots.forEach(d => d.classList.remove('active'));
-            if(dots[index]) dots[index].classList.add('active');
-        });
+        // 🔥 Report Function
+        async function sendReport() {
+            const subject = document.getElementById('rpt-subject').value.trim();
+            const msg = document.getElementById('rpt-msg').value.trim();
+            const adminEmail = "medlifeplus@gmail.com";
 
-        // Load Side Quests
-        function loadSideQuests() {
-            db.collection("side_quests").where("assigneeIds", "array-contains", userId).onSnapshot(snap => {
-                const cols = { "Backlog": document.getElementById("sq-Backlog"), "Doing": document.getElementById("sq-Doing"), "Review": document.getElementById("sq-Review"), "Done": document.getElementById("sq-Done") };
-                Object.values(cols).forEach(c => c.innerHTML = "");
-                const counts = { "Backlog": 0, "Doing": 0, "Review": 0, "Done": 0 };
+            if(!subject || !msg) return alert("กรุณากรอกหัวข้อและรายละเอียดครับ");
 
-                snap.forEach(doc => {
-                    const q = doc.data();
-                    counts[q.status]++;
-                    
-                    let assigneesHtml = '<div class="sq-assignee" style="margin-top:5px;">';
-                    if(q.assignees) q.assignees.forEach(u => assigneesHtml += `<img src="${u.pic}">`);
-                    assigneesHtml += '</div>';
-
-                    // Actions
-                    let btns = "";
-                    if(q.status === "Backlog") btns = `<button class="badge" style="border:none; background:#007bff; cursor:pointer;" onclick="upSQ('${doc.id}','Doing')">เริ่มทำ ▶️</button>`;
-                    else if(q.status === "Doing") {
-                        btns = `<button class="badge" style="border:none; background:#17a2b8; cursor:pointer; margin-right:5px;" onclick="uploadProof('${doc.id}')">📎 ส่งงาน</button>
-                                <button class="badge" style="border:none; background:#ffc107; color:black; cursor:pointer;" onclick="upSQ('${doc.id}','Review')">ส่งตรวจ ▶️</button>`;
-                    }
-
-                    const priorityBadge = q.priority ? `<span class="priority-badge p-${q.priority}">${q.priority}</span>` : '';
-
-                    const card = document.createElement("div");
-                    card.className = "sq-card";
-                    card.innerHTML = `${priorityBadge} <b>${q.title}</b><p style="font-size:0.9em; margin:5px 0; color:#666;">${q.description}</p>${assigneesHtml}<div style="text-align:right; margin-top:10px;">${btns}</div>`;
-                    
-                    if(cols[q.status]) cols[q.status].appendChild(card);
+            try {
+                // 1. บันทึกลง Firestore (กันเหนียว)
+                await db.collection("reports").add({
+                    userId: userId,
+                    displayName: userProfile.displayName,
+                    subject: subject,
+                    message: msg,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    status: "New"
                 });
+
+                // 2. เด้งไปหน้าส่ง Email (mailto)
+                const body = `เรียน Admin,\n\n${msg}\n\n----------------\nจาก: ${userProfile.displayName}\nID: ${userId}`;
+                const mailtoLink = `mailto:${adminEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
                 
-                // Empty States
-                Object.keys(cols).forEach(k => {
-                    document.getElementById(`sq-c-${k.toLowerCase()}`).innerText = counts[k];
-                    if(counts[k] === 0) cols[k].innerHTML = `<div class="empty-state">😴 ว่างจัง...</div>`;
-                });
-                
-                // Auto Scroll to Doing
-                if(counts["Doing"] > 0) {
-                     // Simple logic to scroll to 2nd column
-                     // container.scrollLeft = container.offsetWidth; 
-                }
-            });
-        }
-        
-        async function upSQ(id, st) { if(confirm("เลื่อนสถานะ?")) await db.collection("side_quests").doc(id).update({status:st}); }
-        async function uploadProof(id) { 
-            const link = prompt("กรุณาวางลิงก์ผลงาน (Google Drive / Canva):");
-            if(link) {
-                await db.collection("side_quests").doc(id).update({ proofLink: link });
-                alert("แนบลิงก์เรียบร้อย! อย่าลืมกดส่งตรวจนะ");
+                window.location.href = mailtoLink;
+
+                // 3. Clear Form
+                document.getElementById('rpt-subject').value = "";
+                document.getElementById('rpt-msg').value = "";
+
+            } catch(e) {
+                alert("เกิดข้อผิดพลาดในการบันทึก: " + e.message);
+                // ถ้าบันทึกไม่ได้ ก็ยังเด้งเมลให้ user ส่งได้อยู่ดี
+                const body = `เรียน Admin,\n\n${msg}\n\n----------------\nจาก: ${userProfile.displayName}`;
+                window.location.href = `mailto:${adminEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
             }
         }
-        
-        // Functions เดิม (Checkin, Quest) ให้คงไว้เหมือน V12 หรือนำมาใส่ต่อท้าย
-        function checkUser() { const r=db.collection("users").doc(userId); r.onSnapshot(d=>{ if(d.exists){ const data=d.data(); document.getElementById('u-score').innerText=parseFloat((data.score||0).toFixed(2)); } else r.set({displayName:userProfile.displayName, pictureUrl:userProfile.pictureUrl, score:0}) }) }
-        function submitCheckIn(){ /* Logic V12 */ alert("ยืนยันรับแต้ม"); }
+
+        // --- Functions เดิมทั้งหมด (ไม่เปลี่ยนแปลง Logic) ---
+        function checkUser() { const r=db.collection("users").doc(userId); r.onSnapshot(d=>{ if(d.exists){ const data=d.data(); document.getElementById('u-score').innerText=parseFloat((data.score||0).toFixed(2)); updateCheckIn(data.lastCheckIn); } else r.set({displayName:userProfile.displayName, pictureUrl:userProfile.pictureUrl, score:0}) }) }
+        function updateCheckIn(l){ const f=document.getElementById('checkin-form'),d=document.getElementById('checkin-done'); document.getElementById('checkin-container').classList.remove('hidden'); if(l&&isToday(l.toDate())){f.classList.add('hidden');d.classList.remove('hidden')}else{f.classList.remove('hidden');d.classList.add('hidden')} }
+        function isToday(d){const n=new Date();return d.getDate()===n.getDate()&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()}
+        function toggleCheckinBtn(){document.getElementById('btn-checkin').disabled=!document.getElementById('chk-checkin').checked}
+        async function submitCheckIn(){ try{const r=db.collection("users").doc(userId);const doc=await r.get();if(!doc.exists)return;const d=doc.data();let s=d.currentStreak||0;let b=0;if(d.lastCheckIn){const l=d.lastCheckIn.toDate();const y=new Date();y.setDate(new Date().getDate()-1);if(l.getDate()===y.getDate())s++;else s=1}else s=1;if(s>0&&s%5===0)b=0.1;const batch=db.batch();batch.update(r,{score:firebase.firestore.FieldValue.increment(0.1+b),lastCheckIn:firebase.firestore.FieldValue.serverTimestamp(),currentStreak:s});batch.set(db.collection("checkin_logs").doc(),{userId,displayName:userProfile.displayName,timestamp:firebase.firestore.FieldValue.serverTimestamp(),isStreakBonus:b>0});await batch.commit();alert("บันทึกเวลาแล้ว!")}catch(e){alert(e.message)}}
+
+        // Side Quest Load
+        function loadSideQuests(){ db.collection("side_quests").where("assigneeIds","array-contains",userId).onSnapshot(s=>{ const cols={"Backlog":document.getElementById("sq-Backlog"),"Doing":document.getElementById("sq-Doing"),"Review":document.getElementById("sq-Review"),"Done":document.getElementById("sq-Done")}; Object.values(cols).forEach(c=>c.innerHTML=""); s.forEach(d=>{ const q=d.data(); if(cols[q.status]){ let as=""; if(q.assignees)q.assignees.forEach(u=>as+=`<img src="${u.pic}" style="width:20px;height:20px;border-radius:50%;">`); let btn=""; if(q.status==="Backlog")btn=`<button class="badge" onclick="upSQ('${d.id}','Doing')" style="background:#007bff;border:none;">เริ่ม ▶️</button>`; else if(q.status==="Doing")btn=`<button class="badge" onclick="upSQ('${d.id}','Review')" style="background:#ffc107;color:black;border:none;">ส่ง ▶️</button>`; const c=document.createElement("div"); c.className="sq-card"; c.innerHTML=`<b>${q.title}</b><br><small>${q.description}</small><div style="margin-top:5px;display:flex;justify-content:space-between;"><div>${as}</div>${btn}</div>`; cols[q.status].appendChild(c); } }) }) }
+        async function upSQ(id,s){if(confirm("เลื่อนสถานะ?"))await db.collection("side_quests").doc(id).update({status:s})}
+
+        // Quest & Works
+        function loadQuests(){ db.collection("quest_submissions").where("userId","==",userId).onSnapshot(s=>{ submittedQuestIds.clear(); s.forEach(d=>submittedQuestIds.add(d.data().questId)); db.collection("quests").orderBy("createdAt","asc").onSnapshot(renderQuests) }) }
+        function renderQuests(s){ const c=document.getElementById('quest-list-container');c.innerHTML="";const now=new Date(); s.forEach(d=>{ const q=d.data(); if(!q.deadline||now>q.deadline.toDate()||submittedQuestIds.has(d.id))return; const h=Math.ceil((q.deadline.toDate()-now)/36e5); const img=q.imageUrl?`<img src="${q.imageUrl}" style="width:100%;border-radius:8px;">`:""; c.innerHTML+=`<div class="card quest-card">⏰ เหลือ ${h} ชม.<br>${img}<h3>${q.question}</h3><textarea id="ans-${d.id}"></textarea><button onclick="subQ('${d.id}',${q.baseScore})">ส่ง</button></div>` }) }
+        async function subQ(qid,s){ const a=document.getElementById(`ans-${qid}`).value.trim(); if(!a)return; const b=db.batch(); b.set(db.collection("quest_submissions").doc(),{questId:qid,userId,displayName:userProfile.displayName,pictureUrl:userProfile.pictureUrl,answer:a,timestamp:firebase.firestore.FieldValue.serverTimestamp(),isLate:false,earnedScore:s,bonusGiven:0}); b.update(db.collection("users").doc(userId),{score:firebase.firestore.FieldValue.increment(s)}); await b.commit(); alert("ส่งแล้ว"); }
+        async function submitWork(){ const t=document.getElementById('w-title').value, l=document.getElementById('w-link').value; if(!t||!l)return; await db.collection("works").add({userId,displayName:userProfile.displayName,pictureUrl:userProfile.pictureUrl,title:t,link:l,status:"รอตรวจ",score:0,timestamp:firebase.firestore.FieldValue.serverTimestamp()}); alert("ส่งแล้ว"); document.getElementById('w-title').value=""; }
+        function loadMyWorks(){ db.collection("works").where("userId","==",userId).orderBy("timestamp","desc").onSnapshot(s=>{ const l=document.getElementById('work-list'); l.innerHTML=""; s.forEach(d=>{ const w=d.data(); let sc=w.score>0?`<span class="badge" style="background:#17a2b8">+${w.score}</span>`:""; l.innerHTML+=`<div class="card" style="padding:15px;border-left:5px solid ${w.status==='ตรวจแล้ว'?'#28a745':'#ffc107'}"><b>${w.title}</b> ${sc}<br><small>${w.status}</small></div>` }) }) }
     </script>
 </body>
 </html>
