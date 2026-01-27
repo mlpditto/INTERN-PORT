@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP INTERNSHIP V.260127 (V34)</title>
+    <title>MLP INTERNSHIP V.260127 (V35)</title>
     
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
@@ -13,7 +13,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     
     <style>
-        /* ... (CSS เดิม) ... */
+        /* ... (CSS เดิมทั้งหมด - ไม่ต้องแก้) ... */
         :root { --bg-body: #f4f6f9; --bg-card: #ffffff; --text-main: #333; --text-sub: #666; --col-bg: #f8f9fa; --border-color: #e0e0e0; --primary: #4361ee; --success: #2ec4b6; --warning: #ff9f1c; --danger: #ef233c; --dark: #2b2d42; }
         body.dark-mode { --bg-body: #1a1a1a; --bg-card: #2d2d2d; --text-main: #e0e0e0; --text-sub: #aaa; --col-bg: #333; --border-color: #444; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-body); color: var(--text-main); margin: 0; transition: 0.3s; }
@@ -198,6 +198,8 @@
             if(isInit) return; isInit = true;
             try { await liff.init({ liffId: ADMIN_LIFF_ID }); } catch(e) {}
             loadWorks(); loadQuestSubmissions(); loadActiveQuests(); loadQuestHistory(); loadUsers(); loadSideQuests();
+            // 🔥 Fix: initSortable เรียกครั้งเดียวตรงนี้พอ!
+            initSortable();
             setInterval(updateDoneTimers, 60000); 
         }
         function switchTab(id) { document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active')); document.getElementById(id).classList.add('active'); event.target.classList.add('active'); }
@@ -230,8 +232,8 @@
         }
         async function checkQuest(id) { await db.collection("quest_submissions").doc(id).update({ status: 'checked' }); showToast("Checked!"); }
 
-        // --- 🔥 Side Quest & Archive ---
-        function loadSideQuests() { db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(s => { const c = { "Backlog": document.getElementById("Backlog"), "Doing": document.getElementById("Doing"), "Review": document.getElementById("Review"), "Done": document.getElementById("Done") }; Object.values(c).forEach(el => el.innerHTML = ""); const cnt = { "Backlog": 0, "Doing": 0, "Review": 0, "Done": 0 }; s.forEach(d => { const q = d.data(); allSideQuestsCache[d.id] = q; if(q.status==='Archived') return; if(c[q.status]) { cnt[q.status]++; c[q.status].appendChild(createCard(d.id, q)); } }); Object.keys(cnt).forEach(k => document.getElementById(`cnt-${k}`).innerText = cnt[k]); initSortable(); updateDoneTimers(); }); }
+        // --- Side Quest ---
+        function loadSideQuests() { db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(s => { const c = { "Backlog": document.getElementById("Backlog"), "Doing": document.getElementById("Doing"), "Review": document.getElementById("Review"), "Done": document.getElementById("Done") }; Object.values(c).forEach(el => el.innerHTML = ""); const cnt = { "Backlog": 0, "Doing": 0, "Review": 0, "Done": 0 }; s.forEach(d => { const q = d.data(); allSideQuestsCache[d.id] = q; if(q.status==='Archived') return; if(c[q.status]) { cnt[q.status]++; c[q.status].appendChild(createCard(d.id, q)); } }); Object.keys(cnt).forEach(k => document.getElementById(`cnt-${k}`).innerText = cnt[k]); updateDoneTimers(); }); }
         
         function createCard(id, q) { 
             const d=document.createElement('div'); d.className=`kanban-card card-${q.status}`; d.setAttribute('data-id',id); d.onclick=(e)=>{if(!e.target.closest('button'))d.classList.toggle('expanded')}; 
@@ -254,89 +256,63 @@
                 const q = d.data();
                 l.innerHTML += `<div class="history-item"><div class="h-left"><b>${q.title}</b><br><small>${q.description||""}</small></div><div class="h-right"><button class="btn-sm btn-success" onclick="restoreSideQuest('${d.id}')">↺ กู้คืน</button></div></div>`;
             });
-            if(s.empty) l.innerHTML = "<p>ไม่มีงานในกรุ</p>";
+            if(s.empty) l.innerHTML = "<p style='text-align:center'>ไม่มีงานในกรุ</p>";
         }
         
         async function restoreSideQuest(id) {
-            const to = prompt("กู้คืนไปที่ไหน?", "Done");
+            const to = prompt("กู้คืนไปที่ไหน? (Backlog, Doing, Review, Done)", "Done");
             if(['Backlog','Doing','Review','Done'].includes(to)) {
                 await db.collection("side_quests").doc(id).update({ status: to, doneAt: to==='Done'?firebase.firestore.FieldValue.serverTimestamp():null });
-                openArchiveModal(); // Refresh list
+                openArchiveModal(); 
                 showToast("Restored!");
-            } else alert("ใส่ชื่อช่องผิด (Backlog, Doing, Review, Done)");
+            } else alert("ใส่ชื่อช่องผิด!");
         }
 
         function updateDoneTimers() { document.querySelectorAll('.timer-text').forEach(el => { const doneTime = parseInt(el.getAttribute('data-done')); if (!doneTime) return; const now = Date.now(); const diffMs = (doneTime + 48 * 3600000) - now; if (diffMs <= 0) { el.innerText = "หมดเวลา (กำลังเก็บ...)"; db.collection("side_quests").doc(el.closest('.kanban-card').getAttribute('data-id')).update({status:'Archived'}); } else { const hrs = Math.floor(diffMs / 3600000); const mins = Math.floor((diffMs % 3600000) / 60000); el.innerText = `⏳ เหลือ ${hrs} ชม. ${mins} นาที`; } }); }
 
-        // --- 🔥 Users & History (with Note & Date) ---
+        // --- Users & History ---
         function loadUsers(){ db.collection("users").orderBy("score","desc").onSnapshot(s=>{ const tb=document.querySelector("#usersTable tbody"); const lb=document.getElementById("leaderboardList"); const sel=document.getElementById("sq-user-list"); tb.innerHTML=""; lb.innerHTML=""; sel.innerHTML=""; topUsersCache=[]; let r=1; s.forEach(d=>{ const u=d.data(); const score=parseFloat((u.score||0).toFixed(2)); const lv=Math.floor(score/10)+1; tb.innerHTML+=`<tr><td><div style="display:flex;align-items:center;"><img src="${u.pictureUrl}" class="user-pic">${u.displayName}</div></td><td><span class="badge" style="background:#eee;color:#555">Lv.${lv}</span></td><td style="font-weight:bold;color:var(--primary);font-size:1.1em;">${score}</td><td><div style="display:flex;align-items:center;"><input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" class="score-input"><button class="btn-sm btn-success" onclick="adjDec('${d.id}')">💾</button></div></td><td><button class="btn-sm btn-dark" onclick="showHistory('${d.id}','${u.displayName}',${score})">📜</button></td><td><button class="btn-delete-icon" onclick="delUser('${d.id}')">✕</button></td></tr>`; sel.innerHTML+=`<label style="margin-right:10px;"><input type="checkbox" class="sq-user-check" value="${d.id}" data-name="${u.displayName}" data-pic="${u.pictureUrl}"> ${u.displayName}</label>`; if(r<=20){ topUsersCache.push(`${r}. ${u.displayName} (${score})`); let cls='rank-other',ic='⭐'; if(r===1){cls='rank-1';ic='🌟';}else if(r===2){cls='rank-2';ic='🥈';}else if(r===3){cls='rank-3';ic='🥉';} lb.innerHTML+=`<div class="leaderboard-card ${cls}"><div style="display:flex;align-items:center;"><b style="width:30px">#${r}</b><img src="${u.pictureUrl}" class="user-pic"><span>${u.displayName}</span><span class="badge" style="margin-left:8px;background:#f0f0f0;color:#333;font-size:0.75em;border:1px solid #ddd;">Lv.${lv}</span></div><div><b>${score}</b> ${ic}</div></div>`; } r++; }); }) }
         
-        // 🔥 New Adj Dec with Note
         async function adjDec(id){
             const v=parseFloat(document.getElementById(`adj-${id}`).value);
             if(isNaN(v)||v===0)return;
-            
-            const note = prompt("📝 ใส่หมายเหตุ/เหตุผล (ถ้ามี):", "ปรับคะแนนพิเศษ");
-            if(note === null) return; // Cancel
-
+            const note = prompt("📝 หมายเหตุ (Note):", "ปรับคะแนน");
+            if(note===null)return;
             try {
                 const batch = db.batch();
-                // 1. Update User
                 batch.update(db.collection("users").doc(id), { score: firebase.firestore.FieldValue.increment(v) });
-                // 2. Log Transaction
-                batch.set(db.collection("checkin_logs").doc(), {
-                    userId: id,
-                    type: 'manual_adjust',
-                    amount: v,
-                    note: note,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                await batch.commit();
-                document.getElementById(`adj-${id}`).value="";
-                showToast("Adjusted!");
+                batch.set(db.collection("checkin_logs").doc(), { userId: id, type: 'manual_adjust', amount: v, note: note, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+                await batch.commit(); document.getElementById(`adj-${id}`).value=""; showToast("Saved!");
             } catch(e) { alert(e.message); }
         }
 
-        // 🔥 Full History Timeline
         async function showHistory(uid,name,total){
             const m=document.getElementById("historyModal");const l=document.getElementById("history-list");
-            document.getElementById("history-title").innerText=`📜 ${name}`;l.innerHTML="<p>Loading...</p>";m.style.display="block";
-            
+            document.getElementById("history-title").innerText=`📜 ${name}`;l.innerHTML="<p style='text-align:center'>Loading...</p>";m.style.display="block";
             try {
-                let allEvents = [];
-                // 1. Works
-                (await db.collection("works").where("userId","==",uid).get()).forEach(d=>{const w=d.data(); if(w.score>0) allEvents.push({t: w.timestamp?.toDate(), type:'work', text: `📁 ${w.title}`, score: w.score})});
-                // 2. Quest
-                (await db.collection("quest_submissions").where("userId","==",uid).get()).forEach(d=>{const q=d.data(); const s=(q.earnedScore||0)+(q.bonusGiven||0); if(q.status!=='none') allEvents.push({t: q.receivedAt?.toDate(), type:'quest_recv', text:`🚀 รับภารกิจ`, score:0.1}); if(s>0) allEvents.push({t: q.submittedAt?.toDate(), type:'quest_done', text:`⚡ ตอบ Q`, score:s})});
-                // 3. Logs (Streak & Manual)
+                let all=[];
+                (await db.collection("works").where("userId","==",uid).get()).forEach(d=>{const w=d.data(); if(w.score>0) all.push({t:w.timestamp?.toDate(), type:'work', text:`📁 ${w.title}`, score:w.score})});
+                (await db.collection("quest_submissions").where("userId","==",uid).get()).forEach(d=>{const q=d.data(); const s=(q.earnedScore||0)+(q.bonusGiven||0); if(q.status!=='none') all.push({t:q.receivedAt?.toDate(), type:'bonus', text:`🚀 รับภารกิจ`, score:0.1}); if(s>0) all.push({t:q.submittedAt?.toDate(), type:'quest', text:`⚡ Daily: ${q.answer}`, score:s})});
                 (await db.collection("checkin_logs").where("userId","==",uid).get()).forEach(d=>{
-                    const g=d.data(); 
-                    if(g.type==='streak') allEvents.push({t: g.timestamp?.toDate(), type:'streak', text:`🔥 Streak (${g.count})`, score:g.amount});
-                    if(g.type==='manual_adjust') allEvents.push({t: g.timestamp?.toDate(), type:'manual', text:`🛠️ ${g.note || 'ปรับมือ'}`, score:g.amount});
+                    const g=d.data();
+                    if(g.type==='streak') all.push({t:g.timestamp?.toDate(), type:'bonus', text:`🔥 Streak (${g.count})`, score:g.amount});
+                    if(g.type==='manual_adjust') all.push({t:g.timestamp?.toDate(), type:'manual', text:`🛠️ ${g.note}`, score:g.amount});
                 });
-
-                // Sort & Render
-                allEvents.sort((a,b) => (b.t || 0) - (a.t || 0));
                 
-                let html = "";
-                let sumCalc = 0;
-                
-                allEvents.forEach(e => {
-                    sumCalc += e.score;
-                    const dateStr = e.t ? e.t.toLocaleString('th-TH') : 'No Date';
-                    let cls = ""; if(e.type==='streak') cls="bonus"; if(e.type==='manual') cls="manual";
-                    html += `<li class="history-item ${cls}">
-                        <div class="h-left"><span>${e.text}</span><small class="h-time">${dateStr}</small></div>
-                        <div class="h-right">${e.score>0?'+':''}${e.score}</div>
-                    </li>`;
+                all.sort((a,b)=>(b.t||0)-(a.t||0));
+                let html=""; let sumCalc=0;
+                all.forEach(e=>{
+                    sumCalc+=e.score;
+                    let cls=""; if(e.type==='bonus')cls="bonus"; if(e.type==='manual')cls="manual";
+                    const dStr = e.t ? e.t.toLocaleString('th-TH') : '-';
+                    html+=`<div class="history-item ${cls}"><div class="h-left"><span>${e.text}</span><br><small class="h-time">${dStr}</small></div><div class="h-right">${e.score>0?'+':''}${e.score}</div></div>`;
                 });
-
                 document.getElementById("history-summary").innerHTML = `คะแนนสุทธิ: ${total.toFixed(2)}`;
                 l.innerHTML = html;
             } catch(e) { l.innerHTML = "Error: "+e.message; }
         }
 
-        // Helpers (Same)
+        // Helpers
         function closeModal(){document.getElementById("historyModal").style.display="none"}
         async function svSc(wid,uid,old){const n=parseFloat(document.getElementById('sc-'+wid).value)||0;if(n==old)return;db.collection("works").doc(wid).update({score:n,status:"ตรวจแล้ว"});db.collection("users").doc(uid).update({score:firebase.firestore.FieldValue.increment(n-old)});showToast("Saved")}
         async function upQSc(id,uid,cur,base){const n=parseFloat(document.getElementById('qsc-'+id).value)||0;const b=parseFloat((n-base).toFixed(2));if(confirm("Update?")){db.collection("quest_submissions").doc(id).update({bonusGiven:b,status:'checked'});db.collection("users").doc(uid).update({score:firebase.firestore.FieldValue.increment(n-cur)});showToast("Updated")}}
@@ -353,7 +329,14 @@
         function loadQuestHistory(){db.collection("quests").orderBy("createdAt","desc").limit(20).onSnapshot(s=>{const t=document.querySelector("#questHistoryTable tbody");t.innerHTML="";s.forEach(d=>{const q=d.data();const sq=q.question.replace(/'/g,"\\'").replace(/"/g,"&quot;");const si=(q.imageUrl||"").replace(/'/g,"\\'"),sl=(q.questLink||"").replace(/'/g,"\\'");t.innerHTML+=`<tr><td>${q.question}</td><td>${q.baseScore}</td><td><button class="btn-sm btn-success" onclick="reuse('${sq}',${q.baseScore},'${si}','${sl}')">♻️</button> <button class="btn-delete-icon" onclick="delQ('${d.id}')">✕</button></td></tr>`})})}
         function reuse(q,s,i,l){document.getElementById('q-text').value=q;document.getElementById('q-score').value=s;document.getElementById('q-img').value=i;document.getElementById('q-link').value=l;document.querySelector('.tab-content.active').scrollIntoView({behavior:'smooth'})}
         async function delQ(id){if(confirm("Del?"))await db.collection("quests").doc(id).delete()}
-        // Logic เดิม: function editSideQuest, saveSideQuest, resetForm, initSortable, toggleForm, filterBoard, delSQ, loadUsers, closeModal, adjDec, svSc, upQSc, delWork, delQSub, delUser, filterUsers, shareLeaderboard, showToast, createQuest, loadActiveQuests, stopQ, editQ, loadQuestHistory, reuse, delQ
+        // 🔥 Move initSortable to main
+        function initSortable() { ['Backlog','Doing','Review','Done'].forEach(id=>{ new Sortable(document.getElementById(id),{group:'shared',animation:150,onEnd:e=>{const ns=e.to.id; const up={status:ns}; if(ns==='Done')up.doneAt=firebase.firestore.FieldValue.serverTimestamp(); db.collection("side_quests").doc(e.item.getAttribute('data-id')).update(up)}}) }) }
+        function toggleForm(){const f=document.getElementById("sq-form");f.style.display=f.style.display==="none"?"block":"none"}
+        function filterBoard(){const t=document.getElementById("board-search").value.toLowerCase();document.querySelectorAll('.kanban-card').forEach(c=>{c.style.display=c.innerText.toLowerCase().includes(t)?'block':'none'})}
+        async function delSQ(id){if(confirm("Del?"))await db.collection("side_quests").doc(id).delete()}
+        function editSideQuest(id) { const data = allSideQuestsCache[id]; if (!data) return; document.getElementById("edit-id").value = id; document.getElementById("sq-title").value = data.title; document.getElementById("sq-desc").value = data.description; document.getElementById("sq-priority").value = data.priority; document.getElementById("sq-due").value = data.dueDate || ""; document.querySelectorAll('.sq-user-check').forEach(c => { c.checked = (data.assigneeIds || []).includes(c.value); }); document.getElementById("form-header").innerText = "✏️ แก้ไขภารกิจ"; document.getElementById("btn-submit-task").innerText = "💾 Save Change"; document.getElementById("btn-cancel-task").style.display = "inline-block"; const f = document.getElementById("sq-form"); if(f.style.display === "none") f.style.display = "block"; f.scrollIntoView({behavior:"smooth"}); }
+        async function saveSideQuest() { const id = document.getElementById("edit-id").value; const t=document.getElementById("sq-title").value, d=document.getElementById("sq-desc").value, p=document.getElementById("sq-priority").value, date=document.getElementById("sq-due").value; const chk=document.querySelectorAll('.sq-user-check:checked'); let u=[]; chk.forEach(c=>u.push({uid:c.value,name:c.dataset.name,pic:c.dataset.pic})); if(!t)return alert("Title?"); const data = {title:t,description:d,priority:p,dueDate:date,assignees:u,assigneeIds:u.map(x=>x.uid)}; if (id) { await db.collection("side_quests").doc(id).update(data); showToast("Updated!"); } else { data.status="Backlog"; data.createdAt=firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").add(data); showToast("Created!"); } resetForm(); }
+        function resetForm() { document.getElementById("edit-id").value = ""; document.getElementById("sq-title").value = ""; document.getElementById("sq-desc").value = ""; document.getElementById("sq-due").value = ""; document.querySelectorAll('.sq-user-check').forEach(c => c.checked = false); document.getElementById("form-header").innerText = "➕ สร้างภารกิจใหม่"; document.getElementById("btn-submit-task").innerText = "🚀 Create"; document.getElementById("btn-cancel-task").style.display = "none"; document.getElementById("sq-form").style.display = "none"; }
     </script>
 </body>
 </html>
