@@ -28,20 +28,13 @@
         .sq-card { background: white; padding: 15px; border-radius: 8px; border-left: 5px solid #4361ee; margin-bottom: 10px; position: relative; }
         
         .report-card { border-left: 5px solid #ef233c; }
+        .grad-card { border-left: 5px solid #ff9f1c; background: #fffbf0; }
         .hidden { display: none !important; }
         .badge { padding: 4px 8px; border-radius: 4px; color: white; font-size: 0.8em; }
         .propose-btn { background: #6f42c1; color: white; border: none; padding: 8px 15px; border-radius: 20px; font-size: 0.9em; float: right; cursor: pointer; }
         
         .version-tag { text-align: center; font-size: 0.8em; color: #ccc; margin-top: 20px; }
-        
-        /* Refresh Button */
-        .refresh-btn { 
-            position: absolute; top: 0; right: 0; 
-            background: #fff; color: #333; border: 1px solid #ddd; 
-            padding: 5px 10px; border-radius: 20px; font-size: 0.8em; 
-            cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
-            display: flex; align-items: center; gap: 5px; z-index: 99;
-        }
+        .refresh-btn { position: absolute; top: 0; right: 0; background: #fff; color: #333; border: 1px solid #ddd; padding: 5px 10px; border-radius: 20px; font-size: 0.8em; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 5px; z-index: 99; }
     </style>
 </head>
 <body>
@@ -56,6 +49,12 @@
                 <img id="u-img" class="profile-img" src="">
                 <h3 id="u-name" style="margin:10px 0 5px;">User</h3>
                 <p>คะแนนสะสม: <span id="u-score" class="score-text">0</span> แต้ม</p>
+            </div>
+
+            <div id="grad-section" class="card grad-card hidden">
+                <h4 style="margin-top:0; color:#ff9f1c;">🎓 สถานะการฝึกงาน</h4>
+                <p style="margin:5px 0; font-size:0.9em;">📅 ระยะเวลา: <span id="grad-dates">-</span></p>
+                <div id="grad-action" style="margin-top:10px;"></div>
             </div>
             
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -83,19 +82,19 @@
 
             <div class="card report-card">
                 <h4>🚩 รายงานปัญหา / ติดต่อ Admin</h4>
-                <input type="text" id="rpt-subject" placeholder="หัวข้อเรื่อง (ห้ามเว้นว่าง)">
-                <textarea id="rpt-msg" rows="3" placeholder="รายละเอียด... (ห้ามเว้นว่าง)"></textarea>
+                <input type="text" id="rpt-subject" placeholder="หัวข้อเรื่อง">
+                <textarea id="rpt-msg" rows="3" placeholder="รายละเอียด..."></textarea>
                 <button onclick="sendReport()" style="background:#ef233c;">📧 ส่งรายงาน</button>
             </div>
             
-            <div class="version-tag">System v9.0 (Fix Profile)</div>
+            <div class="version-tag">System v39 (Cert Request)</div>
             <div style="height:50px;"></div>
         </div>
     </div>
 
     <script src="firebase-config.js?v=9.0"></script>
     <script>
-        const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ⚠️ ใส่ ID ของคุณ
+        const USER_LIFF_ID = "2008959998-yjcNpaGt"; 
         let userProfile, userId, myQuestData = {}; 
         
         async function main() {
@@ -108,7 +107,6 @@
                 document.getElementById('loading').classList.add('hidden'); 
                 document.getElementById('main-app').classList.remove('hidden');
                 
-                // กันเหนียว: ถ้าไม่มีรูป ให้ใช้ Placeholder
                 const displayPic = userProfile.pictureUrl || "https://via.placeholder.com/150";
                 document.getElementById('u-img').src = displayPic; 
                 document.getElementById('u-name').innerText = userProfile.displayName;
@@ -117,20 +115,66 @@
             } catch (e) { alert("LIFF Error: "+e.message); }
         } main();
 
-        // 🔥 Fix: ใส่ || "" กัน undefined ตอนบันทึก
         function checkUser(){
             const r=db.collection("users").doc(userId);
             r.onSnapshot(d=>{
                 if(d.exists){
-                    document.getElementById('u-score').innerText=parseFloat((d.data().score||0).toFixed(2));
+                    const data = d.data();
+                    document.getElementById('u-score').innerText=parseFloat((data.score||0).toFixed(2));
+                    // 🔥 Check Graduation Status
+                    checkGraduation(data);
                 }else{
-                    r.set({
-                        displayName: userProfile.displayName, 
-                        pictureUrl: userProfile.pictureUrl || "", // ✅ Fix here
-                        score: 0
-                    });
+                    r.set({ displayName: userProfile.displayName, pictureUrl: userProfile.pictureUrl || "", score: 0 });
                 }
             });
+        }
+
+        // 🔥 New: Graduation Logic
+        function checkGraduation(data) {
+            if(!data.startDate || !data.endDate) return;
+            
+            const start = new Date(data.startDate);
+            const end = new Date(data.endDate);
+            const now = new Date();
+            
+            const options = { year: 'numeric', month: 'short', day: 'numeric' };
+            document.getElementById('grad-dates').innerText = `${start.toLocaleDateString('th-TH', options)} - ${end.toLocaleDateString('th-TH', options)}`;
+            document.getElementById('grad-section').classList.remove('hidden');
+
+            const btnContainer = document.getElementById('grad-action');
+            if (now > end) {
+                // จบแล้ว -> แสดงปุ่มขอ Cert
+                if (data.certRequested) {
+                    btnContainer.innerHTML = `<span style="color:#28a745; font-weight:bold;">✅ ส่งคำร้องแล้ว รอ Admin ดำเนินการ</span>`;
+                } else {
+                    btnContainer.innerHTML = `<button onclick="requestCert()" style="background:#ff9f1c; color:black;">📜 ขอใบรับรองจบ (Request Certificate)</button>`;
+                }
+            } else {
+                // ยังไม่จบ
+                const daysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+                btnContainer.innerHTML = `<small style="color:#666">⏳ อีก ${daysLeft} วันจะจบการฝึกงาน</small>`;
+            }
+        }
+
+        async function requestCert() {
+            if(!confirm("ยืนยันขอใบรับรองจบการศึกษา?")) return;
+            try {
+                // 1. สร้าง Request ลงใน report หรือ collection ใหม่ก็ได้ (ใช้ reports ให้ง่ายต่อ Admin)
+                await db.collection('reports').add({
+                    userId: userId,
+                    displayName: userProfile.displayName,
+                    pictureUrl: userProfile.pictureUrl || "",
+                    subject: "🎓 ขอใบรับรองจบ (Certificate Request)",
+                    message: "นักศึกษาฝึกงานกดขอใบรับรองผ่านระบบ",
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    type: "cert_request"
+                });
+                
+                // 2. Update status User ว่ากดขอแล้ว
+                await db.collection('users').doc(userId).update({ certRequested: true });
+                
+                alert("ส่งคำร้องเรียบร้อยครับ! กรุณารอ Admin ตรวจสอบและส่งไฟล์ให้ทาง Line/Email");
+            } catch(e) { alert("Error: " + e.message); }
         }
 
         function loadQuests() {
@@ -163,49 +207,21 @@
             });
         }
 
-        // 🔥 Fix: ใส่ || "" กัน undefined ตอนบันทึก
         async function receiveQuest(qid, qTitle) {
             const docId = `${qid}_${userId}`;
             const userRef = db.collection("users").doc(userId);
             try {
                 const userDoc = await userRef.get();
                 let currentCount = 0; if (userDoc.exists) currentCount = userDoc.data().questReceivedCount || 0;
-                
                 const newCount = currentCount + 1;
                 let bonus = 0; if (newCount > 0 && newCount % 5 === 0) bonus = 0.1;
 
                 const batch = db.batch();
-                // 1. Create Submission
-                batch.set(db.collection("quest_submissions").doc(docId), { 
-                    questId: qid, 
-                    userId, 
-                    displayName: userProfile.displayName, 
-                    pictureUrl: userProfile.pictureUrl || "", // ✅ Fix here
-                    status: 'received', 
-                    receivedAt: firebase.firestore.FieldValue.serverTimestamp() 
-                });
-                // 2. Add Score
+                batch.set(db.collection("quest_submissions").doc(docId), { questId: qid, userId, displayName: userProfile.displayName, pictureUrl: userProfile.pictureUrl || "", status: 'received', receivedAt: firebase.firestore.FieldValue.serverTimestamp() });
                 batch.update(userRef, { score: firebase.firestore.FieldValue.increment(0.1 + bonus), questReceivedCount: newCount });
-                // 3. Create Kanban
                 const kanbanRef = db.collection("side_quests").doc();
-                batch.set(kanbanRef, { 
-                    title: `[Daily] ${qTitle}`, 
-                    description: "ภารกิจประจำวัน", 
-                    assignees: [{ 
-                        uid: userId, 
-                        name: userProfile.displayName, 
-                        pic: userProfile.pictureUrl || "" // ✅ Fix here
-                    }], 
-                    assigneeIds: [userId], 
-                    status: 'Doing', 
-                    priority: 'Medium', 
-                    isDailyQuest: true, 
-                    refQuestId: qid, 
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp() 
-                });
-                // 4. Log
+                batch.set(kanbanRef, { title: `[Daily] ${qTitle}`, description: "ภารกิจประจำวัน", assignees: [{ uid: userId, name: userProfile.displayName, pic: userProfile.pictureUrl || "" }], assigneeIds: [userId], status: 'Doing', priority: 'Medium', isDailyQuest: true, refQuestId: qid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
                 if (bonus > 0) { batch.set(db.collection("checkin_logs").doc(), { userId, type: 'streak', amount: bonus, count: newCount, timestamp: firebase.firestore.FieldValue.serverTimestamp() }); }
-
                 await batch.commit(); alert("🎉 รับภารกิจแล้ว!");
             } catch(e) { alert("Error: " + e.message); }
         }
@@ -218,56 +234,19 @@
                 const snapshot = await db.collection("quest_submissions").where("questId", "==", qid).where("status", "in", ["submitted", "checked"]).get();
                 let score = baseScore - (snapshot.size * 0.1); if (score < 1) score = 1;
                 const finalScore = score + 0.1; 
-
                 const batch = db.batch();
                 batch.update(db.collection("quest_submissions").doc(docId), { answer: ans, status: 'submitted', submittedAt: firebase.firestore.FieldValue.serverTimestamp(), earnedScore: parseFloat(score.toFixed(2)) });
                 batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(finalScore) });
-                
                 const sqSnap = await db.collection("side_quests").where("refQuestId", "==", qid).where("assigneeIds", "array-contains", userId).get();
                 sqSnap.forEach(doc => { batch.update(db.collection("side_quests").doc(doc.id), { userAnswer: ans }); });
-
                 await batch.commit(); alert(`ส่งแล้ว! ได้ ${score.toFixed(2)} + 0.1 คะแนน`);
             } catch(e) { alert("Error: " + e.message); }
         }
 
-        // 🔥 Fix: ใส่ || "" กัน undefined ตอนบันทึก
-        async function proposeProject() { 
-            const t=prompt("ชื่อโปรเจกต์:"); if(!t)return; const d=prompt("รายละเอียด:"); 
-            try{
-                await db.collection('side_quests').add({
-                    title:t, 
-                    description:d||"", 
-                    assignees:[{
-                        uid:userId,
-                        name:userProfile.displayName,
-                        pic:userProfile.pictureUrl || "" // ✅ Fix here
-                    }],
-                    assigneeIds:[userId],
-                    status:'Backlog',
-                    priority:'Medium',
-                    isProposal:true,
-                    createdAt:firebase.firestore.FieldValue.serverTimestamp()
-                });
-                alert("เสนอแล้ว!");
-            }catch(e){alert(e.message)} 
-        }
-        
+        async function proposeProject() { const t=prompt("ชื่อโปรเจกต์:"); if(!t)return; const d=prompt("รายละเอียด:"); try{await db.collection('side_quests').add({title:t, description:d||"", assignees:[{uid:userId,name:userProfile.displayName,pic:userProfile.pictureUrl || ""}], assigneeIds:[userId], status:'Backlog', priority:'Medium', isProposal:true, createdAt:firebase.firestore.FieldValue.serverTimestamp()}); alert("เสนอแล้ว!");}catch(e){alert(e.message)} }
         function loadSideQuests(){db.collection("side_quests").where("assigneeIds","array-contains",userId).onSnapshot(s=>{const cols={"Backlog":document.getElementById("sq-Backlog"),"Doing":document.getElementById("sq-Doing"),"Review":document.getElementById("sq-Review"),"Done":document.getElementById("sq-Done")};Object.values(cols).forEach(c=>c.innerHTML="");s.forEach(d=>{const q=d.data();if(cols[q.status]){let as="";if(q.assignees)q.assignees.forEach(u=>as+=`<img src="${u.pic||'https://via.placeholder.com/20'}" style="width:20px;height:20px;border-radius:50%;">`);let btn="";if(q.status==="Backlog")btn=`<button class="badge" onclick="upSQ('${d.id}','Doing')" style="background:#007bff;border:none;">เริ่ม ▶️</button>`;else if(q.status==="Doing")btn=`<button class="badge" onclick="upSQ('${d.id}','Review')" style="background:#ffc107;color:black;border:none;">ส่ง ▶️</button>`;const c=document.createElement("div");c.className="sq-card";c.innerHTML=`<b>${q.title}</b><br><small>${q.description}</small><div style="margin-top:5px;display:flex;justify-content:space-between;"><div>${as}</div>${btn}</div>`;cols[q.status].appendChild(c)}})})}
         async function upSQ(id,s){if(confirm("เลื่อนสถานะ?"))await db.collection("side_quests").doc(id).update({status:s})}
-        
-        // 🔥 Fix: ใส่ || "" กัน undefined ตอนบันทึก
-        async function submitWork(){
-            const t=document.getElementById('w-title').value,l=document.getElementById('w-link').value;if(!t||!l)return;
-            await db.collection("works").add({
-                userId,
-                displayName:userProfile.displayName,
-                pictureUrl:userProfile.pictureUrl || "", // ✅ Fix here
-                title:t,link:l,status:"รอตรวจ",score:0,
-                timestamp:firebase.firestore.FieldValue.serverTimestamp()
-            });
-            alert("ส่งแล้ว");document.getElementById('w-title').value=""
-        }
-        
+        async function submitWork(){const t=document.getElementById('w-title').value,l=document.getElementById('w-link').value;if(!t||!l)return;await db.collection("works").add({userId, displayName:userProfile.displayName, pictureUrl:userProfile.pictureUrl || "", title:t,link:l,status:"รอตรวจ",score:0, timestamp:firebase.firestore.FieldValue.serverTimestamp()});alert("ส่งแล้ว");document.getElementById('w-title').value=""}
         function loadMyWorks(){db.collection("works").where("userId","==",userId).orderBy("timestamp","desc").onSnapshot(s=>{const l=document.getElementById('work-list');l.innerHTML="";s.forEach(d=>{const w=d.data();let sc=w.score>0?`<span class="badge" style="background:#17a2b8">+${w.score}</span>`:"";l.innerHTML+=`<div class="card" style="padding:15px;border-left:5px solid ${w.status==='ตรวจแล้ว'?'#28a745':'#ffc107'}"><b>${w.title}</b> ${sc}<br><small>${w.status}</small></div>`})})}
         async function sendReport(){const s=document.getElementById('rpt-subject').value.trim(),m=document.getElementById('rpt-msg').value.trim();if(!s||!m)return alert("กรอกข้อมูลให้ครบ");window.location.href=`mailto:medlifeplus@gmail.com?subject=${encodeURIComponent(s)}&body=${encodeURIComponent(m)}`;}
     </script>
