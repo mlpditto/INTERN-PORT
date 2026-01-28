@@ -16,32 +16,42 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     
     <style>
-        /* ... (CSS Base V58-60) ... */
+        /* ... (CSS Base) ... */
         :root { --bg-body: #f4f6f9; --bg-card: #ffffff; --text-main: #333; --text-sub: #666; --col-bg: #f8f9fa; --border-color: #e0e0e0; --primary: #4361ee; --success: #2ec4b6; --warning: #ff9f1c; --danger: #ef233c; --dark: #2b2d42; }
         body.dark-mode { --bg-body: #1a1a1a; --bg-card: #2d2d2d; --text-main: #e0e0e0; --text-sub: #ccc; --col-bg: #333; --border-color: #444; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-body); color: var(--text-main); margin: 0; transition: 0.3s; }
         #dashboard-container { display: none; max-width: 1400px; margin: 0 auto; padding: 20px; }
         .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Modal */
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
         .modal-content { background-color: var(--bg-card); margin: 5% auto; padding: 25px; border-radius: 12px; width: 95%; max-width: 600px; max-height: 90vh; overflow-y: auto; position: relative; color: var(--text-main); box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
         .close-modal { float: right; font-size: 24px; cursor: pointer; }
+        
+        /* Elements */
         input, select, textarea { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-card); color: var(--text-main); box-sizing: border-box; }
         .magic-btn { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
         .btn-sm { padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer; color: white; font-size: 0.85em; display: inline-flex; align-items: center; gap: 5px; }
         .btn-primary { background: var(--primary); } .btn-danger { background: var(--danger); } .btn-success { background: var(--success); } .btn-warning { background: var(--warning); color: black; } .btn-dark { background: var(--dark); }
         .btn-toggle { background: #e9ecef; color: #333; border: 1px solid #ccc; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
         .btn-toggle.active { background: var(--primary); color: white; border-color: var(--primary); }
+        
+        /* Tables & Tabs */
         table { width: 100%; border-collapse: collapse; background: var(--bg-card); border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border-color); }
         .tab-nav { display: flex; gap: 10px; overflow-x: auto; border-bottom: 2px solid var(--border-color); margin-bottom: 20px; padding-bottom: 5px; }
         .tab-btn { padding: 10px 20px; border: none; background: none; cursor: pointer; font-weight: 600; color: var(--text-sub); }
         .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
         .tab-content { display: none; } .tab-content.active { display: block; }
+
+        /* Kanban */
         .kanban-board { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 20px; min-height: 600px; }
         .kanban-col { flex: 1; min-width: 300px; background: var(--col-bg); border-radius: 12px; padding: 15px; display: flex; flex-direction: column; border: 1px solid var(--border-color); }
         .kanban-card { background: var(--bg-card); padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 10px; border-left: 5px solid #ccc; position: relative; }
         .kanban-card.project { background-color: #fff0f5; border-left: 5px solid #e83e8c; }
         .kanban-card.scored { background-color: #d1e7dd; border-left: 5px solid var(--success); }
+        
+        /* Card UI */
         .card-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .card-header-right { display: flex; align-items: center; gap: 5px; }
         .assignee-stack { display: flex; margin-right: 5px; }
@@ -53,6 +63,8 @@
         .timer-global { color: #e67e22; display: block; }
         .timer-active { color: #4361ee; font-weight: bold; display: block; }
         .timer-cooldown { color: #ef233c; font-weight: bold; display: block; }
+
+        /* Chat UI */
         .chat-box { height: 300px; overflow-y: auto; border: 1px solid var(--border-color); padding: 15px; margin-bottom: 10px; border-radius: 8px; background: var(--col-bg); }
         .chat-msg { margin-bottom: 10px; padding: 8px 12px; border-radius: 12px; font-size: 0.95em; max-width: 80%; position: relative; display: flex; gap: 10px; align-items: flex-end; }
         .msg-admin { background: #d1e7dd; margin-left: auto; text-align: right; color: #0f5132; flex-direction: row-reverse; }
@@ -60,11 +72,15 @@
         .chat-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .tag-in { background: #d4edda; color: #155724; padding: 2px 5px; border-radius: 4px; font-weight: bold; }
         .tag-out { background: #fff3cd; color: #856404; padding: 2px 5px; border-radius: 4px; font-weight: bold; }
+
+        /* Utils */
         .user-pic { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
         .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75em; font-weight: bold; color: white; display: inline-block; }
         .u-ignored { opacity: 0.5; filter: grayscale(1); }
         .quest-deadline { font-weight: bold; color: #e67e22; font-family: monospace; }
         .input-wide { flex: 2 !important; }
+        
+        /* Leaderboard V53 */
         .lb-container { background: var(--bg-card); border-radius: 15px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05); padding: 10px; }
         .lb-row { display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid var(--border-color); justify-content: space-between; margin-bottom: 5px; border-radius: 8px; transition: 0.2s; }
         .lb-row:hover { background: var(--col-bg); transform: translateX(5px); }
@@ -77,7 +93,10 @@
         .lb-right { text-align: right; min-width: 100px; }
         .lb-score { font-weight: 800; font-size: 1.4em; color: var(--primary); }
         .lb-lv { font-size: 0.8em; color: #999; background: #eee; padding: 2px 8px; border-radius: 10px; }
-        .rank-1 .lb-rank { color: #ffd700; font-size: 1.5em; } .rank-2 .lb-rank { color: #c0c0c0; font-size: 1.4em; } .rank-3 .lb-rank { color: #cd7f32; font-size: 1.3em; }
+        .rank-1 .lb-rank { color: #ffd700; font-size: 1.5em; }
+        .rank-2 .lb-rank { color: #c0c0c0; font-size: 1.4em; } 
+        .rank-3 .lb-rank { color: #cd7f32; font-size: 1.3em; }
+        
         #login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
         #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 3000; left: 50%; bottom: 30px; transform: translateX(-50%); }
         #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
@@ -152,20 +171,10 @@
                     <input type="text" id="q-img" placeholder="Img URL" class="input-wide" style="flex:2">
                     <input type="text" id="q-link" placeholder="Link" class="input-wide" style="flex:2">
                 </div>
-                
                 <div style="display:flex; align-items:flex-end; gap:15px; margin-top:10px;">
-                    <div>
-                        <label style="font-size:0.85em; font-weight:bold; color:#555; display:block; margin-bottom:3px;">Expires (hr)</label>
-                        <input type="number" id="q-hours" value="24" style="width:80px; margin:0; text-align:center;">
-                    </div>
-                    <div>
-                        <label style="font-size:0.85em; font-weight:bold; color:#555; display:block; margin-bottom:3px;">Duration (min)</label>
-                        <input type="number" id="q-duration" value="30" style="width:80px; margin:0; text-align:center;">
-                    </div>
-                    <div>
-                        <label style="font-size:0.85em; font-weight:bold; color:#555; display:block; margin-bottom:3px;">Score</label>
-                        <input type="number" id="q-score" value="0.1" step="0.1" style="width:80px; margin:0; text-align:center;">
-                    </div>
+                    <div><label style="font-size:0.85em; font-weight:bold; color:#555; display:block; margin-bottom:3px;">Expires (hr)</label><input type="number" id="q-hours" value="24" style="width:80px; margin:0; text-align:center;"></div>
+                    <div><label style="font-size:0.85em; font-weight:bold; color:#555; display:block; margin-bottom:3px;">Duration (min)</label><input type="number" id="q-duration" value="30" style="width:80px; margin:0; text-align:center;"></div>
+                    <div><label style="font-size:0.85em; font-weight:bold; color:#555; display:block; margin-bottom:3px;">Score</label><input type="number" id="q-score" value="0.1" step="0.1" style="width:80px; margin:0; text-align:center;"></div>
                     <div style="flex-grow:1;"></div>
                     <button class="magic-btn" onclick="createQuest()" style="margin:0; height:38px;">Post</button>
                 </div>
@@ -242,7 +251,6 @@
             db.collection("quest_submissions").onSnapshot(s => { questsSubCache = {}; s.forEach(d => { questsSubCache[`${d.data().questId}_${d.data().userId}`] = d.data(); }); filterBoard(); });
         }
 
-        // --- Render Tables ---
         function renderTable(type) {
             const tbody = document.querySelector(`#${type}Table tbody`);
             let data = (type==='works')?worksData:usersData;
@@ -253,27 +261,33 @@
                 if(type==='works'){ const st = d.status==='ตรวจแล้ว'?'#2ec4b6':d.status==='แก้ไข'?'#ef233c':'#ff9f1c'; tbody.innerHTML += `<tr><td>${d.timestamp?.toDate().toLocaleString()||'-'}</td><td><img src="${d.pictureUrl}" class="user-pic">${d.displayName}</td><td>${d.title}</td><td><a href="${d.link}" target="_blank" class="btn-sm btn-dark">Link</a></td><td><span class="badge" style="background:${st}">${d.status}</span></td><td><div style="display:flex;"><input type="number" id="sc-${d.id}" value="${d.score||0}" style="width:60px;"><button class="btn-sm btn-primary" onclick="svSc('${d.id}','${d.userId}')">Save</button></div></td><td><button class="btn-sm btn-danger" onclick="delWork('${d.id}')">Del</button></td></tr>`; }
                 else { 
                     const ignored = d.isIgnored; 
-                    tbody.innerHTML += `<tr class="${ignored?'u-ignored':''}"><td><img src="${d.pictureUrl}" class="user-pic"> ${d.displayName}</td><td><button class="btn-sm" onclick="toggleIgnoreUser('${d.id}',${ignored})">${ignored?'🚫':'👁️'}</button></td><td>${parseFloat((d.score||0).toFixed(2))}</td><td><div style="display:flex;"><input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:70px;margin:0;" onkeypress="if(event.key==='Enter')adjDec('${d.id}')"><button class="btn-sm btn-success" onclick="adjDec('${d.id}')">Adj</button></div></td><td><button class="btn-sm btn-dark" onclick="showHistory('${d.id}','${d.displayName}',${d.score||0})">📜</button></td><td><button class="btn-sm btn-danger" onclick="delUser('${d.id}')">Del</button></td></tr>`; 
+                    /* 🔥 V61 Add Lv. */
+                    const lv = Math.floor((d.score||0)/10)+1;
+                    tbody.innerHTML += `<tr class="${ignored?'u-ignored':''}"><td><img src="${d.pictureUrl}" class="user-pic"> ${d.displayName}</td><td><button class="btn-sm" onclick="toggleIgnoreUser('${d.id}',${ignored})">${ignored?'🚫':'👁️'}</button></td><td><span class="badge" style="background:#eee;color:#333;margin-right:5px;">Lv.${lv}</span><span style="font-weight:bold;color:var(--primary);">${parseFloat((d.score||0).toFixed(2))}</span></td><td><div style="display:flex;"><input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:70px;margin:0;" onkeypress="if(event.key==='Enter')adjDec('${d.id}')"><button class="btn-sm btn-success" onclick="adjDec('${d.id}')">Adj</button></div></td><td><button class="btn-sm btn-dark" onclick="showHistory('${d.id}','${d.displayName}',${d.score||0})">📜</button></td><td><button class="btn-sm btn-danger" onclick="delUser('${d.id}')">Del</button></td></tr>`; 
                 }
             });
         }
         function toggleWorkArchive() { hideCompletedWorks = !hideCompletedWorks; document.getElementById('btn-toggle-work-archive').classList.toggle('active'); renderTable('works'); }
         async function adjDec(id){ try { const valInput = document.getElementById(`adj-${id}`); let v = valInput.value; if(!v) return alert("กรุณาระบุคะแนน"); v = v.replace(',', '.'); const scoreVal = parseFloat(v); if(isNaN(scoreVal)) return alert("ค่าคะแนนไม่ถูกต้อง"); const n = prompt("เหตุผล (Note):"); if(!n) return; await db.collection("users").doc(id).update({score: firebase.firestore.FieldValue.increment(scoreVal)}); await db.collection("checkin_logs").add({userId: id, type: 'manual_adjust', amount: scoreVal, note: n, timestamp: firebase.firestore.FieldValue.serverTimestamp()}); showToast("Saved!"); valInput.value = ""; valInput.blur(); } catch (e) { alert("Error saving score: " + e.message); } }
 
+        // --- Certs V61 Fix ---
         function renderCertTable(){
             const t = document.querySelector("#certsTable tbody"); t.innerHTML = "";
             const sortedUsers = usersData.filter(u=>!u.isIgnored).sort((a,b) => (b.certRequested?1:0) - (a.certRequested?1:0));
             sortedUsers.forEach(u => {
                 let dateStr = (u.startDate && u.endDate) ? `${u.startDate} - ${u.endDate}` : '<span style="color:#ccc">Waiting Dates</span>';
                 let status = u.certRequested ? '<span class="badge" style="background:#ffc107;color:black;">🔔 Requesting</span>' : '-';
-                let btn = `<button class="btn-sm btn-warning" onclick="editCert('${u.id}', '${u.displayName.replace(/'/g,"")}', '${u.startDate||''}', '${u.endDate||''}')">Preview / Edit</button>`;
+                /* 🔥 Fix: Use openCertModal(uid) */
+                let btn = `<button class="btn-sm btn-warning" onclick="openCertModal('${u.id}')">Preview / Edit</button>`;
                 t.innerHTML += `<tr><td><img src="${u.pictureUrl}" class="user-pic"> ${u.displayName}</td><td>${dateStr}</td><td>${status}</td><td>${btn}</td></tr>`;
             });
         }
-        function editCert(uid, name, s, e) {
-            certUser = { uid, name };
-            document.getElementById('cert-start').value = s;
-            document.getElementById('cert-end').value = e;
+        function openCertModal(uid) {
+            const u = usersData.find(x => x.id === uid);
+            if(!u) return;
+            certUser = { uid: u.id, name: u.displayName };
+            document.getElementById('cert-start').value = u.startDate || "";
+            document.getElementById('cert-end').value = u.endDate || "";
             updateCertPreview();
             document.getElementById('certModal').style.display = "block";
         }
@@ -286,7 +300,7 @@
             document.getElementById('certModal').style.display = "none";
         }
 
-        // --- History Logic (V60) ---
+        // --- History Logic ---
         async function showHistory(uid, name, total) {
             currentHistoryUserId = uid;
             document.getElementById("history-title").innerText = `📜 ${name}`;
@@ -306,11 +320,9 @@
                 q.forEach(d => { 
                     const x=d.data(); 
                     const s=(x.earnedScore||0)+(x.bonusGiven||0);
-                    // 🔥 V60: Find Name
                     const qObj = questsCache.find(q => q.id === x.questId);
                     const qName = qObj ? qObj.question : 'Quest';
                     const shortName = qName.length > 30 ? qName.substring(0,30)+'...' : qName;
-
                     if(x.status !== 'none') all.push({t:x.receivedAt?.toDate(), type:'bonus', text:`🚀 Receive: ${shortName}`, score:0.1});
                     if(s>0) all.push({t:x.submittedAt?.toDate(), type:'quest', text:`⚡ Submit: ${shortName}`, score:s}); 
                 });
@@ -332,17 +344,14 @@
             showToast("Calculating...");
             try {
                 let totalScore = 0;
-                // Works
                 const wSnap = await db.collection("works").where("userId", "==", uid).get();
                 wSnap.forEach(d => { totalScore += (d.data().score || 0); });
-                // Quests
                 const qSnap = await db.collection("quest_submissions").where("userId", "==", uid).get();
                 qSnap.forEach(d => { 
                     const data = d.data();
                     if(data.status !== 'none' && data.receivedAt) totalScore += 0.1;
                     totalScore += (data.earnedScore || 0) + (data.bonusGiven || 0);
                 });
-                // Logs
                 const lSnap = await db.collection("checkin_logs").where("userId", "==", uid).get();
                 lSnap.forEach(d => { totalScore += (d.data().amount || 0); });
 
@@ -353,7 +362,7 @@
             } catch (e) { alert(e.message); }
         }
 
-        // Standard Functions
+        // ... Standard ...
         function initKanban() { ['Backlog','Doing','Review','Done'].forEach(id => { new Sortable(document.getElementById(id), { group:'kanban', animation:150, onEnd: e => { const ns=e.to.id; const up={status:ns}; if(ns==='Done')up.doneAt=firebase.firestore.FieldValue.serverTimestamp(); db.collection("side_quests").doc(e.item.dataset.id).update(up); }}); }); }
         function renderKanban(snap) { const cols={"Backlog":document.getElementById("Backlog"),"Doing":document.getElementById("Doing"),"Review":document.getElementById("Review"),"Done":document.getElementById("Done")}; Object.values(cols).forEach(e=>e.innerHTML=""); const cnt={"Backlog":0,"Doing":0,"Review":0,"Done":0}; const filter=document.getElementById('board-search').value.toLowerCase(); snap.forEach(doc => { const q=doc.data(); sideQuestsCache[doc.id]=q; if(q.status==='Archived')return; let match = q.title.toLowerCase().includes(filter); if(q.assignees) q.assignees.forEach(u=>{if(u.name.toLowerCase().includes(filter)) match=true;}); if(!match) return; if(cols[q.status]) { cnt[q.status]++; const isProj = q.isProject === true; const d=document.createElement('div'); d.className=`kanban-card card-${q.status} ${q.isScored?'scored':''} ${isProj?'project':''}`; d.dataset.id=doc.id; let imgs='<div class="assignee-stack">'; if(q.assignees)q.assignees.forEach(u=>imgs+=`<img src="${u.pic}" class="assignee-img" title="${u.name}">`); imgs+='</div>'; let timersHtml = ""; if(q.refQuestId && q.assigneeIds && q.assigneeIds.length > 0) { const globalQ = questsCache.find(x => x.id === q.refQuestId); const subKey = `${q.refQuestId}_${q.assigneeIds[0]}`; const sub = questsSubCache[subKey]; if(globalQ && globalQ.deadline && q.status !== 'Done') { timersHtml += `<span class="timer-global" data-dead="${globalQ.deadline.toDate().getTime()}">⏳ Exp: ...</span>`; } if(sub) { if(sub.status === 'received' && sub.deadline && q.status === 'Doing') { timersHtml += `<span class="timer-active" data-dead="${sub.deadline.toDate().getTime()}">⏱️ ...</span>`; } else if (sub.status === 'unsuccessful' && sub.cooldownUntil && q.status === 'Backlog') { timersHtml += `<span class="timer-cooldown" data-dead="${sub.cooldownUntil.toDate().getTime()}">❄️ Cool: ...</span>`; } } } let act=""; if(q.status==='Done'&&q.doneAt) act=`<button class="btn-sm btn-dark" style="width:100%;margin-top:5px;" onclick="archiveSQ('${doc.id}')">📥 ar·chive</button>`; else if(!q.isScored && q.status!=='Backlog' && q.status!=='Done') act=`<button class="btn-sm btn-success" style="width:100%;margin-top:5px;" onclick="giveScore('${doc.id}')">💰 ให้คะแนน</button>`; let chatBtn = ""; if(isProj) chatBtn = `<button class="btn-sm" style="color:var(--primary); font-size:1.1em;" onclick="openChat('${doc.id}', '${q.title}')"><i class="fa-solid fa-comments"></i></button>`; let arrows = `<div class="arrow-controls">`; if(q.status!=='Backlog') arrows+=`<button class="btn-arrow" onclick="moveCard('${doc.id}','prev')"><i class="fa-solid fa-chevron-left"></i></button>`; if(q.status!=='Done') arrows+=`<button class="btn-arrow" onclick="moveCard('${doc.id}','next')"><i class="fa-solid fa-chevron-right"></i></button>`; arrows += `</div>`; let pColor = '#17a2b8'; if(q.priority==='Medium') pColor='#ff9f1c'; if(q.priority==='High') pColor='#ef233c'; d.innerHTML=`<div class="card-header-row"><span class="badge" style="background:${pColor}">${q.priority}</span><div class="card-header-right">${imgs} ${arrows}</div></div><div style="font-weight:bold;">${isProj?'<span class="badge" style="background:#e83e8c;font-size:0.6em;">PROJ</span>':''} ${q.title}</div><div class="card-timers">${timersHtml}</div><p style="font-size:0.85em; color:#666; margin-bottom:5px;">${q.description||'-'}</p><div class="card-tool-row"><div><button class="btn-sm btn-warning" onclick="openTaskModal('${doc.id}')"><i class="fa-solid fa-pen"></i></button><button class="btn-sm btn-danger" onclick="startDeleteCard('${doc.id}')"><i class="fa-solid fa-trash"></i></button></div>${chatBtn}</div>${act}`; cols[q.status].appendChild(d); } }); Object.keys(cnt).forEach(k=>document.getElementById(`cnt-${k}`).innerText=cnt[k]); }
         function updateRealtimeTimers() { const now = Date.now(); document.querySelectorAll('.timer-global').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if(diff <= 0) el.innerText = "⏳ Expired"; else { const h = Math.floor(diff/3600000); const m = Math.floor((diff%3600000)/60000); el.innerText = `⏳ Ends: ${h}h ${m}m`; } }); document.querySelectorAll('.timer-active').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if(diff <= 0) { el.innerText = "⏱️ Time Up!"; const card = el.closest('.kanban-card'); if(card && card.parentElement.id === 'Doing') { db.collection("side_quests").doc(card.dataset.id).update({status: 'Review'}); } } else { const m = Math.floor(diff/60000); const s = Math.floor((diff%60000)/1000); el.innerText = `⏱️ ${m}m ${s}s`; } }); document.querySelectorAll('.timer-cooldown').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if(diff <= 0) el.innerText = "❄️ Ready"; else { const m = Math.floor(diff/60000); const s = Math.floor((diff%60000)/1000); el.innerText = `❄️ Cool: ${m}m ${s}s`; } }); updateQuestTimers(); }
