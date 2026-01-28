@@ -3,96 +3,126 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP INTERNSHIP</title>
+    <title>MLP INTERNSHIP (V40)</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     
     <style>
-        body { font-family: 'Kanit', sans-serif; background-color: #f8f9fa; padding: 20px; color:#333; margin:0; }
-        .container { max-width: 600px; margin: 0 auto; position: relative; }
-        .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        .profile-img { width: 80px; height: 80px; border-radius: 50%; border: 3px solid #06C755; background: #eee; object-fit: cover; }
-        .score-text { color: #06C755; font-weight: bold; font-size: 1.4em; }
-        input, textarea { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-family: inherit; }
-        button { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; color: white; background-color: #06C755; transition: 0.2s; min-height: 44px; }
-        button:hover { background-color: #05a546; } button:disabled { background-color: #ccc; }
+        /* --- Base Theme --- */
+        body { font-family: 'Kanit', sans-serif; background-color: #f4f6f9; padding: 20px; color:#333; margin:0; }
+        .container { max-width: 600px; margin: 0 auto; position: relative; padding-bottom: 80px; }
         
-        .quest-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; margin-bottom: 20px; }
+        /* Cards */
+        .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #f0f0f0; }
+        .profile-img { width: 90px; height: 90px; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 5px 15px rgba(6, 199, 85, 0.2); object-fit: cover; }
+        .score-text { color: #4361ee; font-weight: 800; font-size: 1.8em; }
         
-        /* Side Quest Scroll */
+        /* Inputs & Buttons */
+        input, textarea { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 10px; border: 1px solid #eee; box-sizing: border-box; font-family: inherit; background: #fcfcfc; transition: 0.2s; }
+        input:focus, textarea:focus { border-color: #4361ee; outline: none; background: #fff; }
+        
+        button { width: 100%; padding: 12px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 1em; }
+        button:active { transform: scale(0.98); }
+        button:disabled { background-color: #e0e0e0 !important; cursor: not-allowed; opacity: 0.7; }
+        
+        .btn-primary { background-color: #4361ee; color: white; }
+        .btn-success { background-color: #2ec4b6; color: white; }
+        .btn-warning { background-color: #ff9f1c; color: black; }
+        .btn-danger { background-color: #ef233c; color: white; }
+
+        /* Quest Card */
+        .quest-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; border:none; }
+        
+        /* Kanban Scroll */
         .sq-container { display: flex; overflow-x: auto; gap: 15px; padding-bottom: 20px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
-        .sq-col { min-width: 85%; background: #f1f3f5; border-radius: 12px; padding: 15px; scroll-snap-align: center; }
-        .sq-card { background: white; padding: 15px; border-radius: 8px; border-left: 5px solid #4361ee; margin-bottom: 10px; position: relative; }
+        .sq-col { min-width: 85%; background: #f8f9fa; border-radius: 12px; padding: 15px; scroll-snap-align: center; border: 1px solid #eee; }
+        .sq-card { background: white; padding: 15px; border-radius: 10px; border-left: 5px solid #ccc; margin-bottom: 10px; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
         
-        .report-card { border-left: 5px solid #ef233c; }
+        /* Kanban Colors & States */
+        .status-Doing { border-left-color: #4361ee; }
+        .status-Review { border-left-color: #ff9f1c; }
+        .status-Done { border-left-color: #2ec4b6; }
+        
+        /* 🔥 Scored Card */
+        .sq-card.scored { background-color: #d1e7dd; border-left-color: #198754; }
+        .score-badge { position: absolute; top: 10px; right: 10px; background: #198754; color: white; font-size: 0.75em; padding: 2px 8px; border-radius: 10px; font-weight: bold; }
+
+        /* Grad Card */
         .grad-card { border-left: 5px solid #ff9f1c; background: #fffbf0; }
-        .hidden { display: none !important; }
-        .badge { padding: 4px 8px; border-radius: 4px; color: white; font-size: 0.8em; }
-        .propose-btn { background: #6f42c1; color: white; border: none; padding: 8px 15px; border-radius: 20px; font-size: 0.9em; float: right; cursor: pointer; }
         
-        .version-tag { text-align: center; font-size: 0.8em; color: #ccc; margin-top: 20px; }
-        .refresh-btn { position: absolute; top: 0; right: 0; background: #fff; color: #333; border: 1px solid #ddd; padding: 5px 10px; border-radius: 20px; font-size: 0.8em; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 5px; z-index: 99; }
+        /* Utility */
+        .hidden { display: none !important; }
+        .version-tag { text-align: center; font-size: 0.8em; color: #ccc; margin-top: 30px; }
+        .refresh-btn { position: absolute; top: 10px; right: 10px; background: white; color: #333; border: 1px solid #ddd; padding: 6px 12px; border-radius: 20px; font-size: 0.85em; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 99; }
     </style>
 </head>
 <body>
     <div class="container">
-        <button class="refresh-btn" onclick="window.location.reload(true)">🔄 รีเฟรช</button>
-        <div id="loading" style="text-align:center; margin-top:50px;">⏳ กำลังโหลด...</div>
+        <button class="refresh-btn" onclick="window.location.reload(true)"><i class="fa-solid fa-rotate"></i> รีเฟรช</button>
+        <div id="loading" style="text-align:center; margin-top:100px; color:#666;">
+            <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><br><br>กำลังโหลดข้อมูล...
+        </div>
         
         <div id="main-app" class="hidden">
-            <div style="height:30px;"></div>
+            <div style="height:20px;"></div>
 
-            <div class="card" style="text-align:center;">
-                <img id="u-img" class="profile-img" src="">
-                <h3 id="u-name" style="margin:10px 0 5px;">User</h3>
-                <p>คะแนนสะสม: <span id="u-score" class="score-text">0</span> แต้ม</p>
+            <div class="card" style="text-align:center; position:relative; overflow:hidden;">
+                <div style="background:#4361ee; height:60px; position:absolute; top:0; left:0; width:100%;"></div>
+                <div style="position:relative; margin-top:15px;">
+                    <img id="u-img" class="profile-img" src="">
+                </div>
+                <h2 id="u-name" style="margin:10px 0 5px;">User</h2>
+                <p style="margin:0; color:#666;">คะแนนสะสม</p>
+                <div id="u-score" class="score-text">0</div>
             </div>
 
             <div id="grad-section" class="card grad-card hidden">
-                <h4 style="margin-top:0; color:#ff9f1c;">🎓 สถานะการฝึกงาน</h4>
-                <p style="margin:5px 0; font-size:0.9em;">📅 ระยะเวลา: <span id="grad-dates">-</span></p>
-                <div id="grad-action" style="margin-top:10px;"></div>
+                <h4 style="margin-top:0; color:#e67e22;"><i class="fa-solid fa-graduation-cap"></i> สถานะการฝึกงาน</h4>
+                <p style="margin:5px 0; font-size:0.9em; color:#555;">📅 ระยะเวลา: <span id="grad-dates">-</span></p>
+                <div id="grad-action" style="margin-top:15px;"></div>
             </div>
             
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <h3 style="margin:0; color:#4361ee;">🗺️ ภารกิจ (Side Quest)</h3>
-                <button class="propose-btn" onclick="proposeProject()">💡 เสนอโปรเจกต์</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0; color:#4361ee;"><i class="fa-solid fa-map"></i> ภารกิจ (Kanban)</h3>
+                <button onclick="proposeProject()" style="width:auto; padding:8px 15px; font-size:0.85em; background:#6f42c1; color:white;"><i class="fa-solid fa-lightbulb"></i> เสนอไอเดีย</button>
             </div>
-            <div class="sq-container" id="sq-scroll">
-                <div class="sq-col" id="col-Backlog"><div style="border-bottom:1px solid #ddd;margin-bottom:10px;font-weight:bold;">📌 Backlog</div><div id="sq-Backlog"></div></div>
-                <div class="sq-col" id="col-Doing"><div style="border-bottom:1px solid #ddd;margin-bottom:10px;font-weight:bold;">🚧 Doing</div><div id="sq-Doing"></div></div>
-                <div class="sq-col" id="col-Review"><div style="border-bottom:1px solid #ddd;margin-bottom:10px;font-weight:bold;">👀 Review</div><div id="sq-Review"></div></div>
-                <div class="sq-col" id="col-Done"><div style="border-bottom:1px solid #ddd;margin-bottom:10px;font-weight:bold;">✅ Done</div><div id="sq-Done"></div></div>
+            <div class="sq-container">
+                <div class="sq-col"><div style="font-weight:bold; margin-bottom:10px; color:#666;">📌 Backlog</div><div id="sq-Backlog"></div></div>
+                <div class="sq-col"><div style="font-weight:bold; margin-bottom:10px; color:#4361ee;">🚧 Doing</div><div id="sq-Doing"></div></div>
+                <div class="sq-col"><div style="font-weight:bold; margin-bottom:10px; color:#ff9f1c;">👀 Review</div><div id="sq-Review"></div></div>
+                <div class="sq-col"><div style="font-weight:bold; margin-bottom:10px; color:#2ec4b6;">✅ Done</div><div id="sq-Done"></div></div>
             </div>
 
+            <h3 style="color:#4361ee; margin-top:30px;"><i class="fa-solid fa-fire"></i> ภารกิจประจำวัน</h3>
             <div id="quest-list-container"></div>
             
             <div class="card">
-                <h4>📤 ส่งงาน / การบ้าน</h4>
-                <input type="text" id="w-title" placeholder="ชื่อหัวข้อ">
-                <input type="url" id="w-link" placeholder="ลิงก์งาน">
-                <button onclick="submitWork()">ยืนยันส่งงาน</button>
+                <h4 style="margin-top:0;"><i class="fa-solid fa-upload"></i> ส่งงาน / การบ้าน</h4>
+                <input type="text" id="w-title" placeholder="ชื่อหัวข้องาน...">
+                <input type="url" id="w-link" placeholder="ลิงก์งาน (Google Drive / Canva)...">
+                <button class="btn-success" onclick="submitWork()" id="btn-submit-work"><i class="fa-solid fa-paper-plane"></i> ยืนยันส่งงาน</button>
             </div>
 
-            <h4 style="margin-left:5px; color:#666;">📂 ประวัติการส่งงาน</h4>
+            <h4 style="margin-left:5px; color:#666;"><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการส่งงาน</h4>
             <div id="work-list"></div>
 
-            <div class="card report-card">
-                <h4>🚩 รายงานปัญหา / ติดต่อ Admin</h4>
-                <input type="text" id="rpt-subject" placeholder="หัวข้อเรื่อง">
+            <div class="card" style="border-left: 5px solid #ef233c;">
+                <h4 style="margin-top:0; color:#ef233c;"><i class="fa-solid fa-circle-exclamation"></i> แจ้งปัญหา / ติดต่อ Admin</h4>
+                <input type="text" id="rpt-subject" placeholder="หัวข้อเรื่อง...">
                 <textarea id="rpt-msg" rows="3" placeholder="รายละเอียด..."></textarea>
-                <button onclick="sendReport()" style="background:#ef233c;">📧 ส่งรายงาน</button>
+                <button class="btn-danger" onclick="sendReport()"><i class="fa-solid fa-envelope"></i> ส่งรายงาน</button>
             </div>
             
-            <div class="version-tag">System v39 (Cert Request)</div>
-            <div style="height:50px;"></div>
+            <div class="version-tag">System V40 (Final Stable)</div>
         </div>
     </div>
 
-    <script src="firebase-config.js?v=9.0"></script>
+    <script src="firebase-config.js?v=40"></script>
     <script>
         const USER_LIFF_ID = "2008959998-yjcNpaGt"; 
         let userProfile, userId, myQuestData = {}; 
@@ -107,6 +137,7 @@
                 document.getElementById('loading').classList.add('hidden'); 
                 document.getElementById('main-app').classList.remove('hidden');
                 
+                // Set Profile
                 const displayPic = userProfile.pictureUrl || "https://via.placeholder.com/150";
                 document.getElementById('u-img').src = displayPic; 
                 document.getElementById('u-name').innerText = userProfile.displayName;
@@ -121,7 +152,6 @@
                 if(d.exists){
                     const data = d.data();
                     document.getElementById('u-score').innerText=parseFloat((data.score||0).toFixed(2));
-                    // 🔥 Check Graduation Status
                     checkGraduation(data);
                 }else{
                     r.set({ displayName: userProfile.displayName, pictureUrl: userProfile.pictureUrl || "", score: 0 });
@@ -129,54 +159,31 @@
             });
         }
 
-        // 🔥 New: Graduation Logic
+        // Graduation Logic
         function checkGraduation(data) {
             if(!data.startDate || !data.endDate) return;
-            
-            const start = new Date(data.startDate);
-            const end = new Date(data.endDate);
-            const now = new Date();
-            
-            const options = { year: 'numeric', month: 'short', day: 'numeric' };
-            document.getElementById('grad-dates').innerText = `${start.toLocaleDateString('th-TH', options)} - ${end.toLocaleDateString('th-TH', options)}`;
+            const s=new Date(data.startDate), e=new Date(data.endDate), now=new Date();
+            const opt={year:'numeric',month:'short',day:'numeric'};
+            document.getElementById('grad-dates').innerText=`${s.toLocaleDateString('th-TH',opt)} - ${e.toLocaleDateString('th-TH',opt)}`;
             document.getElementById('grad-section').classList.remove('hidden');
-
-            const btnContainer = document.getElementById('grad-action');
-            if (now > end) {
-                // จบแล้ว -> แสดงปุ่มขอ Cert
-                if (data.certRequested) {
-                    btnContainer.innerHTML = `<span style="color:#28a745; font-weight:bold;">✅ ส่งคำร้องแล้ว รอ Admin ดำเนินการ</span>`;
-                } else {
-                    btnContainer.innerHTML = `<button onclick="requestCert()" style="background:#ff9f1c; color:black;">📜 ขอใบรับรองจบ (Request Certificate)</button>`;
-                }
+            const btn = document.getElementById('grad-action');
+            
+            if (now > e) {
+                if (data.certRequested) btn.innerHTML = `<span style="color:#28a745;font-weight:bold;"><i class="fa-solid fa-check-circle"></i> ส่งคำร้องแล้ว รอ Admin</span>`;
+                else btn.innerHTML = `<button onclick="requestCert()" class="btn-warning"><i class="fa-solid fa-certificate"></i> ขอใบรับรองจบ (Request Cert)</button>`;
             } else {
-                // ยังไม่จบ
-                const daysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
-                btnContainer.innerHTML = `<small style="color:#666">⏳ อีก ${daysLeft} วันจะจบการฝึกงาน</small>`;
+                const left = Math.ceil((e - now) / 86400000);
+                btn.innerHTML = `<small style="color:#666"><i class="fa-solid fa-hourglass-half"></i> อีก ${left} วันจบการฝึกงาน</small>`;
             }
         }
-
         async function requestCert() {
-            if(!confirm("ยืนยันขอใบรับรองจบการศึกษา?")) return;
-            try {
-                // 1. สร้าง Request ลงใน report หรือ collection ใหม่ก็ได้ (ใช้ reports ให้ง่ายต่อ Admin)
-                await db.collection('reports').add({
-                    userId: userId,
-                    displayName: userProfile.displayName,
-                    pictureUrl: userProfile.pictureUrl || "",
-                    subject: "🎓 ขอใบรับรองจบ (Certificate Request)",
-                    message: "นักศึกษาฝึกงานกดขอใบรับรองผ่านระบบ",
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    type: "cert_request"
-                });
-                
-                // 2. Update status User ว่ากดขอแล้ว
-                await db.collection('users').doc(userId).update({ certRequested: true });
-                
-                alert("ส่งคำร้องเรียบร้อยครับ! กรุณารอ Admin ตรวจสอบและส่งไฟล์ให้ทาง Line/Email");
-            } catch(e) { alert("Error: " + e.message); }
+            if(!confirm("ยืนยันขอใบรับรอง?")) return;
+            await db.collection('reports').add({ userId, displayName:userProfile.displayName, pictureUrl:userProfile.pictureUrl||"", subject:"🎓 ขอใบรับรองจบ", message:"กดขอผ่านระบบ", timestamp:firebase.firestore.FieldValue.serverTimestamp(), type:"cert_request" });
+            await db.collection('users').doc(userId).update({ certRequested: true });
+            alert("ส่งคำร้องแล้ว!");
         }
 
+        // --- Quest System (Fixed Double Click) ---
         function loadQuests() {
             db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => {
                 myQuestData = {}; s.forEach(doc => { myQuestData[doc.data().questId] = doc.data(); });
@@ -198,56 +205,129 @@
 
                 let actionHtml = "";
                 if (myStatus === 'none') {
-                    actionHtml = `<button onclick="receiveQuest('${qId}', '${safeTitle}')" style="background:#ffc107; color:black; width:100%; margin-top:10px;">🚀 กดรับภารกิจ (+0.1 คะแนน)</button>`;
+                    // 🔥 ID Button added for disabling
+                    actionHtml = `<button id="btn-recv-${qId}" class="btn-warning" onclick="receiveQuest('${qId}', '${safeTitle}')"><i class="fa-solid fa-hand-point-up"></i> กดรับภารกิจ (+0.1 คะแนน)</button>`;
                 } else if (myStatus === 'received') {
-                    actionHtml = `<textarea id="ans-${qId}" rows="2" placeholder="พิมพ์คำตอบ..." style="margin-top:10px;"></textarea><button onclick="subQ('${qId}',${q.baseScore})" style="background:#28a745; width:100%;">✉️ ส่งคำตอบ (ลุ้นคะแนนเต็ม)</button>`;
+                    actionHtml = `<textarea id="ans-${qId}" rows="2" placeholder="พิมพ์คำตอบ..."></textarea><button id="btn-sub-${qId}" class="btn-success" onclick="subQ('${qId}',${q.baseScore})"><i class="fa-solid fa-paper-plane"></i> ส่งคำตอบ</button>`;
                 }
-
-                c.innerHTML += `<div class="card quest-card"><div style="font-size:0.9em; margin-bottom:5px;">⏰ เหลือเวลา ${h} ชม.</div>${img}<h3 style="margin:5px 0;">⚡ ${q.question}</h3>${q.questLink ? `<a href="${q.questLink}" target="_blank" style="color:white;text-decoration:underline;">🔗 ข้อมูลเพิ่มเติม</a>` : ""}${actionHtml}</div>`;
+                c.innerHTML += `<div class="card quest-card"><div style="font-size:0.9em; margin-bottom:5px;"><i class="fa-regular fa-clock"></i> เหลือเวลา ${h} ชม.</div>${img}<h3 style="margin:5px 0;">⚡ ${q.question}</h3>${q.questLink ? `<a href="${q.questLink}" target="_blank" style="color:white;text-decoration:underline;">🔗 ข้อมูลเพิ่มเติม</a>` : ""}${actionHtml}</div>`;
             });
         }
 
         async function receiveQuest(qid, qTitle) {
+            // 🛑 Anti-Spam: Disable button immediately
+            const btn = document.getElementById(`btn-recv-${qid}`);
+            if(btn) { btn.disabled = true; btn.innerText = "กำลังรับ..."; }
+
             const docId = `${qid}_${userId}`;
             const userRef = db.collection("users").doc(userId);
+            
             try {
+                // Double check local state
+                if (myQuestData[qid] && myQuestData[qid].status !== 'none') return;
+
                 const userDoc = await userRef.get();
                 let currentCount = 0; if (userDoc.exists) currentCount = userDoc.data().questReceivedCount || 0;
                 const newCount = currentCount + 1;
                 let bonus = 0; if (newCount > 0 && newCount % 5 === 0) bonus = 0.1;
 
                 const batch = db.batch();
-                batch.set(db.collection("quest_submissions").doc(docId), { questId: qid, userId, displayName: userProfile.displayName, pictureUrl: userProfile.pictureUrl || "", status: 'received', receivedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                // 1. Create Sub
+                batch.set(db.collection("quest_submissions").doc(docId), { questId: qid, userId, displayName: userProfile.displayName, pictureUrl: userProfile.pictureUrl||"", status: 'received', receivedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                // 2. Score
                 batch.update(userRef, { score: firebase.firestore.FieldValue.increment(0.1 + bonus), questReceivedCount: newCount });
+                // 3. Kanban
                 const kanbanRef = db.collection("side_quests").doc();
-                batch.set(kanbanRef, { title: `[Daily] ${qTitle}`, description: "ภารกิจประจำวัน", assignees: [{ uid: userId, name: userProfile.displayName, pic: userProfile.pictureUrl || "" }], assigneeIds: [userId], status: 'Doing', priority: 'Medium', isDailyQuest: true, refQuestId: qid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-                if (bonus > 0) { batch.set(db.collection("checkin_logs").doc(), { userId, type: 'streak', amount: bonus, count: newCount, timestamp: firebase.firestore.FieldValue.serverTimestamp() }); }
-                await batch.commit(); alert("🎉 รับภารกิจแล้ว!");
-            } catch(e) { alert("Error: " + e.message); }
+                batch.set(kanbanRef, { title: `[Daily] ${qTitle}`, description: "ภารกิจประจำวัน", assignees: [{ uid: userId, name: userProfile.displayName, pic: userProfile.pictureUrl||"" }], assigneeIds: [userId], status: 'Doing', priority: 'Medium', isDailyQuest: true, refQuestId: qid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                // 4. Log
+                if (bonus > 0) batch.set(db.collection("checkin_logs").doc(), { userId, type: 'streak', amount: bonus, count: newCount, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+
+                await batch.commit(); 
+                // Alert handled by UI update (snapshot listener will redraw)
+            } catch(e) { 
+                alert("Error: " + e.message); 
+                if(btn) btn.disabled = false; // Re-enable on error
+            }
         }
 
         async function subQ(qid, baseScore) {
+            const btn = document.getElementById(`btn-sub-${qid}`);
             const ans = document.getElementById(`ans-${qid}`).value.trim();
-            if(!ans) return alert("กรอกคำตอบ");
-            const docId = `${qid}_${userId}`;
+            if(!ans) return alert("กรุณาพิมพ์คำตอบ");
+            
+            if(btn) { btn.disabled = true; btn.innerText = "กำลังส่ง..."; }
+            
             try {
                 const snapshot = await db.collection("quest_submissions").where("questId", "==", qid).where("status", "in", ["submitted", "checked"]).get();
                 let score = baseScore - (snapshot.size * 0.1); if (score < 1) score = 1;
                 const finalScore = score + 0.1; 
+
                 const batch = db.batch();
-                batch.update(db.collection("quest_submissions").doc(docId), { answer: ans, status: 'submitted', submittedAt: firebase.firestore.FieldValue.serverTimestamp(), earnedScore: parseFloat(score.toFixed(2)) });
+                batch.update(db.collection("quest_submissions").doc(`${qid}_${userId}`), { answer: ans, status: 'submitted', submittedAt: firebase.firestore.FieldValue.serverTimestamp(), earnedScore: parseFloat(score.toFixed(2)) });
                 batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(finalScore) });
+                
                 const sqSnap = await db.collection("side_quests").where("refQuestId", "==", qid).where("assigneeIds", "array-contains", userId).get();
                 sqSnap.forEach(doc => { batch.update(db.collection("side_quests").doc(doc.id), { userAnswer: ans }); });
-                await batch.commit(); alert(`ส่งแล้ว! ได้ ${score.toFixed(2)} + 0.1 คะแนน`);
-            } catch(e) { alert("Error: " + e.message); }
+
+                await batch.commit(); 
+                alert(`ส่งเรียบร้อย! ได้ ${score.toFixed(2)} + 0.1 คะแนน`);
+            } catch(e) { 
+                alert("Error: " + e.message); 
+                if(btn) btn.disabled = false; 
+            }
         }
 
-        async function proposeProject() { const t=prompt("ชื่อโปรเจกต์:"); if(!t)return; const d=prompt("รายละเอียด:"); try{await db.collection('side_quests').add({title:t, description:d||"", assignees:[{uid:userId,name:userProfile.displayName,pic:userProfile.pictureUrl || ""}], assigneeIds:[userId], status:'Backlog', priority:'Medium', isProposal:true, createdAt:firebase.firestore.FieldValue.serverTimestamp()}); alert("เสนอแล้ว!");}catch(e){alert(e.message)} }
-        function loadSideQuests(){db.collection("side_quests").where("assigneeIds","array-contains",userId).onSnapshot(s=>{const cols={"Backlog":document.getElementById("sq-Backlog"),"Doing":document.getElementById("sq-Doing"),"Review":document.getElementById("sq-Review"),"Done":document.getElementById("sq-Done")};Object.values(cols).forEach(c=>c.innerHTML="");s.forEach(d=>{const q=d.data();if(cols[q.status]){let as="";if(q.assignees)q.assignees.forEach(u=>as+=`<img src="${u.pic||'https://via.placeholder.com/20'}" style="width:20px;height:20px;border-radius:50%;">`);let btn="";if(q.status==="Backlog")btn=`<button class="badge" onclick="upSQ('${d.id}','Doing')" style="background:#007bff;border:none;">เริ่ม ▶️</button>`;else if(q.status==="Doing")btn=`<button class="badge" onclick="upSQ('${d.id}','Review')" style="background:#ffc107;color:black;border:none;">ส่ง ▶️</button>`;const c=document.createElement("div");c.className="sq-card";c.innerHTML=`<b>${q.title}</b><br><small>${q.description}</small><div style="margin-top:5px;display:flex;justify-content:space-between;"><div>${as}</div>${btn}</div>`;cols[q.status].appendChild(c)}})})}
+        // --- Side Quest & Kanban ---
+        function loadSideQuests() {
+            db.collection("side_quests").where("assigneeIds","array-contains",userId).onSnapshot(s => {
+                const cols = { "Backlog":document.getElementById("sq-Backlog"), "Doing":document.getElementById("sq-Doing"), "Review":document.getElementById("sq-Review"), "Done":document.getElementById("sq-Done") };
+                Object.values(cols).forEach(c => c.innerHTML="");
+                
+                s.forEach(d => {
+                    const q = d.data();
+                    if(cols[q.status]) {
+                        // Check Scored
+                        const isScored = q.isScored === true;
+                        const scoredClass = isScored ? 'scored' : '';
+                        const scoreBadge = (isScored && q.archiveScore) ? `<div class="score-badge">+${q.archiveScore}</div>` : '';
+                        
+                        let btn = "";
+                        if (q.status==="Backlog") btn=`<button class="btn-primary" style="height:30px; font-size:0.8em;" onclick="upSQ('${d.id}','Doing')">เริ่มทำ <i class="fa-solid fa-play"></i></button>`;
+                        else if (q.status==="Doing") btn=`<button class="btn-warning" style="height:30px; font-size:0.8em;" onclick="upSQ('${d.id}','Review')">ส่งตรวจ <i class="fa-solid fa-arrow-right"></i></button>`;
+                        
+                        const c = document.createElement("div");
+                        c.className = `sq-card status-${q.status} ${scoredClass}`;
+                        c.innerHTML = `
+                            ${scoreBadge}
+                            <div style="font-weight:600; margin-bottom:5px;">${q.title}</div>
+                            <div style="font-size:0.85em; color:#666; margin-bottom:10px;">${q.description||""}</div>
+                            ${btn}
+                        `;
+                        cols[q.status].appendChild(c);
+                    }
+                })
+            })
+        }
+        
+        async function proposeProject() { const t=prompt("ชื่อโปรเจกต์:"); if(!t)return; const d=prompt("รายละเอียด:"); try{await db.collection('side_quests').add({title:t, description:d||"", assignees:[{uid:userId,name:userProfile.displayName,pic:userProfile.pictureUrl||""}], assigneeIds:[userId], status:'Backlog', priority:'Medium', isProposal:true, createdAt:firebase.firestore.FieldValue.serverTimestamp()}); alert("เสนอแล้ว!");}catch(e){alert(e.message)} }
         async function upSQ(id,s){if(confirm("เลื่อนสถานะ?"))await db.collection("side_quests").doc(id).update({status:s})}
-        async function submitWork(){const t=document.getElementById('w-title').value,l=document.getElementById('w-link').value;if(!t||!l)return;await db.collection("works").add({userId, displayName:userProfile.displayName, pictureUrl:userProfile.pictureUrl || "", title:t,link:l,status:"รอตรวจ",score:0, timestamp:firebase.firestore.FieldValue.serverTimestamp()});alert("ส่งแล้ว");document.getElementById('w-title').value=""}
-        function loadMyWorks(){db.collection("works").where("userId","==",userId).orderBy("timestamp","desc").onSnapshot(s=>{const l=document.getElementById('work-list');l.innerHTML="";s.forEach(d=>{const w=d.data();let sc=w.score>0?`<span class="badge" style="background:#17a2b8">+${w.score}</span>`:"";l.innerHTML+=`<div class="card" style="padding:15px;border-left:5px solid ${w.status==='ตรวจแล้ว'?'#28a745':'#ffc107'}"><b>${w.title}</b> ${sc}<br><small>${w.status}</small></div>`})})}
+        
+        // --- Submit Work ---
+        async function submitWork() {
+            const t=document.getElementById('w-title').value, l=document.getElementById('w-link').value;
+            if(!t||!l)return;
+            
+            const btn = document.getElementById('btn-submit-work');
+            btn.disabled = true;
+            
+            await db.collection("works").add({userId, displayName:userProfile.displayName, pictureUrl:userProfile.pictureUrl||"", title:t, link:l, status:"รอตรวจ", score:0, timestamp:firebase.firestore.FieldValue.serverTimestamp()});
+            
+            alert("ส่งงานเรียบร้อย");
+            document.getElementById('w-title').value=""; document.getElementById('w-link').value="";
+            btn.disabled = false;
+        }
+        
+        function loadMyWorks(){db.collection("works").where("userId","==",userId).orderBy("timestamp","desc").onSnapshot(s=>{const l=document.getElementById('work-list');l.innerHTML="";s.forEach(d=>{const w=d.data();let sc=w.score>0?`<span class="badge" style="background:#17a2b8; color:white; padding:2px 6px; border-radius:4px; font-size:0.8em;">+${w.score}</span>`:"";l.innerHTML+=`<div class="card" style="padding:15px; border-left:5px solid ${w.status==='ตรวจแล้ว'?'#28a745':'#ffc107'};"><b>${w.title}</b> ${sc}<br><small style="color:#666;">${w.status}</small></div>`})})}
         async function sendReport(){const s=document.getElementById('rpt-subject').value.trim(),m=document.getElementById('rpt-msg').value.trim();if(!s||!m)return alert("กรอกข้อมูลให้ครบ");window.location.href=`mailto:medlifeplus@gmail.com?subject=${encodeURIComponent(s)}&body=${encodeURIComponent(m)}`;}
     </script>
 </body>
