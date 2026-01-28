@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP INTERNSHIP (V45)</title>
+    <title>MLP INTERNSHIP (V46)</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -13,7 +13,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     
     <style>
-        /* ... (CSS เดิมทั้งหมด - ไม่ต้องแก้) ... */
+        /* ... (CSS V45 Same) ... */
         body { font-family: 'Kanit', sans-serif; background-color: #f4f6f9; padding: 20px; color:#333; margin:0; }
         .container { max-width: 600px; margin: 0 auto; position: relative; padding-bottom: 80px; }
         .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #f0f0f0; }
@@ -37,8 +37,6 @@
         .hidden { display: none !important; }
         .version-tag { text-align: center; font-size: 0.8em; color: #ccc; margin-top: 30px; }
         .refresh-btn { position: absolute; top: 10px; right: 10px; background: white; color: #333; border: 1px solid #ddd; padding: 6px 12px; border-radius: 20px; font-size: 0.85em; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 99; }
-        
-        /* 🔥 Custom CSS V45 */
         .date-input-group { display: flex; gap: 10px; margin-top: 10px; }
         .date-input-group div { flex: 1; }
         .date-input-group label { font-size: 0.85em; color: #666; display: block; margin-bottom: 3px; }
@@ -105,11 +103,11 @@
                 <button class="btn-danger" onclick="sendReport()"><i class="fa-solid fa-envelope"></i> ส่งรายงาน</button>
             </div>
             
-            <div class="version-tag">System V45 (User Dates)</div>
+            <div class="version-tag">System V46 (Fix Date Input)</div>
         </div>
     </div>
 
-    <script src="firebase-config.js?v=45"></script>
+    <script src="firebase-config.js?v=46"></script>
     <script>
         const USER_LIFF_ID = "2008959998-yjcNpaGt"; 
         let userProfile, userId, myQuestData = {}; 
@@ -139,7 +137,7 @@
                 if(d.exists){
                     const data = d.data();
                     document.getElementById('u-score').innerText=parseFloat((data.score||0).toFixed(2));
-                    // Update Date Inputs if exists
+                    // 🔥 Ensure Inputs are populated
                     if(data.startDate) document.getElementById('u-start-date').value = data.startDate;
                     if(data.endDate) document.getElementById('u-end-date').value = data.endDate;
                     checkGraduation(data);
@@ -149,20 +147,16 @@
             });
         }
 
-        // 🔥 Save Dates Logic
         async function saveMyDates() {
             const s = document.getElementById('u-start-date').value;
             const e = document.getElementById('u-end-date').value;
-            if(s && e) {
-                await db.collection("users").doc(userId).update({ startDate: s, endDate: e });
-            }
+            if(s || e) await db.collection("users").doc(userId).update({ startDate: s, endDate: e });
         }
 
         function checkGraduation(data) {
             if(!data.startDate || !data.endDate) return;
             const s=new Date(data.startDate), e=new Date(data.endDate), now=new Date();
             const btn = document.getElementById('grad-action');
-            
             if (now > e) {
                 if (data.certRequested) btn.innerHTML = `<span style="color:#28a745;font-weight:bold;"><i class="fa-solid fa-check-circle"></i> ส่งคำร้องแล้ว รอ Admin</span>`;
                 else btn.innerHTML = `<button onclick="requestCert()" class="btn-warning"><i class="fa-solid fa-certificate"></i> ขอใบรับรองจบ (Request Cert)</button>`;
@@ -178,7 +172,6 @@
             alert("ส่งคำร้องแล้ว!");
         }
 
-        // --- Quest System (Updated Button Text) ---
         function loadQuests() {
             db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => {
                 myQuestData = {}; s.forEach(doc => { myQuestData[doc.data().questId] = doc.data(); });
@@ -201,10 +194,9 @@
                         html += `<div class="retry-wait" id="cd-${qId}" data-until="${cooldown.getTime()}">Please Wait...</div>`;
                     } else {
                         const duration = q.durationMinutes || 30; 
-                        // 🔥 Button Text Changed
                         html += `<p style="font-size:0.9em; opacity:0.8;"><i class="fa-solid fa-stopwatch"></i> เวลาทำ: ${duration} นาที</p>
                                  <button id="btn-recv-${qId}" class="btn-warning" onclick="receiveQuest('${qId}', '${q.question.replace(/'/g,"")}', ${duration})">
-                                 <i class="fa-solid fa-hand-point-up"></i> กดเริ่มทำภารกิจ</button>`;
+                                 <i class="fa-solid fa-hand-point-up"></i> กดเริ่มทำภารกิจ</button>`; // Text Updated
                     }
                 } else if (status === 'received') {
                     const deadline = myQ.deadline ? myQ.deadline.toDate().getTime() : 0;
@@ -286,6 +278,7 @@
             try { await batch.commit(); } catch(e) { console.error(e); }
         }
 
+        // Standard Functions
         function loadSideQuests(){db.collection("side_quests").where("assigneeIds","array-contains",userId).onSnapshot(s=>{const cols={"Backlog":document.getElementById("sq-Backlog"),"Doing":document.getElementById("sq-Doing"),"Review":document.getElementById("sq-Review"),"Done":document.getElementById("sq-Done")};Object.values(cols).forEach(c=>c.innerHTML="");s.forEach(d=>{const q=d.data();if(cols[q.status]){let as="";if(q.assignees)q.assignees.forEach(u=>as+=`<img src="${u.pic||'https://via.placeholder.com/20'}" style="width:20px;height:20px;border-radius:50%;">`);let btn="";if(q.status==="Backlog")btn=`<button class="btn-primary" style="height:30px;font-size:0.8em;" onclick="upSQ('${d.id}','Doing')">Start</button>`;else if(q.status==="Doing")btn=`<button class="btn-warning" style="height:30px;font-size:0.8em;" onclick="upSQ('${d.id}','Review')">Send</button>`;const isScored=q.isScored===true;const scClass=isScored?'scored':'';const scBadge=(isScored&&q.archiveScore)?`<div class="score-badge">+${q.archiveScore}</div>`:'';const c=document.createElement("div");c.className=`sq-card status-${q.status} ${scClass}`;c.innerHTML=`${scBadge}<b>${q.title}</b><br><small>${q.description}</small><div style="margin-top:5px;display:flex;justify-content:space-between;"><div>${as}</div>${btn}</div>`;cols[q.status].appendChild(c)}})})}
         async function upSQ(id,s){if(confirm("Move?"))await db.collection("side_quests").doc(id).update({status:s})}
         async function submitWork(){const t=document.getElementById('w-title').value,l=document.getElementById('w-link').value;if(!t||!l)return;document.getElementById('btn-submit-work').disabled=true;await db.collection("works").add({userId, displayName:userProfile.displayName, pictureUrl:userProfile.pictureUrl||"", title:t,link:l,status:"รอตรวจ",score:0, timestamp:firebase.firestore.FieldValue.serverTimestamp()});alert("Sent");document.getElementById('w-title').value="";document.getElementById('w-link').value="";document.getElementById('btn-submit-work').disabled=false;}
