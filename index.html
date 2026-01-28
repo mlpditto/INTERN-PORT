@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP INTERNSHIP (V47)</title>
+    <title>MLP INTERNSHIP (V48)</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -13,11 +13,11 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     
     <style>
-        /* ... (CSS Base from V45/V46) ... */
+        /* ... (CSS เดิม V45/V47) ... */
         body { font-family: 'Kanit', sans-serif; background-color: #f4f6f9; padding: 20px; color:#333; margin:0; }
-        .container { max-width: 600px; margin: 0 auto; padding-bottom: 80px; }
-        .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        .profile-img { width: 90px; height: 90px; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 5px 15px rgba(6,199,85,0.2); object-fit: cover; }
+        .container { max-width: 600px; margin: 0 auto; position: relative; padding-bottom: 80px; }
+        .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #f0f0f0; }
+        .profile-img { width: 90px; height: 90px; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 5px 15px rgba(6, 199, 85, 0.2); object-fit: cover; }
         .score-text { color: #4361ee; font-weight: 800; font-size: 1.8em; }
         .hidden { display: none !important; }
         
@@ -25,7 +25,9 @@
         .sq-col { min-width: 85%; background: #f8f9fa; border-radius: 12px; padding: 15px; scroll-snap-align: center; }
         .sq-card { background: white; padding: 15px; border-radius: 10px; border-left: 5px solid #ccc; margin-bottom: 10px; position: relative; }
         .sq-card.project { background-color: #fff0f5; border-left-color: #e83e8c; }
-        
+        .sq-card.scored { background-color: #d1e7dd; border-left-color: #198754; }
+        .score-badge { position: absolute; top: 10px; right: 10px; background: #198754; color: white; font-size: 0.75em; padding: 2px 8px; border-radius: 10px; font-weight: bold; }
+
         /* Chat */
         .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
         .modal-content { background: white; margin: 15% auto; padding: 20px; border-radius: 15px; width: 90%; max-width: 400px; position: relative; }
@@ -34,14 +36,18 @@
         .msg-admin { background: #d1e7dd; margin-right: auto; text-align: left; color: #0f5132; }
         .msg-user { background: #4361ee; color: white; margin-left: auto; text-align: right; }
         
+        /* Quest & Timer */
+        .quest-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; border:none; }
+        .timer-display { font-size: 1.8em; font-weight: bold; margin: 15px 0; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 12px; font-family: monospace; letter-spacing: 2px; }
+        .retry-wait { color: #ef233c; font-weight: bold; background: #fff; padding: 10px; border-radius: 8px; margin-top: 10px; }
+        .global-expiry { font-size: 0.8em; color: #eee; margin-bottom: 5px; display: block; }
+
         /* Utils */
         button { width: 100%; padding: 12px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; min-height: 48px; }
-        .btn-primary { background: #4361ee; color: white; }
+        .btn-primary { background: #4361ee; color: white; } .btn-warning { background: #ff9f1c; color: black; } .btn-success { background: #2ec4b6; color: white; }
         .btn-sm { width: auto; min-height: 30px; padding: 5px 10px; font-size: 0.85em; }
-        input, textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; }
+        input, textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; margin-bottom: 10px; }
         .date-input-group { display: flex; gap: 10px; margin-top: 10px; } .date-input-group div { flex: 1; }
-        
-        /* Refresh Btn */
         .refresh-btn { position: absolute; top: 10px; right: 10px; width:auto; min-height:auto; background:white; border:1px solid #ddd; padding:5px 10px; font-size:0.8em; z-index:99; }
     </style>
 </head>
@@ -75,6 +81,19 @@
                 <div class="sq-col"><div style="font-weight:bold;margin-bottom:10px;">✅ Done</div><div id="sq-Done"></div></div>
             </div>
 
+            <h3><i class="fa-solid fa-fire"></i> ภารกิจประจำวัน</h3>
+            <div id="quest-list-container"></div>
+
+            <div class="card">
+                <h4><i class="fa-solid fa-upload"></i> ส่งงานทั่วไป</h4>
+                <input type="text" id="w-title" placeholder="หัวข้องาน...">
+                <input type="url" id="w-link" placeholder="ลิงก์งาน...">
+                <button class="btn-success" onclick="submitWork()">ยืนยันส่งงาน</button>
+            </div>
+
+            <h4><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการส่งงาน</h4>
+            <div id="work-list"></div>
+
             <div style="height:50px;"></div>
         </div>
     </div>
@@ -92,10 +111,13 @@
         </div>
     </div>
 
-    <script src="firebase-config.js?v=47"></script>
+    <script src="firebase-config.js?v=48"></script>
     <script>
         const USER_LIFF_ID = "2008959998-yjcNpaGt"; 
-        let userProfile, userId; 
+        let userProfile, userId;
+        // 🔥 Separate Caches
+        let questsCache = [];
+        let mySubmissionsCache = {};
         
         async function main() {
             try { 
@@ -106,13 +128,146 @@
                 document.getElementById('main-app').classList.remove('hidden');
                 document.getElementById('u-img').src = userProfile.pictureUrl || "https://via.placeholder.com/150"; 
                 document.getElementById('u-name').innerText = userProfile.displayName;
-                checkUser(); loadSideQuests();
+                
+                checkUser(); 
+                
+                // 🔥 Parallel Loading (Fixes "Not Found" issue)
+                loadAllQuests();      // Load Master List
+                loadMySubmissions();  // Load User Status
+                
+                loadMyWorks(); loadSideQuests();
+                setInterval(checkExpiry, 1000); 
             } catch (e) { alert(e.message); }
         } main();
 
         function checkUser(){ const r=db.collection("users").doc(userId); r.onSnapshot(d=>{ if(d.exists) { const da=d.data(); document.getElementById('u-score').innerText=parseFloat((da.score||0).toFixed(2)); if(da.startDate)document.getElementById('u-start-date').value=da.startDate; if(da.endDate)document.getElementById('u-end-date').value=da.endDate; } else r.set({displayName:userProfile.displayName,pictureUrl:userProfile.pictureUrl||"",score:0}); }); }
         async function saveMyDates() { const s=document.getElementById('u-start-date').value, e=document.getElementById('u-end-date').value; if(s||e) await db.collection("users").doc(userId).update({startDate:s,endDate:e}); }
 
+        // --- 🔥 New Quest Logic (Decoupled) ---
+        function loadAllQuests() {
+            db.collection("quests").orderBy("createdAt", "desc").limit(5).onSnapshot(s => {
+                questsCache = s.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                renderQuestList(); // Re-render when quests change
+            });
+        }
+
+        function loadMySubmissions() {
+            db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => {
+                mySubmissionsCache = {};
+                s.forEach(doc => { mySubmissionsCache[doc.data().questId] = doc.data(); });
+                renderQuestList(); // Re-render when user status changes
+            });
+        }
+
+        function renderQuestList() {
+            const c = document.getElementById('quest-list-container'); c.innerHTML = "";
+            const now = new Date();
+
+            questsCache.forEach(q => {
+                const qId = q.id;
+                const myQ = mySubmissionsCache[qId] || {};
+                const status = myQ.status || 'none';
+                
+                // 🔥 Global Expiry Check (Admin "Expires In" setting)
+                // If admin set global deadline and it passed -> Don't show if status is none
+                if (status === 'none' && q.deadline && now > q.deadline.toDate()) return;
+
+                let html = `<div class="card quest-card"><h3>${q.question}</h3>`;
+                
+                if (status === 'none') {
+                    const cooldown = myQ.cooldownUntil ? myQ.cooldownUntil.toDate() : null;
+                    if (cooldown && now < cooldown) {
+                        html += `<div class="retry-wait" id="cd-${qId}" data-until="${cooldown.getTime()}">Please Wait...</div>`;
+                    } else {
+                        const duration = q.durationMinutes || 30;
+                        // Display Global Expiry info if exists
+                        let expiryInfo = "";
+                        if(q.deadline) {
+                            const exp = q.deadline.toDate();
+                            const diffH = Math.ceil((exp - now)/3600000);
+                            expiryInfo = `<span class="global-expiry">⏳ หมดเขตรับใน: ${diffH} ชม.</span>`;
+                        }
+
+                        html += `${expiryInfo}
+                                 <p style="font-size:0.9em; opacity:0.9;"><i class="fa-solid fa-stopwatch"></i> เวลาทำ: ${duration} นาที</p>
+                                 <button id="btn-recv-${qId}" class="btn-warning" onclick="receiveQuest('${qId}', '${q.question.replace(/'/g,"")}', ${duration})">
+                                 <i class="fa-solid fa-play"></i> กดเริ่มทำภารกิจ</button>`;
+                    }
+                } else if (status === 'received') {
+                    const deadline = myQ.deadline ? myQ.deadline.toDate().getTime() : 0;
+                    html += `<div class="timer-display" id="timer-${qId}" data-deadline="${deadline}">Loading...</div>
+                             <textarea id="ans-${qId}" rows="2" placeholder="พิมพ์คำตอบ..."></textarea>
+                             <button id="btn-sub-${qId}" class="btn-success" onclick="subQ('${qId}',${q.baseScore})"><i class="fa-solid fa-paper-plane"></i> ส่งคำตอบ</button>`;
+                } else if (status === 'unsuccessful') {
+                    html += `<div style="color:#ef233c;font-weight:bold;font-size:1.2em;"><i class="fa-solid fa-times-circle"></i> หมดเวลา!</div><small>ติดคูลดาวน์ 2 ชม.</small>`;
+                } else {
+                    html += `<div style="color:#2ec4b6;font-weight:bold;font-size:1.2em;"><i class="fa-solid fa-check-circle"></i> เรียบร้อย</div>`;
+                }
+                c.innerHTML += html + `</div>`;
+            });
+        }
+
+        async function receiveQuest(qid, qTitle, dur) {
+            const btn = document.getElementById(`btn-recv-${qid}`);
+            if(btn) { btn.disabled = true; btn.innerText = "กำลังเริ่ม..."; }
+            const docId = `${qid}_${userId}`;
+            const userRef = db.collection("users").doc(userId);
+            try {
+                if (mySubmissionsCache[qid] && mySubmissionsCache[qid].status !== 'none') return;
+                const deadline = new Date(Date.now() + dur * 60000); 
+                const batch = db.batch();
+                batch.set(db.collection("quest_submissions").doc(docId), { questId: qid, userId, displayName: userProfile.displayName, pictureUrl: userProfile.pictureUrl||"", status: 'received', receivedAt: firebase.firestore.FieldValue.serverTimestamp(), deadline: firebase.firestore.Timestamp.fromDate(deadline) });
+                batch.update(userRef, { score: firebase.firestore.FieldValue.increment(0.1), questReceivedCount: firebase.firestore.FieldValue.increment(1) });
+                const kanbanRef = db.collection("side_quests").doc();
+                batch.set(kanbanRef, { title: `[Daily] ${qTitle}`, description: "ภารกิจประจำวัน", assignees: [{ uid: userId, name: userProfile.displayName, pic: userProfile.pictureUrl||"" }], assigneeIds: [userId], status: 'Doing', priority: 'Medium', isDailyQuest: true, refQuestId: qid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                await batch.commit(); 
+            } catch(e) { alert("Error: " + e.message); if(btn) btn.disabled = false; }
+        }
+
+        async function subQ(qid, baseScore) {
+            const btn = document.getElementById(`btn-sub-${qid}`);
+            const ans = document.getElementById(`ans-${qid}`).value.trim();
+            if(!ans) return alert("กรุณาพิมพ์คำตอบ");
+            if(btn) { btn.disabled = true; btn.innerText = "กำลังส่ง..."; }
+            try {
+                const myQ = mySubmissionsCache[qid];
+                if(myQ && myQ.deadline && Date.now() > myQ.deadline.toDate()) { alert("หมดเวลาแล้วครับ!"); return failQuest(qid); }
+                const batch = db.batch();
+                batch.update(db.collection("quest_submissions").doc(`${qid}_${userId}`), { answer: ans, status: 'submitted', submittedAt: firebase.firestore.FieldValue.serverTimestamp(), earnedScore: parseFloat(score.toFixed(2)) }); // *Note: score calc should be backend or simple logic here
+                batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(baseScore) }); // Giving full score for now
+                // Also update Kanban
+                const sqSnap = await db.collection("side_quests").where("refQuestId", "==", qid).where("assigneeIds", "array-contains", userId).get();
+                sqSnap.forEach(doc => { batch.update(db.collection("side_quests").doc(doc.id), { userAnswer: ans }); });
+                await batch.commit(); alert(`ส่งเรียบร้อย! ได้คะแนนแล้ว`);
+            } catch(e) { alert("Error: " + e.message); if(btn) btn.disabled = false; }
+        }
+
+        // --- Helper Logic ---
+        function checkExpiry() {
+            document.querySelectorAll('[id^="timer-"]').forEach(el => {
+                const dead = parseInt(el.dataset.deadline); const diff = dead - Date.now();
+                if(diff <= 0) el.innerText = "00:00"; else { const m = Math.floor(diff/60000); const s = Math.floor((diff%60000)/1000); el.innerText = `${m}:${s<10?'0':''}${s}`; }
+            });
+            document.querySelectorAll('[id^="cd-"]').forEach(el => {
+                const until = parseInt(el.dataset.until); const diff = until - Date.now();
+                if(diff <= 0) el.innerText = "Ready (Refresh)"; else { const h = Math.floor(diff/3600000); const m = Math.floor((diff%3600000)/60000); el.innerText = `Retry in ${h}h ${m}m`; }
+            });
+            // Auto Fail
+            for (let qid in mySubmissionsCache) {
+                const q = mySubmissionsCache[qid];
+                if (q.status === 'received' && q.deadline) { if (Date.now() > q.deadline.toDate()) failQuest(qid); }
+            }
+        }
+        async function failQuest(qid) {
+            if(mySubmissionsCache[qid].status === 'unsuccessful') return; 
+            const cooldown = new Date(Date.now() + 2 * 60 * 60 * 1000); 
+            const batch = db.batch();
+            batch.update(db.collection("quest_submissions").doc(`${qid}_${userId}`), { status: 'unsuccessful', cooldownUntil: firebase.firestore.Timestamp.fromDate(cooldown) });
+            batch.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(-0.1) });
+            try { await batch.commit(); } catch(e) {}
+        }
+
+        // --- Standard Logic (Kanban/Chat/Works) ---
         function loadSideQuests(){
             db.collection("side_quests").where("assigneeIds","array-contains",userId).onSnapshot(s=>{
                 const cols={"Backlog":document.getElementById("sq-Backlog"),"Doing":document.getElementById("sq-Doing"),"Review":document.getElementById("sq-Review"),"Done":document.getElementById("sq-Done")};
@@ -122,49 +277,27 @@
                     if(cols[q.status]){
                         const isProj = q.isProject === true;
                         let btn = "", chatBtn = "";
-                        if(q.status==="Backlog") btn=`<button class="btn-sm btn-primary" onclick="upSQ('${d.id}','Doing')">Start</button>`;
-                        else if(q.status==="Doing") btn=`<button class="btn-sm btn-warning" onclick="upSQ('${d.id}','Review')">Send</button>`;
-                        
-                        if(isProj) chatBtn = `<button class="btn-sm" style="background:#e83e8c; color:white; margin-left:5px;" onclick="openChat('${d.id}')">💬 Chat</button>`;
-
+                        if(q.status==="Backlog") btn=`<button class="btn-primary" onclick="upSQ('${d.id}','Doing')" style="min-height:30px;font-size:0.8em;">Start</button>`;
+                        else if(q.status==="Doing") btn=`<button class="btn-warning" onclick="upSQ('${d.id}','Review')" style="min-height:30px;font-size:0.8em;">Send</button>`;
+                        if(isProj) chatBtn = `<button class="btn-primary" style="min-height:30px;font-size:0.8em;background:#e83e8c;margin-left:5px;" onclick="openChat('${d.id}')">💬</button>`;
                         const c=document.createElement("div");
-                        c.className=`sq-card status-${q.status} ${isProj?'project':''}`;
-                        c.innerHTML=`${isProj?'<span class="badge" style="background:#e83e8c;color:white;font-size:0.7em;padding:2px 5px;border-radius:4px;">Project</span>':''} <b>${q.title}</b><br><small>${q.description||""}</small><div style="margin-top:5px;">${btn}${chatBtn}</div>`;
+                        c.className=`sq-card status-${q.status} ${isProj?'project':''} ${q.isScored?'scored':''}`;
+                        c.innerHTML=`${q.isScored?`<div class="score-badge">+${q.archiveScore}</div>`:''}<b>${q.title}</b><br><small>${q.description||""}</small><div style="margin-top:5px;display:flex;">${btn}${chatBtn}</div>`;
                         cols[q.status].appendChild(c);
                     }
                 })
             })
         }
         async function upSQ(id,s){if(confirm("Move?"))await db.collection("side_quests").doc(id).update({status:s})}
-
-        // --- Chat ---
+        // Chat
         let chatUnsub;
-        function openChat(id) {
-            document.getElementById('chatModal').style.display='block';
-            document.getElementById('chat-card-id').value = id;
-            const box = document.getElementById('chat-box');
-            box.innerHTML = "Loading...";
-            if(chatUnsub) chatUnsub();
-            chatUnsub = db.collection("side_quests").doc(id).collection("comments").orderBy("timestamp","asc")
-                .onSnapshot(snap => {
-                    box.innerHTML = "";
-                    snap.forEach(d => {
-                        const m = d.data();
-                        const cls = m.sender==='User' ? 'msg-user' : 'msg-admin';
-                        box.innerHTML += `<div class="chat-msg ${cls}"><b>${m.sender}</b>: ${m.msg}</div>`;
-                    });
-                    box.scrollTop = box.scrollHeight;
-                });
-        }
-        async function sendChat() {
-            const txt = document.getElementById('chat-input').value.trim();
-            const id = document.getElementById('chat-card-id').value;
-            if(!txt) return;
-            await db.collection("side_quests").doc(id).collection("comments").add({
-                msg: txt, sender: 'User', timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            document.getElementById('chat-input').value = "";
-        }
+        function openChat(id) { document.getElementById('chatModal').style.display='block'; document.getElementById('chat-card-id').value=id; const box=document.getElementById('chat-box'); box.innerHTML="Loading..."; if(chatUnsub)chatUnsub(); chatUnsub=db.collection("side_quests").doc(id).collection("comments").orderBy("timestamp","asc").onSnapshot(s=>{box.innerHTML="";s.forEach(d=>{const m=d.data();const cls=m.sender==='User'?'msg-user':'msg-admin';box.innerHTML+=`<div class="chat-msg ${cls}"><b>${m.sender}</b>: ${m.msg}</div>`});box.scrollTop=box.scrollHeight;}); }
+        async function sendChat() { const t=document.getElementById('chat-input').value; const id=document.getElementById('chat-card-id').value; if(!t)return; await db.collection("side_quests").doc(id).collection("comments").add({msg:t,sender:'User',timestamp:firebase.firestore.FieldValue.serverTimestamp()}); document.getElementById('chat-input').value=""; }
+        // Work
+        async function submitWork(){const t=document.getElementById('w-title').value,l=document.getElementById('w-link').value;if(!t||!l)return;await db.collection("works").add({userId, displayName:userProfile.displayName, pictureUrl:userProfile.pictureUrl||"", title:t,link:l,status:"รอตรวจ",score:0, timestamp:firebase.firestore.FieldValue.serverTimestamp()});alert("Sent");document.getElementById('w-title').value="";document.getElementById('w-link').value="";}
+        function loadMyWorks(){db.collection("works").where("userId","==",userId).orderBy("timestamp","desc").onSnapshot(s=>{const l=document.getElementById('work-list');l.innerHTML="";s.forEach(d=>{const w=d.data();let sc=w.score>0?`<span class="badge" style="background:#17a2b8;color:white;padding:2px 6px;border-radius:4px;">+${w.score}</span>`:"";l.innerHTML+=`<div class="card" style="padding:15px;border-left:5px solid ${w.status==='ตรวจแล้ว'?'#28a745':'#ffc107'}"><b>${w.title}</b> ${sc}<br><small>${w.status}</small></div>`})})}
+        async function sendReport(){const s=document.getElementById('rpt-subject').value.trim(),m=document.getElementById('rpt-msg').value.trim();if(!s||!m)return alert("Empty");window.location.href=`mailto:medlifeplus@gmail.com?subject=${encodeURIComponent(s)}&body=${encodeURIComponent(m)}`;}
+        async function proposeProject(){const t=prompt("Project:");if(!t)return;await db.collection('side_quests').add({title:t,description:"",assignees:[{uid:userId,name:userProfile.displayName,pic:userProfile.pictureUrl||""}],assigneeIds:[userId],status:'Backlog',priority:'Medium',isProposal:true,createdAt:firebase.firestore.FieldValue.serverTimestamp()});}
     </script>
 </body>
 </html>
