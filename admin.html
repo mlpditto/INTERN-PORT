@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP INTERNSHIP V.260128 (V58 Stable)</title>
+    <title>MLP INTERNSHIP V.260128 (V59 Recalc)</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
@@ -16,7 +16,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     
     <style>
-        /* ... (CSS Base V50-57) ... */
+        /* ... (CSS Base V50-58 Same) ... */
         :root { --bg-body: #f4f6f9; --bg-card: #ffffff; --text-main: #333; --text-sub: #666; --col-bg: #f8f9fa; --border-color: #e0e0e0; --primary: #4361ee; --success: #2ec4b6; --warning: #ff9f1c; --danger: #ef233c; --dark: #2b2d42; }
         body.dark-mode { --bg-body: #1a1a1a; --bg-card: #2d2d2d; --text-main: #e0e0e0; --text-sub: #ccc; --col-bg: #333; --border-color: #444; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-body); color: var(--text-main); margin: 0; transition: 0.3s; }
@@ -92,6 +92,7 @@
         #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 3000; left: 50%; bottom: 30px; transform: translateX(-50%); }
         #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
         @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} } @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+        
         .history-controls { display: flex; justify-content: center; gap: 10px; margin-top: 15px; }
         .btn-del-hist { padding: 2px 6px; font-size: 0.7em; background: #ffebeb; color: #ef233c; border: 1px solid #ef233c; border-radius: 4px; cursor: pointer; margin-left: 10px; }
     </style>
@@ -110,7 +111,7 @@
         <div class="flex-between" style="margin-bottom:20px;">
             <div><h2 style="margin:0;"><i class="fa-solid fa-user-shield"></i> Dashboard</h2><span id="admin-email" style="font-size:0.8em; color:var(--text-sub);"></span></div>
             <div style="display:flex; gap:10px;">
-                <button class="magic-btn" onclick="openShareModal()"><i class="fa-solid fa-share-nodes"></i> Share LB</button>
+                <button class="magic-btn" onclick="openShareModal()"><i class="fa-solid fa-share-nodes"></i> Share</button>
                 <button class="btn-sm btn-dark" onclick="toggleTheme()"><i class="fa-solid fa-moon"></i></button>
                 <button class="magic-btn" style="background:var(--danger);" onclick="logout()">Logout</button>
             </div>
@@ -194,11 +195,19 @@
 
     <div id="taskModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="document.getElementById('taskModal').style.display='none'">&times;</span><h2 id="task-modal-title">New Task</h2><input type="hidden" id="edit-id"><div style="display:flex; gap:10px;"><input type="text" id="sq-title" placeholder="Topic" style="flex:2;"><select id="sq-priority" style="flex:1;"><option value="Low">Low</option><option value="Medium" selected>Medium</option><option value="High">High</option></select></div><textarea id="sq-desc" rows="3" placeholder="Description"></textarea><div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;"><input type="date" id="sq-due" style="flex:1;"><label style="flex:1; cursor:pointer; background:#fff0f5; padding:8px; border-radius:6px; border:1px solid #e83e8c; color:#e83e8c; font-weight:bold;"><input type="checkbox" id="sq-isProject" style="width:auto; margin:0;"> 💖 Mark as Project</label></div><p>Assign to:</p><div id="sq-user-list" style="display:flex; flex-wrap:wrap; gap:5px; max-height:100px; overflow-y:auto; border:1px solid #ddd; padding:5px;"></div><button class="magic-btn" style="width:100%; margin-top:15px;" onclick="saveSideQuest()">🚀 Save</button></div></div>
     <div id="chatModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="document.getElementById('chatModal').style.display='none'">&times;</span><h3 id="chat-title">💬 Project Chat</h3><input type="hidden" id="chat-card-id"><div id="chat-box" class="chat-box"></div><div style="display:flex; gap:5px;"><input type="text" id="chat-input" placeholder="Type @name..." style="margin:0;"><button class="btn-primary" onclick="sendChat()"><i class="fa-solid fa-paper-plane"></i></button></div></div></div>
-    <div id="historyModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="document.getElementById('historyModal').style.display='none'">&times;</span><h2 id="history-title"></h2><div id="history-summary"></div><ul id="history-list" style="list-style:none; padding:0;"></ul><div id="history-controls" class="history-controls"></div></div></div>
+    
+    <div id="historyModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="document.getElementById('historyModal').style.display='none'">&times;</span><h2 id="history-title"></h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h3 id="history-summary" style="margin:0;color:var(--primary);">Total: 0.00</h3>
+            <button class="btn-sm btn-warning" onclick="recalculateUserScore(currentHistoryUserId)"><i class="fa-solid fa-rotate"></i> Recalculate Score</button>
+        </div>
+        <ul id="history-list" style="list-style:none; padding:0;"></ul><div id="history-controls" class="history-controls"></div>
+    </div></div>
+    
     <div id="archiveModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="document.getElementById('archiveModal').style.display='none'">&times;</span><div style="display:flex;justify-content:space-between;align-items:center;"><h2 style="margin:0;">🗄️ ar·chive</h2><button class="btn-sm btn-danger" onclick="confirmClearArchive()">🧨 Clear All</button></div><div id="archive-list" style="margin-top:10px;"></div></div></div>
     <div id="delCardModal" class="modal" style="z-index:2200;"><div class="modal-content" style="max-width:350px;text-align:center;"><h2 style="color:#ef233c;">⚠️ Delete Card?</h2><p>กดปุ่มยืนยันภายในเวลาที่กำหนด</p><button id="btn-del-card-confirm" class="magic-btn" style="background:#ef233c;width:100%;">Confirm (5)</button></div></div>
     <div id="clearConfirmModal" class="modal" style="z-index:2100;"><div class="modal-content" style="max-width:350px;text-align:center;"><h2 style="color:#ef233c;">⚠️ Clear Archive?</h2><p>ล้างประวัติงานทั้งหมด?</p><button id="btn-confirm-clear" class="magic-btn" style="background:#ccc;width:100%;" disabled>Confirm (5)</button></div></div>
-    <div id="certModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="document.getElementById('certModal').style.display='none'">&times;</span><h2>🎓 Certificate</h2><input type="hidden" id="cert-uid"><input type="hidden" id="cert-uname"><div style="display:flex; gap:10px; margin-bottom:10px;"><div style="flex:1"><label>Start:</label><input type="date" id="cert-start" onchange="updateCertPreview()"></div><div style="flex:1"><label>End:</label><input type="date" id="cert-end" onchange="updateCertPreview()"></div></div><div id="cert-preview-container" style="text-align:center;border:1px solid #ddd;padding:10px;margin-bottom:10px;"><canvas id="cert-canvas" style="width:100%;max-width:500px;"></canvas></div><div style="display:flex; gap:10px; justify-content:flex-end;"><button class="btn-sm btn-primary" onclick="saveUserDates()">💾 Save</button><button class="btn-sm btn-warning" id="btn-gen-pdf" onclick="generateCertPDF()">🖨️ PDF</button></div></div></div>
+    <div id="certModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="document.getElementById('certModal').style.display='none'">&times;</span><h2>🎓 Certificate</h2><input type="hidden" id="cert-uid"><input type="hidden" id="cert-uname"><div style="display:flex; gap:10px; margin-bottom:10px;"><div style="flex:1"><label>Start:</label><input type="date" id="cert-start" onchange="updateCertPreview()"></div><div style="flex:1"><label>End:</label><input type="date" id="cert-end" onchange="updateCertPreview()"></div></div><div id="cert-preview-container" style="text-align:center;border:1px solid #ddd;padding:10px;margin-bottom:10px;"><canvas id="cert-canvas" style="width:100%;max-width:500px;"></canvas></div><div style="display:flex; gap:10px; justify-content:flex-end;"><button class="btn-sm btn-primary" onclick="saveUserDates()">💾 Save & Approve</button><button class="btn-sm btn-warning" id="btn-gen-pdf" onclick="generateCertPDF()">🖨️ PDF</button></div></div></div>
     <div id="shareModal" class="modal" style="z-index:3000;"><div class="modal-content" style="max-width:300px;text-align:center;"><h3><i class="fa-solid fa-share-nodes"></i> Share Leaderboard</h3><button class="magic-btn" style="width:100%;margin-bottom:10px;" onclick="copyLB(true)">📋 Copy (Show Names)</button><button class="magic-btn" style="width:100%;background:#6c757d;" onclick="copyLB(false)">🕵️ Copy (Anonymous)</button><button class="btn-sm btn-dark" style="margin-top:10px;" onclick="document.getElementById('shareModal').style.display='none'">Cancel</button></div></div>
 
     <div id="toast">Saved!</div>
@@ -215,7 +224,7 @@
         let historyCache = []; let historyPage = 1; const HISTORY_PER_PAGE = 10;
         let deleteCardId = null; let deleteTimer = null;
         let currentHistoryUserId = null;
-        let certUser = null; // Cache for current Cert User
+        let certUser = null;
 
         function toggleTheme() { document.body.classList.toggle('dark-mode'); }
         auth.onAuthStateChanged(user => { if(user && user.email===ALLOWED_EMAIL) { document.getElementById('login-screen').style.display='none'; document.getElementById('dashboard-container').style.display='block'; initSystem(); } });
@@ -235,7 +244,6 @@
             db.collection("quest_submissions").onSnapshot(s => { questsSubCache = {}; s.forEach(d => { questsSubCache[`${d.data().questId}_${d.data().userId}`] = d.data(); }); filterBoard(); });
         }
 
-        // --- Tables ---
         function renderTable(type) {
             const tbody = document.querySelector(`#${type}Table tbody`);
             let data = (type==='works')?worksData:usersData;
@@ -251,42 +259,22 @@
             });
         }
         function toggleWorkArchive() { hideCompletedWorks = !hideCompletedWorks; document.getElementById('btn-toggle-work-archive').classList.toggle('active'); renderTable('works'); }
-        
-        // 🔥 V58 Fix: Robust Score Adjust
-        async function adjDec(id){ 
-            const valInput = document.getElementById(`adj-${id}`);
-            let v = valInput.value;
-            if(!v) return alert("กรุณาระบุคะแนน");
-            // Fix comma issue
-            v = v.replace(',', '.'); 
-            const scoreVal = parseFloat(v);
-            if(isNaN(scoreVal)) return alert("ค่าคะแนนไม่ถูกต้อง");
-            const n = prompt("เหตุผล (Note):"); if(!n) return; 
-            try { 
-                await db.collection("users").doc(id).update({score: firebase.firestore.FieldValue.increment(scoreVal)}); 
-                await db.collection("checkin_logs").add({userId: id, type: 'manual_adjust', amount: scoreVal, note: n, timestamp: firebase.firestore.FieldValue.serverTimestamp()}); 
-                showToast("Saved!"); valInput.value = ""; valInput.blur();
-            } catch (e) { console.error(e); alert("Error saving score: " + e.message); } 
-        }
+        async function adjDec(id){ try { const valInput = document.getElementById(`adj-${id}`); let v = valInput.value; if(!v) return alert("กรุณาระบุคะแนน"); v = v.replace(',', '.'); const scoreVal = parseFloat(v); if(isNaN(scoreVal)) return alert("ค่าคะแนนไม่ถูกต้อง"); const n = prompt("เหตุผล (Note):"); if(!n) return; await db.collection("users").doc(id).update({score: firebase.firestore.FieldValue.increment(scoreVal)}); await db.collection("checkin_logs").add({userId: id, type: 'manual_adjust', amount: scoreVal, note: n, timestamp: firebase.firestore.FieldValue.serverTimestamp()}); showToast("Saved!"); valInput.value = ""; valInput.blur(); } catch (e) { alert("Error saving score: " + e.message); } }
 
-        // --- Certs V58 Fix ---
         function renderCertTable(){
             const t = document.querySelector("#certsTable tbody"); t.innerHTML = "";
             const sortedUsers = usersData.filter(u=>!u.isIgnored).sort((a,b) => (b.certRequested?1:0) - (a.certRequested?1:0));
             sortedUsers.forEach(u => {
                 let dateStr = (u.startDate && u.endDate) ? `${u.startDate} - ${u.endDate}` : '<span style="color:#ccc">Waiting Dates</span>';
                 let status = u.certRequested ? '<span class="badge" style="background:#ffc107;color:black;">🔔 Requesting</span>' : '-';
-                // 🔥 Use ID lookup instead of passing strings to avoid errors
-                let btn = `<button class="btn-sm btn-warning" onclick="openCertModal('${u.id}')">Preview / Edit</button>`;
+                let btn = `<button class="btn-sm btn-warning" onclick="editCert('${u.id}', '${u.displayName.replace(/'/g,"")}', '${u.startDate||''}', '${u.endDate||''}')">Preview / Edit</button>`;
                 t.innerHTML += `<tr><td><img src="${u.pictureUrl}" class="user-pic"> ${u.displayName}</td><td>${dateStr}</td><td>${status}</td><td>${btn}</td></tr>`;
             });
         }
-        function openCertModal(uid) {
-            const u = usersData.find(x => x.id === uid);
-            if(!u) return;
-            certUser = { uid: u.id, name: u.displayName };
-            document.getElementById('cert-start').value = u.startDate || "";
-            document.getElementById('cert-end').value = u.endDate || "";
+        function editCert(uid, name, s, e) {
+            certUser = { uid, name };
+            document.getElementById('cert-start').value = s;
+            document.getElementById('cert-end').value = e;
             updateCertPreview();
             document.getElementById('certModal').style.display = "block";
         }
@@ -299,10 +287,9 @@
             document.getElementById('certModal').style.display = "none";
         }
 
-        // --- Kanban V58 Fix ---
+        // --- Kanban Timers V57 ---
         function initKanban() { ['Backlog','Doing','Review','Done'].forEach(id => { new Sortable(document.getElementById(id), { group:'kanban', animation:150, onEnd: e => { const ns=e.to.id; const up={status:ns}; if(ns==='Done')up.doneAt=firebase.firestore.FieldValue.serverTimestamp(); db.collection("side_quests").doc(e.item.dataset.id).update(up); }}); }); }
         function renderKanban(snap) { const cols={"Backlog":document.getElementById("Backlog"),"Doing":document.getElementById("Doing"),"Review":document.getElementById("Review"),"Done":document.getElementById("Done")}; Object.values(cols).forEach(e=>e.innerHTML=""); const cnt={"Backlog":0,"Doing":0,"Review":0,"Done":0}; const filter=document.getElementById('board-search').value.toLowerCase(); snap.forEach(doc => { const q=doc.data(); sideQuestsCache[doc.id]=q; if(q.status==='Archived')return; let match = q.title.toLowerCase().includes(filter); if(q.assignees) q.assignees.forEach(u=>{if(u.name.toLowerCase().includes(filter)) match=true;}); if(!match) return; if(cols[q.status]) { cnt[q.status]++; const isProj = q.isProject === true; const d=document.createElement('div'); d.className=`kanban-card card-${q.status} ${q.isScored?'scored':''} ${isProj?'project':''}`; d.dataset.id=doc.id; let imgs='<div class="assignee-stack">'; if(q.assignees)q.assignees.forEach(u=>imgs+=`<img src="${u.pic}" class="assignee-img" title="${u.name}">`); imgs+='</div>'; let timersHtml = ""; if(q.refQuestId && q.assigneeIds && q.assigneeIds.length > 0) { const globalQ = questsCache.find(x => x.id === q.refQuestId); const subKey = `${q.refQuestId}_${q.assigneeIds[0]}`; const sub = questsSubCache[subKey]; if(globalQ && globalQ.deadline && q.status !== 'Done') { timersHtml += `<span class="timer-global" data-dead="${globalQ.deadline.toDate().getTime()}">⏳ Exp: ...</span>`; } if(sub) { if(sub.status === 'received' && sub.deadline && q.status === 'Doing') { timersHtml += `<span class="timer-active" data-dead="${sub.deadline.toDate().getTime()}">⏱️ ...</span>`; } else if (sub.status === 'unsuccessful' && sub.cooldownUntil && q.status === 'Backlog') { timersHtml += `<span class="timer-cooldown" data-dead="${sub.cooldownUntil.toDate().getTime()}">❄️ Cool: ...</span>`; } } } let act=""; if(q.status==='Done'&&q.doneAt) act=`<button class="btn-sm btn-dark" style="width:100%;margin-top:5px;" onclick="archiveSQ('${doc.id}')">📥 ar·chive</button>`; else if(!q.isScored && q.status!=='Backlog' && q.status!=='Done') act=`<button class="btn-sm btn-success" style="width:100%;margin-top:5px;" onclick="giveScore('${doc.id}')">💰 ให้คะแนน</button>`; let chatBtn = ""; if(isProj) chatBtn = `<button class="btn-sm" style="color:var(--primary); font-size:1.1em;" onclick="openChat('${doc.id}', '${q.title}')"><i class="fa-solid fa-comments"></i></button>`; let arrows = `<div class="arrow-controls">`; if(q.status!=='Backlog') arrows+=`<button class="btn-arrow" onclick="moveCard('${doc.id}','prev')"><i class="fa-solid fa-chevron-left"></i></button>`; if(q.status!=='Done') arrows+=`<button class="btn-arrow" onclick="moveCard('${doc.id}','next')"><i class="fa-solid fa-chevron-right"></i></button>`; arrows += `</div>`; let pColor = '#17a2b8'; if(q.priority==='Medium') pColor='#ff9f1c'; if(q.priority==='High') pColor='#ef233c'; d.innerHTML=`<div class="card-header-row"><span class="badge" style="background:${pColor}">${q.priority}</span><div class="card-header-right">${imgs} ${arrows}</div></div><div style="font-weight:bold;">${isProj?'<span class="badge" style="background:#e83e8c;font-size:0.6em;">PROJ</span>':''} ${q.title}</div><div class="card-timers">${timersHtml}</div><p style="font-size:0.85em; color:#666; margin-bottom:5px;">${q.description||'-'}</p><div class="card-tool-row"><div><button class="btn-sm btn-warning" onclick="openTaskModal('${doc.id}')"><i class="fa-solid fa-pen"></i></button><button class="btn-sm btn-danger" onclick="startDeleteCard('${doc.id}')"><i class="fa-solid fa-trash"></i></button></div>${chatBtn}</div>${act}`; cols[q.status].appendChild(d); } }); Object.keys(cnt).forEach(k=>document.getElementById(`cnt-${k}`).innerText=cnt[k]); }
-        
         function updateRealtimeTimers() { 
             const now = Date.now(); 
             // 🔥 V58: Auto Move Time Up -> Review
@@ -310,11 +297,8 @@
                 const d = parseInt(el.dataset.dead); const diff = d - now; 
                 if(diff <= 0) {
                     el.innerText = "⏱️ Time Up!";
-                    // Auto Move Logic
                     const card = el.closest('.kanban-card');
-                    // Check if in 'Doing' column
                     if(card && card.parentElement.id === 'Doing') {
-                        // Trigger update (Debounce is handled by Firestore not updating if same value)
                         db.collection("side_quests").doc(card.dataset.id).update({status: 'Review'});
                     }
                 } else { const m = Math.floor(diff/60000); const s = Math.floor((diff%60000)/1000); el.innerText = `⏱️ ${m}m ${s}s`; } 
@@ -330,20 +314,14 @@
         async function executeDeleteCard() { 
             if(!deleteCardId)return; clearInterval(deleteTimer); document.getElementById('delCardModal').style.display='none'; 
             const deduct=confirm("หักคะแนนผู้รับผิดชอบ?\nOK=หัก, Cancel=ไม่หัก"); 
-            
-            // 1. Delete Card First (Priority)
             try {
                 const q = sideQuestsCache[deleteCardId]; // Get data before delete
                 await db.collection("side_quests").doc(deleteCardId).delete();
                 showToast("Deleted!"); // Success UI immediately
 
-                // 2. Then try to deduct points (Secondary)
                 if(deduct && q && q.assigneeIds){
                     const s=prompt("Points to deduct (e.g., 0.5):"); 
                     if(s){
-                        const batch = db.batch();
-                        // Add ops to batch, ignore errors if user missing here? No, batch fails if one fails.
-                        // Better: Loop and update individually to avoid one deleted user blocking others.
                         q.assigneeIds.forEach(uid => {
                             db.collection("users").doc(uid).update({score:firebase.firestore.FieldValue.increment(-parseFloat(s))})
                             .then(() => {
@@ -356,7 +334,49 @@
             } catch(e) { alert("Delete failed: " + e.message); }
         }
 
-        // Standard Functions
+        // 🔥 V59 Recalculate Score
+        async function recalculateUserScore(uid) {
+            if(!confirm("Are you sure you want to recalculate this user's score from all history logs? This cannot be undone.")) return;
+            showToast("Recalculating...");
+            try {
+                let totalScore = 0;
+                
+                // 1. Works (score > 0)
+                const wSnap = await db.collection("works").where("userId", "==", uid).get();
+                wSnap.forEach(d => { totalScore += (d.data().score || 0); });
+
+                // 2. Quest Submissions (earnedScore + bonusGiven)
+                const qSnap = await db.collection("quest_submissions").where("userId", "==", uid).get();
+                qSnap.forEach(d => { 
+                    const data = d.data();
+                    // Base receive +0.1 logic is not stored in doc, usually separate log?
+                    // Wait, V58 logic: receiveQuest increments +0.1 directly to user score but doesn't add log?
+                    // Ah, 'showHistory' adds fake log based on receivedAt. 
+                    // To be safe, we should count received quests.
+                    if(data.status !== 'none' && data.receivedAt) totalScore += 0.1;
+                    
+                    totalScore += (data.earnedScore || 0);
+                    totalScore += (data.bonusGiven || 0);
+                });
+
+                // 3. Check-in Logs (Adjustments, Streaks)
+                const lSnap = await db.collection("checkin_logs").where("userId", "==", uid).get();
+                lSnap.forEach(d => { totalScore += (d.data().amount || 0); });
+
+                // Update User
+                await db.collection("users").doc(uid).update({ score: totalScore });
+                
+                showToast(`Updated! New Score: ${totalScore.toFixed(2)}`);
+                // Refresh History View
+                const user = usersData.find(u => u.id === uid);
+                showHistory(uid, user ? user.displayName : 'User', totalScore);
+
+            } catch (e) {
+                console.error(e);
+                alert("Recalculation Failed: " + e.message);
+            }
+        }
+
         function openTaskModal(id=null){document.getElementById('taskModal').style.display='block';if(id){const q=sideQuestsCache[id];document.getElementById('edit-id').value=id;document.getElementById('sq-title').value=q.title;document.getElementById('sq-desc').value=q.description;document.getElementById('sq-priority').value=q.priority;document.getElementById('sq-due').value=q.dueDate||"";document.getElementById('sq-isProject').checked=q.isProject||false;}else{document.getElementById('edit-id').value="";document.getElementById('sq-title').value="";document.getElementById('sq-desc').value="";}}
         async function saveSideQuest(){const id=document.getElementById('edit-id').value;const t=document.getElementById('sq-title').value;if(!t)return alert("Title?");const d={title:t,description:document.getElementById('sq-desc').value,priority:document.getElementById('sq-priority').value,dueDate:document.getElementById('sq-due').value,isProject:document.getElementById('sq-isProject').checked,assigneeIds:[...document.querySelectorAll('.sq-user-check:checked')].map(c=>c.value),assignees:[...document.querySelectorAll('.sq-user-check:checked')].map(c=>({uid:c.value,name:c.dataset.name,pic:c.dataset.pic}))};if(id){await db.collection("side_quests").doc(id).update(d);showToast("Updated");}else{d.status="Backlog";d.createdAt=firebase.firestore.FieldValue.serverTimestamp();await db.collection("side_quests").add(d);showToast("Created");}document.getElementById('taskModal').style.display='none';}
         let chatUnsub;function openChat(id,title){document.getElementById('chatModal').style.display='block';document.getElementById('chat-title').innerText=`💬 ${title}`;document.getElementById('chat-card-id').value=id;const box=document.getElementById('chat-box');box.innerHTML="Loading...";if(chatUnsub)chatUnsub();chatUnsub=db.collection("side_quests").doc(id).collection("comments").orderBy("timestamp","asc").onSnapshot(snap=>{box.innerHTML="";snap.forEach(d=>{const m=d.data();const cls=m.sender==='Admin'?'msg-admin':'msg-user';let pic=m.pic?`<img src="${m.pic}" class="chat-avatar">`:'<div class="chat-avatar" style="background:#ccc;">?</div>';if(m.sender==='Admin')pic='<div class="chat-avatar" style="background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;">A</div>';let msg=m.msg.replace(/@([^\s]+)/g,(match,name)=>{const q=sideQuestsCache[id];const inP=q.assignees&&q.assignees.some(u=>u.name.toLowerCase().includes(name.toLowerCase()));return inP?`<span class="tag-in">${match}</span>`:`<span class="tag-out">${match}</span>`;});box.innerHTML+=`<div class="chat-msg ${cls}">${pic}<div><b>${m.sender}</b>: ${msg}</div></div>`;});box.scrollTop=box.scrollHeight;});}
