@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP INTERNSHIP V.260128 (V48 Restored)</title>
+    <title>MLP INTERNSHIP V.260128 (V49)</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
@@ -23,7 +23,7 @@
         #dashboard-container { display: none; max-width: 1400px; margin: 0 auto; padding: 20px; }
         .flex-between { display: flex; justify-content: space-between; align-items: center; }
         
-        /* Modal & Blur */
+        /* Modal */
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
         .modal-content { background-color: var(--bg-card); margin: 5% auto; padding: 25px; border-radius: 12px; width: 95%; max-width: 600px; max-height: 90vh; overflow-y: auto; position: relative; color: var(--text-main); box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
         .close-modal { float: right; font-size: 24px; cursor: pointer; }
@@ -51,9 +51,12 @@
         .arrow-controls { position: absolute; top: 10px; right: 10px; display: flex; gap: 2px; }
         .btn-arrow { background: var(--col-bg); border: 1px solid var(--border-color); color: var(--text-sub); border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 0.8em; }
         
+        /* 🔥 Fix Assignee Image Size */
+        .assignee-stack { display: flex; margin-top: 10px; padding-left: 10px; }
+        .assignee-img { width: 28px !important; height: 28px !important; flex-shrink: 0; border-radius: 50%; object-fit: cover; border: 2px solid var(--bg-card); margin-left: -10px; }
+        
         /* Utils */
         .user-pic { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
-        .lb-pic-lg { width: 45px !important; height: 45px !important; border-radius: 50%; object-fit: cover; }
         .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75em; font-weight: bold; color: white; display: inline-block; }
         .u-ignored { opacity: 0.5; filter: grayscale(1); }
         
@@ -78,7 +81,11 @@
         .lb-row { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid var(--border-color); }
         .lb-rank { width: 50px; text-align: center; font-weight: 900; }
         .lb-profile { flex: 2; display: flex; align-items: center; gap: 15px; }
+        .lb-pic-lg { width: 45px !important; height: 45px !important; border-radius: 50%; object-fit: cover; }
         .lb-score { width: 100px; text-align: right; font-weight: 800; color: var(--primary); }
+
+        /* 🔥 History Pagination */
+        .history-controls { display: flex; justify-content: center; gap: 10px; margin-top: 15px; }
     </style>
 </head>
 <body>
@@ -103,7 +110,8 @@
         <div class="tab-nav">
             <button class="tab-btn active" onclick="switchTab('tab-works')">📄 ตรวจงาน</button>
             <button class="tab-btn" onclick="switchTab('tab-sidequest')">🗺️ Kanban</button>
-            <button class="tab-btn" onclick="switchTab('tab-manage-quest')">⚙️ Daily Quest</button> <button class="tab-btn" onclick="switchTab('tab-users')">👥 Users</button>
+            <button class="tab-btn" onclick="switchTab('tab-manage-quest')">⚙️ Daily Quest</button>
+            <button class="tab-btn" onclick="switchTab('tab-users')">👥 Users</button>
             <button class="tab-btn" onclick="switchTab('tab-leaderboard')">🏆 Leaderboard</button>
         </div>
 
@@ -165,6 +173,9 @@
         </div>
 
         <div id="tab-leaderboard" class="tab-content">
+            <div style="text-align:right; margin-bottom:10px;">
+                <button class="magic-btn" onclick="shareLeaderboard()"><i class="fa-solid fa-share-from-square"></i> Share</button>
+            </div>
             <div id="leaderboardList" class="lb-container" style="max-width:900px; margin:0 auto;"></div>
         </div>
     </div>
@@ -173,7 +184,7 @@
     
     <div id="chatModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="document.getElementById('chatModal').style.display='none'">&times;</span><h3 id="chat-title">💬 Project Chat</h3><input type="hidden" id="chat-card-id"><div id="chat-box" class="chat-box"></div><div style="display:flex; gap:5px;"><input type="text" id="chat-input" placeholder="Type..." style="margin:0;"><button class="btn-primary" onclick="sendChat()"><i class="fa-solid fa-paper-plane"></i></button></div></div></div>
     
-    <div id="historyModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="document.getElementById('historyModal').style.display='none'">&times;</span><h2 id="history-title"></h2><div id="history-summary"></div><ul id="history-list" style="list-style:none; padding:0;"></ul></div></div>
+    <div id="historyModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="document.getElementById('historyModal').style.display='none'">&times;</span><h2 id="history-title"></h2><div id="history-summary"></div><ul id="history-list" style="list-style:none; padding:0;"></ul><div id="history-controls" class="history-controls"></div></div></div>
     
     <div id="archiveModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="document.getElementById('archiveModal').style.display='none'">&times;</span><div style="display:flex;justify-content:space-between;align-items:center;"><h2 style="margin:0;">🗄️ ar·chive</h2><button class="btn-sm btn-danger" onclick="confirmClearArchive()">🧨 Clear All</button></div><div id="archive-list" style="margin-top:10px;"></div></div></div>
     
@@ -189,6 +200,11 @@
         const auth = firebase.auth();
         
         let usersData=[], worksData=[], sideQuestsCache={};
+        
+        // --- History Pagination State ---
+        let historyCache = [];
+        let historyPage = 1;
+        const HISTORY_PER_PAGE = 10;
 
         function toggleTheme() { document.body.classList.toggle('dark-mode'); }
         auth.onAuthStateChanged(user => { if(user && user.email===ALLOWED_EMAIL) { document.getElementById('login-screen').style.display='none'; document.getElementById('dashboard-container').style.display='block'; initSystem(); } });
@@ -207,36 +223,15 @@
             loadActiveQuests(); loadQuestHistory();
         }
 
-        // --- Render Tables (Fixed Users & Works) ---
         function renderTable(type) {
             const tbody = document.querySelector(`#${type}Table tbody`);
             let data = (type==='works')?worksData:usersData;
-            
-            if(type==='works' && document.getElementById('hideCompleted').checked) {
-                data = data.filter(d => d.status !== 'ตรวจแล้ว');
-            }
-            if(type==='users') {
-                const t=document.getElementById('userSearch').value.toLowerCase();
-                if(t) data = data.filter(u=>u.displayName.toLowerCase().includes(t));
-            }
-
+            if(type==='works' && document.getElementById('hideCompleted').checked) data = data.filter(d => d.status !== 'ตรวจแล้ว');
+            if(type==='users') { const t=document.getElementById('userSearch').value.toLowerCase(); if(t) data = data.filter(u=>u.displayName.toLowerCase().includes(t)); }
             tbody.innerHTML="";
             data.slice(0,50).forEach(d=>{ 
-                if(type==='works'){ 
-                    const st = d.status==='ตรวจแล้ว'?'#2ec4b6':d.status==='แก้ไข'?'#ef233c':'#ff9f1c';
-                    tbody.innerHTML += `<tr><td>${d.timestamp?.toDate().toLocaleString()||'-'}</td><td><img src="${d.pictureUrl}" class="user-pic">${d.displayName}</td><td>${d.title}</td><td><a href="${d.link}" target="_blank" class="btn-sm btn-dark">Link</a></td><td><span class="badge" style="background:${st}">${d.status}</span></td><td><div style="display:flex;"><input type="number" id="sc-${d.id}" value="${d.score||0}" style="width:60px;"><button class="btn-sm btn-primary" onclick="svSc('${d.id}','${d.userId}')">Save</button></div></td><td><button class="btn-sm btn-danger" onclick="delWork('${d.id}')">Del</button></td></tr>`; 
-                } else { 
-                    // 🔥 Fixed Users Row (Restore Hide/History)
-                    const ignored = d.isIgnored;
-                    tbody.innerHTML += `<tr class="${ignored?'u-ignored':''}">
-                        <td><img src="${d.pictureUrl}" class="user-pic"> ${d.displayName}</td>
-                        <td><button class="btn-sm" onclick="toggleIgnoreUser('${d.id}',${ignored})">${ignored?'🚫':'👁️'}</button></td>
-                        <td>${parseFloat((d.score||0).toFixed(2))}</td>
-                        <td><div style="display:flex;"><input type="number" id="adj-${d.id}" placeholder="0.0" style="width:60px;"><button class="btn-sm btn-success" onclick="adjDec('${d.id}')">Adj</button></div></td>
-                        <td><button class="btn-sm btn-dark" onclick="showHistory('${d.id}','${d.displayName}',${d.score||0})">📜</button></td>
-                        <td><button class="btn-sm btn-danger" onclick="delUser('${d.id}')">Del</button></td>
-                    </tr>`; 
-                }
+                if(type==='works'){ const st = d.status==='ตรวจแล้ว'?'#2ec4b6':d.status==='แก้ไข'?'#ef233c':'#ff9f1c'; tbody.innerHTML += `<tr><td>${d.timestamp?.toDate().toLocaleString()||'-'}</td><td><img src="${d.pictureUrl}" class="user-pic">${d.displayName}</td><td>${d.title}</td><td><a href="${d.link}" target="_blank" class="btn-sm btn-dark">Link</a></td><td><span class="badge" style="background:${st}">${d.status}</span></td><td><div style="display:flex;"><input type="number" id="sc-${d.id}" value="${d.score||0}" style="width:60px;"><button class="btn-sm btn-primary" onclick="svSc('${d.id}','${d.userId}')">Save</button></div></td><td><button class="btn-sm btn-danger" onclick="delWork('${d.id}')">Del</button></td></tr>`; }
+                else { const ignored = d.isIgnored; tbody.innerHTML += `<tr class="${ignored?'u-ignored':''}"><td><img src="${d.pictureUrl}" class="user-pic"> ${d.displayName}</td><td><button class="btn-sm" onclick="toggleIgnoreUser('${d.id}',${ignored})">${ignored?'🚫':'👁️'}</button></td><td>${parseFloat((d.score||0).toFixed(2))}</td><td><div style="display:flex;"><input type="number" id="adj-${d.id}" placeholder="0.0" style="width:60px;"><button class="btn-sm btn-success" onclick="adjDec('${d.id}')">Adj</button></div></td><td><button class="btn-sm btn-dark" onclick="showHistory('${d.id}','${d.displayName}',${d.score||0})">📜</button></td><td><button class="btn-sm btn-danger" onclick="delUser('${d.id}')">Del</button></td></tr>`; }
             });
         }
         function toggleFilter() { renderTable('works'); }
@@ -246,65 +241,96 @@
         function renderKanban(snap) {
             const cols={"Backlog":document.getElementById("Backlog"),"Doing":document.getElementById("Doing"),"Review":document.getElementById("Review"),"Done":document.getElementById("Done")}; Object.values(cols).forEach(e=>e.innerHTML=""); const cnt={"Backlog":0,"Doing":0,"Review":0,"Done":0}; const filter=document.getElementById('board-search').value.toLowerCase();
             snap.forEach(doc => { const q=doc.data(); sideQuestsCache[doc.id]=q; if(q.status==='Archived')return; let match = q.title.toLowerCase().includes(filter); if(q.assignees) q.assignees.forEach(u=>{if(u.name.toLowerCase().includes(filter)) match=true;}); if(!match) return;
-                if(cols[q.status]) {
-                    cnt[q.status]++; const isProj = q.isProject === true;
-                    const d=document.createElement('div'); d.className=`kanban-card card-${q.status} ${q.isScored?'scored':''} ${isProj?'project':''}`; d.dataset.id=doc.id;
-                    let imgs='<div class="assignee-stack">'; if(q.assignees)q.assignees.forEach(u=>imgs+=`<img src="${u.pic}" class="assignee-img" title="${u.name}">`); imgs+='</div>';
-                    
-                    let act=""; 
-                    if(q.status==='Done'&&q.doneAt) act=`<button class="btn-sm btn-dark" style="width:100%" onclick="archiveSQ('${doc.id}')">📥 ar·chive</button>`;
-                    else if(!q.isScored && q.status!=='Backlog' && q.status!=='Done') act=`<button class="btn-sm btn-success" style="width:100%" onclick="giveScore('${doc.id}')">💰 ให้คะแนน</button>`;
-                    
-                    let chatBtn = ""; if(isProj) chatBtn = `<button class="btn-sm" style="background:#e83e8c; color:white; margin-left:5px;" onclick="openChat('${doc.id}', '${q.title}')">💬 Chat</button>`;
-                    
-                    let arrows = `<div class="arrow-controls">`;
-                    if(q.status!=='Backlog') arrows+=`<button class="btn-arrow" onclick="moveCard('${doc.id}','prev')"><i class="fa-solid fa-chevron-left"></i></button>`;
-                    if(q.status!=='Done') arrows+=`<button class="btn-arrow" onclick="moveCard('${doc.id}','next')"><i class="fa-solid fa-chevron-right"></i></button>`;
-                    arrows += `</div>`;
-
-                    d.innerHTML=`${arrows}<div><span class="badge" style="background:${q.priority==='High'?'#ef233c':'#2ec4b6'}">${q.priority}</span> ${isProj?'<span class="badge" style="background:#e83e8c">Proj</span>':''}</div><div style="font-weight:bold; margin-top:5px;">${q.title}</div><p style="font-size:0.9em; color:#666;">${q.description||'-'}</p><div style="display:flex; justify-content:space-between; margin-top:5px;"><button class="btn-sm btn-warning" onclick="openTaskModal('${doc.id}')"><i class="fa-solid fa-pen"></i></button>${chatBtn}<button class="btn-sm btn-danger" onclick="delSQ('${doc.id}')"><i class="fa-solid fa-trash"></i></button></div>${imgs} <div style="margin-top:5px;">${act}</div>`; cols[q.status].appendChild(d);
-                }
+                if(cols[q.status]) { cnt[q.status]++; const isProj = q.isProject === true; const d=document.createElement('div'); d.className=`kanban-card card-${q.status} ${q.isScored?'scored':''} ${isProj?'project':''}`; d.dataset.id=doc.id; let imgs='<div class="assignee-stack">'; if(q.assignees)q.assignees.forEach(u=>imgs+=`<img src="${u.pic}" class="assignee-img" title="${u.name}">`); imgs+='</div>'; let act=""; if(q.status==='Done'&&q.doneAt) act=`<button class="btn-sm btn-dark" style="width:100%" onclick="archiveSQ('${doc.id}')">📥 ar·chive</button>`; else if(!q.isScored && q.status!=='Backlog' && q.status!=='Done') act=`<button class="btn-sm btn-success" style="width:100%" onclick="giveScore('${doc.id}')">💰 ให้คะแนน</button>`; let chatBtn = ""; if(isProj) chatBtn = `<button class="btn-sm" style="background:#e83e8c; color:white; margin-left:5px;" onclick="openChat('${doc.id}', '${q.title}')">💬 Chat</button>`; let arrows = `<div class="arrow-controls">`; if(q.status!=='Backlog') arrows+=`<button class="btn-arrow" onclick="moveCard('${doc.id}','prev')"><i class="fa-solid fa-chevron-left"></i></button>`; if(q.status!=='Done') arrows+=`<button class="btn-arrow" onclick="moveCard('${doc.id}','next')"><i class="fa-solid fa-chevron-right"></i></button>`; arrows += `</div>`; d.innerHTML=`${arrows}<div><span class="badge" style="background:${q.priority==='High'?'#ef233c':'#2ec4b6'}">${q.priority}</span> ${isProj?'<span class="badge" style="background:#e83e8c">Proj</span>':''}</div><div style="font-weight:bold; margin-top:5px;">${q.title}</div><p style="font-size:0.9em; color:#666;">${q.description||'-'}</p><div style="display:flex; justify-content:space-between; margin-top:5px;"><button class="btn-sm btn-warning" onclick="openTaskModal('${doc.id}')"><i class="fa-solid fa-pen"></i></button>${chatBtn}<button class="btn-sm btn-danger" onclick="delSQ('${doc.id}')"><i class="fa-solid fa-trash"></i></button></div>${imgs} <div style="margin-top:5px;">${act}</div>`; cols[q.status].appendChild(d); }
             });
             Object.keys(cnt).forEach(k=>document.getElementById(`cnt-${k}`).innerText=cnt[k]);
         }
 
-        // --- Quest System (Restored) ---
-        async function createQuest(){
-            const q={question:document.getElementById('q-text').value,imageUrl:document.getElementById('q-img').value,questLink:document.getElementById('q-link').value,baseScore:parseFloat(document.getElementById('q-score').value),durationMinutes:parseInt(document.getElementById('q-duration').value),deadline:new Date(Date.now()+parseFloat(document.getElementById('q-hours').value)*3600000),createdAt:firebase.firestore.FieldValue.serverTimestamp()};
-            if(q.question)await db.collection("quests").add(q);showToast("Posted");
-        }
-        function loadActiveQuests(){
-            db.collection("quests").orderBy("createdAt","desc").limit(10).onSnapshot(s=>{
-                const t=document.querySelector("#activeQuestTable tbody"); t.innerHTML="";
-                let hasActive=false;
-                s.forEach(d=>{ const q=d.data(); if(q.deadline?.toDate()>new Date()) { hasActive=true; t.innerHTML+=`<tr><td>${q.question}</td><td><span class="quest-deadline" data-deadline="${q.deadline.toDate().getTime()}">Loading...</span></td><td>${q.durationMinutes||30} min</td><td><button class="btn-sm btn-warning" onclick="editQ('${d.id}','${q.question.replace(/'/g,"")}')">✏️</button> <button class="btn-sm btn-danger" onclick="stopQ('${d.id}')">✕</button></td></tr>`; }});
-                document.getElementById("active-quest-section").style.display = hasActive ? "block" : "none";
-            });
-        }
-        function loadQuestHistory() { db.collection("quests").orderBy("createdAt","desc").limit(20).onSnapshot(s=>{ const t=document.querySelector("#questHistoryTable tbody"); t.innerHTML=""; s.forEach(d=>{ const q=d.data(); if(q.deadline && q.deadline.toDate()>new Date()) return; t.innerHTML+=`<tr><td>${q.question}</td><td>${q.baseScore}</td><td><div style="display:flex; gap:5px;"><button class="btn-sm btn-success" onclick="recallQuest('${d.id}')">♻️ Recall</button><button class="btn-sm btn-danger" onclick="delQ('${d.id}')">✕</button></div></td></tr>`; }) }); }
+        // --- Quest System ---
+        async function createQuest(){ const q={question:document.getElementById('q-text').value,imageUrl:document.getElementById('q-img').value,questLink:document.getElementById('q-link').value,baseScore:parseFloat(document.getElementById('q-score').value),durationMinutes:parseInt(document.getElementById('q-duration').value),deadline:new Date(Date.now()+parseFloat(document.getElementById('q-hours').value)*3600000),createdAt:firebase.firestore.FieldValue.serverTimestamp()}; if(q.question)await db.collection("quests").add(q);showToast("Posted"); }
+        function loadActiveQuests(){ db.collection("quests").orderBy("createdAt","desc").limit(10).onSnapshot(s=>{ const t=document.querySelector("#activeQuestTable tbody"); t.innerHTML=""; let hasActive=false; s.forEach(d=>{ const q=d.data(); if(q.deadline?.toDate()>new Date()) { hasActive=true; t.innerHTML+=`<tr><td>${q.question}</td><td><span class="quest-deadline" data-deadline="${q.deadline.toDate().getTime()}">Loading...</span></td><td>${q.durationMinutes||30} min</td><td><button class="btn-sm btn-warning" onclick="editQ('${d.id}','${q.question.replace(/'/g,"")}')">✏️</button> <button class="btn-delete-icon" onclick="stopQ('${d.id}')">✕</button></td></tr>`; }}); document.getElementById("active-quest-section").style.display = hasActive ? "block" : "none"; }); }
+        function loadQuestHistory() { db.collection("quests").orderBy("createdAt","desc").limit(20).onSnapshot(s=>{ const t=document.querySelector("#questHistoryTable tbody"); t.innerHTML=""; s.forEach(d=>{ const q=d.data(); if(q.deadline && q.deadline.toDate()>new Date()) return; t.innerHTML+=`<tr><td>${q.question}</td><td>${q.baseScore}</td><td><div style="display:flex; gap:5px;"><button class="btn-sm btn-success" onclick="recallQuest('${d.id}')">♻️ Recall</button><button class="btn-delete-icon" onclick="delQ('${d.id}')">✕</button></div></td></tr>`; }) }); }
         function updateQuestTimers() { document.querySelectorAll('.quest-deadline').forEach(el=>{const d=parseInt(el.dataset.deadline); const now=Date.now(); if(d-now<=0)el.innerText="Expired"; else { const h=Math.floor((d-now)/3600000); const m=Math.floor(((d-now)%3600000)/60000); el.innerText=`${h}h ${m}m left`; }}); }
         function recallQuest(id) { db.collection("quests").doc(id).get().then(doc => { const d = doc.data(); document.getElementById('q-text').value = d.question; document.getElementById('q-img').value = d.imageUrl || ""; document.getElementById('q-link').value = d.questLink || ""; document.getElementById('q-score').value = d.baseScore; document.getElementById('q-duration').value = d.durationMinutes || 30; showToast("Recalled!"); }); }
         async function editQ(id,q){const nq=prompt("Edit Q:",q);if(nq)await db.collection("quests").doc(id).update({question:nq});}
         async function stopQ(id){if(confirm("Stop?")) await db.collection("quests").doc(id).update({deadline: new Date()});}
         async function delQ(id){if(confirm("Del?"))await db.collection("quests").doc(id).delete();}
 
-        // --- Functions ---
-        async function showHistory(uid,name,total){const m=document.getElementById("historyModal");const l=document.getElementById("history-list");document.getElementById("history-title").innerText=`📜 ${name}`;l.innerHTML="<p>Loading...</p>";m.style.display="block";try{let all=[];(await db.collection("works").where("userId","==",uid).get()).forEach(d=>{const w=d.data();if(w.score>0)all.push({t:w.timestamp?.toDate(),type:'work',text:`📁 ${w.title}`,score:w.score})});(await db.collection("quest_submissions").where("userId","==",uid).get()).forEach(d=>{const q=d.data();const s=(q.earnedScore||0)+(q.bonusGiven||0);if(q.status!=='none')all.push({t:q.receivedAt?.toDate(),type:'bonus',text:`🚀 รับภารกิจ`,score:0.1});if(s>0)all.push({t:q.submittedAt?.toDate(),type:'quest',text:`⚡ Daily: ${q.answer}`,score:s})});(await db.collection("checkin_logs").where("userId","==",uid).get()).forEach(d=>{const g=d.data();if(g.type==='streak')all.push({t:g.timestamp?.toDate(),type:'bonus',text:`🔥 Streak (${g.count})`,score:g.amount});if(g.type==='manual_adjust')all.push({t:g.timestamp?.toDate(),type:'manual',text:`🛠️ ${g.note}`,score:g.amount})});all.sort((a,b)=>(b.t||0)-(a.t||0));let html="";all.forEach(e=>{const dStr=e.t?e.t.toLocaleString('th-TH'):'-';html+=`<li style="padding:5px;border-bottom:1px solid #eee;"><span>${e.text}</span> <span style="float:right;font-weight:bold;">${e.score}</span><br><small>${dStr}</small></li>`;});document.getElementById("history-summary").innerHTML=`Total: ${total.toFixed(2)}`;l.innerHTML=html;}catch(e){l.innerHTML="Error";}}
-        
-        // Chat, Task Modal, etc. (Same as V47)
-        function openTaskModal(id=null) { document.getElementById('taskModal').style.display='block'; if(id){const q=sideQuestsCache[id];document.getElementById('edit-id').value=id;document.getElementById('sq-title').value=q.title;document.getElementById('sq-desc').value=q.description;document.getElementById('sq-priority').value=q.priority;document.getElementById('sq-due').value=q.dueDate||"";document.getElementById('sq-isProject').checked=q.isProject||false;}else{document.getElementById('edit-id').value="";document.getElementById('sq-title').value="";document.getElementById('sq-desc').value="";} }
-        async function saveSideQuest(){ const id=document.getElementById('edit-id').value; const t=document.getElementById('sq-title').value; if(!t)return alert("Title?"); const d={title:t,description:document.getElementById('sq-desc').value,priority:document.getElementById('sq-priority').value,dueDate:document.getElementById('sq-due').value,isProject:document.getElementById('sq-isProject').checked,assigneeIds:[...document.querySelectorAll('.sq-user-check:checked')].map(c=>c.value),assignees:[...document.querySelectorAll('.sq-user-check:checked')].map(c=>({uid:c.value,name:c.dataset.name,pic:c.dataset.pic}))}; if(id){await db.collection("side_quests").doc(id).update(d);showToast("Updated");}else{d.status="Backlog";d.createdAt=firebase.firestore.FieldValue.serverTimestamp();await db.collection("side_quests").add(d);showToast("Created");} document.getElementById('taskModal').style.display='none'; }
-        
-        let chatUnsub; function openChat(id,title) { document.getElementById('chatModal').style.display='block'; document.getElementById('chat-title').innerText=`💬 ${title}`; document.getElementById('chat-card-id').value=id; const box=document.getElementById('chat-box'); box.innerHTML="Loading..."; if(chatUnsub)chatUnsub(); chatUnsub=db.collection("side_quests").doc(id).collection("comments").orderBy("timestamp","asc").onSnapshot(snap=>{box.innerHTML="";snap.forEach(d=>{const m=d.data();const cls=m.sender==='Admin'?'msg-admin':'msg-user';box.innerHTML+=`<div class="chat-msg ${cls}"><b>${m.sender}</b>: ${m.msg}</div>`});box.scrollTop=box.scrollHeight;}); }
-        async function sendChat(){const t=document.getElementById('chat-input').value.trim();const id=document.getElementById('chat-card-id').value;if(!t)return;await db.collection("side_quests").doc(id).collection("comments").add({msg:t,sender:'Admin',timestamp:firebase.firestore.FieldValue.serverTimestamp()});document.getElementById('chat-input').value="";}
+        // --- History & Pagination ---
+        async function showHistory(uid, name, total) {
+            document.getElementById("history-title").innerText = `📜 ${name}`;
+            document.getElementById("history-summary").innerText = `Total: ${total.toFixed(2)}`;
+            document.getElementById("historyModal").style.display = "block";
+            document.getElementById("history-list").innerHTML = "<p>Loading...</p>";
+            
+            try {
+                let all = [];
+                // Fetch All Types
+                const [w, q, l] = await Promise.all([
+                    db.collection("works").where("userId","==",uid).get(),
+                    db.collection("quest_submissions").where("userId","==",uid).get(),
+                    db.collection("checkin_logs").where("userId","==",uid).get()
+                ]);
+                
+                w.forEach(d => { const x=d.data(); if(x.score>0) all.push({t:x.timestamp?.toDate(), type:'work', text:`📁 ${x.title}`, score:x.score}); });
+                q.forEach(d => { const x=d.data(); const s=(x.earnedScore||0)+(x.bonusGiven||0); if(x.status!=='none') all.push({t:x.receivedAt?.toDate(), type:'bonus', text:`🚀 Quest Received`, score:0.1}); if(s>0) all.push({t:x.submittedAt?.toDate(), type:'quest', text:`⚡ Daily: ${x.answer}`, score:s}); });
+                l.forEach(d => { const x=d.data(); if(x.type==='streak') all.push({t:x.timestamp?.toDate(), type:'bonus', text:`🔥 Streak`, score:x.amount}); if(x.type==='manual_adjust' || x.type==='manual') all.push({t:x.timestamp?.toDate(), type:'manual', text:`🛠️ ${x.note}`, score:x.amount}); });
 
-        // Archive & Clear
+                all.sort((a, b) => (b.t || 0) - (a.t || 0));
+                historyCache = all;
+                historyPage = 1;
+                renderHistoryPage();
+            } catch(e) { document.getElementById("history-list").innerHTML = "Error loading history"; }
+        }
+
+        function renderHistoryPage() {
+            const list = document.getElementById("history-list");
+            const controls = document.getElementById("history-controls");
+            list.innerHTML = "";
+            controls.innerHTML = "";
+
+            const start = (historyPage - 1) * HISTORY_PER_PAGE;
+            const paged = historyCache.slice(start, start + HISTORY_PER_PAGE);
+            const totalPages = Math.ceil(historyCache.length / HISTORY_PER_PAGE);
+
+            paged.forEach(e => {
+                const dStr = e.t ? e.t.toLocaleString('th-TH') : '-';
+                let cls = e.type === 'bonus' ? 'bonus' : (e.type === 'manual' ? 'manual' : '');
+                list.innerHTML += `<li style="padding:10px;border-bottom:1px solid #eee;" class="${cls}">
+                    <div style="display:flex;justify-content:space-between;"><span>${e.text}</span> <span style="font-weight:bold;">${e.score>0?'+':''}${e.score}</span></div>
+                    <small style="color:#888">${dStr}</small>
+                </li>`;
+            });
+
+            if (totalPages > 1) {
+                controls.innerHTML = `
+                    <button class="btn-sm btn-dark" ${historyPage===1?'disabled':''} onclick="historyPage--;renderHistoryPage()">< Prev</button>
+                    <span style="align-self:center;">${historyPage} / ${totalPages}</span>
+                    <button class="btn-sm btn-dark" ${historyPage===totalPages?'disabled':''} onclick="historyPage++;renderHistoryPage()">Next ></button>
+                `;
+            }
+        }
+
+        // --- Leaderboard Share ---
+        async function shareLeaderboard(){
+            if(!topUsersCache.length)return alert("No Data");
+            const type = prompt("พิมพ์ 1 = แสดงชื่อ, 2 = ปิดบังชื่อ", "1");
+            if(type!=="1" && type!=="2") return;
+            const isAnon = (type==="2");
+            let t = "🏆 Leaderboard\n";
+            topUsersCache.forEach((u,i)=>{t+=`${i+1}. ${isAnon?`Lv.${Math.floor(u.score/10)+1}`:u.displayName} (${u.score})\n`});
+            if(liff.isInClient())liff.shareTargetPicker([{type:"text",text:t}]);else{await navigator.clipboard.writeText(t);alert("Copied!");}
+        }
+
+        // ... (Standard logic: openTaskModal, saveSideQuest, openChat, sendChat, openArchiveModal, delArchiveDoc, restoreSQ, confirmClearArchive, renderLeaderboard, updateAssigneeList, moveCard, giveScore, delSQ, archiveSQ, delUser, delWork, toggleIgnoreUser, toggleForm, filterBoard, filterUsers, svSc, adjDec, showToast, closeModal) ...
+        function openTaskModal(id=null){document.getElementById('taskModal').style.display='block';if(id){const q=sideQuestsCache[id];document.getElementById('edit-id').value=id;document.getElementById('sq-title').value=q.title;document.getElementById('sq-desc').value=q.description;document.getElementById('sq-priority').value=q.priority;document.getElementById('sq-due').value=q.dueDate||"";document.getElementById('sq-isProject').checked=q.isProject||false;}else{document.getElementById('edit-id').value="";document.getElementById('sq-title').value="";document.getElementById('sq-desc').value="";}}
+        async function saveSideQuest(){const id=document.getElementById('edit-id').value;const t=document.getElementById('sq-title').value;if(!t)return alert("Title?");const d={title:t,description:document.getElementById('sq-desc').value,priority:document.getElementById('sq-priority').value,dueDate:document.getElementById('sq-due').value,isProject:document.getElementById('sq-isProject').checked,assigneeIds:[...document.querySelectorAll('.sq-user-check:checked')].map(c=>c.value),assignees:[...document.querySelectorAll('.sq-user-check:checked')].map(c=>({uid:c.value,name:c.dataset.name,pic:c.dataset.pic}))};if(id){await db.collection("side_quests").doc(id).update(d);showToast("Updated");}else{d.status="Backlog";d.createdAt=firebase.firestore.FieldValue.serverTimestamp();await db.collection("side_quests").add(d);showToast("Created");}document.getElementById('taskModal').style.display='none';}
+        let chatUnsub; function openChat(id,title){document.getElementById('chatModal').style.display='block';document.getElementById('chat-title').innerText=`💬 ${title}`;document.getElementById('chat-card-id').value=id;const box=document.getElementById('chat-box');box.innerHTML="Loading...";if(chatUnsub)chatUnsub();chatUnsub=db.collection("side_quests").doc(id).collection("comments").orderBy("timestamp","asc").onSnapshot(snap=>{box.innerHTML="";snap.forEach(d=>{const m=d.data();const cls=m.sender==='Admin'?'msg-admin':'msg-user';box.innerHTML+=`<div class="chat-msg ${cls}"><b>${m.sender}</b>: ${m.msg}</div>`});box.scrollTop=box.scrollHeight;});}
+        async function sendChat(){const t=document.getElementById('chat-input').value.trim();const id=document.getElementById('chat-card-id').value;if(!t)return;await db.collection("side_quests").doc(id).collection("comments").add({msg:t,sender:'Admin',timestamp:firebase.firestore.FieldValue.serverTimestamp()});document.getElementById('chat-input').value="";}
         async function openArchiveModal(){const l=document.getElementById("archive-list");l.innerHTML="Loading...";document.getElementById("archiveModal").style.display="block";const s=await db.collection("side_quests").where("status","==","Archived").get();let i=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt?.toMillis()||0)-(a.createdAt?.toMillis()||0));l.innerHTML="";i.forEach(q=>{let imgs="";if(q.assignees)q.assignees.forEach(u=>imgs+=`<img src="${u.pic}" style="width:24px;height:24px;border-radius:50%;margin-right:2px;">`);l.innerHTML+=`<div style="padding:10px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between;align-items:center;"><div><b>${q.title}</b> (+${q.archiveScore||0})<br>${imgs}</div><div><button class="btn-sm btn-success" onclick="restoreSQ('${q.id}','Done')">Restore</button> <button class="btn-sm btn-danger" onclick="delArchiveDoc('${q.id}')">Del</button></div></div>`});}
         async function delArchiveDoc(id){if(confirm("Del?"))await db.collection("side_quests").doc(id).delete();openArchiveModal();}
         async function restoreSQ(id,t){await db.collection("side_quests").doc(id).update({status:t,doneAt:firebase.firestore.FieldValue.serverTimestamp()});openArchiveModal();showToast("Restored");}
         function confirmClearArchive(){document.getElementById('clearConfirmModal').style.display='block';const btn=document.getElementById('btn-confirm-clear');btn.disabled=true;btn.style.background='#ccc';let c=5;btn.innerText=`Confirm (${c})`;const t=setInterval(()=>{c--;btn.innerText=`Confirm (${c})`;if(c<=0){clearInterval(t);btn.disabled=false;btn.style.background='#ef233c';btn.innerText="CLEAR ALL";btn.onclick=async()=>{document.getElementById('clearConfirmModal').style.display='none';const s=await db.collection("side_quests").where("status","==","Archived").get();const b=db.batch();s.forEach(d=>b.delete(d.ref));await b.commit();showToast("Cleared!");openArchiveModal();}}},1000);}
-
-        // Helper
         function renderLeaderboard(){const l=document.getElementById("leaderboardList");l.innerHTML="";usersData.filter(u=>!u.isIgnored).slice(0,20).forEach((u,i)=>{const lv=Math.floor((u.score||0)/10)+1;l.innerHTML+=`<div class="lb-row"><div class="lb-rank">#${i+1}</div><div class="lb-profile"><img src="${u.pictureUrl}" class="lb-pic-lg"> ${u.displayName} <span class="badge" style="background:#eee;color:#333;">Lv.${lv}</span></div><div class="lb-score">${parseFloat((u.score||0).toFixed(2))}</div></div>`;});}
         function updateAssigneeList(){const d=document.getElementById('sq-user-list');d.innerHTML="";usersData.forEach(u=>{if(!u.isIgnored)d.innerHTML+=`<label style="margin-right:5px"><input type="checkbox" class="sq-user-check" value="${u.id}" data-name="${u.displayName}" data-pic="${u.pictureUrl}"> ${u.displayName}</label>`});}
         async function moveCard(id,dir){const q=sideQuestsCache[id];const f=['Backlog','Doing','Review','Done'];const c=f.indexOf(q.status);let n=q.status;if(dir==='next'&&c<3)n=f[c+1];if(dir==='prev'&&c>0)n=f[c-1];if(n!==q.status){const u={status:n};if(n==='Done')u.doneAt=firebase.firestore.FieldValue.serverTimestamp();await db.collection("side_quests").doc(id).update(u);}}
@@ -317,8 +343,7 @@
         function toggleForm(){const f=document.getElementById('sq-form');f.style.display=f.style.display==='none'?'block':'none';}
         function filterBoard(){renderKanban({forEach:cb=>{Object.values(sideQuestsCache).forEach(q=>cb({data:()=>q,id:Object.keys(sideQuestsCache).find(k=>sideQuestsCache[k]===q)}))}});}
         function filterUsers(){renderTable('users');}
-        async function shareLeaderboard(){if(!topUsersCache.length)return alert("No Data");const a=confirm("Anon?");let t="🏆 Leaderboard\n";topUsersCache.forEach((u,i)=>{t+=`${i+1}. ${a?`Lv.${Math.floor(u.score/10)+1}`:u.displayName} (${u.score})\n`});if(liff.isInClient())liff.shareTargetPicker([{type:"text",text:t}]);else{await navigator.clipboard.writeText(t);alert("Copied");}}
-        function copyHistory(){alert("Copied");}
+        function copyHistory(){navigator.clipboard.writeText("Copied!").then(()=>showToast("Copied"));}
         function closeModal(){document.querySelectorAll('.modal').forEach(m=>m.style.display='none');}
         function showToast(m){const x=document.getElementById("toast");x.innerText=m;x.className="show";setTimeout(()=>x.className="",3000);}
         async function svSc(id,uid){const v=prompt("Score:");if(v){await db.collection("works").doc(id).update({score:parseFloat(v),status:'ตรวจแล้ว'});await db.collection("users").doc(uid).update({score:firebase.firestore.FieldValue.increment(parseFloat(v))});showToast("Saved");}}
