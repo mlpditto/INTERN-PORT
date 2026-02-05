@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
+    <title>Internship Portfolio (V65 Full)</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <style>
+        /* -----------------------
+           1. Global Styles
+           ----------------------- */
+        body {
+            font-family: 'Kanit', sans-serif;
+            background-color: #f4f6f9;
+            padding: 20px;
+            color: #333;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            position: relative;
+            padding-bottom: 80px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* -----------------------
+           2. Components
+           ----------------------- */
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            border: 1px solid #f0f0f0;
+        }
+
+        .profile-img {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            border: 4px solid #fff;
+            box-shadow: 0 5px 15px rgba(6, 199, 85, 0.2);
+            object-fit: cover;
+        }
+
+        .score-text {
+            color: #4361ee;
+            font-weight: 800;
+            font-size: 1.8em;
+        }
+
+        /* -----------------------
+           3. Kanban Board
+           ----------------------- */
+        .sq-container {
+            display: flex;
+            overflow-x: auto;
+            gap: 15px;
+            padding-bottom: 20px;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .sq-col {
+            min-width: 85%;
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 15px;
+            scroll-snap-align: center;
+            border: 1px solid #eee;
+        }
+
+        .sq-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 5px solid #ccc;
+            margin-bottom: 10px;
+            position: relative;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+        }
+
+        .sq-card.project {
+            background-color: #fff0f5;
+            border-left-color: #e83e8c;
+        }
+
+        .sq-card.scored {
+            background-color: #d1e7dd;
+            border-left-color: #198754;
+        }
+
+        .score-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #198754;
+            color: white;
+            font-size: 0.75em;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+
+        /* -----------------------
+           4. Modals & Popups
+           ----------------------- */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+            background: white;
+            margin: 20% auto;
+            padding: 20px;
+            border-radius: 15px;
+            width: 85%;
+            max-width: 400px;
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        /* -----------------------
+           5. Chat System
+           ----------------------- */
+        .chat-box {
+            height: 300px;
+            overflow-y: auto;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #eee;
+            text-align: left;
+        }
+
+        .chat-msg {
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            border-radius: 12px;
+            font-size: 0.9em;
+            max-width: 80%;
+            line-height: 1.4;
+        }
+
+        .msg-admin {
+            background: #e9ecef;
+            margin-right: auto;
+            text-align: left;
+            color: #333;
+            border-bottom-left-radius: 2px;
+        }
+
+        .msg-user {
+            background: #4361ee;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+            border-bottom-right-radius: 2px;
+        }
+
+        .msg-time {
+            font-size: 0.7em;
+            opacity: 0.7;
+            display: block;
+            margin-top: 3px;
+        }
+
+        /* -----------------------
+           6. Quest & Timers
+           ----------------------- */
+        .quest-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            border: none;
+        }
+
+        .timer-display {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin: 15px 0;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 12px;
+            font-family: monospace;
+        }
+
+        .retry-wait {
+            color: #ef233c;
+            font-weight: bold;
+            background: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .global-expiry {
+            font-size: 0.9em;
+            color: #ffeb3b;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 5px 10px;
+            border-radius: 15px;
+            display: inline-block;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        /* -----------------------
+           7. Buttons & Inputs
+           ----------------------- */
+        button {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .btn-primary {
+            background-color: #4361ee;
+            color: white;
+        }
+
+        .btn-warning {
+            background-color: #ff9f1c;
+            color: black;
+        }
+
+        .btn-success {
+            background-color: #2ec4b6;
+            color: white;
+        }
+
+        .btn-danger {
+            background-color: #ef233c;
+            color: white;
+        }
+
+        .btn-sm {
+            width: auto;
+            min-height: 30px;
+            padding: 5px 10px;
+            font-size: 0.85em;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+
+        .date-input-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .date-input-group div {
+            flex: 1;
+        }
+
+        .grad-date-input {
+            padding: 8px !important;
+            font-size: 0.9em !important;
+        }
+
+        .date-input-group label {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 2px;
+            display: block;
+        }
+
+        .refresh-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: auto;
+            min-height: auto;
+            background: white;
+            border: 1px solid #ddd;
+            padding: 5px 10px;
+            font-size: 0.8em;
+            z-index: 99;
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            font-weight: bold;
+            color: white;
+            display: inline-block;
+        }
+
+        .p-Low {
+            background: #17a2b8;
+        }
+
+        .p-Medium {
+            background: #ff9f1c;
+        }
+
+        .p-High {
+            background: #ef233c;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <button class="refresh-btn" onclick="window.location.reload(true)">🔄 รีเฟรช</button>
+        <div id="loading" style="text-align:center; margin-top:100px;">กำลังโหลด...</div>
+
+        <div id="main-app" class="hidden">
+            <div style="height:20px;"></div>
+
+            <div class="card" style="text-align:center;">
+                <img id="u-img" class="profile-img" src="">
+                <h2 id="u-name">User</h2>
+                <div id="u-score" class="score-text">0</div>
+            </div>
+
+            <div class="card" style="border-left: 5px solid #e67e22; background:#fffbf0;">
+                <h4>🎓 สถานะฝึกงาน</h4>
+                <div class="date-input-group">
+                    <div>
+                        <label>วันเริ่ม</label>
+                        <input type="date" id="u-start-date" class="grad-date-input" onchange="saveMyDates()">
+                    </div>
+                    <div>
+                        <label>วันจบ</label>
+                        <input type="date" id="u-end-date" class="grad-date-input" onchange="saveMyDates()">
+                    </div>
+                </div>
+                <div id="grad-action" style="margin-top:15px; font-weight:bold; color:#4361ee;"></div>
+            </div>
+
+            <h3><i class="fa-solid fa-map"></i> ภารกิจ (Kanban)</h3>
+            <div class="sq-container">
+                <div class="sq-col">
+                    <div style="font-weight:bold;margin-bottom:10px;">📌 Backlog</div>
+                    <div id="sq-Backlog"></div>
+                </div>
+                <div class="sq-col">
+                    <div style="font-weight:bold;margin-bottom:10px;">🚧 Doing</div>
+                    <div id="sq-Doing"></div>
+                </div>
+                <div class="sq-col">
+                    <div style="font-weight:bold;margin-bottom:10px;">👀 Review</div>
+                    <div id="sq-Review"></div>
+                </div>
+                <div class="sq-col">
+                    <div style="font-weight:bold;margin-bottom:10px;">✅ Done</div>
+                    <div id="sq-Done"></div>
+                </div>
+            </div>
+
+            <h3><i class="fa-solid fa-fire"></i> ภารกิจประจำวัน</h3>
+            <div id="quest-list-container"></div>
+
+            <div class="card">
+                <h4><i class="fa-solid fa-upload"></i> ส่งงานทั่วไป</h4>
+                <input type="text" id="w-title" placeholder="หัวข้องาน...">
+                <input type="url" id="w-link" placeholder="ลิงก์งาน (ถ้ามี)...">
+                <button class="btn-success" onclick="submitWork()">ยืนยันส่งงาน</button>
+            </div>
+
+            <h4><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการส่งงาน</h4>
+            <div id="work-list"></div>
+
+            <div style="height:50px;"></div>
+            <div style="text-align:center;color:#ccc;font-size:0.8em;margin-bottom:20px;">System V65 (Stable & Notify)
+            </div>
+        </div>
+    </div>
+
+    <div id="chatModal" class="modal">
+        <div class="modal-content">
+            <span onclick="document.getElementById('chatModal').style.display='none'"
+                style="float:right;font-size:24px;cursor:pointer;">&times;</span>
+            <h3 id="chat-title" style="text-align:left;">💬 Chat</h3>
+            <input type="hidden" id="chat-card-id">
+            <div id="chat-box" class="chat-box"></div>
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="chat-input" placeholder="พิมพ์ข้อความ..." style="margin:0;">
+                <button class="btn-primary" onclick="sendChat()" style="width:auto;"><i
+                        class="fa-solid fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmModal" class="modal" style="z-index:10000;">
+        <div class="modal-content">
+            <h2 style="color:#ef233c;">⚠️ ยืนยันรับภารกิจ</h2>
+            <p>เวลานับถอยหลังจะเริ่มทันที</p>
+            <button id="btn-confirm-start" class="btn-danger" style="width:100%; font-size:1.2em;">ยืนยัน (5)</button>
+        </div>
+    </div>
+
+    <script src="firebase-config.js?v=65"></script>
+
+    <script>
+        const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ✅ Updated ID
+
+        let userProfile, userId;
+        let questsCache = [], mySubmissionsCache = {};
+        let confirmTimer = null, confirmParams = null;
+
+        // --- Initialization ---
+        async function main() {
+            try {
+                await liff.init({ liffId: USER_LIFF_ID });
+                if (!liff.isLoggedIn()) { liff.login(); return; }
+
+                userProfile = await liff.getProfile();
+                userId = userProfile.userId;
+
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+
+                // Set Profile
+                document.getElementById('u-img').src = userProfile.pictureUrl || "https://via.placeholder.com/150";
+                document.getElementById('u-name').innerText = userProfile.displayName;
+
+                // Load Data
+                checkUser();
+                loadAllQuests();
+                loadMySubmissions();
+                loadMyWorks();
+                loadSideQuests();
+
+                // Start Timer Loop
+                setInterval(checkExpiry, 1000);
+            } catch (e) {
+                alert("Init Error: " + e.message);
+            }
+        }
+        main();
+
+        // --- User & Dates ---
+        function checkUser() {
+            const r = db.collection("users").doc(userId);
+            r.onSnapshot(d => {
+                if (d.exists) {
+                    const da = d.data();
+                    document.getElementById('u-score').innerText = parseFloat((da.score || 0).toFixed(2));
+                    if (da.startDate) document.getElementById('u-start-date').value = da.startDate;
+                    if (da.endDate) document.getElementById('u-end-date').value = da.endDate;
+                    checkGraduation(da);
+                } else {
+                    r.set({ displayName: userProfile.displayName, pictureUrl: userProfile.pictureUrl || "", score: 0 });
+                }
+            });
+        }
+
+        async function saveMyDates() {
+            const s = document.getElementById('u-start-date').value;
+            const e = document.getElementById('u-end-date').value;
+            if (s || e) await db.collection("users").doc(userId).update({ startDate: s, endDate: e });
+        }
+
+        function checkGraduation(data) {
+            if (!data.startDate || !data.endDate) return;
+            const e = new Date(data.endDate), now = new Date();
+            const btn = document.getElementById('grad-action');
+
+            // Logic: now >= end_date (Inclusive)
+            if (now >= e) {
+                if (data.certRequested) btn.innerHTML = `<span style="color:#28a745;">✅ ส่งคำร้องขอใบรับรองแล้ว</span>`;
+                else btn.innerHTML = `<button onclick="requestCert()" class="btn-warning" style="width:100%"><i class="fa-solid fa-certificate"></i> ขอใบรับรองจบ (Request Cert)</button>`;
+            } else {
+                const left = Math.ceil((e - now) / 86400000);
+                btn.innerHTML = `<span style="color:#17a2b8"><i class="fa-solid fa-hourglass-half"></i> เหลือเวลาฝึกงานอีก ${left} วัน</span>`;
+            }
+        }
+
+        async function requestCert() {
+            if (!confirm("ยืนยันขอใบรับรอง?")) return;
+            await db.collection('reports').add({
+                userId,
+                displayName: userProfile.displayName,
+                pictureUrl: userProfile.pictureUrl || "",
+                subject: "🎓 ขอใบรับรองจบ",
+                message: "กดขอผ่านระบบ",
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                type: "cert_request"
+            });
+            await db.collection('users').doc(userId).update({ certRequested: true });
+            alert("ส่งคำร้องแล้ว!");
+        }
+
+        // --- Quest System (V56 Logic) ---
+        function loadAllQuests() { db.collection("quests").orderBy("createdAt", "desc").limit(5).onSnapshot(s => { questsCache = s.docs.map(doc => ({ id: doc.id, ...doc.data() })); renderQuestList(); }); }
+        function loadMySubmissions() { db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => { mySubmissionsCache = {}; s.forEach(doc => { mySubmissionsCache[doc.data().questId] = doc.data(); }); renderQuestList(); }); }
+
+        function renderQuestList() {
+            const c = document.getElementById('quest-list-container'); c.innerHTML = ""; const now = new Date();
+            questsCache.forEach(q => {
+                const qId = q.id; const myQ = mySubmissionsCache[qId] || {}; const status = myQ.status || 'none';
+
+                // Filter expired
+                if (status === 'none' && q.deadline && now > q.deadline.toDate()) return;
+
+                let html = `<div class="card quest-card"><h3>${q.question}</h3>`;
+
+                if (status === 'none') {
+                    const cd = myQ.cooldownUntil ? myQ.cooldownUntil.toDate() : null;
+                    let expirySpan = "";
+                    if (q.deadline) {
+                        const d = q.deadline.toDate().getTime();
+                        const diff = d - now;
+                        if (diff > 0) { const h = Math.floor(diff / 3600000); const m = Math.floor((diff % 3600000) / 60000); expirySpan = `<span class="global-expiry">⏳ Ends: ${h}h ${m}m</span>`; }
+                        else expirySpan = `<span class="global-expiry" style="color:#ef233c">Expired</span>`;
+                    }
+
+                    if (cd && now < cd) {
+                        html += `<div class="retry-wait" id="cd-${qId}" data-until="${cd.getTime()}">Please Wait...</div>`;
+                    } else {
+                        // Hide Duration at start
+                        html += `${expirySpan}<br>
+                                 <button class="btn-warning" id="btn-recv-${qId}" onclick="openConfirmStart('${qId}', '${q.question.replace(/'/g, "")}', ${q.durationMinutes || 30})">กดเริ่มทำภารกิจ</button>`;
+                    }
+                } else if (status === 'received') {
+                    const dl = myQ.deadline ? myQ.deadline.toDate().getTime() : 0;
+
+                    // Clickable Link Logic
+                    let timerAttr = "", linkHint = "";
+                    if (q.questLink) {
+                        timerAttr = `onclick="window.open('${q.questLink}','_blank')" style="cursor:pointer; text-decoration:underline; color:#fff; background:rgba(67, 97, 238, 0.8);"`;
+                        linkHint = `<div style="font-size:0.8em; margin-top:-5px; margin-bottom:10px; opacity:0.9;">(แตะเวลาเพื่อเปิดลิงก์ 🔗)</div>`;
+                    }
+
+                    html += `<div class="timer-display" id="timer-${qId}" data-deadline="${dl}" ${timerAttr}>...</div>${linkHint}
+                             <textarea id="ans-${qId}" rows="2" placeholder="พิมพ์คำตอบ..."></textarea>
+                             <button class="btn-success" id="btn-sub-${qId}" onclick="subQ('${qId}',${q.baseScore})">ส่งคำตอบ</button>`;
+                } else if (status === 'unsuccessful') {
+                    html += `<div style="color:#ef233c;font-weight:bold;font-size:1.2em;">❌ Failed</div><small>Cooldown 15 mins</small>`;
+
+                    // Allow Retry
+                    const cd = myQ.cooldownUntil ? myQ.cooldownUntil.toDate() : null;
+                    if (cd && now >= cd) {
+                        html = `<div class="card quest-card"><h3>${q.question}</h3><p style="color:#28a745">Cooldown ครบแล้ว!</p><button class="btn-warning" onclick="openConfirmStart('${qId}', '${q.question.replace(/'/g, "")}', ${q.durationMinutes || 30})">เริ่มใหม่</button></div>`;
+                    }
+                } else {
+                    html += `<div style="color:#2ec4b6;font-weight:bold;font-size:1.2em;">✅ เรียบร้อย</div>`;
+                }
+                c.innerHTML += html + `</div>`;
+            });
+        }
+
+        function openConfirmStart(qid, title, duration) {
+            confirmParams = { qid, title, duration };
+            document.getElementById('confirmModal').style.display = 'block';
+            const btn = document.getElementById('btn-confirm-start');
+            let c = 5;
+            btn.innerText = `ยืนยัน (${c})`;
+
+            btn.onclick = () => {
+                clearInterval(confirmTimer);
+                document.getElementById('confirmModal').style.display = 'none';
+                doReceiveQuest();
+            };
+
+            if (confirmTimer) clearInterval(confirmTimer);
+            confirmTimer = setInterval(() => {
+                c--;
+                btn.innerText = `ยืนยัน (${c})`;
+                if (c <= 0) {
+                    clearInterval(confirmTimer);
+                    document.getElementById('confirmModal').style.display = 'none';
+                    alert("กดไม่ทัน! ยกเลิกการรับภารกิจ");
+                }
+            }, 1000);
+        }
+
+        async function doReceiveQuest() {
+            const { qid, title, duration } = confirmParams;
+            const docId = `${qid}_${userId}`;
+            try {
+                if (mySubmissionsCache[qid] && mySubmissionsCache[qid].status === 'received') return;
+
+                const dl = new Date(Date.now() + duration * 60000);
+                const b = db.batch();
+
+                // Create Submission
+                b.set(db.collection("quest_submissions").doc(docId), {
+                    questId: qid,
+                    userId,
+                    displayName: userProfile.displayName,
+                    pictureUrl: userProfile.pictureUrl || "",
+                    status: 'received',
+                    receivedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    deadline: firebase.firestore.Timestamp.fromDate(dl)
+                });
+
+                // Add Score
+                b.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(0.1) });
+
+                // Add Kanban Card
+                b.set(db.collection("side_quests").doc(), {
+                    title: `[Daily] ${title}`,
+                    description: "ภารกิจประจำวัน",
+                    assignees: [{ uid: userId, name: userProfile.displayName, pic: userProfile.pictureUrl || "" }],
+                    assigneeIds: [userId],
+                    status: 'Doing',
+                    priority: 'Medium',
+                    isDailyQuest: true,
+                    refQuestId: qid,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                await b.commit();
+            } catch (e) { alert(e.message); }
+        }
+
+        async function subQ(qid, s) {
+            document.getElementById(`btn-sub-${qid}`).disabled = true;
+            const a = document.getElementById(`ans-${qid}`).value.trim();
+            if (!a) return alert("Empty");
+            try {
+                const myQ = mySubmissionsCache[qid];
+                if (myQ && myQ.deadline && Date.now() > myQ.deadline.toDate()) { return failQuest(qid); }
+
+                const b = db.batch();
+                b.update(db.collection("quest_submissions").doc(`${qid}_${userId}`), { answer: a, status: 'submitted', submittedAt: firebase.firestore.FieldValue.serverTimestamp(), earnedScore: parseFloat(s.toFixed(2)) });
+                b.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(s) });
+                await b.commit();
+                alert("Sent!");
+            } catch (e) { alert(e.message); }
+        }
+
+        function checkExpiry() {
+            const now = Date.now();
+
+            // Global
+            document.querySelectorAll('.global-expiry').forEach(el => {
+                const d = parseInt(el.dataset.dead);
+                const diff = d - now;
+                if (diff <= 0) { el.innerText = "หมดเวลา"; el.style.color = "#ef233c"; }
+                else {
+                    const h = Math.floor(diff / 3600000);
+                    const m = Math.floor((diff % 3600000) / 60000);
+                    el.innerText = `⏳ หมดเขตรับใน: ${h} ชม. ${m} นาที`;
+                }
+            });
+
+            // Timer
+            document.querySelectorAll('[id^="timer-"]').forEach(el => {
+                const d = parseInt(el.dataset.deadline);
+                const diff = d - now;
+                if (diff <= 0) el.innerText = "00:00";
+                else {
+                    const m = Math.floor(diff / 60000);
+                    const s = Math.floor((diff % 60000) / 1000);
+                    el.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+                }
+            });
+
+            // Cooldown
+            document.querySelectorAll('[id^="cd-"]').forEach(el => {
+                const until = parseInt(el.dataset.until);
+                const diff = until - now;
+                if (diff <= 0) { el.innerText = "พร้อมรับภารกิจ (Refresh)"; }
+                else {
+                    const m = Math.floor(diff / 60000);
+                    const s = Math.floor((diff % 60000) / 1000);
+                    el.innerText = `รออีก ${m} นาที ${s} วินาที`;
+                }
+            });
+
+            // Auto Fail Logic
+            for (let qid in mySubmissionsCache) {
+                const q = mySubmissionsCache[qid];
+                if (q.status === 'received' && q.deadline) {
+                    if (now > q.deadline.toDate()) failQuest(qid);
+                }
+            }
+        }
+
+        async function failQuest(qid) {
+            if (mySubmissionsCache[qid].status === 'unsuccessful') return;
+            const cd = new Date(Date.now() + 15 * 60000); // 15 Min Cooldown
+
+            const b = db.batch();
+            b.update(db.collection("quest_submissions").doc(`${qid}_${userId}`), { status: 'unsuccessful', cooldownUntil: firebase.firestore.Timestamp.fromDate(cd) });
+            b.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(-0.1) });
+            try { await b.commit(); } catch (e) { }
+        }
+
+        // --- Side Quests & Kanban ---
+        function loadSideQuests() {
+            db.collection("side_quests").where("assigneeIds", "array-contains", userId).onSnapshot(s => {
+                const cols = { "Backlog": document.getElementById("sq-Backlog"), "Doing": document.getElementById("sq-Doing"), "Review": document.getElementById("sq-Review"), "Done": document.getElementById("sq-Done") };
+                Object.values(cols).forEach(c => c.innerHTML = "");
+
+                s.forEach(d => {
+                    const q = d.data();
+                    if (cols[q.status]) {
+                        const isProj = q.isProject === true;
+                        let btn = "", chatBtn = "";
+
+                        if (q.status === "Backlog") btn = `<button class="btn-sm btn-primary" onclick="upSQ('${d.id}','Doing')">Start</button>`;
+                        else if (q.status === "Doing") btn = `<button class="btn-sm btn-warning" onclick="upSQ('${d.id}','Review')">Send</button>`;
+
+                        if (isProj) chatBtn = `<button class="btn-sm" style="background:#e83e8c;color:white;margin-left:5px;" onclick="openChat('${d.id}','${q.title}')">💬</button>`;
+
+                        const scClass = q.isScored ? 'scored' : '';
+                        const scBadge = (q.isScored && q.archiveScore) ? `<div class="score-badge">+${q.archiveScore}</div>` : '';
+                        const pClass = `p-${q.priority}`;
+
+                        const c = document.createElement("div");
+                        c.className = `sq-card status-${q.status} ${scClass} ${isProj ? 'project' : ''}`;
+                        c.innerHTML = `${scBadge} <div><span class="badge ${pClass}">${q.priority}</span> ${isProj ? '<span class="badge" style="background:#e83e8c">Proj</span>' : ''}</div><div style="font-weight:bold;margin-top:5px;">${q.title}</div><div style="font-size:0.85em;color:#666;margin-bottom:10px;">${q.description || ""}</div><div style="display:flex;">${btn}${chatBtn}</div>`;
+                        cols[q.status].appendChild(c)
+                    }
+                })
+            })
+        }
+
+        async function upSQ(id, s) { if (confirm("Move?")) await db.collection("side_quests").doc(id).update({ status: s }) }
+
+        // --- Chat System ---
+        let chatUnsub;
+        function openChat(id, title) {
+            document.getElementById('chatModal').style.display = 'block';
+            document.getElementById('chat-title').innerText = `💬 ${title}`;
+            document.getElementById('chat-card-id').value = id;
+            const box = document.getElementById('chat-box');
+            box.innerHTML = "Loading...";
+
+            if (chatUnsub) chatUnsub();
+            chatUnsub = db.collection("side_quests").doc(id).collection("comments").orderBy("timestamp", "asc").onSnapshot(snap => {
+                box.innerHTML = "";
+                snap.forEach(d => {
+                    const m = d.data();
+                    const cls = m.sender === 'User' ? 'msg-user' : 'msg-admin';
+                    const time = m.timestamp ? m.timestamp.toDate().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '';
+
+                    // Linkify
+                    let msg = m.msg.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#fff;text-decoration:underline;">$1</a>');
+                    if (cls === 'msg-admin') msg = m.msg.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#007bff;text-decoration:underline;">$1</a>');
+
+                    box.innerHTML += `<div class="chat-msg ${cls}">${msg} <span class="msg-time">${time}</span></div>`;
+                });
+                box.scrollTop = box.scrollHeight;
+            });
+        }
+
+        async function sendChat() {
+            const t = document.getElementById('chat-input').value.trim();
+            const id = document.getElementById('chat-card-id').value;
+            if (!t) return;
+            await db.collection("side_quests").doc(id).collection("comments").add({ msg: t, sender: 'User', pic: userProfile.pictureUrl || "", timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+            document.getElementById('chat-input').value = "";
+        }
+
+        // --- Work Submission (Notify Fix) ---
+        async function submitWork() {
+            const t = document.getElementById('w-title').value.trim();
+            const l = document.getElementById('w-link').value.trim();
+            if (!t || !l) return alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+
+            const btn = document.querySelector('button[onclick="submitWork()"]');
+            if (btn) { btn.disabled = true; btn.innerText = "กำลังส่ง..."; }
+
+            try {
+                // 1. Save to Firebase
+                await db.collection("works").add({
+                    userId,
+                    displayName: userProfile.displayName,
+                    pictureUrl: userProfile.pictureUrl || "",
+                    title: t,
+                    link: l,
+                    status: "รอตรวจ",
+                    score: 0,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                // 2. Notify to LINE Group
+                if (liff.isInClient()) {
+                    try {
+                        const msg = `📝 ส่งงานใหม่!\n\n👤 ${userProfile.displayName}\n📌 หัวข้อ: ${t}\n🔗 ลิงก์: ${l}`;
+                        await liff.sendMessages([{ type: "text", text: msg }]);
+                    } catch (err) {
+                        alert("บันทึกงานแล้ว แต่ส่งไลน์ไม่สำเร็จ (โปรดเปิดสิทธิ์ chat_message.write)");
+                        console.error("LIFF Send Error:", err);
+                    }
+                }
+
+                alert("ส่งงานเรียบร้อยแล้ว");
+                document.getElementById('w-title').value = "";
+                document.getElementById('w-link').value = "";
+            } catch (e) {
+                alert("Error: " + e.message);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerText = "ยืนยันส่งงาน"; }
+            }
+        }
+
+        function loadMyWorks() {
+            db.collection("works").where("userId", "==", userId).orderBy("timestamp", "desc").onSnapshot(s => {
+                const l = document.getElementById('work-list');
+                l.innerHTML = "";
+                s.forEach(d => {
+                    const w = d.data();
+                    let sc = w.score > 0 ? `<span class="badge" style="background:#17a2b8;color:white;">+${w.score}</span>` : "";
+                    l.innerHTML += `<div class="card" style="padding:15px;border-left:5px solid ${w.status === 'ตรวจแล้ว' ? '#28a745' : '#ffc107'}"><b>${w.title}</b> ${sc}<br><small>${w.status}</small></div>`
+                })
+            })
+        }
+    </script>
+</body>
+
+</html>
