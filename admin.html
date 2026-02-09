@@ -1011,7 +1011,8 @@
         <div class="modal-content" style="max-width: 700px;">
             <span class="close-modal"
                 onclick="document.getElementById('quizManageModal').style.display='none'">&times;</span>
-            <h2 id="quiz-manage-title">Manage Quiz</h2>
+            <h2 id="quiz-manage-title">Manage Quiz <span id="auto-save-status"
+                    style="font-size:0.5em; color:var(--success); display:none; margin-left:10px;">Saved</span></h2>
             <input type="hidden" id="edit-quiz-id">
             <div style="display:flex; gap:10px; margin-bottom:10px;">
                 <div style="flex:2;">
@@ -1031,12 +1032,12 @@
                 <div style="flex:1;">
                     <label style="font-size:0.8em; color:#4361ee; font-weight:bold;"><i
                             class="fa-solid fa-calendar-play"></i> Start Time (dd/mm/yyyy 24h)</label>
-                    <input type="datetime-local" id="quiz-start-time">
+                    <input type="datetime-local" id="quiz-start-time" lang="en-GB">
                 </div>
                 <div style="flex:1;">
                     <label style="font-size:0.8em; color:#ef233c; font-weight:bold;"><i
                             class="fa-solid fa-hourglass-end"></i> Deadline (dd/mm/yyyy 24h)</label>
-                    <input type="datetime-local" id="quiz-deadline">
+                    <input type="datetime-local" id="quiz-deadline" lang="en-GB">
                 </div>
             </div>
             <textarea id="quiz-desc" placeholder="Description" style="margin-top:10px;"></textarea>
@@ -1058,7 +1059,15 @@
             <div id="quiz-questions-container"
                 style="min-height: 200px; text-align: left; padding: 10px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; background:#fff;">
             </div>
-            <button class="magic-btn" style="width:100%; margin-top:15px;" onclick="saveQuiz()">💾 Save Quiz</button>
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button class="magic-btn" style="flex:2;" onclick="saveQuiz()">💾 Save Quiz</button>
+                <button class="btn-sm btn-warning" style="flex:1;" onclick="saveAsTemplate()">📑 Template</button>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <button class="btn-sm btn-success" style="flex:1; background:#2ec4b6;" onclick="goLiveNow()">🚀 Go
+                    Live</button>
+                <button class="btn-sm btn-danger" style="flex:1;" onclick="endQuizNow()">🛑 End Now</button>
+            </div>
         </div>
     </div>
 
@@ -1149,55 +1158,125 @@
             // 🔥 V68: Load Data First (Firefox Protection)
             loadData();
             initKanban();
+            initKanban();
             setInterval(updateRealtimeTimers, 1000);
+            setInterval(updateQuizCountdown, 1000); // Quiz Countdown
             document.addEventListener('keydown', (e) => { if (e.key === "Escape") document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); });
 
             // Try LIFF independently
             try { await liff.init({ liffId: ADMIN_LIFF_ID }); } catch (e) { console.warn("LIFF Init Failed (Non-critical):", e); }
         }
 
-        // --- Quiz Logic ---
         let quizzesData = [];
+        let autoSaveTimer;
+
         function openQuizModal(id = null) {
             document.getElementById('quizManageModal').style.display = 'block';
             const container = document.getElementById('quiz-questions-container');
             container.innerHTML = "";
+
+            // Auto-save listeners
+            setTimeout(() => {
+                const inputs = document.querySelectorAll('#quizManageModal input, #quizManageModal textarea');
+                inputs.forEach(el => el.addEventListener('input', triggerAutoSave));
+            }, 500);
+
             if (id) {
                 const q = quizzesData.find(x => x.id === id);
+                fillQuizForm(q);
                 document.getElementById('edit-quiz-id').value = id;
-                document.getElementById('quiz-title').value = q.title;
-                document.getElementById('quiz-short-title').value = q.shortTitle || "";
-                document.getElementById('quiz-total-points').value = q.totalPoints || 1.0;
-                document.getElementById('quiz-desc').value = q.description || "";
-
-                // Helper to format ISO to datetime-local value
-                const fmt = (d) => {
-                    if (!d) return "";
-                    try {
-                        const dateObj = d.toDate ? d.toDate() : (d instanceof Date ? d : new Date(d));
-                        if (isNaN(dateObj.getTime())) return "";
-                        return dateObj.toISOString().slice(0, 16);
-                    } catch (e) { return ""; }
-                };
-                document.getElementById('quiz-start-time').value = fmt(q.startTime);
-                document.getElementById('quiz-deadline').value = fmt(q.deadline);
-
-                quizQPageIndex = 0;
-                if (q.questions) {
-                    q.questions.forEach(item => addQuestionUI(item));
-                }
             } else {
-                document.getElementById('edit-quiz-id').value = "";
-                document.getElementById('quiz-title').value = "";
-                document.getElementById('quiz-short-title').value = "";
-                document.getElementById('quiz-total-points').value = 1.0;
-                document.getElementById('quiz-desc').value = "";
-                document.getElementById('quiz-start-time').value = "";
-                document.getElementById('quiz-deadline').value = "";
-                quizQPageIndex = 0;
-                addQuestionUI();
+                // Check for draft
+                const draft = localStorage.getItem('quiz_draft');
+                if (draft && confirm("พบแบบทดสอบที่ยังบันทึกไม่เสร็จ (Draft) ต้องการกู้คืนหรือไม่?")) {
+                    const data = JSON.parse(draft);
+                    fillQuizForm(data);
+                } else {
+                    resetQuizForm();
+                    addQuestionUI();
+                }
             }
             updateQuizPagination();
+        }
+
+        function fillQuizForm(q) {
+            document.getElementById('quiz-title').value = q.title || "";
+            document.getElementById('quiz-short-title').value = q.shortTitle || "";
+            document.getElementById('quiz-total-points').value = q.totalPoints || 1.0;
+            document.getElementById('quiz-desc').value = q.description || "";
+
+            const fmt = (d) => {
+                if (!d) return "";
+                // Handle both Firestore Timestamp and ISO string (from draft)
+                try {
+                    // If it's a string (from draft), use it directly if it fits, else parse
+                    if (typeof d === 'string') return d.slice(0, 16);
+                    const dateObj = d.toDate ? d.toDate() : (d instanceof Date ? d : new Date(d));
+                    if (isNaN(dateObj.getTime())) return "";
+                    return dateObj.toISOString().slice(0, 16);
+                } catch (e) { return ""; }
+            };
+
+            document.getElementById('quiz-start-time').value = fmt(q.startTime);
+            document.getElementById('quiz-deadline').value = fmt(q.deadline);
+
+            document.getElementById('quiz-questions-container').innerHTML = "";
+            if (q.questions) {
+                q.questions.forEach(item => addQuestionUI(item));
+            }
+            quizQPageIndex = 0;
+        }
+
+        function resetQuizForm() {
+            document.getElementById('edit-quiz-id').value = "";
+            document.getElementById('quiz-title').value = "";
+            document.getElementById('quiz-short-title').value = "";
+            document.getElementById('quiz-total-points').value = 1.0;
+            document.getElementById('quiz-desc').value = "";
+            document.getElementById('quiz-start-time').value = "";
+            document.getElementById('quiz-deadline').value = "";
+            document.getElementById('quiz-questions-container').innerHTML = "";
+            quizQPageIndex = 0;
+        }
+
+        function triggerAutoSave() {
+            clearTimeout(autoSaveTimer);
+            const status = document.getElementById('auto-save-status');
+            status.style.display = 'inline';
+            status.innerText = 'Typing...';
+            status.style.color = '#f72585';
+
+            autoSaveTimer = setTimeout(() => {
+                const data = getQuizFormData();
+                localStorage.setItem('quiz_draft', JSON.stringify(data));
+                status.innerText = 'Saved';
+                status.style.color = 'var(--success)';
+                setTimeout(() => status.style.display = 'none', 2000);
+            }, 1000);
+        }
+
+        function getQuizFormData() {
+            const title = document.getElementById('quiz-title').value.trim();
+            const shortTitle = document.getElementById('quiz-short-title').value.trim();
+            const description = document.getElementById('quiz-desc').value;
+            const totalPoints = parseFloat(document.getElementById('quiz-total-points').value) || 1.0;
+
+            const qItems = document.querySelectorAll('.quiz-q-item');
+            const questions = [];
+            qItems.forEach(item => {
+                const qText = item.querySelector('.q-text').value;
+                const opts = [...item.querySelectorAll('.q-opt')].map(i => i.value);
+                const correctEl = item.querySelector('.q-correct-radio:checked');
+                const correct = correctEl ? parseInt(correctEl.value) : 0;
+                const timer = parseInt(item.querySelector('.q-timer').value) || 60;
+                questions.push({ q: qText, options: opts, correct, timer });
+            });
+
+            return {
+                title, shortTitle, description, totalPoints, questions,
+                startTime: document.getElementById('quiz-start-time').value,
+                deadline: document.getElementById('quiz-deadline').value
+            };
         }
 
         let quizQPageIndex = 0;
@@ -1271,24 +1350,13 @@
 
         async function saveQuiz() {
             const id = document.getElementById('edit-quiz-id').value;
-            const title = document.getElementById('quiz-title').value.trim();
-            if (!title) return alert("Title required");
+            const formData = getQuizFormData();
 
-            const qItems = document.querySelectorAll('.quiz-q-item');
-            const questions = [];
-            qItems.forEach(item => {
-                const qText = item.querySelector('.q-text').value;
-                const opts = [...item.querySelectorAll('.q-opt')].map(i => i.value);
-                const correctEl = item.querySelector('.q-correct-radio:checked');
-                const correct = correctEl ? parseInt(correctEl.value) : 0;
-                const timer = parseInt(item.querySelector('.q-timer').value) || 60;
-                if (qText && opts.every(o => o)) {
-                    questions.push({ q: qText, options: opts, correct, timer });
-                }
-            });
+            if (!formData.title) return alert("Title required");
 
-            const startTime = document.getElementById('quiz-start-time').value;
-            const deadline = document.getElementById('quiz-deadline').value;
+            // Validate Questions
+            const validQuestions = formData.questions.filter(q => q.q && q.options.every(o => o));
+            if (validQuestions.length === 0) return alert("Please add at least one complete question.");
 
             const convertDate = (val) => {
                 if (!val || val.trim() === "") return null;
@@ -1298,13 +1366,13 @@
             };
 
             const data = {
-                title,
-                shortTitle: document.getElementById('quiz-short-title').value.trim(),
-                description: document.getElementById('quiz-desc').value,
-                totalPoints: parseFloat(document.getElementById('quiz-total-points').value) || 1.0,
-                questions,
-                startTime: convertDate(startTime),
-                deadline: convertDate(deadline),
+                title: formData.title,
+                shortTitle: formData.shortTitle,
+                description: formData.description,
+                totalPoints: formData.totalPoints,
+                questions: validQuestions,
+                startTime: convertDate(formData.startTime),
+                deadline: convertDate(formData.deadline),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
 
@@ -1316,15 +1384,50 @@
                     data.isActive = true;
                     await db.collection("quizzes").add(data);
                 }
+                localStorage.removeItem('quiz_draft'); // Clear draft on success
                 document.getElementById('quizManageModal').style.display = 'none';
                 showToast("Quiz Saved!");
             } catch (e) {
                 console.error("Save Quiz Error:", e);
-                const user = auth.currentUser;
-                alert(`Error: ${e.message}\n\n` +
-                    `User: ${user ? user.email : "Not Logged In"}\n` +
-                    `Possible cause: Please check your Firestore Rules for the 'quizzes' collection.`);
+                alert(`Error: ${e.message}`);
             }
+        }
+
+        async function saveAsTemplate() {
+            const formData = getQuizFormData();
+            if (!formData.title) return alert("Title required");
+            if (!confirm("Save this quiz structure as a copy/template?")) return;
+
+            const data = {
+                ...formData,
+                title: `${formData.title} (Template)`,
+                isActive: false,
+                isTemplate: true,
+                startTime: null,
+                deadline: null,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            delete data.startTime; // Ensure strict null
+            delete data.deadline;
+
+            try {
+                await db.collection("quizzes").add(data);
+                showToast("Template Saved!");
+            } catch (e) { alert(e.message); }
+        }
+
+        async function goLiveNow() {
+            const now = new Date();
+            document.getElementById('quiz-start-time').value = now.toISOString().slice(0, 16); // Local time string
+            if (!confirm("🚀 Launch Quiz Immediately? (Start Time will be set to NOW)")) return;
+            await saveQuiz();
+        }
+
+        async function endQuizNow() {
+            const now = new Date();
+            document.getElementById('quiz-deadline').value = now.toISOString().slice(0, 16);
+            if (!confirm("🛑 End Quiz Immediately? (Deadline will be set to NOW)")) return;
+            await saveQuiz();
         }
 
         function renderPendingQuizzes(data) {
@@ -1349,12 +1452,72 @@
                         <td>${att.correctCount}/${att.totalQuestions}</td>
                         <td style="font-weight:bold; color:var(--primary);">${pointsToAdd.toFixed(3)}</td>
                         <td>
+                            <button class="btn-sm btn-info" onclick="reviewQuiz('${att.id}')">Review</button>
                             <button class="btn-sm btn-success" onclick="approveQuiz('${att.id}', '${att.userId}', ${pointsToAdd})">Approve</button>
                             <button class="btn-sm btn-danger" onclick="rejectQuiz('${att.id}')">Reject</button>
                         </td>
                     </tr>
                 `;
             });
+        }
+
+        async function reviewQuiz(attemptId) {
+            const attemptDoc = await db.collection("quiz_attempts").doc(attemptId).get();
+            if (!attemptDoc.exists) return alert("Data not found");
+            const att = attemptDoc.data();
+            const quiz = quizzesData.find(x => x.id === att.quizId);
+
+            if (!quiz) return alert("Quiz Reference missing");
+
+            document.getElementById('review-attempt-id').value = attemptId;
+            const container = document.getElementById('review-quiz-container');
+            container.innerHTML = "";
+
+            quiz.questions.forEach((q, i) => {
+                const studentAns = att.answers[i];
+                const isCorrect = studentAns == q.correct;
+
+                container.innerHTML += `
+                    <div style="border:1px solid #ddd; padding:10px; margin-bottom:10px; border-radius:8px; background:${isCorrect ? '#d4edda' : '#f8d7da'}">
+                        <b>Q${i + 1}: ${q.q}</b><br>
+                        <div style="margin-top:5px; font-size:0.9em;">
+                             Student: <b>${q.options[studentAns] || '-'}</b> (Choice ${studentAns + 1}) <br>
+                             Correct: <span style="color:green;">${q.options[q.correct]}</span> (Choice ${q.correct + 1})
+                        </div>
+                        <div style="margin-top:5px;">
+                            <label><input type="checkbox" onchange="manualCorrectAns('${attemptId}', ${i}, this.checked)" ${isCorrect ? 'checked disabled' : ''}> Mark as Correct (Override)</label>
+                        </div>
+                    </div>
+                 `;
+            });
+
+            document.getElementById('quizReviewModal').style.display = 'block';
+        }
+
+        async function manualCorrectAns(attemptId, qIndex, isChecked) {
+            if (!isChecked) return; // Only support one-way override to correct for now
+            if (!confirm("Manually mark this answer as CORRECT?\n(Score will be recalculated upon Approval)")) return;
+
+            // We need to update the local 'answers' array in Firestore to match the correct answer index
+            // So when we approve, it recalculates correctly.
+            try {
+                const docRef = db.collection("quiz_attempts").doc(attemptId);
+                const docSnap = await docRef.get();
+                const att = docSnap.data();
+                const quiz = quizzesData.find(x => x.id === att.quizId);
+
+                // Update specific answer to be the correct one
+                att.answers[qIndex] = quiz.questions[qIndex].correct;
+                att.correctCount++; // Increment local count
+
+                await docRef.update({
+                    answers: att.answers,
+                    correctCount: att.correctCount
+                });
+
+                alert("Updated! Please refresh or close/open review to see score update.");
+                reviewQuiz(attemptId); // Refresh UI
+            } catch (e) { alert(e.message); }
         }
 
         async function approveQuiz(attemptId, uid, score) {
@@ -1381,6 +1544,27 @@
             showToast("Rejected & Removed");
         }
 
+        function updateQuizCountdown() {
+            const els = document.querySelectorAll('.quiz-countdown');
+            const now = new Date();
+            els.forEach(el => {
+                const deadStr = el.getAttribute('data-deadline');
+                if (!deadStr) return;
+                const dead = new Date(deadStr);
+                const diff = dead - now;
+
+                if (diff <= 0) {
+                    el.innerText = "Ended";
+                    el.style.color = "#666";
+                } else {
+                    const hrs = Math.floor(diff / 3600000);
+                    const mins = Math.floor((diff % 3600000) / 60000);
+                    const secs = Math.floor((diff % 60000) / 1000);
+                    el.innerText = `⏳ ${hrs}h ${mins}m ${secs}s`;
+                }
+            });
+        }
+
         function renderQuizzes() {
             const tbody = document.querySelector("#quizzesTable tbody");
             tbody.innerHTML = "";
@@ -1393,11 +1577,11 @@
                 if (!q.isActive) statusInfo = '<span class="badge" style="background:#6c757d">Inactive</span>';
                 else if (start && now < start) statusInfo = `<span class="badge" style="background:#ff9f1c">Scheduled: ${start.toLocaleString('th-TH')}</span>`;
                 else if (dead && now > dead) statusInfo = `<span class="badge" style="background:#ef233c">Expired: ${dead.toLocaleString('th-TH')}</span>`;
-                else statusInfo = '<span class="badge" style="background:#2ec4b6">Active</span>';
+                else statusInfo = `<span class="badge" style="background:#2ec4b6">Active</span> <br> <small class="quiz-countdown" data-deadline="${dead ? dead.toISOString() : ''}" style="font-weight:bold; color:#ef233c;"></small>`;
 
                 tbody.innerHTML += `
                     <tr>
-                        <td>${q.title} <br><small style="color:#666;">(${q.shortTitle || '-'})</small></td>
+                        <td>${q.title} <br><small style="color:#666;">(${q.shortTitle || '-'})</small> ${q.isTemplate ? '<b style="color:orange;">[TEMPLATE]</b>' : ''}</td>
                         <td>${q.questions ? q.questions.length : 0} Qs</td>
                         <td>${q.totalPoints || 1.0}</td>
                         <td>${statusInfo}</td>
@@ -1560,10 +1744,11 @@
                     const points = (att.correctCount / att.totalQuestions) * (qData.totalPoints || 1.0);
                     totalScore += points;
                 });
+
                 await db.collection("users").doc(uid).update({ score: totalScore });
                 showToast(`New Score: ${totalScore.toFixed(2)}`);
                 const user = usersData.find(u => u.id === uid);
-                showHistory(uid, user ? user.displayName : 'User', totalScore);
+                document.getElementById('historyModal').style.display = 'none'; // Close history modal to refresh
             } catch (e) { alert(e.message); }
         }
 
