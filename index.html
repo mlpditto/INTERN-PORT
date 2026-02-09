@@ -407,8 +407,19 @@
                 <button class="btn-success" onclick="submitWork()">ยืนยันส่งงาน</button>
             </div>
 
-            <h4><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการส่งงาน</h4>
-            <div id="work-list"></div>
+            <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0;">
+                <div onclick="toggleWorkHistory()"
+                    style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fff;">
+                    <h4 style="margin: 0; font-size: 1.1em; color: #333;"><i class="fa-solid fa-clock-rotate-left"></i>
+                        ประวัติการส่งงาน</h4>
+                    <i id="work-hist-icon" class="fa-solid fa-chevron-down"
+                        style="color: #999; transition: 0.3s; font-size: 0.9em;"></i>
+                </div>
+                <div id="work-history-content"
+                    style="display: none; padding: 0 15px 15px 15px; border-top: 1px solid #f0f0f0; background: #fafafa;">
+                    <div id="work-list" style="margin-top: 10px;"></div>
+                </div>
+            </div>
 
             <div style="height:50px;"></div>
             <div style="text-align:center;color:#ccc;font-size:0.8em;margin-bottom:20px;">System V65 (Stable & Notify)
@@ -433,8 +444,9 @@
 
     <div id="quizModal" class="modal">
         <div class="modal-content" style="max-width: 500px; text-align: left;">
-            <span onclick="document.getElementById('quizModal').style.display='none'"
-                style="float:right;font-size:24px;cursor:pointer;">&times;</span>
+            <span onclick="closeQuiz()" style="float:right;font-size:24px;cursor:pointer;">&times;</span>
+            <div id="quiz-q-timer"
+                style="float:right; font-weight:bold; color:#ef233c; margin-right:20px; font-size:1.2em;"></div>
             <h3 id="quiz-run-title">Quiz</h3>
             <div id="quiz-run-container">
                 <!-- Quiz content dynamically injected -->
@@ -772,33 +784,47 @@
             const container = document.getElementById('quiz-list-container');
             if (!container) return;
             container.innerHTML = "";
+            const now = new Date();
             quizzesCache.forEach(q => {
                 const attempt = quizAttemptsCache[q.id];
+                const start = q.startTime ? q.startTime.toDate() : null;
+                const dead = q.deadline ? q.deadline.toDate() : null;
+
+                // Visibility logic
+                if (start && now < start) return;
+                if (dead && now > dead && !attempt) return; // Hide expired unless done
+
                 const card = document.createElement('div');
                 card.className = 'card';
                 if (attempt) {
-                    card.style.borderLeft = "5px solid #2ec4b6";
+                    const isPending = attempt.status === 'pending';
+                    const qTitle = q.shortTitle || q.title;
+                    const points = (attempt.correctCount / attempt.totalQuestions) * (q.totalPoints || 1.0);
+
+                    card.style.borderLeft = isPending ? "5px solid #ff9f1c" : "5px solid #2ec4b6";
                     card.innerHTML = `
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div>
-                                <h4 style="margin:0;">✅ ${q.title}</h4>
-                                <small style="color:#666;">${q.description || ''}</small>
+                                <h4 style="margin:0;">${isPending ? '⏳' : '✅'} ${qTitle}</h4>
+                                <small style="color:#666;">${q.title} - ${q.description || ''}</small>
                             </div>
                             <div style="text-align:right;">
-                                <div style="font-weight:bold; color:#2ec4b6;">${attempt.score.toFixed(2)} pts</div>
-                                <small style="font-size:0.7em; color:#999;">เสร็จสมบูรณ์</small>
+                                <div style="font-weight:bold; color:${isPending ? '#ff9f1c' : '#2ec4b6'};">${points.toFixed(3)} pts</div>
+                                <small style="font-size:0.75em; color:#999;">${isPending ? 'รออาจารย์ตรวจ' : 'อนุมัติแล้ว'}</small>
                             </div>
                         </div>
                     `;
                 } else {
                     card.style.borderLeft = "5px solid #4361ee";
+                    let dlInfo = dead ? `<br><small style="color:#ef233c; font-weight:bold;">Deadline: ${dead.toLocaleString('th-TH')}</small>` : "";
                     card.innerHTML = `
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div>
                                 <h4 style="margin:0;">🧠 ${q.title}</h4>
-                                <small style="color:#666;">${q.description || ''}</small>
+                                <small style="color:#666;">คะแนนเต็ม: ${q.totalPoints || 1.0} แต้ม</small>
+                                ${dlInfo}
                             </div>
-                            <button class="btn-sm btn-primary" onclick="runQuiz('${q.id}')">เริ่มทำ</button>
+                            <button class="btn-sm btn-primary" onclick="confirmRunQuiz('${q.id}')">เริ่มทำ</button>
                         </div>
                     `;
                 }
@@ -806,9 +832,35 @@
             });
         }
 
+        let quizTimerInterval = null;
+        let timeLeftForStep = 0;
+
+        function confirmRunQuiz(quizId) {
+            const q = quizzesCache.find(x => x.id === quizId);
+            if (!q) return;
+            const currentScore = userProfile.score || 0;
+            const msg = `เริ่มแบบทดสอบ: ${q.title}\n` +
+                `------------------------------\n` +
+                `คะแนนปัจจุบันของคุณ: ${currentScore.toFixed(3)} แต้ม\n` +
+                `คะแนนเต็มของวิชานี้: ${q.totalPoints || 1.0} แต้ม\n` +
+                `(คะแนนจะถูกเพิ่มหลังจากอาจารย์อนุมัติ)\n\n` +
+                `ยืนยันที่จะเริ่มทำหรือไม่?`;
+
+            if (confirm(msg)) {
+                runQuiz(quizId);
+            }
+        }
+
         function runQuiz(quizId) {
             currentQuiz = quizzesCache.find(x => x.id === quizId);
             if (!currentQuiz) return;
+
+            // Check deadline again before starting
+            if (currentQuiz.deadline && new Date() > currentQuiz.deadline.toDate()) {
+                alert("ขออภัย แบบทดสอบนี้หมดเวลาแล้ว");
+                return;
+            }
+
             currentStep = 0;
             userAnswers = new Array(currentQuiz.questions.length).fill(null);
             document.getElementById('quiz-run-title').innerText = currentQuiz.title;
@@ -817,8 +869,27 @@
         }
 
         function renderQuizStep() {
+            clearInterval(quizTimerInterval);
             const container = document.getElementById('quiz-run-container');
             const question = currentQuiz.questions[currentStep];
+
+            timeLeftForStep = question.timer || 60;
+            updateTimerUI();
+
+            quizTimerInterval = setInterval(() => {
+                timeLeftForStep--;
+                updateTimerUI();
+                if (timeLeftForStep <= 0) {
+                    clearInterval(quizTimerInterval);
+                    alert("🍭 หมดเวลาสำหรับข้อนี้!");
+                    if (currentStep < currentQuiz.questions.length - 1) {
+                        nextQuizStep();
+                    } else {
+                        submitQuiz();
+                    }
+                }
+            }, 1000);
+
             container.innerHTML = `
                 <div style="margin-bottom:15px;">
                     <span class="badge" style="background:#4361ee; margin-bottom:10px;">ข้อที่ ${currentStep + 1} / ${currentQuiz.questions.length}</span>
@@ -827,7 +898,7 @@
                 <div style="display:flex; flex-direction:column; gap:10px;">
                     ${question.options.map((opt, i) => `
                         <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #ddd; border-radius:8px; cursor:pointer; background:${userAnswers[currentStep] === i ? '#e9ecef' : '#fff'};">
-                            <input type="radio" name="q-opt" value="${i}" ${userAnswers[currentStep] === i ? 'checked' : ''} onchange="userAnswers[${currentStep}] = ${i}; renderQuizStep();" style="width:auto; margin:0;">
+                            <input type="radio" name="q-opt" value="${i}" ${userAnswers[currentStep] === i ? 'checked' : ''} onchange="userAnswers[${currentStep}] = ${i}; renderQuizStepUIOnly();" style="width:auto; margin:0;">
                             ${opt}
                         </label>
                     `).join('')}
@@ -845,12 +916,47 @@
             }
         }
 
+        function updateTimerUI() {
+            const el = document.getElementById('quiz-q-timer');
+            if (el) el.innerText = `⏱ ${timeLeftForStep}s`;
+        }
+
+        function renderQuizStepUIOnly() {
+            const labels = document.querySelectorAll('#quiz-run-container label');
+            labels.forEach((l, i) => {
+                const radio = l.querySelector('input');
+                if (radio.checked) {
+                    l.style.background = '#e9ecef';
+                    userAnswers[currentStep] = i;
+                } else {
+                    l.style.background = '#fff';
+                }
+            });
+        }
+
+        function closeQuiz() {
+            if (confirm("คุณต้องการปิดแบบทดสอบหรือไม่? (ข้อมูลที่ทำไว้จะไม่ถูกบันทึก)")) {
+                clearInterval(quizTimerInterval);
+                document.getElementById('quizModal').style.display = 'none';
+            }
+        }
+
         function nextQuizStep() { if (currentStep < currentQuiz.questions.length - 1) { currentStep++; renderQuizStep(); } }
         function prevQuizStep() { if (currentStep > 0) { currentStep--; renderQuizStep(); } }
 
         async function submitQuiz() {
-            if (userAnswers.some(a => a === null)) return alert("กรุณาตอบให้ครบทุกข้อ");
-            if (!confirm("ยืนยันส่งคำตอบ?")) return;
+            clearInterval(quizTimerInterval);
+            if (userAnswers.some(a => a === null)) {
+                const confirmFinish = confirm("คุณยังตอบไม่ครบทุกข้อ ยันยืนที่จะส่งหรือไม่?");
+                if (!confirmFinish) {
+                    // Restart timer for current step if they cancel
+                    renderQuizStep();
+                    return;
+                }
+            } else if (!confirm("ยืนยันส่งคำตอบ?")) {
+                renderQuizStep();
+                return;
+            }
 
             const btn = document.getElementById('btn-quiz-submit');
             btn.disabled = true;
@@ -861,25 +967,20 @@
                 if (userAnswers[i] === q.correct) correctCount++;
             });
 
-            const totalScore = correctCount * (currentQuiz.scorePerQuestion || 1);
+            const pointsAwarded = (correctCount / currentQuiz.questions.length) * (currentQuiz.totalPoints || 1.0);
 
             try {
-                const b = db.batch();
-                b.set(db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`), {
+                await db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
                     quizId: currentQuiz.id,
                     userId,
                     displayName: userProfile.displayName,
-                    score: totalScore,
                     correctCount,
                     totalQuestions: currentQuiz.questions.length,
                     answers: userAnswers,
+                    status: 'pending', // Wait for admin approval
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                b.update(db.collection("users").doc(userId), {
-                    score: firebase.firestore.FieldValue.increment(totalScore)
-                });
-                await b.commit();
-                alert(`ทำแบบทดสอบเรียบร้อย!\nคะแนนที่ได้: ${totalScore.toFixed(2)}`);
+                alert(`ส่งคำตอบเรียบร้อย!\nคะแนนที่คาดว่าจะได้รับ: ${pointsAwarded.toFixed(3)} แต้ม\n(รออาจารย์อนุมัติคะแนนเพื่อให้เข้าสู่ระบบคะแนนรวม)`);
                 document.getElementById('quizModal').style.display = 'none';
             } catch (e) {
                 alert("Error: " + e.message);
@@ -892,6 +993,18 @@
             const el = document.getElementById(id);
             if (el.style.display === 'none') el.style.display = 'block';
             else el.style.display = 'none';
+        }
+
+        function toggleWorkHistory() {
+            const content = document.getElementById('work-history-content');
+            const icon = document.getElementById('work-hist-icon');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                content.style.display = 'none';
+                icon.style.transform = 'rotate(0deg)';
+            }
         }
 
         function checkExpiry() {

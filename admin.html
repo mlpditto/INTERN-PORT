@@ -670,11 +670,34 @@
         <div id="tab-works" class="tab-content active">
             <div class="header-row"
                 style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <h3>📁 งานทั่วไป</h3>
+                <h3>📁 งานทั่วไป & 📝 Quiz รอตรวจ</h3>
                 <button id="btn-toggle-work-archive" class="btn-toggle active" onclick="toggleWorkArchive()">
                     <i class="fa-solid fa-box-archive"></i> fin·ished
                 </button>
             </div>
+
+            <!-- Quiz Pending Review Section -->
+            <div id="quiz-pending-section" style="margin-bottom:30px; display:none;">
+                <h4 style="color:var(--primary); margin-bottom:10px;"><i class="fa-solid fa-clock-rotate-left"></i>
+                    แบบทดสอบที่รออนุมัติ</h4>
+                <div style="overflow-x:auto;">
+                    <table id="pendingQuizzesTable">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>User</th>
+                                <th>Quiz</th>
+                                <th>Correct</th>
+                                <th>Points to add</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <hr style="margin:20px 0; border:0; border-top:1px solid #ddd;">
+            </div>
+
             <div style="overflow-x:auto;">
                 <table id="worksTable">
                     <thead>
@@ -939,17 +962,51 @@
                 onclick="document.getElementById('quizManageModal').style.display='none'">&times;</span>
             <h2 id="quiz-manage-title">Manage Quiz</h2>
             <input type="hidden" id="edit-quiz-id">
-            <div style="display:flex; gap:10px;">
-                <input type="text" id="quiz-title" placeholder="Quiz Title" style="flex:2;">
-                <input type="number" id="quiz-score-per-q" value="1" step="0.1" placeholder="Score/Q" style="flex:1;">
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <div style="flex:2;">
+                    <label style="font-size:0.8em; color:#666;">ชื่อเต็ม (Full Title)</label>
+                    <input type="text" id="quiz-title" placeholder="Quiz Title (Full)">
+                </div>
+                <div style="flex:1;">
+                    <label style="font-size:0.8em; color:#666;">ชื่อย่อ (Short)</label>
+                    <input type="text" id="quiz-short-title" placeholder="Short Name">
+                </div>
+                <div style="flex:1;">
+                    <label style="font-size:0.8em; color:#666;">Points (เต็ม)</label>
+                    <input type="number" id="quiz-total-points" value="1.0" step="0.1">
+                </div>
             </div>
-            <textarea id="quiz-desc" placeholder="Description"></textarea>
+            <div style="display:flex; gap:10px; margin-top:5px; margin-bottom:10px;">
+                <div style="flex:1;">
+                    <label style="font-size:0.8em; color:#66ff;"><i class="fa-solid fa-calendar-play"></i> Start
+                        Time</label>
+                    <input type="datetime-local" id="quiz-start-time">
+                </div>
+                <div style="flex:1;">
+                    <label style="font-size:0.8em; color:#ef233c;"><i class="fa-solid fa-hourglass-end"></i>
+                        Deadline</label>
+                    <input type="datetime-local" id="quiz-deadline">
+                </div>
+            </div>
+            <textarea id="quiz-desc" placeholder="Description" style="margin-top:10px;"></textarea>
             <hr>
-            <h3>Questions</h3>
-            <div id="quiz-questions-container"
-                style="max-height: 400px; overflow-y: auto; text-align: left; padding: 10px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px;">
+            <h3>Questions (<span id="quiz-q-counter">0</span>)</h3>
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; background:var(--col-bg); padding:10px; border-radius:8px;">
+                <div style="display:flex; gap:5px;">
+                    <button class="btn-sm btn-dark" onclick="addQuestionUI()">+ Add New</button>
+                </div>
+                <div id="quiz-pagination-controls" style="display:flex; gap:10px; align-items:center;">
+                    <button class="btn-sm btn-dark" onclick="moveQuizQ(-1)"><i class="fa-solid fa-chevron-left"></i>
+                        Prev</button>
+                    <span id="quiz-q-page-info" style="font-weight:bold; font-family:monospace;">1 / 1</span>
+                    <button class="btn-sm btn-dark" onclick="moveQuizQ(1)">Next <i
+                            class="fa-solid fa-chevron-right"></i></button>
+                </div>
             </div>
-            <button class="btn-sm btn-dark" onclick="addQuestionUI()">+ Add Question</button>
+            <div id="quiz-questions-container"
+                style="min-height: 200px; text-align: left; padding: 10px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; background:#fff;">
+            </div>
             <button class="magic-btn" style="width:100%; margin-top:15px;" onclick="saveQuiz()">💾 Save Quiz</button>
         </div>
     </div>
@@ -1058,38 +1115,100 @@
                 const q = quizzesData.find(x => x.id === id);
                 document.getElementById('edit-quiz-id').value = id;
                 document.getElementById('quiz-title').value = q.title;
-                document.getElementById('quiz-score-per-q').value = q.scorePerQuestion || 1;
+                document.getElementById('quiz-short-title').value = q.shortTitle || "";
+                document.getElementById('quiz-total-points').value = q.totalPoints || 1.0;
                 document.getElementById('quiz-desc').value = q.description || "";
-                if (q.questions) q.questions.forEach(item => addQuestionUI(item));
+
+                // Helper to format ISO to datetime-local value
+                const fmt = (d) => d ? new Date(d.toDate ? d.toDate() : d).toISOString().slice(0, 16) : "";
+                document.getElementById('quiz-start-time').value = fmt(q.startTime);
+                document.getElementById('quiz-deadline').value = q.deadline ? q.deadline.toDate().toISOString().slice(0, 16) : "";
+
+                quizQPageIndex = 0;
+                if (q.questions) {
+                    q.questions.forEach(item => addQuestionUI(item));
+                }
             } else {
                 document.getElementById('edit-quiz-id').value = "";
                 document.getElementById('quiz-title').value = "";
-                document.getElementById('quiz-score-per-q').value = 1;
+                document.getElementById('quiz-short-title').value = "";
+                document.getElementById('quiz-total-points').value = 1.0;
                 document.getElementById('quiz-desc').value = "";
+                document.getElementById('quiz-start-time').value = "";
+                document.getElementById('quiz-deadline').value = "";
+                quizQPageIndex = 0;
                 addQuestionUI();
             }
+            updateQuizPagination();
+        }
+
+        let quizQPageIndex = 0;
+        function updateQuizPagination() {
+            const items = document.querySelectorAll('.quiz-q-item');
+            const total = items.length;
+            if (quizQPageIndex >= total && total > 0) quizQPageIndex = total - 1;
+            if (quizQPageIndex < 0) quizQPageIndex = 0;
+
+            items.forEach((item, i) => {
+                item.style.display = (i === quizQPageIndex) ? 'block' : 'none';
+            });
+
+            document.getElementById('quiz-q-counter').innerText = total;
+            document.getElementById('quiz-q-page-info').innerText = total > 0 ? `${quizQPageIndex + 1} / ${total}` : "0 / 0";
+        }
+
+        function moveQuizQ(dir) {
+            const total = document.querySelectorAll('.quiz-q-item').length;
+            quizQPageIndex += dir;
+            if (quizQPageIndex < 0) quizQPageIndex = 0;
+            if (quizQPageIndex >= total) quizQPageIndex = total - 1;
+            updateQuizPagination();
+        }
+
+        function highlightCorrectOpt(div) {
+            const sel = div.querySelector('.q-correct');
+            const idx = parseInt(sel.value);
+            const opts = div.querySelectorAll('.q-opt');
+            opts.forEach((opt, i) => {
+                if (i === idx) {
+                    opt.style.background = '#d1e7dd';
+                    opt.style.borderColor = '#2ec4b6';
+                    opt.style.fontWeight = 'bold';
+                } else {
+                    opt.style.background = '';
+                    opt.style.borderColor = '';
+                    opt.style.fontWeight = '';
+                }
+            });
         }
 
         function addQuestionUI(data = null) {
             const container = document.getElementById('quiz-questions-container');
             const div = document.createElement('div');
             div.className = 'quiz-q-item';
-            div.style = 'border:1px solid #eee; padding:10px; margin-bottom:10px; border-radius:6px; background:#f9f9f9;';
+            div.style = 'border:1px solid #eee; padding:15px; border-radius:8px; background:#fcfcfc;';
             div.innerHTML = `
-                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                    <b>Question</b>
-                    <button class="btn-sm btn-danger" onclick="this.parentElement.parentElement.remove()">✕</button>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;">
+                    <b style="color:var(--primary);">Question 编辑</b>
+                    <div>
+                        <label style="font-size:0.8em; color:#666;">Timer (sec):</label>
+                        <input type="number" class="q-timer" value="${data ? (data.timer || 60) : 60}" style="width:60px; display:inline-block; margin:0; padding:2px;">
+                        <button class="btn-sm btn-danger" onclick="this.closest('.quiz-q-item').remove(); updateQuizPagination();" style="margin-left:10px;">✕ Delete</button>
+                    </div>
                 </div>
-                <input type="text" class="q-text" placeholder="Question text..." value="${data ? data.q : ''}">
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
-                    <input type="text" class="q-opt" placeholder="Option 1" value="${data ? data.options[0] : ''}">
-                    <input type="text" class="q-opt" placeholder="Option 2" value="${data ? data.options[1] : ''}">
-                    <input type="text" class="q-opt" placeholder="Option 3" value="${data ? data.options[2] : ''}">
-                    <input type="text" class="q-opt" placeholder="Option 4" value="${data ? data.options[3] : ''}">
+                <div style="margin-bottom:10px;">
+                    <label style="font-size:0.85em; font-weight:bold;">โจทย์คำถาม:</label>
+                    <textarea class="q-text" placeholder="พิมพ์โจทย์ที่นี่..." style="margin-top:5px; height:60px;">${data ? data.q : ''}</textarea>
                 </div>
-                <div style="margin-top:5px; font-size:0.85em;">
-                    Correct Answer: 
-                    <select class="q-correct">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px;">
+                    <div><label style="font-size:0.75em; color:#888;">Option 1</label><input type="text" class="q-opt" value="${data ? data.options[0] : ''}"></div>
+                    <div><label style="font-size:0.75em; color:#888;">Option 2</label><input type="text" class="q-opt" value="${data ? data.options[1] : ''}"></div>
+                    <div><label style="font-size:0.75em; color:#888;">Option 3</label><input type="text" class="q-opt" value="${data ? data.options[2] : ''}"></div>
+                    <div><label style="font-size:0.75em; color:#888;">Option 4</label><input type="text" class="q-opt" value="${data ? data.options[3] : ''}"></div>
+                </div>
+                <div style="background:#f1f3f5; padding:10px; border-radius:6px; display:flex; align-items:center; gap:10px;">
+                    <label style="font-weight:bold; font-size:0.9em; min-width:100px;">✅ คำตอบที่ถูก:</label> 
+                    <select class="q-correct" onchange="highlightCorrectOpt(this.closest('.quiz-q-item'))" style="margin:0;">
                         <option value="0" ${data && data.correct == 0 ? 'selected' : ''}>Option 1</option>
                         <option value="1" ${data && data.correct == 1 ? 'selected' : ''}>Option 2</option>
                         <option value="2" ${data && data.correct == 2 ? 'selected' : ''}>Option 3</option>
@@ -1098,6 +1217,16 @@
                 </div>
             `;
             container.appendChild(div);
+
+            // Initial highlight
+            highlightCorrectOpt(div);
+
+            // If it's a new question from button click, go to it
+            if (!data) {
+                const total = document.querySelectorAll('.quiz-q-item').length;
+                quizQPageIndex = total - 1;
+            }
+            updateQuizPagination();
         }
 
         async function saveQuiz() {
@@ -1111,16 +1240,23 @@
                 const qText = item.querySelector('.q-text').value;
                 const opts = [...item.querySelectorAll('.q-opt')].map(i => i.value);
                 const correct = parseInt(item.querySelector('.q-correct').value);
+                const timer = parseInt(item.querySelector('.q-timer').value) || 60;
                 if (qText && opts.every(o => o)) {
-                    questions.push({ q: qText, options: opts, correct });
+                    questions.push({ q: qText, options: opts, correct, timer });
                 }
             });
 
+            const startTime = document.getElementById('quiz-start-time').value;
+            const deadline = document.getElementById('quiz-deadline').value;
+
             const data = {
                 title,
+                shortTitle: document.getElementById('quiz-short-title').value.trim(),
                 description: document.getElementById('quiz-desc').value,
-                scorePerQuestion: parseFloat(document.getElementById('quiz-score-per-q').value),
+                totalPoints: parseFloat(document.getElementById('quiz-total-points').value) || 1.0,
                 questions,
+                startTime: startTime ? firebase.firestore.Timestamp.fromDate(new Date(startTime)) : null,
+                deadline: deadline ? firebase.firestore.Timestamp.fromDate(new Date(deadline)) : null,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
 
@@ -1137,24 +1273,100 @@
             } catch (e) { alert(e.message); }
         }
 
+        function renderPendingQuizzes(data) {
+            const tbody = document.querySelector("#pendingQuizzesTable tbody");
+            const section = document.getElementById('quiz-pending-section');
+            if (data.length === 0) {
+                section.style.display = "none";
+                return;
+            }
+            section.style.display = "block";
+            tbody.innerHTML = "";
+            data.forEach(att => {
+                const q = quizzesData.find(x => x.id === att.quizId) || {};
+                const qTitle = q.shortTitle || q.title || "Unknown Quiz";
+                const pointsToAdd = (att.correctCount / att.totalQuestions) * (q.totalPoints || 1.0);
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${att.timestamp ? att.timestamp.toDate().toLocaleString('th-TH') : '-'}</td>
+                        <td>${att.displayName}</td>
+                        <td>${qTitle}</td>
+                        <td>${att.correctCount}/${att.totalQuestions}</td>
+                        <td style="font-weight:bold; color:var(--primary);">${pointsToAdd.toFixed(3)}</td>
+                        <td>
+                            <button class="btn-sm btn-success" onclick="approveQuiz('${att.id}', '${att.userId}', ${pointsToAdd})">Approve</button>
+                            <button class="btn-sm btn-danger" onclick="rejectQuiz('${att.id}')">Reject</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function approveQuiz(attemptId, uid, score) {
+            if (!confirm(`อนุมัติแต้มจำนวน ${score.toFixed(3)} ให้กับผู้ใช้นี้?`)) return;
+            try {
+                const b = db.batch();
+                b.update(db.collection("quiz_attempts").doc(attemptId), { status: 'approved', approvedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                b.update(db.collection("users").doc(uid), { score: firebase.firestore.FieldValue.increment(score) });
+                b.set(db.collection("checkin_logs").doc(), {
+                    userId: uid,
+                    type: 'quiz',
+                    amount: score,
+                    note: `Quiz Approved: ${attemptId.split('_')[0]}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                await b.commit();
+                showToast("Approved & Points added!");
+            } catch (e) { alert(e.message); }
+        }
+
+        async function rejectQuiz(attemptId) {
+            if (!confirm("ต้องการลบคำร้องนี้หรือไม่? (นักศึกษาจะต้องทำใหม่)")) return;
+            await db.collection("quiz_attempts").doc(attemptId).delete();
+            showToast("Rejected & Removed");
+        }
+
         function renderQuizzes() {
             const tbody = document.querySelector("#quizzesTable tbody");
             tbody.innerHTML = "";
+            const now = new Date();
             quizzesData.forEach(q => {
+                let statusInfo = "";
+                const start = q.startTime ? q.startTime.toDate() : null;
+                const dead = q.deadline ? q.deadline.toDate() : null;
+
+                if (!q.isActive) statusInfo = '<span class="badge" style="background:#6c757d">Inactive</span>';
+                else if (start && now < start) statusInfo = `<span class="badge" style="background:#ff9f1c">Scheduled: ${start.toLocaleString('th-TH')}</span>`;
+                else if (dead && now > dead) statusInfo = `<span class="badge" style="background:#ef233c">Expired: ${dead.toLocaleString('th-TH')}</span>`;
+                else statusInfo = '<span class="badge" style="background:#2ec4b6">Active</span>';
+
                 tbody.innerHTML += `
                     <tr>
-                        <td>${q.title}</td>
+                        <td>${q.title} <br><small style="color:#666;">(${q.shortTitle || '-'})</small></td>
                         <td>${q.questions ? q.questions.length : 0} Qs</td>
-                        <td>${q.scorePerQuestion}</td>
-                        <td>${q.isActive ? '✅ Active' : '❌ Inactive'}</td>
+                        <td>${q.totalPoints || 1.0}</td>
+                        <td>${statusInfo}</td>
                         <td>
                             <button class="btn-sm btn-primary" onclick="openQuizModal('${q.id}')">Edit</button>
                             <button class="btn-sm btn-dark" onclick="toggleQuizStatus('${q.id}', ${q.isActive})">${q.isActive ? 'Deactivate' : 'Activate'}</button>
+                            ${(dead && now > dead) ? `<button class="btn-sm btn-warning" onclick="repostQuiz('${q.id}')">♻️ Repost</button>` : ''}
                             <button class="btn-sm btn-danger" onclick="deleteQuiz('${q.id}')">Del</button>
                         </td>
                     </tr>
                 `;
             });
+        }
+
+        async function repostQuiz(id) {
+            if (!confirm("ต้องการ Repost แบบทดสอบนี้หรือไม่? (จะล้างเวลาเดิมออก)")) return;
+            await db.collection("quizzes").doc(id).update({
+                startTime: null,
+                deadline: null,
+                isActive: true,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            showToast("Reposted!");
         }
 
         async function toggleQuizStatus(id, current) { await db.collection("quizzes").doc(id).update({ isActive: !current }); }
@@ -1168,6 +1380,7 @@
             db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban);
             db.collection("quests").onSnapshot(s => { questsCache = s.docs.map(d => ({ id: d.id, ...d.data() })); loadActiveQuests(); loadQuestHistory(); });
             db.collection("quizzes").onSnapshot(s => { quizzesData = s.docs.map(d => ({ id: d.id, ...d.data() })); renderQuizzes(); });
+            db.collection("quiz_attempts").where("status", "==", "pending").onSnapshot(s => { renderPendingQuizzes(s.docs.map(d => ({ id: d.id, ...d.data() }))); });
             db.collection("quest_submissions").onSnapshot(s => { questsSubCache = {}; s.forEach(d => { questsSubCache[`${d.data().questId}_${d.data().userId}`] = d.data(); }); filterBoard(); });
         }
 
@@ -1285,6 +1498,14 @@
                 });
                 const lSnap = await db.collection("checkin_logs").where("userId", "==", uid).get();
                 lSnap.forEach(d => { totalScore += (d.data().amount || 0); });
+
+                const quizSnap = await db.collection("quiz_attempts").where("userId", "==", uid).where("status", "==", "approved").get();
+                quizSnap.forEach(d => {
+                    const att = d.data();
+                    const qData = quizzesData.find(x => x.id === att.quizId) || {};
+                    const points = (att.correctCount / att.totalQuestions) * (qData.totalPoints || 1.0);
+                    totalScore += points;
+                });
                 await db.collection("users").doc(uid).update({ score: totalScore });
                 showToast(`New Score: ${totalScore.toFixed(2)}`);
                 const user = usersData.find(u => u.id === uid);
