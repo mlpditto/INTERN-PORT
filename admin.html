@@ -1120,9 +1120,16 @@
                 document.getElementById('quiz-desc').value = q.description || "";
 
                 // Helper to format ISO to datetime-local value
-                const fmt = (d) => d ? new Date(d.toDate ? d.toDate() : d).toISOString().slice(0, 16) : "";
+                const fmt = (d) => {
+                    if (!d) return "";
+                    try {
+                        const dateObj = d.toDate ? d.toDate() : (d instanceof Date ? d : new Date(d));
+                        if (isNaN(dateObj.getTime())) return "";
+                        return dateObj.toISOString().slice(0, 16);
+                    } catch (e) { return ""; }
+                };
                 document.getElementById('quiz-start-time').value = fmt(q.startTime);
-                document.getElementById('quiz-deadline').value = q.deadline ? q.deadline.toDate().toISOString().slice(0, 16) : "";
+                document.getElementById('quiz-deadline').value = fmt(q.deadline);
 
                 quizQPageIndex = 0;
                 if (q.questions) {
@@ -1249,14 +1256,21 @@
             const startTime = document.getElementById('quiz-start-time').value;
             const deadline = document.getElementById('quiz-deadline').value;
 
+            const convertDate = (val) => {
+                if (!val || val.trim() === "") return null;
+                const d = new Date(val);
+                if (isNaN(d.getTime())) return null;
+                return firebase.firestore.Timestamp.fromDate(d);
+            };
+
             const data = {
                 title,
                 shortTitle: document.getElementById('quiz-short-title').value.trim(),
                 description: document.getElementById('quiz-desc').value,
                 totalPoints: parseFloat(document.getElementById('quiz-total-points').value) || 1.0,
                 questions,
-                startTime: startTime ? firebase.firestore.Timestamp.fromDate(new Date(startTime)) : null,
-                deadline: deadline ? firebase.firestore.Timestamp.fromDate(new Date(deadline)) : null,
+                startTime: convertDate(startTime),
+                deadline: convertDate(deadline),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
 
@@ -1270,7 +1284,13 @@
                 }
                 document.getElementById('quizManageModal').style.display = 'none';
                 showToast("Quiz Saved!");
-            } catch (e) { alert(e.message); }
+            } catch (e) {
+                console.error("Save Quiz Error:", e);
+                const user = auth.currentUser;
+                alert(`Error: ${e.message}\n\n` +
+                    `User: ${user ? user.email : "Not Logged In"}\n` +
+                    `Possible cause: Please check your Firestore Rules for the 'quizzes' collection.`);
+            }
         }
 
         function renderPendingQuizzes(data) {
