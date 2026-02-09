@@ -397,6 +397,9 @@
             <h3><i class="fa-solid fa-fire"></i> ภารกิจประจำวัน</h3>
             <div id="quest-list-container"></div>
 
+            <h3><i class="fa-solid fa-brain"></i> แบบทดสอบ (Quiz)</h3>
+            <div id="quiz-list-container"></div>
+
             <div class="card">
                 <h4><i class="fa-solid fa-upload"></i> ส่งงานทั่วไป</h4>
                 <input type="text" id="w-title" placeholder="หัวข้องาน...">
@@ -424,6 +427,24 @@
                 <input type="text" id="chat-input" placeholder="พิมพ์ข้อความ..." style="margin:0;">
                 <button class="btn-primary" onclick="sendChat()" style="width:auto;"><i
                         class="fa-solid fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="quizModal" class="modal">
+        <div class="modal-content" style="max-width: 500px; text-align: left;">
+            <span onclick="document.getElementById('quizModal').style.display='none'"
+                style="float:right;font-size:24px;cursor:pointer;">&times;</span>
+            <h3 id="quiz-run-title">Quiz</h3>
+            <div id="quiz-run-container">
+                <!-- Quiz content dynamically injected -->
+            </div>
+            <div id="quiz-run-footer" style="margin-top:20px; display:flex; gap:10px;">
+                <button id="btn-quiz-prev" class="btn-sm btn-dark" onclick="prevQuizStep()"
+                    style="display:none;">Previous</button>
+                <button id="btn-quiz-next" class="btn-sm btn-primary" onclick="nextQuizStep()">Next</button>
+                <button id="btn-quiz-submit" class="btn-sm btn-success" onclick="submitQuiz()"
+                    style="display:none;">Submit (ยืนยันส่ง)</button>
             </div>
         </div>
     </div>
@@ -467,6 +488,7 @@
                 loadMySubmissions();
                 loadMyWorks();
                 loadSideQuests();
+                loadQuizzes();
 
                 // Start Timer Loop
                 setInterval(checkExpiry, 1000);
@@ -529,8 +551,8 @@
         }
 
         // --- Quest System (V56 Logic) ---
-        function loadAllQuests() { db.collection("quests").orderBy("createdAt", "desc").limit(5).onSnapshot(s => { questsCache = s.docs.map(doc => ({ id: doc.id, ...doc.data() })); renderQuestList(); }); }
-        function loadMySubmissions() { db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => { mySubmissionsCache = {}; s.forEach(doc => { mySubmissionsCache[doc.data().questId] = doc.data(); }); renderQuestList(); }); }
+        function loadAllQuests() { db.collection("quests").orderBy("createdAt", "desc").limit(5).onSnapshot(s => { questsCache = s.docs.map(doc => ({ id: doc.id, ...doc.data() })); renderQuestList(); renderHistory(); }); }
+        function loadMySubmissions() { db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => { mySubmissionsCache = {}; s.forEach(doc => { mySubmissionsCache[doc.data().questId] = doc.data(); }); renderQuestList(); renderHistory(); }); }
 
         function renderQuestList() {
             const c = document.getElementById('quest-list-container'); c.innerHTML = ""; const now = new Date();
@@ -581,7 +603,8 @@
                         html = `<div class="card quest-card"><h3>${q.question}</h3><p style="color:#28a745">Cooldown ครบแล้ว!</p><button class="btn-warning" onclick="openConfirmStart('${qId}', '${q.question.replace(/'/g, "")}', ${q.durationMinutes || 30})">เริ่มใหม่</button></div>`;
                     }
                 } else {
-                    html += `<div style="color:#2ec4b6;font-weight:bold;font-size:1.2em;">✅ เรียบร้อย</div>`;
+                    // ✅ Completed -> Moved to History (Do NOT render here)
+                    return;
                 }
                 c.innerHTML += html + `</div>`;
             });
@@ -666,6 +689,209 @@
                 await b.commit();
                 alert("Sent!");
             } catch (e) { alert(e.message); }
+        }
+
+        // --- History Logic (V69) ---
+        let usersWorksCache = [];
+
+        function renderHistory() {
+            const list = document.getElementById('work-list');
+            list.innerHTML = "";
+
+            let allItems = [];
+
+            // 1. Add Works
+            usersWorksCache.forEach(w => {
+                allItems.push({ type: 'work', data: w, ts: w.timestamp ? w.timestamp.toDate() : new Date(0) });
+            });
+
+            // 2. Add Completed Quests
+            Object.keys(mySubmissionsCache).forEach(qid => {
+                const sub = mySubmissionsCache[qid];
+                if (sub.status === 'submitted') {
+                    // Start finding quest title
+                    const q = questsCache.find(x => x.id === qid);
+                    const title = q ? q.question : "ภารกิจประจำวัน (Daily Quest)";
+                    allItems.push({ type: 'quest', data: { ...sub, title }, ts: sub.submittedAt ? sub.submittedAt.toDate() : new Date(0) });
+                }
+            });
+
+            // 3. Sort Desc
+            allItems.sort((a, b) => b.ts - a.ts);
+
+            // 4. Render
+            allItems.forEach(item => {
+                if (item.type === 'work') {
+                    const w = item.data;
+                    let sc = w.score > 0 ? `<span class="badge" style="background:#17a2b8;color:white;">+${w.score}</span>` : "";
+                    list.innerHTML += `<div class="card" style="padding:15px;border-left:5px solid ${w.status === 'ตรวจแล้ว' ? '#28a745' : '#ffc107'}"><b>${w.title}</b> ${sc}<br><small>${w.status}</small></div>`;
+                } else {
+                    // Quest Item (Compact & Expandable)
+                    const q = item.data;
+                    // Unique ID for toggle
+                    const uid = `hist-q-${Math.random().toString(36).substr(2, 9)}`;
+
+                    list.innerHTML += `
+                    <div class="card" style="padding:10px; border-left:5px solid #4361ee; background:#f8f9fa;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleHist('${uid}')">
+                            <div style="font-weight:bold; font-size:0.95em; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; max-width:70%;">
+                                ⚡ ${q.title}
+                            </div>
+                            <div>
+                                <span class="badge" style="background:#28a745">+${q.earnedScore || 0}</span>
+                                <i class="fa-solid fa-chevron-down" style="font-size:0.8em; color:#999; margin-left:5px;"></i>
+                            </div>
+                        </div>
+                        <div id="${uid}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid #ddd; font-size:0.9em; color:#555;">
+                            <b>คำถาม:</b> ${q.title}<br>
+                            <b>คำตอบ:</b> ${q.answer || "-"}<br>
+                            <div style="text-align:right; margin-top:5px; font-size:0.8em; color:#999;">${item.ts.toLocaleString('th-TH')}</div>
+                        </div>
+                    </div>`;
+                }
+            });
+        }
+
+        // --- Quiz System ---
+        let quizzesCache = [], quizAttemptsCache = {};
+        let currentQuiz = null, currentStep = 0, userAnswers = [];
+
+        function loadQuizzes() {
+            db.collection("quizzes").where("isActive", "==", true).onSnapshot(s => {
+                quizzesCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderQuizList();
+            });
+            db.collection("quiz_attempts").where("userId", "==", userId).onSnapshot(s => {
+                quizAttemptsCache = {};
+                s.forEach(d => quizAttemptsCache[d.data().quizId] = d.data());
+                renderQuizList();
+            });
+        }
+
+        function renderQuizList() {
+            const container = document.getElementById('quiz-list-container');
+            if (!container) return;
+            container.innerHTML = "";
+            quizzesCache.forEach(q => {
+                const attempt = quizAttemptsCache[q.id];
+                const card = document.createElement('div');
+                card.className = 'card';
+                if (attempt) {
+                    card.style.borderLeft = "5px solid #2ec4b6";
+                    card.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <h4 style="margin:0;">✅ ${q.title}</h4>
+                                <small style="color:#666;">${q.description || ''}</small>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="font-weight:bold; color:#2ec4b6;">${attempt.score.toFixed(2)} pts</div>
+                                <small style="font-size:0.7em; color:#999;">เสร็จสมบูรณ์</small>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    card.style.borderLeft = "5px solid #4361ee";
+                    card.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <h4 style="margin:0;">🧠 ${q.title}</h4>
+                                <small style="color:#666;">${q.description || ''}</small>
+                            </div>
+                            <button class="btn-sm btn-primary" onclick="runQuiz('${q.id}')">เริ่มทำ</button>
+                        </div>
+                    `;
+                }
+                container.appendChild(card);
+            });
+        }
+
+        function runQuiz(quizId) {
+            currentQuiz = quizzesCache.find(x => x.id === quizId);
+            if (!currentQuiz) return;
+            currentStep = 0;
+            userAnswers = new Array(currentQuiz.questions.length).fill(null);
+            document.getElementById('quiz-run-title').innerText = currentQuiz.title;
+            document.getElementById('quizModal').style.display = 'block';
+            renderQuizStep();
+        }
+
+        function renderQuizStep() {
+            const container = document.getElementById('quiz-run-container');
+            const question = currentQuiz.questions[currentStep];
+            container.innerHTML = `
+                <div style="margin-bottom:15px;">
+                    <span class="badge" style="background:#4361ee; margin-bottom:10px;">ข้อที่ ${currentStep + 1} / ${currentQuiz.questions.length}</span>
+                    <div style="font-weight:bold; font-size:1.1em; color:#333;">${question.q}</div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    ${question.options.map((opt, i) => `
+                        <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #ddd; border-radius:8px; cursor:pointer; background:${userAnswers[currentStep] === i ? '#e9ecef' : '#fff'};">
+                            <input type="radio" name="q-opt" value="${i}" ${userAnswers[currentStep] === i ? 'checked' : ''} onchange="userAnswers[${currentStep}] = ${i}; renderQuizStep();" style="width:auto; margin:0;">
+                            ${opt}
+                        </label>
+                    `).join('')}
+                </div>
+            `;
+
+            // Update footer buttons
+            document.getElementById('btn-quiz-prev').style.display = currentStep > 0 ? 'inline-block' : 'none';
+            if (currentStep === currentQuiz.questions.length - 1) {
+                document.getElementById('btn-quiz-next').style.display = 'none';
+                document.getElementById('btn-quiz-submit').style.display = 'inline-block';
+            } else {
+                document.getElementById('btn-quiz-next').style.display = 'inline-block';
+                document.getElementById('btn-quiz-submit').style.display = 'none';
+            }
+        }
+
+        function nextQuizStep() { if (currentStep < currentQuiz.questions.length - 1) { currentStep++; renderQuizStep(); } }
+        function prevQuizStep() { if (currentStep > 0) { currentStep--; renderQuizStep(); } }
+
+        async function submitQuiz() {
+            if (userAnswers.some(a => a === null)) return alert("กรุณาตอบให้ครบทุกข้อ");
+            if (!confirm("ยืนยันส่งคำตอบ?")) return;
+
+            const btn = document.getElementById('btn-quiz-submit');
+            btn.disabled = true;
+            btn.innerText = "กำลังประมวลผล...";
+
+            let correctCount = 0;
+            currentQuiz.questions.forEach((q, i) => {
+                if (userAnswers[i] === q.correct) correctCount++;
+            });
+
+            const totalScore = correctCount * (currentQuiz.scorePerQuestion || 1);
+
+            try {
+                const b = db.batch();
+                b.set(db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`), {
+                    quizId: currentQuiz.id,
+                    userId,
+                    displayName: userProfile.displayName,
+                    score: totalScore,
+                    correctCount,
+                    totalQuestions: currentQuiz.questions.length,
+                    answers: userAnswers,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                b.update(db.collection("users").doc(userId), {
+                    score: firebase.firestore.FieldValue.increment(totalScore)
+                });
+                await b.commit();
+                alert(`ทำแบบทดสอบเรียบร้อย!\nคะแนนที่ได้: ${totalScore.toFixed(2)}`);
+                document.getElementById('quizModal').style.display = 'none';
+            } catch (e) {
+                alert("Error: " + e.message);
+                btn.disabled = false;
+                btn.innerText = "Submit (ยืนยันส่ง)";
+            }
+        }
+
+        function toggleHist(id) {
+            const el = document.getElementById(id);
+            if (el.style.display === 'none') el.style.display = 'block';
+            else el.style.display = 'none';
         }
 
         function checkExpiry() {
@@ -838,13 +1064,8 @@
 
         function loadMyWorks() {
             db.collection("works").where("userId", "==", userId).orderBy("timestamp", "desc").onSnapshot(s => {
-                const l = document.getElementById('work-list');
-                l.innerHTML = "";
-                s.forEach(d => {
-                    const w = d.data();
-                    let sc = w.score > 0 ? `<span class="badge" style="background:#17a2b8;color:white;">+${w.score}</span>` : "";
-                    l.innerHTML += `<div class="card" style="padding:15px;border-left:5px solid ${w.status === 'ตรวจแล้ว' ? '#28a745' : '#ffc107'}"><b>${w.title}</b> ${sc}<br><small>${w.status}</small></div>`
-                })
+                usersWorksCache = s.docs.map(d => d.data());
+                renderHistory();
             })
         }
     </script>

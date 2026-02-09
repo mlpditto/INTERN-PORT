@@ -662,6 +662,7 @@
             <button class="tab-btn" onclick="switchTab('tab-sidequest')">🗺️ Kanban</button>
             <button class="tab-btn" onclick="switchTab('tab-manage-quest')">⚙️ Daily Quest</button>
             <button class="tab-btn" onclick="switchTab('tab-users')">👥 Users</button>
+            <button class="tab-btn" onclick="switchTab('tab-quizzes')">📝 Quizzes</button>
             <button class="tab-btn" onclick="switchTab('tab-leaderboard')">🏆 Leaderboard</button>
             <button class="tab-btn" onclick="switchTab('tab-certs')">🎓 Certificates</button>
         </div>
@@ -797,6 +798,29 @@
             </table>
         </div>
 
+        <div id="tab-quizzes" class="tab-content">
+            <div style="background:var(--col-bg); padding:20px; border-radius:12px; margin-bottom:20px;">
+                <div class="flex-between">
+                    <h3 style="margin:0; color:var(--primary);">📝 จัดการ Quiz</h3>
+                    <button class="magic-btn" onclick="openQuizModal()">Create Quiz</button>
+                </div>
+            </div>
+            <div style="overflow-x:auto;">
+                <table id="quizzesTable">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Questions</th>
+                            <th>Score/Q</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
         <div id="tab-leaderboard" class="tab-content">
             <div id="leaderboardList" class="lb-container" style="max-width:900px; margin:0 auto;"></div>
         </div>
@@ -909,6 +933,27 @@
                     id="btn-gen-pdf" onclick="generateCertPDF()">🖨️ PDF</button></div>
         </div>
     </div>
+    <div id="quizManageModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <span class="close-modal"
+                onclick="document.getElementById('quizManageModal').style.display='none'">&times;</span>
+            <h2 id="quiz-manage-title">Manage Quiz</h2>
+            <input type="hidden" id="edit-quiz-id">
+            <div style="display:flex; gap:10px;">
+                <input type="text" id="quiz-title" placeholder="Quiz Title" style="flex:2;">
+                <input type="number" id="quiz-score-per-q" value="1" step="0.1" placeholder="Score/Q" style="flex:1;">
+            </div>
+            <textarea id="quiz-desc" placeholder="Description"></textarea>
+            <hr>
+            <h3>Questions</h3>
+            <div id="quiz-questions-container"
+                style="max-height: 400px; overflow-y: auto; text-align: left; padding: 10px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px;">
+            </div>
+            <button class="btn-sm btn-dark" onclick="addQuestionUI()">+ Add Question</button>
+            <button class="magic-btn" style="width:100%; margin-top:15px;" onclick="saveQuiz()">💾 Save Quiz</button>
+        </div>
+    </div>
+
     <div id="shareModal" class="modal" style="z-index:3000;">
         <div class="modal-content" style="max-width:300px;text-align:center;">
             <h3><i class="fa-solid fa-share-nodes"></i> Share Leaderboard</h3><button class="magic-btn"
@@ -1003,6 +1048,118 @@
             try { await liff.init({ liffId: ADMIN_LIFF_ID }); } catch (e) { console.warn("LIFF Init Failed (Non-critical):", e); }
         }
 
+        // --- Quiz Logic ---
+        let quizzesData = [];
+        function openQuizModal(id = null) {
+            document.getElementById('quizManageModal').style.display = 'block';
+            const container = document.getElementById('quiz-questions-container');
+            container.innerHTML = "";
+            if (id) {
+                const q = quizzesData.find(x => x.id === id);
+                document.getElementById('edit-quiz-id').value = id;
+                document.getElementById('quiz-title').value = q.title;
+                document.getElementById('quiz-score-per-q').value = q.scorePerQuestion || 1;
+                document.getElementById('quiz-desc').value = q.description || "";
+                if (q.questions) q.questions.forEach(item => addQuestionUI(item));
+            } else {
+                document.getElementById('edit-quiz-id').value = "";
+                document.getElementById('quiz-title').value = "";
+                document.getElementById('quiz-score-per-q').value = 1;
+                document.getElementById('quiz-desc').value = "";
+                addQuestionUI();
+            }
+        }
+
+        function addQuestionUI(data = null) {
+            const container = document.getElementById('quiz-questions-container');
+            const div = document.createElement('div');
+            div.className = 'quiz-q-item';
+            div.style = 'border:1px solid #eee; padding:10px; margin-bottom:10px; border-radius:6px; background:#f9f9f9;';
+            div.innerHTML = `
+                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                    <b>Question</b>
+                    <button class="btn-sm btn-danger" onclick="this.parentElement.parentElement.remove()">✕</button>
+                </div>
+                <input type="text" class="q-text" placeholder="Question text..." value="${data ? data.q : ''}">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
+                    <input type="text" class="q-opt" placeholder="Option 1" value="${data ? data.options[0] : ''}">
+                    <input type="text" class="q-opt" placeholder="Option 2" value="${data ? data.options[1] : ''}">
+                    <input type="text" class="q-opt" placeholder="Option 3" value="${data ? data.options[2] : ''}">
+                    <input type="text" class="q-opt" placeholder="Option 4" value="${data ? data.options[3] : ''}">
+                </div>
+                <div style="margin-top:5px; font-size:0.85em;">
+                    Correct Answer: 
+                    <select class="q-correct">
+                        <option value="0" ${data && data.correct == 0 ? 'selected' : ''}>Option 1</option>
+                        <option value="1" ${data && data.correct == 1 ? 'selected' : ''}>Option 2</option>
+                        <option value="2" ${data && data.correct == 2 ? 'selected' : ''}>Option 3</option>
+                        <option value="3" ${data && data.correct == 3 ? 'selected' : ''}>Option 4</option>
+                    </select>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        async function saveQuiz() {
+            const id = document.getElementById('edit-quiz-id').value;
+            const title = document.getElementById('quiz-title').value.trim();
+            if (!title) return alert("Title required");
+
+            const qItems = document.querySelectorAll('.quiz-q-item');
+            const questions = [];
+            qItems.forEach(item => {
+                const qText = item.querySelector('.q-text').value;
+                const opts = [...item.querySelectorAll('.q-opt')].map(i => i.value);
+                const correct = parseInt(item.querySelector('.q-correct').value);
+                if (qText && opts.every(o => o)) {
+                    questions.push({ q: qText, options: opts, correct });
+                }
+            });
+
+            const data = {
+                title,
+                description: document.getElementById('quiz-desc').value,
+                scorePerQuestion: parseFloat(document.getElementById('quiz-score-per-q').value),
+                questions,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            try {
+                if (id) {
+                    await db.collection("quizzes").doc(id).update(data);
+                } else {
+                    data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    data.isActive = true;
+                    await db.collection("quizzes").add(data);
+                }
+                document.getElementById('quizManageModal').style.display = 'none';
+                showToast("Quiz Saved!");
+            } catch (e) { alert(e.message); }
+        }
+
+        function renderQuizzes() {
+            const tbody = document.querySelector("#quizzesTable tbody");
+            tbody.innerHTML = "";
+            quizzesData.forEach(q => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${q.title}</td>
+                        <td>${q.questions ? q.questions.length : 0} Qs</td>
+                        <td>${q.scorePerQuestion}</td>
+                        <td>${q.isActive ? '✅ Active' : '❌ Inactive'}</td>
+                        <td>
+                            <button class="btn-sm btn-primary" onclick="openQuizModal('${q.id}')">Edit</button>
+                            <button class="btn-sm btn-dark" onclick="toggleQuizStatus('${q.id}', ${q.isActive})">${q.isActive ? 'Deactivate' : 'Activate'}</button>
+                            <button class="btn-sm btn-danger" onclick="deleteQuiz('${q.id}')">Del</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function toggleQuizStatus(id, current) { await db.collection("quizzes").doc(id).update({ isActive: !current }); }
+        async function deleteQuiz(id) { if (confirm("Delete this quiz?")) await db.collection("quizzes").doc(id).delete(); }
+
         function switchTab(id) { document.querySelectorAll('.tab-content,.tab-btn').forEach(e => e.classList.remove('active')); document.getElementById(id).classList.add('active'); event.target.classList.add('active'); }
 
         function loadData() {
@@ -1010,6 +1167,7 @@
             db.collection("users").orderBy("score", "desc").onSnapshot(s => { usersData = s.docs.map(d => ({ id: d.id, ...d.data() })); renderTable('users'); renderLeaderboard(); updateAssigneeList(); renderCertTable(); });
             db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban);
             db.collection("quests").onSnapshot(s => { questsCache = s.docs.map(d => ({ id: d.id, ...d.data() })); loadActiveQuests(); loadQuestHistory(); });
+            db.collection("quizzes").onSnapshot(s => { quizzesData = s.docs.map(d => ({ id: d.id, ...d.data() })); renderQuizzes(); });
             db.collection("quest_submissions").onSnapshot(s => { questsSubCache = {}; s.forEach(d => { questsSubCache[`${d.data().questId}_${d.data().userId}`] = d.data(); }); filterBoard(); });
         }
 
