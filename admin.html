@@ -616,6 +616,55 @@
             width: 20px;
             height: 20px;
         }
+
+        /* 🔥 Quiz V71.4 Polish */
+        .quiz-q-item {
+            border: 1px solid #eee;
+            padding: 20px;
+            border-radius: 12px;
+            background: #ffffff !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+            margin-bottom: 15px;
+        }
+
+        .correct-circle-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 2px solid #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: bold;
+            color: #777;
+            transition: 0.2s all ease;
+            background: white;
+            user-select: none;
+            font-size: 0.9em;
+        }
+
+        .q-correct-radio:checked+.correct-circle-btn {
+            background: var(--success);
+            color: white;
+            border-color: var(--success);
+            box-shadow: 0 0 8px rgba(46, 196, 182, 0.4);
+        }
+
+        .q-opt-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .q-opt-prefix {
+            font-weight: bold;
+            color: var(--primary);
+            min-width: 25px;
+            font-size: 1.1em;
+            text-align: center;
+        }
     </style>
 </head>
 
@@ -978,13 +1027,13 @@
             </div>
             <div style="display:flex; gap:10px; margin-top:5px; margin-bottom:10px;">
                 <div style="flex:1;">
-                    <label style="font-size:0.8em; color:#66ff;"><i class="fa-solid fa-calendar-play"></i> Start
-                        Time</label>
+                    <label style="font-size:0.8em; color:#4361ee; font-weight:bold;"><i
+                            class="fa-solid fa-calendar-play"></i> Start Time (dd/mm/yyyy 24h)</label>
                     <input type="datetime-local" id="quiz-start-time">
                 </div>
                 <div style="flex:1;">
-                    <label style="font-size:0.8em; color:#ef233c;"><i class="fa-solid fa-hourglass-end"></i>
-                        Deadline</label>
+                    <label style="font-size:0.8em; color:#ef233c; font-weight:bold;"><i
+                            class="fa-solid fa-hourglass-end"></i> Deadline (dd/mm/yyyy 24h)</label>
                     <input type="datetime-local" id="quiz-deadline">
                 </div>
             </div>
@@ -1172,63 +1221,45 @@
             updateQuizPagination();
         }
 
-        function highlightCorrectOpt(div) {
-            const sel = div.querySelector('.q-correct');
-            const idx = parseInt(sel.value);
-            const opts = div.querySelectorAll('.q-opt');
-            opts.forEach((opt, i) => {
-                if (i === idx) {
-                    opt.style.background = '#d1e7dd';
-                    opt.style.borderColor = '#2ec4b6';
-                    opt.style.fontWeight = 'bold';
-                } else {
-                    opt.style.background = '';
-                    opt.style.borderColor = '';
-                    opt.style.fontWeight = '';
-                }
-            });
-        }
+
 
         function addQuestionUI(data = null) {
             const container = document.getElementById('quiz-questions-container');
+            const qId = Date.now() + Math.floor(Math.random() * 1000);
             const div = document.createElement('div');
             div.className = 'quiz-q-item';
-            div.style = 'border:1px solid #eee; padding:15px; border-radius:8px; background:#fcfcfc;';
             div.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;">
-                    <b style="color:var(--primary);">คำถาม Question</b>
-                    <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
+                    <b style="color:var(--primary); font-size:1.1em;">คำถาม Question</b>
+                    <div style="display:flex; align-items:center; gap:10px;">
                         <label style="font-size:0.8em; color:#666;">Timer (sec):</label>
-                        <input type="number" class="q-timer" value="${data ? (data.timer || 60) : 60}" style="width:60px; display:inline-block; margin:0; padding:2px;">
-                        <button class="btn-sm btn-danger" onclick="this.closest('.quiz-q-item').remove(); updateQuizPagination();" style="margin-left:10px;">✕ Delete</button>
+                        <input type="number" class="q-timer" value="${data ? (data.timer || 60) : 60}" style="width:70px; margin:0; padding:4px;">
+                        <button class="btn-sm btn-danger" onclick="if(confirm('Delete this question?')){this.closest('.quiz-q-item').remove(); updateQuizPagination();}" style="padding:6px 12px;">✕ Delete</button>
                     </div>
                 </div>
-                <div style="margin-bottom:10px;">
-                    <label style="font-size:0.85em; font-weight:bold;">โจทย์คำถาม:</label>
-                    <textarea class="q-text" placeholder="พิมพ์โจทย์ที่นี่..." style="margin-top:5px; height:60px;">${data ? data.q : ''}</textarea>
+                <div style="margin-bottom:15px;">
+                    <label style="font-size:0.9em; font-weight:bold; margin-bottom:5px; display:block;">โจทย์คำถาม:</label>
+                    <textarea class="q-text" placeholder="พิมพ์โจทย์ที่นี่..." style="height:80px; font-size:1em;">${data ? data.q : ''}</textarea>
                 </div>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px;">
-                    <div><label style="font-size:0.75em; color:#888;">Option 1</label><input type="text" class="q-opt" value="${data ? data.options[0] : ''}"></div>
-                    <div><label style="font-size:0.75em; color:#888;">Option 2</label><input type="text" class="q-opt" value="${data ? data.options[1] : ''}"></div>
-                    <div><label style="font-size:0.75em; color:#888;">Option 3</label><input type="text" class="q-opt" value="${data ? data.options[2] : ''}"></div>
-                    <div><label style="font-size:0.75em; color:#888;">Option 4</label><input type="text" class="q-opt" value="${data ? data.options[3] : ''}"></div>
+                <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+                    <div class="q-opt-row"><span class="q-opt-prefix">ก.</span><input type="text" class="q-opt" value="${data ? data.options[0] : ''}" placeholder="ตัวเลือก 1"></div>
+                    <div class="q-opt-row"><span class="q-opt-prefix">ข.</span><input type="text" class="q-opt" value="${data ? data.options[1] : ''}" placeholder="ตัวเลือก 2"></div>
+                    <div class="q-opt-row"><span class="q-opt-prefix">ค.</span><input type="text" class="q-opt" value="${data ? data.options[2] : ''}" placeholder="ตัวเลือก 3"></div>
+                    <div class="q-opt-row"><span class="q-opt-prefix">ง.</span><input type="text" class="q-opt" value="${data ? data.options[3] : ''}" placeholder="ตัวเลือก 4"></div>
                 </div>
-                <div style="background:#f1f3f5; padding:10px; border-radius:6px; display:flex; align-items:center; gap:10px;">
-                    <label style="font-weight:bold; font-size:0.9em; min-width:100px;">✅ คำตอบที่ถูก:</label> 
-                    <select class="q-correct" onchange="highlightCorrectOpt(this.closest('.quiz-q-item'))" style="margin:0;">
-                        <option value="0" ${data && data.correct == 0 ? 'selected' : ''}>Option 1</option>
-                        <option value="1" ${data && data.correct == 1 ? 'selected' : ''}>Option 2</option>
-                        <option value="2" ${data && data.correct == 2 ? 'selected' : ''}>Option 3</option>
-                        <option value="3" ${data && data.correct == 3 ? 'selected' : ''}>Option 4</option>
-                    </select>
+                <div style="background:#f8f9fa; padding:15px; border-radius:12px; display:flex; align-items:center; gap:20px; flex-wrap:nowrap; border:1px solid #eee;">
+                    <label style="font-weight:bold; font-size:1em; color:#333; white-space:nowrap;">✅ คำตอบที่ถูก:</label> 
+                    <div style="display:flex; gap:15px;">
+                        ${[0, 1, 2, 3].map(i => `
+                            <div style="display:flex; align-items:center;">
+                                <input type="radio" name="q-correct-${qId}" value="${i}" id="corr-${qId}-${i}" class="q-correct-radio" ${data && data.correct == i ? 'checked' : (!data && i === 0 ? 'checked' : '')} style="display:none;">
+                                <label for="corr-${qId}-${i}" class="correct-circle-btn">${i + 1}</label>
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
             `;
             container.appendChild(div);
-
-            // Initial highlight
-            highlightCorrectOpt(div);
-
-            // If it's a new question from button click, go to it
             if (!data) {
                 const total = document.querySelectorAll('.quiz-q-item').length;
                 quizQPageIndex = total - 1;
@@ -1246,7 +1277,8 @@
             qItems.forEach(item => {
                 const qText = item.querySelector('.q-text').value;
                 const opts = [...item.querySelectorAll('.q-opt')].map(i => i.value);
-                const correct = parseInt(item.querySelector('.q-correct').value);
+                const correctEl = item.querySelector('.q-correct-radio:checked');
+                const correct = correctEl ? parseInt(correctEl.value) : 0;
                 const timer = parseInt(item.querySelector('.q-timer').value) || 60;
                 if (qText && opts.every(o => o)) {
                     questions.push({ q: qText, options: opts, correct, timer });
