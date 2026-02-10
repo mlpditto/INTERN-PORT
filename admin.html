@@ -2393,316 +2393,315 @@
         }
 
         async function loadLeaderboardCharts(users) {
-            // Batch process (max 10 for 'in' query)
-            const batches = [];
-            while (users.length > 0) batches.push(users.splice(0, 10));
+            // Process individually to avoid complex composite index requirements
+            for (const u of users) {
+                const container = document.getElementById(`chart-${u.id}`);
+                if (!container) continue;
 
-            for (const batch of batches) {
-                const uids = batch.map(u => u.id);
                 try {
-                    // Fetch data for this batch
-                    // Note: We fetch from multiple collections to reconstruct history. This is heavy but necessary for accurate history.
-                    // Limiting history to 4 months ~ 120 days for performance if no startDate
-                    const ninetyDaysAgo = new Date(); ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 120);
+                    // Default query range: last 120 days for performance.
+                    // If user's start date is more recent than 120 days ago, query from user's start date.
+                    let queryStart = new Date();
+                    queryStart.setDate(queryStart.getDate() - 120); // This is 120 days ago
 
+                    if (u.startDate) {
+                        const userStartDate = new Date(u.startDate);
+                        if (userStartDate > queryStart) { // If user's start date is more recent than 120 days ago
+                            queryStart = userStartDate;
+                        }
+                    }
+
+                    // Fetch data just for this user
                     const [worksSnap, questsSnap, logsSnap] = await Promise.all([
-                        db.collection("works").where("userId", "in", uids).where("timestamp", ">", ninetyDaysAgo).get(),
-                        db.collection("quest_submissions").where("userId", "in", uids).where("submittedAt", ">", ninetyDaysAgo).get(),
-                        db.collection("checkin_logs").where("userId", "in", uids).where("timestamp", ">", ninetyDaysAgo).get()
+                        db.collection("works").where("userId", "==", u.id).where("timestamp", ">", queryStart).get(),
+                        db.collection("quest_submissions").where("userId", "==", u.id).where("submittedAt", ">", queryStart).get(),
+                        db.collection("checkin_logs").where("userId", "==", u.id).where("timestamp", ">", queryStart).get()
                     ]);
 
-                    const pointsMap = {}; // { uid: { dateStr: score } }
-                    uids.forEach(id => pointsMap[id] = {});
+                    const pointsMap = {};
 
-                    // Helper to add points
-                    const addP = (uid, dateObj, score) => {
+                    const addP = (dateObj, score) => {
                         if (!dateObj || !score) return;
                         const d = dateObj.toDate().toISOString().split('T')[0];
-                        if (!pointsMap[uid]) pointsMap[uid] = {};
-                        if (!pointsMap[uid][d]) pointsMap[uid][d] = 0;
-                        pointsMap[uid][d] += parseFloat(score);
+                        if (!pointsMap[d]) pointsMap[d] = 0;
+                        pointsMap[d] += parseFloat(score);
                     };
 
-                    worksSnap.forEach(doc => { const d = doc.data(); addP(d.userId, d.timestamp, d.score); });
-                    questsSnap.forEach(doc => { const d = doc.data(); addP(d.userId, d.submittedAt, (d.earnedScore || 0) + (d.bonusGiven || 0)); });
-                    logsSnap.forEach(doc => { const d = doc.data(); addP(d.userId, d.timestamp, d.amount); });
+                    worksSnap.forEach(doc => { const d = doc.data(); addP(d.timestamp, d.score); });
+                    questsSnap.forEach(doc => { const d = doc.data(); addP(d.submittedAt, (d.earnedScore || 0) + (d.bonusGiven || 0)); });
+                    logsSnap.forEach(doc => { const d = doc.data(); addP(d.timestamp, d.amount); });
 
-                    // Render charts
-                    batch.forEach(u => {
-                        const container = document.getElementById(`chart-${u.id}`);
-                        if (!container) return;
-                        container.innerHTML = "";
+                    container.innerHTML = "";
 
-                        // Determine Date Range
-                        const start = u.startDate ? new Date(u.startDate) : new Date(Date.now() - 90 * 86400000);
-                        let end = u.endDate ? new Date(u.endDate) : new Date();
-                        if (end < start) end = new Date(); // Safety
+                    // Determine Display Range
+                    const start = u.startDate ? new Date(u.startDate) : new Date(Date.now() - 90 * 86400000);
+                    let end = u.endDate ? new Date(u.endDate) : new Date();
+                    if (end < start) end = new Date();
 
-                        const totalMs = end - start;
-                        const totalDays = Math.ceil(totalMs / (86400000));
-                        if (totalDays <= 0) return;
+                    const totalMs = end - start;
+                    const totalDays = Math.ceil(totalMs / (86400000));
 
-                        // Identify max score for scaling (per day max)
-                        let maxDaily = 0.1;
-                        Object.values(pointsMap[u.id] || {}).forEach(s => { if (s > maxDaily) maxDaily = s; });
+                    if (totalDays <= 0) {
+                        container.innerHTML = "<span style='font-size:0.7em; color:#ccc'>Invalid Dates</span>";
+                        continue;
+                    }
 
-                        // Draw Bars
-                        Object.keys(pointsMap[u.id] || {}).forEach(dateStr => {
-                            const d = new Date(dateStr);
-                            if (d < start || d > end) return; // Point outside range
+                    // Find max score for scaling
+                    let maxDaily = 0.5; // Minimum scale
+                    Object.values(pointsMap).forEach(s => { if (s > maxDaily) maxDaily = s; });
 
-                            const dayOffset = Math.ceil((d - start) / 86400000);
-                            const leftPct = (dayOffset / totalDays) * 100;
-                            const score = pointsMap[u.id][dateStr];
-                            const heightPct = Math.min((score / maxDaily) * 100, 100);
+                    // Render Bars
+                    Object.keys(pointsMap).forEach(dateStr => {
+                        const d = new Date(dateStr);
+                        // Filter points outside the display timeline
+                        if (d < start || d > end) return;
 
+                        const dayOffset = (d - start) / 86400000;
+                        const leftPct = (dayOffset / totalDays) * 100;
+                        const score = pointsMap[dateStr];
+                        // If score is negative (penalty), handle differently? For now, clamp to 0 for chart height, or use absolute.
+                        // Let's assume positive progress mainly.
+                        const heightPct = Math.min((Math.max(0, score) / maxDaily) * 100, 100);
+
+                        if (heightPct > 0) {
                             const bar = document.createElement('div');
                             bar.className = 'chart-bar';
                             bar.style.left = `${leftPct}%`;
-                            bar.style.height = `${heightPct * 0.8}%`; // Max 80% height to leave room
-                            bar.style.width = `${Math.max(100 / totalDays, 2)}%`; // Dynamic width
+                            bar.style.height = `${heightPct * 0.8}%`;
+                            bar.style.width = `${Math.max(100 / totalDays, 2)}%`;
                             bar.title = `${dateStr}: ${score.toFixed(2)}`;
                             container.appendChild(bar);
-                        });
-
-                        // Draw Markers (Start / End)
-                        // Actually, the container REPRESENTS the range [start, end].
-                        // So Start is 0%, End is 100%.
-                        // We just need labels.
-                        const sMark = document.createElement('div');
-                        sMark.className = 'chart-marker start';
-                        sMark.style.left = '0%';
-                        sMark.innerHTML = `<span>${start.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</span>`;
-                        container.appendChild(sMark);
-
-                        const eMark = document.createElement('div');
-                        eMark.className = 'chart-marker';
-                        eMark.style.left = '100%';
-                        eMark.innerHTML = `<span>${end.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</span>`;
-                        container.appendChild(eMark);
-
-                        // If Today is within range, show Today marker?
-                        const today = new Date();
-                        if (today >= start && today <= end) {
-                            const todayOffset = Math.ceil((today - start) / 86400000);
-                            const todayPct = (todayOffset / totalDays) * 100;
-                            const tMark = document.createElement('div');
-                            tMark.className = 'chart-marker';
-                            tMark.style.left = `${todayPct}%`;
-                            tMark.style.background = '#ffc107'; // Yellow for Today
-                            tMark.style.height = '50%'; // Shorter
-                            tMark.style.top = 'auto';
-                            tMark.style.bottom = '0';
-                            tMark.title = "Today";
-                            container.appendChild(tMark);
                         }
                     });
 
+                    // Draw Start Marker
+                    const sMark = document.createElement('div');
+                    sMark.className = 'chart-marker start';
+                    sMark.style.left = '0%';
+                    sMark.innerHTML = `<span>${start.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</span>`;
+                    container.appendChild(sMark);
+
+                    // Draw End Marker
+                    const eMark = document.createElement('div');
+                    eMark.className = 'chart-marker';
+                    eMark.style.left = '100%';
+                    eMark.innerHTML = `<span>${end.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</span>`;
+                    container.appendChild(eMark);
+
+                    // Draw Today Marker
+                    const today = new Date();
+                    if (today >= start && today <= end) {
+                        const todayOffset = (today - start) / 86400000;
+                        const todayPct = (todayOffset / totalDays) * 100;
+                        const tMark = document.createElement('div');
+                        tMark.className = 'chart-marker';
+                        tMark.style.left = `${todayPct}%`;
+                        tMark.style.background = '#ffc107';
+                        tMark.style.height = '60%';
+                        tMark.style.zIndex = '2';
+                        tMark.title = "Today";
+                        container.appendChild(tMark);
+                    }
+
                 } catch (e) {
-                    console.error("Chart Error:", e);
-                }
-            }
-        }
+                    function renderKanban(snap) { const cols = { "Backlog": document.getElementById("Backlog"), "Doing": document.getElementById("Doing"), "Review": document.getElementById("Review"), "Done": document.getElementById("Done") }; Object.values(cols).forEach(e => e.innerHTML = ""); const cnt = { "Backlog": 0, "Doing": 0, "Review": 0, "Done": 0 }; const filter = document.getElementById('board-search').value.toLowerCase(); snap.forEach(doc => { const q = doc.data(); sideQuestsCache[doc.id] = q; if (q.status === 'Archived') return; let match = q.title.toLowerCase().includes(filter); if (q.assignees) q.assignees.forEach(u => { if (u.name.toLowerCase().includes(filter)) match = true; }); if (!match) return; if (cols[q.status]) { cnt[q.status]++; const isProj = q.isProject === true; const d = document.createElement('div'); d.className = `kanban-card card-${q.status} ${q.isScored ? 'scored' : ''} ${isProj ? 'project' : ''}`; d.dataset.id = doc.id; let imgs = '<div class="assignee-stack">'; if (q.assignees) q.assignees.forEach(u => imgs += `<img src="${u.pic}" class="assignee-img" title="${u.name}">`); imgs += '</div>'; let timersHtml = ""; if (q.refQuestId && q.assigneeIds && q.assigneeIds.length > 0) { const globalQ = questsCache.find(x => x.id === q.refQuestId); const subKey = `${q.refQuestId}_${q.assigneeIds[0]}`; const sub = questsSubCache[subKey]; if (globalQ && globalQ.deadline && q.status !== 'Done') { timersHtml += `<span class="timer-global" data-dead="${globalQ.deadline.toDate().getTime()}">⏳ Exp: ...</span>`; } if (sub) { if (sub.status === 'received' && sub.deadline && q.status === 'Doing') { timersHtml += `<span class="timer-active" data-dead="${sub.deadline.toDate().getTime()}">⏱️ ...</span>`; } else if (sub.status === 'unsuccessful' && sub.cooldownUntil && q.status === 'Backlog') { timersHtml += `<span class="timer-cooldown" data-dead="${sub.cooldownUntil.toDate().getTime()}">❄️ Cool: ...</span>`; } } } let act = ""; if (q.status === 'Done' && q.doneAt) act = `<button class="btn-sm btn-dark" style="width:100%;margin-top:5px;" onclick="archiveSQ('${doc.id}')">📥 ar·chive</button>`; else if (!q.isScored && q.status !== 'Backlog' && q.status !== 'Done') act = `<button class="btn-sm btn-success" style="width:100%;margin-top:5px;" onclick="giveScore('${doc.id}')">💰 ให้คะแนน</button>`; let chatBtn = ""; if (isProj) chatBtn = `<button class="btn-sm" style="color:var(--primary); font-size:1.1em;" onclick="openChat('${doc.id}', '${q.title}')"><i class="fa-solid fa-comments"></i></button>`; let arrows = `<div class="arrow-controls">`; if (q.status !== 'Backlog') arrows += `<button class="btn-arrow" onclick="moveCard('${doc.id}','prev')"><i class="fa-solid fa-chevron-left"></i></button>`; if (q.status !== 'Done') arrows += `<button class="btn-arrow" onclick="moveCard('${doc.id}','next')"><i class="fa-solid fa-chevron-right"></i></button>`; arrows += `</div>`; let pColor = '#17a2b8'; if (q.priority === 'Medium') pColor = '#ff9f1c'; if (q.priority === 'High') pColor = '#ef233c'; d.innerHTML = `<div class="card-header-row"><span class="badge" style="background:${pColor}">${q.priority}</span><div class="card-header-right">${imgs} ${arrows}</div></div><div style="font-weight:bold;">${isProj ? '<span class="badge" style="background:#e83e8c;font-size:0.6em;">PROJ</span>' : ''} ${q.title}</div><div class="card-timers">${timersHtml}</div><p style="font-size:0.85em; color:#666; margin-bottom:5px;">${q.description || '-'}</p><div class="card-tool-row"><div><button class="btn-sm btn-warning" onclick="openTaskModal('${doc.id}')"><i class="fa-solid fa-pen"></i></button><button class="btn-sm btn-danger" onclick="startDeleteCard('${doc.id}')"><i class="fa-solid fa-trash"></i></button></div>${chatBtn}</div>${act}`; cols[q.status].appendChild(d); } }); Object.keys(cnt).forEach(k => document.getElementById(`cnt-${k}`).innerText = cnt[k]); }
+                    function updateRealtimeTimers() { const now = Date.now(); document.querySelectorAll('.timer-global').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) el.innerText = "⏳ Expired"; else { const h = Math.floor(diff / 3600000); const m = Math.floor((diff % 3600000) / 60000); el.innerText = `⏳ Ends: ${h}h ${m}m`; } }); document.querySelectorAll('.timer-active').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) { el.innerText = "⏱️ Time Up!"; const card = el.closest('.kanban-card'); if (card && card.parentElement.id === 'Doing') { db.collection("side_quests").doc(card.dataset.id).update({ status: 'Review' }); } } else { const m = Math.floor(diff / 60000); const s = Math.floor((diff % 60000) / 1000); el.innerText = `⏱️ ${m}m ${s}s`; } }); document.querySelectorAll('.timer-cooldown').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) el.innerText = "❄️ Ready"; else { const m = Math.floor(diff / 60000); const s = Math.floor((diff % 60000) / 1000); el.innerText = `❄️ Cool: ${m}m ${s}s`; } }); updateQuestTimers(); }
+                    function startDeleteCard(id) { deleteCardId = id; document.getElementById('delCardModal').style.display = 'block'; const btn = document.getElementById('btn-del-card-confirm'); btn.disabled = false; btn.style.background = '#ef233c'; let c = 5; btn.innerText = `Confirm (${c})`; if (deleteTimer) clearInterval(deleteTimer); deleteTimer = setInterval(() => { c--; btn.innerText = `Confirm (${c})`; if (c <= 0) { clearInterval(deleteTimer); document.getElementById('delCardModal').style.display = 'none'; showToast("Cancelled"); } }, 1000); btn.onclick = executeDeleteCard; }
+                    async function executeDeleteCard() { if (!deleteCardId) return; clearInterval(deleteTimer); document.getElementById('delCardModal').style.display = 'none'; const deduct = confirm("หักคะแนนผู้รับผิดชอบ?\nOK=หัก, Cancel=ไม่หัก"); try { const q = sideQuestsCache[deleteCardId]; const b = db.batch(); if (deduct && q.assigneeIds) { const s = prompt("Points to deduct (e.g., 0.5):"); if (s) { q.assigneeIds.forEach(u => { b.update(db.collection("users").doc(u), { score: firebase.firestore.FieldValue.increment(-parseFloat(s)) }); b.set(db.collection("checkin_logs").doc(), { userId: u, type: 'manual_adjust', amount: -parseFloat(s), note: `Del: ${q.title}`, timestamp: firebase.firestore.FieldValue.serverTimestamp() }); }); } } b.delete(db.collection("side_quests").doc(deleteCardId)); await b.commit(); showToast("Deleted!"); } catch (e) { alert(e.message); } }
+                    function openTaskModal(id = null) { document.getElementById('taskModal').style.display = 'block'; if (id) { const q = sideQuestsCache[id]; document.getElementById('edit-id').value = id; document.getElementById('sq-title').value = q.title; document.getElementById('sq-desc').value = q.description; document.getElementById('sq-priority').value = q.priority; document.getElementById('sq-due').value = q.dueDate || ""; document.getElementById('sq-isProject').checked = q.isProject || false; } else { document.getElementById('edit-id').value = ""; document.getElementById('sq-title').value = ""; document.getElementById('sq-desc').value = ""; } }
+                    async function saveSideQuest() { const id = document.getElementById('edit-id').value; const t = document.getElementById('sq-title').value; if (!t) return alert("Title?"); const d = { title: t, description: document.getElementById('sq-desc').value, priority: document.getElementById('sq-priority').value, dueDate: document.getElementById('sq-due').value, isProject: document.getElementById('sq-isProject').checked, assigneeIds: [...document.querySelectorAll('.sq-user-check:checked')].map(c => c.value), assignees: [...document.querySelectorAll('.sq-user-check:checked')].map(c => ({ uid: c.value, name: c.dataset.name, pic: c.dataset.pic })) }; if (id) { await db.collection("side_quests").doc(id).update(d); showToast("Updated"); } else { d.status = "Backlog"; d.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").add(d); showToast("Created"); } document.getElementById('taskModal').style.display = 'none'; }
+                    let chatUnsub; function openChat(id, title) { document.getElementById('chatModal').style.display = 'block'; document.getElementById('chat-title').innerText = `💬 ${title}`; document.getElementById('chat-card-id').value = id; const box = document.getElementById('chat-box'); box.innerHTML = "Loading..."; if (chatUnsub) chatUnsub(); chatUnsub = db.collection("side_quests").doc(id).collection("comments").orderBy("timestamp", "asc").onSnapshot(snap => { box.innerHTML = ""; snap.forEach(d => { const m = d.data(); const cls = m.sender === 'Admin' ? 'msg-admin' : 'msg-user'; let pic = m.pic ? `<img src="${m.pic}" class="chat-avatar">` : '<div class="chat-avatar" style="background:#ccc;">?</div>'; if (m.sender === 'Admin') pic = '<div class="chat-avatar" style="background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;">A</div>'; let msg = m.msg.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#007bff;text-decoration:underline;">$1</a>'); msg = msg.replace(/@([^\s]+)/g, (match, name) => { const q = sideQuestsCache[id]; const inP = q.assignees && q.assignees.some(u => u.name.toLowerCase().includes(name.toLowerCase())); return inP ? `<span class="tag-in">${match}</span>` : `<span class="tag-out">${match}</span>`; }); box.innerHTML += `<div class="chat-msg ${cls}">${pic}<div><b>${m.sender}</b>: ${msg}</div></div>`; }); box.scrollTop = box.scrollHeight; }); }
+                    async function sendChat() { const t = document.getElementById('chat-input').value.trim(); const id = document.getElementById('chat-card-id').value; if (!t) return; await db.collection("side_quests").doc(id).collection("comments").add({ msg: t, sender: 'Admin', timestamp: firebase.firestore.FieldValue.serverTimestamp() }); document.getElementById('chat-input').value = ""; }
+                    async function openArchiveModal() { const l = document.getElementById("archive-list"); l.innerHTML = "Loading..."; document.getElementById("archiveModal").style.display = "block"; const s = await db.collection("side_quests").where("status", "==", "Archived").get(); let i = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)); l.innerHTML = ""; i.forEach(q => { let imgs = ""; if (q.assignees) q.assignees.forEach(u => imgs += `<img src="${u.pic}" style="width:24px;height:24px;border-radius:50%;margin-right:2px;">`); l.innerHTML += `<div style="padding:10px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between;align-items:center;"><div><b>${q.title}</b> (+${q.archiveScore || 0})<br>${imgs}</div><div><button class="btn-sm btn-success" onclick="restoreSQ('${q.id}','Done')">Restore</button> <button class="btn-sm btn-danger" onclick="delArchiveDoc('${q.id}')">Del</button></div></div>` }); }
+                    async function delArchiveDoc(id) { if (confirm("Del?")) await db.collection("side_quests").doc(id).delete(); openArchiveModal(); }
+                    async function restoreSQ(id, t) { await db.collection("side_quests").doc(id).update({ status: t, doneAt: firebase.firestore.FieldValue.serverTimestamp() }); openArchiveModal(); showToast("Restored"); }
+                    function confirmClearArchive() { document.getElementById('clearConfirmModal').style.display = 'block'; const btn = document.getElementById('btn-confirm-clear'); btn.disabled = true; btn.style.background = '#ccc'; let c = 5; btn.innerText = `Confirm (${c})`; const t = setInterval(() => { c--; btn.innerText = `Confirm (${c})`; if (c <= 0) { clearInterval(t); btn.disabled = false; btn.style.background = '#ef233c'; btn.innerText = "CLEAR ALL"; btn.onclick = async () => { document.getElementById('clearConfirmModal').style.display = 'none'; const s = await db.collection("side_quests").where("status", "==", "Archived").get(); const b = db.batch(); s.forEach(d => b.delete(d.ref)); await b.commit(); showToast("Cleared!"); openArchiveModal(); } } }, 1000); }
+                    function renderHistoryPage() { const l = document.getElementById("history-list"); const c = document.getElementById("history-controls"); l.innerHTML = ""; c.innerHTML = ""; const s = (historyPage - 1) * HISTORY_PER_PAGE; const p = historyCache.slice(s, s + HISTORY_PER_PAGE); const t = Math.ceil(historyCache.length / HISTORY_PER_PAGE); p.forEach(e => { const d = e.t ? e.t.toLocaleString('th-TH') : '-'; let cls = e.type === 'bonus' ? 'bonus' : (e.type === 'manual' ? 'manual' : ''); let delBtn = ""; if (e.source === 'checkin_logs' && e.docId) { delBtn = `<button class="btn-del-hist" onclick="deleteHistoryLog('${e.docId}', ${e.score})">✕ Delete</button>`; } l.innerHTML += `<li style="padding:10px;border-bottom:1px solid #eee;" class="${cls}"><div style="display:flex;justify-content:space-between;align-items:center;"><div>${e.text} ${delBtn}</div><span style="font-weight:bold;">${e.score > 0 ? '+' : ''}${e.score}</span></div><small style="color:#888">${d}</small></li>` }); if (t > 1) { c.innerHTML = `<button class="btn-sm btn-dark" ${historyPage === 1 ? 'disabled' : ''} onclick="historyPage--;renderHistoryPage()">< Prev</button> <span style="align-self:center;">${historyPage}/${t}</span> <button class="btn-sm btn-dark" ${historyPage === t ? 'disabled' : ''} onclick="historyPage++;renderHistoryPage()">Next ></button>`; } }
+                    async function deleteHistoryLog(logId, amount) { if (!confirm(`Delete log and revert ${amount} points?`)) return; try { await db.collection("users").doc(currentHistoryUserId).update({ score: firebase.firestore.FieldValue.increment(-amount) }); await db.collection("checkin_logs").doc(logId).delete(); showToast("Reverted!"); const user = usersData.find(u => u.id === currentHistoryUserId); showHistory(currentHistoryUserId, user ? user.displayName : 'User', (user ? user.score : 0) - amount); } catch (e) { alert(e.message); } }
+                    function updateAssigneeList() { const d = document.getElementById('sq-user-list'); d.innerHTML = ""; usersData.forEach(u => { if (!u.isIgnored) d.innerHTML += `<label style="margin-right:5px"><input type="checkbox" class="sq-user-check" value="${u.id}" data-name="${u.displayName}" data-pic="${u.pictureUrl}"> ${u.displayName}</label>` }); }
+                    async function moveCard(id, dir) { const q = sideQuestsCache[id]; const f = ['Backlog', 'Doing', 'Review', 'Done']; const c = f.indexOf(q.status); let n = q.status; if (dir === 'next' && c < 3) n = f[c + 1]; if (dir === 'prev' && c > 0) n = f[c - 1]; if (n !== q.status) { const u = { status: n }; if (n === 'Done') u.doneAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").doc(id).update(u); } }
+                    async function giveScore(id) { const q = sideQuestsCache[id]; if (!q) return; const s = prompt("Score:", "0.5"); if (!s) return; const n = prompt("Note:", q.title); const b = db.batch(); q.assigneeIds.forEach(u => { b.update(db.collection("users").doc(u), { score: firebase.firestore.FieldValue.increment(parseFloat(s)) }); b.set(db.collection("checkin_logs").doc(), { userId: u, type: 'manual', amount: parseFloat(s), note: n, timestamp: firebase.firestore.FieldValue.serverTimestamp() }) }); b.update(db.collection("side_quests").doc(id), { status: 'Done', isScored: true, archiveScore: parseFloat(s), doneAt: firebase.firestore.FieldValue.serverTimestamp() }); await b.commit(); showToast("Scored!"); }
+                    async function archiveSQ(id) { if (confirm("Archive?")) await db.collection("side_quests").doc(id).update({ status: 'Archived' }); }
+                    async function delUser(id) { if (confirm("Del?")) await db.collection("users").doc(id).delete(); }
+                    async function delWork(id) { if (confirm("Del?")) await db.collection("works").doc(id).delete(); }
+                    async function delQuizAttempt(id) { if (confirm("Delete this quiz attempt record?")) await db.collection("quiz_attempts").doc(id).delete(); }
+                    function toggleIgnoreUser(id, s) { db.collection("users").doc(id).update({ isIgnored: !s }); }
+                    function toggleForm() { const f = document.getElementById('sq-form'); f.style.display = f.style.display === 'none' ? 'block' : 'none'; }
+                    function filterBoard() { renderKanban({ forEach: cb => { Object.values(sideQuestsCache).forEach(q => cb({ data: () => q, id: Object.keys(sideQuestsCache).find(k => sideQuestsCache[k] === q) })) } }); }
+                    function filterUsers() { renderTable('users'); }
+                    function openShareModal() { document.getElementById('shareModal').style.display = 'block'; }
+                    async function copyLB(showName) { document.getElementById('shareModal').style.display = 'none'; if (!usersData.length) return alert("No Data"); let t = "🏆 Leaderboard\n"; const top = usersData.filter(u => !u.isIgnored).sort((a, b) => (b.score - a.score)).slice(0, 20); top.forEach((u, i) => { t += `${i + 1}. ${showName ? u.displayName : `Lv.${Math.floor(u.score / 10) + 1}`} (${parseFloat((u.score || 0).toFixed(2))})\n` }); if (liff.isInClient()) liff.shareTargetPicker([{ type: "text", text: t }]); else { try { await navigator.clipboard.writeText(t); alert("Copied!"); } catch (e) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); alert("Copied (Manual)!"); } } }
+                    function copyHistory() { navigator.clipboard.writeText("Copied!").then(() => showToast("Copied")); }
+                    function closeModal() { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
+                    function showToast(m) { const x = document.getElementById("toast"); x.innerText = m; x.className = "show"; setTimeout(() => x.className = "", 3000); }
+                    async function svSc(id, uid) { const v = prompt("Score:"); if (v) { await db.collection("works").doc(id).update({ score: parseFloat(v), status: 'ตรวจแล้ว' }); await db.collection("users").doc(uid).update({ score: firebase.firestore.FieldValue.increment(parseFloat(v)) }); showToast("Saved"); } }
+                    async function createQuest() { const q = { question: document.getElementById('q-text').value, imageUrl: document.getElementById('q-img').value, questLink: document.getElementById('q-link').value, baseScore: parseFloat(document.getElementById('q-score').value), durationMinutes: parseInt(document.getElementById('q-duration').value), deadline: new Date(Date.now() + parseFloat(document.getElementById('q-hours').value) * 3600000), createdAt: firebase.firestore.FieldValue.serverTimestamp() }; if (q.question) await db.collection("quests").add(q); showToast("Posted"); }
+                    function loadActiveQuests() { db.collection("quests").orderBy("createdAt", "desc").limit(10).onSnapshot(s => { const t = document.querySelector("#activeQuestTable tbody"); t.innerHTML = ""; let hasActive = false; s.forEach(d => { const q = d.data(); if (q.deadline?.toDate() > new Date()) { hasActive = true; t.innerHTML += `<tr><td>${q.question}</td><td><span class="quest-deadline" data-deadline="${q.deadline.toDate().getTime()}">Loading...</span></td><td>${q.durationMinutes || 30} min</td><td><button class="btn-sm btn-warning" onclick="editQ('${d.id}','${q.question.replace(/'/g, "")}')">✏️</button> <button class="btn-delete-icon" onclick="stopQ('${d.id}')">✕</button></td></tr>`; } }); document.getElementById("active-quest-section").style.display = hasActive ? "block" : "none"; }); }
+                    function loadQuestHistory() { db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(s => { const t = document.querySelector("#questHistoryTable tbody"); t.innerHTML = ""; s.forEach(d => { const q = d.data(); if (q.deadline && q.deadline.toDate() > new Date()) return; t.innerHTML += `<tr><td>${q.question}</td><td>${q.baseScore}</td><td><div style="display:flex;gap:5px;"><button class="btn-sm btn-success" onclick="recallQuest('${d.id}')">♻️ Recall</button><button class="btn-delete-icon" onclick="delQ('${d.id}')">✕</button></div></td></tr>`; }) }); }
+                    function updateQuestTimers() { document.querySelectorAll('.quest-deadline').forEach(el => { const d = parseInt(el.dataset.deadline); const now = Date.now(); if (d - now <= 0) el.innerText = "Expired"; else { const h = Math.floor((d - now) / 3600000); const m = Math.floor(((d - now) % 3600000) / 60000); el.innerText = `${h}h ${m}m left`; } }); }
+                    function recallQuest(id) { db.collection("quests").doc(id).get().then(doc => { const d = doc.data(); document.getElementById('q-text').value = d.question; document.getElementById('q-img').value = d.imageUrl || ""; document.getElementById('q-link').value = d.questLink || ""; document.getElementById('q-score').value = d.baseScore; document.getElementById('q-duration').value = d.durationMinutes || 30; showToast("Recalled!"); }); }
+                    async function editQ(id, q) { const nq = prompt("Edit Q:", q); if (nq) await db.collection("quests").doc(id).update({ question: nq }); }
+                    async function stopQ(id) { if (confirm("Stop?")) await db.collection("quests").doc(id).update({ deadline: new Date() }); }
+                    async function delQ(id) { if (confirm("Del?")) await db.collection("quests").doc(id).delete(); }
+                    function drawCertificate(ctx, name, dates) {
+                        const w = 800, h = 600;
+                        // 1. Background
+                        ctx.fillStyle = "#ffffff";
+                        ctx.fillRect(0, 0, w, h);
 
-        function initKanban() { ['Backlog', 'Doing', 'Review', 'Done'].forEach(id => { new Sortable(document.getElementById(id), { group: 'kanban', animation: 150, onEnd: e => { const ns = e.to.id; const up = { status: ns }; if (ns === 'Done') up.doneAt = firebase.firestore.FieldValue.serverTimestamp(); db.collection("side_quests").doc(e.item.dataset.id).update(up); } }); }); }
-        function renderKanban(snap) { const cols = { "Backlog": document.getElementById("Backlog"), "Doing": document.getElementById("Doing"), "Review": document.getElementById("Review"), "Done": document.getElementById("Done") }; Object.values(cols).forEach(e => e.innerHTML = ""); const cnt = { "Backlog": 0, "Doing": 0, "Review": 0, "Done": 0 }; const filter = document.getElementById('board-search').value.toLowerCase(); snap.forEach(doc => { const q = doc.data(); sideQuestsCache[doc.id] = q; if (q.status === 'Archived') return; let match = q.title.toLowerCase().includes(filter); if (q.assignees) q.assignees.forEach(u => { if (u.name.toLowerCase().includes(filter)) match = true; }); if (!match) return; if (cols[q.status]) { cnt[q.status]++; const isProj = q.isProject === true; const d = document.createElement('div'); d.className = `kanban-card card-${q.status} ${q.isScored ? 'scored' : ''} ${isProj ? 'project' : ''}`; d.dataset.id = doc.id; let imgs = '<div class="assignee-stack">'; if (q.assignees) q.assignees.forEach(u => imgs += `<img src="${u.pic}" class="assignee-img" title="${u.name}">`); imgs += '</div>'; let timersHtml = ""; if (q.refQuestId && q.assigneeIds && q.assigneeIds.length > 0) { const globalQ = questsCache.find(x => x.id === q.refQuestId); const subKey = `${q.refQuestId}_${q.assigneeIds[0]}`; const sub = questsSubCache[subKey]; if (globalQ && globalQ.deadline && q.status !== 'Done') { timersHtml += `<span class="timer-global" data-dead="${globalQ.deadline.toDate().getTime()}">⏳ Exp: ...</span>`; } if (sub) { if (sub.status === 'received' && sub.deadline && q.status === 'Doing') { timersHtml += `<span class="timer-active" data-dead="${sub.deadline.toDate().getTime()}">⏱️ ...</span>`; } else if (sub.status === 'unsuccessful' && sub.cooldownUntil && q.status === 'Backlog') { timersHtml += `<span class="timer-cooldown" data-dead="${sub.cooldownUntil.toDate().getTime()}">❄️ Cool: ...</span>`; } } } let act = ""; if (q.status === 'Done' && q.doneAt) act = `<button class="btn-sm btn-dark" style="width:100%;margin-top:5px;" onclick="archiveSQ('${doc.id}')">📥 ar·chive</button>`; else if (!q.isScored && q.status !== 'Backlog' && q.status !== 'Done') act = `<button class="btn-sm btn-success" style="width:100%;margin-top:5px;" onclick="giveScore('${doc.id}')">💰 ให้คะแนน</button>`; let chatBtn = ""; if (isProj) chatBtn = `<button class="btn-sm" style="color:var(--primary); font-size:1.1em;" onclick="openChat('${doc.id}', '${q.title}')"><i class="fa-solid fa-comments"></i></button>`; let arrows = `<div class="arrow-controls">`; if (q.status !== 'Backlog') arrows += `<button class="btn-arrow" onclick="moveCard('${doc.id}','prev')"><i class="fa-solid fa-chevron-left"></i></button>`; if (q.status !== 'Done') arrows += `<button class="btn-arrow" onclick="moveCard('${doc.id}','next')"><i class="fa-solid fa-chevron-right"></i></button>`; arrows += `</div>`; let pColor = '#17a2b8'; if (q.priority === 'Medium') pColor = '#ff9f1c'; if (q.priority === 'High') pColor = '#ef233c'; d.innerHTML = `<div class="card-header-row"><span class="badge" style="background:${pColor}">${q.priority}</span><div class="card-header-right">${imgs} ${arrows}</div></div><div style="font-weight:bold;">${isProj ? '<span class="badge" style="background:#e83e8c;font-size:0.6em;">PROJ</span>' : ''} ${q.title}</div><div class="card-timers">${timersHtml}</div><p style="font-size:0.85em; color:#666; margin-bottom:5px;">${q.description || '-'}</p><div class="card-tool-row"><div><button class="btn-sm btn-warning" onclick="openTaskModal('${doc.id}')"><i class="fa-solid fa-pen"></i></button><button class="btn-sm btn-danger" onclick="startDeleteCard('${doc.id}')"><i class="fa-solid fa-trash"></i></button></div>${chatBtn}</div>${act}`; cols[q.status].appendChild(d); } }); Object.keys(cnt).forEach(k => document.getElementById(`cnt-${k}`).innerText = cnt[k]); }
-        function updateRealtimeTimers() { const now = Date.now(); document.querySelectorAll('.timer-global').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) el.innerText = "⏳ Expired"; else { const h = Math.floor(diff / 3600000); const m = Math.floor((diff % 3600000) / 60000); el.innerText = `⏳ Ends: ${h}h ${m}m`; } }); document.querySelectorAll('.timer-active').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) { el.innerText = "⏱️ Time Up!"; const card = el.closest('.kanban-card'); if (card && card.parentElement.id === 'Doing') { db.collection("side_quests").doc(card.dataset.id).update({ status: 'Review' }); } } else { const m = Math.floor(diff / 60000); const s = Math.floor((diff % 60000) / 1000); el.innerText = `⏱️ ${m}m ${s}s`; } }); document.querySelectorAll('.timer-cooldown').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) el.innerText = "❄️ Ready"; else { const m = Math.floor(diff / 60000); const s = Math.floor((diff % 60000) / 1000); el.innerText = `❄️ Cool: ${m}m ${s}s`; } }); updateQuestTimers(); }
-        function startDeleteCard(id) { deleteCardId = id; document.getElementById('delCardModal').style.display = 'block'; const btn = document.getElementById('btn-del-card-confirm'); btn.disabled = false; btn.style.background = '#ef233c'; let c = 5; btn.innerText = `Confirm (${c})`; if (deleteTimer) clearInterval(deleteTimer); deleteTimer = setInterval(() => { c--; btn.innerText = `Confirm (${c})`; if (c <= 0) { clearInterval(deleteTimer); document.getElementById('delCardModal').style.display = 'none'; showToast("Cancelled"); } }, 1000); btn.onclick = executeDeleteCard; }
-        async function executeDeleteCard() { if (!deleteCardId) return; clearInterval(deleteTimer); document.getElementById('delCardModal').style.display = 'none'; const deduct = confirm("หักคะแนนผู้รับผิดชอบ?\nOK=หัก, Cancel=ไม่หัก"); try { const q = sideQuestsCache[deleteCardId]; const b = db.batch(); if (deduct && q.assigneeIds) { const s = prompt("Points to deduct (e.g., 0.5):"); if (s) { q.assigneeIds.forEach(u => { b.update(db.collection("users").doc(u), { score: firebase.firestore.FieldValue.increment(-parseFloat(s)) }); b.set(db.collection("checkin_logs").doc(), { userId: u, type: 'manual_adjust', amount: -parseFloat(s), note: `Del: ${q.title}`, timestamp: firebase.firestore.FieldValue.serverTimestamp() }); }); } } b.delete(db.collection("side_quests").doc(deleteCardId)); await b.commit(); showToast("Deleted!"); } catch (e) { alert(e.message); } }
-        function openTaskModal(id = null) { document.getElementById('taskModal').style.display = 'block'; if (id) { const q = sideQuestsCache[id]; document.getElementById('edit-id').value = id; document.getElementById('sq-title').value = q.title; document.getElementById('sq-desc').value = q.description; document.getElementById('sq-priority').value = q.priority; document.getElementById('sq-due').value = q.dueDate || ""; document.getElementById('sq-isProject').checked = q.isProject || false; } else { document.getElementById('edit-id').value = ""; document.getElementById('sq-title').value = ""; document.getElementById('sq-desc').value = ""; } }
-        async function saveSideQuest() { const id = document.getElementById('edit-id').value; const t = document.getElementById('sq-title').value; if (!t) return alert("Title?"); const d = { title: t, description: document.getElementById('sq-desc').value, priority: document.getElementById('sq-priority').value, dueDate: document.getElementById('sq-due').value, isProject: document.getElementById('sq-isProject').checked, assigneeIds: [...document.querySelectorAll('.sq-user-check:checked')].map(c => c.value), assignees: [...document.querySelectorAll('.sq-user-check:checked')].map(c => ({ uid: c.value, name: c.dataset.name, pic: c.dataset.pic })) }; if (id) { await db.collection("side_quests").doc(id).update(d); showToast("Updated"); } else { d.status = "Backlog"; d.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").add(d); showToast("Created"); } document.getElementById('taskModal').style.display = 'none'; }
-        let chatUnsub; function openChat(id, title) { document.getElementById('chatModal').style.display = 'block'; document.getElementById('chat-title').innerText = `💬 ${title}`; document.getElementById('chat-card-id').value = id; const box = document.getElementById('chat-box'); box.innerHTML = "Loading..."; if (chatUnsub) chatUnsub(); chatUnsub = db.collection("side_quests").doc(id).collection("comments").orderBy("timestamp", "asc").onSnapshot(snap => { box.innerHTML = ""; snap.forEach(d => { const m = d.data(); const cls = m.sender === 'Admin' ? 'msg-admin' : 'msg-user'; let pic = m.pic ? `<img src="${m.pic}" class="chat-avatar">` : '<div class="chat-avatar" style="background:#ccc;">?</div>'; if (m.sender === 'Admin') pic = '<div class="chat-avatar" style="background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;">A</div>'; let msg = m.msg.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#007bff;text-decoration:underline;">$1</a>'); msg = msg.replace(/@([^\s]+)/g, (match, name) => { const q = sideQuestsCache[id]; const inP = q.assignees && q.assignees.some(u => u.name.toLowerCase().includes(name.toLowerCase())); return inP ? `<span class="tag-in">${match}</span>` : `<span class="tag-out">${match}</span>`; }); box.innerHTML += `<div class="chat-msg ${cls}">${pic}<div><b>${m.sender}</b>: ${msg}</div></div>`; }); box.scrollTop = box.scrollHeight; }); }
-        async function sendChat() { const t = document.getElementById('chat-input').value.trim(); const id = document.getElementById('chat-card-id').value; if (!t) return; await db.collection("side_quests").doc(id).collection("comments").add({ msg: t, sender: 'Admin', timestamp: firebase.firestore.FieldValue.serverTimestamp() }); document.getElementById('chat-input').value = ""; }
-        async function openArchiveModal() { const l = document.getElementById("archive-list"); l.innerHTML = "Loading..."; document.getElementById("archiveModal").style.display = "block"; const s = await db.collection("side_quests").where("status", "==", "Archived").get(); let i = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)); l.innerHTML = ""; i.forEach(q => { let imgs = ""; if (q.assignees) q.assignees.forEach(u => imgs += `<img src="${u.pic}" style="width:24px;height:24px;border-radius:50%;margin-right:2px;">`); l.innerHTML += `<div style="padding:10px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between;align-items:center;"><div><b>${q.title}</b> (+${q.archiveScore || 0})<br>${imgs}</div><div><button class="btn-sm btn-success" onclick="restoreSQ('${q.id}','Done')">Restore</button> <button class="btn-sm btn-danger" onclick="delArchiveDoc('${q.id}')">Del</button></div></div>` }); }
-        async function delArchiveDoc(id) { if (confirm("Del?")) await db.collection("side_quests").doc(id).delete(); openArchiveModal(); }
-        async function restoreSQ(id, t) { await db.collection("side_quests").doc(id).update({ status: t, doneAt: firebase.firestore.FieldValue.serverTimestamp() }); openArchiveModal(); showToast("Restored"); }
-        function confirmClearArchive() { document.getElementById('clearConfirmModal').style.display = 'block'; const btn = document.getElementById('btn-confirm-clear'); btn.disabled = true; btn.style.background = '#ccc'; let c = 5; btn.innerText = `Confirm (${c})`; const t = setInterval(() => { c--; btn.innerText = `Confirm (${c})`; if (c <= 0) { clearInterval(t); btn.disabled = false; btn.style.background = '#ef233c'; btn.innerText = "CLEAR ALL"; btn.onclick = async () => { document.getElementById('clearConfirmModal').style.display = 'none'; const s = await db.collection("side_quests").where("status", "==", "Archived").get(); const b = db.batch(); s.forEach(d => b.delete(d.ref)); await b.commit(); showToast("Cleared!"); openArchiveModal(); } } }, 1000); }
-        function renderHistoryPage() { const l = document.getElementById("history-list"); const c = document.getElementById("history-controls"); l.innerHTML = ""; c.innerHTML = ""; const s = (historyPage - 1) * HISTORY_PER_PAGE; const p = historyCache.slice(s, s + HISTORY_PER_PAGE); const t = Math.ceil(historyCache.length / HISTORY_PER_PAGE); p.forEach(e => { const d = e.t ? e.t.toLocaleString('th-TH') : '-'; let cls = e.type === 'bonus' ? 'bonus' : (e.type === 'manual' ? 'manual' : ''); let delBtn = ""; if (e.source === 'checkin_logs' && e.docId) { delBtn = `<button class="btn-del-hist" onclick="deleteHistoryLog('${e.docId}', ${e.score})">✕ Delete</button>`; } l.innerHTML += `<li style="padding:10px;border-bottom:1px solid #eee;" class="${cls}"><div style="display:flex;justify-content:space-between;align-items:center;"><div>${e.text} ${delBtn}</div><span style="font-weight:bold;">${e.score > 0 ? '+' : ''}${e.score}</span></div><small style="color:#888">${d}</small></li>` }); if (t > 1) { c.innerHTML = `<button class="btn-sm btn-dark" ${historyPage === 1 ? 'disabled' : ''} onclick="historyPage--;renderHistoryPage()">< Prev</button> <span style="align-self:center;">${historyPage}/${t}</span> <button class="btn-sm btn-dark" ${historyPage === t ? 'disabled' : ''} onclick="historyPage++;renderHistoryPage()">Next ></button>`; } }
-        async function deleteHistoryLog(logId, amount) { if (!confirm(`Delete log and revert ${amount} points?`)) return; try { await db.collection("users").doc(currentHistoryUserId).update({ score: firebase.firestore.FieldValue.increment(-amount) }); await db.collection("checkin_logs").doc(logId).delete(); showToast("Reverted!"); const user = usersData.find(u => u.id === currentHistoryUserId); showHistory(currentHistoryUserId, user ? user.displayName : 'User', (user ? user.score : 0) - amount); } catch (e) { alert(e.message); } }
-        function updateAssigneeList() { const d = document.getElementById('sq-user-list'); d.innerHTML = ""; usersData.forEach(u => { if (!u.isIgnored) d.innerHTML += `<label style="margin-right:5px"><input type="checkbox" class="sq-user-check" value="${u.id}" data-name="${u.displayName}" data-pic="${u.pictureUrl}"> ${u.displayName}</label>` }); }
-        async function moveCard(id, dir) { const q = sideQuestsCache[id]; const f = ['Backlog', 'Doing', 'Review', 'Done']; const c = f.indexOf(q.status); let n = q.status; if (dir === 'next' && c < 3) n = f[c + 1]; if (dir === 'prev' && c > 0) n = f[c - 1]; if (n !== q.status) { const u = { status: n }; if (n === 'Done') u.doneAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").doc(id).update(u); } }
-        async function giveScore(id) { const q = sideQuestsCache[id]; if (!q) return; const s = prompt("Score:", "0.5"); if (!s) return; const n = prompt("Note:", q.title); const b = db.batch(); q.assigneeIds.forEach(u => { b.update(db.collection("users").doc(u), { score: firebase.firestore.FieldValue.increment(parseFloat(s)) }); b.set(db.collection("checkin_logs").doc(), { userId: u, type: 'manual', amount: parseFloat(s), note: n, timestamp: firebase.firestore.FieldValue.serverTimestamp() }) }); b.update(db.collection("side_quests").doc(id), { status: 'Done', isScored: true, archiveScore: parseFloat(s), doneAt: firebase.firestore.FieldValue.serverTimestamp() }); await b.commit(); showToast("Scored!"); }
-        async function archiveSQ(id) { if (confirm("Archive?")) await db.collection("side_quests").doc(id).update({ status: 'Archived' }); }
-        async function delUser(id) { if (confirm("Del?")) await db.collection("users").doc(id).delete(); }
-        async function delWork(id) { if (confirm("Del?")) await db.collection("works").doc(id).delete(); }
-        async function delQuizAttempt(id) { if (confirm("Delete this quiz attempt record?")) await db.collection("quiz_attempts").doc(id).delete(); }
-        function toggleIgnoreUser(id, s) { db.collection("users").doc(id).update({ isIgnored: !s }); }
-        function toggleForm() { const f = document.getElementById('sq-form'); f.style.display = f.style.display === 'none' ? 'block' : 'none'; }
-        function filterBoard() { renderKanban({ forEach: cb => { Object.values(sideQuestsCache).forEach(q => cb({ data: () => q, id: Object.keys(sideQuestsCache).find(k => sideQuestsCache[k] === q) })) } }); }
-        function filterUsers() { renderTable('users'); }
-        function openShareModal() { document.getElementById('shareModal').style.display = 'block'; }
-        async function copyLB(showName) { document.getElementById('shareModal').style.display = 'none'; if (!usersData.length) return alert("No Data"); let t = "🏆 Leaderboard\n"; const top = usersData.filter(u => !u.isIgnored).sort((a, b) => (b.score - a.score)).slice(0, 20); top.forEach((u, i) => { t += `${i + 1}. ${showName ? u.displayName : `Lv.${Math.floor(u.score / 10) + 1}`} (${parseFloat((u.score || 0).toFixed(2))})\n` }); if (liff.isInClient()) liff.shareTargetPicker([{ type: "text", text: t }]); else { try { await navigator.clipboard.writeText(t); alert("Copied!"); } catch (e) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); alert("Copied (Manual)!"); } } }
-        function copyHistory() { navigator.clipboard.writeText("Copied!").then(() => showToast("Copied")); }
-        function closeModal() { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
-        function showToast(m) { const x = document.getElementById("toast"); x.innerText = m; x.className = "show"; setTimeout(() => x.className = "", 3000); }
-        async function svSc(id, uid) { const v = prompt("Score:"); if (v) { await db.collection("works").doc(id).update({ score: parseFloat(v), status: 'ตรวจแล้ว' }); await db.collection("users").doc(uid).update({ score: firebase.firestore.FieldValue.increment(parseFloat(v)) }); showToast("Saved"); } }
-        async function createQuest() { const q = { question: document.getElementById('q-text').value, imageUrl: document.getElementById('q-img').value, questLink: document.getElementById('q-link').value, baseScore: parseFloat(document.getElementById('q-score').value), durationMinutes: parseInt(document.getElementById('q-duration').value), deadline: new Date(Date.now() + parseFloat(document.getElementById('q-hours').value) * 3600000), createdAt: firebase.firestore.FieldValue.serverTimestamp() }; if (q.question) await db.collection("quests").add(q); showToast("Posted"); }
-        function loadActiveQuests() { db.collection("quests").orderBy("createdAt", "desc").limit(10).onSnapshot(s => { const t = document.querySelector("#activeQuestTable tbody"); t.innerHTML = ""; let hasActive = false; s.forEach(d => { const q = d.data(); if (q.deadline?.toDate() > new Date()) { hasActive = true; t.innerHTML += `<tr><td>${q.question}</td><td><span class="quest-deadline" data-deadline="${q.deadline.toDate().getTime()}">Loading...</span></td><td>${q.durationMinutes || 30} min</td><td><button class="btn-sm btn-warning" onclick="editQ('${d.id}','${q.question.replace(/'/g, "")}')">✏️</button> <button class="btn-delete-icon" onclick="stopQ('${d.id}')">✕</button></td></tr>`; } }); document.getElementById("active-quest-section").style.display = hasActive ? "block" : "none"; }); }
-        function loadQuestHistory() { db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(s => { const t = document.querySelector("#questHistoryTable tbody"); t.innerHTML = ""; s.forEach(d => { const q = d.data(); if (q.deadline && q.deadline.toDate() > new Date()) return; t.innerHTML += `<tr><td>${q.question}</td><td>${q.baseScore}</td><td><div style="display:flex;gap:5px;"><button class="btn-sm btn-success" onclick="recallQuest('${d.id}')">♻️ Recall</button><button class="btn-delete-icon" onclick="delQ('${d.id}')">✕</button></div></td></tr>`; }) }); }
-        function updateQuestTimers() { document.querySelectorAll('.quest-deadline').forEach(el => { const d = parseInt(el.dataset.deadline); const now = Date.now(); if (d - now <= 0) el.innerText = "Expired"; else { const h = Math.floor((d - now) / 3600000); const m = Math.floor(((d - now) % 3600000) / 60000); el.innerText = `${h}h ${m}m left`; } }); }
-        function recallQuest(id) { db.collection("quests").doc(id).get().then(doc => { const d = doc.data(); document.getElementById('q-text').value = d.question; document.getElementById('q-img').value = d.imageUrl || ""; document.getElementById('q-link').value = d.questLink || ""; document.getElementById('q-score').value = d.baseScore; document.getElementById('q-duration').value = d.durationMinutes || 30; showToast("Recalled!"); }); }
-        async function editQ(id, q) { const nq = prompt("Edit Q:", q); if (nq) await db.collection("quests").doc(id).update({ question: nq }); }
-        async function stopQ(id) { if (confirm("Stop?")) await db.collection("quests").doc(id).update({ deadline: new Date() }); }
-        async function delQ(id) { if (confirm("Del?")) await db.collection("quests").doc(id).delete(); }
-        function drawCertificate(ctx, name, dates) {
-            const w = 800, h = 600;
-            // 1. Background
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(0, 0, w, h);
+                        // 2. Right Navy Decoration
+                        ctx.fillStyle = "#001f3f"; // Navy Blue
+                        ctx.beginPath();
+                        ctx.moveTo(w * 0.7, 0);
+                        ctx.bezierCurveTo(w * 0.8, h * 0.3, w * 0.6, h * 0.7, w * 0.8, h);
+                        ctx.lineTo(w, h);
+                        ctx.lineTo(w, 0);
+                        ctx.fill();
 
-            // 2. Right Navy Decoration
-            ctx.fillStyle = "#001f3f"; // Navy Blue
-            ctx.beginPath();
-            ctx.moveTo(w * 0.7, 0);
-            ctx.bezierCurveTo(w * 0.8, h * 0.3, w * 0.6, h * 0.7, w * 0.8, h);
-            ctx.lineTo(w, h);
-            ctx.lineTo(w, 0);
-            ctx.fill();
+                        // 3. Gold Accent Line
+                        ctx.strokeStyle = "#d4af37"; // Gold
+                        ctx.lineWidth = 8;
+                        ctx.beginPath();
+                        ctx.moveTo(w * 0.68, 0);
+                        ctx.bezierCurveTo(w * 0.78, h * 0.3, w * 0.58, h * 0.7, w * 0.78, h);
+                        ctx.stroke();
 
-            // 3. Gold Accent Line
-            ctx.strokeStyle = "#d4af37"; // Gold
-            ctx.lineWidth = 8;
-            ctx.beginPath();
-            ctx.moveTo(w * 0.68, 0);
-            ctx.bezierCurveTo(w * 0.78, h * 0.3, w * 0.58, h * 0.7, w * 0.78, h);
-            ctx.stroke();
+                        // 4. Subtle Border
+                        ctx.strokeStyle = "#eee";
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(20, 20, w - 40, h - 40);
 
-            // 4. Subtle Border
-            ctx.strokeStyle = "#eee";
-            ctx.lineWidth = 1;
-            ctx.strokeRect(20, 20, w - 40, h - 40);
+                        // 5. Header "CERTIFICATE"
+                        ctx.textAlign = "left";
+                        ctx.fillStyle = "#001f3f";
+                        ctx.font = "bold 56px Georgia, serif";
+                        ctx.fillText("CERTIFICATE", 60, 160);
 
-            // 5. Header "CERTIFICATE"
-            ctx.textAlign = "left";
-            ctx.fillStyle = "#001f3f";
-            ctx.font = "bold 56px Georgia, serif";
-            ctx.fillText("CERTIFICATE", 60, 160);
+                        ctx.font = "italic 20px Georgia, serif";
+                        ctx.fillStyle = "#666";
+                        ctx.fillText("OF ACHIEVEMENT", 65, 195);
 
-            ctx.font = "italic 20px Georgia, serif";
-            ctx.fillStyle = "#666";
-            ctx.fillText("OF ACHIEVEMENT", 65, 195);
+                        // 6. Name (Cursive-style)
+                        ctx.textAlign = "center";
+                        ctx.fillStyle = "#333";
+                        ctx.font = "italic 64px 'Brush Script MT', cursive, Georgia";
+                        ctx.fillText(name || "Student Name", w * 0.38, 330);
 
-            // 6. Name (Cursive-style)
-            ctx.textAlign = "center";
-            ctx.fillStyle = "#333";
-            ctx.font = "italic 64px 'Brush Script MT', cursive, Georgia";
-            ctx.fillText(name || "Student Name", w * 0.38, 330);
+                        // 7. Divider/Underline for Name
+                        ctx.strokeStyle = "#d4af37";
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(w * 0.1, 350);
+                        ctx.lineTo(w * 0.65, 350);
+                        ctx.stroke();
 
-            // 7. Divider/Underline for Name
-            ctx.strokeStyle = "#d4af37";
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(w * 0.1, 350);
-            ctx.lineTo(w * 0.65, 350);
-            ctx.stroke();
+                        // 8. Description
+                        ctx.textAlign = "left";
+                        ctx.fillStyle = "#555";
+                        ctx.font = "16px Arial, sans-serif";
+                        const desc = "This is to certify that the above-named student has successfully";
+                        const desc2 = "completed their internship program with excellence and dedication.";
+                        ctx.fillText(desc, 65, 390);
+                        ctx.fillText(desc2, 65, 415);
 
-            // 8. Description
-            ctx.textAlign = "left";
-            ctx.fillStyle = "#555";
-            ctx.font = "16px Arial, sans-serif";
-            const desc = "This is to certify that the above-named student has successfully";
-            const desc2 = "completed their internship program with excellence and dedication.";
-            ctx.fillText(desc, 65, 390);
-            ctx.fillText(desc2, 65, 415);
+                        // 9. Date & Signature
+                        ctx.font = "bold 14px Arial";
+                        ctx.fillStyle = "#001f3f";
+                        ctx.fillText("DATE", 65, 480);
+                        ctx.fillText("SIGNATURE", 300, 480);
 
-            // 9. Date & Signature
-            ctx.font = "bold 14px Arial";
-            ctx.fillStyle = "#001f3f";
-            ctx.fillText("DATE", 65, 480);
-            ctx.fillText("SIGNATURE", 300, 480);
+                        ctx.font = "16px Arial";
+                        ctx.fillStyle = "#333";
+                        ctx.fillText(dates || "Date not set", 65, 510);
 
-            ctx.font = "16px Arial";
-            ctx.fillStyle = "#333";
-            ctx.fillText(dates || "Date not set", 65, 510);
+                        ctx.beginPath();
+                        ctx.moveTo(300, 505);
+                        ctx.lineTo(500, 505);
+                        ctx.strokeStyle = "#ccc";
+                        ctx.stroke();
 
-            ctx.beginPath();
-            ctx.moveTo(300, 505);
-            ctx.lineTo(500, 505);
-            ctx.strokeStyle = "#ccc";
-            ctx.stroke();
+                        // 10. Golden Seal
+                        const sealX = w * 0.85, sealY = h * 0.78;
+                        const grd = ctx.createRadialGradient(sealX, sealY, 10, sealX, sealY, 50);
+                        grd.addColorStop(0, "#f1c40f");
+                        grd.addColorStop(1, "#d4af37");
 
-            // 10. Golden Seal
-            const sealX = w * 0.85, sealY = h * 0.78;
-            const grd = ctx.createRadialGradient(sealX, sealY, 10, sealX, sealY, 50);
-            grd.addColorStop(0, "#f1c40f");
-            grd.addColorStop(1, "#d4af37");
+                        ctx.fillStyle = grd;
+                        ctx.beginPath();
+                        ctx.arc(sealX, sealY, 55, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.strokeStyle = "#ffffff";
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
 
-            ctx.fillStyle = grd;
-            ctx.beginPath();
-            ctx.arc(sealX, sealY, 55, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = "#ffffff";
-            ctx.lineWidth = 2;
-            ctx.stroke();
+                        ctx.textAlign = "center";
+                        ctx.fillStyle = "#fff";
+                        ctx.font = "bold 10px Arial";
+                        ctx.fillText("MEDLIFE+", sealX, sealY - 15);
+                        ctx.font = "bold 12px Arial";
+                        ctx.fillText("EXCELLENCE", sealX, sealY + 5);
+                        ctx.font = "9px Arial";
+                        ctx.fillText("AWARDS", sealX, sealY + 20);
+                    }
 
-            ctx.textAlign = "center";
-            ctx.fillStyle = "#fff";
-            ctx.font = "bold 10px Arial";
-            ctx.fillText("MEDLIFE+", sealX, sealY - 15);
-            ctx.font = "bold 12px Arial";
-            ctx.fillText("EXCELLENCE", sealX, sealY + 5);
-            ctx.font = "9px Arial";
-            ctx.fillText("AWARDS", sealX, sealY + 20);
-        }
+                    async function updateCertPreview() {
+                        const c = document.getElementById('cert-canvas');
+                        const ctx = c.getContext('2d');
 
-        async function updateCertPreview() {
-            const c = document.getElementById('cert-canvas');
-            const ctx = c.getContext('2d');
+                        // 🔥 Fix: Handle High DPI Screens & Explicit Resolution
+                        // Get the display size (CSS width)
+                        // But for certificate generation, we want a fixed internal resolution of 800x600
+                        // regardless of screen size, so the PDF/Image is consistent.
+                        c.width = 800;
+                        c.height = 600;
 
-            // 🔥 Fix: Handle High DPI Screens & Explicit Resolution
-            // Get the display size (CSS width)
-            // But for certificate generation, we want a fixed internal resolution of 800x600
-            // regardless of screen size, so the PDF/Image is consistent.
-            c.width = 800;
-            c.height = 600;
+                        // Reset transform to avoid accumulation
+                        ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-            // Reset transform to avoid accumulation
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
+                        const s = document.getElementById('cert-start').value;
+                        const e = document.getElementById('cert-end').value;
+                        const fn = document.getElementById('cert-fullname').value;
+                        drawCertificate(ctx, fn || certUser.name, s && e ? `${s} - ${e}` : "");
+                    }
+                    async function generateBulkCert() {
+                        const { jsPDF } = window.jspdf;
+                        const users = usersData.filter(u => !u.isIgnored && u.startDate && u.endDate);
+                        if (!users.length) return alert("ไม่มีข้อมูลนักศึกษาที่มีวันเริ่ม-จบฝึกงานสมบูรณ์ (ต้องมีทั้งวันเริ่มและจบ)");
 
-            const s = document.getElementById('cert-start').value;
-            const e = document.getElementById('cert-end').value;
-            const fn = document.getElementById('cert-fullname').value;
-            drawCertificate(ctx, fn || certUser.name, s && e ? `${s} - ${e}` : "");
-        }
-        async function generateBulkCert() {
-            const { jsPDF } = window.jspdf;
-            const users = usersData.filter(u => !u.isIgnored && u.startDate && u.endDate);
-            if (!users.length) return alert("ไม่มีข้อมูลนักศึกษาที่มีวันเริ่ม-จบฝึกงานสมบูรณ์ (ต้องมีทั้งวันเริ่มและจบ)");
+                        if (!confirm(`กำลังจะสร้างใบรับรองจำนวน ${users.length} ใบในไฟล์เดียว ต้องการดำเนินการต่อหรือไม่?`)) return;
 
-            if (!confirm(`กำลังจะสร้างใบรับรองจำนวน ${users.length} ใบในไฟล์เดียว ต้องการดำเนินการต่อหรือไม่?`)) return;
+                        showToast("Generating Bulk PDF... Please wait.");
 
-            showToast("Generating Bulk PDF... Please wait.");
+                        const c = document.createElement('canvas');
+                        const ctx = c.getContext('2d');
+                        c.width = 800;
+                        c.height = 600;
 
-            const c = document.createElement('canvas');
-            const ctx = c.getContext('2d');
-            c.width = 800;
-            c.height = 600;
+                        const doc = new jsPDF('l', 'mm', 'a4');
 
-            const doc = new jsPDF('l', 'mm', 'a4');
+                        for (let i = 0; i < users.length; i++) {
+                            const u = users[i];
+                            drawCertificate(ctx, u.fullName || u.displayName, `${u.startDate} - ${u.endDate}`);
 
-            for (let i = 0; i < users.length; i++) {
-                const u = users[i];
-                drawCertificate(ctx, u.fullName || u.displayName, `${u.startDate} - ${u.endDate}`);
+                            const imgData = c.toDataURL('image/jpeg', 0.95);
+                            if (i > 0) doc.addPage();
+                            doc.addImage(imgData, 'JPEG', 0, 0, 297, 210); // Fill A4
+                        }
 
-                const imgData = c.toDataURL('image/jpeg', 0.95);
-                if (i > 0) doc.addPage();
-                doc.addImage(imgData, 'JPEG', 0, 0, 297, 210); // Fill A4
-            }
+                        doc.save("Bulk_Certificates.pdf");
+                        showToast("Export Completed!");
+                    }
 
-            doc.save("Bulk_Certificates.pdf");
-            showToast("Export Completed!");
-        }
-
-        function generateCertPDF() { const { jsPDF } = window.jspdf; const doc = new jsPDF('l'); doc.addImage(document.getElementById('cert-canvas').toDataURL('image/jpeg'), 'JPEG', 10, 10, 280, 190); doc.save("cert.pdf"); }
-        async function delQuizAttempt(id, collection = 'quiz_attempts') {
-            if (!confirm("Delete this attempt/response?")) return;
-            try {
-                await db.collection(collection).doc(id).delete();
-                showToast("Deleted!");
-                // If it was a poll response, we might need to refresh manually if snapshot doesn't cover it?
-                // But we have onSnapshot for poll_responses in loadData, so it should update.
-            } catch (e) { alert(e.message); }
-        }
+                    function generateCertPDF() { const { jsPDF } = window.jspdf; const doc = new jsPDF('l'); doc.addImage(document.getElementById('cert-canvas').toDataURL('image/jpeg'), 'JPEG', 10, 10, 280, 190); doc.save("cert.pdf"); }
+                    async function delQuizAttempt(id, collection = 'quiz_attempts') {
+                        if (!confirm("Delete this attempt/response?")) return;
+                        try {
+                            await db.collection(collection).doc(id).delete();
+                            showToast("Deleted!");
+                            // If it was a poll response, we might need to refresh manually if snapshot doesn't cover it?
+                            // But we have onSnapshot for poll_responses in loadData, so it should update.
+                        } catch (e) { alert(e.message); }
+                    }
     </script>
 </body>
 
