@@ -959,6 +959,7 @@
                     <thead>
                         <tr>
                             <th>User</th>
+                            <th>Full Name (Certificate)</th>
                             <th>Internship Period</th>
                             <th>Status</th>
                             <th>Action</th>
@@ -2100,14 +2101,39 @@
 
         function renderCertTable() {
             const t = document.querySelector("#certsTable tbody"); t.innerHTML = "";
-            if (!usersData.length) { t.innerHTML = "<tr><td colspan='4'>No data.</td></tr>"; return; }
+            if (!usersData.length) { t.innerHTML = "<tr><td colspan='5'>No data.</td></tr>"; return; }
             const sortedUsers = usersData.filter(u => !u.isIgnored).sort((a, b) => (b.certRequested ? 1 : 0) - (a.certRequested ? 1 : 0));
             sortedUsers.forEach(u => {
                 let dateStr = (u.startDate && u.endDate) ? `${u.startDate} - ${u.endDate}` : '<span style="color:#ccc">Waiting Dates</span>';
                 let status = u.certRequested ? '<span class="badge" style="background:#ffc107;color:black;">🔔 Requesting</span>' : '-';
                 let btn = `<button class="btn-sm btn-warning" onclick="openCertModal('${u.id}')">Preview / Edit</button>`;
-                t.innerHTML += `<tr><td><img src="${u.pictureUrl}" class="user-pic"> ${u.displayName}</td><td>${dateStr}</td><td>${status}</td><td>${btn}</td></tr>`;
+
+                // Full Name Input with Auto-Save
+                let nameInput = `<input type="text" class="form-input" style="width:100%; max-width:200px; padding:5px; margin:0;" 
+                    placeholder="ชื่อ-นามสกุล จริง" value="${u.fullName || ''}" 
+                    onchange="updateFullName('${u.id}', this.value)">`;
+
+                t.innerHTML += `<tr>
+                    <td><img src="${u.pictureUrl}" class="user-pic"> ${u.displayName}</td>
+                    <td>${nameInput}</td>
+                    <td>${dateStr}</td>
+                    <td>${status}</td>
+                    <td>${btn}</td>
+                </tr>`;
             });
+        }
+
+        async function updateFullName(uid, newName) {
+            try {
+                await db.collection("users").doc(uid).update({ fullName: newName });
+                showToast("Full Name Saved!");
+                // Update local data
+                const user = usersData.find(u => u.id === uid);
+                if (user) user.fullName = newName;
+            } catch (e) {
+                console.error(e);
+                alert("Save failed: " + e.message);
+            }
         }
         function openCertModal(uid) {
             const u = usersData.find(x => x.id === uid);
