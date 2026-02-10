@@ -1282,11 +1282,18 @@
             const questions = [];
             qItems.forEach(item => {
                 const qText = item.querySelector('.q-text').value;
-                const opts = [...item.querySelectorAll('.q-opt')].map(i => i.value);
-                const correctEl = item.querySelector('.q-correct-radio:checked');
-                const correct = correctEl ? parseInt(correctEl.value) : 0;
+                const qType = item.querySelector('.q-type').value;
+                let opts = [];
+                let correct = 0;
+
+                if (qType === 'choice') {
+                    opts = [...item.querySelectorAll('.q-opt')].map(i => i.value);
+                    const correctEl = item.querySelector('.q-correct-radio:checked');
+                    correct = correctEl ? parseInt(correctEl.value) : 0;
+                }
+
                 const timer = parseInt(item.querySelector('.q-timer').value) || 60;
-                questions.push({ q: qText, options: opts, correct, timer });
+                questions.push({ q: qText, type: qType, options: opts, correct, timer });
             });
 
             return {
@@ -1326,26 +1333,34 @@
             const qId = Date.now() + Math.floor(Math.random() * 1000);
             const div = document.createElement('div');
             div.className = 'quiz-q-item';
+            const qType = data ? (data.type || 'choice') : 'choice';
+
             div.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
                     <b style="color:var(--primary); font-size:1.1em;">คำถาม Question</b>
                     <div style="display:flex; align-items:center; gap:10px;">
+                        <select class="q-type" onchange="toggleQType(this)" style="width:auto; margin:0; padding:4px; font-size:0.85em;">
+                            <option value="choice" ${qType === 'choice' ? 'selected' : ''}>Choice</option>
+                            <option value="short_answer" ${qType === 'short_answer' ? 'selected' : ''}>Short Answer</option>
+                        </select>
                         <label style="font-size:0.8em; color:#666;">Timer (sec):</label>
                         <input type="number" class="q-timer" value="${data ? (data.timer || 60) : 60}" style="width:70px; margin:0; padding:4px;">
                         <button class="btn-sm btn-danger" onclick="if(confirm('Delete this question?')){this.closest('.quiz-q-item').remove(); updateQuizPagination();}" style="padding:6px 12px;">✕ Delete</button>
                     </div>
                 </div>
                 <div style="margin-bottom:15px;">
-                    <label style="font-size:0.9em; font-weight:bold; margin-bottom:5px; display:block;">โจทย์คำถาม:</label>
+                    <label style="font-size:0.9em; font-weight:bold; margin-bottom:5px; display:block;">โจทย์คำถาม: (Short Answer จะเป็นช่องพิมพ์ตอบ)</label>
                     <textarea class="q-text" placeholder="พิมพ์โจทย์ที่นี่..." style="height:80px; font-size:1em;">${data ? data.q : ''}</textarea>
                 </div>
-                <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
-                    <div class="q-opt-row"><span class="q-opt-prefix">1.</span><input type="text" class="q-opt" value="${data ? data.options[0] : ''}" placeholder="ตัวเลือก 1"></div>
-                    <div class="q-opt-row"><span class="q-opt-prefix">2.</span><input type="text" class="q-opt" value="${data ? data.options[1] : ''}" placeholder="ตัวเลือก 2"></div>
-                    <div class="q-opt-row"><span class="q-opt-prefix">3.</span><input type="text" class="q-opt" value="${data ? data.options[2] : ''}" placeholder="ตัวเลือก 3"></div>
-                    <div class="q-opt-row"><span class="q-opt-prefix">4.</span><input type="text" class="q-opt" value="${data ? data.options[3] : ''}" placeholder="ตัวเลือก 4"></div>
+                
+                <div class="options-container" style="display:${qType === 'choice' ? 'flex' : 'none'}; flex-direction:column; gap:10px; margin-bottom:20px;">
+                    <div class="q-opt-row"><span class="q-opt-prefix">1.</span><input type="text" class="q-opt" value="${data && data.options ? data.options[0] : ''}" placeholder="ตัวเลือก 1"></div>
+                    <div class="q-opt-row"><span class="q-opt-prefix">2.</span><input type="text" class="q-opt" value="${data && data.options ? data.options[1] : ''}" placeholder="ตัวเลือก 2"></div>
+                    <div class="q-opt-row"><span class="q-opt-prefix">3.</span><input type="text" class="q-opt" value="${data && data.options ? data.options[2] : ''}" placeholder="ตัวเลือก 3"></div>
+                    <div class="q-opt-row"><span class="q-opt-prefix">4.</span><input type="text" class="q-opt" value="${data && data.options ? data.options[3] : ''}" placeholder="ตัวเลือก 4"></div>
                 </div>
-                <div style="background:#f8f9fa; padding:15px; border-radius:12px; display:flex; align-items:center; gap:20px; flex-wrap:nowrap; border:1px solid #eee;">
+
+                <div class="correct-container" style="display:${qType === 'choice' ? 'flex' : 'none'}; background:#f8f9fa; padding:15px; border-radius:12px; align-items:center; gap:20px; flex-wrap:nowrap; border:1px solid #eee;">
                     <label style="font-weight:bold; font-size:1em; color:#333; white-space:nowrap;">✅ คำตอบที่ถูก:</label> 
                     <div style="display:flex; gap:15px;">
                         ${[0, 1, 2, 3].map(i => `
@@ -1365,6 +1380,13 @@
             updateQuizPagination();
         }
 
+        function toggleQType(el) {
+            const item = el.closest('.quiz-q-item');
+            const type = el.value;
+            item.querySelector('.options-container').style.display = type === 'choice' ? 'flex' : 'none';
+            item.querySelector('.correct-container').style.display = type === 'choice' ? 'flex' : 'none';
+        }
+
         async function saveQuiz() {
             const id = document.getElementById('edit-quiz-id').value;
             const formData = getQuizFormData();
@@ -1372,7 +1394,10 @@
             if (!formData.title) return alert("Title required");
 
             // Validate Questions
-            const validQuestions = formData.questions.filter(q => q.q && q.options.every(o => o));
+            const validQuestions = formData.questions.filter(q => {
+                if (q.type === 'short_answer') return q.q;
+                return q.q && q.options && q.options.every(o => o);
+            });
             if (validQuestions.length === 0) return alert("Please add at least one complete question.");
 
             const convertDate = (val) => {
@@ -1492,17 +1517,41 @@
 
             quiz.questions.forEach((q, i) => {
                 const studentAns = att.answers[i];
-                const isCorrect = studentAns == q.correct;
+                const isChoice = (q.type || 'choice') === 'choice';
+                const isCorrect = isChoice ? (studentAns == q.correct) : (att.gradedAnswers && att.gradedAnswers[i]);
+
+                let studentAnsText = "";
+                let correctAnsText = "";
+
+                if (isChoice) {
+                    studentAnsText = `<b>${q.options[studentAns] || '-'}</b> (Choice ${studentAns + 1})`;
+                    correctAnsText = `<span style="color:green;">${q.options[q.correct]}</span> (Choice ${q.correct + 1})`;
+                } else {
+                    if (Array.isArray(studentAns)) {
+                        studentAnsText = `<div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+                            ${studentAns.map((tweet, tidx) => `
+                                <div style="background:#fff; border:1px solid #1da1f2; padding:10px; border-radius:12px; font-size:0.95em; position:relative;">
+                                    <span style="position:absolute; top:5px; right:10px; color:#1da1f2; font-size:0.7em; font-weight:bold;">#${tidx + 1}</span>
+                                    <div style="white-space:pre-wrap; color:#333;">${tweet || '-'}</div>
+                                    <div style="font-size:0.7em; color:#999; text-align:right; margin-top:4px;">${tweet.length} letters</div>
+                                </div>
+                            `).join('')}
+                        </div>`;
+                    } else {
+                        studentAnsText = `<div style="background:#fff; padding:10px; border-radius:5px; border:1px solid #ccc; margin-top:5px; white-space:pre-wrap;">${studentAns || '-'}</div>`;
+                    }
+                    correctAnsText = `<span style="color:#666;">(Subjective Answer - No fixed correct answer)</span>`;
+                }
 
                 container.innerHTML += `
                     <div style="border:1px solid #ddd; padding:10px; margin-bottom:10px; border-radius:8px; background:${isCorrect ? '#d4edda' : '#f8d7da'}">
-                        <b>Q${i + 1}: ${q.q}</b><br>
+                        <b>Q${i + 1}: ${q.q}</b> <span class="badge" style="background:#6c757d; font-size:0.7em;">${isChoice ? 'Choice' : 'Short Answer'}</span><br>
                         <div style="margin-top:5px; font-size:0.9em;">
-                             Student: <b>${q.options[studentAns] || '-'}</b> (Choice ${studentAns + 1}) <br>
-                             Correct: <span style="color:green;">${q.options[q.correct]}</span> (Choice ${q.correct + 1})
+                             Student: ${studentAnsText} <br>
+                             Correct: ${correctAnsText}
                         </div>
                         <div style="margin-top:5px;">
-                            <label><input type="checkbox" onchange="manualCorrectAns('${attemptId}', ${i}, this.checked)" ${isCorrect ? 'checked disabled' : ''}> Mark as Correct (Override)</label>
+                            <label><input type="checkbox" onchange="manualCorrectAns('${attemptId}', ${i}, this.checked)" ${isCorrect ? 'checked disabled' : ''}> Mark as Correct / Graded</label>
                         </div>
                     </div>
                  `;
@@ -1512,27 +1561,34 @@
         }
 
         async function manualCorrectAns(attemptId, qIndex, isChecked) {
-            if (!isChecked) return; // Only support one-way override to correct for now
-            if (!confirm("Manually mark this answer as CORRECT?\n(Score will be recalculated upon Approval)")) return;
+            if (!isChecked) return;
+            if (!confirm("Confirm grading this question as CORRECT/DONE?\n(Score will be recalculated upon Approval)")) return;
 
-            // We need to update the local 'answers' array in Firestore to match the correct answer index
-            // So when we approve, it recalculates correctly.
             try {
                 const docRef = db.collection("quiz_attempts").doc(attemptId);
                 const docSnap = await docRef.get();
                 const att = docSnap.data();
                 const quiz = quizzesData.find(x => x.id === att.quizId);
+                const q = quiz.questions[qIndex];
 
-                // Update specific answer to be the correct one
-                att.answers[qIndex] = quiz.questions[qIndex].correct;
-                att.correctCount++; // Increment local count
+                // For Choice: Update answer to the correct index if we are overriding
+                // For Short Answer: Just increment correctCount and record in gradedAnswers
+                if (!att.gradedAnswers) att.gradedAnswers = {};
+                att.gradedAnswers[qIndex] = true;
+
+                if ((q.type || 'choice') === 'choice') {
+                    att.answers[qIndex] = q.correct;
+                }
+
+                att.correctCount++;
 
                 await docRef.update({
                     answers: att.answers,
-                    correctCount: att.correctCount
+                    correctCount: att.correctCount,
+                    gradedAnswers: att.gradedAnswers
                 });
 
-                alert("Updated! Please refresh or close/open review to see score update.");
+                alert("Updated!");
                 reviewQuiz(attemptId); // Refresh UI
             } catch (e) { alert(e.message); }
         }

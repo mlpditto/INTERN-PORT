@@ -890,19 +890,41 @@
                 }
             }, 1000);
 
+            const isChoice = (question.type || 'choice') === 'choice';
+            let inputHtml = "";
+
+            if (isChoice) {
+                inputHtml = `
+                    <div style="display:flex; flex-direction:column; gap:10px;">
+                        ${question.options.map((opt, i) => `
+                            <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #ddd; border-radius:8px; cursor:pointer; background:${userAnswers[currentStep] === i ? '#e9ecef' : '#fff'};">
+                                <input type="radio" name="q-opt" value="${i}" ${userAnswers[currentStep] === i ? 'checked' : ''} onchange="userAnswers[${currentStep}] = ${i}; renderQuizStepUIOnly();" style="width:auto; margin:0;">
+                                ${opt}
+                            </label>
+                        `).join('')}
+                    </div>
+                `;
+            } else {
+                // Tweetstorm UI
+                if (!Array.isArray(userAnswers[currentStep])) {
+                    userAnswers[currentStep] = ['']; // Initialize with one empty tweet
+                }
+                inputHtml = `
+                    <div id="tweetstorm-container" style="display:flex; flex-direction:column; gap:15px;">
+                        ${renderTweetstormItems()}
+                    </div>
+                    <button class="btn-sm btn-dark" onclick="addTweet()" style="margin-top:10px; width:auto; padding:8px 15px;">
+                        <i class="fa-solid fa-plus"></i> Add Tweet
+                    </button>
+                `;
+            }
+
             container.innerHTML = `
                 <div style="margin-bottom:15px;">
-                    <span class="badge" style="background:#4361ee; margin-bottom:10px;">ข้อที่ ${currentStep + 1} / ${currentQuiz.questions.length}</span>
+                    <span class="badge" style="background:#4361ee; margin-bottom:10px;">ข้อที่ ${currentStep + 1} / ${currentQuiz.questions.length} (${isChoice ? 'Choice' : 'Short Answer'})</span>
                     <div style="font-weight:bold; font-size:1.1em; color:#333;">${question.q}</div>
                 </div>
-                <div style="display:flex; flex-direction:column; gap:10px;">
-                    ${question.options.map((opt, i) => `
-                        <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #ddd; border-radius:8px; cursor:pointer; background:${userAnswers[currentStep] === i ? '#e9ecef' : '#fff'};">
-                            <input type="radio" name="q-opt" value="${i}" ${userAnswers[currentStep] === i ? 'checked' : ''} onchange="userAnswers[${currentStep}] = ${i}; renderQuizStepUIOnly();" style="width:auto; margin:0;">
-                            ${opt}
-                        </label>
-                    `).join('')}
-                </div>
+                ${inputHtml}
             `;
 
             // Update footer buttons
@@ -923,15 +945,62 @@
 
         function renderQuizStepUIOnly() {
             const labels = document.querySelectorAll('#quiz-run-container label');
+            if (labels.length === 0) return; // Not a choice question
             labels.forEach((l, i) => {
                 const radio = l.querySelector('input');
-                if (radio.checked) {
+                if (radio && radio.checked) {
                     l.style.background = '#e9ecef';
                     userAnswers[currentStep] = i;
                 } else {
                     l.style.background = '#fff';
                 }
             });
+        }
+
+        // --- Tweetstorm Helpers ---
+        function renderTweetstormItems() {
+            const tweets = userAnswers[currentStep];
+            return tweets.map((text, i) => `
+                <div class="tweet-item" style="position:relative; background:#fff; border:1px solid #1da1f2; border-radius:12px; padding:12px; padding-bottom:30px; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+                    <div style="display:flex; gap:10px; align-items:flex-start;">
+                        <img src="${userProfile.pictureUrl}" style="width:35px; height:35px; border-radius:50%;">
+                        <div style="flex:1;">
+                            <div style="font-weight:bold; font-size:0.9em; margin-bottom:5px;">${userProfile.displayName} <span style="font-weight:normal; color:#666;">@${i + 1}/${tweets.length}</span></div>
+                            <textarea oninput="updateTweet(${i}, this.value)" 
+                                      maxlength="280"
+                                      placeholder="What's happening?" 
+                                      style="width:100%; border:none; outline:none; resize:none; font-family:inherit; font-size:1.05em; margin:0; padding:0; background:transparent;">${text}</textarea>
+                        </div>
+                        ${tweets.length > 1 ? `<button onclick="removeTweet(${i})" style="width:auto; background:transparent; color:#999; border:none; padding:0; min-height:0;">✕</button>` : ''}
+                    </div>
+                    <div style="position:absolute; bottom:8px; right:12px; font-size:0.75em; color:${text.length > 250 ? '#ef233c' : '#999'};">
+                        ${text.length} / 280
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function addTweet() {
+            userAnswers[currentStep].push('');
+            refreshTweetstormUI();
+        }
+
+        function removeTweet(i) {
+            userAnswers[currentStep].splice(i, 1);
+            refreshTweetstormUI();
+        }
+
+        function updateTweet(i, val) {
+            userAnswers[currentStep][i] = val;
+            const counters = document.querySelectorAll('.tweet-item');
+            const counter = counters[i].querySelector('div[style*="position:absolute"]');
+            counter.innerText = `${val.length} / 280`;
+            counter.style.color = val.length > 250 ? '#ef233c' : '#999';
+        }
+
+        function refreshTweetstormUI() {
+            const container = document.getElementById('tweetstorm-container');
+            if (container) container.innerHTML = renderTweetstormItems();
         }
 
         function closeQuiz() {
@@ -996,7 +1065,9 @@
             let correctCount = 0;
             if (currentQuiz && currentQuiz.questions) {
                 currentQuiz.questions.forEach((q, i) => {
-                    if (userAnswers[i] == q.correct) correctCount++;
+                    const isChoice = (q.type || 'choice') === 'choice';
+                    if (isChoice && userAnswers[i] == q.correct) correctCount++;
+                    // short_answer will be 0 until admin grades it
                 });
             }
 
