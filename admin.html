@@ -1591,7 +1591,13 @@
                             if (ans) {
                                 // For open answers, show display name if available (not anon)
                                 const prefix = data.displayName ? `<b>${data.displayName}:</b> ` : "";
-                                openAnswers.push(prefix + (Array.isArray(ans) ? ans.join(" / ") : ans));
+                                let displayAns = ans;
+                                if (Array.isArray(ans)) {
+                                    displayAns = ans.join(" / ");
+                                } else if (typeof ans === 'string' && ans.includes("\n---\n")) {
+                                    displayAns = ans.split("\n---\n").join(" / ");
+                                }
+                                openAnswers.push(prefix + displayAns);
                             }
                         }
                     });
@@ -1662,13 +1668,21 @@
                     studentAnsText = `<b>${q.options[studentAns] || '-'}</b> (Choice ${studentAns + 1})`;
                     correctAnsText = `<span style="color:green;">${q.options[q.correct]}</span> (Choice ${q.correct + 1})`;
                 } else {
+                    // Handle Tweetstorm (Array) or Flattened string
+                    let ansArray = [];
                     if (Array.isArray(studentAns)) {
+                        ansArray = studentAns;
+                    } else if (typeof studentAns === 'string' && studentAns.includes("\n---\n")) {
+                        ansArray = studentAns.split("\n---\n");
+                    }
+
+                    if (ansArray.length > 0) {
                         studentAnsText = `<div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
-                            ${studentAns.map((tweet, tidx) => `
+                            ${ansArray.map((tweet, tidx) => `
                                 <div style="background:#fff; border:1px solid #1da1f2; padding:10px; border-radius:12px; font-size:0.95em; position:relative;">
                                     <span style="position:absolute; top:5px; right:10px; color:#1da1f2; font-size:0.7em; font-weight:bold;">#${tidx + 1}</span>
                                     <div style="white-space:pre-wrap; color:#333;">${tweet || '-'}</div>
-                                    <div style="font-size:0.7em; color:#999; text-align:right; margin-top:4px;">${tweet.length} letters</div>
+                                    <div style="font-size:0.7em; color:#999; text-align:right; margin-top:4px;">${tweet.length || 0} letters</div>
                                 </div>
                             `).join('')}
                         </div>`;
