@@ -679,8 +679,7 @@
             <p style="color:#666; font-size:0.9em; margin-bottom:20px;">Internal Use Only</p>
 
             <!-- Magic Link UI -->
-            <input type="email" id="email-input" value="medlifeplus@gmail.com" placeholder="Email"
-                style="margin-bottom:10px;">
+            <input type="email" id="email-input" value="" placeholder="Enter Admin Email" style="margin-bottom:10px;">
             <button class="magic-btn" onclick="sendMagicLink()" style="width:100%;">
                 ✨ Send Login Link
             </button>
@@ -691,13 +690,20 @@
                 </div>
             </div>
 
-            <!-- Google Sign-In -->
-            <button class="btn-google magic-btn" onclick="loginWithGoogle()"
-                style="width:100%; background:white; color:#444; border:1px solid #ddd;">
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"
-                    style="width:18px; vertical-align:middle; margin-right:8px;">
-                Sign in with Google
-            </button>
+            <!-- Login Options -->
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <button class="btn-google magic-btn" onclick="loginWithGoogle()"
+                    style="background:white; color:#444; border:1px solid #ddd; font-size: 0.85em;">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"
+                        style="width:16px; margin-right:5px;">
+                    Google
+                </button>
+                <button class="btn-line magic-btn" onclick="loginWithLINE()"
+                    style="background:#06c755; color:white; border:none; font-size: 0.85em;">
+                    <i class="fa-brands fa-line" style="margin-right:5px;"></i>
+                    LINE
+                </button>
+            </div>
 
             <div id="login-error" style="color:red; margin-top:10px; font-size:0.9em;"></div>
 
@@ -1153,7 +1159,7 @@
     <script src="firebase-config.js"></script>
     <script>
         const ALLOWED_EMAIL = "medlifeplus@gmail.com";
-        const ADMIN_LIFF_ID = "XXXXXXXX-XXXXXXXX";
+        const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; // ✅ Updated with Project LIFF ID
         const MY_URL = 'https://mlp-int.work/admin.html'; // V72.5 Updated to Custom Domain
 
         const auth = firebase.auth();
@@ -1184,6 +1190,34 @@
                 .catch((error) => {
                     document.getElementById('login-error').innerText = "Google Error: " + error.message;
                 });
+        }
+
+        // 🔥 LINE Login Logic (Admin)
+        async function loginWithLINE() {
+            try {
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                } else {
+                    const profile = await liff.getProfile();
+                    const user = liff.getDecodedIDToken();
+                    const lineEmail = user.email;
+
+                    if (lineEmail === ALLOWED_EMAIL) {
+                        // Custom token logic or manual trigger if already authorized
+                        // For static admin, we just rely on onAuthStateChanged or manual UI switch
+                        // If LINE email matches, we can use a "Backdoor" or Custom Auth
+                        alert("✅ LINE Auths Success: " + lineEmail);
+                        document.getElementById('login-screen').style.display = 'none';
+                        document.getElementById('dashboard-container').style.display = 'block';
+                        document.getElementById('admin-email').innerText = lineEmail + " (via LINE)";
+                        initSystem();
+                    } else {
+                        alert("❌ Access Denied: Your LINE email (" + lineEmail + ") is not authorized.");
+                    }
+                }
+            } catch (e) {
+                document.getElementById('login-error').innerText = "LINE Error: " + e.message;
+            }
         }
 
         // 🔥 Magic Link Logic (Replaces Google Sign-In)
