@@ -1007,6 +1007,11 @@
         <div class="modal-content"><span class="close-modal"
                 onclick="document.getElementById('certModal').style.display='none'">&times;</span>
             <h2>🎓 Certificate</h2><input type="hidden" id="cert-uid"><input type="hidden" id="cert-uname">
+            <div style="margin-bottom:15px;">
+                <label style="font-size:0.8em; color:#666;">Full Name (ชื่อ-สกุล):</label>
+                <input type="text" id="cert-fullname" placeholder="พิมพ์ชื่อ-นามสกุล ของนักศึกษา..."
+                    onkeyup="updateCertPreview()">
+            </div>
             <div style="display:flex; gap:10px; margin-bottom:10px;">
                 <div style="flex:1"><label>Start:</label><input type="date" id="cert-start"
                         onchange="updateCertPreview()"></div>
@@ -2007,6 +2012,7 @@
             const u = usersData.find(x => x.id === uid);
             if (!u) return;
             certUser = { uid: u.id, name: u.displayName };
+            document.getElementById('cert-fullname').value = u.fullName || u.displayName || "";
             document.getElementById('cert-start').value = u.startDate || "";
             document.getElementById('cert-end').value = u.endDate || "";
             updateCertPreview();
@@ -2016,7 +2022,13 @@
             if (!certUser) return;
             const s = document.getElementById('cert-start').value;
             const e = document.getElementById('cert-end').value;
-            await db.collection("users").doc(certUser.uid).update({ startDate: s, endDate: e, certRequested: false });
+            const fn = document.getElementById('cert-fullname').value;
+            await db.collection("users").doc(certUser.uid).update({
+                startDate: s,
+                endDate: e,
+                fullName: fn,
+                certRequested: false
+            });
             showToast("Saved & Approved!");
             document.getElementById('certModal').style.display = "none";
         }
@@ -2319,7 +2331,8 @@
 
             const s = document.getElementById('cert-start').value;
             const e = document.getElementById('cert-end').value;
-            drawCertificate(ctx, certUser.name, s && e ? `${s} - ${e}` : "");
+            const fn = document.getElementById('cert-fullname').value;
+            drawCertificate(ctx, fn || certUser.name, s && e ? `${s} - ${e}` : "");
         }
         async function generateBulkCert() {
             const { jsPDF } = window.jspdf;
@@ -2339,7 +2352,7 @@
 
             for (let i = 0; i < users.length; i++) {
                 const u = users[i];
-                drawCertificate(ctx, u.displayName, `${u.startDate} - ${u.endDate}`);
+                drawCertificate(ctx, u.fullName || u.displayName, `${u.startDate} - ${u.endDate}`);
 
                 const imgData = c.toDataURL('image/jpeg', 0.95);
                 if (i > 0) doc.addPage();
