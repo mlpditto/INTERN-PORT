@@ -907,10 +907,32 @@
                     <button class="magic-btn" onclick="openQuizModal()">Create Quiz</button>
                 </div>
             </div>
-            <div style="overflow-x:auto;">
-                <table id="quizzesTable">
+
+            <!-- Active Quizzes -->
+            <h4 style="color:#2ec4b6; margin-bottom:10px;">🟢 Active Quizzes (กำลังใช้งาน)</h4>
+            <div
+                style="overflow-x:auto; margin-bottom:30px; background:white; padding:15px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                <table id="quizzesTableActive" style="width:100%;">
                     <thead>
-                        <tr>
+                        <tr style="background:#e0f7fa;">
+                            <th>Title</th>
+                            <th>Questions</th>
+                            <th>Score/Q</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- Inactive / Templates -->
+            <h4 style="color:#6c757d; margin-bottom:10px;">⚪ Inactive / Templates (หมดเวลา/เทมเพลต)</h4>
+            <div
+                style="overflow-x:auto; background:white; padding:15px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                <table id="quizzesTableInactive" style="width:100%; opacity:0.8;">
+                    <thead>
+                        <tr style="background:#f1f3f5;">
                             <th>Title</th>
                             <th>Questions</th>
                             <th>Score/Q</th>
@@ -1875,7 +1897,10 @@
 
         function updateQuizCountdown() {
             const els = document.querySelectorAll('.quiz-countdown');
+            if (els.length === 0) return;
             const now = new Date();
+            let shouldRerender = false;
+
             els.forEach(el => {
                 const deadStr = el.getAttribute('data-deadline');
                 if (!deadStr) return;
@@ -1885,6 +1910,7 @@
                 if (diff <= 0) {
                     el.innerText = "Ended";
                     el.style.color = "#666";
+                    shouldRerender = true;
                 } else {
                     const hrs = Math.floor(diff / 3600000);
                     const mins = Math.floor((diff % 3600000) / 60000);
@@ -1892,32 +1918,54 @@
                     el.innerText = `⏳ ${hrs}h ${mins}m ${secs}s`;
                 }
             });
+
+            if (shouldRerender) {
+                console.log("Quiz expired, re-rendering...");
+                renderQuizzes();
+            }
         }
 
         function renderQuizzes() {
-            const tbody = document.querySelector("#quizzesTable tbody");
-            tbody.innerHTML = "";
+            const tbodyActive = document.querySelector("#quizzesTableActive tbody");
+            const tbodyInactive = document.querySelector("#quizzesTableInactive tbody");
+            tbodyActive.innerHTML = "";
+            tbodyInactive.innerHTML = "";
             const now = new Date();
+
             quizzesData.forEach(q => {
                 let statusInfo = "";
                 const start = q.startTime ? q.startTime.toDate() : null;
                 const dead = q.deadline ? q.deadline.toDate() : null;
+                let isActiveSection = false;
 
-                if (!q.isActive) statusInfo = '<span class="badge" style="background:#6c757d">Inactive</span>';
-                else if (start && now < start) statusInfo = `<span class="badge" style="background:#ff9f1c">Scheduled: ${start.toLocaleString('th-TH')}</span>`;
-                else if (dead && now > dead) statusInfo = `<span class="badge" style="background:#ef233c">Expired: ${dead.toLocaleString('th-TH')}</span>`;
-                else statusInfo = `<span class="badge" style="background:#2ec4b6">Active</span> <br> <small class="quiz-countdown" data-deadline="${dead ? dead.toISOString() : ''}" style="font-weight:bold; color:#ef233c;"></small>`;
+                // Determine Active vs Inactive
+                if (!q.isActive) {
+                    isActiveSection = false; // Manually inactive
+                    statusInfo = '<span class="badge" style="background:#6c757d">Inactive</span>';
+                } else if (dead && now > dead) {
+                    isActiveSection = false; // Expired
+                    statusInfo = `<span class="badge" style="background:#ef233c">Expired: ${dead.toLocaleString('th-TH')}</span>`;
+                } else {
+                    isActiveSection = true; // Active or Scheduled
+                    if (start && now < start) {
+                        statusInfo = `<span class="badge" style="background:#ff9f1c">Scheduled: ${start.toLocaleString('th-TH')}</span>`;
+                    } else {
+                        statusInfo = `<span class="badge" style="background:#2ec4b6">Active</span> <br> <small class="quiz-countdown" data-deadline="${dead ? dead.toISOString() : ''}" style="font-weight:bold; color:#ef233c;"></small>`;
+                    }
+                }
 
                 const hasWriting = q.questions && q.questions.some(x => x.type === 'short_answer');
                 const pollLabel = q.isPoll ? '<span class="badge" style="background:var(--primary);">🗳️ POLL</span>' : '';
                 const subjLabel = hasWriting ? '<span class="badge" style="background:#e67e22;">📝 SUBJECTIVE</span>' : '';
+                // Show TEMPLATE badge if explicitly a template OR if it's in the inactive section (as implies template)
+                const templateLabel = (q.isTemplate || !isActiveSection) ? '<div style="margin-top:4px;"><span class="badge" style="background:orange; color:white; font-size:0.75em;">TEMPLATE</span></div>' : '';
 
-                tbody.innerHTML += `
+                const row = `
                     <tr>
                         <td>
                             ${q.title ? q.title.replace(/\s*\(Template\)$/i, '') : '-'} 
                             <br><small style="color:#666;">(${q.shortTitle || '-'})</small> 
-                            ${q.isTemplate ? '<div style="margin-top:4px;"><span class="badge" style="background:orange; color:white; font-size:0.75em;">TEMPLATE</span></div>' : ''} 
+                            ${templateLabel}
                             ${pollLabel} ${subjLabel}
                         </td>
                         <td>${q.questions ? q.questions.length : 0} Qs</td>
@@ -1925,13 +1973,16 @@
                         <td>${statusInfo}</td>
                         <td>
                             <button class="btn-sm btn-primary" onclick="openQuizModal('${q.id}')">Edit</button>
-                            <button class="btn-sm btn-dark" onclick="toggleQuizStatus('${q.id}', ${q.isActive})">${q.isActive ? 'Deactivate' : 'Activate'}</button>
+                            <button class="btn-sm btn-dark" onclick="toggleQuizStatus('${q.id}', ${q.isActive})">${q.isActive ? 'End Now' : 'Activate'}</button>
                             ${(q.isPoll || hasWriting) ? `<button class="btn-sm btn-info" style="background:#8e44ad;" onclick="showPollResults('${q.id}')">📊 Result</button>` : ''}
-                            ${(dead && now > dead) ? `<button class="btn-sm btn-warning" onclick="repostQuiz('${q.id}')">♻️ Repost</button>` : ''}
+                            ${(!isActiveSection) ? `<button class="btn-sm btn-warning" onclick="repostQuiz('${q.id}')">♻️ Repost</button>` : ''}
                             <button class="btn-sm btn-danger" onclick="deleteQuiz('${q.id}')">Del</button>
                         </td>
                     </tr>
                 `;
+
+                if (isActiveSection) tbodyActive.innerHTML += row;
+                else tbodyInactive.innerHTML += row;
             });
         }
 
@@ -1946,7 +1997,12 @@
             showToast("Reposted!");
         }
 
-        async function toggleQuizStatus(id, current) { await db.collection("quizzes").doc(id).update({ isActive: !current }); }
+        async function toggleQuizStatus(id, current) {
+            const updates = { isActive: !current };
+            // If ending (deactivating), mark as template
+            if (current) updates.isTemplate = true;
+            await db.collection("quizzes").doc(id).update(updates);
+        }
         async function deleteQuiz(id) { if (confirm("Delete this quiz?")) await db.collection("quizzes").doc(id).delete(); }
 
         function switchTab(id) { document.querySelectorAll('.tab-content,.tab-btn').forEach(e => e.classList.remove('active')); document.getElementById(id).classList.add('active'); event.target.classList.add('active'); }
