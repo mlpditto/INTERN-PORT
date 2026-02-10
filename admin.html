@@ -1738,16 +1738,18 @@
                     return;
                 }
 
-                // 🔥 Add Participants List
+                // 🔥 Add Participants List (Updated V72.5 - Add Delete Btn)
                 const participants = allDocs.map(d => {
                     const data = d.data();
-                    // Try to find user in global usersData first for latest info
                     const u = usersData.find(u => u.id === data.userId);
                     return {
-                        id: data.userId || 'anon',
+                        docId: d.id, // Important for deletion
+                        userId: data.userId || 'anon',
                         name: u ? u.displayName : (data.displayName || 'Anonymous'),
                         pic: u ? u.pictureUrl : (data.pictureUrl || ''),
-                        timestamp: data.timestamp ? data.timestamp.toDate() : null
+                        timestamp: data.timestamp ? data.timestamp.toDate() : null,
+                        collection: d.ref.parent.id, // poll_responses or quiz_attempts
+                        scoreGiven: data.status === 'approved' ? (parseFloat(quiz.totalPoints) || 0) : 0 // Assuming Poll always gives full points if approved/present
                     };
                 }).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
@@ -1756,10 +1758,17 @@
                     <div style="max-height:150px; overflow-y:auto; display:flex; flex-wrap:wrap; gap:10px;">`;
 
                 participants.forEach(p => {
-                    partHtml += `<div style="display:flex; align-items:center; background:white; padding:5px 10px; border-radius:20px; border:1px solid #eee; font-size:0.85em;">
-                        ${p.pic ? `<img src="${p.pic}" style="width:20px; height:20px; border-radius:50%; margin-right:5px;">` : ''}
+                    const dateStr = p.timestamp ? `(${p.timestamp.toLocaleDateString()})` : '';
+                    const picHtml = p.pic ? `<img src="${p.pic}" style="width:20px; height:20px; border-radius:50%; margin-right:5px;">` : '';
+                    partHtml += `
+                    <div style="display:flex; align-items:center; background:white; padding:5px 10px; border-radius:20px; border:1px solid #eee; font-size:0.85em;">
+                        ${picHtml}
                         <span>${p.name}</span>
-                        <span style="color:#999; font-size:0.8em; margin-left:5px;">${p.timestamp ? `(${p.timestamp.toLocaleDateString()})` : ''}</span>
+                        <span style="color:#999; font-size:0.8em; margin-left:5px;">${dateStr}</span>
+                        <button onclick="deletePollParticipant('${p.docId}', '${p.collection}', '${p.userId}', ${p.scoreGiven}, '${quiz.title}')" 
+                            style="margin-left:8px; border:none; background:none; cursor:pointer; color:#ef233c; font-weight:bold; padding:0;">
+                            ✕
+                        </button>
                     </div>`;
                 });
                 partHtml += `</div></div>`;
@@ -1835,6 +1844,44 @@
 
             } catch (e) {
                 container.innerHTML = `<p style="color:red;">Error: ${e.message}</p>`;
+            }
+        }
+
+        async function deletePollParticipant(docId, collection, userId, scoreToRemove, quizTitle) {
+            if (!confirm(`ต้องการลบผู้เข้าร่วมรายนี้ออกจาก Poll/Quiz ใช่ไหม?\n(คะแนนจำนวน ${scoreToRemove} แต้ม จะถูกจำกัดออกด้วย)`)) return;
+
+            try {
+                const b = db.batch();
+                const docRef = db.collection(collection).doc(docId);
+
+                // 1. Delete the attempt/response
+                b.delete(docRef);
+
+                // 2. Revert Score if applicable
+                if (scoreToRemove > 0 && userId && userId !== 'anon') {
+                    const userRef = db.collection("users").doc(userId);
+                    b.update(userRef, { score: firebase.firestore.FieldValue.increment(-scoreToRemove) });
+
+                    // 3. Log the reversion
+                    const logRef = db.collection("checkin_logs").doc();
+                    b.set(logRef, {
+                        userId: userId,
+                        type: 'manual_adjust',
+                        amount: -scoreToRemove,
+                        note: `Revert: Removed from Poll '${quizTitle}'`,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+
+                await b.commit();
+                alert("Participant removed & Score reverted!");
+                document.getElementById('pollResultModal').style.display = 'none'; // Close to refresh or re-fetch?
+                // Ideally, we re-call showPollResults. But we need quizId. 
+                // Since this function is global, we might not have quizId handy easily unless passed.
+                // Let's just close modal for now.
+            } catch (e) {
+                console.error(e);
+                alert("Error deleting participant: " + e.message);
             }
         }
 
