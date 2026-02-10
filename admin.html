@@ -1887,10 +1887,19 @@
             db.collection("quizzes").onSnapshot(s => { quizzesData = s.docs.map(d => ({ id: d.id, ...d.data() })); renderQuizzes(); });
             db.collection("quiz_attempts").where("status", "==", "pending").onSnapshot(s => { renderPendingQuizzes(s.docs.map(d => ({ id: d.id, ...d.data() }))); });
             // 🔥 Fix: Query by timestamp first then filter status (avoids missing index issue)
+            // 🔥 Fix: Query by timestamp first then filter status (avoids missing index issue)
             db.collection("quiz_attempts").orderBy("timestamp", "desc").limit(100).onSnapshot(s => {
                 quizApprovedData = s.docs
-                    .map(d => ({ id: d.id, ...d.data(), isQuiz: true }))
+                    .map(d => ({ id: d.id, ...d.data(), isQuiz: true, collection: 'quiz_attempts' }))
                     .filter(d => d.status === 'approved');
+                if (!hideCompletedWorks) renderTable('works');
+            });
+            // 🔥 Feature: Load Poll Responses for Works Table
+            db.collection("poll_responses").orderBy("timestamp", "desc").limit(50).onSnapshot(s => {
+                const polls = s.docs.map(d => ({ id: d.id, ...d.data(), isQuiz: true, isPollResponse: true, status: 'approved', collection: 'poll_responses' }));
+                // Merge into quizApprovedData or handle separately? 
+                // Let's just append to a global variable like pollData and merge in renderTable
+                window.pollData = polls;
                 if (!hideCompletedWorks) renderTable('works');
             });
             db.collection("quest_submissions").onSnapshot(s => { questsSubCache = {}; s.forEach(d => { questsSubCache[`${d.data().questId}_${d.data().userId}`] = d.data(); }); filterBoard(); });
@@ -1901,7 +1910,7 @@
             let data = (type === 'works') ? [...worksData] : [...usersData];
             if (type === 'works') {
                 if (!hideCompletedWorks) {
-                    data = [...data, ...quizApprovedData];
+                    data = [...data, ...quizApprovedData, ...(window.pollData || [])];
                     data.sort((a, b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
                 } else {
                     data = data.filter(d => d.status !== 'ตรวจแล้ว');
@@ -1919,7 +1928,19 @@
                         const isPoll = q.isPoll === true;
                         const points = isPoll ? (q.totalPoints || 1.0) : (d.correctCount / d.totalQuestions) * (q.totalPoints || 1.0);
                         const reviewBtn = isPoll ? '<span class="badge" style="background:#6c757d">Poll (Anon)</span>' : `<button class="btn-sm btn-info" onclick="reviewQuiz('${d.id}')">Review</button>`;
-                        tbody.innerHTML += `<tr><td>${d.timestamp?.toDate().toLocaleString() || '-'}</td><td><img src="${d.pictureUrl || d.pic || ''}" class="user-pic">${d.displayName}</td><td>📝 ${isPoll ? 'Poll' : 'Quiz'}: ${qTitle}</td><td>${reviewBtn}</td><td><span class="badge" style="background:${st}">Approved</span></td><td><b style="color:var(--primary);">${points.toFixed(3)}</b></td><td><button class="btn-sm btn-danger" onclick="delQuizAttempt('${d.id}')">Del</button></td></tr>`;
+
+                        // User Lookup fallback
+                        let uImg = d.pictureUrl || d.pic || '';
+                        let uName = d.displayName || 'Unknown';
+                        if (d.userId) {
+                            const u = usersData.find(x => x.id === d.userId);
+                            if (u) {
+                                if (!uImg) uImg = u.pictureUrl;
+                                if (uName === 'Unknown' || !uName) uName = u.displayName;
+                            }
+                        }
+
+                        tbody.innerHTML += `<tr><td>${d.timestamp?.toDate().toLocaleString() || '-'}</td><td><img src="${uImg}" class="user-pic">${uName}</td><td>📝 ${isPoll ? 'Poll' : 'Quiz'}: ${qTitle}</td><td>${reviewBtn}</td><td><span class="badge" style="background:${st}">Approved</span></td><td><b style="color:var(--primary);">${points.toFixed(3)}</b></td><td><button class="btn-sm btn-danger" onclick="delQuizAttempt('${d.id}', '${d.collection}')">Del</button></td></tr>`;
                     } else {
                         // 🔥 Link Fix
                         let linkUrl = d.link || "";
@@ -2307,6 +2328,15 @@
         }
 
         function generateCertPDF() { const { jsPDF } = window.jspdf; const doc = new jsPDF('l'); doc.addImage(document.getElementById('cert-canvas').toDataURL('image/jpeg'), 'JPEG', 10, 10, 280, 190); doc.save("cert.pdf"); }
+        async function delQuizAttempt(id, collection = 'quiz_attempts') {
+            if (!confirm("Delete this attempt/response?")) return;
+            try {
+                await db.collection(collection).doc(id).delete();
+                showToast("Deleted!");
+                // If it was a poll response, we might need to refresh manually if snapshot doesn't cover it?
+                // But we have onSnapshot for poll_responses in loadData, so it should update.
+            } catch (e) { alert(e.message); }
+        }
     </script>
 </body>
 
