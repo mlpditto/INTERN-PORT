@@ -1493,7 +1493,7 @@
 
             const data = {
                 ...formData,
-                title: `${formData.title} (Template)`,
+                title: formData.title,
                 isActive: false,
                 isTemplate: true,
                 startTime: null,
@@ -1590,11 +1590,14 @@
                         if (isChoice) {
                             if (ans !== null && counts[ans] !== undefined) counts[ans]++;
                         } else {
-                            if (ans) {
+                            if (ans !== undefined && ans !== null) {
                                 // For open answers, show display name if available (not anon)
                                 const prefix = data.displayName ? `<b>${data.displayName}:</b> ` : "";
                                 let displayAns = ans;
-                                if (Array.isArray(ans)) {
+
+                                if (displayAns === "" || (typeof displayAns === 'string' && displayAns.trim() === "")) {
+                                    displayAns = `<span style="color:#ccc; font-style:italic;">(ไม่ระบุ)</span>`;
+                                } else if (Array.isArray(ans)) {
                                     displayAns = ans.join(" / ");
                                 } else if (typeof ans === 'string' && ans.includes("\n---\n")) {
                                     displayAns = ans.split("\n---\n").join(" / ");
@@ -1809,7 +1812,12 @@
 
                 tbody.innerHTML += `
                     <tr>
-                        <td>${q.title} <br><small style="color:#666;">(${q.shortTitle || '-'})</small> ${q.isTemplate ? '<b style="color:orange;">[TEMPLATE]</b>' : ''} ${pollLabel} ${subjLabel}</td>
+                        <td>
+                            ${q.title ? q.title.replace(/\s*\(Template\)$/i, '') : '-'} 
+                            <br><small style="color:#666;">(${q.shortTitle || '-'})</small> 
+                            ${q.isTemplate ? '<div style="margin-top:4px;"><span class="badge" style="background:orange; color:white; font-size:0.75em;">TEMPLATE</span></div>' : ''} 
+                            ${pollLabel} ${subjLabel}
+                        </td>
                         <td>${q.questions ? q.questions.length : 0} Qs</td>
                         <td>${q.totalPoints || 1.0}</td>
                         <td>${statusInfo}</td>
@@ -1848,7 +1856,13 @@
             db.collection("quests").onSnapshot(s => { questsCache = s.docs.map(d => ({ id: d.id, ...d.data() })); loadActiveQuests(); loadQuestHistory(); });
             db.collection("quizzes").onSnapshot(s => { quizzesData = s.docs.map(d => ({ id: d.id, ...d.data() })); renderQuizzes(); });
             db.collection("quiz_attempts").where("status", "==", "pending").onSnapshot(s => { renderPendingQuizzes(s.docs.map(d => ({ id: d.id, ...d.data() }))); });
-            db.collection("quiz_attempts").where("status", "==", "approved").orderBy("timestamp", "desc").limit(50).onSnapshot(s => { quizApprovedData = s.docs.map(d => ({ id: d.id, ...d.data(), isQuiz: true })); if (!hideCompletedWorks) renderTable('works'); });
+            // 🔥 Fix: Query by timestamp first then filter status (avoids missing index issue)
+            db.collection("quiz_attempts").orderBy("timestamp", "desc").limit(100).onSnapshot(s => {
+                quizApprovedData = s.docs
+                    .map(d => ({ id: d.id, ...d.data(), isQuiz: true }))
+                    .filter(d => d.status === 'approved');
+                if (!hideCompletedWorks) renderTable('works');
+            });
             db.collection("quest_submissions").onSnapshot(s => { questsSubCache = {}; s.forEach(d => { questsSubCache[`${d.data().questId}_${d.data().userId}`] = d.data(); }); filterBoard(); });
         }
 
@@ -1956,13 +1970,36 @@
                     if (x.status !== 'none') all.push({ t: x.receivedAt?.toDate(), type: 'bonus', text: `🚀 Receive: ${shortName}`, score: 0.1 });
                     if (s > 0) all.push({ t: x.submittedAt?.toDate(), type: 'quest', text: `⚡ Submit: ${shortName}`, score: s });
                 });
+
+                // 🔥 Add Quiz Attempts to History
+                const qAz = await db.collection("quiz_attempts").where("userId", "==", uid).where("status", "==", "approved").get();
+                qAz.forEach(d => {
+                    const att = d.data();
+                    const qData = quizzesData.find(x => x.id === att.quizId) || {};
+                    const qTitle = qData.shortTitle || qData.title || "Quiz";
+                    const points = att.gradedAnswers ? Object.keys(att.gradedAnswers).length : 0; // Simple calc, or use stored if available
+                    // Recalc points based on logic
+                    const isPoll = qData.isPoll === true;
+                    // If poll, usually fixed points. If quiz, correct/total * totalPoints
+                    let finalScore = 0;
+                    if (isPoll) finalScore = (qData.totalPoints || 1.0);
+                    else finalScore = (att.correctCount / att.totalQuestions) * (qData.totalPoints || 1.0);
+
+                    all.push({
+                        t: att.timestamp?.toDate(),
+                        type: 'work',
+                        text: `📝 ${isPoll ? 'Poll' : 'Quiz'}: ${qTitle}`,
+                        score: finalScore
+                    });
+                });
+
                 l.forEach(d => {
                     const x = d.data();
                     if (x.type === 'streak') all.push({ t: x.timestamp?.toDate(), type: 'bonus', text: `🔥 Streak`, score: x.amount, docId: d.id, source: 'checkin_logs' });
                     if (x.type === 'manual_adjust' || x.type === 'manual') all.push({ t: x.timestamp?.toDate(), type: 'manual', text: `🛠️ ${x.note}`, score: x.amount, docId: d.id, source: 'checkin_logs' });
                 });
                 all.sort((a, b) => (b.t || 0) - (a.t || 0));
-                historyCache = all.reverse();
+                historyCache = all; // 🔥 Fix: Latest first (removed .reverse())
                 historyPage = 1;
                 renderHistoryPage();
             } catch (e) { document.getElementById("history-list").innerHTML = "Error loading history"; }
