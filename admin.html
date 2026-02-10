@@ -691,12 +691,17 @@
             </div>
 
             <!-- Login Options -->
-            <div style="margin-bottom:15px;">
+            <div style="margin-bottom:15px; display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
                 <button class="btn-google magic-btn" onclick="loginWithGoogle()"
                     style="width:100%; background:white; color:#444; border:1px solid #ddd;">
                     <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"
                         style="width:18px; vertical-align:middle; margin-right:8px;">
-                    Google Login
+                    Google
+                </button>
+                <button class="btn-line magic-btn" onclick="loginWithLINE()"
+                    style="background:#06c755; color:white; border:none;">
+                    <i class="fa-brands fa-line" style="margin-right:5px;"></i>
+                    LINE
                 </button>
             </div>
 
@@ -712,7 +717,7 @@
 
             <div
                 style="margin-top: 20px; font-size: 0.75em; color: #999; border-top: 1px solid #eee; padding-top: 10px;">
-                Secure Access via Email or Google.<br>
+                Secure Access via Email, Google or LINE.<br>
             </div>
         </div>
     </div>
@@ -1162,7 +1167,7 @@
     <script src="firebase-config.js"></script>
     <script>
         const ALLOWED_EMAIL = "medlifeplus@gmail.com";
-        const ADMIN_LIFF_ID = ""; // Removed to avoid LIFF init error on admin page
+        const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; // ✅ Shared LIFF ID
         const MY_URL = 'https://mlp-int.work/admin.html'; // V72.5 Updated to Custom Domain
 
         const auth = firebase.auth();
@@ -1193,6 +1198,34 @@
                 .catch((error) => {
                     document.getElementById('login-error').innerText = "Google Error: " + error.message;
                 });
+        }
+
+        // 🔥 LINE Login Logic (Admin)
+        async function loginWithLINE() {
+            try {
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                } else {
+                    const profile = await liff.getProfile();
+                    const user = liff.getDecodedIDToken();
+                    const lineEmail = user.email;
+
+                    if (lineEmail === ALLOWED_EMAIL) {
+                        // Custom token logic or manual trigger if already authorized
+                        // For static admin, we just rely on onAuthStateChanged or manual UI switch
+                        // If LINE email matches, we can use a "Backdoor" or Custom Auth
+                        // alert("✅ LINE Auths Success: " + lineEmail);
+                        document.getElementById('login-screen').style.display = 'none';
+                        document.getElementById('dashboard-container').style.display = 'block';
+                        document.getElementById('admin-email').innerText = lineEmail + " (via LINE)";
+                        initSystem();
+                    } else {
+                        alert("❌ Access Denied: Your LINE email (" + lineEmail + ") is not authorized.");
+                    }
+                }
+            } catch (e) {
+                document.getElementById('login-error').innerText = "LINE Error: " + e.message;
+            }
         }
 
         // 🔥 Magic Link Logic (Replaces Google Sign-In)
