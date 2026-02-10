@@ -1001,7 +1001,7 @@
             </div>
             <div id="cert-preview-container"
                 style="text-align:center; border:2px solid #ddd; padding:15px; margin-bottom:15px; background:#f9f9f9; border-radius:12px; overflow:hidden; display: flex; justify-content: center; align-items: center;">
-                <canvas id="cert-canvas"
+                <canvas id="cert-canvas" width="800" height="600"
                     style="max-width:100%; height:auto; border-radius:4px; box-shadow:0 4px 15px rgba(0,0,0,0.1);"></canvas>
             </div>
             <div style="display:flex; gap:10px; justify-content:flex-end;"><button class="btn-sm btn-primary"
@@ -2260,10 +2260,19 @@
         }
 
         async function updateCertPreview() {
-            const c = document.getElementById('cert-canvas'), ctx = c.getContext('2d');
-            // 🔥 Fix: Set explicit resolution to match drawing logic
+            const c = document.getElementById('cert-canvas');
+            const ctx = c.getContext('2d');
+
+            // 🔥 Fix: Handle High DPI Screens & Explicit Resolution
+            // Get the display size (CSS width)
+            // But for certificate generation, we want a fixed internal resolution of 800x600
+            // regardless of screen size, so the PDF/Image is consistent.
             c.width = 800;
             c.height = 600;
+
+            // Reset transform to avoid accumulation
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+
             const s = document.getElementById('cert-start').value;
             const e = document.getElementById('cert-end').value;
             drawCertificate(ctx, certUser.name, s && e ? `${s} - ${e}` : "");
