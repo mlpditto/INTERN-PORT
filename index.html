@@ -494,12 +494,18 @@
         let confirmTimer = null, confirmParams = null;
 
         // --- Initialization ---
-        // --- Initialization ---
         async function main() {
             try {
                 // Ensure liff is available
-                if (!window.liff) throw new Error("LIFF SDK not found");
-                await liff.init({ liffId: USER_LIFF_ID });
+                if (!window.liff) throw new Error("LIFF SDK not found on window");
+
+                // Timeout for LIFF Init (5 seconds)
+                const initPromise = liff.init({ liffId: USER_LIFF_ID });
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error("LIFF Init Timeout")), 10000)
+                );
+
+                await Promise.race([initPromise, timeoutPromise]);
                 if (!liff.isLoggedIn()) {
                     document.getElementById('btn-manual-login').style.display = 'inline-block';
                     liff.login();
