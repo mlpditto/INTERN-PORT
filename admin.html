@@ -1031,7 +1031,8 @@
                     style="flex:1; display:flex; flex-direction:column; justify-content:flex-end; padding-bottom:10px;">
                     <label
                         style="cursor:pointer; background:var(--col-bg); border:1px solid var(--border-color); padding:8px; border-radius:6px; font-size:0.85em; font-weight:bold; color:var(--primary); display:flex; align-items:center; gap:5px; margin:0;">
-                        <input type="checkbox" id="quiz-is-poll" style="width:auto; margin:0;"> 🗳️ Poll Mode
+                        <input type="checkbox" id="quiz-is-poll" onchange="updatePollUI()"
+                            style="width:auto; margin:0;"> 🗳️ Poll Mode
                     </label>
                 </div>
             </div>
@@ -1250,6 +1251,7 @@
             document.getElementById('quiz-total-points').value = q.totalPoints || 1.0;
             document.getElementById('quiz-desc').value = q.description || "";
             document.getElementById('quiz-is-poll').checked = q.isPoll || false;
+            updatePollUI();
 
             const fmt = (d) => {
                 if (!d) return "";
@@ -1280,6 +1282,7 @@
             document.getElementById('quiz-total-points').value = 1.0;
             document.getElementById('quiz-desc').value = "";
             document.getElementById('quiz-is-poll').checked = false;
+            updatePollUI();
             document.getElementById('quiz-start-time').value = "";
             document.getElementById('quiz-deadline').value = "";
             document.getElementById('quiz-questions-container').innerHTML = "";
@@ -1336,6 +1339,7 @@
 
         let quizQPageIndex = 0;
         function updateQuizPagination() {
+            updatePollUI();
             const items = document.querySelectorAll('.quiz-q-item');
             const total = items.length;
             if (quizQPageIndex >= total && total > 0) quizQPageIndex = total - 1;
@@ -1416,6 +1420,13 @@
             const type = el.value;
             item.querySelector('.options-container').style.display = type === 'choice' ? 'flex' : 'none';
             item.querySelector('.correct-container').style.display = type === 'choice' ? 'flex' : 'none';
+        }
+
+        function updatePollUI() {
+            const isPoll = document.getElementById('quiz-is-poll').checked;
+            document.querySelectorAll('.correct-container').forEach(el => {
+                el.style.display = isPoll ? 'none' : 'flex';
+            });
         }
 
         async function saveQuiz() {
