@@ -2282,13 +2282,29 @@
                     totalScore += (data.earnedScore || 0) + (data.bonusGiven || 0);
                 });
                 const lSnap = await db.collection("checkin_logs").where("userId", "==", uid).get();
-                lSnap.forEach(d => { totalScore += (d.data().amount || 0); });
+                lSnap.forEach(d => {
+                    const l = d.data();
+                    // Skip 'quiz' type in logs to avoid double counting with quiz_attempts below
+                    if (l.type === 'quiz') return;
+                    totalScore += (parseFloat(l.amount) || 0);
+                });
 
                 const quizSnap = await db.collection("quiz_attempts").where("userId", "==", uid).where("status", "==", "approved").get();
                 quizSnap.forEach(d => {
                     const att = d.data();
                     const qData = quizzesData.find(x => x.id === att.quizId) || {};
-                    const points = (att.correctCount / att.totalQuestions) * (qData.totalPoints || 1.0);
+                    let points = 0;
+
+                    if (qData.isPoll) {
+                        points = (parseFloat(qData.totalPoints) || 1.0);
+                    } else {
+                        const totalQ = att.totalQuestions || 1; // Prevent div by zero
+                        const correct = att.correctCount || 0;
+                        const maxPoints = parseFloat(qData.totalPoints) || 1.0;
+                        points = (correct / totalQ) * maxPoints;
+                    }
+
+                    if (isNaN(points)) points = 0;
                     totalScore += points;
                 });
 
