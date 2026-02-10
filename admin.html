@@ -1558,8 +1558,12 @@
             info.innerText = `Title: ${quiz.title}`;
 
             try {
-                const snap = await db.collection("poll_responses").where("quizId", "==", quizId).get();
-                const totalResponses = snap.size;
+                // Fetch from BOTH poll_responses (anon) and quiz_attempts (regular)
+                const pollSnap = await db.collection("poll_responses").where("quizId", "==", quizId).get();
+                const attemptSnap = await db.collection("quiz_attempts").where("quizId", "==", quizId).get();
+
+                const allDocs = [...pollSnap.docs, ...attemptSnap.docs];
+                const totalResponses = allDocs.length;
                 info.innerText += ` | Total Responses: ${totalResponses}`;
 
                 if (totalResponses === 0) {
@@ -1572,12 +1576,17 @@
                     const counts = isChoice ? new Array(q.options.length).fill(0) : [];
                     const openAnswers = [];
 
-                    snap.forEach(doc => {
-                        const ans = doc.data().answers[qIdx];
+                    allDocs.forEach(doc => {
+                        const data = doc.data();
+                        const ans = data.answers ? data.answers[qIdx] : null;
                         if (isChoice) {
                             if (ans !== null && counts[ans] !== undefined) counts[ans]++;
                         } else {
-                            if (ans) openAnswers.push(ans);
+                            if (ans) {
+                                // For open answers, show display name if available (not anon)
+                                const prefix = data.displayName ? `<b>${data.displayName}:</b> ` : "";
+                                openAnswers.push(prefix + (Array.isArray(ans) ? ans.join(" / ") : ans));
+                            }
                         }
                     });
 
@@ -1772,16 +1781,20 @@
                 else if (dead && now > dead) statusInfo = `<span class="badge" style="background:#ef233c">Expired: ${dead.toLocaleString('th-TH')}</span>`;
                 else statusInfo = `<span class="badge" style="background:#2ec4b6">Active</span> <br> <small class="quiz-countdown" data-deadline="${dead ? dead.toISOString() : ''}" style="font-weight:bold; color:#ef233c;"></small>`;
 
+                const hasWriting = q.questions && q.questions.some(x => x.type === 'short_answer');
+                const pollLabel = q.isPoll ? '<span class="badge" style="background:var(--primary);">🗳️ POLL</span>' : '';
+                const subjLabel = hasWriting ? '<span class="badge" style="background:#e67e22;">📝 SUBJECTIVE</span>' : '';
+
                 tbody.innerHTML += `
                     <tr>
-                        <td>${q.title} <br><small style="color:#666;">(${q.shortTitle || '-'})</small> ${q.isTemplate ? '<b style="color:orange;">[TEMPLATE]</b>' : ''} ${q.isPoll ? '<span class="badge" style="background:var(--primary);">🗳️ POLL</span>' : ''}</td>
+                        <td>${q.title} <br><small style="color:#666;">(${q.shortTitle || '-'})</small> ${q.isTemplate ? '<b style="color:orange;">[TEMPLATE]</b>' : ''} ${pollLabel} ${subjLabel}</td>
                         <td>${q.questions ? q.questions.length : 0} Qs</td>
                         <td>${q.totalPoints || 1.0}</td>
                         <td>${statusInfo}</td>
                         <td>
                             <button class="btn-sm btn-primary" onclick="openQuizModal('${q.id}')">Edit</button>
                             <button class="btn-sm btn-dark" onclick="toggleQuizStatus('${q.id}', ${q.isActive})">${q.isActive ? 'Deactivate' : 'Activate'}</button>
-                            ${q.isPoll ? `<button class="btn-sm btn-info" style="background:#8e44ad;" onclick="showPollResults('${q.id}')">📊 Result</button>` : ''}
+                            ${(q.isPoll || hasWriting) ? `<button class="btn-sm btn-info" style="background:#8e44ad;" onclick="showPollResults('${q.id}')">📊 Result</button>` : ''}
                             ${(dead && now > dead) ? `<button class="btn-sm btn-warning" onclick="repostQuiz('${q.id}')">♻️ Repost</button>` : ''}
                             <button class="btn-sm btn-danger" onclick="deleteQuiz('${q.id}')">Del</button>
                         </td>
