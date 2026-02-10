@@ -1100,6 +1100,22 @@
         </div>
     </div>
 
+    <div id="pollResultModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close-modal"
+                onclick="document.getElementById('pollResultModal').style.display='none'">&times;</span>
+            <h3 style="color:var(--primary);"><i class="fa-solid fa-chart-pie"></i> Poll Results Summary</h3>
+            <div id="poll-result-info" style="margin-bottom:15px; font-size:0.9em; color:#666;"></div>
+            <div id="poll-result-container" style="max-height: 500px; overflow-y: auto;">
+                <!-- Result content injected by JS showPollResults -->
+            </div>
+            <div style="margin-top: 15px; text-align: right;">
+                <button class="btn-sm btn-dark"
+                    onclick="document.getElementById('pollResultModal').style.display='none'">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div id="shareModal" class="modal" style="z-index:3000;">
         <div class="modal-content" style="max-width:300px;text-align:center;">
             <h3><i class="fa-solid fa-share-nodes"></i> Share Leaderboard</h3><button class="magic-btn"
@@ -1520,6 +1536,82 @@
             });
         }
 
+        async function showPollResults(quizId) {
+            const quiz = quizzesData.find(x => x.id === quizId);
+            if (!quiz) return;
+
+            document.getElementById('pollResultModal').style.display = 'block';
+            const container = document.getElementById('poll-result-container');
+            const info = document.getElementById('poll-result-info');
+            container.innerHTML = "<p>Loading statistics...</p>";
+            info.innerText = `Title: ${quiz.title}`;
+
+            try {
+                const snap = await db.collection("poll_responses").where("quizId", "==", quizId).get();
+                const totalResponses = snap.size;
+                info.innerText += ` | Total Responses: ${totalResponses}`;
+
+                if (totalResponses === 0) {
+                    container.innerHTML = "<p style='text-align:center; padding:20px;'>No responses yet.</p>";
+                    return;
+                }
+
+                const stats = quiz.questions.map((q, qIdx) => {
+                    const isChoice = (q.type || 'choice') === 'choice';
+                    const counts = isChoice ? new Array(q.options.length).fill(0) : [];
+                    const openAnswers = [];
+
+                    snap.forEach(doc => {
+                        const ans = doc.data().answers[qIdx];
+                        if (isChoice) {
+                            if (ans !== null && counts[ans] !== undefined) counts[ans]++;
+                        } else {
+                            if (ans) openAnswers.push(ans);
+                        }
+                    });
+
+                    return { q, counts, openAnswers, isChoice };
+                });
+
+                container.innerHTML = stats.map((stat, i) => {
+                    let body = "";
+                    if (stat.isChoice) {
+                        body = stat.q.options.map((opt, optIdx) => {
+                            const count = stat.counts[optIdx];
+                            const percent = totalResponses > 0 ? (count / totalResponses * 100).toFixed(1) : 0;
+                            return `
+                                <div style="margin-bottom:10px;">
+                                    <div style="display:flex; justify-content:space-between; font-size:0.9em; margin-bottom:4px;">
+                                        <span>${optIdx + 1}. ${opt}</span>
+                                        <span><b>${count}</b> (${percent}%)</span>
+                                    </div>
+                                    <div style="height:10px; background:#eee; border-radius:5px; overflow:hidden;">
+                                        <div style="height:100%; background:var(--primary); width:${percent}%;"></div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    } else {
+                        body = `<div style="max-height:150px; overflow-y:auto; background:#f8f9fa; padding:10px; border-radius:8px; font-size:0.85em; border:1px solid #eee;">
+                            ${stat.openAnswers.length > 0
+                                ? stat.openAnswers.map(a => `<div style="margin-bottom:5px; border-bottom:1px solid #ddd; padding-bottom:5px;">• ${a}</div>`).join('')
+                                : 'No text responses.'}
+                        </div>`;
+                    }
+
+                    return `
+                        <div style="border:1px solid #eee; padding:15px; margin-bottom:15px; border-radius:10px; background:#fff;">
+                            <b style="color:var(--primary); display:block; margin-bottom:10px;">Q${i + 1}: ${stat.q.q}</b>
+                            ${body}
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (e) {
+                container.innerHTML = `<p style="color:red;">Error: ${e.message}</p>`;
+            }
+        }
+
         async function reviewQuiz(attemptId) {
             const attemptDoc = await db.collection("quiz_attempts").doc(attemptId).get();
             if (!attemptDoc.exists) return alert("Data not found");
@@ -1678,6 +1770,7 @@
                         <td>
                             <button class="btn-sm btn-primary" onclick="openQuizModal('${q.id}')">Edit</button>
                             <button class="btn-sm btn-dark" onclick="toggleQuizStatus('${q.id}', ${q.isActive})">${q.isActive ? 'Deactivate' : 'Activate'}</button>
+                            ${q.isPoll ? `<button class="btn-sm btn-info" style="background:#8e44ad;" onclick="showPollResults('${q.id}')">📊 Result</button>` : ''}
                             ${(dead && now > dead) ? `<button class="btn-sm btn-warning" onclick="repostQuiz('${q.id}')">♻️ Repost</button>` : ''}
                             <button class="btn-sm btn-danger" onclick="deleteQuiz('${q.id}')">Del</button>
                         </td>
