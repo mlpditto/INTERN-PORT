@@ -1113,7 +1113,7 @@
 
         const auth = firebase.auth();
 
-        let usersData = [], worksData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {};
+        let usersData = [], worksData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {};
         let hideCompletedWorks = true;
         let historyCache = []; let historyPage = 1; const HISTORY_PER_PAGE = 10;
         let archiveCache = []; let archivePage = 1; const ARCHIVE_PER_PAGE = 10;
@@ -1697,33 +1697,49 @@
             db.collection("quests").onSnapshot(s => { questsCache = s.docs.map(d => ({ id: d.id, ...d.data() })); loadActiveQuests(); loadQuestHistory(); });
             db.collection("quizzes").onSnapshot(s => { quizzesData = s.docs.map(d => ({ id: d.id, ...d.data() })); renderQuizzes(); });
             db.collection("quiz_attempts").where("status", "==", "pending").onSnapshot(s => { renderPendingQuizzes(s.docs.map(d => ({ id: d.id, ...d.data() }))); });
+            db.collection("quiz_attempts").where("status", "==", "approved").orderBy("timestamp", "desc").limit(50).onSnapshot(s => { quizApprovedData = s.docs.map(d => ({ id: d.id, ...d.data(), isQuiz: true })); if (!hideCompletedWorks) renderTable('works'); });
             db.collection("quest_submissions").onSnapshot(s => { questsSubCache = {}; s.forEach(d => { questsSubCache[`${d.data().questId}_${d.data().userId}`] = d.data(); }); filterBoard(); });
         }
 
         function renderTable(type) {
             const tbody = document.querySelector(`#${type}Table tbody`);
-            let data = (type === 'works') ? worksData : usersData;
-            if (type === 'works' && hideCompletedWorks) data = data.filter(d => d.status !== 'ตรวจแล้ว');
+            let data = (type === 'works') ? [...worksData] : [...usersData];
+            if (type === 'works') {
+                if (!hideCompletedWorks) {
+                    data = [...data, ...quizApprovedData];
+                    data.sort((a, b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
+                } else {
+                    data = data.filter(d => d.status !== 'ตรวจแล้ว');
+                }
+            }
             if (type === 'users') { const t = document.getElementById('userSearch').value.toLowerCase(); if (t) data = data.filter(u => u.displayName.toLowerCase().includes(t)); }
             tbody.innerHTML = "";
             data.slice(0, 50).forEach(d => {
                 if (type === 'works') {
                     const st = d.status === 'ตรวจแล้ว' ? '#2ec4b6' : d.status === 'แก้ไข' ? '#ef233c' : '#ff9f1c';
-                    // 🔥 Link Fix
-                    let linkUrl = d.link || "";
-                    let btnClass = "btn-sm btn-dark";
-                    let onclickAttr = "";
-                    let hrefAttr = "javascript:void(0)";
 
-                    if (linkUrl.trim() !== "") {
-                        if (!linkUrl.startsWith('http')) linkUrl = 'https://' + linkUrl.trim();
-                        onclickAttr = `onclick="window.open('${linkUrl}', '_blank')"`;
+                    if (d.isQuiz) {
+                        const q = quizzesData.find(x => x.id === d.quizId) || {};
+                        const qTitle = q.shortTitle || q.title || "Quiz";
+                        const points = (d.correctCount / d.totalQuestions) * (q.totalPoints || 1.0);
+                        tbody.innerHTML += `<tr><td>${d.timestamp?.toDate().toLocaleString() || '-'}</td><td><img src="${d.pictureUrl || d.pic || ''}" class="user-pic">${d.displayName}</td><td>📝 Quiz: ${qTitle}</td><td><button class="btn-sm btn-info" onclick="reviewQuiz('${d.id}')">Review</button></td><td><span class="badge" style="background:${st}">Approved</span></td><td><b style="color:var(--primary);">${points.toFixed(3)}</b></td><td><button class="btn-sm btn-danger" onclick="delQuizAttempt('${d.id}')">Del</button></td></tr>`;
                     } else {
-                        btnClass += " disabled";
-                        onclickAttr = "onclick='alert(\"No link provided\")'";
-                    }
+                        // 🔥 Link Fix
+                        let linkUrl = d.link || "";
+                        let btnClass = "btn-sm btn-dark";
+                        let onclickAttr = "";
+                        let hrefAttr = "javascript:void(0)";
 
-                    tbody.innerHTML += `<tr><td>${d.timestamp?.toDate().toLocaleString() || '-'}</td><td><img src="${d.pictureUrl}" class="user-pic">${d.displayName}</td><td>${d.title}</td><td><a ${hrefAttr} ${onclickAttr} class="${btnClass}">Link</a></td><td><span class="badge" style="background:${st}">${d.status}</span></td><td><div style="display:flex;"><input type="number" id="sc-${d.id}" value="${d.score || 0}" style="width:60px;"><button class="btn-sm btn-primary" onclick="svSc('${d.id}','${d.userId}')">Save</button></div></td><td><button class="btn-sm btn-danger" onclick="delWork('${d.id}')">Del</button></td></tr>`;
+                        if (linkUrl.trim() !== "") {
+                            if (!linkUrl.startsWith('http')) linkUrl = 'https://' + linkUrl.trim();
+                            onclickAttr = `onclick="window.open('${linkUrl}', '_blank')"`;
+                        } else {
+                            btnClass += " disabled";
+                            onclickAttr = "onclick='alert(\"No link provided\")'";
+                        }
+
+                        tbody.innerHTML += `<tr><td>${d.timestamp?.toDate().toLocaleString() || '-'}</td><td><img src="${d.pictureUrl}" class="user-pic">${d.displayName}</td><td>${d.title}</td><td><a ${hrefAttr} ${onclickAttr} class="${btnClass}">Link</a></td><td><span class="badge" style="background:${st}">${d.status}</span></td><td><div style="display:flex;"><input type="number" id="sc-${d.id}" value="${d.score || 0}" style="width:60px;"><button class="btn-sm btn-primary" onclick="svSc('${d.id}','${d.userId}')">Save</button></div></td><td><button class="btn-sm btn-danger" onclick="delWork('${d.id}')">Del</button></td></tr>`;
+                    }
                 }
                 else {
                     const ignored = d.isIgnored;
@@ -1903,6 +1919,7 @@
         async function archiveSQ(id) { if (confirm("Archive?")) await db.collection("side_quests").doc(id).update({ status: 'Archived' }); }
         async function delUser(id) { if (confirm("Del?")) await db.collection("users").doc(id).delete(); }
         async function delWork(id) { if (confirm("Del?")) await db.collection("works").doc(id).delete(); }
+        async function delQuizAttempt(id) { if (confirm("Delete this quiz attempt record?")) await db.collection("quiz_attempts").doc(id).delete(); }
         function toggleIgnoreUser(id, s) { db.collection("users").doc(id).update({ isIgnored: !s }); }
         function toggleForm() { const f = document.getElementById('sq-form'); f.style.display = f.style.display === 'none' ? 'block' : 'none'; }
         function filterBoard() { renderKanban({ forEach: cb => { Object.values(sideQuestsCache).forEach(q => cb({ data: () => q, id: Object.keys(sideQuestsCache).find(k => sideQuestsCache[k] === q) })) } }); }
