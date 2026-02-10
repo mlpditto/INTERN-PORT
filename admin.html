@@ -1579,6 +1579,34 @@
                     return;
                 }
 
+                // 🔥 Add Participants List
+                const participants = allDocs.map(d => {
+                    const data = d.data();
+                    // Try to find user in global usersData first for latest info
+                    const u = usersData.find(u => u.id === data.userId);
+                    return {
+                        id: data.userId || 'anon',
+                        name: u ? u.displayName : (data.displayName || 'Anonymous'),
+                        pic: u ? u.pictureUrl : (data.pictureUrl || ''),
+                        timestamp: data.timestamp ? data.timestamp.toDate() : null
+                    };
+                }).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+                let partHtml = `<div style="margin-bottom:20px; padding:15px; border:1px solid #ddd; border-radius:8px; background:#f0f8ff;">
+                    <strong style="display:block; margin-bottom:10px;">👥 Participants (${participants.length})</strong>
+                    <div style="max-height:150px; overflow-y:auto; display:flex; flex-wrap:wrap; gap:10px;">`;
+
+                participants.forEach(p => {
+                    partHtml += `<div style="display:flex; align-items:center; background:white; padding:5px 10px; border-radius:20px; border:1px solid #eee; font-size:0.85em;">
+                        ${p.pic ? `<img src="${p.pic}" style="width:20px; height:20px; border-radius:50%; margin-right:5px;">` : ''}
+                        <span>${p.name}</span>
+                        <span style="color:#999; font-size:0.8em; margin-left:5px;">${p.timestamp ? `(${p.timestamp.toLocaleDateString()})` : ''}</span>
+                    </div>`;
+                });
+                partHtml += `</div></div>`;
+
+                container.innerHTML = partHtml; // Start with participants list
+
                 const stats = quiz.questions.map((q, qIdx) => {
                     const isChoice = (q.type || 'choice') === 'choice';
                     const counts = isChoice ? new Array(q.options.length).fill(0) : [];
@@ -1610,7 +1638,7 @@
                     return { q, counts, openAnswers, isChoice };
                 });
 
-                container.innerHTML = stats.map((stat, i) => {
+                const statsHtml = stats.map((stat, i) => {
                     let body = "";
                     if (stat.isChoice) {
                         body = stat.q.options.map((opt, optIdx) => {
@@ -1643,6 +1671,8 @@
                         </div>
                     `;
                 }).join('');
+
+                container.innerHTML = partHtml + statsHtml; // 🔥 Fix: Concat both parts
 
             } catch (e) {
                 container.innerHTML = `<p style="color:red;">Error: ${e.message}</p>`;
@@ -2231,6 +2261,9 @@
 
         async function updateCertPreview() {
             const c = document.getElementById('cert-canvas'), ctx = c.getContext('2d');
+            // 🔥 Fix: Set explicit resolution to match drawing logic
+            c.width = 800;
+            c.height = 600;
             const s = document.getElementById('cert-start').value;
             const e = document.getElementById('cert-end').value;
             drawCertificate(ctx, certUser.name, s && e ? `${s} - ${e}` : "");
