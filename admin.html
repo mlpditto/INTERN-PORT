@@ -454,6 +454,56 @@
             flex: 2;
         }
 
+        .lb-mid {
+            flex: 3;
+            height: 60px;
+            margin: 0 20px;
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            border-bottom: 1px solid #eee;
+        }
+
+        .chart-bar {
+            background: var(--primary);
+            opacity: 0.6;
+            margin-right: 2px;
+            min-width: 4px;
+            border-radius: 2px 2px 0 0;
+            position: absolute;
+            bottom: 0;
+            transition: height 0.3s;
+        }
+
+        .chart-bar:hover {
+            opacity: 1;
+            transform: scaleY(1.1);
+        }
+
+        .chart-marker {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #ef233c;
+            opacity: 0.5;
+            z-index: 0;
+        }
+
+        .chart-marker.start {
+            background: #28a745;
+        }
+
+        .chart-marker span {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.6em;
+            color: #666;
+            white-space: nowrap;
+        }
+
         .lb-rank {
             width: 40px;
             text-align: center;
@@ -2283,11 +2333,14 @@
             }
         }
 
-        function renderLeaderboard() {
+        async function renderLeaderboard() {
             const l = document.getElementById("leaderboardList");
             l.innerHTML = "";
             if (!usersData.length) { l.innerHTML = "<div style='text-align:center;padding:20px;color:#999;'>No user data found.</div>"; return; }
-            usersData.filter(u => !u.isIgnored).slice(0, 20).forEach((u, i) => {
+
+            const topUsers = usersData.filter(u => !u.isIgnored).slice(0, 20);
+
+            topUsers.forEach((u, i) => {
                 const lv = Math.floor((u.score || 0) / 10) + 1;
                 let daysLeftHtml = "";
                 if (u.endDate) {
@@ -2297,8 +2350,142 @@
                     if (diff < 0) daysLeftHtml = `<span class="badge" style="background:#28a745">✅ จบการศึกษา</span>`;
                     else daysLeftHtml = `<span class="badge" style="background:#17a2b8">⏳ เหลือ ${diff} วัน</span>`;
                 }
-                l.innerHTML += `<div class="lb-row"><div class="lb-left"><div class="lb-rank">#${i + 1}</div><div class="lb-profile"><img src="${u.pictureUrl}" class="lb-pic-lg"><div class="lb-info"><div class="lb-name">${u.displayName} <span class="lb-lv">Lv.${lv}</span></div><div class="lb-days">${daysLeftHtml}</div></div></div></div><div class="lb-right"><div class="lb-score">${parseFloat((u.score || 0).toFixed(2))}</div></div></div>`;
+
+                const rankClass = i < 3 ? `rank-${i + 1}` : '';
+
+                l.innerHTML += `
+                    <div class="lb-row ${rankClass}">
+                        <div class="lb-left">
+                            <div class="lb-rank">#${i + 1}</div>
+                            <div class="lb-profile">
+                                <img src="${u.pictureUrl}" class="lb-pic-lg">
+                                <div class="lb-info">
+                                    <div class="lb-name">${u.displayName} <span class="lb-lv">Lv.${lv}</span></div>
+                                    <div class="lb-days">${daysLeftHtml}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="lb-mid" id="chart-${u.id}"></div>
+                        <div class="lb-right">
+                            <div class="lb-score">${parseFloat((u.score || 0).toFixed(2))}</div>
+                        </div>
+                    </div>`;
             });
+
+            // Load charts after rendering
+            if (topUsers.length > 0) loadLeaderboardCharts(topUsers);
+        }
+
+        async function loadLeaderboardCharts(users) {
+            // Batch process (max 10 for 'in' query)
+            const batches = [];
+            while (users.length > 0) batches.push(users.splice(0, 10));
+
+            for (const batch of batches) {
+                const uids = batch.map(u => u.id);
+                try {
+                    // Fetch data for this batch
+                    // Note: We fetch from multiple collections to reconstruct history. This is heavy but necessary for accurate history.
+                    // Limiting history to 4 months ~ 120 days for performance if no startDate
+                    const ninetyDaysAgo = new Date(); ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 120);
+
+                    const [worksSnap, questsSnap, logsSnap] = await Promise.all([
+                        db.collection("works").where("userId", "in", uids).where("timestamp", ">", ninetyDaysAgo).get(),
+                        db.collection("quest_submissions").where("userId", "in", uids).where("submittedAt", ">", ninetyDaysAgo).get(),
+                        db.collection("checkin_logs").where("userId", "in", uids).where("timestamp", ">", ninetyDaysAgo).get()
+                    ]);
+
+                    const pointsMap = {}; // { uid: { dateStr: score } }
+                    uids.forEach(id => pointsMap[id] = {});
+
+                    // Helper to add points
+                    const addP = (uid, dateObj, score) => {
+                        if (!dateObj || !score) return;
+                        const d = dateObj.toDate().toISOString().split('T')[0];
+                        if (!pointsMap[uid]) pointsMap[uid] = {};
+                        if (!pointsMap[uid][d]) pointsMap[uid][d] = 0;
+                        pointsMap[uid][d] += parseFloat(score);
+                    };
+
+                    worksSnap.forEach(doc => { const d = doc.data(); addP(d.userId, d.timestamp, d.score); });
+                    questsSnap.forEach(doc => { const d = doc.data(); addP(d.userId, d.submittedAt, (d.earnedScore || 0) + (d.bonusGiven || 0)); });
+                    logsSnap.forEach(doc => { const d = doc.data(); addP(d.userId, d.timestamp, d.amount); });
+
+                    // Render charts
+                    batch.forEach(u => {
+                        const container = document.getElementById(`chart-${u.id}`);
+                        if (!container) return;
+                        container.innerHTML = "";
+
+                        // Determine Date Range
+                        const start = u.startDate ? new Date(u.startDate) : new Date(Date.now() - 90 * 86400000);
+                        let end = u.endDate ? new Date(u.endDate) : new Date();
+                        if (end < start) end = new Date(); // Safety
+
+                        const totalMs = end - start;
+                        const totalDays = Math.ceil(totalMs / (86400000));
+                        if (totalDays <= 0) return;
+
+                        // Identify max score for scaling (per day max)
+                        let maxDaily = 0.1;
+                        Object.values(pointsMap[u.id] || {}).forEach(s => { if (s > maxDaily) maxDaily = s; });
+
+                        // Draw Bars
+                        Object.keys(pointsMap[u.id] || {}).forEach(dateStr => {
+                            const d = new Date(dateStr);
+                            if (d < start || d > end) return; // Point outside range
+
+                            const dayOffset = Math.ceil((d - start) / 86400000);
+                            const leftPct = (dayOffset / totalDays) * 100;
+                            const score = pointsMap[u.id][dateStr];
+                            const heightPct = Math.min((score / maxDaily) * 100, 100);
+
+                            const bar = document.createElement('div');
+                            bar.className = 'chart-bar';
+                            bar.style.left = `${leftPct}%`;
+                            bar.style.height = `${heightPct * 0.8}%`; // Max 80% height to leave room
+                            bar.style.width = `${Math.max(100 / totalDays, 2)}%`; // Dynamic width
+                            bar.title = `${dateStr}: ${score.toFixed(2)}`;
+                            container.appendChild(bar);
+                        });
+
+                        // Draw Markers (Start / End)
+                        // Actually, the container REPRESENTS the range [start, end].
+                        // So Start is 0%, End is 100%.
+                        // We just need labels.
+                        const sMark = document.createElement('div');
+                        sMark.className = 'chart-marker start';
+                        sMark.style.left = '0%';
+                        sMark.innerHTML = `<span>${start.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</span>`;
+                        container.appendChild(sMark);
+
+                        const eMark = document.createElement('div');
+                        eMark.className = 'chart-marker';
+                        eMark.style.left = '100%';
+                        eMark.innerHTML = `<span>${end.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</span>`;
+                        container.appendChild(eMark);
+
+                        // If Today is within range, show Today marker?
+                        const today = new Date();
+                        if (today >= start && today <= end) {
+                            const todayOffset = Math.ceil((today - start) / 86400000);
+                            const todayPct = (todayOffset / totalDays) * 100;
+                            const tMark = document.createElement('div');
+                            tMark.className = 'chart-marker';
+                            tMark.style.left = `${todayPct}%`;
+                            tMark.style.background = '#ffc107'; // Yellow for Today
+                            tMark.style.height = '50%'; // Shorter
+                            tMark.style.top = 'auto';
+                            tMark.style.bottom = '0';
+                            tMark.title = "Today";
+                            container.appendChild(tMark);
+                        }
+                    });
+
+                } catch (e) {
+                    console.error("Chart Error:", e);
+                }
+            }
         }
 
         function initKanban() { ['Backlog', 'Doing', 'Review', 'Done'].forEach(id => { new Sortable(document.getElementById(id), { group: 'kanban', animation: 150, onEnd: e => { const ns = e.to.id; const up = { status: ns }; if (ns === 'Done') up.doneAt = firebase.firestore.FieldValue.serverTimestamp(); db.collection("side_quests").doc(e.item.dataset.id).update(up); } }); }); }
