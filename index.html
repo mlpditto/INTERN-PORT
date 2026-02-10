@@ -1072,12 +1072,19 @@
 
             const isPoll = currentQuiz.isPoll === true;
 
+            // 🔥 Avoid "Nested arrays are not supported" Error 
+            // Flatten tweetstorm answers (array of strings) into a single string
+            const finalAnswers = userAnswers.map(ans => {
+                if (Array.isArray(ans)) return ans.join("\n---\n");
+                return ans;
+            });
+
             try {
                 if (isPoll) {
                     // 1. Save Anonymous Response
                     await db.collection("poll_responses").add({
                         quizId: currentQuiz.id,
-                        answers: userAnswers,
+                        answers: finalAnswers,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
 
@@ -1100,7 +1107,7 @@
                         pictureUrl: userProfile.pictureUrl || "",
                         correctCount,
                         totalQuestions: currentQuiz.questions.length,
-                        answers: userAnswers,
+                        answers: finalAnswers,
                         status: 'pending', // Wait for admin approval
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
