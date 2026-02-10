@@ -2089,7 +2089,142 @@
         async function editQ(id, q) { const nq = prompt("Edit Q:", q); if (nq) await db.collection("quests").doc(id).update({ question: nq }); }
         async function stopQ(id) { if (confirm("Stop?")) await db.collection("quests").doc(id).update({ deadline: new Date() }); }
         async function delQ(id) { if (confirm("Del?")) await db.collection("quests").doc(id).delete(); }
-        async function updateCertPreview() { const c = document.getElementById('cert-canvas'), ctx = c.getContext('2d'); c.width = 800; c.height = 600; ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, 800, 600); ctx.strokeStyle = "#4361ee"; ctx.lineWidth = 10; ctx.strokeRect(0, 0, 800, 600); ctx.fillStyle = "#333"; ctx.textAlign = "center"; ctx.font = "bold 40px Arial"; ctx.fillText("CERTIFICATE", 400, 150); ctx.font = "30px Arial"; ctx.fillStyle = "#4361ee"; ctx.fillText(certUser.name, 400, 300); ctx.fillStyle = "#333"; ctx.font = "20px Arial"; const s = document.getElementById('cert-start').value, e = document.getElementById('cert-end').value; ctx.fillText(s && e ? `${s} - ${e}` : "Date not set", 400, 400); }
+        function drawCertificate(ctx, name, dates) {
+            const w = 800, h = 600;
+            // 1. Background
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, w, h);
+
+            // 2. Right Navy Decoration
+            ctx.fillStyle = "#001f3f"; // Navy Blue
+            ctx.beginPath();
+            ctx.moveTo(w * 0.7, 0);
+            ctx.bezierCurveTo(w * 0.8, h * 0.3, w * 0.6, h * 0.7, w * 0.8, h);
+            ctx.lineTo(w, h);
+            ctx.lineTo(w, 0);
+            ctx.fill();
+
+            // 3. Gold Accent Line
+            ctx.strokeStyle = "#d4af37"; // Gold
+            ctx.lineWidth = 8;
+            ctx.beginPath();
+            ctx.moveTo(w * 0.68, 0);
+            ctx.bezierCurveTo(w * 0.78, h * 0.3, w * 0.58, h * 0.7, w * 0.78, h);
+            ctx.stroke();
+
+            // 4. Subtle Border
+            ctx.strokeStyle = "#eee";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(20, 20, w - 40, h - 40);
+
+            // 5. Header "CERTIFICATE"
+            ctx.textAlign = "left";
+            ctx.fillStyle = "#001f3f";
+            ctx.font = "bold 56px Georgia, serif";
+            ctx.fillText("CERTIFICATE", 60, 160);
+
+            ctx.font = "italic 20px Georgia, serif";
+            ctx.fillStyle = "#666";
+            ctx.fillText("OF ACHIEVEMENT", 65, 195);
+
+            // 6. Name (Cursive-style)
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#333";
+            ctx.font = "italic 64px 'Brush Script MT', cursive, Georgia";
+            ctx.fillText(name || "Student Name", w * 0.38, 330);
+
+            // 7. Divider/Underline for Name
+            ctx.strokeStyle = "#d4af37";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(w * 0.1, 350);
+            ctx.lineTo(w * 0.65, 350);
+            ctx.stroke();
+
+            // 8. Description
+            ctx.textAlign = "left";
+            ctx.fillStyle = "#555";
+            ctx.font = "16px Arial, sans-serif";
+            const desc = "This is to certify that the above-named student has successfully";
+            const desc2 = "completed their internship program with excellence and dedication.";
+            ctx.fillText(desc, 65, 390);
+            ctx.fillText(desc2, 65, 415);
+
+            // 9. Date & Signature
+            ctx.font = "bold 14px Arial";
+            ctx.fillStyle = "#001f3f";
+            ctx.fillText("DATE", 65, 480);
+            ctx.fillText("SIGNATURE", 300, 480);
+
+            ctx.font = "16px Arial";
+            ctx.fillStyle = "#333";
+            ctx.fillText(dates || "Date not set", 65, 510);
+
+            ctx.beginPath();
+            ctx.moveTo(300, 505);
+            ctx.lineTo(500, 505);
+            ctx.strokeStyle = "#ccc";
+            ctx.stroke();
+
+            // 10. Golden Seal
+            const sealX = w * 0.85, sealY = h * 0.78;
+            const grd = ctx.createRadialGradient(sealX, sealY, 10, sealX, sealY, 50);
+            grd.addColorStop(0, "#f1c40f");
+            grd.addColorStop(1, "#d4af37");
+
+            ctx.fillStyle = grd;
+            ctx.beginPath();
+            ctx.arc(sealX, sealY, 55, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 10px Arial";
+            ctx.fillText("MEDLIFE+", sealX, sealY - 15);
+            ctx.font = "bold 12px Arial";
+            ctx.fillText("EXCELLENCE", sealX, sealY + 5);
+            ctx.font = "9px Arial";
+            ctx.fillText("AWARDS", sealX, sealY + 20);
+        }
+
+        async function updateCertPreview() {
+            const c = document.getElementById('cert-canvas'), ctx = c.getContext('2d');
+            const s = document.getElementById('cert-start').value;
+            const e = document.getElementById('cert-end').value;
+            drawCertificate(ctx, certUser.name, s && e ? `${s} - ${e}` : "");
+        }
+        async function generateBulkCert() {
+            const { jsPDF } = window.jspdf;
+            const users = usersData.filter(u => !u.isIgnored && u.startDate && u.endDate);
+            if (!users.length) return alert("ไม่มีข้อมูลนักศึกษาที่มีวันเริ่ม-จบฝึกงานสมบูรณ์ (ต้องมีทั้งวันเริ่มและจบ)");
+
+            if (!confirm(`กำลังจะสร้างใบรับรองจำนวน ${users.length} ใบในไฟล์เดียว ต้องการดำเนินการต่อหรือไม่?`)) return;
+
+            showToast("Generating Bulk PDF... Please wait.");
+
+            const c = document.createElement('canvas');
+            const ctx = c.getContext('2d');
+            c.width = 800;
+            c.height = 600;
+
+            const doc = new jsPDF('l', 'mm', 'a4');
+
+            for (let i = 0; i < users.length; i++) {
+                const u = users[i];
+                drawCertificate(ctx, u.displayName, `${u.startDate} - ${u.endDate}`);
+
+                const imgData = c.toDataURL('image/jpeg', 0.95);
+                if (i > 0) doc.addPage();
+                doc.addImage(imgData, 'JPEG', 0, 0, 297, 210); // Fill A4
+            }
+
+            doc.save("Bulk_Certificates.pdf");
+            showToast("Export Completed!");
+        }
+
         function generateCertPDF() { const { jsPDF } = window.jspdf; const doc = new jsPDF('l'); doc.addImage(document.getElementById('cert-canvas').toDataURL('image/jpeg'), 'JPEG', 10, 10, 280, 190); doc.save("cert.pdf"); }
     </script>
 </body>
