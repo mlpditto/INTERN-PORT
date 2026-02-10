@@ -1073,19 +1073,47 @@
 
             const pointsAwarded = (correctCount / (currentQuiz.questions ? currentQuiz.questions.length : 1)) * (currentQuiz.totalPoints || 1.0);
 
+            const isPoll = currentQuiz.isPoll === true;
+
             try {
-                await db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
-                    quizId: currentQuiz.id,
-                    userId,
-                    displayName: userProfile.displayName,
-                    pictureUrl: userProfile.pictureUrl || "",
-                    correctCount,
-                    totalQuestions: currentQuiz.questions.length,
-                    answers: userAnswers,
-                    status: 'pending', // Wait for admin approval
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                alert(`ส่งคำตอบเรียบร้อย!\nคะแนนที่คาดว่าจะได้รับ: ${pointsAwarded.toFixed(3)} แต้ม\n(รออาจารย์อนุมัติคะแนนเพื่อให้เข้าสู่ระบบคะแนนรวม)`);
+                if (isPoll) {
+                    // 1. Save Anonymous Response
+                    await db.collection("poll_responses").add({
+                        quizId: currentQuiz.id,
+                        answers: userAnswers,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    // 2. Save Non-identifying Attempt (for points and tracking)
+                    await db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
+                        quizId: currentQuiz.id,
+                        userId,
+                        displayName: userProfile.displayName,
+                        pictureUrl: userProfile.pictureUrl || "",
+                        isPoll: true,
+                        status: 'pending', // Admin still clicks 'Approve' to give points
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        // NO answers here for anonymity
+                    });
+                } else {
+                    await db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
+                        quizId: currentQuiz.id,
+                        userId,
+                        displayName: userProfile.displayName,
+                        pictureUrl: userProfile.pictureUrl || "",
+                        correctCount,
+                        totalQuestions: currentQuiz.questions.length,
+                        answers: userAnswers,
+                        status: 'pending', // Wait for admin approval
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+
+                if (isPoll) {
+                    alert(`ส่งโพลเรียบร้อย!\nขอบคุณสำหรับความคิดเห็น (คำตอบของคุณถูกเก็บแบบไม่ระบุตัวตน)`);
+                } else {
+                    alert(`ส่งคำตอบเรียบร้อย!\nคะแนนที่คาดว่าจะได้รับ: ${pointsAwarded.toFixed(3)} แต้ม\n(รออาจารย์อนุมัติคะแนนเพื่อให้เข้าสู่ระบบคะแนนรวม)`);
+                }
                 document.getElementById('quizModal').style.display = 'none';
             } catch (e) {
                 console.error(e);

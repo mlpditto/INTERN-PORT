@@ -1027,6 +1027,13 @@
                     <label style="font-size:0.8em; color:#666;">Points (เต็ม)</label>
                     <input type="number" id="quiz-total-points" value="1.0" step="0.1">
                 </div>
+                <div
+                    style="flex:1; display:flex; flex-direction:column; justify-content:flex-end; padding-bottom:10px;">
+                    <label
+                        style="cursor:pointer; background:var(--col-bg); border:1px solid var(--border-color); padding:8px; border-radius:6px; font-size:0.85em; font-weight:bold; color:var(--primary); display:flex; align-items:center; gap:5px; margin:0;">
+                        <input type="checkbox" id="quiz-is-poll" style="width:auto; margin:0;"> 🗳️ Poll Mode
+                    </label>
+                </div>
             </div>
             <div style="display:flex; gap:10px; margin-top:5px; margin-bottom:10px;">
                 <div style="flex:1;">
@@ -1226,6 +1233,7 @@
             document.getElementById('quiz-short-title').value = q.shortTitle || "";
             document.getElementById('quiz-total-points').value = q.totalPoints || 1.0;
             document.getElementById('quiz-desc').value = q.description || "";
+            document.getElementById('quiz-is-poll').checked = q.isPoll || false;
 
             const fmt = (d) => {
                 if (!d) return "";
@@ -1255,6 +1263,7 @@
             document.getElementById('quiz-short-title').value = "";
             document.getElementById('quiz-total-points').value = 1.0;
             document.getElementById('quiz-desc').value = "";
+            document.getElementById('quiz-is-poll').checked = false;
             document.getElementById('quiz-start-time').value = "";
             document.getElementById('quiz-deadline').value = "";
             document.getElementById('quiz-questions-container').innerHTML = "";
@@ -1282,6 +1291,7 @@
             const shortTitle = document.getElementById('quiz-short-title').value.trim();
             const description = document.getElementById('quiz-desc').value;
             const totalPoints = parseFloat(document.getElementById('quiz-total-points').value) || 1.0;
+            const isPoll = document.getElementById('quiz-is-poll').checked;
 
             const qItems = document.querySelectorAll('.quiz-q-item');
             const questions = [];
@@ -1302,7 +1312,7 @@
             });
 
             return {
-                title, shortTitle, description, totalPoints, questions,
+                title, shortTitle, description, totalPoints, isPoll, questions,
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
             };
@@ -1417,6 +1427,7 @@
                 shortTitle: formData.shortTitle,
                 description: formData.description,
                 totalPoints: formData.totalPoints,
+                isPoll: formData.isPoll,
                 questions: validQuestions,
                 startTime: convertDate(formData.startTime),
                 deadline: convertDate(formData.deadline),
@@ -1489,17 +1500,18 @@
             data.forEach(att => {
                 const q = quizzesData.find(x => x.id === att.quizId) || {};
                 const qTitle = q.shortTitle || q.title || "Unknown Quiz";
-                const pointsToAdd = (att.correctCount / att.totalQuestions) * (q.totalPoints || 1.0);
+                const isPoll = q.isPoll === true;
+                const pointsToAdd = isPoll ? (q.totalPoints || 1.0) : (att.correctCount / att.totalQuestions) * (q.totalPoints || 1.0);
 
                 tbody.innerHTML += `
                     <tr>
                         <td>${att.timestamp ? att.timestamp.toDate().toLocaleString('th-TH') : '-'}</td>
                         <td>${att.displayName}</td>
                         <td>${qTitle}</td>
-                        <td>${att.correctCount}/${att.totalQuestions}</td>
+                        <td>${isPoll ? '-' : `${att.correctCount}/${att.totalQuestions}`}</td>
                         <td style="font-weight:bold; color:var(--primary);">${pointsToAdd.toFixed(3)}</td>
                         <td>
-                            <button class="btn-sm btn-info" onclick="reviewQuiz('${att.id}')">Review</button>
+                            ${isPoll ? '<span class="badge" style="background:#6c757d">Poll Response</span>' : `<button class="btn-sm btn-info" onclick="reviewQuiz('${att.id}')">Review</button>`}
                             <button class="btn-sm btn-success" onclick="approveQuiz('${att.id}', '${att.userId}', ${pointsToAdd})">Approve</button>
                             <button class="btn-sm btn-danger" onclick="rejectQuiz('${att.id}')">Reject</button>
                         </td>
@@ -1659,7 +1671,7 @@
 
                 tbody.innerHTML += `
                     <tr>
-                        <td>${q.title} <br><small style="color:#666;">(${q.shortTitle || '-'})</small> ${q.isTemplate ? '<b style="color:orange;">[TEMPLATE]</b>' : ''}</td>
+                        <td>${q.title} <br><small style="color:#666;">(${q.shortTitle || '-'})</small> ${q.isTemplate ? '<b style="color:orange;">[TEMPLATE]</b>' : ''} ${q.isPoll ? '<span class="badge" style="background:var(--primary);">🗳️ POLL</span>' : ''}</td>
                         <td>${q.questions ? q.questions.length : 0} Qs</td>
                         <td>${q.totalPoints || 1.0}</td>
                         <td>${statusInfo}</td>
@@ -1721,8 +1733,10 @@
                     if (d.isQuiz) {
                         const q = quizzesData.find(x => x.id === d.quizId) || {};
                         const qTitle = q.shortTitle || q.title || "Quiz";
-                        const points = (d.correctCount / d.totalQuestions) * (q.totalPoints || 1.0);
-                        tbody.innerHTML += `<tr><td>${d.timestamp?.toDate().toLocaleString() || '-'}</td><td><img src="${d.pictureUrl || d.pic || ''}" class="user-pic">${d.displayName}</td><td>📝 Quiz: ${qTitle}</td><td><button class="btn-sm btn-info" onclick="reviewQuiz('${d.id}')">Review</button></td><td><span class="badge" style="background:${st}">Approved</span></td><td><b style="color:var(--primary);">${points.toFixed(3)}</b></td><td><button class="btn-sm btn-danger" onclick="delQuizAttempt('${d.id}')">Del</button></td></tr>`;
+                        const isPoll = q.isPoll === true;
+                        const points = isPoll ? (q.totalPoints || 1.0) : (d.correctCount / d.totalQuestions) * (q.totalPoints || 1.0);
+                        const reviewBtn = isPoll ? '<span class="badge" style="background:#6c757d">Poll (Anon)</span>' : `<button class="btn-sm btn-info" onclick="reviewQuiz('${d.id}')">Review</button>`;
+                        tbody.innerHTML += `<tr><td>${d.timestamp?.toDate().toLocaleString() || '-'}</td><td><img src="${d.pictureUrl || d.pic || ''}" class="user-pic">${d.displayName}</td><td>📝 ${isPoll ? 'Poll' : 'Quiz'}: ${qTitle}</td><td>${reviewBtn}</td><td><span class="badge" style="background:${st}">Approved</span></td><td><b style="color:var(--primary);">${points.toFixed(3)}</b></td><td><button class="btn-sm btn-danger" onclick="delQuizAttempt('${d.id}')">Del</button></td></tr>`;
                     } else {
                         // 🔥 Link Fix
                         let linkUrl = d.link || "";
