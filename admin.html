@@ -822,7 +822,7 @@
             <!-- Moved from Works Tab -->
             <div class="header-row"
                 style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <h3>📁 งานทั่วไป & 📝 Quiz รอตรวจ</h3>
+                <h3>📁 & 📝 </h3>
                 <button id="btn-toggle-work-archive" class="btn-toggle active" onclick="toggleWorkArchive()">
                     <i class="fa-solid fa-box-archive"></i> fin·ished
                 </button>
@@ -911,7 +911,7 @@
                 style="background:#f8f9fa; padding:20px; border-radius:12px; margin-bottom:30px; border:1px solid #eee;">
                 <h3
                     style="color:#d35400; display:flex; align-items:center; gap:10px; border-bottom:1px solid #ddd; padding-bottom:10px; margin-bottom:20px;">
-                    <i class="fa-solid fa-scroll"></i> จัดการ Daily Quest
+                    <i class="fa-solid fa-scroll"></i> Daily Quest
                 </h3>
 
                 <div
@@ -991,7 +991,7 @@
                 <div class="flex-between"
                     style="border-bottom:1px solid #90caf9; padding-bottom:10px; margin-bottom:20px;">
                     <h3 style="margin:0; color:#1565c0; display:flex; align-items:center; gap:10px;">
-                        <i class="fa-solid fa-brain"></i> จัดการ Quizzes
+                        <i class="fa-solid fa-brain"></i> Quizzes
                     </h3>
                     <button class="magic-btn" onclick="openQuizModal()" style="background:#1565c0;">Create Quiz</button>
                 </div>
@@ -1774,6 +1774,7 @@
             }
 
             async function showPollResults(quizId) {
+                window.currentPollQuizId = quizId; // Store for refresh logic
                 const quiz = quizzesData.find(x => x.id === quizId);
                 if (!quiz) return;
 
@@ -1819,12 +1820,16 @@
                     participants.forEach(p => {
                         const dateStr = p.timestamp ? `(${p.timestamp.toLocaleDateString()})` : '';
                         const picHtml = p.pic ? `<img src="${p.pic}" style="width:20px; height:20px; border-radius:50%; margin-right:5px;">` : '';
+
+                        // Escape quiz title for safely passing to onclick
+                        const escapedTitle = quiz.title.replace(/'/g, "\\'");
+
                         partHtml += `
                     <div style="display:flex; align-items:center; background:white; padding:5px 10px; border-radius:20px; border:1px solid #eee; font-size:0.85em;">
                         ${picHtml}
                         <span>${p.name}</span>
                         <span style="color:#999; font-size:0.8em; margin-left:5px;">${dateStr}</span>
-                        <button onclick="deletePollParticipant('${p.docId}', '${p.collection}', '${p.userId}', ${p.scoreGiven}, '${quiz.title}')" 
+                        <button onclick="deletePollParticipant('${p.docId}', '${p.collection}', '${p.userId}', ${p.scoreGiven}, '${escapedTitle}')" 
                             style="margin-left:8px; border:none; background:none; cursor:pointer; color:#ef233c; font-weight:bold; padding:0;">
                             ✕
                         </button>
@@ -1907,7 +1912,7 @@
             }
 
             async function deletePollParticipant(docId, collection, userId, scoreToRemove, quizTitle) {
-                if (!confirm(`ต้องการลบผู้เข้าร่วมรายนี้ออกจาก Poll/Quiz ใช่ไหม?\n(คะแนนจำนวน ${scoreToRemove} แต้ม จะถูกจำกัดออกด้วย)`)) return;
+                if (!confirm(`ต้องการลบผู้เข้าร่วมรายนี้ออกจาก Poll/Quiz ใช่ไหม?\n(คะแนนจำนวน ${scoreToRemove} แต้ม จะถูกหักออกด้วย)`)) return;
 
                 try {
                     const b = db.batch();
@@ -1916,8 +1921,11 @@
                     // 1. Delete the attempt/response
                     b.delete(docRef);
 
+                    // Check if user actually exists in our local cache before trying to update
+                    const userExists = userId && userId !== 'anon' && usersData.some(u => u.id === userId);
+
                     // 2. Revert Score if applicable
-                    if (scoreToRemove > 0 && userId && userId !== 'anon') {
+                    if (scoreToRemove > 0 && userExists) {
                         const userRef = db.collection("users").doc(userId);
                         b.update(userRef, { score: firebase.firestore.FieldValue.increment(-scoreToRemove) });
 
@@ -1933,14 +1941,22 @@
                     }
 
                     await b.commit();
-                    alert("Participant removed & Score reverted!");
-                    document.getElementById('pollResultModal').style.display = 'none'; // Close to refresh or re-fetch?
-                    // Ideally, we re-call showPollResults. But we need quizId. 
-                    // Since this function is global, we might not have quizId handy easily unless passed.
-                    // Let's just close modal for now.
+                    showToast("Participant removed & Score reverted!");
+
+                    // 🔥 Refresh the Poll Results UI if we have the quizId
+                    if (window.currentPollQuizId) {
+                        showPollResults(window.currentPollQuizId);
+                    } else {
+                        document.getElementById('pollResultModal').style.display = 'none';
+                    }
                 } catch (e) {
-                    console.error(e);
-                    alert("Error deleting participant: " + e.message);
+                    console.error("Delete Poll Participant Error:", e);
+                    // Detailed error message to help identify permission issues
+                    if (e.code === 'permission-denied') {
+                        alert("❌ Error: Missing or insufficient permissions. \n\nโปรดตรวจสอบว่าเครื่องของคุณมีสิทธิ์ระดับ Admin ในระบบ Firebase สำหรับคอลเลกชัน " + collection + " และ log\n(หากเป็นเครื่อง Admin แล้วยังลบไม่ได้ อาจต้องตั้งค่า Firebase Rules เพิ่มเติม)");
+                    } else {
+                        alert("Error deleting participant: " + e.message);
+                    }
                 }
             }
 
