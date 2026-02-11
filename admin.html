@@ -12,6 +12,20 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2.22.1/sdk.js"></script>
+    <div id="liffPreviewModal" class="modal" style="display:none; z-index:9999;">
+        <div class="modal-content"
+            style="max-width:400px; padding:0; background:black; border-radius:30px; border:8px solid #333; height:80vh; overflow:hidden; position:relative;">
+            <div
+                style="background:#333; color:white; padding:10px; text-align:center; position:absolute; top:0; width:100%; z-index:10;">
+                <span onclick="closeLiffPreview()"
+                    style="font-size:24px; cursor:pointer; color:white; position:absolute; right:15px; top:5px;">&times;</span>
+                <span style="font-size:0.9em;">📱 LIFF Preview (Admin Mode)</span>
+            </div>
+            <iframe id="liff-frame" style="width:100%; height:100%; border:none; background:white; margin-top:40px;"
+                src=""></iframe>
+        </div>
+    </div>
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -784,6 +798,8 @@
                 <span id="admin-email" style="font-size:0.8em; color:var(--text-sub);"></span>
             </div>
             <div style="display:flex; gap:10px;">
+                <button class="btn-sm btn-info" onclick="openLiffPreview()"><i class="fa-solid fa-mobile-screen"></i> UI
+                    Preview</button>
                 <button class="magic-btn" onclick="openShareModal()"><i class="fa-solid fa-share-nodes"></i>
                     Share</button>
                 <button class="btn-sm btn-dark" onclick="toggleTheme()"><i class="fa-solid fa-moon"></i></button>
@@ -2768,9 +2784,20 @@
             try {
                 await db.collection(collection).doc(id).delete();
                 showToast("Deleted!");
-                // If it was a poll response, we might need to refresh manually if snapshot doesn't cover it?
-                // But we have onSnapshot for poll_responses in loadData, so it should update.
             } catch (e) { alert(e.message); }
+        }
+
+        // --- LIFF Preview ---
+        function openLiffPreview() {
+            document.getElementById('liffPreviewModal').style.display = 'flex';
+            // Use current origin + index.html + preview mode
+            const url = window.location.href.replace('admin.html', 'index.html?mode=preview');
+            document.getElementById('liff-frame').src = url;
+        }
+
+        function closeLiffPreview() {
+            document.getElementById('liffPreviewModal').style.display = 'none';
+            document.getElementById('liff-frame').src = ""; // Clear to stop running
         }
     </script>
 </body>
