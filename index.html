@@ -473,6 +473,7 @@
             </p>
             <p style="font-size:0.8em; margin-top:10px; color:#fff59d;">⚠️ ต้องอนุญาตการเข้าถึงข้อมูล (Allow Access)
                 เพื่อระบุตัวตน</p>
+            <p id="loading-status" style="font-size:0.7em; color:#ccc; margin-top:10px;">Starting...</p>
             <button id="btn-manual-login" onclick="liff.login()"
                 style="margin-top:20px; padding:10px 20px; border-radius:30px; border:none; background:#06c755; color:white; font-weight:bold; display:none;">
                 <i class="fa-brands fa-line"></i> Login with LINE
@@ -531,26 +532,40 @@
         let confirmTimer = null, confirmParams = null;
 
         // --- Initialization ---
+        function updateStatus(msg) {
+            const el = document.getElementById('loading-status');
+            if (el) el.innerText = msg;
+            console.log(msg);
+        }
+
         async function main() {
             try {
+                updateStatus("Checking LIFF SDK...");
                 // Ensure liff is available
                 if (!window.liff) throw new Error("LIFF SDK not found on window");
 
-                // Timeout for LIFF Init (5 seconds)
+                updateStatus("Initializing LIFF...");
+                // Timeout for LIFF Init (10 seconds)
                 const initPromise = liff.init({ liffId: USER_LIFF_ID });
                 const timeoutPromise = new Promise((_, reject) =>
                     setTimeout(() => reject(new Error("LIFF Init Timeout")), 10000)
                 );
 
                 await Promise.race([initPromise, timeoutPromise]);
+
+                updateStatus("Checking Login Status...");
                 if (!liff.isLoggedIn()) {
+                    updateStatus("Not Logged In. Redirecting...");
                     document.getElementById('btn-manual-login').style.display = 'inline-block';
                     liff.login();
                     return;
                 }
 
+                updateStatus("Getting User Profile...");
                 userProfile = await liff.getProfile();
                 userId = userProfile.userId;
+
+                updateStatus("Checking Admin Access...");
 
                 // 🔥 Admin Auto-Redirect logic
                 const idToken = liff.getDecodedIDToken();
