@@ -374,6 +374,122 @@
             animation: spin 1s linear infinite;
         }
 
+        /* -----------------------
+           8. New Assignment Cards (Modern UI)
+           ----------------------- */
+        .assignment-card {
+            background: white;
+            border-radius: 16px;
+            padding: 0;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #f0f0f0;
+            overflow: hidden;
+            transition: transform 0.2s;
+        }
+
+        .assignment-card:active {
+            transform: scale(0.98);
+        }
+
+        .assign-header {
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid #f9f9f9;
+        }
+
+        .assign-icon {
+            width: 45px;
+            height: 45px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .icon-quest {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 4px 10px rgba(118, 75, 162, 0.3);
+        }
+
+        .icon-quiz {
+            background: linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%);
+            box-shadow: 0 4px 10px rgba(67, 97, 238, 0.3);
+        }
+
+        .assign-info {
+            flex-grow: 1;
+            min-width: 0;
+            /* Flex truncation fix */
+        }
+
+        .assign-info h4 {
+            margin: 0;
+            font-size: 1.1em;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .assign-tag {
+            font-size: 0.75em;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: #f0f0f0;
+            color: #666;
+            margin-top: 4px;
+            display: inline-block;
+        }
+
+        .assign-body {
+            padding: 15px 20px;
+            font-size: 0.95em;
+            color: #555;
+            line-height: 1.5;
+        }
+
+        .assign-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+            font-size: 0.85em;
+            color: #888;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .assign-footer {
+            padding: 15px 20px;
+            background: #fafafa;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        /* Status colors */
+        .status-pending {
+            color: #ff9f1c;
+        }
+
+        .status-done {
+            color: #2ec4b6;
+        }
+
+        .status-expired {
+            color: #ef233c;
+        }
+
+
+
         @keyframes spin {
             0% {
                 transform: rotate(0deg);
@@ -458,11 +574,8 @@
                 </div>
             </div>
 
-            <h3><i class="fa-solid fa-fire"></i> ภารกิจประจำวัน</h3>
-            <div id="quest-list-container"></div>
-
-            <h3><i class="fa-solid fa-brain"></i> แบบทดสอบ (Quiz)</h3>
-            <div id="quiz-list-container"></div>
+            <h3><i class="fa-solid fa-clipboard-list"></i> ภารกิจและแบบทดสอบ (Assignments)</h3>
+            <div id="assignments-container"></div>
 
             <div class="card">
                 <h4><i class="fa-solid fa-upload"></i> ส่งงานทั่วไป</h4>
@@ -830,229 +943,47 @@
         }
 
         // --- Quest System (V56 Logic) ---
-        function loadAllQuests() { db.collection("quests").orderBy("createdAt", "desc").limit(5).onSnapshot(s => { questsCache = s.docs.map(doc => ({ id: doc.id, ...doc.data() })); renderQuestList(); renderHistory(); }); }
-        function loadMySubmissions() { db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => { mySubmissionsCache = {}; s.forEach(doc => { mySubmissionsCache[doc.data().questId] = doc.data(); }); renderQuestList(); renderHistory(); }); }
-
-        function renderQuestList() {
-            const c = document.getElementById('quest-list-container'); c.innerHTML = ""; const now = new Date();
-            questsCache.forEach(q => {
-                const qId = q.id; const myQ = mySubmissionsCache[qId] || {}; const status = myQ.status || 'none';
-
-                // Filter expired
-                if (status === 'none' && q.deadline && now > q.deadline.toDate()) return;
-
-                let html = `<div class="card quest-card"><h3>${q.question}</h3>`;
-
-                if (status === 'none') {
-                    const cd = myQ.cooldownUntil ? myQ.cooldownUntil.toDate() : null;
-                    let expirySpan = "";
-                    if (q.deadline) {
-                        const d = q.deadline.toDate().getTime();
-                        const diff = d - now;
-                        if (diff > 0) { const h = Math.floor(diff / 3600000); const m = Math.floor((diff % 3600000) / 60000); expirySpan = `<span class="global-expiry">⏳ Ends: ${h}h ${m}m</span>`; }
-                        else expirySpan = `<span class="global-expiry" style="color:#ef233c">Expired</span>`;
-                    }
-
-                    if (cd && now < cd) {
-                        html += `<div class="retry-wait" id="cd-${qId}" data-until="${cd.getTime()}">Please Wait...</div>`;
-                    } else {
-                        // Hide Duration at start
-                        html += `${expirySpan}<br>
-                                 <button class="btn-warning" id="btn-recv-${qId}" onclick="openConfirmStart('${qId}', '${q.question.replace(/'/g, "")}', ${q.durationMinutes || 30})">กดเริ่มทำภารกิจ</button>`;
-                    }
-                } else if (status === 'received') {
-                    const dl = myQ.deadline ? myQ.deadline.toDate().getTime() : 0;
-
-                    // Clickable Link Logic
-                    let timerAttr = "", linkHint = "";
-                    if (q.questLink) {
-                        timerAttr = `onclick="window.open('${q.questLink}','_blank')" style="cursor:pointer; text-decoration:underline; color:#fff; background:rgba(67, 97, 238, 0.8);"`;
-                        linkHint = `<div style="font-size:0.8em; margin-top:-5px; margin-bottom:10px; opacity:0.9;">(แตะเวลาเพื่อเปิดลิงก์ 🔗)</div>`;
-                    }
-
-                    html += `<div class="timer-display" id="timer-${qId}" data-deadline="${dl}" ${timerAttr}>...</div>${linkHint}
-                             <textarea id="ans-${qId}" rows="2" placeholder="พิมพ์คำตอบ..."></textarea>
-                             <button class="btn-success" id="btn-sub-${qId}" onclick="subQ('${qId}',${q.baseScore})">ส่งคำตอบ</button>`;
-                } else if (status === 'unsuccessful') {
-                    html += `<div style="color:#ef233c;font-weight:bold;font-size:1.2em;">❌ Failed</div><small>Cooldown 15 mins</small>`;
-
-                    // Allow Retry
-                    const cd = myQ.cooldownUntil ? myQ.cooldownUntil.toDate() : null;
-                    if (cd && now >= cd) {
-                        html = `<div class="card quest-card"><h3>${q.question}</h3><p style="color:#28a745">Cooldown ครบแล้ว!</p><button class="btn-warning" onclick="openConfirmStart('${qId}', '${q.question.replace(/'/g, "")}', ${q.durationMinutes || 30})">เริ่มใหม่</button></div>`;
-                    }
-                } else {
-                    // ✅ Completed -> Moved to History (Do NOT render here)
-                    return;
-                }
-                c.innerHTML += html + `</div>`;
-            });
-        }
-
-        function openConfirmStart(qid, title, duration) {
-            confirmParams = { qid, title, duration };
-            document.getElementById('confirmModal').style.display = 'block';
-            const btn = document.getElementById('btn-confirm-start');
-            let c = 5;
-            btn.innerText = `ยืนยัน (${c})`;
-
-            btn.onclick = () => {
-                clearInterval(confirmTimer);
-                document.getElementById('confirmModal').style.display = 'none';
-                doReceiveQuest();
-            };
-
-            if (confirmTimer) clearInterval(confirmTimer);
-            confirmTimer = setInterval(() => {
-                c--;
-                btn.innerText = `ยืนยัน (${c})`;
-                if (c <= 0) {
-                    clearInterval(confirmTimer);
-                    document.getElementById('confirmModal').style.display = 'none';
-                    alert("กดไม่ทัน! ยกเลิกการรับภารกิจ");
-                }
-            }, 1000);
-        }
-
-        async function doReceiveQuest() {
-            const { qid, title, duration } = confirmParams;
-            const docId = `${qid}_${userId}`;
-            try {
-                if (mySubmissionsCache[qid] && mySubmissionsCache[qid].status === 'received') return;
-
-                const dl = new Date(Date.now() + duration * 60000);
-                const b = db.batch();
-
-                // Create Submission
-                b.set(db.collection("quest_submissions").doc(docId), {
-                    questId: qid,
-                    userId,
-                    displayName: userProfile.displayName,
-                    pictureUrl: userProfile.pictureUrl || "",
-                    status: 'received',
-                    receivedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    deadline: firebase.firestore.Timestamp.fromDate(dl)
-                });
-
-                // Add Score
-                b.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(0.1) });
-
-                // Add Kanban Card
-                b.set(db.collection("side_quests").doc(), {
-                    title: `[Daily] ${title}`,
-                    description: "ภารกิจประจำวัน",
-                    assignees: [{ uid: userId, name: userProfile.displayName, pic: userProfile.pictureUrl || "" }],
-                    assigneeIds: [userId],
-                    status: 'Doing',
-                    priority: 'Medium',
-                    isDailyQuest: true,
-                    refQuestId: qid,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-
-                await b.commit();
-            } catch (e) { alert(e.message); }
-        }
-
-        async function subQ(qid, s) {
-            document.getElementById(`btn-sub-${qid}`).disabled = true;
-            const a = document.getElementById(`ans-${qid}`).value.trim();
-            if (!a) return alert("Empty");
-            try {
-                const myQ = mySubmissionsCache[qid];
-                if (myQ && myQ.deadline && Date.now() > myQ.deadline.toDate()) { return failQuest(qid); }
-
-                const b = db.batch();
-                b.update(db.collection("quest_submissions").doc(`${qid}_${userId}`), { answer: a, status: 'submitted', submittedAt: firebase.firestore.FieldValue.serverTimestamp(), earnedScore: parseFloat(s.toFixed(2)) });
-                b.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(s) });
-                await b.commit();
-                alert("Sent!");
-            } catch (e) { alert(e.message); }
-        }
-
-        // --- History Logic (V69) ---
-        let usersWorksCache = [];
-
-        function renderHistory() {
-            const list = document.getElementById('work-list');
-            list.innerHTML = "";
-
-            let allItems = [];
-
-            // 1. Add Works
-            usersWorksCache.forEach(w => {
-                allItems.push({ type: 'work', data: w, ts: w.timestamp ? w.timestamp.toDate() : new Date(0) });
-            });
-
-            // 2. Add Completed Quests
-            Object.keys(mySubmissionsCache).forEach(qid => {
-                const sub = mySubmissionsCache[qid];
-                if (sub.status === 'submitted') {
-                    // Start finding quest title
-                    const q = questsCache.find(x => x.id === qid);
-                    const title = q ? q.question : "ภารกิจประจำวัน (Daily Quest)";
-                    allItems.push({ type: 'quest', data: { ...sub, title }, ts: sub.submittedAt ? sub.submittedAt.toDate() : new Date(0) });
-                }
-            });
-
-            // 3. Sort Desc
-            allItems.sort((a, b) => b.ts - a.ts);
-
-            // 4. Render
-            allItems.forEach(item => {
-                if (item.type === 'work') {
-                    const w = item.data;
-                    let sc = w.score > 0 ? `<span class="badge" style="background:#17a2b8;color:white;">+${w.score}</span>` : "";
-                    list.innerHTML += `<div class="card" style="padding:15px;border-left:5px solid ${w.status === 'ตรวจแล้ว' ? '#28a745' : '#ffc107'}"><b>${w.title}</b> ${sc}<br><small>${w.status}</small></div>`;
-                } else {
-                    // Quest Item (Compact & Expandable)
-                    const ALLOWED_EMAIL = "medlifeplus@gmail.com";
-                    const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; // ✅ Shared LIFF ID
-                    const MY_URL = 'https://mlp-int.work/admin.html'; // V72.5 Updated to Custom Domaing
-                    const uid = `hist-q-${Math.random().toString(36).substr(2, 9)}`;
-
-                    list.innerHTML += `
-                    <div class="card" style="padding:10px; border-left:5px solid #4361ee; background:#f8f9fa;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleHist('${uid}')">
-                            <div style="font-weight:bold; font-size:0.95em; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; max-width:70%;">
-                                ⚡ ${q.title}
-                            </div>
-                            <div>
-                                <span class="badge" style="background:#28a745">+${q.earnedScore || 0}</span>
-                                <i class="fa-solid fa-chevron-down" style="font-size:0.8em; color:#999; margin-left:5px;"></i>
-                            </div>
-                        </div>
-                        <div id="${uid}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid #ddd; font-size:0.9em; color:#555;">
-                            <b>คำถาม:</b> ${q.title}<br>
-                            <b>คำตอบ:</b> ${q.answer || "-"}<br>
-                            <div style="text-align:right; margin-top:5px; font-size:0.8em; color:#999;">${item.ts.toLocaleString('th-TH')}</div>
-                        </div>
-                    </div>`;
-                }
-            });
-        }
+        function loadAllQuests() { db.collection("quests").orderBy("createdAt", "desc").limit(5).onSnapshot(s => { questsCache = s.docs.map(doc => ({ id: doc.id, ...doc.data() })); renderAssignments(); renderHistory(); }); }
+        function loadMySubmissions() { db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => { mySubmissionsCache = {}; s.forEach(doc => { mySubmissionsCache[doc.data().questId] = doc.data(); }); renderAssignments(); renderHistory(); }); }
 
         // --- Quiz System ---
         let quizzesCache = [], quizAttemptsCache = {};
-        let currentQuiz = null, currentStep = 0, userAnswers = [];
 
         function loadQuizzes() {
             db.collection("quizzes").where("isActive", "==", true).onSnapshot(s => {
                 quizzesCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
-                renderQuizList();
+                renderAssignments();
             });
             db.collection("quiz_attempts").where("userId", "==", userId).onSnapshot(s => {
                 quizAttemptsCache = {};
                 s.forEach(d => quizAttemptsCache[d.data().quizId] = d.data());
-                renderQuizList();
+                renderAssignments();
             });
         }
 
-        function renderQuizList() {
-            const container = document.getElementById('quiz-list-container');
+        function renderAssignments() {
+            const container = document.getElementById('assignments-container');
             if (!container) return;
             container.innerHTML = "";
+
             const now = new Date();
+            let allItems = [];
+
+            // 1. Process Quests
+            questsCache.forEach(q => {
+                const qId = q.id;
+                const myQ = mySubmissionsCache[qId] || {};
+                const status = myQ.status || 'none';
+
+                // Filter expired if not interactable
+                if (status === 'none' && q.deadline && now > q.deadline.toDate()) return;
+                // Don't show completed/submitted quests (they go to history)
+                if (status === 'submitted') return;
+
+                allItems.push({ type: 'quest', data: q, myData: myQ, sortDate: q.deadline ? q.deadline.toDate() : new Date(8640000000000000) });
+            });
+
+            // 2. Process Quizzes
             quizzesCache.forEach(q => {
                 const attempt = quizAttemptsCache[q.id];
                 const start = q.startTime ? q.startTime.toDate() : null;
@@ -1060,41 +991,173 @@
 
                 // Visibility logic
                 if (start && now < start) return;
-                if (dead && now > dead && !attempt) return; // Hide expired unless done
+                if (dead && now > dead && !attempt) return;
 
+                allItems.push({ type: 'quiz', data: q, myData: attempt, sortDate: dead || new Date(8640000000000000) });
+            });
+
+            // 3. Sort: Urgent First
+            allItems.sort((a, b) => a.sortDate - b.sortDate);
+
+            // 4. Render
+            if (allItems.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align:center; padding:40px 20px; color:#999; opacity:0.8;">
+                        <i class="fa-solid fa-mug-hot" style="font-size:3em; margin-bottom:10px;"></i><br>
+                        🎉 เย้! ไม่มีภารกิจค้างแล้ว<br><small>พักผ่อนได้เลย</small>
+                    </div>`;
+                return;
+            }
+
+            allItems.forEach(item => {
                 const card = document.createElement('div');
-                card.className = 'card';
-                if (attempt) {
-                    const isPending = attempt.status === 'pending';
-                    const qTitle = q.shortTitle || q.title;
-                    const points = (attempt.correctCount / attempt.totalQuestions) * (q.totalPoints || 1.0);
+                card.className = "assignment-card";
 
-                    card.style.borderLeft = isPending ? "5px solid #ff9f1c" : "5px solid #2ec4b6";
-                    card.innerHTML = `
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div>
-                                <h4 style="margin:0;">${isPending ? '⏳' : '✅'} ${qTitle}</h4>
-                                <small style="color:#666;">${q.title} - ${q.description || ''}</small>
+                if (item.type === 'quest') {
+                    // --- QUEST UI ---
+                    const q = item.data;
+                    const myQ = item.myData;
+                    const qId = q.id;
+                    const status = myQ.status || 'none';
+
+                    // Meta Info
+                    let metaParams = [];
+                    if (q.durationMinutes) metaParams.push(`<div class="meta-item"><i class="fa-regular fa-clock"></i> ${q.durationMinutes} min</div>`);
+                    if (q.baseScore) metaParams.push(`<div class="meta-item" style="color:#667eea; font-weight:bold;"><i class="fa-solid fa-star"></i> ${q.baseScore} pts</div>`);
+
+                    let deadlineText = "";
+                    if (q.deadline) {
+                        const d = q.deadline.toDate();
+                        const diff = d - now;
+                        if (diff > 0) {
+                            const h = Math.floor(diff / 3600000);
+                            const m = Math.floor((diff % 3600000) / 60000);
+                            deadlineText = `<span style="color:#f39c12;"><i class="fa-solid fa-hourglass-half"></i> เหลือเวลา ${h}ชม. ${m}น.</span>`;
+                        } else {
+                            deadlineText = `<span style="color:#ef233c;">Expired</span>`;
+                        }
+                    }
+
+                    // Content Logic
+                    let bodyHtml = `<div class="assign-meta">${metaParams.join('')}</div>`;
+                    let actionHtml = "";
+
+                    if (status === 'none') {
+                        const cd = myQ.cooldownUntil ? myQ.cooldownUntil.toDate() : null;
+                        if (cd && now < cd) {
+                            actionHtml = `<div class="retry-wait" id="cd-${qId}" data-until="${cd.getTime()}">Please Wait...</div>`;
+                        } else {
+                            // Pre-start info
+                            bodyHtml += `<div style="margin-top:10px; font-size:0.9em; color:#666;">${deadlineText}</div>`;
+                            actionHtml = `<button class="btn-primary" id="btn-recv-${qId}" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border:none;" onclick="openConfirmStart('${qId}', '${q.question.replace(/'/g, "")}', ${q.durationMinutes || 30})">⚡ Start Quest</button>`;
+                        }
+                    } else if (status === 'received') {
+                        const dl = myQ.deadline ? myQ.deadline.toDate().getTime() : 0;
+                        let timerAttr = "", linkHint = "";
+                        if (q.questLink) {
+                            timerAttr = `onclick="window.open('${q.questLink}','_blank')" style="cursor:pointer; text-decoration:underline; color:#fff; background:#4361ee; padding:2px 8px; border-radius:4px;"`;
+                            linkHint = `<div style="font-size:0.8em; margin-top:5px; color:#4361ee;"><i class="fa-solid fa-link"></i> แตะที่เวลาเพื่อเปิดลิงก์</div>`;
+                        }
+
+                        bodyHtml = `
+                            <div style="background:#f8f9fa; padding:15px; border-radius:10px; text-align:center; margin-bottom:10px;">
+                                <div class="timer-display" id="timer-${qId}" data-deadline="${dl}" ${timerAttr} style="margin:0; background:none; color:#333; font-size:2em;">...</div>
+                                ${linkHint}
                             </div>
-                            <div style="text-align:right;">
-                                <div style="font-weight:bold; color:${isPending ? '#ff9f1c' : '#2ec4b6'};">${points.toFixed(3)} pts</div>
-                                <small style="font-size:0.75em; color:#999;">${isPending ? 'รออาจารย์ตรวจ' : 'อนุมัติแล้ว'}</small>
+                            <textarea id="ans-${qId}" rows="3" placeholder="✍️ พิมพ์คำตอบ..." style="width:100%; border-color:#eee;"></textarea>
+                         `;
+                        actionHtml = `<button class="btn-success" id="btn-sub-${qId}" onclick="subQ('${qId}',${q.baseScore})">ส่งคำตอบ (Submit)</button>`;
+                    } else if (status === 'unsuccessful') {
+                        bodyHtml = `<div style="color:#ef233c; font-weight:bold; text-align:center;">❌ ภารกิจล้มเหลว (Failed)</div>`;
+                        const cd = myQ.cooldownUntil ? myQ.cooldownUntil.toDate() : null;
+                        if (cd && now >= cd) {
+                            actionHtml = `<button class="btn-warning" onclick="openConfirmStart('${qId}', '${q.question.replace(/'/g, "")}', ${q.durationMinutes || 30})">🔄 เริ่มใหม่ (Retry)</button>`;
+                        } else {
+                            actionHtml = `<button class="btn-dark" disabled>🚫 ติด Cooldown</button>`;
+                        }
+                    }
+
+                    // Card HTML
+                    card.innerHTML = `
+                        <div class="assign-header">
+                            <div class="assign-icon icon-quest"><i class="fa-solid fa-scroll"></i></div>
+                            <div class="assign-info">
+                                <h4>${q.question}</h4>
+                                <span class="assign-tag">Daily Quest</span>
                             </div>
                         </div>
+                        <div class="assign-body">${bodyHtml}</div>
+                        <div class="assign-footer">${actionHtml}</div>
                     `;
-                } else {
-                    card.style.borderLeft = "5px solid #4361ee";
-                    let dlInfo = dead ? `<br><small style="color:#ef233c; font-weight:bold;">Deadline: ${dead.toLocaleString('th-TH')}</small>` : "";
-                    card.innerHTML = `
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div>
-                                <h4 style="margin:0;">🧠 ${q.title}</h4>
-                                ${dlInfo}
+
+                } else if (item.type === 'quiz') {
+                    // --- QUIZ UI ---
+                    const q = item.data;
+                    const attempt = item.myData;
+                    const dead = q.deadline ? q.deadline.toDate() : null;
+                    const qTitle = q.shortTitle || q.title;
+
+                    let icon = `<div class="assign-icon icon-quiz"><i class="fa-solid fa-brain"></i></div>`;
+                    let statusBadge = "";
+                    let bodyHtml = "";
+                    let actionHtml = "";
+
+                    if (attempt) {
+                        const isPending = attempt.status === 'pending';
+                        const isStarted = attempt.status === 'started';
+
+                        if (isStarted) {
+                            statusBadge = `<span class="assign-tag" style="background:#fff3cd; color:#856404;">⏳ กำลังทำ (In Progress)</span>`;
+                            bodyHtml = `<div style="color:#666;">คุณกำลังทำแบบทดสอบนี้อยู่...</div>`;
+                            actionHtml = `<button class="btn-warning" onclick="runQuiz('${q.id}')">▶️ ทำต่อ (Resume)</button>`;
+                        } else {
+                            // Pending/Done
+                            const score = attempt.totalQuestions ? (attempt.correctCount / attempt.totalQuestions) * (q.totalPoints || 1.0) : 0;
+                            const color = isPending ? '#ff9f1c' : '#2ec4b6';
+                            const text = isPending ? 'รอตรวจ (Pending)' : 'อนุมัติแล้ว (Approved)';
+                            statusBadge = `<span class="assign-tag" style="background:${isPending ? '#fff3cd' : '#d4edda'}; color:${isPending ? '#856404' : '#155724'}">${text}</span>`;
+
+                            bodyHtml = `
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span>คะแนนที่ได้ (Score)</span>
+                                    <span style="font-size:1.5em; font-weight:bold; color:${color};">${score.toFixed(2)}</span>
+                                </div>
+                             `;
+                            actionHtml = `<div style="text-align:right; font-size:0.85em; color:#999;">ส่งเมื่อ: ${attempt.timestamp ? attempt.timestamp.toDate().toLocaleString('th-TH') : '-'}</div>`;
+                        }
+
+                    } else {
+                        // Not Started
+                        statusBadge = `<span class="assign-tag" style="background:#e2e6ea;">ยังไม่ทำ (Not Started)</span>`;
+                        let deadlineHtml = "";
+                        if (dead) {
+                            deadlineHtml = `<div class="meta-item" style="color:#ef233c;"><i class="fa-solid fa-circle-exclamation"></i> Due: ${dead.toLocaleString('th-TH')}</div>`;
+                        }
+
+                        bodyHtml = `
+                            <div class="assign-meta">
+                                <div class="meta-item"><i class="fa-solid fa-list-ol"></i> ${q.questions ? q.questions.length : '?'} ข้อ</div>
+                                <div class="meta-item"><i class="fa-solid fa-trophy"></i> ${q.totalPoints || 1} pts</div>
+                                ${deadlineHtml}
                             </div>
-                            <button class="btn-sm btn-primary" onclick="confirmRunQuiz('${q.id}')">เริ่มทำ</button>
+                            <div style="margin-top:10px; font-size:0.9em;">${q.description || "แบบทดสอบวัดความรู้"}</div>
+                        `;
+                        actionHtml = `<button class="btn-primary" onclick="confirmRunQuiz('${q.id}')" style="background:linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%); border:none;">🚀 เริ่มทำแบบทดสอบ</button>`;
+                    }
+
+                    card.innerHTML = `
+                        <div class="assign-header">
+                            ${icon}
+                            <div class="assign-info">
+                                <h4>${qTitle}</h4>
+                                ${statusBadge}
+                            </div>
                         </div>
+                        <div class="assign-body">${bodyHtml}</div>
+                        <div class="assign-footer">${actionHtml}</div>
                     `;
                 }
+
                 container.appendChild(card);
             });
         }
@@ -1116,29 +1179,74 @@
             }
         }
 
-        function runQuiz(quizId) {
+        async function runQuiz(quizId) {
             currentQuiz = quizzesCache.find(x => x.id === quizId);
             if (!currentQuiz) return;
 
-            // Check deadline again before starting
             if (currentQuiz.deadline && new Date() > currentQuiz.deadline.toDate()) {
                 alert("ขออภัย แบบทดสอบนี้หมดเวลาแล้ว");
                 return;
             }
 
-            currentStep = 0;
-            userAnswers = new Array(currentQuiz.questions.length).fill(null);
+            const existing = quizAttemptsCache[quizId];
+            let isResuming = false;
+
+            if (existing && existing.status === 'started') {
+                const startTime = existing.startTime ? existing.startTime.toDate().getTime() : Date.now();
+                const totalElapsed = (Date.now() - startTime) / 1000;
+
+                let step = 0;
+                let elapsed = totalElapsed;
+                const questions = currentQuiz.questions;
+
+                while (step < questions.length) {
+                    const qTimer = questions[step].timer || 60;
+                    if (elapsed < qTimer) break;
+                    elapsed -= qTimer;
+                    step++;
+                }
+
+                if (step >= questions.length) {
+                    alert("🍭 หมดเวลาทำแบบทดสอบแล้ว!");
+                    return;
+                }
+
+                currentStep = step;
+                timeLeftForStep = Math.floor((questions[step].timer || 60) - elapsed);
+                userAnswers = existing.answers || new Array(questions.length).fill(null);
+                isResuming = true;
+            } else {
+                currentStep = 0;
+                userAnswers = new Array(currentQuiz.questions.length).fill(null);
+                timeLeftForStep = (currentQuiz.questions[0].timer || 60);
+
+                try {
+                    await db.collection("quiz_attempts").doc(`${quizId}_${userId}`).set({
+                        quizId,
+                        userId,
+                        displayName: userProfile.displayName,
+                        pictureUrl: userProfile.pictureUrl || "",
+                        status: 'started',
+                        startTime: firebase.firestore.FieldValue.serverTimestamp(),
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        answers: userAnswers
+                    });
+                } catch (e) { console.error("Start Quiz Error:", e); }
+            }
+
             document.getElementById('quiz-run-title').innerText = currentQuiz.title;
             document.getElementById('quizModal').style.display = 'block';
-            renderQuizStep();
+            renderQuizStep(isResuming);
         }
 
-        function renderQuizStep() {
+        function renderQuizStep(useExistingTime = false) {
             clearInterval(quizTimerInterval);
             const container = document.getElementById('quiz-run-container');
             const question = currentQuiz.questions[currentStep];
 
-            timeLeftForStep = question.timer || 60;
+            if (!useExistingTime) {
+                timeLeftForStep = question.timer || 60;
+            }
             updateTimerUI();
 
             quizTimerInterval = setInterval(() => {
@@ -1275,46 +1383,47 @@
             }
         }
 
-        function nextQuizStep() { if (currentStep < currentQuiz.questions.length - 1) { currentStep++; renderQuizStep(); } }
+        async function nextQuizStep() {
+            if (currentStep < currentQuiz.questions.length - 1) {
+                currentStep++;
+                renderQuizStep();
+                // Optional: Save progress to Firestore
+                try {
+                    const finalAnswers = userAnswers.map(ans => {
+                        if (Array.isArray(ans)) return ans.join("\n---\n");
+                        return ans;
+                    });
+                    db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).update({ answers: finalAnswers });
+                } catch (e) { }
+            }
+        }
         function prevQuizStep() { if (currentStep > 0) { currentStep--; renderQuizStep(); } }
 
         async function submitQuiz() {
             clearInterval(quizTimerInterval);
 
-            // Allow submit even if not all answered, but confirm
             if (userAnswers.some(a => a === null)) {
                 if (!confirm("คุณยังตอบไม่ครบทุกข้อ ยืนยันที่จะส่งหรือไม่?")) {
-                    // Resume timer logic if needed, or just return to let them continue
-                    // For simplicity, we just restart the interval for the current step
                     quizTimerInterval = setInterval(() => {
                         timeLeftForStep--;
                         updateTimerUI();
                         if (timeLeftForStep <= 0) {
                             clearInterval(quizTimerInterval);
                             alert("🍭 หมดเวลาสำหรับข้อนี้!");
-                            if (currentStep < currentQuiz.questions.length - 1) {
-                                nextQuizStep();
-                            } else {
-                                submitQuiz();
-                            }
+                            if (currentStep < currentQuiz.questions.length - 1) { nextQuizStep(); } else { submitQuiz(); }
                         }
                     }, 1000);
                     return;
                 }
             } else {
                 if (!confirm("ยืนยันส่งคำตอบ?")) {
-                    // Resume timer
                     quizTimerInterval = setInterval(() => {
                         timeLeftForStep--;
                         updateTimerUI();
                         if (timeLeftForStep <= 0) {
                             clearInterval(quizTimerInterval);
                             alert("🍭 หมดเวลาสำหรับข้อนี้!");
-                            if (currentStep < currentQuiz.questions.length - 1) {
-                                nextQuizStep();
-                            } else {
-                                submitQuiz();
-                            }
+                            if (currentStep < currentQuiz.questions.length - 1) { nextQuizStep(); } else { submitQuiz(); }
                         }
                     }, 1000);
                     return;
@@ -1332,60 +1441,43 @@
                 currentQuiz.questions.forEach((q, i) => {
                     const isChoice = (q.type || 'choice') === 'choice';
                     if (isChoice && userAnswers[i] == q.correct) correctCount++;
-                    // short_answer will be 0 until admin grades it
                 });
             }
 
             const pointsAwarded = (correctCount / (currentQuiz.questions ? currentQuiz.questions.length : 1)) * (currentQuiz.totalPoints || 1.0);
-
             const isPoll = currentQuiz.isPoll === true;
 
-            // 🔥 Avoid "Nested arrays are not supported" Error 
-            // Flatten tweetstorm answers (array of strings) into a single string
             const finalAnswers = userAnswers.map(ans => {
                 if (Array.isArray(ans)) return ans.join("\n---\n");
                 return ans;
             });
 
             try {
+                const attemptRef = db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`);
                 if (isPoll) {
-                    // 1. Save Anonymous Response
                     await db.collection("poll_responses").add({
                         quizId: currentQuiz.id,
                         answers: finalAnswers,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
 
-                    // 2. Save Non-identifying Attempt (for points and tracking)
-                    await db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
-                        quizId: currentQuiz.id,
-                        userId,
-                        displayName: userProfile.displayName,
-                        pictureUrl: userProfile.pictureUrl || "",
+                    await attemptRef.update({
                         isPoll: true,
-                        status: 'pending', // Admin still clicks 'Approve' to give points
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                        // NO answers here for anonymity
+                        status: 'pending',
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        answers: [] // Clear answers for privacy in polls
                     });
                 } else {
-                    await db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
-                        quizId: currentQuiz.id,
-                        userId,
-                        displayName: userProfile.displayName,
-                        pictureUrl: userProfile.pictureUrl || "",
+                    await attemptRef.update({
                         correctCount,
                         totalQuestions: currentQuiz.questions.length,
                         answers: finalAnswers,
-                        status: 'pending', // Wait for admin approval
+                        status: 'pending',
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 }
 
-                if (isPoll) {
-                    alert(`ส่งโพลเรียบร้อย!\nขอบคุณสำหรับความคิดเห็น (คำตอบของคุณถูกเก็บแบบไม่ระบุตัวตน)`);
-                } else {
-                    alert(`ส่งคำตอบเรียบร้อย!\nคะแนนที่คาดว่าจะได้รับ: ${pointsAwarded.toFixed(3)} แต้ม\n(รออาจารย์อนุมัติคะแนนเพื่อให้เข้าสู่ระบบคะแนนรวม)`);
-                }
+                alert(isPoll ? "ส่งโพลเรียบร้อย!" : `ส่งคำตอบเรียบร้อย!\nคะแนนที่คาดว่าจะได้รับ: ${pointsAwarded.toFixed(3)} แต้ม`);
                 document.getElementById('quizModal').style.display = 'none';
             } catch (e) {
                 console.error(e);
