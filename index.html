@@ -600,17 +600,49 @@
         main();
 
         // --- User & Dates ---
+        // --- User & Dates ---
         function checkUser() {
             const r = db.collection("users").doc(userId);
+
+            // Sync Profile (If Changed)
+            r.get().then(doc => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    const newPic = userProfile.pictureUrl || "";
+                    const newName = userProfile.displayName || "";
+
+                    // Check diff
+                    if (data.pictureUrl !== newPic || data.displayName !== newName) {
+                        console.log("Profile updated, syncing to DB...");
+                        r.update({
+                            pictureUrl: newPic,
+                            displayName: newName,
+                            lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    } else {
+                        // Just update lastSeen for activity tracking
+                        r.update({ lastSeen: firebase.firestore.FieldValue.serverTimestamp() });
+                    }
+                }
+            });
+
             r.onSnapshot(d => {
                 if (d.exists) {
                     const da = d.data();
-                    document.getElementById('u-score').innerText = parseFloat((da.score || 0).toFixed(2));
+                    const score = parseFloat(da.score || 0);
+                    document.getElementById('u-score').innerText = score.toFixed(2);
+
                     if (da.startDate) document.getElementById('u-start-date').value = da.startDate;
                     if (da.endDate) document.getElementById('u-end-date').value = da.endDate;
                     checkGraduation(da);
                 } else {
-                    r.set({ displayName: userProfile.displayName, pictureUrl: userProfile.pictureUrl || "", score: 0 });
+                    // First time user
+                    r.set({
+                        displayName: userProfile.displayName,
+                        pictureUrl: userProfile.pictureUrl || "",
+                        score: 0,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
                 }
             });
         }
