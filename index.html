@@ -1140,16 +1140,21 @@
             const divUsers = allUsersData.filter(u => relevantGroups.includes(u.group || "Public") || (u.group === myGroup));
 
             // If myDiv is General and no groups match, it might just be myGroup
-            const finalUsers = divUsers.length > 0 ? divUsers : allUsersData.filter(u => (u.group || "Public") === myGroup);
+            let finalUsers = divUsers.length > 0 ? divUsers : allUsersData.filter(u => (u.group || "Public") === myGroup);
+
+            // Explicit Sort by Score (Desc) to ensure rank #1 is highest
+            finalUsers.sort((a, b) => (b.score || 0) - (a.score || 0));
 
             container.innerHTML = "";
             finalUsers.slice(0, 20).forEach((u, i) => {
                 const isMe = u.id === userId;
                 const lv = Math.floor((u.score || 0) / 10) + 1;
+                const rankColor = i === 0 ? '#ffd700' : (i === 1 ? '#c0c0c0' : (i === 2 ? '#cd7f32' : '#666'));
+
                 container.innerHTML += `
                     <div class="lb-item" style="${isMe ? 'background:#eef2ff; border:1px solid #4361ee;' : ''}">
                         <div style="display:flex; align-items:center; gap:15px;">
-                            <div style="font-weight:bold; color:#666; min-width:25px;">#${i + 1}</div>
+                            <div style="font-weight:bold; color:${rankColor}; min-width:25px; font-size:${i < 3 ? '1.2em' : '1em'};">#${i + 1}</div>
                             <img src="${u.pictureUrl}" style="width:40px; height:40px; border-radius:50%; border:2px solid #fff; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
                             <div style="text-align:left;">
                                 <div style="font-weight:600; font-size:0.95em;">${u.displayName} ${isMe ? '⭐' : ''}</div>
@@ -2212,6 +2217,36 @@
                 usersWorksCache = s.docs.map(d => d.data());
                 renderHistory();
             })
+        }
+
+        // --- Helpers for Group UI ---
+        function getGroupColor(g) {
+            // Sync with Admin Panel colors
+            const colors = {
+                "Public": "#6c757d",
+                "IT": "#007bff",
+                "Marketing": "#e83e8c",
+                "HR": "#fd7e14",
+                "Creative": "#6f42c1",
+                "Content": "#20c997",
+                "Data": "#17a2b8",
+                "Admin": "#343a40"
+            };
+            return colors[g] || "#6c757d";
+        }
+
+        function getGroupIcon(g) {
+            const icons = {
+                "Public": "fa-users",
+                "IT": "fa-laptop-code",
+                "Marketing": "fa-bullhorn",
+                "HR": "fa-user-tie",
+                "Creative": "fa-palette",
+                "Content": "fa-pen-nib",
+                "Data": "fa-chart-pie",
+                "Admin": "fa-user-shield"
+            };
+            return icons[g] || "fa-users";
         }
 
         // Wait for window load to ensure SDK is ready
