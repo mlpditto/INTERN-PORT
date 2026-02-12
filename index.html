@@ -513,7 +513,11 @@
 
             <div class="card" style="text-align:center;">
                 <img id="u-img" class="profile-img" src="">
-                <h2 id="u-name">User</h2>
+                <h2 style="display:flex; align-items:center; justify-content:center; gap:10px; margin:10px 0;">
+                    <span id="u-name">User</span>
+                    <span id="u-group-badge"
+                        style="display:none; background:#4361ee; color:white; font-size:0.4em; padding:3px 10px; border-radius:12px; font-weight:bold; letter-spacing:0.5px;">Public</span>
+                </h2>
                 <div id="u-score" class="score-text">0</div>
             </div>
 
@@ -715,9 +719,9 @@
     <script>
         const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ✅ Updated ID
 
-        let userProfile, userId;
-        let questsCache = [], mySubmissionsCache = {};
-        let confirmTimer = null, confirmParams = null;
+        let userId = "", userProfile = {}, userSubmissions = {};
+        let questsCache = [], mySubmissionsCache = {}, myWorksCache = [], sideQuestsCache = {}, myGroup = "Public"; // 🔥 Added myGroup V77.7
+        let quizzesCache = [], quizAttemptsCache = {};
 
         // --- Initialization ---
         function updateStatus(msg) {
@@ -805,6 +809,8 @@
                 // Set Profile
                 document.getElementById('u-img').src = userProfile.pictureUrl || "https://via.placeholder.com/150";
                 document.getElementById('u-name').innerText = userProfile.displayName;
+                // Pre-set group display if needed
+                document.getElementById('u-group-badge').innerText = myGroup;
 
                 // Load Data
                 checkUser();
@@ -854,7 +860,10 @@
                 if (d.exists) {
                     const da = d.data();
                     const score = parseFloat(da.score || 0);
+                    myGroup = da.group || "Public"; // 🔥 Sync group V77.7
                     document.getElementById('u-score').innerText = score.toFixed(2);
+                    document.getElementById('u-group-badge').innerText = myGroup;
+                    document.getElementById('u-group-badge').style.display = myGroup !== 'Public' ? 'inline-block' : 'none';
 
                     if (da.startDate) document.getElementById('u-start-date').value = da.startDate;
                     if (da.endDate) document.getElementById('u-end-date').value = da.endDate;
@@ -958,7 +967,7 @@
         function loadMySubmissions() { db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => { mySubmissionsCache = {}; s.forEach(doc => { mySubmissionsCache[doc.data().questId] = doc.data(); }); renderAssignments(); renderHistory(); }); }
 
         // --- Quiz System ---
-        let quizzesCache = [], quizAttemptsCache = {};
+        // (Variables declared globally)
 
         function loadQuizzes() {
             db.collection("quizzes").where("isActive", "==", true).onSnapshot(s => {
@@ -986,6 +995,10 @@
                 const myQ = mySubmissionsCache[qId] || {};
                 const status = myQ.status || 'none';
 
+                // 🔥 Audience Group Filter (V77.7)
+                const target = q.targetGroup || "Public";
+                if (target !== "Public" && target !== myGroup) return;
+
                 // Filter expired if not interactable
                 if (status === 'none' && q.deadline && now > q.deadline.toDate()) return;
                 // Don't show completed/submitted quests (they go to history)
@@ -999,6 +1012,10 @@
                 const attempt = quizAttemptsCache[q.id];
                 const start = q.startTime ? q.startTime.toDate() : null;
                 const dead = q.deadline ? q.deadline.toDate() : null;
+
+                // 🔥 Audience Group Filter (V77.7)
+                const target = q.targetGroup || "Public";
+                if (target !== "Public" && target !== myGroup) return;
 
                 // Visibility logic
                 if (start && now < start) return;

@@ -815,7 +815,7 @@
                 <h2 style="margin:0;"><i class="fa-solid fa-user-shield"></i> Dashboard
                     <span
                         style="font-size:0.5em; background:#ff9f1c; padding:2px 8px; border-radius:10px; color:white; vertical-align:middle; font-weight:bold;">
-                        LIFF: V77 | Admin: V77.6
+                        LIFF: V77 | Admin: V77.7
                     </span>
                 </h2>
                 <span id="admin-email" style="font-size:0.8em; color:var(--text-sub);"></span>
@@ -944,6 +944,8 @@
                     <div style="display:flex; gap:10px; margin-bottom:5px;">
                         <input type="text" id="q-img" placeholder="Img URL" class="input-wide" style="flex:2">
                         <input type="text" id="q-link" placeholder="Link" class="input-wide" style="flex:2">
+                        <input type="text" id="q-target-group-manual" placeholder="Target Group (Public, IT...)"
+                            list="group-list" style="flex:2">
                     </div>
                     <div style="display:flex; align-items:flex-end; gap:15px; margin-top:10px;">
                         <div>
@@ -1064,6 +1066,7 @@
                 <thead>
                     <tr>
                         <th>User</th>
+                        <th>Group</th>
                         <th>Status</th>
                         <th>Score</th>
                         <th>Adjust</th>
@@ -1210,6 +1213,15 @@
                     <div style="flex:1;">
                         <label style="font-size:0.8em; color:#666;">ชื่อย่อ (Short)</label>
                         <input type="text" id="quiz-short-title" placeholder="Short Name">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:0.8em; color:#1565c0; font-weight:bold;">🎯 Target Group</label>
+                        <input type="text" id="quiz-target-group" placeholder="e.g. Public, IT" list="group-list">
+                        <datalist id="group-list">
+                            <option value="Public">
+                            <option value="IT">
+                            <option value="Marketing">
+                        </datalist>
                     </div>
                     <div style="flex:1;">
                         <label style="font-size:0.8em; color:#666;">Points (เต็ม)</label>
@@ -1461,7 +1473,7 @@
 
             function openQuizModal(id = null) {
                 document.getElementById('quizManageModal').style.display = 'block';
-                document.querySelector('#quizManageModal h2').innerHTML = 'Manage Quiz <small style="font-size:0.5em; opacity:0.5;">v77.6-STABLE</small>';
+                document.querySelector('#quizManageModal h2').innerHTML = 'Manage Quiz <small style="font-size:0.5em; opacity:0.5;">v77.7-STABLE</small>';
                 const container = document.getElementById('quiz-questions-container');
                 container.innerHTML = "";
 
@@ -1492,6 +1504,7 @@
             function fillQuizForm(q) {
                 document.getElementById('quiz-title').value = q.title || "";
                 document.getElementById('quiz-short-title').value = q.shortTitle || "";
+                document.getElementById('quiz-target-group').value = q.targetGroup || "Public";
                 document.getElementById('quiz-total-points').value = q.totalPoints || 1.0;
                 document.getElementById('quiz-desc').value = q.description || "";
                 document.getElementById('quiz-is-poll').checked = q.isPoll || false;
@@ -1523,6 +1536,7 @@
                 document.getElementById('edit-quiz-id').value = "";
                 document.getElementById('quiz-title').value = "";
                 document.getElementById('quiz-short-title').value = "";
+                document.getElementById('quiz-target-group').value = "Public";
                 document.getElementById('quiz-total-points').value = 1.0;
                 document.getElementById('quiz-desc').value = "";
                 document.getElementById('quiz-is-poll').checked = false;
@@ -1552,6 +1566,7 @@
             function getQuizFormData() {
                 const title = document.getElementById('quiz-title').value.trim();
                 const shortTitle = document.getElementById('quiz-short-title').value.trim();
+                const targetGroup = document.getElementById('quiz-target-group').value.trim() || "Public";
                 const description = document.getElementById('quiz-desc').value;
                 const totalPoints = parseFloat(document.getElementById('quiz-total-points').value) || 1.0;
                 const isPoll = document.getElementById('quiz-is-poll').checked;
@@ -1575,7 +1590,7 @@
                 });
 
                 return {
-                    title, shortTitle, description, totalPoints, isPoll, questions,
+                    title, shortTitle, targetGroup, description, totalPoints, isPoll, questions,
                     startTime: document.getElementById('quiz-start-time').value,
                     deadline: document.getElementById('quiz-deadline').value
                 };
@@ -1862,6 +1877,7 @@
                 const data = {
                     title: formData.title,
                     shortTitle: formData.shortTitle,
+                    targetGroup: formData.targetGroup, // Add targetGroup
                     description: formData.description,
                     totalPoints: formData.totalPoints,
                     isPoll: formData.isPoll,
@@ -2399,6 +2415,8 @@
                     const pollLabel = q.isPoll ? '<span class="badge" style="background:var(--primary);">🗳️ POLL</span>' : '';
                     const subjLabel = hasWriting ? '<span class="badge" style="background:#e67e22;">📝 SUBJECTIVE</span>' : '';
                     const templateLabel = (q.isTemplate || !isActiveSection) ? '<div style="margin-top:4px;"><span class="badge" style="background:orange; color:white; font-size:0.75em;">TEMPLATE</span></div>' : '';
+                    const targetGroupLabel = q.targetGroup && q.targetGroup !== "Public" ? `<span class="badge" style="background:#007bff; margin-left:5px;">${q.targetGroup}</span>` : '';
+
 
                     return `
                     <tr>
@@ -2406,7 +2424,7 @@
                             ${q.title ? q.title.replace(/\s*\(Template\)$/i, '') : '-'} 
                             <br><small style="color:#666;">(${q.shortTitle || '-'})</small> 
                             ${templateLabel}
-                            ${pollLabel} ${subjLabel}
+                            ${pollLabel} ${subjLabel} ${targetGroupLabel}
                         </td>
                         <td>${q.questions ? q.questions.length : 0} Qs</td>
                         <td>${q.totalPoints || 1.0}</td>
@@ -2507,6 +2525,15 @@
                 } catch (e) { alert(e.message); }
             }
 
+            async function setUserGroup(uid, current) {
+                const newGroup = prompt("ระบุกลุ่มเป้าหมาย (Audience Group) ของผู้ใช้นี้:", current);
+                if (newGroup === null) return;
+                try {
+                    await db.collection("users").doc(uid).update({ group: newGroup.trim() || "Public" });
+                    showToast("User Group Updated!");
+                } catch (e) { alert(e.message); }
+            }
+
             function renderTable(type) {
                 const tbody = document.querySelector(`#${type}Table tbody`);
                 let data = (type === 'works') ? [...worksData] : [...usersData];
@@ -2564,7 +2591,16 @@
                     else {
                         const ignored = d.isIgnored;
                         const lv = Math.floor((d.score || 0) / 10) + 1;
-                        tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}"><td><img src="${d.pictureUrl}" class="user-pic"> ${d.displayName}</td><td><button class="btn-sm" onclick="toggleIgnoreUser('${d.id}',${ignored})">${ignored ? '🚫' : '👁️'}</button></td><td><span class="badge" style="background:#eee;color:#333;margin-right:5px;">Lv.${lv}</span><span style="font-weight:bold;color:var(--primary);">${parseFloat((d.score || 0).toFixed(2))}</span></td><td><div style="display:flex;"><input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:70px;margin:0;" onkeypress="if(event.key==='Enter')adjDec('${d.id}')"><button class="btn-sm btn-success" onclick="adjDec('${d.id}')">Adj</button></div></td><td><button class="btn-sm btn-dark" onclick="showHistory('${d.id}','${d.displayName}',${d.score || 0})">📜</button></td><td><button class="btn-sm btn-danger" onclick="delUser('${d.id}')">Del</button></td></tr>`;
+                        const group = d.group || "Public";
+                        tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}">
+                            <td><img src="${d.pictureUrl}" class="user-pic"> ${d.displayName}</td>
+                            <td><button class="btn-sm btn-info" style="font-size:0.75em; padding:2px 8px;" onclick="setUserGroup('${d.id}', '${group}')">${group}</button></td>
+                            <td><button class="btn-sm" onclick="toggleIgnoreUser('${d.id}',${ignored})">${ignored ? '🚫' : '👁️'}</button></td>
+                            <td><span class="badge" style="background:#eee;color:#333;margin-right:5px;">Lv.${lv}</span><span style="font-weight:bold;color:var(--primary);">${parseFloat((d.score || 0).toFixed(2))}</span></td>
+                            <td><div style="display:flex;"><input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:70px;margin:0;" onkeypress="if(event.key==='Enter')adjDec('${d.id}')"><button class="btn-sm btn-success" onclick="adjDec('${d.id}')">Adj</button></div></td>
+                            <td><button class="btn-sm btn-dark" onclick="showHistory('${d.id}','${d.displayName}',${d.score || 0})">📜</button></td>
+                            <td><button class="btn-sm btn-danger" onclick="delUser('${d.id}')">Del</button></td>
+                        </tr>`;
                     }
                 });
             }
@@ -2962,11 +2998,25 @@
             function closeModal() { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
             function showToast(m) { const x = document.getElementById("toast"); x.innerText = m; x.className = "show"; setTimeout(() => x.className = "", 3000); }
             async function svSc(id, uid) { const v = prompt("Score:"); if (v) { await db.collection("works").doc(id).update({ score: parseFloat(v), status: 'ตรวจแล้ว' }); await db.collection("users").doc(uid).update({ score: firebase.firestore.FieldValue.increment(parseFloat(v)) }); showToast("Saved"); } }
-            async function createQuest() { const q = { question: document.getElementById('q-text').value, imageUrl: document.getElementById('q-img').value, questLink: document.getElementById('q-link').value, baseScore: parseFloat(document.getElementById('q-score').value), durationMinutes: parseInt(document.getElementById('q-duration').value), deadline: new Date(Date.now() + parseFloat(document.getElementById('q-hours').value) * 3600000), createdAt: firebase.firestore.FieldValue.serverTimestamp() }; if (q.question) await db.collection("quests").add(q); showToast("Posted"); }
+            async function createQuest() {
+                const q = {
+                    question: document.getElementById('q-text').value,
+                    imageUrl: document.getElementById('q-img').value,
+                    questLink: document.getElementById('q-link').value,
+                    targetGroup: document.getElementById('q-target-group-manual').value.trim() || "Public", // 🔥 Added V77.7
+                    baseScore: parseFloat(document.getElementById('q-score').value),
+                    durationMinutes: parseInt(document.getElementById('q-duration').value),
+                    deadline: new Date(Date.now() + parseFloat(document.getElementById('q-hours').value) * 3600000),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                if (q.question) await db.collection("quests").add(q);
+                showToast("Posted");
+                document.getElementById('q-text').value = ''; // Reset UI
+            }
             function loadActiveQuests() { db.collection("quests").orderBy("createdAt", "desc").limit(10).onSnapshot(s => { const t = document.querySelector("#activeQuestTable tbody"); t.innerHTML = ""; let hasActive = false; s.forEach(d => { const q = d.data(); if (q.deadline?.toDate() > new Date()) { hasActive = true; t.innerHTML += `<tr><td>${q.question}</td><td><span class="quest-deadline" data-deadline="${q.deadline.toDate().getTime()}">Loading...</span></td><td>${q.durationMinutes || 30} min</td><td><button class="btn-sm btn-warning" onclick="editQ('${d.id}','${q.question.replace(/'/g, "")}')">✏️</button> <button class="btn-delete-icon" onclick="stopQ('${d.id}')">✕</button></td></tr>`; } }); document.getElementById("active-quest-section").style.display = hasActive ? "block" : "none"; }); }
             function loadQuestHistory() { db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(s => { const t = document.querySelector("#questHistoryTable tbody"); t.innerHTML = ""; s.forEach(d => { const q = d.data(); if (q.deadline && q.deadline.toDate() > new Date()) return; t.innerHTML += `<tr><td>${q.question}</td><td>${q.baseScore}</td><td><div style="display:flex;gap:5px;"><button class="btn-sm btn-success" onclick="recallQuest('${d.id}')">♻️ Recall</button><button class="btn-delete-icon" onclick="delQ('${d.id}')">✕</button></div></td></tr>`; }) }); }
             function updateQuestTimers() { document.querySelectorAll('.quest-deadline').forEach(el => { const d = parseInt(el.dataset.deadline); const now = Date.now(); if (d - now <= 0) el.innerText = "Expired"; else { const h = Math.floor((d - now) / 3600000); const m = Math.floor(((d - now) % 3600000) / 60000); el.innerText = `${h}h ${m}m left`; } }); }
-            function recallQuest(id) { db.collection("quests").doc(id).get().then(doc => { const d = doc.data(); document.getElementById('q-text').value = d.question; document.getElementById('q-img').value = d.imageUrl || ""; document.getElementById('q-link').value = d.questLink || ""; document.getElementById('q-score').value = d.baseScore; document.getElementById('q-duration').value = d.durationMinutes || 30; showToast("Recalled!"); }); }
+            function recallQuest(id) { db.collection("quests").doc(id).get().then(doc => { const d = doc.data(); document.getElementById('q-text').value = d.question; document.getElementById('q-img').value = d.imageUrl || ""; document.getElementById('q-link').value = d.questLink || ""; document.getElementById('q-score').value = d.baseScore; document.getElementById('q-duration').value = d.durationMinutes || 30; document.getElementById('q-target-group-manual').value = d.targetGroup || ""; showToast("Recalled!"); }); }
             async function editQ(id, q) { const nq = prompt("Edit Q:", q); if (nq) await db.collection("quests").doc(id).update({ question: nq }); }
             async function stopQ(id) { if (confirm("Stop?")) await db.collection("quests").doc(id).update({ deadline: new Date() }); }
             async function delQ(id) { if (confirm("Del?")) await db.collection("quests").doc(id).delete(); }
