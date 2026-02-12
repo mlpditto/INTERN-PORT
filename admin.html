@@ -821,7 +821,7 @@
                 <h2 style="margin:0;"><i class="fa-solid fa-user-shield"></i> Dashboard
                     <span
                         style="font-size:0.5em; background:#ff9f1c; padding:2px 8px; border-radius:10px; color:white; vertical-align:middle; font-weight:bold;">
-                        LIFF: V77.11 | Admin: V77.12
+                        LIFF: V77.14 | Admin: V77.14
                     </span>
                 </h2>
                 <span id="admin-email" style="font-size:0.8em; color:var(--text-sub);"></span>
@@ -1486,18 +1486,42 @@
 
         const groupColorMap = {
             'Public': '#4361ee',
-            'IT': '#2ec4b6',
+            'IT': '#20c997',
             'Marketing': '#ff9f1c',
-            'MLP': '#8338ec',
-            'Pharmacists': '#ef233c',
+            'MLP': '#ef233c',
+            'Pharmacists': '#8338ec',
             'Dev': '#34495e',
-            'Design': '#e83e8c'
+            'Design': '#e83e8c',
+            'Intern': '#00b4d8',
+            'Extern': '#6610f2',
+            'Audit': '#fd7e14'
+        };
+
+        const groupIconMap = {
+            'Public': 'fa-users',
+            'IT': 'fa-laptop-code',
+            'Marketing': 'fa-bullhorn',
+            'MLP': 'fa-hospital-user',
+            'Pharmacists': 'fa-pills',
+            'Dev': 'fa-terminal',
+            'Design': 'fa-palette',
+            'Intern': 'fa-user-graduate',
+            'Extern': 'fa-user-md',
+            'Audit': 'fa-clipboard-check'
         };
 
         function getGroupColor(group) {
             if (!group) return '#6c757d';
-            const key = group.split('-')[0].trim(); // Handle MLP-Pharmacists etc
-            return groupColorMap[key] || groupColorMap[group] || '#7209b7';
+            const key = group.split('-')[0].trim();
+            const key2 = group.split(' ')[0].trim();
+            return groupColorMap[key] || groupColorMap[key2] || groupColorMap[group] || '#7209b7';
+        }
+
+        function getGroupIcon(group) {
+            if (!group) return 'fa-tag';
+            const key = group.split('-')[0].trim();
+            const key2 = group.split(' ')[0].trim();
+            return groupIconMap[key] || groupIconMap[key2] || groupIconMap[group] || 'fa-tag';
         }
 
         auth.onAuthStateChanged(user => {
@@ -2765,11 +2789,10 @@
             const suggestions = document.getElementById('gs-suggestions');
             suggestions.innerHTML = allGroups.map(g => `<option value="${g}">`).join('');
 
-            const list = document.getElementById('gs-list');
             list.innerHTML = allGroups.map(g => `
                     <div style="display:flex; gap:5px; align-items:stretch;">
                         <button class="btn-sm" style="flex:1; background:${getGroupColor(g)}; color:white; border:none; text-align:left; padding:10px 15px; font-size:0.95em; border-radius:8px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="document.getElementById('gs-input').value='${g}'">
-                            <span>${g}</span>
+                            <span><i class="fa-solid ${getGroupIcon(g)}" style="width:20px; margin-right:8px; opacity:0.8;"></i> ${g}</span>
                             <i class="fa-solid fa-chevron-right" style="font-size:0.7em; opacity:0.7;"></i>
                         </button>
                         ${g !== 'Public' ? `<button class="btn-sm btn-danger" style="width:40px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:#ff4d4f; border:none; color:white;" onclick="deleteGroupGlobally('${g}')" title="ลบกลุ่มนี้ออกจากระบบ"><i class="fa-solid fa-trash-can"></i></button>` : ''}
@@ -2946,7 +2969,7 @@
                     const group = d.group || "Public";
                     tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}">
                             <td><img src="${d.pictureUrl}" class="user-pic"> ${d.displayName}</td>
-                            <td><button class="btn-sm" style="font-size:0.75em; padding:2px 8px; background:${getGroupColor(group)}; color:white; border:none;" onclick="setUserGroup('${d.id}', '${group}')">${group}</button></td>
+                            <td><button class="btn-sm" style="font-size:0.75em; padding:2px 8px; background:${getGroupColor(group)}; color:white; border:none; display:flex; align-items:center; gap:5px;" onclick="setUserGroup('${d.id}', '${group}')"><i class="fa-solid ${getGroupIcon(group)}"></i> ${group}</button></td>
                             <td><button class="btn-sm" onclick="toggleIgnoreUser('${d.id}',${ignored})">${ignored ? '🚫' : '👁️'}</button></td>
                             <td><span class="badge" style="background:#eee;color:#333;margin-right:5px;">Lv.${lv}</span><span style="font-weight:bold;color:var(--primary);">${parseFloat((d.score || 0).toFixed(2))}</span></td>
                             <td><div style="display:flex;"><input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:70px;margin:0;" onkeypress="if(event.key==='Enter')adjDec('${d.id}')"><button class="btn-sm btn-success" onclick="adjDec('${d.id}')">Adj</button></div></td>
@@ -3255,7 +3278,7 @@
                                 <img src="${u.pictureUrl}" class="lb-pic-lg">
                                 <div class="lb-info">
                                     <div class="lb-name">${u.displayName} <span class="lb-lv">Lv.${lv}</span></div>
-                                    <div class="lb-days">${daysLeftHtml}</div>
+                                    <div class="lb-days">${daysLeftHtml} <span class="badge" style="background:${getGroupColor(u.group)}; font-size:0.8em; margin-left:5px;"><i class="fa-solid ${getGroupIcon(u.group)}"></i> ${u.group || 'Public'}</span></div>
                                 </div>
                             </div>
                         </div>
