@@ -1588,7 +1588,11 @@
         }
         function prevQuizStep() { if (currentStep > 0) { currentStep--; renderQuizStep(); } }
 
+        let isSubmittingQuiz = false;
         async function submitQuiz() {
+            if (isSubmittingQuiz) return;
+            isSubmittingQuiz = true;
+
             clearInterval(quizTimerInterval);
 
             const hasEmptyAnswers = userAnswers.some(a => {
@@ -1631,6 +1635,18 @@
                 btn.innerText = "กำลังประมวลผล...";
             }
 
+            // Safety timeout: if alert/modal doesn't close in 30s, let them try again
+            const safetyTimeout = setTimeout(() => {
+                if (isSubmittingQuiz && document.getElementById('quizModal').style.display !== 'none') {
+                    console.warn("Submission safety timeout reached");
+                    isSubmittingQuiz = false;
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerText = "ส่งใหม่อีกครั้ง (Retry)";
+                    }
+                }
+            }, 30000);
+
             let correctCount = 0;
             if (currentQuiz && currentQuiz.questions) {
                 currentQuiz.questions.forEach((q, i) => {
@@ -1663,6 +1679,8 @@
 
             if (!userId || !currentQuiz) {
                 alert("Session error: กรุณารีเฟรชหน้าจอแล้วลองใหม่อีกครั้ง");
+                isSubmittingQuiz = false;
+                clearTimeout(safetyTimeout);
                 if (btn) { btn.disabled = false; btn.innerText = "Submit (ยืนยันส่ง)"; }
                 return;
             }
@@ -1673,7 +1691,7 @@
                     isPoll: true,
                     status: 'pending',
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    answers: [] // Clear answers for privacy in polls
+                    answers: []
                 } : {
                     correctCount,
                     totalQuestions: currentQuiz.questions.length,
@@ -1682,16 +1700,20 @@
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 };
 
+                const tasks = [];
                 if (isPoll) {
-                    await db.collection("poll_responses").add({
+                    tasks.push(db.collection("poll_responses").add({
                         quizId: currentQuiz.id,
                         answers: finalAnswers,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+                    }));
                 }
+                tasks.push(attemptRef.set(submissionData, { merge: true }));
 
-                // Use set with merge:true instead of update to be safer
-                await attemptRef.set(submissionData, { merge: true });
+                await Promise.all(tasks);
+
+                clearTimeout(safetyTimeout);
+                isSubmittingQuiz = false;
 
                 document.getElementById('quizModal').style.display = 'none';
                 setTimeout(() => {
@@ -1700,10 +1722,12 @@
 
             } catch (e) {
                 console.error("Submission Error:", e);
+                clearTimeout(safetyTimeout);
+                isSubmittingQuiz = false;
                 alert("เกิดข้อผิดพลาดในการส่ง: " + e.message);
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerText = "Submit (ยืนยันส่ง)";
+                    btn.innerText = "คลิกเพื่อลองส่งอีกครั้ง";
                 }
             }
         }
