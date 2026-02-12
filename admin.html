@@ -3247,27 +3247,46 @@
             if (!usersData.length) { l.innerHTML = "<div style='text-align:center;padding:20px;color:#999;'>No user data found.</div>"; return; }
 
             const divs = Object.entries(divisionConfig);
-            // Removed 'Students' hardcoded tab as it was redundant
-            const allDivNames = ['All', ...divs.map(d => d[0])];
+            // Get all unique active groups
+            const allGroups = [...new Set(usersData.map(u => u.group || "Public"))].sort();
+
+            // Filter groups that might have same name as a Division to avoid duplicate tabs (edge case)
+            const divNames = divs.map(d => d[0]);
+            const groupTabs = allGroups.filter(g => !divNames.includes(g));
+
+            // Tabs: All -> Divisions -> Individual Groups
+            const allDivNames = ['All', ...divNames, ...groupTabs];
 
             // Render Selector Buttons
             selector.innerHTML = allDivNames.map(name => {
                 const isActive = activeDivisionTab === name;
-                return `<button class="btn-sm" onclick="switchDivisionTab('${name}')" style="background:${isActive ? 'var(--primary)' : '#fff'}; color:${isActive ? 'white' : '#666'}; border:1px solid ${isActive ? 'var(--primary)' : '#ddd'}; white-space:nowrap; border-radius:30px; padding:8px 20px; font-weight:bold; box-shadow:${isActive ? '0 4px 10px rgba(67, 97, 238, 0.3)' : 'none'}; transition:0.2s;">${name}</button>`;
+                /* If it's a group tab, maybe use its specific color for active state? For now keep uniform primary color */
+                let activeColor = 'var(--primary)';
+                if (isActive && groupTabs.includes(name)) {
+                    // activeColor = getGroupColor(name); // Optional: Use group color for button
+                }
+
+                return `<button class="btn-sm" onclick="switchDivisionTab('${name}')" style="background:${isActive ? activeColor : '#fff'}; color:${isActive ? 'white' : '#666'}; border:1px solid ${isActive ? activeColor : '#ddd'}; white-space:nowrap; border-radius:30px; padding:8px 20px; font-weight:bold; box-shadow:${isActive ? '0 4px 10px rgba(67, 97, 238, 0.3)' : 'none'}; transition:0.2s;">${name}</button>`;
             }).join('');
 
             if (activeDivisionTab === 'All' || activeDivisionTab === 'Students') {
-                // Show Global Students Ranking ONLY (clean view requested by user)
+                // Show Global Students Ranking ONLY
                 const allActiveUsers = usersData.filter(u => !u.isIgnored).sort((a, b) => (b.score || 0) - (a.score || 0));
                 renderDivisionSection(l, "Global Leaderboard (รวมทั้งหมด)", allActiveUsers, '#343a40');
 
-                // Previous behavior showed subgroups here, but user requested to remove them.
-
-            } else {
-                // Render Specific Division
-                const groups = divisionConfig[activeDivisionTab] || [];
+            } else if (divisionConfig[activeDivisionTab]) {
+                // Render Specific Division (Multiple Groups)
+                const groups = divisionConfig[activeDivisionTab];
                 const divUsers = usersData.filter(u => !u.isIgnored && groups.includes(u.group || "Public"));
                 renderDivisionSection(l, activeDivisionTab, divUsers);
+            } else {
+                // Render Specific Single Group
+                const groupUsers = usersData.filter(u => !u.isIgnored && (u.group || "Public") === activeDivisionTab);
+                // Try to use group color for header
+                let gColor = 'var(--primary)';
+                try { gColor = getGroupColor(activeDivisionTab); } catch (e) { }
+
+                renderDivisionSection(l, `${activeDivisionTab}`, groupUsers, gColor);
             }
         }
 
