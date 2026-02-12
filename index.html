@@ -655,6 +655,17 @@
         </div>
     </div>
 
+    <div id="quizResultModal" class="modal">
+        <div class="modal-content" style="max-width:600px;">
+            <span class="close-modal"
+                onclick="document.getElementById('quizResultModal').style.display='none'">&times;</span>
+            <h3>📊 ผลการสอบ (Quiz Results)</h3>
+            <div id="quiz-result-container" style="margin-top:20px;"></div>
+            <button class="btn-primary" onclick="document.getElementById('quizResultModal').style.display='none'"
+                style="width:100%; margin-top:20px;">Close</button>
+        </div>
+    </div>
+
     <div id="confirmModal" class="modal" style="z-index:10000;">
         <div class="modal-content">
             <h2 style="color:#ef233c;">⚠️ ยืนยันรับภารกิจ</h2>
@@ -991,7 +1002,16 @@
 
                 // Visibility logic
                 if (start && now < start) return;
-                if (dead && now > dead && !attempt) return;
+
+                // 🔥 Fix: Allow if user has attempt, even if expired or inactive
+                // Only hide if (Expired OR Inactive) AND No Attempt
+                // Note: q.isActive might be undefined in old data, assume true if missing? or false?
+                // Let's check logic: if q.isActive is explicitly false, it's inactive.
+
+                const isExpired = (dead && now > dead);
+                const isInactive = (q.isActive === false);
+
+                if ((isExpired || isInactive) && !attempt) return;
 
                 allItems.push({ type: 'quiz', data: q, myData: attempt, sortDate: dead || new Date(8640000000000000) });
             });
@@ -1123,7 +1143,17 @@
                                     <span style="font-size:1.5em; font-weight:bold; color:${color};">${score.toFixed(2)}</span>
                                 </div>
                              `;
-                            actionHtml = `<div style="text-align:right; font-size:0.85em; color:#999;">ส่งเมื่อ: ${attempt.timestamp ? attempt.timestamp.toDate().toLocaleString('th-TH') : '-'}</div>`;
+
+                            // 🔥 Feature: View Answers Button (Only if Approved)
+                            let viewBtn = "";
+                            if (!isPending) {
+                                viewBtn = `<button class="btn-sm btn-info" onclick="viewQuizAnswers('${q.id}')" style="margin-top:5px; width:100%; border-radius:6px;">👁️ ดูเฉลย (View Answers)</button>`;
+                            }
+
+                            actionHtml = `
+                                <div style="text-align:right; font-size:0.85em; color:#999; margin-bottom:5px;">ส่งเมื่อ: ${attempt.timestamp ? attempt.timestamp.toDate().toLocaleString('th-TH') : '-'}</div>
+                                ${viewBtn}
+                            `;
                         }
 
                     } else {
@@ -1399,6 +1429,107 @@
         function removeTweet(i) {
             userAnswers[currentStep].splice(i, 1);
             refreshTweetstormUI();
+        }
+
+        // --- View Answers Logic ---
+        async function viewQuizAnswers(quizId) {
+            const q = quizzesCache.find(x => x.id === quizId);
+            const attempt = quizAttemptsCache[quizId];
+
+            if (!q || !attempt) return alert("Data not found");
+
+            const container = document.getElementById('quiz-result-container');
+            container.innerHTML = `<div style="text-align:center; padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>`;
+            document.getElementById('quizResultModal').style.display = 'block';
+
+            let html = "";
+            let totalScore = 0;
+
+            q.questions.forEach((question, i) => {
+                const userAns = attempt.answers[i];
+                const isChoice = (question.type || 'choice') === 'choice';
+
+                // Logic to determine correctness
+                // For Choice: Compare index
+                // For Subjective: Look at 'gradedAnswers' map if available, or just show text
+
+                let isCorrect = false;
+                let isGraded = false; // For subjective
+
+                if (isChoice) {
+                    if (Array.isArray(question.correct)) {
+                        // Multi-select
+                        // Check if arrays have same elements
+                        const correctArr = question.correct.sort().join(',');
+                        const userArr = (Array.isArray(userAns) ? userAns : [userAns]).sort().join(',');
+                        isCorrect = (correctArr === userArr);
+                    } else {
+                        isCorrect = (userAns == question.correct);
+                    }
+                } else {
+                    // Subjective
+                    // In admin.html, gradedAnswers[i] is true if marked correct
+                    if (attempt.gradedAnswers && attempt.gradedAnswers[i]) {
+                        isCorrect = true;
+                    }
+                    isGraded = true; // Always considered "graded" if approved, but might be wrong
+                }
+
+                const bg = isCorrect ? '#d4edda' : '#f8d7da';
+                const border = isCorrect ? '#c3e6cb' : '#f5c6cb';
+                const icon = isCorrect ? '<i class="fa-solid fa-check-circle" style="color:#155724;"></i>' : '<i class="fa-solid fa-times-circle" style="color:#721c24;"></i>';
+
+                // Render User Answer
+                let userAnsText = "";
+                if (isChoice) {
+                    if (Array.isArray(userAns)) {
+                        userAnsText = userAns.map(idx => question.options[idx] || '-').join(', ');
+                    } else {
+                        userAnsText = question.options[userAns] || '-';
+                    }
+                } else {
+                    // Tweetstorm
+                    if (Array.isArray(userAns)) {
+                        userAnsText = userAns.join('\n\n');
+                    } else if (typeof userAns === 'string' && userAns.includes("\n---\n")) {
+                        userAnsText = userAns.replace(/\n---\n/g, '\n\n');
+                    } else {
+                        userAnsText = userAns;
+                    }
+                    userAnsText = `<div style="white-space:pre-wrap; font-style:italic;">"${userAnsText || '-'}"</div>`;
+                }
+
+                // Render Correct Answer (if wrong)
+                let correctAnsText = "";
+                if (!isCorrect) {
+                    if (isChoice) {
+                        if (Array.isArray(question.correct)) {
+                            correctAnsText = `<div style="margin-top:5px; color:#155724; font-size:0.9em;"><b>เฉลย:</b> ${question.correct.map(idx => question.options[idx]).join(', ')}</div>`;
+                        } else {
+                            correctAnsText = `<div style="margin-top:5px; color:#155724; font-size:0.9em;"><b>เฉลย:</b> ${question.options[question.correct]}</div>`;
+                        }
+                    } else {
+                        // Subjective usually has no "fixed" correct answer display, maybe a note?
+                        correctAnsText = `<div style="margin-top:5px; color:#666; font-size:0.9em;">(Subjective: ขึ้นอยู่กับดุลยพินิจผู้ตรวจ)</div>`;
+                    }
+                }
+
+                html += `
+                    <div style="background:${bg}; border:1px solid ${border}; padding:15px; border-radius:10px; margin-bottom:15px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                            <b style="color:#333;">ข้อที่ ${i + 1}</b>
+                            ${icon}
+                        </div>
+                        <div style="font-size:1em; margin-bottom:5px;">${question.q}</div>
+                        <div style="background:rgba(255,255,255,0.5); padding:8px; border-radius:6px; font-size:0.95em;">
+                            <b>ตอบ:</b> ${userAnsText}
+                        </div>
+                        ${correctAnsText}
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
         }
 
         function updateTweet(i, val) {
