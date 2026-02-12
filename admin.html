@@ -1591,7 +1591,8 @@
                 const qType = data ? (data.type || 'choice') : 'choice';
 
                 const options = data && data.options ? data.options : ['', '', '', ''];
-                const correct = data && data.correct !== undefined ? (Array.isArray(data.correct) ? data.correct : [parseInt(data.correct)]) : [0];
+                const rawCorrect = data && data.correct !== undefined ? data.correct : [0];
+                const correct = Array.isArray(rawCorrect) ? rawCorrect.map(v => parseInt(v)) : [parseInt(rawCorrect)];
 
                 div.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
@@ -1630,7 +1631,9 @@
                         ${options.map((_, i) => `
                             <div style="display:flex; align-items:center;">
                                 <input type="checkbox" name="q-correct-${qId}" value="${i}" id="corr-${qId}-${i}" class="q-correct-check" ${correct.includes(i) ? 'checked' : ''} style="display:none;">
-                                <button type="button" class="correct-circle-btn ${correct.includes(i) ? 'active' : ''}" onclick="toggleCorrect(this)">${i + 1}</button>
+                                <button type="button" class="correct-circle-btn ${correct.includes(i) ? 'active' : ''}" 
+                                    style="${correct.includes(i) ? 'background:var(--primary); color:white; border-color:var(--primary);' : ''}"
+                                    onclick="toggleCorrect(this)">${i + 1}</button>
                             </div>
                         `).join('')}
                     </div>
@@ -1655,9 +1658,20 @@
             function toggleCorrect(btn) {
                 const wrapper = btn.closest('div');
                 const chk = wrapper.querySelector('input');
+                if (!chk) return;
                 chk.checked = !chk.checked;
-                if (chk.checked) btn.classList.add('active');
-                else btn.classList.remove('active');
+                if (chk.checked) {
+                    btn.classList.add('active');
+                    btn.style.background = 'var(--primary)';
+                    btn.style.color = 'white';
+                    btn.style.borderColor = 'var(--primary)';
+                } else {
+                    btn.classList.remove('active');
+                    btn.style.background = 'white';
+                    btn.style.color = '#777';
+                    btn.style.borderColor = '#ddd';
+                }
+                triggerAutoSave();
             }
 
             function addOption(btn) {
@@ -1716,7 +1730,9 @@
                     corrDiv.style.alignItems = 'center';
                     corrDiv.innerHTML = `
                         <input type="checkbox" name="q-correct-${qId}" value="${i}" id="corr-${qId}-${i}" class="q-correct-check" ${currentCorrects.includes(i) ? 'checked' : ''} style="display:none;">
-                        <button type="button" class="correct-circle-btn ${currentCorrects.includes(i) ? 'active' : ''}" onclick="toggleCorrect(this)">${i + 1}</button>
+                        <button type="button" class="correct-circle-btn ${currentCorrects.includes(i) ? 'active' : ''}" 
+                            style="${currentCorrects.includes(i) ? 'background:var(--primary); color:white; border-color:var(--primary);' : ''}"
+                            onclick="toggleCorrect(this)">${i + 1}</button>
                     `;
                     correctList.appendChild(corrDiv);
                 });
