@@ -2542,36 +2542,68 @@
         }
 
         async function manualCorrectAns(attemptId, qIndex, isChecked) {
-            if (!isChecked) return;
-            if (!confirm("Confirm grading this question as CORRECT/DONE?\n(Score will be recalculated upon Approval)")) return;
+            // Updated V77.16: Robust Score Recalculation
+            if (!confirm(`Confirm mark Q${qIndex + 1} as ${isChecked ? 'CORRECT' : 'INCORRECT'}?`)) {
+                // Revert checkbox state if cancelled
+                const cb = document.querySelectorAll(`input[onchange^="manualCorrectAns('${attemptId}', ${qIndex}"]`)[0];
+                if (cb) cb.checked = !isChecked;
+                return;
+            };
 
             try {
                 const docRef = db.collection("quiz_attempts").doc(attemptId);
                 const docSnap = await docRef.get();
                 const att = docSnap.data();
                 const quiz = quizzesData.find(x => x.id === att.quizId);
-                const q = quiz.questions[qIndex];
 
-                // For Choice: Update answer to the correct index if we are overriding
-                // For Short Answer: Just increment correctCount and record in gradedAnswers
+                // 1. Update Graded Status
                 if (!att.gradedAnswers) att.gradedAnswers = {};
-                att.gradedAnswers[qIndex] = true;
-
-                if ((q.type || 'choice') === 'choice') {
-                    att.answers[qIndex] = q.correct;
+                if (isChecked) {
+                    att.gradedAnswers[qIndex] = true;
+                } else {
+                    delete att.gradedAnswers[qIndex];
                 }
 
-                att.correctCount++;
+                // 2. Recalculate Correct Count from Scratch
+                let newCorrectCount = 0;
+                quiz.questions.forEach((q, i) => {
+                    const isChoice = (q.type || 'choice') === 'choice';
+                    const userAns = att.answers[i];
 
-                await docRef.update({
-                    answers: att.answers,
-                    correctCount: att.correctCount,
-                    gradedAnswers: att.gradedAnswers
+                    if (isChoice) {
+                        // Auto-grade logic for choice
+                        const target = q.correct;
+                        if (Array.isArray(target)) {
+                            // Multi-select strict check
+                            if (Array.isArray(userAns) && target.length === userAns.length && target.every(v => userAns.includes(v))) {
+                                newCorrectCount++;
+                            }
+                        } else {
+                            // Single select
+                            if (userAns == target) newCorrectCount++;
+                        }
+                    } else {
+                        // Short answer: Check manual grade
+                        if (att.gradedAnswers && att.gradedAnswers[i]) {
+                            newCorrectCount++;
+                        }
+                    }
                 });
 
-                alert("Updated!");
-                reviewQuiz(attemptId); // Refresh UI
-            } catch (e) { alert(e.message); }
+                // 3. Update DB
+                await docRef.update({
+                    gradedAnswers: att.gradedAnswers,
+                    correctCount: newCorrectCount,
+                    // Note: We do NOT override att.answers for choice anymore, to preserve original student intent.
+                    // Only manual grading overrides the score count.
+                });
+
+                alert("Updated! New Score Count: " + newCorrectCount);
+                // reviewQuiz(attemptId); // Optional: Reload to see changes, but checkbox is already updated
+            } catch (e) {
+                console.error(e);
+                alert(e.message);
+            }
         }
 
         async function approveQuiz(attemptId, uid, score) {
