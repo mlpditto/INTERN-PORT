@@ -1141,18 +1141,34 @@
                             statusBadge = `<span class="assign-tag" style="background:#fff3cd; color:#856404;">⏳ กำลังทำ (In Progress)</span>`;
                             bodyHtml = `<div style="color:#666;">คุณกำลังทำแบบทดสอบนี้อยู่...</div>`;
                             actionHtml = `<button class="btn-warning" onclick="runQuiz('${q.id}')">▶️ ทำต่อ (Resume)</button>`;
+                        } else if (attempt.status === 'requesting') {
+                            statusBadge = `<span class="assign-tag" style="background:#e9ecef; color:#495057;">📨 รออนุมัติให้ทำเลท</span>`;
+                            bodyHtml = `<div style="color:#666; font-size:0.9em;">ส่งคำขอทำแบบทดสอบหลังกำหนดแล้ว รอแอดมินอนุมัติครับ</div>`;
+                            actionHtml = `<button class="btn-dark" disabled>🚫 Waiting for Admin</button>`;
+                        } else if (attempt.status === 'allowed') {
+                            statusBadge = `<span class="assign-tag" style="background:#d1e7dd; color:#0f5132;">✅ อนุมัติให้ทำเลทได้</span>`;
+                            bodyHtml = `<div style="color:#0f5132; font-weight:bold;">แอดมินอนุญาตให้คุณทำแบบทดสอบนี้แล้วครับ!</div>`;
+                            actionHtml = `<button class="btn-primary" onclick="confirmRunQuiz('${q.id}')">🚀 เริ่มทำแบบทดสอบ</button>`;
                         } else {
                             // Pending/Done
                             const score = attempt.totalQuestions ? (attempt.correctCount / attempt.totalQuestions) * (q.totalPoints || 1.0) : 0;
+                            const isApproved = attempt.status === 'approved';
                             const color = isPending ? '#ff9f1c' : '#2ec4b6';
                             const text = isPending ? 'รอตรวจ (Pending)' : 'อนุมัติแล้ว (Approved)';
                             statusBadge = `<span class="assign-tag" style="background:${isPending ? '#fff3cd' : '#d4edda'}; color:${isPending ? '#856404' : '#155724'}">${text}</span>`;
+
+                            let retryBtn = "";
+                            const isExpired = (dead && new Date() > dead);
+                            if (isExpired && !isApproved) {
+                                retryBtn = `<button class="btn-sm btn-warning" onclick="requestLateQuiz('${q.id}')" style="margin-top:5px; width:100%;">🔄 ขอทำใหม่อีกครั้ง (Late Request)</button>`;
+                            }
 
                             bodyHtml = `
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
                                     <span>คะแนนที่ได้ (Score)</span>
                                     <span style="font-size:1.5em; font-weight:bold; color:${color};">${score.toFixed(2)}</span>
                                 </div>
+                                ${retryBtn}
                              `;
 
                             // 🔥 Feature: View Answers Button (Only if Approved)
@@ -1183,7 +1199,12 @@
                             </div>
                             <div style="margin-top:10px; font-size:0.9em;">${q.description || "แบบทดสอบวัดความรู้"}</div>
                         `;
-                        actionHtml = `<button class="btn-primary" onclick="confirmRunQuiz('${q.id}')" style="background:linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%); border:none;">🚀 เริ่มทำแบบทดสอบ</button>`;
+                        const isExpired = (dead && new Date() > dead);
+                        if (isExpired) {
+                            actionHtml = `<button class="btn-warning" onclick="requestLateQuiz('${q.id}')" style="background:linear-gradient(135deg, #f39c12 0%, #e67e22 100%); border:none;">📨 ขออนุญาตทำเลท</button>`;
+                        } else {
+                            actionHtml = `<button class="btn-primary" onclick="confirmRunQuiz('${q.id}')" style="background:linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%); border:none;">🚀 เริ่มทำแบบทดสอบ</button>`;
+                        }
                     }
 
                     card.innerHTML = `
@@ -1226,11 +1247,15 @@
 
             if (currentQuiz.deadline && new Date() > currentQuiz.deadline.toDate()) {
                 const existing = quizAttemptsCache[quizId];
-                if (existing && existing.status === 'approved') {
+                if (existing && existing.status === 'allowed') {
+                    // Approved to take late, proceed
+                } else if (existing && existing.status === 'approved') {
                     alert("แบบทดสอบนี้หมดเวลาแล้ว และคุณได้คะแนนสมบูรณ์แล้วครับ");
                     return;
+                } else {
+                    alert("แบบทดสอบนี้หมดเวลาแล้ว กรุณากดปุ่ม 'ขออนุญาตทำเลท' เพื่อให้แอดมินอนุมัติก่อนนะครับ");
+                    return;
                 }
-                if (!confirm("แบบทดสอบนี้หมดเวลาแล้ว ต้องการขอยื่นทำแบบทดสอบหลังกำหนดหรือไม่?\n(คะแนนจะคิดจากการส่งครั้งล่าสุด)")) return;
             }
 
             const existing = quizAttemptsCache[quizId];
@@ -1282,6 +1307,28 @@
             document.getElementById('quiz-run-title').innerText = currentQuiz.title;
             document.getElementById('quizModal').style.display = 'block';
             renderQuizStep(isResuming);
+        }
+
+        async function requestLateQuiz(quizId) {
+            const q = quizzesCache.find(x => x.id === quizId);
+            if (!q) return;
+            if (!confirm(`ยืนยันการขออนุญาตทำแบบทดสอบ "${q.title}" หลังกำหนดเวลา?\n(แอดมินจะได้รับแจ้งและต้องอนุมัติก่อนเริ่มทำ)`)) return;
+
+            try {
+                await db.collection("quiz_attempts").doc(`${quizId}_${userId}`).set({
+                    quizId,
+                    userId,
+                    displayName: userProfile.displayName,
+                    pictureUrl: userProfile.pictureUrl || "",
+                    status: 'requesting',
+                    requestTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                alert("ส่งคำขอเรียบร้อย! โปรดรอแอดมินอนุมัติครับ");
+                loadQuizzes();
+            } catch (e) {
+                alert("Request Error: " + e.message);
+            }
         }
 
         function renderQuizStep(useExistingTime = false) {
