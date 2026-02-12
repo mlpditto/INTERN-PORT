@@ -3219,42 +3219,22 @@
             if (!usersData.length) { l.innerHTML = "<div style='text-align:center;padding:20px;color:#999;'>No user data found.</div>"; return; }
 
             const divs = Object.entries(divisionConfig);
-            const allDivNames = ['All', ...divs.map(d => d[0]), 'Students'];
+            // Removed 'Students' hardcoded tab as it was redundant
+            const allDivNames = ['All', ...divs.map(d => d[0])];
 
             // Render Selector Buttons
             selector.innerHTML = allDivNames.map(name => {
                 const isActive = activeDivisionTab === name;
-                return `<button class="btn-sm" onclick="switchDivisionTab('${name}')" style="background:${isActive ? 'var(--primary)' : '#fff'}; color:${isActive ? 'white' : '#666'}; border:1px solid ${isActive ? 'var(--primary)' : '#ddd'}; white-space:nowrap; border-radius:30px; padding:8px 20px; font-weight:bold; box-shadow:${isActive ? '0 4px 10px rgba(67, 97, 238, 0.3)' : 'none'}; transition:0.2s;">${name === 'Students' ? '👥 Students' : name}</button>`;
+                return `<button class="btn-sm" onclick="switchDivisionTab('${name}')" style="background:${isActive ? 'var(--primary)' : '#fff'}; color:${isActive ? 'white' : '#666'}; border:1px solid ${isActive ? 'var(--primary)' : '#ddd'}; white-space:nowrap; border-radius:30px; padding:8px 20px; font-weight:bold; box-shadow:${isActive ? '0 4px 10px rgba(67, 97, 238, 0.3)' : 'none'}; transition:0.2s;">${name}</button>`;
             }).join('');
 
-            if (activeDivisionTab === 'All') {
-                // Show Global Students Ranking first
+            if (activeDivisionTab === 'All' || activeDivisionTab === 'Students') {
+                // Show Global Students Ranking ONLY (clean view requested by user)
                 const allActiveUsers = usersData.filter(u => !u.isIgnored).sort((a, b) => (b.score || 0) - (a.score || 0));
-                renderDivisionSection(l, "All Students (Global)", allActiveUsers, '#343a40');
+                renderDivisionSection(l, "Global Leaderboard (รวมทั้งหมด)", allActiveUsers, '#343a40');
 
-                // Render Division-based sections
-                if (divs.length > 0) {
-                    divs.forEach(([divName, groups]) => {
-                        const divUsers = usersData.filter(u => !u.isIgnored && groups.includes(u.group || "Public"));
-                        if (divUsers.length === 0) return;
-                        renderDivisionSection(l, divName, divUsers);
-                    });
-                }
+                // Previous behavior showed subgroups here, but user requested to remove them.
 
-                // 🔥 Fallback: Render Groups not in any Division (V77.12)
-                const assignedGroups = divs.map(d => d[1]).flat();
-                const allActiveGroups = [...new Set(usersData.filter(u => !u.isIgnored).map(u => u.group || "Public"))].sort();
-                const unassignedGroups = allActiveGroups.filter(g => !assignedGroups.includes(g));
-
-                unassignedGroups.forEach(groupName => {
-                    const groupUsers = usersData.filter(u => !u.isIgnored && (u.group || "Public") === groupName);
-                    if (groupUsers.length > 0) {
-                        renderDivisionSection(l, `${groupName} (Group)`, groupUsers, '#6c757d');
-                    }
-                });
-            } else if (activeDivisionTab === 'Students' || activeDivisionTab === 'Others') {
-                const allActiveUsers = usersData.filter(u => !u.isIgnored).sort((a, b) => (b.score || 0) - (a.score || 0));
-                renderDivisionSection(l, "All Students Ranking", allActiveUsers, '#343a40');
             } else {
                 // Render Specific Division
                 const groups = divisionConfig[activeDivisionTab] || [];
