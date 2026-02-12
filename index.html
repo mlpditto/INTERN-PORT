@@ -1936,18 +1936,23 @@
                 currentQuiz.questions.forEach((q, i) => {
                     const isChoice = (q.type || 'choice') === 'choice';
                     if (isChoice) {
-                        const target = q.correct; // Can be array or number
-                        const mine = userAnswers[i];
+                        // Normalize target to array (it should be array from Admin, but be safe)
+                        const target = Array.isArray(q.correct) ? q.correct : [q.correct];
+                        let mine = userAnswers[i];
 
-                        if (Array.isArray(target)) {
-                            // Multiple Correct Answer Check
-                            if (!Array.isArray(mine)) return;
-                            if (target.length !== mine.length) return;
-                            const allFound = target.every(val => mine.includes(val));
+                        // Normalize user answer to array for consistent comparison
+                        // If single choice, it's a scalar number. If multi, it's an array.
+                        // If null/undefined, treat as empty array to fail gracefully
+                        let mineArray = [];
+                        if (Array.isArray(mine)) mineArray = mine;
+                        else if (mine !== null && mine !== undefined) mineArray = [mine];
+
+                        // Strict All-or-Nothing check (Order doesn't matter, but length must match)
+                        if (target.length === mineArray.length) {
+                            // Check if every correct answer is in user's answer
+                            // We assume values are integers (indices)
+                            const allFound = target.every(val => mineArray.includes(val));
                             if (allFound) correctCount++;
-                        } else {
-                            // Single Answer Check
-                            if (mine == target) correctCount++;
                         }
                     }
                 });
