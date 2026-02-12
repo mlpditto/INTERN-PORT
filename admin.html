@@ -821,7 +821,7 @@
                 <h2 style="margin:0;"><i class="fa-solid fa-user-shield"></i> Dashboard
                     <span
                         style="font-size:0.5em; background:#ff9f1c; padding:2px 8px; border-radius:10px; color:white; vertical-align:middle; font-weight:bold;">
-                        LIFF: V77 | Admin: V77.11
+                        LIFF: V77.11 | Admin: V77.12
                     </span>
                 </h2>
                 <span id="admin-email" style="font-size:0.8em; color:var(--text-sub);"></span>
@@ -3185,6 +3185,18 @@
                         renderDivisionSection(l, divName, divUsers);
                     });
                 }
+
+                // 🔥 Fallback: Render Groups not in any Division (V77.12)
+                const assignedGroups = divs.map(d => d[1]).flat();
+                const allActiveGroups = [...new Set(usersData.filter(u => !u.isIgnored).map(u => u.group || "Public"))].sort();
+                const unassignedGroups = allActiveGroups.filter(g => !assignedGroups.includes(g));
+
+                unassignedGroups.forEach(groupName => {
+                    const groupUsers = usersData.filter(u => !u.isIgnored && (u.group || "Public") === groupName);
+                    if (groupUsers.length > 0) {
+                        renderDivisionSection(l, `${groupName} (Group)`, groupUsers, '#6c757d');
+                    }
+                });
             } else if (activeDivisionTab === 'Students' || activeDivisionTab === 'Others') {
                 const allActiveUsers = usersData.filter(u => !u.isIgnored).sort((a, b) => (b.score || 0) - (a.score || 0));
                 renderDivisionSection(l, "All Students Ranking", allActiveUsers, '#343a40');
