@@ -1427,12 +1427,17 @@
                 renderQuizStep();
                 // Optional: Save progress to Firestore
                 try {
-                    const finalAnswers = userAnswers.map(ans => {
-                        if (Array.isArray(ans)) return ans.join("\n---\n");
-                        return ans;
-                    });
-                    db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).update({ answers: finalAnswers });
-                } catch (e) { }
+                    if (currentQuiz && userId) {
+                        const finalAnswers = userAnswers.map(ans => {
+                            if (Array.isArray(ans)) return ans.join("\n---\n");
+                            return ans;
+                        });
+                        db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
+                            answers: finalAnswers,
+                            lastActive: firebase.firestore.FieldValue.serverTimestamp()
+                        }, { merge: true }).catch(err => console.warn("Auto-save failed:", err));
+                    }
+                } catch (e) { console.error("Auto-save error:", e); }
             }
         }
         function prevQuizStep() { if (currentStep > 0) { currentStep--; renderQuizStep(); } }
@@ -1510,36 +1515,46 @@
                 return ans;
             });
 
+            if (!userId || !currentQuiz) {
+                alert("Session error: กรุณารีเฟรชหน้าจอแล้วลองใหม่อีกครั้ง");
+                if (btn) { btn.disabled = false; btn.innerText = "Submit (ยืนยันส่ง)"; }
+                return;
+            }
+
             try {
                 const attemptRef = db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`);
+                const submissionData = isPoll ? {
+                    isPoll: true,
+                    status: 'pending',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    answers: [] // Clear answers for privacy in polls
+                } : {
+                    correctCount,
+                    totalQuestions: currentQuiz.questions.length,
+                    answers: finalAnswers,
+                    status: 'pending',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
                 if (isPoll) {
                     await db.collection("poll_responses").add({
                         quizId: currentQuiz.id,
                         answers: finalAnswers,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
-
-                    await attemptRef.update({
-                        isPoll: true,
-                        status: 'pending',
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                        answers: [] // Clear answers for privacy in polls
-                    });
-                } else {
-                    await attemptRef.update({
-                        correctCount,
-                        totalQuestions: currentQuiz.questions.length,
-                        answers: finalAnswers,
-                        status: 'pending',
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    });
                 }
 
-                alert(isPoll ? "ส่งโพลเรียบร้อย!" : `ส่งคำตอบเรียบร้อย!\nคะแนนที่คาดว่าจะได้รับ: ${pointsAwarded.toFixed(3)} แต้ม`);
+                // Use set with merge:true instead of update to be safer
+                await attemptRef.set(submissionData, { merge: true });
+
                 document.getElementById('quizModal').style.display = 'none';
+                setTimeout(() => {
+                    alert(isPoll ? "ส่งโพลเรียบร้อย!" : `ส่งคำตอบเรียบร้อย!\nคะแนนที่คาดว่าจะได้รับ: ${pointsAwarded.toFixed(3)} แต้ม`);
+                }, 100);
+
             } catch (e) {
-                console.error(e);
-                alert("Error: " + e.message);
+                console.error("Submission Error:", e);
+                alert("เกิดข้อผิดพลาดในการส่ง: " + e.message);
                 if (btn) {
                     btn.disabled = false;
                     btn.innerText = "Submit (ยืนยันส่ง)";
