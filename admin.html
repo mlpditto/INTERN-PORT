@@ -2754,7 +2754,7 @@
                         <td>
                             <button class="btn-sm btn-primary" onclick="openQuizModal('${q.id}')">Edit</button>
                             <button class="btn-sm btn-dark" onclick="toggleQuizStatus('${q.id}', ${q.isActive})">${q.isActive ? 'End Now' : 'Activate'}</button>
-                            <button class="btn-sm btn-info" style="background:#4361ee; width:34px; justify-content:center;" onclick="showQuizParticipants('${q.id}')" title="View Participants"><i class="fa-solid fa-users"></i></button>
+                            <button class="btn-sm btn-info" style="background:#4361ee; min-width:40px; padding:2px 8px; justify-content:center;" onclick="showQuizParticipants('${q.id}')" title="View Participants (${(window.quizCounts && window.quizCounts[q.id]) || 0})"><i class="fa-solid fa-users"></i> <span style="font-size:0.8em; font-weight:bold; margin-left:4px;">${(window.quizCounts && window.quizCounts[q.id]) || 0}</span></button>
                             ${(q.isPoll || hasWriting) ? `<button class="btn-sm btn-info" style="background:#8e44ad;" onclick="showPollResults('${q.id}')">📊 Result</button>` : ''}
                             ${(!isActiveSection) ? `<button class="btn-sm btn-warning" onclick="repostQuiz('${q.id}')">♻️ Repost</button>` : ''}
                             <button class="btn-sm btn-danger" onclick="deleteQuiz('${q.id}')">Del</button>
@@ -2827,11 +2827,23 @@
             db.collection("quiz_attempts").where("status", "in", ["pending", "requesting"]).onSnapshot(s => {
                 renderPendingQuizzes(s.docs.map(d => ({ id: d.id, ...d.data() })));
             });
-            // 🔥 Fix: Query by timestamp first then filter status (avoids missing index issue)
-            db.collection("quiz_attempts").orderBy("timestamp", "desc").limit(100).onSnapshot(s => {
-                quizApprovedData = s.docs
-                    .map(d => ({ id: d.id, ...d.data(), isQuiz: true, collection: 'quiz_attempts' }))
-                    .filter(d => d.status === 'approved');
+            // 🔥 V77.16: Load ALL quiz attempts for counting and full history (Authorized for Admin)
+            db.collection("quiz_attempts").orderBy("timestamp", "desc").onSnapshot(s => {
+                const allAttempts = s.docs.map(d => ({ id: d.id, ...d.data(), isQuiz: true, collection: 'quiz_attempts' }));
+
+                // 1. Update Approved Data for Works Table
+                quizApprovedData = allAttempts.filter(d => d.status === 'approved');
+
+                // 2. Count Participants per Quiz
+                const counts = {};
+                allAttempts.forEach(att => {
+                    const qId = att.quizId;
+                    if (qId) counts[qId] = (counts[qId] || 0) + 1;
+                });
+                window.quizCounts = counts;
+
+                // 3. Refresh UI
+                renderQuizzes();
                 if (!hideCompletedWorks) renderTable('works');
             });
             // 🔥 Feature: Load Poll Responses for Works Table
