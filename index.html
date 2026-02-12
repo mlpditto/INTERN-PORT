@@ -1010,8 +1010,19 @@
 
                 const isExpired = (dead && now > dead);
                 const isInactive = (q.isActive === false);
+                const isApproved = (attempt && attempt.status === 'approved');
 
-                if ((isExpired || isInactive) && !attempt) return;
+                // 🔥 V77.4: Show if active OR (expired AND not approved)
+                if (isInactive && !attempt) return;
+                if (isExpired && isApproved) return; // Hide completed ones if expired
+                if (isExpired && !attempt && !isInactive) {
+                    // Show expired ones that haven't been done yet
+                } else if (isExpired && attempt && !isApproved) {
+                    // Show expired ones that are not approved (failed or pending)
+                } else if (isExpired) {
+                    // Fallback hide
+                    if (!attempt) return;
+                }
 
                 allItems.push({ type: 'quiz', data: q, myData: attempt, sortDate: dead || new Date(8640000000000000) });
             });
@@ -1214,8 +1225,12 @@
             if (!currentQuiz) return;
 
             if (currentQuiz.deadline && new Date() > currentQuiz.deadline.toDate()) {
-                alert("ขออภัย แบบทดสอบนี้หมดเวลาแล้ว");
-                return;
+                const existing = quizAttemptsCache[quizId];
+                if (existing && existing.status === 'approved') {
+                    alert("แบบทดสอบนี้หมดเวลาแล้ว และคุณได้คะแนนสมบูรณ์แล้วครับ");
+                    return;
+                }
+                if (!confirm("แบบทดสอบนี้หมดเวลาแล้ว ต้องการขอยื่นทำแบบทดสอบหลังกำหนดหรือไม่?\n(คะแนนจะคิดจากการส่งครั้งล่าสุด)")) return;
             }
 
             const existing = quizAttemptsCache[quizId];
@@ -1297,7 +1312,7 @@
             let inputHtml = "";
 
             if (isChoice) {
-                const isMulti = Array.isArray(question.correct);
+                const isMulti = Array.isArray(question.correct) && question.correct.length > 1;
                 if (isMulti && !Array.isArray(userAnswers[currentStep])) {
                     userAnswers[currentStep] = []; // Initialize as array for multi
                 }
@@ -1378,7 +1393,7 @@
             if (labels.length === 0) return;
 
             const question = currentQuiz.questions[currentStep];
-            const isMulti = Array.isArray(question.correct);
+            const isMulti = Array.isArray(question.correct) && question.correct.length > 1;
 
             labels.forEach((l, i) => {
                 const input = l.querySelector('input');
