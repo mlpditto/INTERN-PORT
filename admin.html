@@ -821,7 +821,7 @@
                 <h2 style="margin:0;"><i class="fa-solid fa-user-shield"></i> Dashboard
                     <span
                         style="font-size:0.5em; background:#ff9f1c; padding:2px 8px; border-radius:10px; color:white; vertical-align:middle; font-weight:bold;">
-                        LIFF: V77.14 | Admin: V77.14
+                        LIFF: V77.15 | Admin: V77.15
                     </span>
                 </h2>
                 <span id="admin-email" style="font-size:0.8em; color:var(--text-sub);"></span>
@@ -1382,8 +1382,15 @@
             <div class="modal-content" style="max-width: 600px;">
                 <span class="close-modal"
                     onclick="document.getElementById('quizParticipantsModal').style.display='none'">&times;</span>
-                <h3 style="color:var(--primary);"><i class="fa-solid fa-users"></i> Quiz Participants</h3>
-                <div id="quiz-participants-info" style="margin-bottom:15px; font-size:0.9em; color:#666;"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3 style="color:var(--primary); margin:0;"><i class="fa-solid fa-users"></i> Quiz Participants</h3>
+                    <label
+                        style="font-size:0.85em; display:flex; align-items:center; gap:5px; cursor:pointer; color:#666;">
+                        <input type="checkbox" id="hideScoresToggle" onchange="toggleQuizScores()"> Hide Scores
+                        (ซ่อนคะแนน)
+                    </label>
+                </div>
+                <div id="quiz-participants-info" style="margin:10px 0 15px; font-size:0.9em; color:#666;"></div>
                 <div id="quiz-participants-container" style="max-height: 500px; overflow-y: auto;">
                     <!-- Content injected by JS showQuizParticipants -->
                 </div>
@@ -1410,7 +1417,8 @@
         <div class="modal-content" style="max-width:350px; text-align: left;">
             <span class="close-modal"
                 onclick="document.getElementById('groupSelectModal').style.display='none'">&times;</span>
-            <h3 style="margin-top:0;">🏷️ เลือกกลุ่ม (Group)</h3>
+            <h3 style="margin-top:0;">🏷️ เลือกกลุ่มให้ <span id="gs-title-name"
+                    style="color:var(--primary);">...</span></h3>
             <input type="hidden" id="gs-uid">
             <div style="margin-bottom:15px;">
                 <label style="font-size:0.85em; color:#666;">พิมพ์กลุ่มใหม่ หรือเลือกจากรายการ:</label>
@@ -2389,6 +2397,13 @@
             }
         }
 
+        let hideQuizScores = false;
+        let lastQuizIdForParticipants = null;
+        function toggleQuizScores() {
+            hideQuizScores = document.getElementById('hideScoresToggle').checked;
+            if (lastQuizIdForParticipants) showQuizParticipants(lastQuizIdForParticipants);
+        }
+
         async function showQuizParticipants(quizId) {
             const quiz = quizzesData.find(x => x.id === quizId);
             if (!quiz) return;
@@ -2398,6 +2413,9 @@
             const info = document.getElementById('quiz-participants-info');
             container.innerHTML = "<p>Loading participants...</p>";
             info.innerText = `Quiz: ${quiz.title}`;
+
+            lastQuizIdForParticipants = quizId;
+            document.getElementById('hideScoresToggle').checked = hideQuizScores;
 
             try {
                 // Fetch attempts for this quiz
@@ -2415,9 +2433,10 @@
                         <thead>
                             <tr style="background:#f8f9fa;">
                                 <th>Name</th>
-                                <th style="text-align:center;">Score</th>
+                                ${!hideQuizScores ? '<th style="text-align:center;">Score</th>' : ''}
                                 <th style="text-align:center;">Status</th>
                                 <th>Time</th>
+                                <th style="text-align:center;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -2428,7 +2447,7 @@
                     const name = u ? u.displayName : (att.displayName || "Unknown");
                     const pic = u ? u.pictureUrl : (att.pictureUrl || "");
                     const score = att.status === 'approved' ? (att.correctCount + "/" + (att.totalQuestions || "-")) : "-";
-                    const statusColor = att.status === 'approved' ? '#2ec4b6' : (att.status === 'requesting' ? '#ff9f1c' : '#6c757d');
+                    const statusColor = att.status === 'approved' ? '#2ec4b6' : (att.status === 'requesting' ? '#ff9f1c' : '#666');
                     const timeStr = att.timestamp ? att.timestamp.toDate().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : "-";
 
                     html += `
@@ -2437,9 +2456,14 @@
                                 <img src="${pic}" style="width:24px; height:24px; border-radius:50%;">
                                 <span>${name}</span>
                             </td>
-                            <td style="font-weight:bold; text-align:center;">${score}</td>
+                            ${!hideQuizScores ? `<td style="font-weight:bold; text-align:center;">${score}</td>` : ''}
                             <td style="text-align:center;"><span class="badge" style="background:${statusColor}; font-size:0.7em;">${att.status}</span></td>
                             <td style="font-size:0.8em; color:#666;">${timeStr}</td>
+                            <td style="text-align:center;">
+                                <button class="btn-sm btn-danger" onclick="resetQuizAttempt('${att.id}', '${quizId}')" title="Reset this attempt" style="padding:2px 8px; font-size:0.8em;">
+                                    <i class="fa-solid fa-rotate-left"></i> Reset
+                                </button>
+                            </td>
                         </tr>
                     `;
                 });
@@ -2777,8 +2801,14 @@
         }
 
         function setUserGroup(uid, current) {
+            const user = usersData.find(u => u.id === uid);
+            const userName = user ? user.displayName : "Unknown User";
+
             document.getElementById('gs-uid').value = uid;
+            document.getElementById('gs-title-name').innerText = userName;
+
             const input = document.getElementById('gs-input');
+            const list = document.getElementById('gs-list');
             input.value = current || "Public";
 
             // Get all unique groups from users and config
@@ -3148,39 +3178,7 @@
             } catch (e) { alert(e.message); }
         }
 
-        async function openArchiveModal() {
-            const l = document.getElementById("archive-list");
-            l.innerHTML = "Loading...";
-            document.getElementById("archiveModal").style.display = "block";
-            const s = await db.collection("side_quests").where("status", "==", "Archived").get();
-            archiveCache = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-            archivePage = 1;
-            renderArchivePage();
-        }
-
-        function renderArchivePage() {
-            const l = document.getElementById("archive-list");
-            l.innerHTML = "";
-            const start = (archivePage - 1) * ARCHIVE_PER_PAGE;
-            const paged = archiveCache.slice(start, start + ARCHIVE_PER_PAGE);
-            const totalPages = Math.ceil(archiveCache.length / ARCHIVE_PER_PAGE);
-            if (paged.length === 0) { l.innerHTML = "<p style='text-align:center;color:#999'>No archived items.</p>"; return; }
-            paged.forEach(q => {
-                let imgs = "";
-                if (q.assignees) q.assignees.forEach(u => imgs += `<img src="${u.pic}" style="width:24px;height:24px;border-radius:50%;margin-right:2px;">`);
-                l.innerHTML += `
-                <div style="padding:10px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between;align-items:center;">
-                    <div><b>${q.title}</b> (+${q.archiveScore || 0})<br>${imgs}</div>
-                    <div><button class="btn-sm btn-success" onclick="restoreSQ('${q.id}','Done')">Restore</button> <button class="btn-sm btn-danger" onclick="delArchiveDoc('${q.id}')">Del</button></div>
-                </div>`;
-            });
-            if (totalPages > 1) {
-                const ctrl = document.createElement("div");
-                ctrl.className = "history-controls";
-                ctrl.innerHTML = `<button class="btn-sm btn-dark" ${archivePage === 1 ? 'disabled' : ''} onclick="archivePage--;renderArchivePage()">< Prev</button><span style="align-self:center;">${archivePage} / ${totalPages}</span><button class="btn-sm btn-dark" ${archivePage === totalPages ? 'disabled' : ''} onclick="archivePage++;renderArchivePage()">Next ></button>`;
-                l.appendChild(ctrl);
-            }
-        }
+        // --- Duplicate functions removed (openArchiveModal, renderArchivePage) ---
 
         async function renderLeaderboard() {
             const l = document.getElementById("leaderboardList");
@@ -3492,7 +3490,40 @@
         async function saveSideQuest() { const id = document.getElementById('edit-id').value; const t = document.getElementById('sq-title').value; if (!t) return alert("Title?"); const d = { title: t, description: document.getElementById('sq-desc').value, priority: document.getElementById('sq-priority').value, dueDate: document.getElementById('sq-due').value, isProject: document.getElementById('sq-isProject').checked, assigneeIds: [...document.querySelectorAll('.sq-user-check:checked')].map(c => c.value), assignees: [...document.querySelectorAll('.sq-user-check:checked')].map(c => ({ uid: c.value, name: c.dataset.name, pic: c.dataset.pic })) }; if (id) { await db.collection("side_quests").doc(id).update(d); showToast("Updated"); } else { d.status = "Backlog"; d.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").add(d); showToast("Created"); } document.getElementById('taskModal').style.display = 'none'; }
         let chatUnsub; function openChat(id, title) { document.getElementById('chatModal').style.display = 'block'; document.getElementById('chat-title').innerText = `💬 ${title}`; document.getElementById('chat-card-id').value = id; const box = document.getElementById('chat-box'); box.innerHTML = "Loading..."; if (chatUnsub) chatUnsub(); chatUnsub = db.collection("side_quests").doc(id).collection("comments").orderBy("timestamp", "asc").onSnapshot(snap => { box.innerHTML = ""; snap.forEach(d => { const m = d.data(); const cls = m.sender === 'Admin' ? 'msg-admin' : 'msg-user'; let pic = m.pic ? `<img src="${m.pic}" class="chat-avatar">` : '<div class="chat-avatar" style="background:#ccc;">?</div>'; if (m.sender === 'Admin') pic = '<div class="chat-avatar" style="background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;">A</div>'; let msg = m.msg.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#007bff;text-decoration:underline;">$1</a>'); msg = msg.replace(/@([^\s]+)/g, (match, name) => { const q = sideQuestsCache[id]; const inP = q.assignees && q.assignees.some(u => u.name.toLowerCase().includes(name.toLowerCase())); return inP ? `<span class="tag-in">${match}</span>` : `<span class="tag-out">${match}</span>`; }); box.innerHTML += `<div class="chat-msg ${cls}">${pic}<div><b>${m.sender}</b>: ${msg}</div></div>`; }); box.scrollTop = box.scrollHeight; }); }
         async function sendChat() { const t = document.getElementById('chat-input').value.trim(); const id = document.getElementById('chat-card-id').value; if (!t) return; await db.collection("side_quests").doc(id).collection("comments").add({ msg: t, sender: 'Admin', timestamp: firebase.firestore.FieldValue.serverTimestamp() }); document.getElementById('chat-input').value = ""; }
-        async function openArchiveModal() { const l = document.getElementById("archive-list"); l.innerHTML = "Loading..."; document.getElementById("archiveModal").style.display = "block"; const s = await db.collection("side_quests").where("status", "==", "Archived").get(); let i = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)); l.innerHTML = ""; i.forEach(q => { let imgs = ""; if (q.assignees) q.assignees.forEach(u => imgs += `<img src="${u.pic}" style="width:24px;height:24px;border-radius:50%;margin-right:2px;">`); l.innerHTML += `<div style="padding:10px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between;align-items:center;"><div><b>${q.title}</b> (+${q.archiveScore || 0})<br>${imgs}</div><div><button class="btn-sm btn-success" onclick="restoreSQ('${q.id}','Done')">Restore</button> <button class="btn-sm btn-danger" onclick="delArchiveDoc('${q.id}')">Del</button></div></div>` }); }
+        async function openArchiveModal() {
+            const l = document.getElementById("archive-list");
+            l.innerHTML = "Loading...";
+            document.getElementById("archiveModal").style.display = "block";
+            const s = await db.collection("side_quests").where("status", "==", "Archived").get();
+            archiveCache = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+            archivePage = 1;
+            renderArchivePage();
+        }
+
+        function renderArchivePage() {
+            const l = document.getElementById("archive-list");
+            l.innerHTML = "";
+            const start = (archivePage - 1) * ARCHIVE_PER_PAGE;
+            const paged = archiveCache.slice(start, start + ARCHIVE_PER_PAGE);
+            const totalPages = Math.ceil(archiveCache.length / ARCHIVE_PER_PAGE);
+            if (paged.length === 0) { l.innerHTML = "<p style='text-align:center;color:#999'>No archived items.</p>"; return; }
+            paged.forEach(q => {
+                let imgs = "";
+                if (q.assignees) q.assignees.forEach(u => imgs += `<img src="${u.pic}" style="width:24px;height:24px;border-radius:50%;margin-right:2px;">`);
+                l.innerHTML += `
+                <div style="padding:10px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between;align-items:center;">
+                    <div><b>${q.title}</b> (+${q.archiveScore || 0})<br>${imgs}</div>
+                    <div><button class="btn-sm btn-success" onclick="restoreSQ('${q.id}','Done')">Restore</button> <button class="btn-sm btn-danger" onclick="delArchiveDoc('${q.id}')">Del</button></div>
+                </div>`;
+            });
+            if (totalPages > 1) {
+                const ctrl = document.createElement("div");
+                ctrl.className = "history-controls";
+                ctrl.innerHTML = `<button class="btn-sm btn-dark" ${archivePage === 1 ? 'disabled' : ''} onclick="archivePage--;renderArchivePage()">< Prev</button><span style="align-self:center;">${archivePage} / ${totalPages}</span><button class="btn-sm btn-dark" ${archivePage === totalPages ? 'disabled' : ''} onclick="archivePage++;renderArchivePage()">Next ></button>`;
+                l.appendChild(ctrl);
+            }
+        }
+
         async function delArchiveDoc(id) { if (confirm("Del?")) await db.collection("side_quests").doc(id).delete(); openArchiveModal(); }
         async function restoreSQ(id, t) { await db.collection("side_quests").doc(id).update({ status: t, doneAt: firebase.firestore.FieldValue.serverTimestamp() }); openArchiveModal(); showToast("Restored"); }
         function confirmClearArchive() { document.getElementById('clearConfirmModal').style.display = 'block'; const btn = document.getElementById('btn-confirm-clear'); btn.disabled = true; btn.style.background = '#ccc'; let c = 5; btn.innerText = `Confirm (${c})`; const t = setInterval(() => { c--; btn.innerText = `Confirm (${c})`; if (c <= 0) { clearInterval(t); btn.disabled = false; btn.style.background = '#ef233c'; btn.innerText = "CLEAR ALL"; btn.onclick = async () => { document.getElementById('clearConfirmModal').style.display = 'none'; const s = await db.collection("side_quests").where("status", "==", "Archived").get(); const b = db.batch(); s.forEach(d => b.delete(d.ref)); await b.commit(); showToast("Cleared!"); openArchiveModal(); } } }, 1000); }
@@ -3504,7 +3535,6 @@
         async function archiveSQ(id) { if (confirm("Archive?")) await db.collection("side_quests").doc(id).update({ status: 'Archived' }); }
         async function delUser(id) { if (confirm("Del?")) await db.collection("users").doc(id).delete(); }
         async function delWork(id) { if (confirm("Del?")) await db.collection("works").doc(id).delete(); }
-        async function delQuizAttempt(id) { if (confirm("Delete this quiz attempt record?")) await db.collection("quiz_attempts").doc(id).delete(); }
         function toggleIgnoreUser(id, s) { db.collection("users").doc(id).update({ isIgnored: !s }); }
         function toggleForm() { const f = document.getElementById('sq-form'); f.style.display = f.style.display === 'none' ? 'block' : 'none'; }
         function filterBoard() { renderKanban({ forEach: cb => { Object.values(sideQuestsCache).forEach(q => cb({ data: () => q, id: Object.keys(sideQuestsCache).find(k => sideQuestsCache[k] === q) })) } }); }
@@ -3728,6 +3758,18 @@
                 await db.collection(collection).doc(id).delete();
                 showToast("Deleted!");
             } catch (e) { alert(e.message); }
+        }
+
+        async function resetQuizAttempt(attemptId, quizId) {
+            if (!confirm("ต้องการรีเซ็ตการทำแบบทดสอบของผู้ใช้นี้ใช่หรือไม่?\n(ข้อมูลเดิมจะถูกลบเพื่อให้ผู้ใช้เริ่มทำใหม่ได้)")) return;
+            try {
+                await db.collection("quiz_attempts").doc(attemptId).delete();
+                showToast("Reset Success!");
+                showQuizParticipants(quizId); // Refresh the participants list
+            } catch (e) {
+                console.error("Reset Error:", e);
+                alert("Error: " + e.message);
+            }
         }
 
         // --- LIFF Preview ---
