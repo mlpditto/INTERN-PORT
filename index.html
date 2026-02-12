@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V77 Full Sync)</title>
+    <title>Internship Portfolio (V77.8 Full Sync)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -149,6 +149,19 @@
             /* Ensure scrolling if content is tall */
             max-height: 80vh;
             overflow-y: auto;
+        }
+
+        /* Leaderboard Styles (V77.8) */
+        .lb-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            border-radius: 12px;
+            background: #fff;
+            transition: 0.2s;
+            border: 1px solid #f0f0f0;
         }
 
         /* -----------------------
@@ -519,6 +532,10 @@
                         style="display:none; background:#4361ee; color:white; font-size:0.4em; padding:3px 10px; border-radius:12px; font-weight:bold; letter-spacing:0.5px;">Public</span>
                 </h2>
                 <div id="u-score" class="score-text">0</div>
+                <button class="btn-sm" onclick="openLeaderboard()"
+                    style="margin-top:10px; background:#4361ee; color:white; border:none; padding:5px 15px; border-radius:20px; font-weight:bold; cursor:pointer;">
+                    🏅 ดูอันดับ (Leaderboard)
+                </button>
             </div>
 
             <div class="card" style="border-left: 5px solid #e67e22; background:#fffbf0; position: relative;">
@@ -678,6 +695,33 @@
         </div>
     </div>
 
+    </div>
+    </div>
+    </div>
+
+    <!-- 🔥 Leaderboard Modal (V77.8) -->
+    <div id="leaderboardModal" class="modal">
+        <div class="modal-content" style="max-width: 400px; padding: 0; overflow: hidden; border-radius: 20px;">
+            <div
+                style="background: linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%); padding: 30px 20px; color: white; text-align: center; position: relative;">
+                <span onclick="document.getElementById('leaderboardModal').style.display='none'"
+                    style="position:absolute; right:15px; top:10px; font-size:24px; cursor:pointer; opacity:0.8;">&times;</span>
+                <i class="fa-solid fa-crown"
+                    style="font-size: 3em; margin-bottom: 10px; filter: drop-shadow(0 4px 5px rgba(0,0,0,0.2));"></i>
+                <h2 style="margin: 0; font-size: 1.5em; letter-spacing: 1px;">Top Interns</h2>
+                <div id="lb-div-name" style="font-size: 0.9em; opacity: 0.9; margin-top: 5px; font-weight: 300;">Overall
+                    Division</div>
+            </div>
+            <div id="lb-list" style="padding: 10px; max-height: 450px; overflow-y: auto; background: #fff;">
+                <!-- Items injected by JS -->
+            </div>
+            <div style="padding: 15px; background: #f8f9fa; text-align: center; border-top: 1px solid #eee;">
+                <button class="btn-primary" onclick="document.getElementById('leaderboardModal').style.display='none'"
+                    style="width: 100%; border-radius: 12px; margin: 0;">Awesome!</button>
+            </div>
+        </div>
+    </div>
+
     <div id="personalInfoModal" class="modal">
         <div class="modal-content" style="max-width: 400px; text-align: left;">
             <span onclick="document.getElementById('personalInfoModal').style.display='none'"
@@ -720,8 +764,8 @@
         const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ✅ Updated ID
 
         let userId = "", userProfile = {}, userSubmissions = {};
-        let questsCache = [], mySubmissionsCache = {}, myWorksCache = [], sideQuestsCache = {}, myGroup = "Public"; // 🔥 Added myGroup V77.7
-        let quizzesCache = [], quizAttemptsCache = {};
+        let questsCache = [], mySubmissionsCache = {}, myWorksCache = [], sideQuestsCache = {}, myGroup = "Public";
+        let quizzesCache = [], quizAttemptsCache = {}, allUsersData = [], divisionConfig = {}; // 🔥 Added for Leaderboard V77.8
 
         // --- Initialization ---
         function updateStatus(msg) {
@@ -819,6 +863,7 @@
                 loadMyWorks();
                 loadSideQuests();
                 loadQuizzes();
+                loadDivisionConfig(); // 🔥 Added V77.8
 
                 // Start Timer Loop
                 setInterval(checkExpiry, 1000);
@@ -960,6 +1005,81 @@
             });
             await db.collection('users').doc(userId).update({ certRequested: true });
             alert("ส่งคำร้องแล้ว!");
+        }
+
+        // --- Leaderboard System (V77.8) ---
+        function loadDivisionConfig() {
+            db.collection("config").doc("divisions").onSnapshot(doc => {
+                if (doc.exists) divisionConfig = doc.data();
+            });
+            // Also load all users for leaderboard
+            db.collection("users").orderBy("score", "desc").onSnapshot(s => {
+                allUsersData = s.docs.map(d => ({ id: d.id, ...d.data() }));
+            });
+        }
+
+        function getMyDivision() {
+            for (const [divName, groups] of Object.entries(divisionConfig)) {
+                if (groups.includes(myGroup)) return divName;
+            }
+            return "General Division"; // Default
+        }
+
+        function openLeaderboard() {
+            document.getElementById('leaderboardModal').style.display = 'flex';
+            renderLeaderboard();
+        }
+
+        function renderLeaderboard() {
+            const container = document.getElementById('lb-list');
+            const myDiv = getMyDivision();
+            document.getElementById('lb-div-name').innerText = myDiv;
+
+            // Filter users in the same division
+            const relevantGroups = divisionConfig[myDiv] || [myGroup];
+            const divUsers = allUsersData.filter(u => relevantGroups.includes(u.group || "Public") || (u.group === myGroup));
+
+            // If myDiv is General and no groups match, it might just be myGroup
+            const finalUsers = divUsers.length > 0 ? divUsers : allUsersData.filter(u => (u.group || "Public") === myGroup);
+
+            container.innerHTML = "";
+            finalUsers.slice(0, 20).forEach((u, i) => {
+                const isMe = u.id === userId;
+                const lv = Math.floor((u.score || 0) / 10) + 1;
+                container.innerHTML += `
+                    <div class="lb-item" style="${isMe ? 'background:#eef2ff; border:1px solid #4361ee;' : ''}">
+                        <div style="display:flex; align-items:center; gap:15px;">
+                            <div style="font-weight:bold; color:#666; min-width:25px;">#${i + 1}</div>
+                            <img src="${u.pictureUrl}" style="width:40px; height:40px; border-radius:50%; border:2px solid #fff; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
+                            <div style="text-align:left;">
+                                <div style="font-weight:600; font-size:0.95em;">${u.displayName} ${isMe ? '⭐' : ''}</div>
+                                <div style="font-size:0.75em; color:#999;">Lv.${lv} | ${u.group || 'Public'}</div>
+                            </div>
+                        </div>
+                        <div style="font-weight:800; color:#4361ee; font-size:1.1em;">${parseFloat((u.score || 0).toFixed(2))}</div>
+                    </div>
+                `;
+            });
+
+            // Find my rank if not in top 20
+            const myRank = finalUsers.findIndex(u => u.id === userId) + 1;
+            if (myRank > 20) {
+                const me = finalUsers[myRank - 1];
+                container.innerHTML += `
+                    <div style="text-align:center; padding:10px; color:#999;">...</div>
+                    <div class="lb-item" style="background:#eef2ff; border:1px solid #4361ee;">
+                        <div style="display:flex; align-items:center; gap:15px;">
+                            <div style="font-weight:bold; color:#666; min-width:25px;">#${myRank}</div>
+                            <img src="${me.pictureUrl}" style="width:40px; height:40px; border-radius:50%; border:2px solid #fff;">
+                            <div style="text-align:left;">
+                                <div style="font-weight:600; font-size:0.95em;">${me.displayName} ⭐</div>
+                                <div style="font-size:0.75em; color:#999;">Lv.${Math.floor((me.score || 0) / 10) + 1}</div>
+                            </div>
+                        </div>
+                        <div style="font-weight:800; color:#4361ee; font-size:1.1em;">${parseFloat((me.score || 0).toFixed(2))}</div>
+                    </div>
+                `;
+            }
         }
 
         // --- Quest System (V56 Logic) ---

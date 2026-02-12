@@ -1079,6 +1079,12 @@
         </div>
 
         <div id="tab-leaderboard" class="tab-content">
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; max-width:900px; margin:0 auto 20px;">
+                <h3 style="margin:0;"><i class="fa-solid fa-ranking-star"></i> Rankings</h3>
+                <button class="btn-sm btn-info" onclick="openDivisionsModal()"><i class="fa-solid fa-shield-halved"></i>
+                    Manage Divisions</button>
+            </div>
             <div id="leaderboardList" class="lb-container" style="max-width:900px; margin:0 auto;"></div>
         </div>
 
@@ -1146,6 +1152,30 @@
                 </div>
                 <ul id="history-list" style="list-style:none; padding:0;"></ul>
                 <div id="history-controls" class="history-controls"></div>
+            </div>
+        </div>
+
+        <div id="divisionsModal" class="modal">
+            <div class="modal-content" style="max-width:500px; text-align:left;">
+                <span class="close-modal" onclick="closeModal()">&times;</span>
+                <h3>🛡️ Manage Divisions (V77.8)</h3>
+                <p style="font-size:0.85em; color:#666; margin-bottom:15px;">
+                    Users from different Groups can be ranked together in a Division.
+                </p>
+                <div id="div-list-admin"
+                    style="margin-bottom:20px; border:1px solid #eee; border-radius:8px; padding:10px; background:#fafafa; max-height:200px; overflow-y:auto;">
+                    <!-- List of divisions -->
+                </div>
+
+                <h4 style="margin-bottom:10px;">➕ Add New Division</h4>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <input type="text" id="new-div-name" placeholder="Division Name (e.g. Division 1)">
+                    <input type="text" id="new-div-groups" placeholder="Groups (comma separated): IT, Marketing...">
+                    <button class="btn-primary" onclick="addDivision()" style="width:auto;">Add</button>
+                </div>
+
+                <button class="btn-success" style="width:100%; margin-top:20px; padding:12px;"
+                    onclick="saveDivisions()">🚀 Save All Config</button>
             </div>
         </div>
         <div id="archiveModal" class="modal">
@@ -2485,6 +2515,8 @@
                 }
             }
 
+            let divisionConfig = {}; // 🔥 Added for Divisions V77.8
+
             function loadData() {
                 db.collection("works").orderBy("timestamp", "desc").limit(100).onSnapshot(s => { worksData = s.docs.map(d => ({ id: d.id, ...d.data() })); renderTable('works'); });
                 db.collection("users").orderBy("score", "desc").onSnapshot(s => { usersData = s.docs.map(d => ({ id: d.id, ...d.data() })); renderTable('users'); renderLeaderboard(); updateAssigneeList(); renderCertTable(); });
@@ -2496,7 +2528,6 @@
                     renderPendingQuizzes(s.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
                 // 🔥 Fix: Query by timestamp first then filter status (avoids missing index issue)
-                // 🔥 Fix: Query by timestamp first then filter status (avoids missing index issue)
                 db.collection("quiz_attempts").orderBy("timestamp", "desc").limit(100).onSnapshot(s => {
                     quizApprovedData = s.docs
                         .map(d => ({ id: d.id, ...d.data(), isQuiz: true, collection: 'quiz_attempts' }))
@@ -2506,12 +2537,16 @@
                 // 🔥 Feature: Load Poll Responses for Works Table
                 db.collection("poll_responses").orderBy("timestamp", "desc").limit(50).onSnapshot(s => {
                     const polls = s.docs.map(d => ({ id: d.id, ...d.data(), isQuiz: true, isPollResponse: true, status: 'approved', collection: 'poll_responses' }));
-                    // Merge into quizApprovedData or handle separately? 
-                    // Let's just append to a global variable like pollData and merge in renderTable
                     window.pollData = polls;
                     if (!hideCompletedWorks) renderTable('works');
                 });
                 db.collection("quest_submissions").onSnapshot(s => { questsSubCache = {}; s.forEach(d => { questsSubCache[`${d.data().questId}_${d.data().userId}`] = d.data(); }); filterBoard(); });
+
+                // 🔥 Load Division Config (V77.8)
+                db.collection("config").doc("divisions").onSnapshot(doc => {
+                    if (doc.exists) divisionConfig = doc.data();
+                    renderLeaderboard();
+                });
             }
 
             async function allowLateQuiz(id) {
@@ -2812,9 +2847,32 @@
                 l.innerHTML = "";
                 if (!usersData.length) { l.innerHTML = "<div style='text-align:center;padding:20px;color:#999;'>No user data found.</div>"; return; }
 
-                const topUsers = usersData.filter(u => !u.isIgnored).slice(0, 20);
+                // If divisions exist, render grouped
+                const divs = Object.entries(divisionConfig);
+                if (divs.length > 0) {
+                    divs.forEach(([divName, groups]) => {
+                        const divUsers = usersData.filter(u => !u.isIgnored && groups.includes(u.group || "Public"));
+                        if (divUsers.length === 0) return;
 
-                topUsers.forEach((u, i) => {
+                        l.innerHTML += `<h3 style="border-left:5px solid var(--primary); padding-left:10px; margin-top:30px;">🏅 ${divName}</h3>`;
+                        renderUserStrip(l, divUsers.slice(0, 10));
+                    });
+
+                    // Show Ungrouped/Others
+                    const allGrouped = divs.flatMap(d => d[1]);
+                    const otherUsers = usersData.filter(u => !u.isIgnored && !allGrouped.includes(u.group || "Public"));
+                    if (otherUsers.length > 0) {
+                        l.innerHTML += `<h3 style="border-left:5px solid #ccc; padding-left:10px; margin-top:30px; color:#666;">🔘 Others / Public</h3>`;
+                        renderUserStrip(l, otherUsers.slice(0, 10));
+                    }
+                } else {
+                    // Fallback: One list for all
+                    renderUserStrip(l, usersData.filter(u => !u.isIgnored).slice(0, 20));
+                }
+            }
+
+            function renderUserStrip(container, users) {
+                users.forEach((u, i) => {
                     const lv = Math.floor((u.score || 0) / 10) + 1;
                     let daysLeftHtml = "";
                     if (u.endDate) {
@@ -2824,10 +2882,8 @@
                         if (diff < 0) daysLeftHtml = `<span class="badge" style="background:#28a745">✅ จบการศึกษา</span>`;
                         else daysLeftHtml = `<span class="badge" style="background:#17a2b8">⏳ เหลือ ${diff} วัน</span>`;
                     }
-
                     const rankClass = i < 3 ? `rank-${i + 1}` : '';
-
-                    l.innerHTML += `
+                    container.innerHTML += `
                     <div class="lb-row ${rankClass}">
                         <div class="lb-left">
                             <div class="lb-rank">#${i + 1}</div>
@@ -2845,9 +2901,52 @@
                         </div>
                     </div>`;
                 });
+                loadLeaderboardCharts(users);
+            }
 
-                // Load charts after rendering
-                if (topUsers.length > 0) loadLeaderboardCharts(topUsers);
+            // 🔥 Division Management Functions (V77.8)
+            function openDivisionsModal() {
+                document.getElementById('divisionsModal').style.display = 'flex';
+                renderDivisionAdminList();
+            }
+
+            function renderDivisionAdminList() {
+                const container = document.getElementById('div-list-admin');
+                container.innerHTML = "";
+                Object.entries(divisionConfig).forEach(([name, groups]) => {
+                    container.innerHTML += `
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #eee;">
+                            <div>
+                                <strong>${name}</strong><br>
+                                <small style="color:#666;">Groups: ${groups.join(', ')}</small>
+                            </div>
+                            <button class="btn-sm btn-danger" onclick="removeDivision('${name}')" style="font-size:0.7em;">✕</button>
+                        </div>
+                    `;
+                });
+            }
+
+            function addDivision() {
+                const name = document.getElementById('new-div-name').value.trim();
+                const grps = document.getElementById('new-div-groups').value.split(',').map(g => g.trim()).filter(g => g);
+                if (!name || grps.length === 0) return alert("Please enter name and at least one group.");
+                divisionConfig[name] = grps;
+                renderDivisionAdminList();
+                document.getElementById('new-div-name').value = '';
+                document.getElementById('new-div-groups').value = '';
+            }
+
+            function removeDivision(name) {
+                delete divisionConfig[name];
+                renderDivisionAdminList();
+            }
+
+            async function saveDivisions() {
+                try {
+                    await db.collection("config").doc("divisions").set(divisionConfig);
+                    showToast("Divisions Saved!");
+                    document.getElementById('divisionsModal').style.display = 'none';
+                } catch (e) { alert(e.message); }
             }
 
             async function loadLeaderboardCharts(users) {
