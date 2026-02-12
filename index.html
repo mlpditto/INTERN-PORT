@@ -1267,17 +1267,32 @@
             let inputHtml = "";
 
             if (isChoice) {
+                const isMulti = Array.isArray(question.correct);
+                if (isMulti && !Array.isArray(userAnswers[currentStep])) {
+                    userAnswers[currentStep] = []; // Initialize as array for multi
+                }
+
                 inputHtml = `
                     <div style="display:flex; flex-direction:column; gap:10px;">
-                        ${question.options.map((opt, i) => `
-                            <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #ddd; border-radius:8px; cursor:pointer; background:${userAnswers[currentStep] === i ? '#e9ecef' : '#fff'};">
-                                <input type="radio" name="q-opt" value="${i}" ${userAnswers[currentStep] === i ? 'checked' : ''} onchange="userAnswers[${currentStep}] = ${i}; renderQuizStepUIOnly();" style="width:auto; margin:0;">
-                                ${opt}
-                            </label>
-                        `).join('')}
+                        ${question.options.map((opt, i) => {
+                    const isChecked = isMulti
+                        ? (userAnswers[currentStep] || []).includes(i)
+                        : userAnswers[currentStep] === i;
+
+                    return `
+                                <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #ddd; border-radius:8px; cursor:pointer; background:${isChecked ? '#f0f7ff' : '#fff'}; border-color:${isChecked ? '#4361ee' : '#ddd'};">
+                                    <input type="${isMulti ? 'checkbox' : 'radio'}" name="q-opt" value="${i}"
+                                        ${isChecked ? 'checked' : ''}
+                                        onchange="handleChoiceChange(${currentStep}, ${i}, ${isMulti})"
+                                        style="width:auto; margin:0;">
+                                    ${opt}
+                                </label>
+                            `;
+                }).join('')}
                     </div>
                 `;
-            } else {
+            }
+            else {
                 // Tweetstorm UI
                 if (!Array.isArray(userAnswers[currentStep])) {
                     userAnswers[currentStep] = ['']; // Initialize with one empty tweet
@@ -1316,16 +1331,39 @@
             if (el) el.innerText = `⏱ ${timeLeftForStep}s`;
         }
 
+        function handleChoiceChange(step, index, isMulti) {
+            if (isMulti) {
+                if (!Array.isArray(userAnswers[step])) userAnswers[step] = [];
+                const idx = userAnswers[step].indexOf(index);
+                if (idx > -1) userAnswers[step].splice(idx, 1);
+                else userAnswers[step].push(index);
+            } else {
+                userAnswers[step] = index;
+            }
+            renderQuizStepUIOnly();
+        }
+
         function renderQuizStepUIOnly() {
             const labels = document.querySelectorAll('#quiz-run-container label');
-            if (labels.length === 0) return; // Not a choice question
+            if (labels.length === 0) return;
+
+            const question = currentQuiz.questions[currentStep];
+            const isMulti = Array.isArray(question.correct);
+
             labels.forEach((l, i) => {
-                const radio = l.querySelector('input');
-                if (radio && radio.checked) {
-                    l.style.background = '#e9ecef';
-                    userAnswers[currentStep] = i;
+                const input = l.querySelector('input');
+                const isChecked = isMulti
+                    ? (userAnswers[currentStep] || []).includes(i)
+                    : userAnswers[currentStep] === i;
+
+                if (isChecked) {
+                    l.style.background = '#f0f7ff';
+                    l.style.borderColor = '#4361ee';
+                    if (input) input.checked = true;
                 } else {
                     l.style.background = '#fff';
+                    l.style.borderColor = '#ddd';
+                    if (input) input.checked = false;
                 }
             });
         }
@@ -1402,7 +1440,13 @@
         async function submitQuiz() {
             clearInterval(quizTimerInterval);
 
-            if (userAnswers.some(a => a === null)) {
+            const hasEmptyAnswers = userAnswers.some(a => {
+                if (a === null) return true;
+                if (Array.isArray(a) && a.length === 0) return true; // Multi-choice but none selected
+                return false;
+            });
+
+            if (hasEmptyAnswers) {
                 if (!confirm("คุณยังตอบไม่ครบทุกข้อ ยืนยันที่จะส่งหรือไม่?")) {
                     quizTimerInterval = setInterval(() => {
                         timeLeftForStep--;
@@ -1440,7 +1484,21 @@
             if (currentQuiz && currentQuiz.questions) {
                 currentQuiz.questions.forEach((q, i) => {
                     const isChoice = (q.type || 'choice') === 'choice';
-                    if (isChoice && userAnswers[i] == q.correct) correctCount++;
+                    if (isChoice) {
+                        const target = q.correct; // Can be array or number
+                        const mine = userAnswers[i];
+
+                        if (Array.isArray(target)) {
+                            // Multiple Correct Answer Check
+                            if (!Array.isArray(mine)) return;
+                            if (target.length !== mine.length) return;
+                            const allFound = target.every(val => mine.includes(val));
+                            if (allFound) correctCount++;
+                        } else {
+                            // Single Answer Check
+                            if (mine == target) correctCount++;
+                        }
+                    }
                 });
             }
 

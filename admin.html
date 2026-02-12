@@ -1542,8 +1542,8 @@
 
                     if (qType === 'choice') {
                         opts = [...item.querySelectorAll('.q-opt')].map(i => i.value);
-                        const correctEl = item.querySelector('.q-correct-radio:checked');
-                        correct = correctEl ? parseInt(correctEl.value) : 0;
+                        correct = [...item.querySelectorAll('.q-correct-check:checked')].map(c => parseInt(c.value));
+                        if (correct.length === 0) correct = [0]; // Fallback
                     }
 
                     const timer = parseInt(item.querySelector('.q-timer').value) || 60;
@@ -1590,6 +1590,9 @@
                 div.className = 'quiz-q-item';
                 const qType = data ? (data.type || 'choice') : 'choice';
 
+                const options = data && data.options ? data.options : ['', '', '', ''];
+                const correct = data && data.correct !== undefined ? (Array.isArray(data.correct) ? data.correct : [parseInt(data.correct)]) : [0];
+
                 div.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
                     <b style="color:var(--primary); font-size:1.1em;">คำถาม Question</b>
@@ -1608,19 +1611,25 @@
                     <textarea class="q-text" placeholder="พิมพ์โจทย์ที่นี่..." style="height:80px; font-size:1em;">${data ? data.q : ''}</textarea>
                 </div>
                 
-                <div class="options-container" style="display:${qType === 'choice' ? 'flex' : 'none'}; flex-direction:column; gap:10px; margin-bottom:20px;">
-                    <div class="q-opt-row"><span class="q-opt-prefix">1.</span><input type="text" class="q-opt" value="${data && data.options ? data.options[0] : ''}" placeholder="ตัวเลือก 1"></div>
-                    <div class="q-opt-row"><span class="q-opt-prefix">2.</span><input type="text" class="q-opt" value="${data && data.options ? data.options[1] : ''}" placeholder="ตัวเลือก 2"></div>
-                    <div class="q-opt-row"><span class="q-opt-prefix">3.</span><input type="text" class="q-opt" value="${data && data.options ? data.options[2] : ''}" placeholder="ตัวเลือก 3"></div>
-                    <div class="q-opt-row"><span class="q-opt-prefix">4.</span><input type="text" class="q-opt" value="${data && data.options ? data.options[3] : ''}" placeholder="ตัวเลือก 4"></div>
+                <div class="options-container" style="display:${qType === 'choice' ? 'flex' : 'none'}; flex-direction:column; gap:8px; margin-bottom:15px;">
+                    ${options.map((opt, i) => `
+                        <div class="q-opt-row" style="display:flex; align-items:center; gap:8px;">
+                            <span class="q-opt-prefix" style="min-width:20px;">${i + 1}.</span>
+                            <input type="text" class="q-opt" value="${opt}" placeholder="ตัวเลือก ${i + 1}" style="flex:1; margin:0;">
+                            ${options.length > 2 ? `<button type="button" onclick="removeOption(this)" style="width:30px; min-height:30px; padding:0; background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; border-radius:4px;">✕</button>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="options-actions" style="display:${qType === 'choice' ? 'block' : 'none'}; margin-bottom:20px;">
+                    <button type="button" class="btn-sm" onclick="addOption(this)" style="width:auto; padding:5px 15px; background:#e9f5ff; color:#007bff; border:1px solid #b8daff;"><i class="fa-solid fa-plus"></i> เพิ่มตัวเลือก (Add Option)</button>
                 </div>
 
-                <div class="correct-container" style="display:${qType === 'choice' ? 'flex' : 'none'}; background:#f8f9fa; padding:15px; border-radius:12px; align-items:center; gap:20px; flex-wrap:nowrap; border:1px solid #eee;">
-                    <label style="font-weight:bold; font-size:1em; color:#333; white-space:nowrap;">✅ คำตอบที่ถูก:</label> 
-                    <div style="display:flex; gap:15px;">
-                        ${[0, 1, 2, 3].map(i => `
+                <div class="correct-container" style="display:${qType === 'choice' ? 'flex' : 'none'}; background:#f0f7ff; padding:15px; border-radius:12px; align-items:center; gap:20px; flex-wrap:wrap; border:1px solid #cce5ff;">
+                    <label style="font-weight:bold; font-size:0.95em; color:#004085; white-space:nowrap;"><i class="fa-solid fa-check-double"></i> คำตอบที่ถูก (เลือกได้มากกว่า 1):</label> 
+                    <div class="correct-buttons-list" style="display:flex; gap:10px; flex-wrap:wrap;">
+                        ${options.map((_, i) => `
                             <div style="display:flex; align-items:center;">
-                                <input type="radio" name="q-correct-${qId}" value="${i}" id="corr-${qId}-${i}" class="q-correct-radio" ${data && data.correct == i ? 'checked' : (!data && i === 0 ? 'checked' : '')} style="display:none;">
+                                <input type="checkbox" name="q-correct-${qId}" value="${i}" id="corr-${qId}-${i}" class="q-correct-check" ${correct.includes(i) ? 'checked' : ''} style="display:none;">
                                 <label for="corr-${qId}-${i}" class="correct-circle-btn">${i + 1}</label>
                             </div>
                         `).join('')}
@@ -1639,7 +1648,76 @@
                 const item = el.closest('.quiz-q-item');
                 const type = el.value;
                 item.querySelector('.options-container').style.display = type === 'choice' ? 'flex' : 'none';
+                item.querySelector('.options-actions').style.display = type === 'choice' ? 'block' : 'none';
                 updatePollUI();
+            }
+
+            function addOption(btn) {
+                const item = btn.closest('.quiz-q-item');
+                const container = item.querySelector('.options-container');
+                const correctList = item.querySelector('.correct-buttons-list');
+                const count = container.querySelectorAll('.q-opt-row').length;
+                const qId = item.querySelector('.q-correct-check').name.split('-').pop();
+
+                // Add Option Row
+                const row = document.createElement('div');
+                row.className = 'q-opt-row';
+                row.style.cssText = 'display:flex; align-items:center; gap:8px;';
+                row.innerHTML = `
+                    <span class="q-opt-prefix" style="min-width:20px;">${count + 1}.</span>
+                    <input type="text" class="q-opt" placeholder="ตัวเลือก ${count + 1}" style="flex:1; margin:0;">
+                    <button type="button" onclick="removeOption(this)" style="width:30px; min-height:30px; padding:0; background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; border-radius:4px;">✕</button>
+                `;
+                container.appendChild(row);
+
+                // Add Correct Button
+                const corrDiv = document.createElement('div');
+                corrDiv.style.display = 'flex';
+                corrDiv.style.alignItems = 'center';
+                corrDiv.innerHTML = `
+                    <input type="checkbox" name="q-correct-${qId}" value="${count}" id="corr-${qId}-${count}" class="q-correct-check" style="display:none;">
+                    <label for="corr-${qId}-${count}" class="correct-circle-btn">${count + 1}</label>
+                `;
+                correctList.appendChild(corrDiv);
+                updateOptionNumbers(item);
+            }
+
+            function removeOption(btn) {
+                const item = btn.closest('.quiz-q-item');
+                btn.closest('.q-opt-row').remove();
+                updateOptionNumbers(item);
+            }
+
+            function updateOptionNumbers(item) {
+                const qId = item.querySelector('.q-correct-check').name.split('-').pop();
+                const container = item.querySelector('.options-container');
+                const correctList = item.querySelector('.correct-buttons-list');
+
+                // Re-number rows
+                container.querySelectorAll('.q-opt-row').forEach((row, i) => {
+                    row.querySelector('.q-opt-prefix').innerText = `${i + 1}.`;
+                    row.querySelector('input').placeholder = `ตัวเลือก ${i + 1}`;
+                });
+
+                // Re-generate correct buttons to match indices
+                const currentCorrects = [...item.querySelectorAll('.q-correct-check:checked')].map(c => parseInt(c.value));
+                correctList.innerHTML = "";
+                container.querySelectorAll('.q-opt-row').forEach((_, i) => {
+                    const corrDiv = document.createElement('div');
+                    corrDiv.style.display = 'flex';
+                    corrDiv.style.alignItems = 'center';
+                    corrDiv.innerHTML = `
+                        <input type="checkbox" name="q-correct-${qId}" value="${i}" id="corr-${qId}-${i}" class="q-correct-check" ${currentCorrects.includes(i) ? 'checked' : ''} style="display:none;">
+                        <label for="corr-${qId}-${i}" class="correct-circle-btn">${i + 1}</label>
+                    `;
+                    correctList.appendChild(corrDiv);
+                });
+
+                // Keep at least 2 options
+                const count = container.querySelectorAll('.q-opt-row').length;
+                container.querySelectorAll('button').forEach(b => {
+                    if (b.innerText === '✕') b.style.display = count <= 2 ? 'none' : 'block';
+                });
             }
 
             function updatePollUI() {
@@ -1706,32 +1784,69 @@
 
             async function saveAsTemplate() {
                 const formData = getQuizFormData();
-                if (!formData.title) return alert("Title required");
-                if (!confirm("Save this quiz structure as a copy/template?")) return;
+                if (!formData.title || !formData.shortTitle) return alert("กรุณาระบุ Title และ Short Title ก่อนบันทึกเทมเพลต");
+                if (!confirm("บันทึกข้อมูลโครงสร้างนี้เป็นเทมเพลต? (หากมี Short Title ซ้ำเดิม จะเป็นการอัปเดตเทมเพลตล่าสุด)")) return;
 
                 const data = {
                     ...formData,
-                    title: formData.title,
                     isActive: false,
                     isTemplate: true,
                     startTime: null,
                     deadline: null,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
-                delete data.startTime; // Ensure strict null
-                delete data.deadline;
 
                 try {
-                    await db.collection("quizzes").add(data);
-                    showToast("Template Saved!");
+                    // Check if template with this shortTitle already exists
+                    const existing = quizzesData.find(q => q.isTemplate === true && q.shortTitle === formData.shortTitle);
+
+                    if (existing) {
+                        // Update existing template
+                        await db.collection("quizzes").doc(existing.id).update(data);
+                        showToast("Template Updated!");
+                    } else {
+                        // Create new template
+                        data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                        await db.collection("quizzes").add(data);
+                        showToast("Template Saved!");
+                    }
                 } catch (e) { alert(e.message); }
             }
 
             async function goLiveNow() {
                 const now = new Date();
                 document.getElementById('quiz-start-time').value = now.toISOString().slice(0, 16); // Local time string
-                if (!confirm("🚀 Launch Quiz Immediately? (Start Time will be set to NOW)")) return;
-                await saveQuiz();
+                if (!confirm("🚀 Launch Quiz Immediately? (Status will be set to ACTIVE)")) return;
+
+                // Force Active
+                const formData = getQuizFormData();
+                const id = document.getElementById('edit-quiz-id').value;
+
+                const convertDate = (val) => {
+                    if (!val || val.trim() === "") return null;
+                    const d = new Date(val);
+                    if (isNaN(d.getTime())) return null;
+                    return firebase.firestore.Timestamp.fromDate(d);
+                };
+
+                const data = {
+                    ...formData,
+                    isActive: true, // Force Active
+                    startTime: convertDate(document.getElementById('quiz-start-time').value),
+                    deadline: convertDate(document.getElementById('quiz-deadline').value),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                try {
+                    if (id) {
+                        await db.collection("quizzes").doc(id).update(data);
+                    } else {
+                        data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                        await db.collection("quizzes").add(data);
+                    }
+                    showToast("Quiz is now LIVE!");
+                    document.getElementById('quizModal').style.display = 'none';
+                } catch (e) { alert(e.message); }
             }
 
             async function endQuizNow() {
@@ -2119,21 +2234,37 @@
                 tbodyInactive.innerHTML = "";
                 const now = new Date();
 
+                // 🔥 V75.1: Separating logic with grouping for Inactive/Templates
+                const activeList = [];
+                const inactiveGroups = {};
+
                 quizzesData.forEach(q => {
+                    const dead = q.deadline ? q.deadline.toDate() : null;
+                    const isActuallyActive = q.isActive && (!dead || now <= dead);
+
+                    if (isActuallyActive) {
+                        activeList.push(q);
+                    } else {
+                        // For inactive/templates, group by shortTitle and pick most recent
+                        const key = q.shortTitle || q.title || q.id;
+                        const time = (q.updatedAt || q.createdAt || { toMillis: () => 0 }).toMillis();
+                        if (!inactiveGroups[key] || time > inactiveGroups[key].time) {
+                            inactiveGroups[key] = { data: q, time: time };
+                        }
+                    }
+                });
+
+                // Helper to render row
+                const generateRow = (q, isActiveSection) => {
                     let statusInfo = "";
                     const start = q.startTime ? q.startTime.toDate() : null;
                     const dead = q.deadline ? q.deadline.toDate() : null;
-                    let isActiveSection = false;
 
-                    // Determine Active vs Inactive
                     if (!q.isActive) {
-                        isActiveSection = false; // Manually inactive
                         statusInfo = '<span class="badge" style="background:#6c757d">Inactive</span>';
                     } else if (dead && now > dead) {
-                        isActiveSection = false; // Expired
                         statusInfo = `<span class="badge" style="background:#ef233c">Expired: ${dead.toLocaleString('th-TH')}</span>`;
                     } else {
-                        isActiveSection = true; // Active or Scheduled
                         if (start && now < start) {
                             statusInfo = `<span class="badge" style="background:#ff9f1c">Scheduled: ${start.toLocaleString('th-TH')}</span>`;
                         } else {
@@ -2144,10 +2275,9 @@
                     const hasWriting = q.questions && q.questions.some(x => x.type === 'short_answer');
                     const pollLabel = q.isPoll ? '<span class="badge" style="background:var(--primary);">🗳️ POLL</span>' : '';
                     const subjLabel = hasWriting ? '<span class="badge" style="background:#e67e22;">📝 SUBJECTIVE</span>' : '';
-                    // Show TEMPLATE badge if explicitly a template OR if it's in the inactive section (as implies template)
                     const templateLabel = (q.isTemplate || !isActiveSection) ? '<div style="margin-top:4px;"><span class="badge" style="background:orange; color:white; font-size:0.75em;">TEMPLATE</span></div>' : '';
 
-                    const row = `
+                    return `
                     <tr>
                         <td>
                             ${q.title ? q.title.replace(/\s*\(Template\)$/i, '') : '-'} 
@@ -2167,10 +2297,15 @@
                         </td>
                     </tr>
                 `;
+                };
 
-                    if (isActiveSection) tbodyActive.innerHTML += row;
-                    else tbodyInactive.innerHTML += row;
-                });
+                // Render Active
+                activeList.forEach(q => { tbodyActive.innerHTML += generateRow(q, true); });
+
+                // Render Inactive (Grouped & Sorted)
+                Object.values(inactiveGroups)
+                    .sort((a, b) => b.time - a.time)
+                    .forEach(group => { tbodyInactive.innerHTML += generateRow(group.data, false); });
             }
 
             async function repostQuiz(id) {
