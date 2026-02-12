@@ -691,24 +691,38 @@
             margin-bottom: 15px;
         }
 
-        .correct-circle-btn {
+        .correct-circle-label {
+            position: relative;
             width: 34px;
             height: 34px;
+            cursor: pointer;
+            display: inline-block;
+            user-select: none;
+        }
+
+        .correct-circle-label input {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .correct-circle-label .circle-content {
+            width: 100%;
+            height: 100%;
             border-radius: 50%;
             border: 2px solid #ddd;
             display: flex;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
-            font-weight: bold;
-            color: #777;
-            transition: 0.2s all ease;
             background: white;
-            user-select: none;
+            color: #777;
+            font-weight: bold;
+            transition: 0.2s all ease;
             font-size: 0.9em;
         }
 
-        .correct-circle-btn.active {
+        .correct-circle-label input:checked+.circle-content {
             background: var(--primary);
             color: white;
             border-color: var(--primary);
@@ -1629,12 +1643,10 @@
                     <label style="font-weight:bold; font-size:0.95em; color:#004085; white-space:nowrap;"><i class="fa-solid fa-check-double"></i> คำตอบที่ถูก (เลือกได้มากกว่า 1):</label> 
                     <div class="correct-buttons-list" style="display:flex; gap:10px; flex-wrap:wrap;">
                         ${options.map((_, i) => `
-                            <div style="display:flex; align-items:center;">
-                                <input type="checkbox" name="q-correct-${qId}" value="${i}" id="corr-${qId}-${i}" class="q-correct-check" ${correct.includes(i) ? 'checked' : ''} style="display:none;">
-                                <button type="button" class="correct-circle-btn ${correct.includes(i) ? 'active' : ''}" 
-                                    style="${correct.includes(i) ? 'background:var(--primary); color:white; border-color:var(--primary);' : ''}"
-                                    onclick="toggleCorrect(this)">${i + 1}</button>
-                            </div>
+                            <label class="correct-circle-label">
+                                <input type="checkbox" name="q-correct-${qId}" value="${i}" id="corr-${qId}-${i}" class="q-correct-check" ${correct.includes(i) ? 'checked' : ''} onchange="triggerAutoSave()">
+                                <span class="circle-content">${i + 1}</span>
+                            </label>
                         `).join('')}
                     </div>
                 </div>
@@ -1655,24 +1667,7 @@
                 updatePollUI();
             }
 
-            function toggleCorrect(btn) {
-                const wrapper = btn.closest('div');
-                const chk = wrapper.querySelector('input');
-                if (!chk) return;
-                chk.checked = !chk.checked;
-                if (chk.checked) {
-                    btn.classList.add('active');
-                    btn.style.background = 'var(--primary)';
-                    btn.style.color = 'white';
-                    btn.style.borderColor = 'var(--primary)';
-                } else {
-                    btn.classList.remove('active');
-                    btn.style.background = 'white';
-                    btn.style.color = '#777';
-                    btn.style.borderColor = '#ddd';
-                }
-                triggerAutoSave();
-            }
+
 
             function addOption(btn) {
                 const item = btn.closest('.quiz-q-item');
@@ -1693,14 +1688,13 @@
                 container.appendChild(row);
 
                 // Add Correct Button
-                const corrDiv = document.createElement('div');
-                corrDiv.style.display = 'flex';
-                corrDiv.style.alignItems = 'center';
-                corrDiv.innerHTML = `
-                    <input type="checkbox" name="q-correct-${qId}" value="${count}" id="corr-${qId}-${count}" class="q-correct-check" style="display:none;">
-                    <button type="button" class="correct-circle-btn" onclick="toggleCorrect(this)">${count + 1}</button>
+                const corrLabel = document.createElement('label');
+                corrLabel.className = 'correct-circle-label';
+                corrLabel.innerHTML = `
+                    <input type="checkbox" name="q-correct-${qId}" value="${count}" id="corr-${qId}-${count}" class="q-correct-check" onchange="triggerAutoSave()">
+                    <span class="circle-content">${count + 1}</span>
                 `;
-                correctList.appendChild(corrDiv);
+                correctList.appendChild(corrLabel);
                 updateOptionNumbers(item);
             }
 
@@ -1725,16 +1719,13 @@
                 const currentCorrects = [...item.querySelectorAll('.q-correct-check:checked')].map(c => parseInt(c.value));
                 correctList.innerHTML = "";
                 container.querySelectorAll('.q-opt-row').forEach((_, i) => {
-                    const corrDiv = document.createElement('div');
-                    corrDiv.style.display = 'flex';
-                    corrDiv.style.alignItems = 'center';
-                    corrDiv.innerHTML = `
-                        <input type="checkbox" name="q-correct-${qId}" value="${i}" id="corr-${qId}-${i}" class="q-correct-check" ${currentCorrects.includes(i) ? 'checked' : ''} style="display:none;">
-                        <button type="button" class="correct-circle-btn ${currentCorrects.includes(i) ? 'active' : ''}" 
-                            style="${currentCorrects.includes(i) ? 'background:var(--primary); color:white; border-color:var(--primary);' : ''}"
-                            onclick="toggleCorrect(this)">${i + 1}</button>
+                    const corrLabel = document.createElement('label');
+                    corrLabel.className = 'correct-circle-label';
+                    corrLabel.innerHTML = `
+                        <input type="checkbox" name="q-correct-${qId}" value="${i}" id="corr-${qId}-${i}" class="q-correct-check" ${currentCorrects.includes(i) ? 'checked' : ''} onchange="triggerAutoSave()">
+                        <span class="circle-content">${i + 1}</span>
                     `;
-                    correctList.appendChild(corrDiv);
+                    correctList.appendChild(corrLabel);
                 });
 
                 // Keep at least 2 options
