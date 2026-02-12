@@ -827,11 +827,12 @@
                 <span id="admin-email" style="font-size:0.8em; color:var(--text-sub);"></span>
             </div>
             <div style="display:flex; gap:10px;">
-                <button class="btn-sm btn-info" onclick="openLiffPreview()"
-                    style="background:#4361ee; box-shadow: 0 4px 10px rgba(67, 97, 238, 0.3);"><i
+                <button class="btn-sm" onclick="openLiffPreview()"
+                    style="background:#6200ea; box-shadow: 0 4px 10px rgba(98, 0, 234, 0.3);"><i
                         class="fa-solid fa-mobile-screen"></i> UI
                     Preview</button>
-                <button class="magic-btn" onclick="openShareModal()"><i class="fa-solid fa-share-nodes"></i>
+                <button class="magic-btn" onclick="openShareModal()" style="background:#4361ee;"><i
+                        class="fa-solid fa-share-nodes"></i>
                     Share</button>
                 <button class="btn-sm btn-dark" onclick="toggleTheme()"><i class="fa-solid fa-moon"></i></button>
                 <button class="magic-btn" style="background:var(--danger);" onclick="logout()">Logout</button>
@@ -1377,6 +1378,22 @@
             </div>
         </div>
 
+        <div id="quizParticipantsModal" class="modal">
+            <div class="modal-content" style="max-width: 600px;">
+                <span class="close-modal"
+                    onclick="document.getElementById('quizParticipantsModal').style.display='none'">&times;</span>
+                <h3 style="color:var(--primary);"><i class="fa-solid fa-users"></i> Quiz Participants</h3>
+                <div id="quiz-participants-info" style="margin-bottom:15px; font-size:0.9em; color:#666;"></div>
+                <div id="quiz-participants-container" style="max-height: 500px; overflow-y: auto;">
+                    <!-- Content injected by JS showQuizParticipants -->
+                </div>
+                <div style="margin-top: 15px; text-align: right;">
+                    <button class="btn-sm btn-dark"
+                        onclick="document.getElementById('quizParticipantsModal').style.display='none'">Close</button>
+                </div>
+            </div>
+        </div>
+
         <div id="shareModal" class="modal" style="z-index:3000;">
             <div class="modal-content" style="max-width:300px;text-align:center;">
                 <h3><i class="fa-solid fa-share-nodes"></i> Share Leaderboard</h3><button class="magic-btn"
@@ -1417,6 +1434,33 @@
 
             <button class="magic-btn" style="width:100%;" onclick="confirmSetGroup()">💾 บันทึกกลุ่ม (Save
                 Group)</button>
+            <button class="btn-sm"
+                style="width:100%; background:none; border:none; color:#999; margin-top:10px; cursor:pointer;"
+                onclick="openGroupSettingsUI()">⚙️ จัดการสิทธิ์การมองเห็นกลุ่ม (Group Visibility)</button>
+        </div>
+    </div>
+
+    <div id="groupSettingsModal" class="modal" style="z-index:4100;">
+        <div class="modal-content" style="max-width:450px; text-align: left;">
+            <span class="close-modal"
+                onclick="document.getElementById('groupSettingsModal').style.display='none'">&times;</span>
+            <h3 style="margin-top:0;">🎭 ตั้งค่าการมองเห็นแผนก (Group Settings)</h3>
+            <p style="font-size:0.85em; color:#666; margin-bottom:15px;">
+                ตั้งค่าว่าสมาชิกในกลุ่มแต่ละกลุ่มจะมองเห็นเมนูใดบ้างบน LIFF</p>
+
+            <div id="gs-rules-container"
+                style="max-height:300px; overflow-y:auto; border:1px solid #eee; border-radius:10px; padding:15px; background:#fcfcfc; margin-bottom:15px;">
+                <!-- Table of groups and toggle switches -->
+                Loading settings...
+            </div>
+
+            <div style="background:#e7f5ff; padding:10px; border-radius:8px; font-size:0.8em; margin-bottom:15px;">
+                <i class="fa-solid fa-info-circle"></i> <b>Tip:</b> หากไม่ได้ตั้งค่าไว้
+                กลุ่มนั้นจะมองเห็นทุกอย่างเป็นค่าเริ่มต้น
+            </div>
+
+            <button class="magic-btn" style="width:100%;" onclick="saveGroupSettings()">🚀
+                บันทึกการตั้งค่าทั้งหมด</button>
         </div>
     </div>
 
@@ -2321,6 +2365,69 @@
             }
         }
 
+        async function showQuizParticipants(quizId) {
+            const quiz = quizzesData.find(x => x.id === quizId);
+            if (!quiz) return;
+
+            document.getElementById('quizParticipantsModal').style.display = 'block';
+            const container = document.getElementById('quiz-participants-container');
+            const info = document.getElementById('quiz-participants-info');
+            container.innerHTML = "<p>Loading participants...</p>";
+            info.innerText = `Quiz: ${quiz.title}`;
+
+            try {
+                // Fetch attempts for this quiz
+                const snap = await db.collection("quiz_attempts").where("quizId", "==", quizId).get();
+                const attempts = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                    .sort((a, b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
+
+                if (attempts.length === 0) {
+                    container.innerHTML = "<p style='text-align:center; padding:20px; color:#999;'>ยังไม่มีใครทำข้อสอบนี้ครับ</p>";
+                    return;
+                }
+
+                let html = `
+                    <table style="font-size:0.9em;">
+                        <thead>
+                            <tr style="background:#f8f9fa;">
+                                <th>Name</th>
+                                <th style="text-align:center;">Score</th>
+                                <th style="text-align:center;">Status</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                attempts.forEach(att => {
+                    const u = usersData.find(x => x.id === att.userId);
+                    const name = u ? u.displayName : (att.displayName || "Unknown");
+                    const pic = u ? u.pictureUrl : (att.pictureUrl || "");
+                    const score = att.status === 'approved' ? (att.correctCount + "/" + (att.totalQuestions || "-")) : "-";
+                    const statusColor = att.status === 'approved' ? '#2ec4b6' : (att.status === 'requesting' ? '#ff9f1c' : '#6c757d');
+                    const timeStr = att.timestamp ? att.timestamp.toDate().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : "-";
+
+                    html += `
+                        <tr>
+                            <td style="display:flex; align-items:center; gap:8px;">
+                                <img src="${pic}" style="width:24px; height:24px; border-radius:50%;">
+                                <span>${name}</span>
+                            </td>
+                            <td style="font-weight:bold; text-align:center;">${score}</td>
+                            <td style="text-align:center;"><span class="badge" style="background:${statusColor}; font-size:0.7em;">${att.status}</span></td>
+                            <td style="font-size:0.8em; color:#666;">${timeStr}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `</tbody></table>`;
+                container.innerHTML = html;
+
+            } catch (e) {
+                container.innerHTML = `<p style="color:red;">Error: ${e.message}</p>`;
+            }
+        }
+
         async function reviewQuiz(attemptId) {
             const attemptDoc = await db.collection("quiz_attempts").doc(attemptId).get();
             if (!attemptDoc.exists) return alert("Data not found");
@@ -2539,6 +2646,7 @@
                         <td>
                             <button class="btn-sm btn-primary" onclick="openQuizModal('${q.id}')">Edit</button>
                             <button class="btn-sm btn-dark" onclick="toggleQuizStatus('${q.id}', ${q.isActive})">${q.isActive ? 'End Now' : 'Activate'}</button>
+                            <button class="btn-sm btn-info" style="background:#4361ee; width:34px; justify-content:center;" onclick="showQuizParticipants('${q.id}')" title="View Participants"><i class="fa-solid fa-users"></i></button>
                             ${(q.isPoll || hasWriting) ? `<button class="btn-sm btn-info" style="background:#8e44ad;" onclick="showPollResults('${q.id}')">📊 Result</button>` : ''}
                             ${(!isActiveSection) ? `<button class="btn-sm btn-warning" onclick="repostQuiz('${q.id}')">♻️ Repost</button>` : ''}
                             <button class="btn-sm btn-danger" onclick="deleteQuiz('${q.id}')">Del</button>
@@ -2593,9 +2701,15 @@
         }
 
         let divisionConfig = {}; // 🔥 Added for Divisions V77.8
+        let groupSettings = {}; // 🔥 Added for Visibility Settings V69.0
         let activeDivisionTab = 'All'; // 🔥 Global for Filtering V77.9
 
         function loadData() {
+            // 🔥 Load Group Settings (V69.0)
+            db.collection("quizzes").doc("--group-settings--").onSnapshot(doc => {
+                if (doc.exists) groupSettings = doc.data();
+            });
+
             db.collection("works").orderBy("timestamp", "desc").limit(100).onSnapshot(s => { worksData = s.docs.map(d => ({ id: d.id, ...d.data() })); renderTable('works'); });
             db.collection("users").orderBy("score", "desc").onSnapshot(s => { usersData = s.docs.map(d => ({ id: d.id, ...d.data() })); renderTable('users'); renderLeaderboard(); updateAssigneeList(); renderCertTable(); });
             db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban);
@@ -2653,14 +2767,70 @@
 
             const list = document.getElementById('gs-list');
             list.innerHTML = allGroups.map(g => `
-                    <button class="btn-sm" style="background:${getGroupColor(g)}; color:white; border:none; text-align:left; padding:10px 15px; font-size:0.95em; border-radius:8px; display:flex; justify-content:space-between; align-items:center;" onclick="document.getElementById('gs-input').value='${g}'">
-                        <span>${g}</span>
-                        <i class="fa-solid fa-chevron-right" style="font-size:0.7em; opacity:0.7;"></i>
-                    </button>
+                    <div style="display:flex; gap:5px; align-items:stretch;">
+                        <button class="btn-sm" style="flex:1; background:${getGroupColor(g)}; color:white; border:none; text-align:left; padding:10px 15px; font-size:0.95em; border-radius:8px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="document.getElementById('gs-input').value='${g}'">
+                            <span>${g}</span>
+                            <i class="fa-solid fa-chevron-right" style="font-size:0.7em; opacity:0.7;"></i>
+                        </button>
+                        ${g !== 'Public' ? `<button class="btn-sm btn-danger" style="width:40px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:#ff4d4f; border:none; color:white;" onclick="deleteGroupGlobally('${g}')" title="ลบกลุ่มนี้ออกจากระบบ"><i class="fa-solid fa-trash-can"></i></button>` : ''}
+                    </div>
                 `).join('');
 
             document.getElementById('groupSelectModal').style.display = 'flex';
             setTimeout(() => input.select(), 100);
+        }
+
+        // 🔥 Group Settings Functions (V69.0)
+        function openGroupSettingsUI() {
+            document.getElementById('groupSettingsModal').style.display = 'block';
+            const container = document.getElementById('gs-rules-container');
+
+            // Get all unique groups from usersData and divisionConfig
+            const groupsFromUsers = [...new Set(usersData.map(u => u.group || "Public"))];
+            const groupsFromDivs = Object.values(divisionConfig).flat();
+            const allGroups = [...new Set([...groupsFromUsers, ...groupsFromDivs])].sort();
+
+            let html = `<table style="width:100%; font-size:0.85em; border-collapse:collapse;">
+                <thead style="background:#f8f9fa;">
+                    <tr>
+                        <th style="text-align:left; padding:8px;">กลุ่ม (Group)</th>
+                        <th style="text-align:center; padding:8px;">Status</th>
+                        <th style="text-align:center; padding:8px;">Kanban</th>
+                        <th style="text-align:center; padding:8px;">Assigns</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+            allGroups.forEach(g => {
+                const s = groupSettings[g] || { showStatus: true, showKanban: true, showAssignments: true };
+                html += `<tr style="border-bottom:1px solid #eee;">
+                    <td style="padding:10px;"><b>${g}</b></td>
+                    <td style="text-align:center;"><input type="checkbox" class="gs-check" data-group="${g}" data-field="showStatus" ${s.showStatus !== false ? 'checked' : ''}></td>
+                    <td style="text-align:center;"><input type="checkbox" class="gs-check" data-group="${g}" data-field="showKanban" ${s.showKanban !== false ? 'checked' : ''}></td>
+                    <td style="text-align:center;"><input type="checkbox" class="gs-check" data-group="${g}" data-field="showAssignments" ${s.showAssignments !== false ? 'checked' : ''}></td>
+                </tr>`;
+            });
+
+            html += `</tbody></table>`;
+            container.innerHTML = html;
+        }
+
+        async function saveGroupSettings() {
+            const checks = document.querySelectorAll('.gs-check');
+            const newSettings = {};
+
+            checks.forEach(c => {
+                const g = c.getAttribute('data-group');
+                const field = c.getAttribute('data-field');
+                if (!newSettings[g]) newSettings[g] = {};
+                newSettings[g][field] = c.checked;
+            });
+
+            try {
+                await db.collection("quizzes").doc("--group-settings--").set(newSettings);
+                showToast("Group Settings Saved!");
+                document.getElementById('groupSettingsModal').style.display = 'none';
+            } catch (e) { alert("Error: " + e.message); }
         }
 
         async function confirmSetGroup() {
@@ -2671,6 +2841,47 @@
                 showToast("User Group Updated!");
                 document.getElementById('groupSelectModal').style.display = 'none';
             } catch (e) { alert(e.message); }
+        }
+
+        async function deleteGroupGlobally(groupName) {
+            if (groupName === 'Public') return alert("ไม่สามารถลบกลุ่ม Public ได้ครับ");
+            if (!confirm(`⚠️ คุณแน่ใจหรือไม่ที่จะลบกลุ่ม "${groupName}" ออกจากระบบ?\n\n- User ทุกคนที่อยู่ในกลุ่มนี้จะถูกย้ายไปกลุ่ม "Public" โดยอัตโนมัติ\n- ชื่อกลุ่มนี้จะถูกถอดออกจากทุก Division ในหน้า Leaderboard\n\n(การกระทำนี้จะส่งผลต่อฐานข้อมูลทั้งหมด)`)) return;
+
+            showToast("กำลังลบกลุ่ม...");
+            try {
+                const batch = db.batch();
+
+                // 1. ย้าย User ทุกคนไป Public
+                const usersToUpdate = usersData.filter(u => u.group === groupName);
+                usersToUpdate.forEach(u => {
+                    batch.update(db.collection("users").doc(u.id), { group: "Public" });
+                });
+
+                // 2. ลบออกจาก Division Config
+                let configChanged = false;
+                const newConfig = { ...divisionConfig };
+                Object.keys(newConfig).forEach(divName => {
+                    if (newConfig[divName].includes(groupName)) {
+                        newConfig[divName] = newConfig[divName].filter(g => g !== groupName);
+                        configChanged = true;
+                    }
+                });
+
+                if (configChanged) {
+                    batch.set(db.collection("quizzes").doc("--divisions-config--"), newConfig);
+                }
+
+                await batch.commit();
+                showToast("ลบกลุ่มเรียบร้อยแล้ว!");
+
+                // รีเฟรชรายการใน Modal
+                const uid = document.getElementById('gs-uid').value;
+                const currentInput = document.getElementById('gs-input').value;
+                setUserGroup(uid, currentInput === groupName ? "Public" : currentInput);
+            } catch (e) {
+                console.error(e);
+                alert("เกิดข้อผิดพลาดในการลบกลุ่ม: " + e.message);
+            }
         }
 
         function renderTable(type) {
@@ -2953,35 +3164,30 @@
             if (!usersData.length) { l.innerHTML = "<div style='text-align:center;padding:20px;color:#999;'>No user data found.</div>"; return; }
 
             const divs = Object.entries(divisionConfig);
-            const allDivNames = ['All', ...divs.map(d => d[0]), 'Others'];
+            const allDivNames = ['All', ...divs.map(d => d[0]), 'Students'];
 
             // Render Selector Buttons
             selector.innerHTML = allDivNames.map(name => {
                 const isActive = activeDivisionTab === name;
-                return `<button class="btn-sm" onclick="switchDivisionTab('${name}')" style="background:${isActive ? 'var(--primary)' : '#fff'}; color:${isActive ? 'white' : '#666'}; border:1px solid ${isActive ? 'var(--primary)' : '#ddd'}; white-space:nowrap; border-radius:30px; padding:8px 20px; font-weight:bold; box-shadow:${isActive ? '0 4px 10px rgba(67, 97, 238, 0.3)' : 'none'}; transition:0.2s;">${name}</button>`;
+                return `<button class="btn-sm" onclick="switchDivisionTab('${name}')" style="background:${isActive ? 'var(--primary)' : '#fff'}; color:${isActive ? 'white' : '#666'}; border:1px solid ${isActive ? 'var(--primary)' : '#ddd'}; white-space:nowrap; border-radius:30px; padding:8px 20px; font-weight:bold; box-shadow:${isActive ? '0 4px 10px rgba(67, 97, 238, 0.3)' : 'none'}; transition:0.2s;">${name === 'Students' ? '👥 Students' : name}</button>`;
             }).join('');
 
             if (activeDivisionTab === 'All') {
-                // Render All Mode
+                // Show Global Students Ranking first
+                const allActiveUsers = usersData.filter(u => !u.isIgnored).sort((a, b) => (b.score || 0) - (a.score || 0));
+                renderDivisionSection(l, "All Students (Global)", allActiveUsers, '#343a40');
+
+                // Render Division-based sections
                 if (divs.length > 0) {
                     divs.forEach(([divName, groups]) => {
                         const divUsers = usersData.filter(u => !u.isIgnored && groups.includes(u.group || "Public"));
                         if (divUsers.length === 0) return;
                         renderDivisionSection(l, divName, divUsers);
                     });
-
-                    const allGrouped = divs.flatMap(d => d[1]);
-                    const otherUsers = usersData.filter(u => !u.isIgnored && !allGrouped.includes(u.group || "Public"));
-                    if (otherUsers.length > 0) {
-                        renderDivisionSection(l, "Others / Public", otherUsers, '#6c757d');
-                    }
-                } else {
-                    renderUserStrip(l, usersData.filter(u => !u.isIgnored).slice(0, 30));
                 }
-            } else if (activeDivisionTab === 'Others') {
-                const allGrouped = divs.flatMap(d => d[1]);
-                const otherUsers = usersData.filter(u => !u.isIgnored && !allGrouped.includes(u.group || "Public"));
-                renderDivisionSection(l, "Others / Public", otherUsers, '#6c757d');
+            } else if (activeDivisionTab === 'Students' || activeDivisionTab === 'Others') {
+                const allActiveUsers = usersData.filter(u => !u.isIgnored).sort((a, b) => (b.score || 0) - (a.score || 0));
+                renderDivisionSection(l, "All Students Ranking", allActiveUsers, '#343a40');
             } else {
                 // Render Specific Division
                 const groups = divisionConfig[activeDivisionTab] || [];
