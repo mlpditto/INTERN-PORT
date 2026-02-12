@@ -2189,12 +2189,40 @@
                             <button class="btn-sm btn-danger" onclick="rejectQuiz('${att.id}')">Deny</button>
                         `;
                 } else {
-                    pointsToAdd = isPoll ? (q.totalPoints || 1.0) : (att.correctCount / att.totalQuestions) * (q.totalPoints || 1.0);
+                    // Recalculate score on the fly to fix "0 score" bug for existing submissions
+                    let calcCorrect = 0;
+                    if (q.questions && att.answers) {
+                        q.questions.forEach((qu, idx) => {
+                            const isChoice = (qu.type || 'choice') === 'choice';
+                            if (isChoice) {
+                                const target = Array.isArray(qu.correct) ? qu.correct : [qu.correct];
+                                let mine = att.answers[idx];
+                                let mineArray = [];
+                                if (Array.isArray(mine)) mineArray = mine;
+                                else if (mine !== null && mine !== undefined) mineArray = [mine];
+
+                                if (target.length === mineArray.length && target.every(v => mineArray.includes(v))) {
+                                    calcCorrect++;
+                                }
+                            } else {
+                                // Include manual grading if already done
+                                if (att.gradedAnswers && att.gradedAnswers[idx]) calcCorrect++;
+                            }
+                        });
+                    }
+
+                    // Use calculated correct count if questions exist, otherwise fallback
+                    const finalCorrect = q.questions ? calcCorrect : att.correctCount;
+                    pointsToAdd = isPoll ? (q.totalPoints || 1.0) : (finalCorrect / (att.totalQuestions || q.questions.length)) * (q.totalPoints || 1.0);
+
                     actionHtml = `
                             ${isPoll ? '<span class="badge" style="background:#6c757d">Poll Response</span>' : `<button class="btn-sm btn-info" onclick="reviewQuiz('${att.id}')">Review</button>`}
-                            <button class="btn-sm btn-success" onclick="approveQuiz('${att.id}', '${att.userId}', ${pointsToAdd})">Approve</button>
+                            <button class="btn-sm btn-success" onclick="approveQuiz('${att.id}', '${att.userId}', ${pointsToAdd})">Approve (${pointsToAdd.toFixed(2)} pts)</button>
                             <button class="btn-sm btn-danger" onclick="rejectQuiz('${att.id}')">Reject</button>
                         `;
+
+                    // Update display column to show Recalculated/Total
+                    att.correctCount = finalCorrect; // Update local obj for display below
                 }
 
                 tbody.innerHTML += `
