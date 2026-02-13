@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V77.16 Full Sync)</title>
+    <title>Internship Portfolio (V77.18 Full Sync)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -633,8 +633,8 @@
             </div>
 
             <div style="height:50px;"></div>
-            <div style="text-align:center;color:#ccc;font-size:0.8em;margin-bottom:20px;">System V77.14 (Full Sync &
-                Notify)
+            <div style="text-align:center;color:#ccc;font-size:0.8em;margin-bottom:20px;">System V77.18 (Blind
+                Leaderboard)
             </div>
         </div>
     </div>
@@ -725,7 +725,7 @@
                 <div id="lb-div-name" style="font-size: 0.9em; opacity: 0.9; margin-top: 5px; font-weight: 300;">Overall
                     Division</div>
             </div>
-            <div id="lb-list" style="padding: 10px; max-height: 450px; overflow-y: auto; background: #fff;">
+            <div id="lb-list" style="padding: 10px; max-height: 550px; overflow-y: auto; background: #fff;">
                 <!-- Items injected by JS -->
             </div>
             <div style="padding: 15px; background: #f8f9fa; text-align: center; border-top: 1px solid #eee;">
@@ -1146,19 +1146,26 @@
             finalUsers.sort((a, b) => (b.score || 0) - (a.score || 0));
 
             container.innerHTML = "";
-            finalUsers.slice(0, 20).forEach((u, i) => {
+            finalUsers.forEach((u, i) => {
                 const isMe = u.id === userId;
                 const lv = Math.floor((u.score || 0) / 10) + 1;
                 const rankColor = i === 0 ? '#ffd700' : (i === 1 ? '#c0c0c0' : (i === 2 ? '#cd7f32' : '#666'));
+
+                // Blind Logic V77.17
+                const displayName = isMe ? u.displayName : `Intern #${i + 1}`;
+                const pictureUrl = isMe ? (u.pictureUrl || "https://via.placeholder.com/150") : "https://cdn-icons-png.flaticon.com/512/847/847969.png";
+                const infoText = isMe
+                    ? `Lv.${lv} | <span style="color:${getGroupColor(u.group)}; font-weight:bold;"><i class="fa-solid ${getGroupIcon(u.group)}"></i> ${u.group || 'Public'}</span>`
+                    : `<span style="color:#ccc;"><i>Identity Hidden</i></span>`;
 
                 container.innerHTML += `
                     <div class="lb-item" style="${isMe ? 'background:#eef2ff; border:1px solid #4361ee;' : ''}">
                         <div style="display:flex; align-items:center; gap:15px;">
                             <div style="font-weight:bold; color:${rankColor}; min-width:25px; font-size:${i < 3 ? '1.2em' : '1em'};">#${i + 1}</div>
-                            <img src="${u.pictureUrl}" style="width:40px; height:40px; border-radius:50%; border:2px solid #fff; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
+                            <img src="${pictureUrl}" style="width:40px; height:40px; border-radius:50%; border:2px solid #fff; box-shadow:0 2px 5px rgba(0,0,0,0.1); background:#eee;">
                             <div style="text-align:left;">
-                                <div style="font-weight:600; font-size:0.95em;">${u.displayName} ${isMe ? '⭐' : ''}</div>
-                                <div style="font-size:0.75em; color:#999;">Lv.${lv} | <span style="color:${getGroupColor(u.group)}; font-weight:bold;"><i class="fa-solid ${getGroupIcon(u.group)}"></i> ${u.group || 'Public'}</span></div>
+                                <div style="font-weight:600; font-size:0.95em;">${displayName} ${isMe ? '⭐' : ''}</div>
+                                <div style="font-size:0.75em; color:#999;">${infoText}</div>
                             </div>
                         </div>
                         <div style="font-weight:800; color:#4361ee; font-size:1.1em;">${parseFloat((u.score || 0).toFixed(2))}</div>
@@ -1166,25 +1173,7 @@
                 `;
             });
 
-            // Find my rank if not in top 20
-            const myRank = finalUsers.findIndex(u => u.id === userId) + 1;
-            if (myRank > 20) {
-                const me = finalUsers[myRank - 1];
-                container.innerHTML += `
-                    <div style="text-align:center; padding:10px; color:#999;">...</div>
-                    <div class="lb-item" style="background:#eef2ff; border:1px solid #4361ee;">
-                        <div style="display:flex; align-items:center; gap:15px;">
-                            <div style="font-weight:bold; color:#666; min-width:25px;">#${myRank}</div>
-                            <img src="${me.pictureUrl}" style="width:40px; height:40px; border-radius:50%; border:2px solid #fff;">
-                            <div style="text-align:left;">
-                                <div style="font-weight:600; font-size:0.95em;">${me.displayName} ⭐</div>
-                                <div style="font-size:0.75em; color:#999;">Lv.${Math.floor((me.score || 0) / 10) + 1}</div>
-                            </div>
-                        </div>
-                        <div style="font-weight:800; color:#4361ee; font-size:1.1em;">${parseFloat((me.score || 0).toFixed(2))}</div>
-                    </div>
-                `;
-            }
+
         }
 
         // --- Quest System (V56 Logic) ---
