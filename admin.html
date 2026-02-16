@@ -821,7 +821,7 @@
                 <h2 style="margin:0;"><i class="fa-solid fa-user-shield"></i> Dashboard
                     <span
                         style="font-size:0.5em; background:#ff9f1c; padding:2px 8px; border-radius:10px; color:white; vertical-align:middle; font-weight:bold;">
-                        LIFF: V77.19 | Admin: V77.21
+                        LIFF: V77.19 | Admin: V77.22
                     </span>
                 </h2>
                 <span id="admin-email" style="font-size:0.8em; color:var(--text-sub);"></span>
@@ -2234,10 +2234,20 @@
                     att.correctCount = finalCorrect; // Update local obj for display below
                 }
 
+                let uImg = att.pictureUrl || '';
+                let uName = att.displayName || 'Unknown';
+                if (att.userId) {
+                    const u = usersData.find(x => x.id === att.userId);
+                    if (u) {
+                        if (!uImg) uImg = u.pictureUrl;
+                        if (!uName || uName === 'Unknown') uName = u.displayName;
+                    }
+                }
+
                 tbody.innerHTML += `
                     <tr style="${isRequest ? 'background:#fff8e1;' : ''}">
                         <td>${att.timestamp ? att.timestamp.toDate().toLocaleString('th-TH') : '-'}</td>
-                        <td>${att.displayName}</td>
+                        <td style="display:flex; align-items:center; gap:8px;"><img src="${uImg}" class="user-pic"> <span>${uName}</span></td>
                         <td>${qTitle}</td>
                         <td>${isPoll || isRequest ? '-' : `${att.correctCount}/${att.totalQuestions}`}</td>
                         <td style="font-weight:bold; color:var(--primary);">${isRequest ? 'Request' : pointsToAdd.toFixed(3)}</td>
@@ -3071,7 +3081,18 @@
                             onclickAttr = "onclick='alert(\"No link provided\")'";
                         }
 
-                        tbody.innerHTML += `<tr><td>${d.timestamp?.toDate().toLocaleString() || '-'}</td><td><img src="${d.pictureUrl}" class="user-pic">${d.displayName}</td><td>${d.title}</td><td><a ${hrefAttr} ${onclickAttr} class="${btnClass}">Link</a></td><td><span class="badge" style="background:${st}">${d.status}</span></td><td><div style="display:flex;"><input type="number" id="sc-${d.id}" value="${d.score || 0}" style="width:60px;"><button class="btn-sm btn-primary" onclick="svSc('${d.id}','${d.userId}')">Save</button></div></td><td><button class="btn-sm btn-danger" onclick="delWork('${d.id}')">Del</button></td></tr>`;
+                        // 🔥 User Lookup fallback for regular works
+                        let uImg = d.pictureUrl || '';
+                        let uName = d.displayName || 'Unknown';
+                        if (d.userId) {
+                            const u = usersData.find(x => x.id === d.userId);
+                            if (u) {
+                                if (!uImg) uImg = u.pictureUrl;
+                                if (!uName || uName === 'Unknown') uName = u.displayName;
+                            }
+                        }
+
+                        tbody.innerHTML += `<tr><td>${d.timestamp?.toDate().toLocaleString() || '-'}</td><td><img src="${uImg}" class="user-pic">${uName}</td><td>${d.title}</td><td><a ${hrefAttr} ${onclickAttr} class="${btnClass}">Link</a></td><td><span class="badge" style="background:${st}">${d.status}</span></td><td><div style="display:flex;"><input type="number" id="sc-${d.id}" value="${d.score || 0}" style="width:60px;"><button class="btn-sm btn-primary" onclick="svSc('${d.id}','${d.userId}')">Save</button></div></td><td><button class="btn-sm btn-danger" onclick="delWork('${d.id}')">Del</button></td></tr>`;
                     }
                 }
                 else {
