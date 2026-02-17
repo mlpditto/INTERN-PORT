@@ -1909,11 +1909,11 @@
 
         function handleQuestionPaste(e, textarea) {
             const text = (e.clipboardData || window.clipboardData).getData('text');
-            const lineCount = text.split('\n').filter(l => l.trim() !== "").length;
+            if (!text) return;
+            const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
             const hasPrefix = text.match(/([A-I]|[1-9]|[ก-ฮ])[\.\)\-\s\:]+/i) || text.match(/^[\-•\*]\s+/m);
 
-            if (text && (hasPrefix || lineCount >= 3)) {
-                // Timeout to let paste happen, then check if we should process
+            if (hasPrefix || lines.length >= 3) {
                 setTimeout(() => {
                     if (confirm("ตรวจพบรูปแบบข้อสอบ/ตัวเลือก ต้องการแยกโจทย์และตัวเลือกออกจากกันให้อัตโนมัติหรือไม่? (Smart Paste)")) {
                         processQuizPaste(text, textarea.closest('.quiz-q-item'));
@@ -1924,94 +1924,88 @@
 
         function processQuizPaste(text, item) {
             if (!text) return;
-            const rawLines = text.split('\n');
+            // Handle both \n and \r\n
+            const rawLines = text.split(/\r?\n/);
             const optionPrefixRegex = /^([A-I]|[1-9]|[ก-ฮ])[\.\)\-\s\:]+(.*)/i;
             const bulletPrefixRegex = /^[\-•\*]\s*(.*)/;
 
-            let questionLines = [];
+            let questionText = "";
             let optionsData = [];
-            let optionsStarted = false;
 
-            // 1. Initial Scan for Prefixes/Bullets
-            for (let line of rawLines) {
-                const trimmedLine = line.trim();
-                if (trimmedLine === "") {
-                    if (!optionsStarted && questionLines.length > 0 && questionLines[questionLines.length - 1] !== "") {
-                        questionLines.push("");
-                    }
-                    continue;
-                }
+            // 1. First Scan: Identify where options start (Prefix, Bullet, or Indentation from line 2+)
+            let firstOptionLineIdx = -1;
+            for (let i = 0; i < rawLines.length; i++) {
+                const line = rawLines[i];
+                const trimmed = line.trim();
+                // Skip empty lines between question and options
+                if (trimmed === "" || trimmed === "*" || trimmed.match(/^\d+\/\d+$/)) continue;
 
-                // Skip junk (scores, points)
-                if (trimmedLine === "*" || trimmedLine.match(/^\d+\/\d+$/) || (trimmedLine.toLowerCase().includes('point') && trimmedLine.length < 15)) {
-                    continue;
-                }
+                const hasPrefix = trimmed.match(optionPrefixRegex) || trimmed.match(bulletPrefixRegex);
+                const isIndented = i > 0 && (line.startsWith(' ') || line.startsWith('\t'));
 
-                const prefixMatch = trimmedLine.match(optionPrefixRegex);
-                const bulletMatch = trimmedLine.match(bulletPrefixRegex);
-
-                if (prefixMatch || bulletMatch) {
-                    optionsStarted = true;
-                    optionsData.push((prefixMatch ? prefixMatch[2] : bulletMatch[1]).trim());
-                } else if (!optionsStarted) {
-                    questionLines.push(line);
-                } else {
-                    if (optionsData.length > 0) {
-                        const lastIdx = optionsData.length - 1;
-                        optionsData[lastIdx] = (optionsData[lastIdx] ? optionsData[lastIdx] + " " : "") + trimmedLine;
-                    }
+                if (hasPrefix || isIndented) {
+                    firstOptionLineIdx = i;
+                    break;
                 }
             }
 
-            let questionText = questionLines.join('\n').trim();
+            if (firstOptionLineIdx !== -1) {
+                // Question is everything before the first option line
+                questionText = rawLines.slice(0, firstOptionLineIdx).join('\n').trim();
 
-            // 2. Fallback: If no prefixes, check for "Indented Lines" or a "Simple List" block
-            if (optionsData.length === 0) {
-                const nonBlank = rawLines.map(l => ({ raw: l, trim: l.trim() })).filter(x => x.trim !== "");
+                // Process remaining lines as options
+                let currentOptionText = "";
+                for (let i = firstOptionLineIdx; i < rawLines.length; i++) {
+                    const line = rawLines[i];
+                    const trimmed = line.trim();
+                    if (trimmed === "") continue;
 
-                if (nonBlank.length >= 2) {
-                    // Strategy A: Detect transition to Indented lines (e.g. tabs or spaces)
-                    let firstIndentIdx = -1;
-                    for (let i = 1; i < nonBlank.length; i++) {
-                        // If line starts with \t or at least 2 spaces while the first line didn't
-                        if (nonBlank[i].raw.startsWith('\t') || nonBlank[i].raw.startsWith('  ')) {
-                            firstIndentIdx = i;
-                            break;
-                        }
-                    }
+                    const prefixMatch = trimmed.match(optionPrefixRegex);
+                    const bulletMatch = trimmed.match(bulletPrefixRegex);
+                    const isNewOption = prefixMatch || bulletMatch || (i > firstOptionLineIdx && (line.startsWith(' ') || line.startsWith('\t')));
 
-                    if (firstIndentIdx !== -1) {
-                        // Re-run split based on first indent
-                        const originalLinesOfFirstIndentIdx = rawLines.findIndex(l => l.trim() === nonBlank[firstIndentIdx].trim());
-                        questionText = rawLines.slice(0, originalLinesOfFirstIndentIdx).join('\n').trim();
-                        optionsData = nonBlank.slice(firstIndentIdx).map(x => x.trim);
+                    if (isNewOption) {
+                        if (currentOptionText) optionsData.push(currentOptionText.trim());
+                        currentOptionText = prefixMatch ? prefixMatch[2] : (bulletMatch ? bulletMatch[1] : trimmed);
+                    } else {
+                        // Continuation of the previous option
+                        currentOptionText += (currentOptionText ? " " : "") + trimmed;
                     }
-                    // Strategy B: Simple line-by-line if total count looks like a standard question (3-6 lines total)
-                    else if (nonBlank.length >= 3 && nonBlank.length <= 6) {
-                        questionText = nonBlank[0].raw.trim();
-                        optionsData = nonBlank.slice(1).map(x => x.trim);
-                    }
+                }
+                if (currentOptionText) optionsData.push(currentOptionText.trim());
+            } else {
+                // Fallback: Simple line-by-line if 3-6 lines total
+                const nonBlank = rawLines.filter(l => l.trim() !== "");
+                if (nonBlank.length >= 3 && nonBlank.length <= 6) {
+                    questionText = nonBlank[0].trim();
+                    optionsData = nonBlank.slice(1).map(l => l.trim());
                 }
             }
 
             if (optionsData.length > 0) {
+                // Ensure Choice type is selected if we found options
+                const typeSelect = item.querySelector('.q-type');
+                if (typeSelect && typeSelect.value !== 'choice') {
+                    typeSelect.value = 'choice';
+                    toggleQType(typeSelect);
+                }
+
                 item.querySelector('.q-text').value = questionText;
                 const optContainer = item.querySelector('.options-container');
                 const correctList = item.querySelector('.correct-buttons-list');
-                const qId = item.dataset.qId;
 
-                // Clear existing
+                // Clear existing blank options
                 optContainer.innerHTML = "";
                 correctList.innerHTML = "";
 
                 optionsData.forEach(optVal => {
-                    addOption(item.querySelector('.options-actions button'), optVal.trim());
+                    addOption(item.querySelector('.options-actions button'), optVal);
                 });
 
                 showToast("Smart Paste สำเร็จ! แยกมาได้ " + optionsData.length + " ตัวเลือก");
                 triggerAutoSave();
             } else {
-                showToast("ไม่พบรูปแบบตัวเลือกที่ชัดเจน (A. B. C. ...)", "warning");
+                showToast("ไม่พบรูปแบบที่ชัดเจนในการแยกเป็นข้อสอบ (Smart Paste Failed)", "warning");
             }
         }
 
