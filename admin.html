@@ -1909,7 +1909,7 @@
 
         function handleQuestionPaste(e, textarea) {
             const text = (e.clipboardData || window.clipboardData).getData('text');
-            if (text && (text.includes('A.') || text.includes('B.') || text.includes('1.') || text.includes('2.'))) {
+            if (text && (text.includes('A.') || text.includes('B.') || text.includes('1.') || text.includes('2.') || text.includes('ก.') || text.includes('ข.'))) {
                 // Timeout to let paste happen, then check if we should process
                 setTimeout(() => {
                     if (confirm("ตรวจพบรูปแบบตัวเลือก ต้องการแยกข้อความโจทย์กับตัวเลือกออกจากกันให้อัตโนมัติหรือไม่?")) {
@@ -1922,7 +1922,8 @@
         function processQuizPaste(text, item) {
             if (!text) return;
             const rawLines = text.split('\n');
-            const optionRegex = /^([A-I]|[1-9])[\.\)\-\s\:]+(.*)/i;
+            // Updated regex: Now supports Thai characters ก-ฮ
+            const optionRegex = /^([A-I]|[1-9]|[ก-ฮ])[\.\)\-\s\:]+(.*)/i;
 
             let questionLines = [];
             let optionsData = [];
@@ -1930,6 +1931,16 @@
 
             for (let line of rawLines) {
                 const trimmedLine = line.trim();
+
+                // Skip empty lines to handle cases with lots of gaps
+                if (trimmedLine === "") {
+                    // But if we haven't started options yet, maybe keep one newline for structure
+                    if (!optionsStarted && questionLines.length > 0 && questionLines[questionLines.length - 1] !== "") {
+                        questionLines.push("");
+                    }
+                    continue;
+                }
+
                 // Skip junk lines (asterisks, scores like 10/10, or short "point" labels)
                 if (trimmedLine === "*" || trimmedLine.match(/^\d+\/\d+$/) || (trimmedLine.toLowerCase().includes('point') && trimmedLine.length < 15)) {
                     continue;
@@ -1943,8 +1954,10 @@
                     questionLines.push(line); // Keep original line for question to preserve line breaks
                 } else {
                     // Continuation of an option or noise between options
-                    if (trimmedLine !== "" && optionsData.length > 0) {
-                        optionsData[optionsData.length - 1] += " " + trimmedLine;
+                    if (optionsData.length > 0) {
+                        // Join with space, ensuring no double spaces if the first part was empty
+                        const lastIdx = optionsData.length - 1;
+                        optionsData[lastIdx] = (optionsData[lastIdx] ? optionsData[lastIdx] + " " : "") + trimmedLine;
                     }
                 }
             }
@@ -1962,7 +1975,7 @@
                 correctList.innerHTML = "";
 
                 optionsData.forEach(optVal => {
-                    addOption(item.querySelector('.options-actions button'), optVal);
+                    addOption(item.querySelector('.options-actions button'), optVal.trim());
                 });
 
                 showToast("Smart Paste สำเร็จ! แยกมาได้ " + optionsData.length + " ตัวเลือก");
