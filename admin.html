@@ -1285,12 +1285,18 @@
                     </div>
                     <div style="flex:1;">
                         <label style="font-size:0.8em; color:#1565c0; font-weight:bold;">🎯 Target Group</label>
-                        <input type="text" id="quiz-target-group" placeholder="e.g. Public, IT" list="group-list">
-                        <datalist id="group-list">
-                            <option value="Public">
-                            <option value="IT">
-                            <option value="Marketing">
-                        </datalist>
+                        <select id="quiz-target-group" style="padding:8px;">
+                            <option value="Public">Public</option>
+                            <option value="IT">IT</option>
+                            <option value="Marketing">Marketing</option>
+                            <option value="MLP">MLP</option>
+                            <option value="Pharmacists">Pharmacists</option>
+                            <option value="Dev">Dev</option>
+                            <option value="Design">Design</option>
+                            <option value="Intern">Intern</option>
+                            <option value="Extern">Extern</option>
+                            <option value="Audit">Audit</option>
+                        </select>
                     </div>
                     <div style="flex:1;">
                         <label style="font-size:0.8em; color:#666;">Points (เต็ม)</label>
@@ -1336,11 +1342,17 @@
                     <div style="display:flex; gap:5px;">
                         <button class="btn-sm btn-dark" onclick="addQuestionUI()">+ Add New</button>
                     </div>
-                    <div id="quiz-pagination-controls" style="display:flex; gap:10px; align-items:center;">
-                        <button class="btn-sm btn-dark" onclick="moveQuizQ(-1)"><i class="fa-solid fa-chevron-left"></i>
-                            Prev</button>
-                        <span id="quiz-q-page-info" style="font-weight:bold; font-family:monospace;">1 / 1</span>
-                        <button class="btn-sm btn-dark" onclick="moveQuizQ(1)">Next <i
+                    <div style="display:flex; align-items:center; flex:1; margin:0 15px; overflow-x:auto;">
+                        <div id="quiz-q-nav" style="display:flex; gap:6px; padding:2px;"></div>
+                    </div>
+                    <div id="quiz-pagination-controls"
+                        style="display:flex; gap:10px; align-items:center; flex-shrink:0;">
+                        <button class="btn-sm btn-dark" onclick="moveQuizQ(-1)" style="padding:6px 12px;"><i
+                                class="fa-solid fa-chevron-left"></i> Prev</button>
+                        <span id="quiz-q-page-info"
+                            style="font-weight:bold; font-family:monospace; min-width:45px; text-align:center;">1 /
+                            1</span>
+                        <button class="btn-sm btn-dark" onclick="moveQuizQ(1)" style="padding:6px 12px;">Next <i
                                 class="fa-solid fa-chevron-right"></i></button>
                     </div>
                 </div>
@@ -1805,6 +1817,45 @@
 
             items.forEach((item, i) => {
                 item.style.display = (i === quizQPageIndex) ? 'block' : 'none';
+
+                // Highlight options based on correct answer
+                const qType = item.querySelector('.q-type').value;
+                if (qType === 'choice') {
+                    const checkedIndices = [...item.querySelectorAll('.q-correct-check:checked')].map(c => parseInt(c.value));
+                    item.querySelectorAll('.q-opt-row').forEach((row, idx) => {
+                        if (checkedIndices.includes(idx)) {
+                            row.style.background = '#e6fffa';
+                            row.querySelector('input').style.background = '#e6fffa';
+                            row.style.borderRadius = '8px';
+                            row.style.padding = '2px 8px';
+                        } else {
+                            row.style.background = 'transparent';
+                            row.querySelector('input').style.background = 'white';
+                        }
+                    });
+                }
+            });
+
+            // Update Nav Bar
+            const nav = document.getElementById('quiz-q-nav');
+            nav.innerHTML = "";
+            items.forEach((item, i) => {
+                const btn = document.createElement('button');
+                const qType = item.querySelector('.q-type').value;
+                const isPoll = document.getElementById('quiz-is-poll').checked;
+                const hasCorrect = qType === 'short_answer' || isPoll || item.querySelectorAll('.q-correct-check:checked').length > 0;
+
+                btn.className = 'nav-q-btn';
+                btn.innerText = i + 1;
+                btn.style.cssText = `
+                    min-width:32px; height:32px; border:1px solid ${i === quizQPageIndex ? 'var(--primary)' : '#ddd'};
+                    background: ${i === quizQPageIndex ? 'var(--primary)' : (hasCorrect ? '#d1fae5' : '#fff')};
+                    color: ${i === quizQPageIndex ? '#fff' : (hasCorrect ? '#065f46' : '#666')};
+                    border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.85em; transition:0.2s;
+                    display:flex; align-items:center; justify-content:center;
+                `;
+                btn.onclick = () => { quizQPageIndex = i; updateQuizPagination(); };
+                nav.appendChild(btn);
             });
 
             document.getElementById('quiz-q-counter').innerText = total;
@@ -1830,7 +1881,9 @@
             const qType = data ? (data.type || 'choice') : 'choice';
 
             const options = data && data.options ? data.options : ['', '', '', ''];
-            const rawCorrect = data && data.correct !== undefined ? data.correct : [0];
+            // V77.19.3: Default to NO correct answer if brand new
+            const defaultCorrect = data ? [0] : [];
+            const rawCorrect = data && data.correct !== undefined ? data.correct : defaultCorrect;
             const correct = Array.isArray(rawCorrect) ? rawCorrect.map(v => parseInt(v)) : [parseInt(rawCorrect)];
 
             div.innerHTML = `
@@ -1874,7 +1927,7 @@
                     <div class="correct-buttons-list" style="display:flex; gap:10px; flex-wrap:wrap;">
                         ${options.map((_, i) => `
                             <label class="correct-circle-label">
-                                <input type="checkbox" name="q-correct-${qId}" value="${i}" id="corr-${qId}-${i}" class="q-correct-check" ${correct.includes(i) ? 'checked' : ''} onchange="triggerAutoSave()">
+                                <input type="checkbox" name="q-correct-${qId}" value="${i}" id="corr-${qId}-${i}" class="q-correct-check" ${correct.includes(i) ? 'checked' : ''} onchange="updateQuizPagination(); triggerAutoSave();">
                                 <span class="circle-content">${i + 1}</span>
                             </label>
                         `).join('')}
@@ -2033,11 +2086,12 @@
             const corrLabel = document.createElement('label');
             corrLabel.className = 'correct-circle-label';
             corrLabel.innerHTML = `
-                    <input type="checkbox" name="q-correct-${qId}" value="${count}" id="corr-${qId}-${count}" class="q-correct-check" onchange="triggerAutoSave()">
+                    <input type="checkbox" name="q-correct-${qId}" value="${count}" id="corr-${qId}-${count}" class="q-correct-check" onchange="updateQuizPagination(); triggerAutoSave()">
                     <span class="circle-content">${count + 1}</span>
                 `;
             correctList.appendChild(corrLabel);
             updateOptionNumbers(item);
+            updateQuizPagination(); // Refresh navigation colors
         }
 
         function removeOption(btn) {
@@ -2064,7 +2118,7 @@
                 const corrLabel = document.createElement('label');
                 corrLabel.className = 'correct-circle-label';
                 corrLabel.innerHTML = `
-                        <input type="checkbox" name="q-correct-${qId}" value="${i}" id="corr-${qId}-${i}" class="q-correct-check" ${currentCorrects.includes(i) ? 'checked' : ''} onchange="triggerAutoSave()">
+                        <input type="checkbox" name="q-correct-${qId}" value="${i}" id="corr-${qId}-${i}" class="q-correct-check" ${currentCorrects.includes(i) ? 'checked' : ''} onchange="updateQuizPagination(); triggerAutoSave()">
                         <span class="circle-content">${i + 1}</span>
                     `;
                 correctList.appendChild(corrLabel);
