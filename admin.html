@@ -1909,10 +1909,13 @@
 
         function handleQuestionPaste(e, textarea) {
             const text = (e.clipboardData || window.clipboardData).getData('text');
-            if (text && (text.includes('A.') || text.includes('B.') || text.includes('1.') || text.includes('2.') || text.includes('ก.') || text.includes('ข.'))) {
+            const lineCount = text.split('\n').filter(l => l.trim() !== "").length;
+            const hasPrefix = text.match(/([A-I]|[1-9]|[ก-ฮ])[\.\)\-\s\:]+/i) || text.match(/^[\-•\*]\s+/m);
+
+            if (text && (hasPrefix || lineCount >= 3)) {
                 // Timeout to let paste happen, then check if we should process
                 setTimeout(() => {
-                    if (confirm("ตรวจพบรูปแบบตัวเลือก ต้องการแยกข้อความโจทย์กับตัวเลือกออกจากกันให้อัตโนมัติหรือไม่?")) {
+                    if (confirm("ตรวจพบรูปแบบข้อสอบ/ตัวเลือก ต้องการแยกโจทย์และตัวเลือกออกจากกันให้อัตโนมัติหรือไม่? (Smart Paste)")) {
                         processQuizPaste(text, textarea.closest('.quiz-q-item'));
                     }
                 }, 100);
@@ -1922,47 +1925,74 @@
         function processQuizPaste(text, item) {
             if (!text) return;
             const rawLines = text.split('\n');
-            // Updated regex: Now supports Thai characters ก-ฮ
-            const optionRegex = /^([A-I]|[1-9]|[ก-ฮ])[\.\)\-\s\:]+(.*)/i;
+            const optionPrefixRegex = /^([A-I]|[1-9]|[ก-ฮ])[\.\)\-\s\:]+(.*)/i;
+            const bulletPrefixRegex = /^[\-•\*]\s*(.*)/;
 
             let questionLines = [];
             let optionsData = [];
             let optionsStarted = false;
 
+            // 1. Initial Scan for Prefixes/Bullets
             for (let line of rawLines) {
                 const trimmedLine = line.trim();
-
-                // Skip empty lines to handle cases with lots of gaps
                 if (trimmedLine === "") {
-                    // But if we haven't started options yet, maybe keep one newline for structure
                     if (!optionsStarted && questionLines.length > 0 && questionLines[questionLines.length - 1] !== "") {
                         questionLines.push("");
                     }
                     continue;
                 }
 
-                // Skip junk lines (asterisks, scores like 10/10, or short "point" labels)
+                // Skip junk (scores, points)
                 if (trimmedLine === "*" || trimmedLine.match(/^\d+\/\d+$/) || (trimmedLine.toLowerCase().includes('point') && trimmedLine.length < 15)) {
                     continue;
                 }
 
-                const match = trimmedLine.match(optionRegex);
-                if (match) {
+                const prefixMatch = trimmedLine.match(optionPrefixRegex);
+                const bulletMatch = trimmedLine.match(bulletPrefixRegex);
+
+                if (prefixMatch || bulletMatch) {
                     optionsStarted = true;
-                    optionsData.push(match[2].trim());
+                    optionsData.push((prefixMatch ? prefixMatch[2] : bulletMatch[1]).trim());
                 } else if (!optionsStarted) {
-                    questionLines.push(line); // Keep original line for question to preserve line breaks
+                    questionLines.push(line);
                 } else {
-                    // Continuation of an option or noise between options
                     if (optionsData.length > 0) {
-                        // Join with space, ensuring no double spaces if the first part was empty
                         const lastIdx = optionsData.length - 1;
                         optionsData[lastIdx] = (optionsData[lastIdx] ? optionsData[lastIdx] + " " : "") + trimmedLine;
                     }
                 }
             }
 
-            const questionText = questionLines.join('\n').trim();
+            let questionText = questionLines.join('\n').trim();
+
+            // 2. Fallback: If no prefixes, check for "Indented Lines" or a "Simple List" block
+            if (optionsData.length === 0) {
+                const nonBlank = rawLines.map(l => ({ raw: l, trim: l.trim() })).filter(x => x.trim !== "");
+
+                if (nonBlank.length >= 2) {
+                    // Strategy A: Detect transition to Indented lines (e.g. tabs or spaces)
+                    let firstIndentIdx = -1;
+                    for (let i = 1; i < nonBlank.length; i++) {
+                        // If line starts with \t or at least 2 spaces while the first line didn't
+                        if (nonBlank[i].raw.startsWith('\t') || nonBlank[i].raw.startsWith('  ')) {
+                            firstIndentIdx = i;
+                            break;
+                        }
+                    }
+
+                    if (firstIndentIdx !== -1) {
+                        // Re-run split based on first indent
+                        const originalLinesOfFirstIndentIdx = rawLines.findIndex(l => l.trim() === nonBlank[firstIndentIdx].trim());
+                        questionText = rawLines.slice(0, originalLinesOfFirstIndentIdx).join('\n').trim();
+                        optionsData = nonBlank.slice(firstIndentIdx).map(x => x.trim);
+                    }
+                    // Strategy B: Simple line-by-line if total count looks like a standard question (3-6 lines total)
+                    else if (nonBlank.length >= 3 && nonBlank.length <= 6) {
+                        questionText = nonBlank[0].raw.trim();
+                        optionsData = nonBlank.slice(1).map(x => x.trim);
+                    }
+                }
+            }
 
             if (optionsData.length > 0) {
                 item.querySelector('.q-text').value = questionText;
