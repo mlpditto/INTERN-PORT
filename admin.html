@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP INTERNSHIP PORT V77.25</title>
+    <title>MLP INTERNSHIP PORT V77.26</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
@@ -2957,6 +2957,7 @@
                                 <button class="btn-sm btn-dark" onclick="toggleQuizStatus('${q.id}', ${q.isActive})">${q.isActive ? 'End Now' : 'Activate'}</button>
                                 ${timerMenu}
                                 <button class="btn-sm btn-info" style="background:#4361ee; min-width:40px; padding:2px 8px; justify-content:center;" onclick="showQuizParticipants('${q.id}')" title="View Participants (${(window.quizCounts && window.quizCounts[q.id]) || 0})"><i class="fa-solid fa-users"></i> <span style="font-size:0.8em; font-weight:bold; margin-left:4px;">${(window.quizCounts && window.quizCounts[q.id]) || 0}</span></button>
+                                <button class="btn-sm btn-info" style="background:#009688; min-width:40px; padding:2px 8px; justify-content:center;" onclick="duplicateQuiz('${q.id}')" title="Duplicate Quiz"><i class="fa-solid fa-copy"></i></button>
                                 ${(q.isPoll || hasWriting) ? `<button class="btn-sm btn-info" style="background:#8e44ad;" onclick="showPollResults('${q.id}')">📊 Result</button>` : ''}
                                 ${(!isActiveSection) ? `<button class="btn-sm btn-warning" onclick="repostQuiz('${q.id}')">♻️ Repost</button>` : ''}
                                 <button class="btn-sm btn-danger" onclick="deleteQuiz('${q.id}')">Del</button>
@@ -2999,6 +3000,27 @@
                 });
                 showToast(`Timer set for ${hours} hours!`);
             } catch (e) { alert(e.message); }
+        }
+
+        async function duplicateQuiz(id) {
+            const q = quizzesData.find(x => x.id === id);
+            if (!q) return;
+            if (!confirm(`Duplicate "${q.title}"?`)) return;
+
+            const copy = { ...q };
+            delete copy.id;
+            copy.title = (copy.title || "Untitled") + " (Copy)";
+            copy.isActive = false;
+            copy.isTemplate = true; // Mark copy as template by default
+            copy.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            copy.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+            copy.startTime = null;
+            copy.deadline = null;
+
+            try {
+                await db.collection("quizzes").add(copy);
+                showToast("Quiz Duplicated!");
+            } catch (e) { alert("Duplicate Error: " + e.message); }
         }
 
         async function toggleQuizStatus(id, current) {
