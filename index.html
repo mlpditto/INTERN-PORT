@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V77.19)</title>
+    <title>Internship Portfolio (V77.25)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -563,7 +563,7 @@
                                 style="display:none; background:#343a40; color:white; font-size:0.65em; padding:2px 8px; border-radius:10px; font-weight:bold; opacity:0.8;">Division</span>
                         </div>
                     </div>
-                    <div style="text-align: right; flex-shrink: 0; padding-right: 5px; margin-top: 8px;">
+                    <div style="text-align: right; flex-shrink: 0; padding-right: 5px; margin-top: 35px;">
                         <div id="u-score" class="score-text" style="font-size: 1.4em; line-height: 1;">0</div>
                         <div
                             style="font-size: 0.6em; color: #999; font-weight: bold; letter-spacing: 0.5px; margin-top: 2px;">
@@ -602,6 +602,11 @@
                 </div>
             </div>
 
+            <div id="section-assignments">
+                <h3><i class="fa-solid fa-clipboard-list"></i> 퀴즈 แบบทดสอบ</h3>
+                <div id="assignments-container"></div>
+            </div>
+
             <div id="section-kanban">
                 <h3><i class="fa-solid fa-map"></i> ภารกิจ (Kanban)</h3>
                 <div class="sq-container">
@@ -622,11 +627,6 @@
                         <div id="sq-Done"></div>
                     </div>
                 </div>
-            </div>
-
-            <div id="section-assignments">
-                <h3><i class="fa-solid fa-clipboard-list"></i> ภารกิจและแบบทดสอบ (Assignments)</h3>
-                <div id="assignments-container"></div>
             </div>
 
             <div id="section-general-work">
@@ -654,8 +654,8 @@
             </div>
 
             <div style="height:50px;"></div>
-            <div style="text-align:center;color:#ccc;font-size:0.8em;margin-bottom:20px;">System V77.21 (Award Seal
-                Layers)
+            <div style="text-align:center;color:#ccc;font-size:0.8em;margin-bottom:20px;">System V77.25 (Quiz Advanced
+                Management)
             </div>
         </div>
     </div>
@@ -697,6 +697,17 @@
             <div id="quiz-q-timer"
                 style="float:right; font-weight:bold; color:#ef233c; margin-right:20px; font-size:1.2em;"></div>
             <h3 id="quiz-run-title">Quiz</h3>
+            <!-- 🔥 Case Study Reader Section (V77.23) -->
+            <div id="quiz-case-passage-area" style="display:none; margin-bottom:15px;">
+                <button onclick="toggleCaseReader()"
+                    style="width:100%; justify-content:space-between; background:#e9f5ff; color:var(--primary); font-size:0.9em; padding:8px 15px; border:1px solid #b8daff; border-radius:10px; min-height:auto; font-weight:bold;">
+                    <span>📖 อ่านเนื้อหา (Read Case)</span>
+                    <i id="case-reader-icon" class="fa-solid fa-chevron-down"></i>
+                </button>
+                <div id="quiz-case-content-body"
+                    style="display:none; background:#fff; border:1px solid #eee; border-top:none; border-radius:0 0 10px 10px; padding:15px; font-size:0.95em; line-height:1.6; color:#444; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02); max-height:200px; overflow-y:auto; white-space:pre-wrap;">
+                </div>
+            </div>
             <div id="quiz-run-container">
                 <!-- Quiz content dynamically injected -->
             </div>
@@ -850,9 +861,10 @@
 
         async function main() {
             try {
-                // 🔥 CHECK PREVIEW MODE
+                // 🔥 CHECK PREVIEW MODE (V77.23)
                 const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('mode') === 'preview') {
+                const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                if (urlParams.get('mode') === 'preview' || isLocal) {
                     console.log("Entering Preview Mode...");
 
                     // Mock User Profile
@@ -1454,7 +1466,7 @@
                         statusBadge = `<span class="assign-tag" style="background:#e2e6ea;">ยังไม่ทำ (Not Started)</span>`;
                         let deadlineHtml = "";
                         if (dead) {
-                            deadlineHtml = `<div class="meta-item" style="color:#ef233c;"><i class="fa-solid fa-circle-exclamation"></i> Due: ${dead.toLocaleString('th-TH')}</div>`;
+                            deadlineHtml = `<div class="meta-item quiz-global-expiry" data-dead="${dead.getTime()}" style="color:#ef233c; font-weight:bold;"><i class="fa-solid fa-circle-exclamation"></i> Loading...</div>`;
                         }
 
                         bodyHtml = `
@@ -1492,17 +1504,21 @@
 
         let quizTimerInterval = null;
         let timeLeftForStep = 0;
+        let accumulatedTime = 0; // 🔥 Added for V77.24 Carrying over time
 
         function confirmRunQuiz(quizId) {
             const q = quizzesCache.find(x => x.id === quizId);
             if (!q) return;
-            const currentScore = userProfile.score || 0;
-            const msg = `เริ่มแบบทดสอบ: ${q.title}\n` +
-                `------------------------------\n` +
-                `คะแนนปัจจุบันของคุณ: ${currentScore.toFixed(3)} แต้ม\n\n` +
-                `ยืนยันที่จะเริ่มทำหรือไม่?`;
 
-            if (confirm(msg)) {
+            // 🔥 Added V77.24: Pre-Quiz Warning
+            const warningMsg = `⚠️ คำเตือน (Warning):\n` +
+                `- เมื่อเริ่มแล้ว ห้ามออกจากหน้าจอนี้จนกว่าจะส่งคำตอบ\n` +
+                `- การออกจากหน้าจอ (รวมถึงการ Refresh) จะถือว่าเป็น "สิ้นสุดการทำทันที"\n` +
+                `- หากต้องการทำใหม่ ต้องให้แอดมินปลดล็อคให้เท่านั้น\n` +
+                `------------------------------\n` +
+                `ยืนยันที่จะเริ่มทำแบบทดสอบ "${q.title}" ใช่หรือไม่?`;
+
+            if (confirm(warningMsg)) {
                 runQuiz(quizId);
             }
         }
@@ -1527,32 +1543,31 @@
             const existing = quizAttemptsCache[quizId];
             let isResuming = false;
 
-            if (existing && existing.status === 'started') {
-                const startTime = existing.startTime ? existing.startTime.toDate().getTime() : Date.now();
-                const totalElapsed = (Date.now() - startTime) / 1000;
-
-                let step = 0;
-                let elapsed = totalElapsed;
-                const questions = currentQuiz.questions;
-
-                while (step < questions.length) {
-                    const qTimer = questions[step].timer || 60;
-                    if (elapsed < qTimer) break;
-                    elapsed -= qTimer;
-                    step++;
+            if (existing && (existing.status === 'started' || existing.status === 'abandoned')) {
+                // 🔥 Refined V77.24: Treat exits/reloads as completed attempts unless approved
+                alert("🚫 คุณได้เริ่มทำแบบทดสอบนี้ไปแล้ว และได้ออกจากระบบก่อนส่งคำตอบ\n\nระบบถือว่าการพยายามครั้งนี้สิ้นสุดแล้วครับ หากต้องการทำใหม่โปรดติดต่อแอดมิน");
+                // Mark as abandoned if it was just 'started'
+                if (existing.status === 'started') {
+                    db.collection("quiz_attempts").doc(`${quizId}_${userId}`).update({ status: 'abandoned' });
                 }
+                return;
+            } else if (existing && existing.status === 'allowed') {
+                // Admin allowed a re-take
+                isResuming = false; // Start fresh
+                currentStep = 0;
+                accumulatedTime = 0;
+                userAnswers = new Array(currentQuiz.questions.length).fill(null);
+                timeLeftForStep = (currentQuiz.questions[0].timer || 60);
 
-                if (step >= questions.length) {
-                    alert("🍭 หมดเวลาทำแบบทดสอบแล้ว!");
-                    return;
-                }
-
-                currentStep = step;
-                timeLeftForStep = Math.floor((questions[step].timer || 60) - elapsed);
-                userAnswers = existing.answers || new Array(questions.length).fill(null);
-                isResuming = true;
+                await db.collection("quiz_attempts").doc(`${quizId}_${userId}`).update({
+                    status: 'started',
+                    startTime: firebase.firestore.FieldValue.serverTimestamp(),
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    answers: userAnswers
+                });
             } else {
                 currentStep = 0;
+                accumulatedTime = 0;
                 userAnswers = new Array(currentQuiz.questions.length).fill(null);
                 timeLeftForStep = (currentQuiz.questions[0].timer || 60);
 
@@ -1574,6 +1589,14 @@
             document.getElementById('quizModal').style.display = 'block';
             renderQuizStep(isResuming);
         }
+
+        // 🔥 Added V77.24: Mark as abandoned if user closes tab
+        window.addEventListener('beforeunload', (event) => {
+            if (currentQuiz && document.getElementById('quizModal').style.display === 'block') {
+                const docId = `${currentQuiz.id}_${userId}`;
+                db.collection("quiz_attempts").doc(docId).update({ status: 'abandoned' });
+            }
+        });
 
         async function requestLateQuiz(quizId) {
             const q = quizzesCache.find(x => x.id === quizId);
@@ -1597,13 +1620,43 @@
             }
         }
 
+        function toggleCaseReader() {
+            const body = document.getElementById('quiz-case-content-body');
+            const icon = document.getElementById('case-reader-icon');
+            if (body.style.display === 'none') {
+                body.style.display = 'block';
+                icon.className = 'fa-solid fa-chevron-up';
+            } else {
+                body.style.display = 'none';
+                icon.className = 'fa-solid fa-chevron-down';
+            }
+        }
+
         function renderQuizStep(useExistingTime = false) {
             clearInterval(quizTimerInterval);
             const container = document.getElementById('quiz-run-container');
             const question = currentQuiz.questions[currentStep];
 
+            // 🔥 Case Study Logic (V77.23)
+            const passageArea = document.getElementById('quiz-case-passage-area');
+            const passageBody = document.getElementById('quiz-case-content-body');
+            if (currentQuiz.quizType === 'case_study' && currentQuiz.caseContent) {
+                passageArea.style.display = 'block';
+                passageBody.innerText = currentQuiz.caseContent;
+                // Auto-show on first step
+                if (currentStep === 0 && !useExistingTime) {
+                    passageBody.style.display = 'block';
+                    document.getElementById('case-reader-icon').className = 'fa-solid fa-chevron-up';
+                }
+            } else {
+                passageArea.style.display = 'none';
+            }
+
             if (!useExistingTime) {
-                timeLeftForStep = question.timer || 60;
+                // 🔥 V77.24: Accumulate remaining time from previous question
+                const baseTimer = question.timer || 60;
+                timeLeftForStep = baseTimer + (accumulatedTime || 0);
+                accumulatedTime = 0; // Reset after applying to base
             }
             updateTimerUI();
 
@@ -1882,6 +1935,11 @@
 
         async function nextQuizStep() {
             if (currentStep < currentQuiz.questions.length - 1) {
+                // 🔥 V77.24 Carry over remaining time
+                if (timeLeftForStep > 0) {
+                    accumulatedTime += timeLeftForStep;
+                }
+
                 currentStep++;
                 renderQuizStep();
                 // Optional: Save progress to Firestore
@@ -1893,7 +1951,8 @@
                         });
                         db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
                             answers: finalAnswers,
-                            lastActive: firebase.firestore.FieldValue.serverTimestamp()
+                            lastActive: firebase.firestore.FieldValue.serverTimestamp(),
+                            accumulatedTime: accumulatedTime // Store for safety
                         }, { merge: true }).catch(err => console.warn("Auto-save failed:", err));
                     }
                 } catch (e) { console.error("Auto-save error:", e); }
@@ -2034,6 +2093,28 @@
                 isSubmittingQuiz = false;
 
                 document.getElementById('quizModal').style.display = 'none';
+
+                // 🔥 V77.24: Dynamic Duration Adjustment (-10% of REMAINING time per submission)
+                try {
+                    const quizDoc = await db.collection("quizzes").doc(currentQuiz.id).get();
+                    const qData = quizDoc.data();
+
+                    if (qData && qData.deadline) {
+                        const nowTime = new Date();
+                        const dead = qData.deadline.toDate();
+
+                        if (dead > nowTime) {
+                            const remainingMs = dead.getTime() - nowTime.getTime();
+                            const reductionMs = remainingMs * 0.1; // 10% of REMAINING
+                            const newDeadlineMs = dead.getTime() - reductionMs;
+
+                            await db.collection("quizzes").doc(currentQuiz.id).update({
+                                deadline: firebase.firestore.Timestamp.fromMillis(newDeadlineMs)
+                            });
+                        }
+                    }
+                } catch (errDuration) { console.error("Duration Adjustment Error:", errDuration); }
+
                 setTimeout(() => {
                     alert(isPoll ? "ส่งโพลเรียบร้อย!" : `ส่งคำตอบเรียบร้อย!\nคะแนนที่คาดว่าจะได้รับ: ${pointsAwarded.toFixed(3)} แต้ม`);
                 }, 100);
@@ -2080,6 +2161,20 @@
                     const h = Math.floor(diff / 3600000);
                     const m = Math.floor((diff % 3600000) / 60000);
                     el.innerText = `⏳ หมดเขตรับใน: ${h} ชม. ${m} นาที`;
+                }
+            });
+
+            // 🔥 Quiz Global Expiry (V77.24)
+            document.querySelectorAll('.quiz-global-expiry').forEach(el => {
+                const d = parseInt(el.dataset.dead);
+                const diff = d - now;
+                if (diff <= 0) {
+                    el.innerText = "หมดเวลา (Expired)";
+                    el.style.color = "#ccc";
+                } else {
+                    const h = Math.floor(diff / 3600000);
+                    const m = Math.floor((diff % 3600000) / 60000);
+                    el.innerHTML = `<i class="fa-solid fa-hourglass-half"></i> เหลือเวลา: ${h}ชม. ${m}น.`;
                 }
             });
 

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP INTERNSHIP PORT</title>
+    <title>MLP INTERNSHIP PORT V77.25</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
@@ -1334,7 +1334,22 @@
                         <input type="datetime-local" id="quiz-deadline" lang="en-GB">
                     </div>
                 </div>
-                <textarea id="quiz-desc" placeholder="Description" style="margin-top:10px;"></textarea>
+                <div style="display:flex; gap:10px; margin-top:5px; margin-bottom:10px;">
+                    <div style="flex:1;">
+                        <label style="font-size:0.8em; color:#666;">📝 Quiz Type</label>
+                        <select id="quiz-type" onchange="toggleCaseUI()"
+                            style="padding:8px; border-radius:6px; font-weight:bold; color:var(--primary);">
+                            <option value="standard">Standard Quiz</option>
+                            <option value="case_study">📖 Case Study (Reading)</option>
+                        </select>
+                    </div>
+                    <div style="flex:2;" id="case-content-area" style="display:none;">
+                        <label style="font-size:0.8em; color:#666;">📖 Case Content (Passage)</label>
+                        <textarea id="quiz-case-content" placeholder="ใส่เนื้อหาสำหรับอ่าน 4-5 บรรทัดที่นี่..."
+                            style="height:80px;"></textarea>
+                    </div>
+                </div>
+                <textarea id="quiz-desc" placeholder="Instruction/Description" style="margin-top:10px;"></textarea>
                 <hr>
                 <h3>Questions (<span id="quiz-q-counter">0</span>)</h3>
                 <div
@@ -1342,8 +1357,8 @@
                     <div style="display:flex; gap:5px;">
                         <button class="btn-sm btn-dark" onclick="addQuestionUI()">+ Add New</button>
                     </div>
-                    <div style="display:flex; align-items:center; flex:1; margin:0 15px; overflow-x:auto;">
-                        <div id="quiz-q-nav" style="display:flex; gap:6px; padding:2px;"></div>
+                    <div style="display:flex; align-items:center; flex:1; margin:0 15px;">
+                        <div id="quiz-q-nav" style="display:flex; gap:6px; padding:2px; flex-wrap:wrap;"></div>
                     </div>
                     <div id="quiz-pagination-controls"
                         style="display:flex; gap:10px; align-items:center; flex-shrink:0;">
@@ -1719,6 +1734,9 @@
             document.getElementById('quiz-total-points').value = q.totalPoints || 1.0;
             document.getElementById('quiz-desc').value = q.description || "";
             document.getElementById('quiz-is-poll').checked = q.isPoll || false;
+            document.getElementById('quiz-type').value = q.quizType || "standard";
+            document.getElementById('quiz-case-content').value = q.caseContent || "";
+            toggleCaseUI();
             updatePollUI();
 
             const fmt = (d) => {
@@ -1751,6 +1769,9 @@
             document.getElementById('quiz-total-points').value = 1.0;
             document.getElementById('quiz-desc').value = "";
             document.getElementById('quiz-is-poll').checked = false;
+            document.getElementById('quiz-type').value = "standard";
+            document.getElementById('quiz-case-content').value = "";
+            toggleCaseUI();
             updatePollUI();
             document.getElementById('quiz-start-time').value = "";
             document.getElementById('quiz-deadline').value = "";
@@ -1774,6 +1795,11 @@
             }, 1000);
         }
 
+        function toggleCaseUI() {
+            const type = document.getElementById('quiz-type').value;
+            document.getElementById('case-content-area').style.display = (type === 'case_study') ? 'block' : 'none';
+        }
+
         function getQuizFormData() {
             const title = document.getElementById('quiz-title').value.trim();
             const shortTitle = document.getElementById('quiz-short-title').value.trim();
@@ -1781,6 +1807,8 @@
             const description = document.getElementById('quiz-desc').value;
             const totalPoints = parseFloat(document.getElementById('quiz-total-points').value) || 1.0;
             const isPoll = document.getElementById('quiz-is-poll').checked;
+            const quizType = document.getElementById('quiz-type').value;
+            const caseContent = document.getElementById('quiz-case-content').value;
 
             const qItems = document.querySelectorAll('.quiz-q-item');
             const questions = [];
@@ -1801,7 +1829,7 @@
             });
 
             return {
-                title, shortTitle, targetGroup, description, totalPoints, isPoll, questions,
+                title, shortTitle, targetGroup, description, totalPoints, isPoll, quizType, caseContent, questions,
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
             };
@@ -1852,7 +1880,7 @@
                     background: ${i === quizQPageIndex ? 'var(--primary)' : (hasCorrect ? '#d1fae5' : '#fff')};
                     color: ${i === quizQPageIndex ? '#fff' : (hasCorrect ? '#065f46' : '#666')};
                     border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.85em; transition:0.2s;
-                    display:flex; align-items:center; justify-content:center;
+                    display:flex; align-items:center; justify-content:center; flex-shrink:0;
                 `;
                 btn.onclick = () => { quizQPageIndex = i; updateQuizPagination(); };
                 nav.appendChild(btn);
@@ -2904,6 +2932,14 @@
                 const targetGroupLabel = q.targetGroup && q.targetGroup !== "Public" ? `<span class="badge" style="background:#007bff; margin-left:5px;">${q.targetGroup}</span>` : '';
 
 
+                const timerOptions = [1, 2, 4, 8, 12, 24, 48, 72, 120, 168];
+                const timerMenu = isActiveSection ? `
+                    <select class="btn-sm" onchange="setQuizDuration('${q.id}', this.value)" style="width: auto; background: #e0f2f1; color: #00695c; border: 1px solid #b2dfdb; cursor: pointer; border-radius: 4px; padding: 2px 4px;">
+                        <option value="">⏲️ Timer</option>
+                        ${timerOptions.map(h => `<option value="${h}">${h}h</option>`).join('')}
+                    </select>
+                ` : '';
+
                 return `
                     <tr>
                         <td>
@@ -2916,12 +2952,15 @@
                         <td>${q.totalPoints || 1.0}</td>
                         <td>${statusInfo}</td>
                         <td>
-                            <button class="btn-sm btn-primary" onclick="openQuizModal('${q.id}')">Edit</button>
-                            <button class="btn-sm btn-dark" onclick="toggleQuizStatus('${q.id}', ${q.isActive})">${q.isActive ? 'End Now' : 'Activate'}</button>
-                            <button class="btn-sm btn-info" style="background:#4361ee; min-width:40px; padding:2px 8px; justify-content:center;" onclick="showQuizParticipants('${q.id}')" title="View Participants (${(window.quizCounts && window.quizCounts[q.id]) || 0})"><i class="fa-solid fa-users"></i> <span style="font-size:0.8em; font-weight:bold; margin-left:4px;">${(window.quizCounts && window.quizCounts[q.id]) || 0}</span></button>
-                            ${(q.isPoll || hasWriting) ? `<button class="btn-sm btn-info" style="background:#8e44ad;" onclick="showPollResults('${q.id}')">📊 Result</button>` : ''}
-                            ${(!isActiveSection) ? `<button class="btn-sm btn-warning" onclick="repostQuiz('${q.id}')">♻️ Repost</button>` : ''}
-                            <button class="btn-sm btn-danger" onclick="deleteQuiz('${q.id}')">Del</button>
+                            <div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;">
+                                <button class="btn-sm btn-primary" onclick="openQuizModal('${q.id}')">Edit</button>
+                                <button class="btn-sm btn-dark" onclick="toggleQuizStatus('${q.id}', ${q.isActive})">${q.isActive ? 'End Now' : 'Activate'}</button>
+                                ${timerMenu}
+                                <button class="btn-sm btn-info" style="background:#4361ee; min-width:40px; padding:2px 8px; justify-content:center;" onclick="showQuizParticipants('${q.id}')" title="View Participants (${(window.quizCounts && window.quizCounts[q.id]) || 0})"><i class="fa-solid fa-users"></i> <span style="font-size:0.8em; font-weight:bold; margin-left:4px;">${(window.quizCounts && window.quizCounts[q.id]) || 0}</span></button>
+                                ${(q.isPoll || hasWriting) ? `<button class="btn-sm btn-info" style="background:#8e44ad;" onclick="showPollResults('${q.id}')">📊 Result</button>` : ''}
+                                ${(!isActiveSection) ? `<button class="btn-sm btn-warning" onclick="repostQuiz('${q.id}')">♻️ Repost</button>` : ''}
+                                <button class="btn-sm btn-danger" onclick="deleteQuiz('${q.id}')">Del</button>
+                            </div>
                         </td>
                     </tr>
                 `;
@@ -2945,6 +2984,21 @@
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             showToast("Reposted!");
+        }
+
+        async function setQuizDuration(id, hours) {
+            if (!hours) return;
+            if (!confirm(`Set countdown timer for ${hours} hours?`)) return;
+            const now = new Date();
+            const deadline = new Date(now.getTime() + (parseFloat(hours) * 3600000));
+            try {
+                await db.collection("quizzes").doc(id).update({
+                    deadline: firebase.firestore.Timestamp.fromDate(deadline),
+                    isActive: true, // Ensure it's active
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                showToast(`Timer set for ${hours} hours!`);
+            } catch (e) { alert(e.message); }
         }
 
         async function toggleQuizStatus(id, current) {
