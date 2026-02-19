@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V77.26)</title>
+    <title>Internship Portfolio (V77.27)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -654,9 +654,9 @@
             </div>
 
             <div style="height:50px;"></div>
-            <div style="text-align:center;color:#ccc;font-size:0.8em;margin-bottom:20px;">System V77.26 (Quiz
-                Duplication &
-                Advanced Mgmt)
+            <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
+                LINE LIFF Internship Management System<br>
+                V77.27 (Work History Consolidation)
             </div>
         </div>
     </div>
@@ -1225,21 +1225,23 @@
         }
 
         // --- Quest System (V56 Logic) ---
-        function loadAllQuests() { db.collection("quests").orderBy("createdAt", "desc").limit(5).onSnapshot(s => { questsCache = s.docs.map(doc => ({ id: doc.id, ...doc.data() })); renderAssignments(); renderHistory(); }); }
+        function loadAllQuests() { db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(s => { questsCache = s.docs.map(doc => ({ id: doc.id, ...doc.data() })); renderAssignments(); renderHistory(); }); }
         function loadMySubmissions() { db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => { mySubmissionsCache = {}; s.forEach(doc => { mySubmissionsCache[doc.data().questId] = doc.data(); }); renderAssignments(); renderHistory(); }); }
 
         // --- Quiz System ---
         // (Variables declared globally)
 
         function loadQuizzes() {
-            db.collection("quizzes").where("isActive", "==", true).onSnapshot(s => {
+            db.collection("quizzes").onSnapshot(s => {
                 quizzesCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderAssignments();
+                renderHistory();
             });
             db.collection("quiz_attempts").where("userId", "==", userId).onSnapshot(s => {
                 quizAttemptsCache = {};
                 s.forEach(d => quizAttemptsCache[d.data().quizId] = d.data());
                 renderAssignments();
+                renderHistory();
             });
         }
 
@@ -1290,6 +1292,12 @@
                 const isExpired = (dead && now > dead);
                 const isInactive = (q.isActive === false);
                 const isApproved = (attempt && attempt.status === 'approved');
+
+                // 🔥 V77.27: Hide if completed (moves to history)
+                if (attempt && (attempt.status === 'pending' || attempt.status === 'approved')) return;
+
+                // Visibility logic
+                if (start && now < start) return;
 
                 // 🔥 V77.4: Show if active OR (expired AND not approved)
                 if (isInactive && !attempt) return;
@@ -2334,9 +2342,115 @@
 
         function loadMyWorks() {
             db.collection("works").where("userId", "==", userId).orderBy("timestamp", "desc").onSnapshot(s => {
-                usersWorksCache = s.docs.map(d => d.data());
+                usersWorksCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderHistory();
             })
+        }
+
+        // --- Organize Work History (V77.27) ---
+        function renderHistory() {
+            const container = document.getElementById('work-list');
+            if (!container) return;
+
+            let items = [];
+
+            // 1. Quests (Completed)
+            Object.keys(mySubmissionsCache).forEach(qid => {
+                const sub = mySubmissionsCache[qid];
+                const quest = questsCache.find(x => x.id === qid);
+                if (sub) {
+                    items.push({
+                        title: quest ? quest.title : (sub.questTitle || "ภารกิจ (Quest)"),
+                        type: 'Quest',
+                        timestamp: sub.timestamp,
+                        status: 'ตรวจแล้ว',
+                        score: quest ? quest.points : 0,
+                        link: sub.link,
+                        icon: 'fa-star',
+                        color: '#f1c40f'
+                    });
+                }
+            });
+
+            // 2. Quizzes (Pending/Approved)
+            Object.keys(quizAttemptsCache).forEach(qid => {
+                const att = quizAttemptsCache[qid];
+                if (att.status === 'pending' || att.status === 'approved') {
+                    const quiz = quizzesCache.find(q => q.id === qid);
+                    const qTitle = quiz ? quiz.title : (att.quizTitle || "แบบทดสอบ (Quiz)");
+                    const score = att.correctCount !== undefined ?
+                        (att.correctCount / (att.totalQuestions || 1)) * (quiz ? (quiz.totalPoints || 1) : 1) : 0;
+
+                    items.push({
+                        title: qTitle,
+                        type: 'Quiz',
+                        timestamp: att.timestamp,
+                        status: att.status === 'pending' ? 'รอตรวจ' : 'ตรวจแล้ว',
+                        score: score,
+                        icon: 'fa-brain',
+                        color: '#8e44ad',
+                        isPoll: att.isPoll
+                    });
+                }
+            });
+
+            // 3. General Works
+            const works = usersWorksCache || [];
+            works.forEach(w => {
+                items.push({
+                    title: w.title,
+                    type: 'Work',
+                    timestamp: w.timestamp,
+                    status: w.status,
+                    score: w.score || 0,
+                    link: w.link,
+                    icon: 'fa-file-lines',
+                    color: '#4361ee'
+                });
+            });
+
+            // Sort: Newest First
+            items.sort((a, b) => {
+                const tA = a.timestamp ? a.timestamp.toDate().getTime() : 0;
+                const tB = b.timestamp ? b.timestamp.toDate().getTime() : 0;
+                return tB - tA;
+            });
+
+            if (items.length === 0) {
+                container.innerHTML = `<div style="text-align:center; color:#999; padding:20px; font-size:0.9em;">ยังไม่มีประวัติการส่งงาน</div>`;
+                return;
+            }
+
+            container.innerHTML = items.map(item => {
+                const date = item.timestamp ? item.timestamp.toDate().toLocaleString('th-TH', {
+                    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+                }) : '-';
+                const isPending = item.status === 'รอตรวจ' || item.status === 'pending';
+                const statusBadge = isPending
+                    ? `<span class="badge" style="background:#fff3cd; color:#856404; font-size:0.7em;">⏳ รอตรวจ</span>`
+                    : `<span class="badge" style="background:#d4edda; color:#155724; font-size:0.7em;">✅ ตรวจแล้ว</span>`;
+
+                const scoreDisplay = item.isPoll ? '📊' : `${parseFloat(item.score).toFixed(2)}`;
+                const linkHtml = item.link ? `<a href="${item.link}" target="_blank" style="color:${item.color}; font-size:0.8em; text-decoration:none;"><i class="fa-solid fa-link"></i></a>` : "";
+
+                return `
+                    <div style="background:#fff; border-radius:12px; padding:12px; margin-bottom:10px; display:flex; align-items:center; gap:12px; border:1px solid #f0f0f0; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
+                        <div style="width:38px; height:38px; border-radius:10px; background:${item.color}15; color:${item.color}; display:flex; align-items:center; justify-content:center; font-size:1.1em; flex-shrink:0;">
+                            <i class="fa-solid ${item.icon}"></i>
+                        </div>
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-weight:600; font-size:0.9em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#333;">${item.title}</div>
+                            <div style="font-size:0.7em; color:#999; display:flex; align-items:center; gap:5px;">
+                                ${date} • ${statusBadge}
+                            </div>
+                        </div>
+                        <div style="text-align:right; flex-shrink:0;">
+                            <div style="font-weight:800; color:${item.color}; font-size:1.05em;">${scoreDisplay}</div>
+                            ${linkHtml}
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         // --- Helpers for Group UI ---
