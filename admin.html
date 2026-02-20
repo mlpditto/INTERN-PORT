@@ -3180,6 +3180,7 @@
                                 ${timerMenu}
                                 <button class="btn-sm btn-info" style="background:#4361ee; min-width:40px; padding:2px 8px; justify-content:center;" onclick="showQuizParticipants('${q.id}')" title="View Participants (${(window.quizCounts && window.quizCounts[q.id]) || 0})"><i class="fa-solid fa-users"></i> <span style="font-size:0.8em; font-weight:bold; margin-left:4px;">${(window.quizCounts && window.quizCounts[q.id]) || 0}</span></button>
                                 <button class="btn-sm btn-info" style="background:#009688; min-width:40px; padding:2px 8px; justify-content:center;" onclick="duplicateQuiz('${q.id}')" title="Duplicate Quiz"><i class="fa-solid fa-copy"></i></button>
+                                <button class="btn-sm" style="background:#2e7d32; color:white; min-width:40px; padding:2px 8px; justify-content:center;" onclick="openHomeworkAssignModal('${q.id}')" title="Assign Homework"><i class="fa-solid fa-book"></i></button>
                                 ${(q.isPoll || hasWriting) ? `<button class="btn-sm btn-info" style="background:#8e44ad;" onclick="showPollResults('${q.id}')">📊 Result</button>` : ''}
                                 ${(!isActiveSection) ? `<button class="btn-sm btn-warning" onclick="repostQuiz('${q.id}')">♻️ Repost</button>` : ''}
                                 <button class="btn-sm btn-danger" onclick="deleteQuiz('${q.id}')">Del</button>
@@ -3252,6 +3253,154 @@
             await db.collection("quizzes").doc(id).update(updates);
         }
         async function deleteQuiz(id) { if (confirm("Delete this quiz?")) await db.collection("quizzes").doc(id).delete(); }
+
+        // 🔥 V78.2: Quick Homework Assignment Modal
+        let hwModalQuizId = null;
+        let hwModalSelectedUsers = new Set();
+
+        function openHomeworkAssignModal(quizId) {
+            hwModalQuizId = quizId;
+            const q = quizzesData.find(x => x.id === quizId);
+            if (!q) return;
+
+            // Load existing assigned users
+            hwModalSelectedUsers = new Set(q.assignedUsers || []);
+
+            // Build modal HTML
+            const modalHtml = `
+                <div id="hwAssignModal" class="modal" style="display:flex; z-index:9999;">
+                    <div class="modal-content" style="max-width:500px; border-top:4px solid #2e7d32;">
+                        <span class="close-btn" onclick="closeHwAssignModal()">&times;</span>
+                        <h3 style="margin:0 0 5px 0;">📚 มอบการบ้าน</h3>
+                        <p style="margin:0 0 10px 0; font-size:0.85em; color:#666;">${q.title || q.shortTitle || 'Untitled'}</p>
+                        <div style="display:flex; gap:5px; margin-bottom:8px;">
+                            <input type="text" id="hw-modal-search" placeholder="🔍 ค้นหาชื่อ..." oninput="filterHwModalUsers()" style="flex:1; padding:6px 10px; border-radius:6px; border:1px solid #ccc; font-size:0.9em; margin:0;">
+                            <button class="btn-sm" onclick="hwSelectAll()" style="padding:4px 10px; font-size:0.75em; background:#2e7d32; color:white; border:none; border-radius:6px; white-space:nowrap;">✅ All</button>
+                            <button class="btn-sm" onclick="hwClearAll()" style="padding:4px 10px; font-size:0.75em; background:#c62828; color:white; border:none; border-radius:6px; white-space:nowrap;">✕ Clear</button>
+                        </div>
+                        <div id="hw-modal-user-list" style="max-height:200px; overflow-y:auto; display:flex; flex-wrap:wrap; gap:5px; margin-bottom:8px; border:1px solid #ddd; border-radius:6px; padding:8px; background:#fafafa;"></div>
+                        <div id="hw-modal-chips" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px;"></div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:0.8em; color:#666;">Selected: <b id="hw-modal-count">0</b> users</span>
+                            <div style="display:flex; gap:6px;">
+                                <button class="btn-sm" onclick="closeHwAssignModal()" style="background:#999; color:white; border:none; border-radius:6px; padding:6px 16px;">ยกเลิก</button>
+                                <button class="btn-sm" onclick="saveHwAssign()" style="background:#2e7d32; color:white; border:none; border-radius:6px; padding:6px 16px; font-weight:bold;">💾 บันทึก</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove existing modal if any
+            const existing = document.getElementById('hwAssignModal');
+            if (existing) existing.remove();
+
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            renderHwModalUsers();
+            renderHwModalChips();
+        }
+
+        function closeHwAssignModal() {
+            const modal = document.getElementById('hwAssignModal');
+            if (modal) modal.remove();
+            hwModalQuizId = null;
+            hwModalSelectedUsers = new Set();
+        }
+
+        function renderHwModalUsers(filter = '') {
+            const container = document.getElementById('hw-modal-user-list');
+            if (!container) return;
+            const searchLower = filter.toLowerCase();
+            const q = quizzesData.find(x => x.id === hwModalQuizId);
+            const targetGroup = q ? (q.targetGroup || 'Public') : 'Public';
+
+            const filtered = usersData.filter(u => {
+                if (!u.displayName) return false;
+                if (searchLower && !u.displayName.toLowerCase().includes(searchLower)) return false;
+                return true;
+            });
+
+            container.innerHTML = filtered.map(u => {
+                const checked = hwModalSelectedUsers.has(u.id) ? 'checked' : '';
+                const name = u.displayName || u.id;
+                const group = u.group || 'Public';
+                return `
+                    <label style="display:flex; align-items:center; gap:4px; background:${checked ? '#e8f5e9' : '#f8f9fa'}; padding:4px 8px; border-radius:6px; font-size:0.82em; cursor:pointer; border:1px solid ${checked ? '#4caf50' : '#eee'}; white-space:nowrap;">
+                        <input type="checkbox" ${checked} onchange="toggleHwModalUser('${u.id}')" style="width:auto; margin:0;">
+                        ${name} <span style="color:#999; font-size:0.8em;">(${group})</span>
+                    </label>
+                `;
+            }).join('');
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div style="color:#999; font-size:0.85em; text-align:center; padding:10px;">ไม่พบผู้ใช้</div>';
+            }
+        }
+
+        function toggleHwModalUser(uid) {
+            if (hwModalSelectedUsers.has(uid)) hwModalSelectedUsers.delete(uid);
+            else hwModalSelectedUsers.add(uid);
+            renderHwModalUsers(document.getElementById('hw-modal-search')?.value || '');
+            renderHwModalChips();
+        }
+
+        function renderHwModalChips() {
+            const container = document.getElementById('hw-modal-chips');
+            const countEl = document.getElementById('hw-modal-count');
+            if (!container || !countEl) return;
+            countEl.innerText = hwModalSelectedUsers.size;
+
+            if (hwModalSelectedUsers.size === 0) {
+                container.innerHTML = '<span style="color:#999; font-size:0.8em;">ยังไม่ได้เลือก</span>';
+                return;
+            }
+            container.innerHTML = [...hwModalSelectedUsers].map(uid => {
+                const u = usersData.find(x => x.id === uid);
+                const name = u ? (u.displayName || uid) : uid;
+                return `<span style="background:#2e7d32; color:white; padding:2px 8px; border-radius:12px; font-size:0.75em; display:inline-flex; align-items:center; gap:3px;">
+                    ${name} <span onclick="toggleHwModalUser('${uid}')" style="cursor:pointer; font-weight:bold; margin-left:2px;">✕</span>
+                </span>`;
+            }).join('');
+        }
+
+        function filterHwModalUsers() {
+            const val = document.getElementById('hw-modal-search')?.value || '';
+            renderHwModalUsers(val);
+        }
+
+        function hwSelectAll() {
+            const q = quizzesData.find(x => x.id === hwModalQuizId);
+            const targetGroup = q ? (q.targetGroup || 'Public') : 'Public';
+            usersData.forEach(u => {
+                if (!u.displayName) return;
+                if (targetGroup !== 'Public' && (u.group || 'Public') !== targetGroup) return;
+                hwModalSelectedUsers.add(u.id);
+            });
+            renderHwModalUsers(document.getElementById('hw-modal-search')?.value || '');
+            renderHwModalChips();
+        }
+
+        function hwClearAll() {
+            hwModalSelectedUsers = new Set();
+            renderHwModalUsers(document.getElementById('hw-modal-search')?.value || '');
+            renderHwModalChips();
+        }
+
+        async function saveHwAssign() {
+            if (!hwModalQuizId) return;
+            const users = [...hwModalSelectedUsers];
+            try {
+                await db.collection("quizzes").doc(hwModalQuizId).update({
+                    isHomework: users.length > 0,
+                    assignedUsers: users,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                showToast(`📚 มอบการบ้านให้ ${users.length} คนแล้ว!`);
+                closeHwAssignModal();
+            } catch (e) {
+                alert("Error: " + e.message);
+            }
+        }
 
         function switchTab(id) {
             document.querySelectorAll('.tab-content,.tab-btn').forEach(e => e.classList.remove('active'));
