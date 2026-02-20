@@ -1638,7 +1638,12 @@
                 currentStep = 0;
                 accumulatedTime = 0;
                 userAnswers = new Array(currentQuiz.questions.length).fill(null);
-                timeLeftForStep = (currentQuiz.questions[0].timer || 60);
+                // 🔥 V78.1: Timer initialization based on mode
+                if (currentQuiz.timerMode === 'total_time') {
+                    timeLeftForStep = currentQuiz.totalTimer || 300;
+                } else {
+                    timeLeftForStep = (currentQuiz.questions[0].timer || 60);
+                }
 
                 await db.collection("quiz_attempts").doc(`${quizId}_${userId}`).update({
                     status: 'started',
@@ -1650,7 +1655,12 @@
                 currentStep = 0;
                 accumulatedTime = 0;
                 userAnswers = new Array(currentQuiz.questions.length).fill(null);
-                timeLeftForStep = (currentQuiz.questions[0].timer || 60);
+                // 🔥 V78.1: Timer initialization based on mode
+                if (currentQuiz.timerMode === 'total_time') {
+                    timeLeftForStep = currentQuiz.totalTimer || 300;
+                } else {
+                    timeLeftForStep = (currentQuiz.questions[0].timer || 60);
+                }
 
                 try {
                     await db.collection("quiz_attempts").doc(`${quizId}_${userId}`).set({
@@ -1751,12 +1761,16 @@
                 passageArea.style.display = 'none';
             }
 
-            if (!useExistingTime) {
-                // 🔥 V77.24: Accumulate remaining time from previous question
+            // 🔥 V78.1: Timer logic based on mode
+            const isTotalTimeMode = currentQuiz.timerMode === 'total_time';
+
+            if (!useExistingTime && !isTotalTimeMode) {
+                // Per-question mode: accumulate remaining time from previous question
                 const baseTimer = question.timer || 60;
                 timeLeftForStep = baseTimer + (accumulatedTime || 0);
                 accumulatedTime = 0; // Reset after applying to base
             }
+            // For total_time mode, timeLeftForStep keeps counting down without reset
             updateTimerUI();
 
             quizTimerInterval = setInterval(() => {
@@ -1764,11 +1778,16 @@
                 updateTimerUI();
                 if (timeLeftForStep <= 0) {
                     clearInterval(quizTimerInterval);
-                    alert("🍭 หมดเวลาสำหรับข้อนี้!");
-                    if (currentStep < currentQuiz.questions.length - 1) {
-                        nextQuizStep();
-                    } else {
+                    if (isTotalTimeMode) {
+                        alert("🍭 หมดเวลารวมแล้ว! ระบบจะส่งคำตอบให้อัตโนมัติ");
                         submitQuiz();
+                    } else {
+                        alert("🍭 หมดเวลาสำหรับข้อนี้!");
+                        if (currentStep < currentQuiz.questions.length - 1) {
+                            nextQuizStep();
+                        } else {
+                            submitQuiz();
+                        }
                     }
                 }
             }, 1000);
@@ -1844,7 +1863,19 @@
 
         function updateTimerUI() {
             const el = document.getElementById('quiz-q-timer');
-            if (el) el.innerText = `⏱ ${timeLeftForStep}s`;
+            if (!el) return;
+            // 🔥 V78.1: Format differently for total time mode
+            if (currentQuiz && currentQuiz.timerMode === 'total_time') {
+                const mins = Math.floor(timeLeftForStep / 60);
+                const secs = timeLeftForStep % 60;
+                el.innerText = `⏱ ${mins}:${secs.toString().padStart(2, '0')}`;
+                el.style.color = timeLeftForStep <= 30 ? '#ef233c' : '#e67e22';
+                el.style.fontSize = '1.3em';
+            } else {
+                el.innerText = `⏱ ${timeLeftForStep}s`;
+                el.style.color = timeLeftForStep <= 10 ? '#ef233c' : '';
+                el.style.fontSize = '1.2em';
+            }
         }
 
         function handleChoiceChange(step, displayIdx, isMulti) {
@@ -2047,13 +2078,16 @@
 
         async function nextQuizStep() {
             if (currentStep < currentQuiz.questions.length - 1) {
-                // 🔥 V77.24 Carry over remaining time
-                if (timeLeftForStep > 0) {
-                    accumulatedTime += timeLeftForStep;
+                // 🔥 V78.1: Only accumulate time in per-question mode
+                if (currentQuiz.timerMode !== 'total_time') {
+                    if (timeLeftForStep > 0) {
+                        accumulatedTime += timeLeftForStep;
+                    }
                 }
 
                 currentStep++;
-                renderQuizStep();
+                // In total_time mode, pass true to keep the running timer
+                renderQuizStep(currentQuiz.timerMode === 'total_time');
                 // Optional: Save progress to Firestore
                 try {
                     if (currentQuiz && userId) {
@@ -2070,7 +2104,8 @@
                 } catch (e) { console.error("Auto-save error:", e); }
             }
         }
-        function prevQuizStep() { if (currentStep > 0) { currentStep--; renderQuizStep(); } }
+        // 🔥 V78.1: prevQuizStep also preserves timer in total_time mode
+        function prevQuizStep() { if (currentStep > 0) { currentStep--; renderQuizStep(currentQuiz.timerMode === 'total_time'); } }
 
         let isSubmittingQuiz = false;
         async function submitQuiz() {
@@ -2087,26 +2122,36 @@
 
             if (hasEmptyAnswers) {
                 if (!confirm("คุณยังตอบไม่ครบทุกข้อ ยืนยันที่จะส่งหรือไม่?")) {
+                    isSubmittingQuiz = false;
                     quizTimerInterval = setInterval(() => {
                         timeLeftForStep--;
                         updateTimerUI();
                         if (timeLeftForStep <= 0) {
                             clearInterval(quizTimerInterval);
-                            alert("🍭 หมดเวลาสำหรับข้อนี้!");
-                            if (currentStep < currentQuiz.questions.length - 1) { nextQuizStep(); } else { submitQuiz(); }
+                            if (currentQuiz.timerMode === 'total_time') {
+                                alert("🍭 หมดเวลารวมแล้ว!"); submitQuiz();
+                            } else {
+                                alert("🍭 หมดเวลาสำหรับข้อนี้!");
+                                if (currentStep < currentQuiz.questions.length - 1) { nextQuizStep(); } else { submitQuiz(); }
+                            }
                         }
                     }, 1000);
                     return;
                 }
             } else {
                 if (!confirm("ยืนยันส่งคำตอบ?")) {
+                    isSubmittingQuiz = false;
                     quizTimerInterval = setInterval(() => {
                         timeLeftForStep--;
                         updateTimerUI();
                         if (timeLeftForStep <= 0) {
                             clearInterval(quizTimerInterval);
-                            alert("🍭 หมดเวลาสำหรับข้อนี้!");
-                            if (currentStep < currentQuiz.questions.length - 1) { nextQuizStep(); } else { submitQuiz(); }
+                            if (currentQuiz.timerMode === 'total_time') {
+                                alert("🍭 หมดเวลารวมแล้ว!"); submitQuiz();
+                            } else {
+                                alert("🍭 หมดเวลาสำหรับข้อนี้!");
+                                if (currentStep < currentQuiz.questions.length - 1) { nextQuizStep(); } else { submitQuiz(); }
+                            }
                         }
                     }, 1000);
                     return;

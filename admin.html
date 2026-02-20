@@ -1356,6 +1356,33 @@
                 <textarea id="quiz-desc" placeholder="Instruction/Description" style="margin-top:10px;"></textarea>
                 <hr>
                 <h3>Questions (<span id="quiz-q-counter">0</span>)</h3>
+                <!-- 🔥 V78.1: Timer Controls -->
+                <div
+                    style="display:flex; gap:10px; align-items:center; margin-bottom:10px; background:#fff8e1; padding:10px 15px; border-radius:8px; border:1px solid #ffe082; flex-wrap:wrap;">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <label
+                            style="font-size:0.8em; font-weight:bold; color:#f57f17; margin:0; white-space:nowrap;">⏱️
+                            Timer Mode:</label>
+                        <select id="quiz-timer-mode" onchange="toggleTimerModeUI()"
+                            style="width:auto; margin:0; padding:4px 8px; font-size:0.85em; font-weight:bold; border-radius:6px;">
+                            <option value="per_question">Per Question (แต่ละข้อ)</option>
+                            <option value="total_time">Total Time (เวลารวม)</option>
+                        </select>
+                    </div>
+                    <div id="timer-total-area" style="display:none; align-items:center; gap:6px;">
+                        <label style="font-size:0.8em; color:#666; margin:0; white-space:nowrap;">Total (sec):</label>
+                        <input type="number" id="quiz-total-timer" value="300" min="10"
+                            style="width:80px; margin:0; padding:4px; font-weight:bold;">
+                    </div>
+                    <div id="timer-perq-area" style="display:flex; align-items:center; gap:6px;">
+                        <label style="font-size:0.8em; color:#666; margin:0; white-space:nowrap;">Set All:</label>
+                        <input type="number" id="quiz-set-all-timer" value="60" min="5"
+                            style="width:65px; margin:0; padding:4px;">
+                        <button class="btn-sm" onclick="setAllQuestionTimers()"
+                            style="padding:4px 10px; font-size:0.8em; background:#f57f17; color:white; border:none; border-radius:6px; white-space:nowrap;">⚡
+                            Apply All</button>
+                    </div>
+                </div>
                 <div
                     style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; background:var(--col-bg); padding:10px; border-radius:8px;">
                     <div style="display:flex; gap:5px;">
@@ -1739,6 +1766,9 @@
             document.getElementById('quiz-desc').value = q.description || "";
             document.getElementById('quiz-is-poll').checked = q.isPoll || false;
             document.getElementById('quiz-one-time').checked = q.oneTimeMode || false;
+            document.getElementById('quiz-timer-mode').value = q.timerMode || 'per_question';
+            document.getElementById('quiz-total-timer').value = q.totalTimer || 300;
+            toggleTimerModeUI();
             document.getElementById('quiz-type').value = q.quizType || "standard";
             document.getElementById('quiz-case-content').value = q.caseContent || "";
             toggleCaseUI();
@@ -1775,6 +1805,9 @@
             document.getElementById('quiz-desc').value = "";
             document.getElementById('quiz-is-poll').checked = false;
             document.getElementById('quiz-one-time').checked = false;
+            document.getElementById('quiz-timer-mode').value = 'per_question';
+            document.getElementById('quiz-total-timer').value = 300;
+            toggleTimerModeUI();
             document.getElementById('quiz-type').value = "standard";
             document.getElementById('quiz-case-content').value = "";
             toggleCaseUI();
@@ -1806,6 +1839,43 @@
             document.getElementById('case-content-area').style.display = (type === 'case_study') ? 'block' : 'none';
         }
 
+        // 🔥 V78.1: Timer Mode UI Toggle
+        function toggleTimerModeUI() {
+            const mode = document.getElementById('quiz-timer-mode').value;
+            const totalArea = document.getElementById('timer-total-area');
+            const perQArea = document.getElementById('timer-perq-area');
+            if (mode === 'total_time') {
+                totalArea.style.display = 'flex';
+                perQArea.style.display = 'none';
+                // Hide individual timer inputs on each question
+                document.querySelectorAll('.q-timer').forEach(el => {
+                    el.closest('label') ? el.closest('label').style.display = 'none' : null;
+                    el.style.display = 'none';
+                    // Also hide the label next to it
+                    const prev = el.previousElementSibling;
+                    if (prev && prev.tagName === 'LABEL') prev.style.display = 'none';
+                });
+            } else {
+                totalArea.style.display = 'none';
+                perQArea.style.display = 'flex';
+                // Show individual timer inputs
+                document.querySelectorAll('.q-timer').forEach(el => {
+                    el.style.display = '';
+                    const prev = el.previousElementSibling;
+                    if (prev && prev.tagName === 'LABEL') prev.style.display = '';
+                });
+            }
+        }
+
+        // 🔥 V78.1: Set All Question Timers
+        function setAllQuestionTimers() {
+            const val = parseInt(document.getElementById('quiz-set-all-timer').value) || 60;
+            const timers = document.querySelectorAll('.q-timer');
+            if (timers.length === 0) return alert("ยังไม่มีคำถาม!");
+            timers.forEach(el => el.value = val);
+            showToast(`⏱️ Set all ${timers.length} questions to ${val}s`);
+        }
+
         function getQuizFormData() {
             const title = document.getElementById('quiz-title').value.trim();
             const shortTitle = document.getElementById('quiz-short-title').value.trim();
@@ -1814,6 +1884,8 @@
             const totalPoints = parseFloat(document.getElementById('quiz-total-points').value) || 1.0;
             const isPoll = document.getElementById('quiz-is-poll').checked;
             const oneTimeMode = document.getElementById('quiz-one-time').checked;
+            const timerMode = document.getElementById('quiz-timer-mode').value;
+            const totalTimer = parseInt(document.getElementById('quiz-total-timer').value) || 300;
             const quizType = document.getElementById('quiz-type').value;
             const caseContent = document.getElementById('quiz-case-content').value;
 
@@ -1836,7 +1908,7 @@
             });
 
             return {
-                title, shortTitle, targetGroup, description, totalPoints, isPoll, oneTimeMode, quizType, caseContent, questions,
+                title, shortTitle, targetGroup, description, totalPoints, isPoll, oneTimeMode, timerMode, totalTimer, quizType, caseContent, questions,
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
             };
@@ -2207,6 +2279,8 @@
                 totalPoints: formData.totalPoints,
                 isPoll: formData.isPoll,
                 oneTimeMode: formData.oneTimeMode || false,
+                timerMode: formData.timerMode || 'per_question',
+                totalTimer: formData.totalTimer || 300,
                 questions: validQuestions,
                 startTime: convertDate(formData.startTime),
                 deadline: convertDate(formData.deadline),
