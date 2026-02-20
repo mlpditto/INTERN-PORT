@@ -1313,6 +1313,11 @@
                             style="cursor:pointer; background:#fff8e1; border:1px solid #ffe082; padding:8px; border-radius:6px; font-size:0.85em; font-weight:bold; color:#f57f17; display:flex; align-items:center; gap:5px; margin:0;">
                             <input type="checkbox" id="quiz-one-time" style="width:auto; margin:0;"> 🔄 ONE-TIME
                         </label>
+                        <label
+                            style="cursor:pointer; background:#e8f5e9; border:1px solid #a5d6a7; padding:8px; border-radius:6px; font-size:0.85em; font-weight:bold; color:#2e7d32; display:flex; align-items:center; gap:5px; margin:0;">
+                            <input type="checkbox" id="quiz-is-homework" onchange="toggleHomeworkUI()"
+                                style="width:auto; margin:0;"> 📚 Homework
+                        </label>
                     </div>
                 </div>
                 <div style="display:flex; gap:10px; margin-top:5px; margin-bottom:10px;">
@@ -1354,6 +1359,30 @@
                     </div>
                 </div>
                 <textarea id="quiz-desc" placeholder="Instruction/Description" style="margin-top:10px;"></textarea>
+                <!-- 🔥 V78.2: Homework User Picker -->
+                <div id="homework-assign-area"
+                    style="display:none; margin-top:10px; background:#e8f5e9; border:1px solid #a5d6a7; border-radius:10px; padding:12px;">
+                    <label
+                        style="font-size:0.85em; font-weight:bold; color:#2e7d32; margin-bottom:5px; display:block;">📚
+                        มอบการบ้านให้ (Assign Homework To):</label>
+                    <div style="display:flex; gap:5px; margin-bottom:8px;">
+                        <input type="text" id="homework-user-search" placeholder="🔍 ค้นหาชื่อ..."
+                            oninput="filterHomeworkUsers()"
+                            style="flex:1; padding:6px 10px; border-radius:6px; border:1px solid #ccc; font-size:0.9em; margin:0;">
+                        <button class="btn-sm" onclick="selectAllHomeworkUsers()"
+                            style="padding:4px 10px; font-size:0.75em; background:#2e7d32; color:white; border:none; border-radius:6px; white-space:nowrap;">✅
+                            All</button>
+                        <button class="btn-sm" onclick="clearAllHomeworkUsers()"
+                            style="padding:4px 10px; font-size:0.75em; background:#c62828; color:white; border:none; border-radius:6px; white-space:nowrap;">✕
+                            Clear</button>
+                    </div>
+                    <div id="homework-user-list"
+                        style="max-height:150px; overflow-y:auto; display:flex; flex-wrap:wrap; gap:5px; margin-bottom:8px; border:1px solid #ddd; border-radius:6px; padding:8px; background:white;">
+                    </div>
+                    <div id="homework-selected-chips" style="display:flex; flex-wrap:wrap; gap:4px;"></div>
+                    <div style="font-size:0.75em; color:#666; margin-top:5px;">Selected: <b id="homework-count">0</b>
+                        users</div>
+                </div>
                 <hr>
                 <h3>Questions (<span id="quiz-q-counter">0</span>)</h3>
                 <!-- 🔥 V78.1: Timer Controls -->
@@ -1766,9 +1795,17 @@
             document.getElementById('quiz-desc').value = q.description || "";
             document.getElementById('quiz-is-poll').checked = q.isPoll || false;
             document.getElementById('quiz-one-time').checked = q.oneTimeMode || false;
+            document.getElementById('quiz-is-homework').checked = q.isHomework || false;
             document.getElementById('quiz-timer-mode').value = q.timerMode || 'per_question';
             document.getElementById('quiz-total-timer').value = q.totalTimer || 300;
             toggleTimerModeUI();
+            toggleHomeworkUI();
+            // Load assigned users
+            if (q.isHomework && q.assignedUsers && q.assignedUsers.length > 0) {
+                homeworkSelectedUsers = new Set(q.assignedUsers);
+                renderHomeworkUserList();
+                renderHomeworkChips();
+            }
             document.getElementById('quiz-type').value = q.quizType || "standard";
             document.getElementById('quiz-case-content').value = q.caseContent || "";
             toggleCaseUI();
@@ -1805,9 +1842,12 @@
             document.getElementById('quiz-desc').value = "";
             document.getElementById('quiz-is-poll').checked = false;
             document.getElementById('quiz-one-time').checked = false;
+            document.getElementById('quiz-is-homework').checked = false;
+            homeworkSelectedUsers = new Set();
             document.getElementById('quiz-timer-mode').value = 'per_question';
             document.getElementById('quiz-total-timer').value = 300;
             toggleTimerModeUI();
+            toggleHomeworkUI();
             document.getElementById('quiz-type').value = "standard";
             document.getElementById('quiz-case-content').value = "";
             toggleCaseUI();
@@ -1816,6 +1856,95 @@
             document.getElementById('quiz-deadline').value = "";
             document.getElementById('quiz-questions-container').innerHTML = "";
             quizQPageIndex = 0;
+        }
+
+        // 🔥 V78.2: Homework User Picker
+        let homeworkSelectedUsers = new Set();
+
+        function toggleHomeworkUI() {
+            const checked = document.getElementById('quiz-is-homework').checked;
+            document.getElementById('homework-assign-area').style.display = checked ? 'block' : 'none';
+            if (checked) {
+                renderHomeworkUserList();
+                renderHomeworkChips();
+            }
+        }
+
+        function renderHomeworkUserList(filter = '') {
+            const container = document.getElementById('homework-user-list');
+            const searchLower = filter.toLowerCase();
+            const filtered = usersData.filter(u => {
+                if (!u.displayName) return false;
+                if (searchLower && !u.displayName.toLowerCase().includes(searchLower)) return false;
+                return true;
+            });
+
+            container.innerHTML = filtered.map(u => {
+                const checked = homeworkSelectedUsers.has(u.id) ? 'checked' : '';
+                const name = u.displayName || u.id;
+                const group = u.group || 'Public';
+                return `
+                    <label style="display:flex; align-items:center; gap:4px; background:${checked ? '#e8f5e9' : '#f8f9fa'}; padding:4px 8px; border-radius:6px; font-size:0.82em; cursor:pointer; border:1px solid ${checked ? '#4caf50' : '#eee'}; white-space:nowrap;">
+                        <input type="checkbox" ${checked} onchange="toggleHomeworkUser('${u.id}')" style="width:auto; margin:0;">
+                        ${name} <span style="color:#999; font-size:0.8em;">(${group})</span>
+                    </label>
+                `;
+            }).join('');
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div style="color:#999; font-size:0.85em; text-align:center; padding:10px;">ไม่พบผู้ใช้</div>';
+            }
+        }
+
+        function toggleHomeworkUser(uid) {
+            if (homeworkSelectedUsers.has(uid)) {
+                homeworkSelectedUsers.delete(uid);
+            } else {
+                homeworkSelectedUsers.add(uid);
+            }
+            renderHomeworkUserList(document.getElementById('homework-user-search').value);
+            renderHomeworkChips();
+        }
+
+        function renderHomeworkChips() {
+            const container = document.getElementById('homework-selected-chips');
+            const countEl = document.getElementById('homework-count');
+            countEl.innerText = homeworkSelectedUsers.size;
+
+            if (homeworkSelectedUsers.size === 0) {
+                container.innerHTML = '<span style="color:#999; font-size:0.8em;">ยังไม่ได้เลือก</span>';
+                return;
+            }
+
+            container.innerHTML = [...homeworkSelectedUsers].map(uid => {
+                const u = usersData.find(x => x.id === uid);
+                const name = u ? (u.displayName || uid) : uid;
+                return `<span style="background:#2e7d32; color:white; padding:2px 8px; border-radius:12px; font-size:0.75em; display:inline-flex; align-items:center; gap:3px;">
+                    ${name} <span onclick="toggleHomeworkUser('${uid}')" style="cursor:pointer; font-weight:bold; margin-left:2px;">✕</span>
+                </span>`;
+            }).join('');
+        }
+
+        function filterHomeworkUsers() {
+            const val = document.getElementById('homework-user-search').value;
+            renderHomeworkUserList(val);
+        }
+
+        function selectAllHomeworkUsers() {
+            const targetGroup = document.getElementById('quiz-target-group').value;
+            usersData.forEach(u => {
+                if (!u.displayName) return;
+                if (targetGroup !== 'Public' && (u.group || 'Public') !== targetGroup) return;
+                homeworkSelectedUsers.add(u.id);
+            });
+            renderHomeworkUserList(document.getElementById('homework-user-search').value);
+            renderHomeworkChips();
+        }
+
+        function clearAllHomeworkUsers() {
+            homeworkSelectedUsers = new Set();
+            renderHomeworkUserList(document.getElementById('homework-user-search').value);
+            renderHomeworkChips();
         }
 
         function triggerAutoSave() {
@@ -1884,6 +2013,8 @@
             const totalPoints = parseFloat(document.getElementById('quiz-total-points').value) || 1.0;
             const isPoll = document.getElementById('quiz-is-poll').checked;
             const oneTimeMode = document.getElementById('quiz-one-time').checked;
+            const isHomework = document.getElementById('quiz-is-homework').checked;
+            const assignedUsers = isHomework ? [...homeworkSelectedUsers] : [];
             const timerMode = document.getElementById('quiz-timer-mode').value;
             const totalTimer = parseInt(document.getElementById('quiz-total-timer').value) || 300;
             const quizType = document.getElementById('quiz-type').value;
@@ -1908,7 +2039,7 @@
             });
 
             return {
-                title, shortTitle, targetGroup, description, totalPoints, isPoll, oneTimeMode, timerMode, totalTimer, quizType, caseContent, questions,
+                title, shortTitle, targetGroup, description, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, quizType, caseContent, questions,
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
             };
@@ -2279,6 +2410,8 @@
                 totalPoints: formData.totalPoints,
                 isPoll: formData.isPoll,
                 oneTimeMode: formData.oneTimeMode || false,
+                isHomework: formData.isHomework || false,
+                assignedUsers: formData.assignedUsers || [],
                 timerMode: formData.timerMode || 'per_question',
                 totalTimer: formData.totalTimer || 300,
                 questions: validQuestions,
@@ -3016,6 +3149,7 @@
                 const pollLabel = q.isPoll ? '<span class="badge" style="background:var(--primary);">🗳️ POLL</span>' : '';
                 const subjLabel = hasWriting ? '<span class="badge" style="background:#e67e22;">📝 SUBJECTIVE</span>' : '';
                 const oneTimeLabel = q.oneTimeMode ? '<span class="badge" style="background:#f57f17; color:white;">🔄 ONE-TIME</span>' : '';
+                const homeworkLabel = q.isHomework ? `<span class="badge" style="background:#2e7d32; color:white;">📚 HW${q.assignedUsers && q.assignedUsers.length ? ' (' + q.assignedUsers.length + ')' : ''}</span>` : '';
                 const templateLabel = (q.isTemplate || !isActiveSection) ? '<div style="margin-top:4px;"><span class="badge" style="background:orange; color:white; font-size:0.75em;">TEMPLATE</span></div>' : '';
                 const targetGroupLabel = q.targetGroup && q.targetGroup !== "Public" ? `<span class="badge" style="background:#007bff; margin-left:5px;">${q.targetGroup}</span>` : '';
 
@@ -3034,7 +3168,7 @@
                             ${q.title ? q.title.replace(/\s*\(Template\)$/i, '') : '-'} 
                             <br><small style="color:#666;">(${q.shortTitle || '-'})</small> 
                             ${templateLabel}
-                            ${pollLabel} ${subjLabel} ${oneTimeLabel} ${targetGroupLabel}
+                            ${pollLabel} ${subjLabel} ${oneTimeLabel} ${homeworkLabel} ${targetGroupLabel}
                         </td>
                         <td>${q.questions ? q.questions.length : 0} Qs</td>
                         <td>${q.totalPoints || 1.0}</td>

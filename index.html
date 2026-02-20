@@ -1283,6 +1283,11 @@
                 const target = q.targetGroup || "Public";
                 if (target !== "Public" && target !== myGroup) return;
 
+                // 🔥 V78.2: Homework user-level filter
+                if (q.isHomework && q.assignedUsers && q.assignedUsers.length > 0) {
+                    if (!q.assignedUsers.includes(userId)) return;
+                }
+
                 // Visibility logic
                 if (start && now < start) return;
 
@@ -1417,11 +1422,14 @@
                     const dead = q.deadline ? q.deadline.toDate() : null;
                     const qTitle = q.shortTitle || q.title;
 
-                    let icon = `<div class="assign-icon icon-quiz"><i class="fa-solid fa-brain"></i></div>`;
+                    let icon = q.isHomework
+                        ? `<div class="assign-icon" style="background:linear-gradient(135deg, #2e7d32, #66bb6a); color:white; border-radius:12px; width:42px; height:42px; display:flex; align-items:center; justify-content:center; font-size:1.2em;"><i class="fa-solid fa-book"></i></div>`
+                        : `<div class="assign-icon icon-quiz"><i class="fa-solid fa-brain"></i></div>`;
                     let statusBadge = "";
                     let bodyHtml = "";
                     let actionHtml = "";
                     const isOneTime = q.oneTimeMode === true;
+                    const isHomework = q.isHomework === true;
 
                     if (attempt) {
                         const isPending = attempt.status === 'pending';
@@ -1496,6 +1504,7 @@
 
                         // 🔥 V78: Show ONE-TIME badge
                         const oneTimeBadge = isOneTime ? '<span class="badge" style="background:#f57f17; color:white; font-size:0.75em; margin-left:5px;">🔄 ONE-TIME</span>' : '';
+                        const homeworkBadge = isHomework ? '<span class="badge" style="background:#2e7d32; color:white; font-size:0.75em; margin-left:5px;">📚 การบ้าน</span>' : '';
 
                         bodyHtml = `
                             <div class="assign-meta">
@@ -1503,7 +1512,7 @@
                                 <div class="meta-item"><i class="fa-solid fa-trophy"></i> ${q.totalPoints || 1} pts</div>
                                 ${deadlineHtml}
                             </div>
-                            <div style="margin-top:10px; font-size:0.9em;">${q.description || "แบบทดสอบวัดความรู้"} ${oneTimeBadge}</div>
+                            <div style="margin-top:10px; font-size:0.9em;">${q.description || "แบบทดสอบวัดความรู้"} ${oneTimeBadge} ${homeworkBadge}</div>
                         `;
                         const isExpired = (dead && new Date() > dead);
                         if (isExpired) {
