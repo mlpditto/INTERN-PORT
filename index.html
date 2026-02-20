@@ -812,6 +812,8 @@
         let userId = "", userProfile = {}, userSubmissions = {};
         let questsCache = [], mySubmissionsCache = {}, myWorksCache = [], sideQuestsCache = {}, myGroup = "Public";
         let quizzesCache = [], quizAttemptsCache = {}, allUsersData = [], divisionConfig = {}, groupSettings = {}; // 🔥 Added Settings V69
+        let shuffleMap = []; // 🔥 V78: Shuffle mapping per question [questionIndex] => [originalIndex0, originalIndex1, ...]
+        let isPracticeMode = false; // 🔥 V78: ONE-TIME practice mode flag
 
         // --- Initialization ---
         function updateStatus(msg) {
@@ -1419,6 +1421,7 @@
                     let statusBadge = "";
                     let bodyHtml = "";
                     let actionHtml = "";
+                    const isOneTime = q.oneTimeMode === true;
 
                     if (attempt) {
                         const isPending = attempt.status === 'pending';
@@ -1428,14 +1431,27 @@
                             statusBadge = `<span class="assign-tag" style="background:#fff3cd; color:#856404;">⏳ กำลังทำ (In Progress)</span>`;
                             bodyHtml = `<div style="color:#666;">คุณกำลังทำแบบทดสอบนี้อยู่...</div>`;
                             actionHtml = `<button class="btn-warning" onclick="runQuiz('${q.id}')">▶️ ทำต่อ (Resume)</button>`;
+                        } else if (attempt.status === 'practice_done') {
+                            // 🔥 V78: ONE-TIME practice completed
+                            statusBadge = `<span class="assign-tag" style="background:#fff3cd; color:#856404;">🔄 ฝึกซ้อมเสร็จแล้ว</span>`;
+                            bodyHtml = `
+                                <div style="color:#666; font-size:0.9em;">
+                                    คุณได้ฝึกซ้อมแล้ว ✅<br>
+                                    <span style="font-weight:bold;">Practice Score: ${attempt.practiceScore || 0}/${attempt.practiceTotalQ || '?'}</span>
+                                </div>
+                            `;
+                            actionHtml = `
+                                <button class="btn-sm btn-info" onclick="viewPracticeAnswers('${q.id}')" style="width:100%; margin-bottom:5px; border-radius:6px;">👁️ ดูผลฝึกซ้อม</button>
+                                <button class="btn-primary" onclick="requestRealExam('${q.id}')" style="width:100%; background:linear-gradient(135deg, #e67e22 0%, #d35400 100%); border:none;">📨 ขออนุญาตสอบจริง</button>
+                            `;
                         } else if (attempt.status === 'requesting') {
-                            statusBadge = `<span class="assign-tag" style="background:#e9ecef; color:#495057;">📨 รออนุมัติให้ทำเลท</span>`;
-                            bodyHtml = `<div style="color:#666; font-size:0.9em;">ส่งคำขอทำแบบทดสอบหลังกำหนดแล้ว รอแอดมินอนุมัติครับ</div>`;
+                            statusBadge = `<span class="assign-tag" style="background:#e9ecef; color:#495057;">📨 รออนุมัติ${isOneTime ? 'สอบจริง' : 'ให้ทำเลท'}</span>`;
+                            bodyHtml = `<div style="color:#666; font-size:0.9em;">ส่งคำขอ${isOneTime ? 'สอบจริง' : 'ทำแบบทดสอบหลังกำหนด'}แล้ว รอแอดมินอนุมัติครับ</div>`;
                             actionHtml = `<button class="btn-dark" disabled>🚫 Waiting for Admin</button>`;
                         } else if (attempt.status === 'allowed') {
-                            statusBadge = `<span class="assign-tag" style="background:#d1e7dd; color:#0f5132;">✅ อนุมัติให้ทำเลทได้</span>`;
-                            bodyHtml = `<div style="color:#0f5132; font-weight:bold;">แอดมินอนุญาตให้คุณทำแบบทดสอบนี้แล้วครับ!</div>`;
-                            actionHtml = `<button class="btn-primary" onclick="confirmRunQuiz('${q.id}')">🚀 เริ่มทำแบบทดสอบ</button>`;
+                            statusBadge = `<span class="assign-tag" style="background:#d1e7dd; color:#0f5132;">✅ อนุมัติ${isOneTime ? 'สอบจริง' : 'ให้ทำเลท'}ได้</span>`;
+                            bodyHtml = `<div style="color:#0f5132; font-weight:bold;">แอดมินอนุญาตให้คุณ${isOneTime ? 'สอบจริง' : 'ทำแบบทดสอบนี้'}แล้วครับ!</div>`;
+                            actionHtml = `<button class="btn-primary" onclick="confirmRunQuiz('${q.id}')">🚀 เริ่ม${isOneTime ? 'สอบจริง' : 'ทำแบบทดสอบ'}</button>`;
                         } else {
                             // Pending/Done
                             const score = attempt.totalQuestions ? (attempt.correctCount / attempt.totalQuestions) * (q.totalPoints || 1.0) : 0;
@@ -1478,13 +1494,16 @@
                             deadlineHtml = `<div class="meta-item quiz-global-expiry" data-dead="${dead.getTime()}" style="color:#ef233c; font-weight:bold;"><i class="fa-solid fa-circle-exclamation"></i> Loading...</div>`;
                         }
 
+                        // 🔥 V78: Show ONE-TIME badge
+                        const oneTimeBadge = isOneTime ? '<span class="badge" style="background:#f57f17; color:white; font-size:0.75em; margin-left:5px;">🔄 ONE-TIME</span>' : '';
+
                         bodyHtml = `
                             <div class="assign-meta">
                                 <div class="meta-item"><i class="fa-solid fa-list-ol"></i> ${q.questions ? q.questions.length : '?'} ข้อ</div>
                                 <div class="meta-item"><i class="fa-solid fa-trophy"></i> ${q.totalPoints || 1} pts</div>
                                 ${deadlineHtml}
                             </div>
-                            <div style="margin-top:10px; font-size:0.9em;">${q.description || "แบบทดสอบวัดความรู้"}</div>
+                            <div style="margin-top:10px; font-size:0.9em;">${q.description || "แบบทดสอบวัดความรู้"} ${oneTimeBadge}</div>
                         `;
                         const isExpired = (dead && new Date() > dead);
                         if (isExpired) {
@@ -1519,16 +1538,68 @@
             const q = quizzesCache.find(x => x.id === quizId);
             if (!q) return;
 
-            // 🔥 Added V77.24: Pre-Quiz Warning
-            const warningMsg = `⚠️ คำเตือน (Warning):\n` +
-                `- เมื่อเริ่มแล้ว ห้ามออกจากหน้าจอนี้จนกว่าจะส่งคำตอบ\n` +
-                `- การออกจากหน้าจอ (รวมถึงการ Refresh) จะถือว่าเป็น "สิ้นสุดการทำทันที"\n` +
-                `- หากต้องการทำใหม่ ต้องให้แอดมินปลดล็อคให้เท่านั้น\n` +
-                `------------------------------\n` +
-                `ยืนยันที่จะเริ่มทำแบบทดสอบ "${q.title}" ใช่หรือไม่?`;
+            // 🔥 V78: ONE-TIME Mode branching
+            const isOneTime = q.oneTimeMode === true;
+            const attempt = quizAttemptsCache[quizId];
+            const isAllowed = attempt && attempt.status === 'allowed';
 
-            if (confirm(warningMsg)) {
-                runQuiz(quizId);
+            if (isOneTime && !isAllowed) {
+                // First time on a ONE-TIME quiz → Practice mode
+                const practiceMsg = `🔄 โหมด ONE-TIME\n` +
+                    `------------------------------\n` +
+                    `แบบทดสอบนี้เป็นโหมด ONE-TIME:\n` +
+                    `1. ครั้งแรก: ฝึกซ้อม (Practice) — ไม่มีคะแนนจริง\n` +
+                    `   → หลังส่ง จะเห็นเฉพาะข้อที่ตอบถูกเท่านั้น\n` +
+                    `2. ครั้งที่สอง: สอบจริง — ต้องขออนุมัติจากแอดมินก่อน\n` +
+                    `------------------------------\n` +
+                    `⚠️ เมื่อเริ่มแล้ว ห้ามออกจากหน้าจอนี้\n` +
+                    `ยืนยันเริ่มฝึกซ้อม (Practice)?`;
+
+                if (confirm(practiceMsg)) {
+                    isPracticeMode = true;
+                    runQuiz(quizId);
+                }
+            } else {
+                // Normal quiz or Allowed re-take
+                isPracticeMode = false;
+                const warningMsg = `⚠️ คำเตือน (Warning):\n` +
+                    `- เมื่อเริ่มแล้ว ห้ามออกจากหน้าจอนี้จนกว่าจะส่งคำตอบ\n` +
+                    `- การออกจากหน้าจอ (รวมถึงการ Refresh) จะถือว่าเป็น "สิ้นสุดการทำทันที"\n` +
+                    `- หากต้องการทำใหม่ ต้องให้แอดมินปลดล็อคให้เท่านั้น\n` +
+                    `------------------------------\n` +
+                    `ยืนยันที่จะเริ่ม${isAllowed && q.oneTimeMode ? 'สอบจริง' : 'ทำแบบทดสอบ'} "${q.title}" ใช่หรือไม่?`;
+
+                if (confirm(warningMsg)) {
+                    runQuiz(quizId);
+                }
+            }
+        }
+
+        // 🔥 V78: Request real exam for ONE-TIME mode
+        async function requestRealExam(quizId) {
+            const q = quizzesCache.find(x => x.id === quizId);
+            if (!q) return;
+            if (!confirm(`ยืนยันขออนุญาตสอบจริง "${q.title}"?\n(แอดมินจะเห็นคะแนนฝึกซ้อมของคุณ)`)) return;
+
+            try {
+                const attempt = quizAttemptsCache[quizId];
+                await db.collection("quiz_attempts").doc(`${quizId}_${userId}`).set({
+                    quizId,
+                    userId,
+                    displayName: userProfile.displayName,
+                    pictureUrl: userProfile.pictureUrl || "",
+                    status: 'requesting',
+                    isPractice: true,
+                    practiceScore: attempt ? attempt.practiceScore : 0,
+                    practiceTotalQ: attempt ? attempt.practiceTotalQ : 0,
+                    practiceAnswers: attempt ? attempt.practiceAnswers : [],
+                    requestTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                alert("ส่งคำขอสอบจริงเรียบร้อย! โปรดรอแอดมินอนุมัติครับ");
+                loadQuizzes();
+            } catch (e) {
+                alert("Request Error: " + e.message);
             }
         }
 
@@ -1562,7 +1633,8 @@
                 return;
             } else if (existing && existing.status === 'allowed') {
                 // Admin allowed a re-take
-                isResuming = false; // Start fresh
+                isPracticeMode = false; // Real exam mode
+                isResuming = false;
                 currentStep = 0;
                 accumulatedTime = 0;
                 userAnswers = new Array(currentQuiz.questions.length).fill(null);
@@ -1587,6 +1659,7 @@
                         displayName: userProfile.displayName,
                         pictureUrl: userProfile.pictureUrl || "",
                         status: 'started',
+                        isPractice: isPracticeMode,
                         startTime: firebase.firestore.FieldValue.serverTimestamp(),
                         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                         answers: userAnswers
@@ -1594,7 +1667,24 @@
                 } catch (e) { console.error("Start Quiz Error:", e); }
             }
 
-            document.getElementById('quiz-run-title').innerText = currentQuiz.title;
+            // 🔥 V78: Generate shuffle map for all choice questions
+            shuffleMap = [];
+            currentQuiz.questions.forEach((q, idx) => {
+                if ((q.type || 'choice') === 'choice' && q.options && q.options.length > 0) {
+                    // Create array [0, 1, 2, 3, ...] and shuffle it
+                    const indices = q.options.map((_, i) => i);
+                    // Fisher-Yates shuffle
+                    for (let i = indices.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [indices[i], indices[j]] = [indices[j], indices[i]];
+                    }
+                    shuffleMap[idx] = indices; // shuffleMap[questionIdx][displayPos] = originalIndex
+                } else {
+                    shuffleMap[idx] = null; // No shuffle for non-choice
+                }
+            });
+
+            document.getElementById('quiz-run-title').innerText = currentQuiz.title + (isPracticeMode ? ' (ฝึกซ้อม)' : '');
             document.getElementById('quizModal').style.display = 'block';
             renderQuizStep(isResuming);
         }
@@ -1692,18 +1782,24 @@
                     userAnswers[currentStep] = []; // Initialize as array for multi
                 }
 
+                // 🔥 V78: Use shuffleMap to display options in shuffled order
+                const sMap = shuffleMap[currentStep]; // [displayPos] => originalIndex
+                const displayOrder = sMap || question.options.map((_, i) => i); // Fallback to original order
+
                 inputHtml = `
                     <div style="display:flex; flex-direction:column; gap:10px;">
-                        ${question.options.map((opt, i) => {
+                        ${displayOrder.map((origIdx, displayIdx) => {
+                    const opt = question.options[origIdx];
+                    // userAnswers stores ORIGINAL indices
                     const isChecked = isMulti
-                        ? (userAnswers[currentStep] || []).includes(i)
-                        : userAnswers[currentStep] === i;
+                        ? (userAnswers[currentStep] || []).includes(origIdx)
+                        : userAnswers[currentStep] === origIdx;
 
                     return `
                                 <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #ddd; border-radius:8px; cursor:pointer; background:${isChecked ? '#f0f7ff' : '#fff'}; border-color:${isChecked ? '#4361ee' : '#ddd'};">
-                                    <input type="${isMulti ? 'checkbox' : 'radio'}" name="q-opt" value="${i}"
+                                    <input type="${isMulti ? 'checkbox' : 'radio'}" name="q-opt" value="${displayIdx}"
                                         ${isChecked ? 'checked' : ''}
-                                        onchange="handleChoiceChange(${currentStep}, ${i}, ${isMulti})"
+                                        onchange="handleChoiceChange(${currentStep}, ${displayIdx}, ${isMulti})"
                                         style="width:auto; margin:0;">
                                     ${opt}
                                 </label>
@@ -1751,14 +1847,18 @@
             if (el) el.innerText = `⏱ ${timeLeftForStep}s`;
         }
 
-        function handleChoiceChange(step, index, isMulti) {
+        function handleChoiceChange(step, displayIdx, isMulti) {
+            // 🔥 V78: Convert displayIdx back to originalIdx using shuffleMap
+            const sMap = shuffleMap[step];
+            const originalIdx = sMap ? sMap[displayIdx] : displayIdx;
+
             if (isMulti) {
                 if (!Array.isArray(userAnswers[step])) userAnswers[step] = [];
-                const idx = userAnswers[step].indexOf(index);
+                const idx = userAnswers[step].indexOf(originalIdx);
                 if (idx > -1) userAnswers[step].splice(idx, 1);
-                else userAnswers[step].push(index);
+                else userAnswers[step].push(originalIdx);
             } else {
-                userAnswers[step] = index;
+                userAnswers[step] = originalIdx;
             }
             renderQuizStepUIOnly();
         }
@@ -1769,12 +1869,15 @@
 
             const question = currentQuiz.questions[currentStep];
             const isMulti = Array.isArray(question.correct) && question.correct.length > 1;
+            const sMap = shuffleMap[currentStep];
+            const displayOrder = sMap || question.options.map((_, i) => i);
 
-            labels.forEach((l, i) => {
+            labels.forEach((l, displayIdx) => {
                 const input = l.querySelector('input');
+                const origIdx = displayOrder[displayIdx];
                 const isChecked = isMulti
-                    ? (userAnswers[currentStep] || []).includes(i)
-                    : userAnswers[currentStep] === i;
+                    ? (userAnswers[currentStep] || []).includes(origIdx)
+                    : userAnswers[currentStep] === origIdx;
 
                 if (isChecked) {
                     l.style.background = '#f0f7ff';
@@ -2073,18 +2176,35 @@
 
             try {
                 const attemptRef = db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`);
-                const submissionData = isPoll ? {
-                    isPoll: true,
-                    status: 'pending',
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    answers: []
-                } : {
-                    correctCount,
-                    totalQuestions: currentQuiz.questions.length,
-                    answers: finalAnswers,
-                    status: 'pending',
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                };
+
+                // 🔥 V78: Practice mode vs Regular mode submission
+                let submissionData;
+                if (isPracticeMode) {
+                    // Practice mode: save with practice_done status, NO real score
+                    submissionData = {
+                        practiceScore: correctCount,
+                        practiceTotalQ: currentQuiz.questions.length,
+                        practiceAnswers: finalAnswers,
+                        status: 'practice_done',
+                        isPractice: true,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+                } else if (isPoll) {
+                    submissionData = {
+                        isPoll: true,
+                        status: 'pending',
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        answers: []
+                    };
+                } else {
+                    submissionData = {
+                        correctCount,
+                        totalQuestions: currentQuiz.questions.length,
+                        answers: finalAnswers,
+                        status: 'pending',
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+                }
 
                 const tasks = [];
                 if (isPoll) {
@@ -2103,30 +2223,38 @@
 
                 document.getElementById('quizModal').style.display = 'none';
 
-                // 🔥 V77.24: Dynamic Duration Adjustment (-10% of REMAINING time per submission)
-                try {
-                    const quizDoc = await db.collection("quizzes").doc(currentQuiz.id).get();
-                    const qData = quizDoc.data();
+                // 🔥 V78: Show practice results immediately (only correct answers)
+                if (isPracticeMode) {
+                    isPracticeMode = false; // Reset flag
+                    setTimeout(() => {
+                        showPracticeResult(currentQuiz, correctCount, userAnswers);
+                    }, 100);
+                } else {
+                    // 🔥 V77.24: Dynamic Duration Adjustment (-10% of REMAINING time per submission)
+                    try {
+                        const quizDoc = await db.collection("quizzes").doc(currentQuiz.id).get();
+                        const qData = quizDoc.data();
 
-                    if (qData && qData.deadline) {
-                        const nowTime = new Date();
-                        const dead = qData.deadline.toDate();
+                        if (qData && qData.deadline) {
+                            const nowTime = new Date();
+                            const dead = qData.deadline.toDate();
 
-                        if (dead > nowTime) {
-                            const remainingMs = dead.getTime() - nowTime.getTime();
-                            const reductionMs = remainingMs * 0.1; // 10% of REMAINING
-                            const newDeadlineMs = dead.getTime() - reductionMs;
+                            if (dead > nowTime) {
+                                const remainingMs = dead.getTime() - nowTime.getTime();
+                                const reductionMs = remainingMs * 0.1; // 10% of REMAINING
+                                const newDeadlineMs = dead.getTime() - reductionMs;
 
-                            await db.collection("quizzes").doc(currentQuiz.id).update({
-                                deadline: firebase.firestore.Timestamp.fromMillis(newDeadlineMs)
-                            });
+                                await db.collection("quizzes").doc(currentQuiz.id).update({
+                                    deadline: firebase.firestore.Timestamp.fromMillis(newDeadlineMs)
+                                });
+                            }
                         }
-                    }
-                } catch (errDuration) { console.error("Duration Adjustment Error:", errDuration); }
+                    } catch (errDuration) { console.error("Duration Adjustment Error:", errDuration); }
 
-                setTimeout(() => {
-                    alert(isPoll ? "ส่งโพลเรียบร้อย!" : `ส่งคำตอบเรียบร้อย!\nคะแนนที่คาดว่าจะได้รับ: ${pointsAwarded.toFixed(3)} แต้ม`);
-                }, 100);
+                    setTimeout(() => {
+                        alert(isPoll ? "ส่งโพลเรียบร้อย!" : `ส่งคำตอบเรียบร้อย!\nคะแนนที่คาดว่าจะได้รับ: ${pointsAwarded.toFixed(3)} แต้ม`);
+                    }, 100);
+                }
 
             } catch (e) {
                 console.error("Submission Error:", e);
@@ -2138,6 +2266,106 @@
                     btn.innerText = "คลิกเพื่อลองส่งอีกครั้ง";
                 }
             }
+        }
+
+        // 🔥 V78: Show practice result — only shows which questions user got RIGHT (no answer key for wrong ones)
+        function showPracticeResult(quiz, correctCount, answers) {
+            const container = document.getElementById('quiz-result-container');
+            let html = `
+                <div style="text-align:center; margin-bottom:20px; padding:20px; background:linear-gradient(135deg, #fff3cd, #ffeaa7); border-radius:12px;">
+                    <div style="font-size:1.2em; font-weight:bold; color:#856404;">🔄 ผลฝึกซ้อม (Practice Result)</div>
+                    <div style="font-size:2.5em; font-weight:bold; color:#f57f17; margin:10px 0;">${correctCount} / ${quiz.questions.length}</div>
+                    <div style="font-size:0.9em; color:#856404;">คะแนนนี้ไม่นับจริง — ฝึกซ้อมเท่านั้น</div>
+                </div>
+            `;
+
+            quiz.questions.forEach((question, i) => {
+                const userAns = answers[i];
+                const isChoice = (question.type || 'choice') === 'choice';
+
+                let isCorrect = false;
+                if (isChoice) {
+                    if (Array.isArray(question.correct)) {
+                        const correctArr = question.correct.sort().join(',');
+                        const userArr = (Array.isArray(userAns) ? userAns : [userAns]).sort().join(',');
+                        isCorrect = (correctArr === userArr);
+                    } else {
+                        isCorrect = (userAns == question.correct);
+                    }
+                }
+
+                if (isCorrect) {
+                    // Show correct answers with green background
+                    let userAnsText = "";
+                    if (isChoice) {
+                        if (Array.isArray(userAns)) {
+                            userAnsText = userAns.map(idx => question.options[idx] || '-').join(', ');
+                        } else {
+                            userAnsText = question.options[userAns] || '-';
+                        }
+                    }
+                    html += `
+                        <div style="background:#d4edda; border:1px solid #c3e6cb; padding:15px; border-radius:10px; margin-bottom:10px;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                                <b style="color:#333;">ข้อที่ ${i + 1}</b>
+                                <i class="fa-solid fa-check-circle" style="color:#155724;"></i>
+                            </div>
+                            <div style="font-size:1em; margin-bottom:5px;">${question.q}</div>
+                            <div style="background:rgba(255,255,255,0.5); padding:8px; border-radius:6px; font-size:0.95em;">
+                                <b>ตอบ:</b> ${userAnsText} ✅
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // For wrong answers: show question and that it was wrong, but NOT the correct answer
+                    html += `
+                        <div style="background:#f8d7da; border:1px solid #f5c6cb; padding:15px; border-radius:10px; margin-bottom:10px;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                                <b style="color:#333;">ข้อที่ ${i + 1}</b>
+                                <i class="fa-solid fa-times-circle" style="color:#721c24;"></i>
+                            </div>
+                            <div style="font-size:1em; margin-bottom:5px;">${question.q}</div>
+                            <div style="background:rgba(255,255,255,0.5); padding:8px; border-radius:6px; font-size:0.95em; color:#721c24;">
+                                ❌ ตอบผิด — เฉลยจะแสดงหลังสอบจริงเท่านั้น
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            html += `
+                <div style="text-align:center; margin-top:15px; padding:15px; background:#e3f2fd; border-radius:10px; border:1px dashed #90caf9;">
+                    <div style="font-weight:bold; color:#1565c0;">📨 ขั้นตอนถัดไป</div>
+                    <div style="font-size:0.9em; color:#666; margin-top:5px;">กดปุ่ม "ขออนุญาตสอบจริง" ในการ์ดแบบทดสอบ เพื่อขอทำสอบจริงครับ</div>
+                </div>
+            `;
+
+            container.innerHTML = html;
+            document.getElementById('quizResultModal').style.display = 'block';
+        }
+
+        // 🔥 V78: View practice answers (from saved attempt data)
+        async function viewPracticeAnswers(quizId) {
+            const q = quizzesCache.find(x => x.id === quizId);
+            const attempt = quizAttemptsCache[quizId];
+
+            if (!q || !attempt) return alert("Data not found");
+
+            // Reconstruct answers from practiceAnswers (which are stored as finalAnswers format)
+            const practiceAnswers = attempt.practiceAnswers || [];
+
+            // Convert back from "1\n---\n2" string format to arrays where needed
+            const answers = practiceAnswers.map((ans, i) => {
+                const question = q.questions[i];
+                if (!question) return ans;
+                const isChoice = (question.type || 'choice') === 'choice';
+                if (isChoice && typeof ans === 'string' && ans.includes("\n---\n")) {
+                    return ans.split("\n---\n").map(Number);
+                }
+                return typeof ans === 'string' ? parseInt(ans) : ans;
+            });
+
+            showPracticeResult(q, attempt.practiceScore || 0, answers);
         }
 
         function toggleHist(id) {

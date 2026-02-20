@@ -1303,11 +1303,15 @@
                         <input type="number" id="quiz-total-points" value="1.0" step="0.1">
                     </div>
                     <div
-                        style="flex:1; display:flex; flex-direction:column; justify-content:flex-end; padding-bottom:10px;">
+                        style="flex:1; display:flex; flex-direction:column; justify-content:flex-end; padding-bottom:10px; gap:6px;">
                         <label
                             style="cursor:pointer; background:var(--col-bg); border:1px solid var(--border-color); padding:8px; border-radius:6px; font-size:0.85em; font-weight:bold; color:var(--primary); display:flex; align-items:center; gap:5px; margin:0;">
                             <input type="checkbox" id="quiz-is-poll" onchange="updatePollUI()"
                                 style="width:auto; margin:0;"> 🗳️ Poll Mode
+                        </label>
+                        <label
+                            style="cursor:pointer; background:#fff8e1; border:1px solid #ffe082; padding:8px; border-radius:6px; font-size:0.85em; font-weight:bold; color:#f57f17; display:flex; align-items:center; gap:5px; margin:0;">
+                            <input type="checkbox" id="quiz-one-time" style="width:auto; margin:0;"> 🔄 ONE-TIME
                         </label>
                     </div>
                 </div>
@@ -1734,6 +1738,7 @@
             document.getElementById('quiz-total-points').value = q.totalPoints || 1.0;
             document.getElementById('quiz-desc').value = q.description || "";
             document.getElementById('quiz-is-poll').checked = q.isPoll || false;
+            document.getElementById('quiz-one-time').checked = q.oneTimeMode || false;
             document.getElementById('quiz-type').value = q.quizType || "standard";
             document.getElementById('quiz-case-content').value = q.caseContent || "";
             toggleCaseUI();
@@ -1769,6 +1774,7 @@
             document.getElementById('quiz-total-points').value = 1.0;
             document.getElementById('quiz-desc').value = "";
             document.getElementById('quiz-is-poll').checked = false;
+            document.getElementById('quiz-one-time').checked = false;
             document.getElementById('quiz-type').value = "standard";
             document.getElementById('quiz-case-content').value = "";
             toggleCaseUI();
@@ -1807,6 +1813,7 @@
             const description = document.getElementById('quiz-desc').value;
             const totalPoints = parseFloat(document.getElementById('quiz-total-points').value) || 1.0;
             const isPoll = document.getElementById('quiz-is-poll').checked;
+            const oneTimeMode = document.getElementById('quiz-one-time').checked;
             const quizType = document.getElementById('quiz-type').value;
             const caseContent = document.getElementById('quiz-case-content').value;
 
@@ -1829,7 +1836,7 @@
             });
 
             return {
-                title, shortTitle, targetGroup, description, totalPoints, isPoll, quizType, caseContent, questions,
+                title, shortTitle, targetGroup, description, totalPoints, isPoll, oneTimeMode, quizType, caseContent, questions,
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
             };
@@ -2199,6 +2206,7 @@
                 description: formData.description,
                 totalPoints: formData.totalPoints,
                 isPoll: formData.isPoll,
+                oneTimeMode: formData.oneTimeMode || false,
                 questions: validQuestions,
                 startTime: convertDate(formData.startTime),
                 deadline: convertDate(formData.deadline),
@@ -2314,13 +2322,18 @@
                 const qTitle = q.shortTitle || q.title || "Unknown Quiz";
                 const isPoll = q.isPoll === true;
                 const isRequest = att.status === 'requesting';
+                const isPracticeRequest = att.status === 'requesting' && att.isPractice;
 
                 let actionHtml = "";
                 let pointsToAdd = 0;
 
                 if (isRequest) {
+                    const practiceInfo = att.practiceScore !== undefined
+                        ? `<div style="font-size:0.8em; color:#856404; margin-bottom:4px;">🔄 Practice Score: ${att.practiceScore}/${att.practiceTotalQ || '?'}</div>`
+                        : '';
                     actionHtml = `
-                            <button class="btn-sm btn-success" onclick="allowLateQuiz('${att.id}')">Allow Request</button>
+                            ${practiceInfo}
+                            <button class="btn-sm btn-success" onclick="allowLateQuiz('${att.id}')">Allow ${isPracticeRequest ? '(Real Exam)' : 'Request'}</button>
                             <button class="btn-sm btn-danger" onclick="rejectQuiz('${att.id}')">Deny</button>
                         `;
                 } else {
@@ -2928,6 +2941,7 @@
                 const hasWriting = q.questions && q.questions.some(x => x.type === 'short_answer');
                 const pollLabel = q.isPoll ? '<span class="badge" style="background:var(--primary);">🗳️ POLL</span>' : '';
                 const subjLabel = hasWriting ? '<span class="badge" style="background:#e67e22;">📝 SUBJECTIVE</span>' : '';
+                const oneTimeLabel = q.oneTimeMode ? '<span class="badge" style="background:#f57f17; color:white;">🔄 ONE-TIME</span>' : '';
                 const templateLabel = (q.isTemplate || !isActiveSection) ? '<div style="margin-top:4px;"><span class="badge" style="background:orange; color:white; font-size:0.75em;">TEMPLATE</span></div>' : '';
                 const targetGroupLabel = q.targetGroup && q.targetGroup !== "Public" ? `<span class="badge" style="background:#007bff; margin-left:5px;">${q.targetGroup}</span>` : '';
 
@@ -2946,7 +2960,7 @@
                             ${q.title ? q.title.replace(/\s*\(Template\)$/i, '') : '-'} 
                             <br><small style="color:#666;">(${q.shortTitle || '-'})</small> 
                             ${templateLabel}
-                            ${pollLabel} ${subjLabel} ${targetGroupLabel}
+                            ${pollLabel} ${subjLabel} ${oneTimeLabel} ${targetGroupLabel}
                         </td>
                         <td>${q.questions ? q.questions.length : 0} Qs</td>
                         <td>${q.totalPoints || 1.0}</td>
