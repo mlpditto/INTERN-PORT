@@ -4,9 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP INTERNSHIP PORT V78.2</title>
+    <title>MLP INTERNSHIP PORT V78.6</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Montserrat:wght@400;700&display=swap"
+        rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -821,7 +824,7 @@
                 <h2 style="margin:0;"><i class="fa-solid fa-user-shield"></i> Dashboard
                     <span
                         style="font-size:0.5em; background:#ff9f1c; padding:2px 8px; border-radius:10px; color:white; vertical-align:middle; font-weight:bold;">
-                        LIFF: V78.2 | Admin: V78.2
+                        LIFF: V78.6 | Admin: V78.6
                     </span>
                 </h2>
                 <span id="admin-email" style="font-size:0.8em; color:var(--text-sub);"></span>
@@ -1318,6 +1321,11 @@
                             <input type="checkbox" id="quiz-is-homework" onchange="toggleHomeworkUI()"
                                 style="width:auto; margin:0;"> 📚 Homework
                         </label>
+                        <label
+                            style="cursor:pointer; background:#e8eaf6; border:1px solid #c5cae9; padding:8px; border-radius:6px; font-size:0.85em; font-weight:bold; color:#3f51b5; display:flex; align-items:center; gap:5px; margin:0;">
+                            <input type="checkbox" id="quiz-shuffle-choices" checked style="width:auto; margin:0;"> 🔀
+                            Shuffle Choices
+                        </label>
                     </div>
                 </div>
                 <div style="display:flex; gap:10px; margin-top:5px; margin-bottom:10px;">
@@ -1798,6 +1806,7 @@
             document.getElementById('quiz-is-homework').checked = q.isHomework || false;
             document.getElementById('quiz-timer-mode').value = q.timerMode || 'per_question';
             document.getElementById('quiz-total-timer').value = q.totalTimer || 300;
+            document.getElementById('quiz-shuffle-choices').checked = q.shuffleChoices !== undefined ? q.shuffleChoices : true;
             toggleTimerModeUI();
             toggleHomeworkUI();
             // Load assigned users
@@ -1846,6 +1855,7 @@
             homeworkSelectedUsers = new Set();
             document.getElementById('quiz-timer-mode').value = 'per_question';
             document.getElementById('quiz-total-timer').value = 300;
+            document.getElementById('quiz-shuffle-choices').checked = true;
             toggleTimerModeUI();
             toggleHomeworkUI();
             document.getElementById('quiz-type').value = "standard";
@@ -2017,6 +2027,7 @@
             const assignedUsers = isHomework ? [...homeworkSelectedUsers] : [];
             const timerMode = document.getElementById('quiz-timer-mode').value;
             const totalTimer = parseInt(document.getElementById('quiz-total-timer').value) || 300;
+            const shuffleChoices = document.getElementById('quiz-shuffle-choices').checked;
             const quizType = document.getElementById('quiz-type').value;
             const caseContent = document.getElementById('quiz-case-content').value;
 
@@ -2039,7 +2050,7 @@
             });
 
             return {
-                title, shortTitle, targetGroup, description, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, quizType, caseContent, questions,
+                title, shortTitle, targetGroup, description, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, quizType, caseContent, questions,
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
             };
@@ -2414,6 +2425,7 @@
                 assignedUsers: formData.assignedUsers || [],
                 timerMode: formData.timerMode || 'per_question',
                 totalTimer: formData.totalTimer || 300,
+                shuffleChoices: formData.shuffleChoices !== undefined ? formData.shuffleChoices : true,
                 questions: validQuestions,
                 startTime: convertDate(formData.startTime),
                 deadline: convertDate(formData.deadline),
@@ -4401,108 +4413,191 @@
         async function delQ(id) { if (confirm("Del?")) await db.collection("quests").doc(id).delete(); }
         function drawCertificate(ctx, name, dates, awardType) {
             const w = 800, h = 600;
-            // 1. Background
-            ctx.fillStyle = "#ffffff";
+
+            // 1. Premium Background: Subtle Gradient & Texture
+            ctx.fillStyle = "#fdfcf0"; // Light Cream
             ctx.fillRect(0, 0, w, h);
 
-            // 2. Right Navy Decoration
-            ctx.fillStyle = "#001f3f"; // Navy Blue
+            // Subtle Radial Gradient for Depth
+            const bgGrad = ctx.createRadialGradient(w / 2, h / 2, 100, w / 2, h / 2, 600);
+            bgGrad.addColorStop(0, "rgba(255, 255, 255, 0.8)");
+            bgGrad.addColorStop(1, "rgba(227, 242, 253, 0.2)"); // Light Blue hint
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, w, h);
+
+            // 2. Security Watermark (OFFICIAL)
+            ctx.save();
+            ctx.translate(w / 2, h / 2);
+            ctx.rotate(-Math.PI / 4);
+            ctx.textAlign = "center";
+            ctx.fillStyle = "rgba(0, 0, 0, 0.03)";
+            ctx.font = "bold 120px Montserrat, sans-serif";
+            ctx.fillText("OFFICIAL", 0, 0);
+            ctx.restore();
+
+            // 3. Right Side Navy Decoration (Modern Wave)
+            ctx.fillStyle = "#0a192f"; // Premium Deep Navy
             ctx.beginPath();
-            ctx.moveTo(w * 0.7, 0);
-            ctx.bezierCurveTo(w * 0.8, h * 0.3, w * 0.6, h * 0.7, w * 0.8, h);
+            ctx.moveTo(w * 0.72, 0);
+            ctx.bezierCurveTo(w * 0.82, h * 0.2, w * 0.62, h * 0.8, w * 0.82, h);
             ctx.lineTo(w, h);
             ctx.lineTo(w, 0);
             ctx.fill();
 
-            // 3. Gold Accent Line
-            ctx.strokeStyle = "#d4af37"; // Gold
-            ctx.lineWidth = 10;
+            // 4. Gold Ornament Curves
+            ctx.strokeStyle = "#c5a021"; // Antique Gold
+            ctx.lineWidth = 12;
+            ctx.beginPath();
+            ctx.moveTo(w * 0.7, 0);
+            ctx.bezierCurveTo(w * 0.8, h * 0.2, w * 0.6, h * 0.8, w * 0.8, h);
+            ctx.stroke();
+
+            // Thin Silver Accent
+            ctx.strokeStyle = "#bdc3c7";
+            ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(w * 0.68, 0);
-            ctx.bezierCurveTo(w * 0.78, h * 0.3, w * 0.58, h * 0.7, w * 0.78, h);
+            ctx.bezierCurveTo(w * 0.78, h * 0.2, w * 0.58, h * 0.8, w * 0.78, h);
             ctx.stroke();
 
-            // 4. Subtle Border
-            ctx.strokeStyle = "#eee";
-            ctx.lineWidth = 2;
-            ctx.strokeRect(25, 25, w - 50, h - 50);
-
-            // 5. Header "CERTIFICATE"
-            ctx.textAlign = "left";
-            ctx.fillStyle = "#001f3f";
-            ctx.font = "bold 56px Georgia, serif";
-            ctx.fillText("CERTIFICATE", 70, 160);
-
-            ctx.font = "italic 22px Georgia, serif";
-            ctx.fillStyle = "#666";
-            ctx.fillText("OF ACHIEVEMENT", 75, 195);
-
-            // 6. Name (Cursive-style)
-            ctx.textAlign = "center";
-            ctx.fillStyle = "#222";
-            ctx.font = "italic 68px 'Brush Script MT', cursive, Georgia";
-            ctx.fillText(name || "Student Name", w * 0.38, 330);
-
-            // 7. Divider/Underline for Name
-            ctx.strokeStyle = "#d4af37";
+            // 5. Elegant Frame Borders
+            ctx.strokeStyle = "rgba(197, 160, 33, 0.3)";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(30, 30, w - 60, h - 60);
             ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(w * 0.1, 355);
-            ctx.lineTo(w * 0.65, 355);
-            ctx.stroke();
+            ctx.strokeRect(40, 40, w - 80, h - 80);
 
-            // 8. Description
+            // 6. Header Typography
+            ctx.textAlign = "left";
+            ctx.fillStyle = "#0a192f";
+            ctx.font = "bold 60px 'Cormorant Garamond', Georgia, serif";
+            ctx.fillText("CERTIFICATE", 70, 150);
+
+            ctx.font = "italic 24px 'Cormorant Garamond', serif";
+            ctx.fillStyle = "#c5a021";
+            ctx.fillText("OF ACHIEVEMENT", 75, 185);
+
+            // 7. Bilingual Introduction
             ctx.textAlign = "left";
             ctx.fillStyle = "#444";
-            ctx.font = "17px Arial, sans-serif";
-            const desc = "This is to certify that the above-named student has successfully";
-            const desc2 = "completed their internship program with excellence and dedication.";
-            ctx.fillText(desc, 70, 400);
-            ctx.fillText(desc2, 70, 425);
+            ctx.font = "bold 19px Montserrat, sans-serif";
+            ctx.fillText("เกียรติบัตรฉบับนี้ให้ไว้เพื่อแสดงว่า", 75, 240);
+            ctx.font = "italic 13px Montserrat, sans-serif";
+            ctx.fillStyle = "#888";
+            ctx.fillText("This is to certify that", 75, 258);
 
-            // 9. Date & Signature
-            ctx.font = "bold 15px Arial";
-            ctx.fillStyle = "#001f3f";
-            ctx.fillText("DATE", 70, 490);
-            ctx.fillText("SIGNATURE", 320, 490);
+            // 8. Recipient Name (Dynamic Fitting & Bold Italic)
+            const recipientName = name || "Student Name";
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#222";
 
-            ctx.font = "17px Arial";
-            ctx.fillStyle = "#333";
-            ctx.fillText(dates || "Date not set", 70, 525);
+            // Adjust font size based on name length
+            let fontSize = 72;
+            if (recipientName.length > 20) fontSize = 60;
+            if (recipientName.length > 30) fontSize = 48;
 
+            ctx.font = `bold italic ${fontSize}px 'Montserrat', sans-serif`;
+            // Add subtle shadow to name
+            ctx.shadowColor = "rgba(0,0,0,0.15)";
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+            ctx.fillText(recipientName, w * 0.38, 345);
+            ctx.shadowColor = "transparent"; // Reset shadow
+
+            // 9. Premium Underline
+            const grad = ctx.createLinearGradient(w * 0.1, 0, w * 0.65, 0);
+            grad.addColorStop(0, "rgba(197, 160, 33, 0)");
+            grad.addColorStop(0.5, "rgba(197, 160, 33, 1)");
+            grad.addColorStop(1, "rgba(197, 160, 33, 0)");
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = 4;
             ctx.beginPath();
-            ctx.moveTo(320, 520);
-            ctx.lineTo(540, 520);
-            ctx.strokeStyle = "#ccc";
+            ctx.moveTo(w * 0.1, 375);
+            ctx.lineTo(w * 0.65, 375);
             ctx.stroke();
 
-            // 10. Main Seal: EXCELLENCE AWARDS (Always Shown)
+            // 10. Description (Bilingual)
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#333";
+            ctx.font = "500 16px Montserrat, sans-serif";
+            ctx.fillText("ได้รับเกียรติบัตรเนื่องในโอกาสสำเร็จการฝึกงานด้วยความมุ่งมั่นและวิริยะอุตสาหะ", w * 0.38, 415);
+            ctx.font = "12px Montserrat, sans-serif";
+            ctx.fillStyle = "#666";
+            ctx.fillText("(Successfully completed the internship program with excellence and dedication)", w * 0.38, 435);
+
+            // 11. Dates & Signature Area
+            ctx.textAlign = "left";
+            ctx.font = "bold 14px Montserrat";
+            ctx.fillStyle = "#0a192f";
+            ctx.fillText("วันที่ (DATE)", 80, 500);
+            ctx.fillText("ลายเซ็น (SIGNATURE)", 320, 500);
+
+            ctx.font = "600 16px Montserrat";
+            ctx.fillStyle = "#222";
+            ctx.fillText(dates || "Pending Registration", 80, 530);
+
+            // Signature Line
+            ctx.beginPath();
+            ctx.moveTo(320, 525);
+            ctx.lineTo(540, 525);
+            ctx.strokeStyle = "#aaa";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.font = "italic 11px Montserrat";
+            ctx.fillStyle = "#777";
+            ctx.fillText("Issued by: MLP Management", 320, 545);
+
+            // 12. QR Code Placeholder & Serial
+            const serial = `MLP-2026-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+            ctx.textAlign = "right";
+            ctx.font = "bold 10px Montserrat";
+            ctx.fillStyle = "#888";
+            ctx.fillText(serial, w - 40, h - 20);
+
+            // Minimalist QR placeholder
+            ctx.fillStyle = "rgba(0,0,0,0.05)";
+            ctx.fillRect(w - 75, h - 90, 45, 45);
+            ctx.strokeStyle = "rgba(0,0,0,0.1)";
+            ctx.strokeRect(w - 75, h - 90, 45, 45);
+            ctx.textAlign = "center";
+            ctx.font = "7px Montserrat";
+            ctx.fillText("MLP-ID", w - 52.5, h - 35);
+
+            // 13. Main Seal: EXCELLENCE AWARDS
             const sealX = w * 0.85, sealY = h * 0.78;
-            const grdEx = ctx.createRadialGradient(sealX, sealY, 10, sealX, sealY, 55);
-            grdEx.addColorStop(0, "#f1c40f");
-            grdEx.addColorStop(1, "#d4af37");
+
+            // Glow effect for seal
+            ctx.shadowColor = "rgba(0,0,0,0.3)";
+            ctx.shadowBlur = 15;
+            const grdEx = ctx.createRadialGradient(sealX, sealY, 10, sealX, sealY, 65);
+            grdEx.addColorStop(0, "#ffd700");
+            grdEx.addColorStop(1, "#c5a021");
 
             ctx.fillStyle = grdEx;
             ctx.beginPath();
-            ctx.arc(sealX, sealY, 60, 0, Math.PI * 2);
+            ctx.arc(sealX, sealY, 65, 0, Math.PI * 2);
             ctx.fill();
+            ctx.shadowBlur = 0; // Reset
+
             ctx.strokeStyle = "#ffffff";
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 4;
             ctx.stroke();
 
             ctx.textAlign = "center";
             ctx.fillStyle = "#fff";
-            ctx.font = "bold 11px Arial";
-            ctx.fillText("MEDLIFE+", sealX, sealY - 15);
-            ctx.font = "bold 13px Arial";
+            ctx.font = "bold 12px Montserrat";
+            ctx.fillText("MEDLIFE+", sealX, sealY - 18);
+            ctx.font = "800 15px Montserrat";
             ctx.fillText("EXCELLENCE", sealX, sealY + 5);
-            ctx.font = "10px Arial";
-            ctx.fillText("AWARDS", sealX, sealY + 20);
+            ctx.font = "bold 11px Montserrat";
+            ctx.fillText("AWARDS", sealX, sealY + 22);
 
-            // 11. Optional Special Award Seal (Smaller, shown above)
+            // 14. Optional Special Award Seal (Smaller, shown above)
             if (awardType && awardType !== 'none') {
-                const specX = sealX, specY = sealY - 125;
-                const r = 45; // Smaller size
+                const specX = sealX, specY = sealY - 140;
+                const r = 50;
 
                 if (awardType === 'zero-to-one') {
                     const grd = ctx.createRadialGradient(specX, specY, 5, specX, specY, r);
@@ -4512,22 +4607,22 @@
                     ctx.fillStyle = grd;
                     ctx.beginPath();
                     for (let i = 0; i < 32; i++) {
-                        const radius = i % 2 === 0 ? r : r - 6;
+                        const radius = i % 2 === 0 ? r : r - 8;
                         const angle = (Math.PI / 16) * i;
                         ctx.lineTo(specX + Math.cos(angle) * radius, specY + Math.sin(angle) * radius);
                     }
                     ctx.closePath();
                     ctx.fill();
-                    ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke();
+                    ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
 
                     ctx.textAlign = "center";
                     ctx.fillStyle = "#fff";
-                    ctx.font = "bold 22px Arial";
-                    ctx.fillText("🚀", specX, specY - 5);
-                    ctx.font = "bold 7px Arial";
+                    ctx.font = "bold 24px Arial";
+                    ctx.fillText("🚀", specX, specY - 6);
+                    ctx.font = "bold 9px Montserrat";
                     ctx.fillText("ZERO-TO-ONE", specX, specY + 12);
-                    ctx.font = "6px Arial";
-                    ctx.fillText("GAME CHANGER", specX, specY + 21);
+                    ctx.font = "7px Montserrat";
+                    ctx.fillText("GAME CHANGER", specX, specY + 22);
                 } else if (awardType === 'good-reporter') {
                     const grd = ctx.createRadialGradient(specX, specY, 5, specX, specY, r);
                     grd.addColorStop(0, "#50c878");
@@ -4537,16 +4632,16 @@
                     ctx.beginPath();
                     ctx.arc(specX, specY, r, 0, Math.PI * 2);
                     ctx.fill();
-                    ctx.strokeStyle = "#d4af37"; ctx.lineWidth = 3; ctx.stroke();
+                    ctx.strokeStyle = "#d4af37"; ctx.lineWidth = 4; ctx.stroke();
 
                     ctx.textAlign = "center";
                     ctx.fillStyle = "#fff";
-                    ctx.font = "bold 22px Arial";
-                    ctx.fillText("🎤", specX, specY - 5);
-                    ctx.font = "bold 7px Arial";
+                    ctx.font = "bold 24px Arial";
+                    ctx.fillText("🎤", specX, specY - 6);
+                    ctx.font = "bold 9px Montserrat";
                     ctx.fillText("GOOD REPORTER", specX, specY + 12);
-                    ctx.font = "6px Arial";
-                    ctx.fillText("INSIGHTFUL", specX, specY + 21);
+                    ctx.font = "7px Montserrat";
+                    ctx.fillText("INSIGHTFUL", specX, specY + 22);
                 }
             }
         }
@@ -4600,7 +4695,14 @@
             showToast("Export Completed!");
         }
 
-        function generateCertPDF() { const { jsPDF } = window.jspdf; const doc = new jsPDF('l'); doc.addImage(document.getElementById('cert-canvas').toDataURL('image/jpeg'), 'JPEG', 10, 10, 280, 190); doc.save("cert.pdf"); }
+        function generateCertPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4');
+            const canvas = document.getElementById('cert-canvas');
+            const imgData = canvas.toDataURL('image/jpeg', 1.0);
+            doc.addImage(imgData, 'JPEG', 0, 0, 297, 210);
+            doc.save(`Certificate_${document.getElementById('cert-fullname').value || "User"}.pdf`);
+        }
         async function delQuizAttempt(id, collection = 'quiz_attempts') {
             if (!confirm("Delete this attempt/response?")) return;
             try {

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V78.2)</title>
+    <title>Internship Portfolio (V78.6)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -1697,20 +1697,21 @@
                 } catch (hwErr) { console.error("HW card start sync:", hwErr); }
             }
 
-            // 🔥 V78: Generate shuffle map for all choice questions
+            // 🔥 V78.4: Generate shuffle map (respect toggle + anchor last option)
             shuffleMap = [];
+            const shouldShuffle = currentQuiz.shuffleChoices !== false;
             currentQuiz.questions.forEach((q, idx) => {
-                if ((q.type || 'choice') === 'choice' && q.options && q.options.length > 0) {
-                    // Create array [0, 1, 2, 3, ...] and shuffle it
+                if (shouldShuffle && (q.type || 'choice') === 'choice' && q.options && q.options.length > 0) {
                     const indices = q.options.map((_, i) => i);
-                    // Fisher-Yates shuffle
-                    for (let i = indices.length - 1; i > 0; i--) {
+                    // Anchor last item: shuffle only first N-1 items if N > 1
+                    const shuffleLimit = indices.length > 1 ? indices.length - 1 : indices.length;
+                    for (let i = shuffleLimit - 1; i > 0; i--) {
                         const j = Math.floor(Math.random() * (i + 1));
                         [indices[i], indices[j]] = [indices[j], indices[i]];
                     }
-                    shuffleMap[idx] = indices; // shuffleMap[questionIdx][displayPos] = originalIndex
+                    shuffleMap[idx] = indices;
                 } else {
-                    shuffleMap[idx] = null; // No shuffle for non-choice
+                    shuffleMap[idx] = null; // No shuffle (original order)
                 }
             });
 
@@ -2140,49 +2141,38 @@
                 return false;
             });
 
-            if (hasEmptyAnswers) {
-                if (!confirm("คุณยังตอบไม่ครบทุกข้อ ยืนยันที่จะส่งหรือไม่?")) {
-                    isSubmittingQuiz = false;
-                    quizTimerInterval = setInterval(() => {
-                        timeLeftForStep--;
-                        updateTimerUI();
-                        if (timeLeftForStep <= 0) {
-                            clearInterval(quizTimerInterval);
-                            if (currentQuiz.timerMode === 'total_time') {
-                                alert("🍭 หมดเวลารวมแล้ว!"); submitQuiz();
-                            } else {
-                                alert("🍭 หมดเวลาสำหรับข้อนี้!");
-                                if (currentStep < currentQuiz.questions.length - 1) { nextQuizStep(); } else { submitQuiz(); }
-                            }
+            // --- Confirm Logic ---
+            const confirmMsg = hasEmptyAnswers ? "คุณยังตอบไม่ครบทุกข้อ ยืนยันที่จะส่งหรือไม่?" : "ยืนยันส่งคำตอบ?";
+            if (!confirm(confirmMsg)) {
+                isSubmittingQuiz = false;
+                // Restart timer logic
+                quizTimerInterval = setInterval(() => {
+                    timeLeftForStep--;
+                    updateTimerUI();
+                    if (timeLeftForStep <= 0) {
+                        clearInterval(quizTimerInterval);
+                        if (currentQuiz.timerMode === 'total_time') {
+                            alert("🍭 หมดเวลารวมแล้ว!"); submitQuiz();
+                        } else {
+                            alert("🍭 หมดเวลาสำหรับข้อนี้!");
+                            if (currentStep < currentQuiz.questions.length - 1) { nextQuizStep(); } else { submitQuiz(); }
                         }
-                    }, 1000);
-                    return;
-                }
-            } else {
-                if (!confirm("ยืนยันส่งคำตอบ?")) {
-                    isSubmittingQuiz = false;
-                    quizTimerInterval = setInterval(() => {
-                        timeLeftForStep--;
-                        updateTimerUI();
-                        if (timeLeftForStep <= 0) {
-                            clearInterval(quizTimerInterval);
-                            if (currentQuiz.timerMode === 'total_time') {
-                                alert("🍭 หมดเวลารวมแล้ว!"); submitQuiz();
-                            } else {
-                                alert("🍭 หมดเวลาสำหรับข้อนี้!");
-                                if (currentStep < currentQuiz.questions.length - 1) { nextQuizStep(); } else { submitQuiz(); }
-                            }
-                        }
-                    }, 1000);
-                    return;
-                }
+                    }
+                }, 1000);
+                return;
             }
 
+            // --- UI Feedback & Lock ---
             const btn = document.getElementById('btn-quiz-submit');
+            const btnPrev = document.getElementById('btn-quiz-prev');
+            const btnNext = document.getElementById('btn-quiz-next');
+
             if (btn) {
                 btn.disabled = true;
                 btn.innerText = "กำลังประมวลผล...";
             }
+            if (btnPrev) btnPrev.disabled = true;
+            if (btnNext) btnNext.disabled = true;
 
             // Safety timeout: if alert/modal doesn't close in 30s, let them try again
             const safetyTimeout = setTimeout(() => {
@@ -2193,59 +2183,35 @@
                         btn.disabled = false;
                         btn.innerText = "ส่งใหม่อีกครั้ง (Retry)";
                     }
+                    if (btnPrev) btnPrev.disabled = false;
+                    if (btnNext) btnNext.disabled = false;
                 }
             }, 30000);
 
-            let correctCount = 0;
-            if (currentQuiz && currentQuiz.questions) {
+            try {
+                if (!userId || !currentQuiz) throw new Error("Session error: กรุณารีเฟรชหน้าจอ");
+
+                // --- 1. Calculate Score ---
+                let correctCount = 0;
                 currentQuiz.questions.forEach((q, i) => {
                     const isChoice = (q.type || 'choice') === 'choice';
                     if (isChoice) {
-                        // Normalize target to array (it should be array from Admin, but be safe)
                         const target = Array.isArray(q.correct) ? q.correct : [q.correct];
                         let mine = userAnswers[i];
-
-                        // Normalize user answer to array for consistent comparison
-                        // If single choice, it's a scalar number. If multi, it's an array.
-                        // If null/undefined, treat as empty array to fail gracefully
-                        let mineArray = [];
-                        if (Array.isArray(mine)) mineArray = mine;
-                        else if (mine !== null && mine !== undefined) mineArray = [mine];
-
-                        // Strict All-or-Nothing check (Order doesn't matter, but length must match)
-                        if (target.length === mineArray.length) {
-                            // Check if every correct answer is in user's answer
-                            // We assume values are integers (indices)
-                            const allFound = target.every(val => mineArray.includes(val));
-                            if (allFound) correctCount++;
+                        let mineArray = Array.isArray(mine) ? mine : (mine !== null && mine !== undefined ? [mine] : []);
+                        if (target.length === mineArray.length && target.every(val => mineArray.includes(val))) {
+                            correctCount++;
                         }
                     }
                 });
-            }
 
-            const pointsAwarded = (correctCount / (currentQuiz.questions ? currentQuiz.questions.length : 1)) * (currentQuiz.totalPoints || 1.0);
-            const isPoll = currentQuiz.isPoll === true;
+                const pointsAwarded = (correctCount / (currentQuiz.questions ? currentQuiz.questions.length : 1)) * (currentQuiz.totalPoints || 1.0);
+                const isPoll = currentQuiz.isPoll === true;
+                const finalAnswers = userAnswers.map(ans => Array.isArray(ans) ? ans.join("\n---\n") : ans);
 
-            const finalAnswers = userAnswers.map(ans => {
-                if (Array.isArray(ans)) return ans.join("\n---\n");
-                return ans;
-            });
-
-            if (!userId || !currentQuiz) {
-                alert("Session error: กรุณารีเฟรชหน้าจอแล้วลองใหม่อีกครั้ง");
-                isSubmittingQuiz = false;
-                clearTimeout(safetyTimeout);
-                if (btn) { btn.disabled = false; btn.innerText = "Submit (ยืนยันส่ง)"; }
-                return;
-            }
-
-            try {
-                const attemptRef = db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`);
-
-                // 🔥 V78: Practice mode vs Regular mode submission
+                // --- 2. Build Submission Data ---
                 let submissionData;
                 if (isPracticeMode) {
-                    // Practice mode: save with practice_done status, NO real score
                     submissionData = {
                         practiceScore: correctCount,
                         practiceTotalQ: currentQuiz.questions.length,
@@ -2255,82 +2221,67 @@
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     };
                 } else if (isPoll) {
-                    submissionData = {
-                        isPoll: true,
-                        status: 'pending',
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                        answers: []
-                    };
+                    submissionData = { isPoll: true, status: 'pending', timestamp: firebase.firestore.FieldValue.serverTimestamp(), answers: [] };
                 } else {
-                    submissionData = {
-                        correctCount,
-                        totalQuestions: currentQuiz.questions.length,
-                        answers: finalAnswers,
-                        status: 'pending',
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    };
+                    submissionData = { correctCount, totalQuestions: currentQuiz.questions.length, answers: finalAnswers, status: 'pending', timestamp: firebase.firestore.FieldValue.serverTimestamp() };
                 }
 
-                const tasks = [];
-                if (isPoll) {
+                // --- 3. Core Submission ---
+                const attemptRef = db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`);
+                const tasks = [attemptRef.set(submissionData, { merge: true })];
+
+                if (isPoll && !isPracticeMode) {
                     tasks.push(db.collection("poll_responses").add({
                         quizId: currentQuiz.id,
                         answers: finalAnswers,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     }));
                 }
-                tasks.push(attemptRef.set(submissionData, { merge: true }));
 
                 await Promise.all(tasks);
 
-                // 🔥 V78.2: Auto-move linked Kanban card for homework quizzes
-                if (currentQuiz.isHomework && !isPracticeMode) {
-                    try {
-                        const hwCards = await db.collection("side_quests")
-                            .where("linkedQuizId", "==", currentQuiz.id).get();
-                        if (!hwCards.empty) {
-                            const card = hwCards.docs[0];
-                            const cardStatus = card.data().status;
-                            if (cardStatus === 'Backlog' || cardStatus === 'Doing') {
-                                await card.ref.update({ status: 'Review' });
-                            }
-                        }
-                    } catch (hwErr) { console.error("HW card sync:", hwErr); }
-                }
-
+                // --- 4. UI Success & Modal Close ---
                 clearTimeout(safetyTimeout);
+                document.getElementById('quizModal').style.display = 'none';
                 isSubmittingQuiz = false;
 
-                document.getElementById('quizModal').style.display = 'none';
+                // --- 5. Start Background Tasks (Non-blocking) ---
+                if (!isPracticeMode) {
+                    // A. Kanban Sync
+                    if (currentQuiz.isHomework) {
+                        db.collection("side_quests").where("linkedQuizId", "==", currentQuiz.id).get()
+                            .then(hwCards => {
+                                if (!hwCards.empty) {
+                                    const card = hwCards.docs[0];
+                                    const cardStatus = card.data().status;
+                                    if (cardStatus === 'Backlog' || cardStatus === 'Doing') {
+                                        card.ref.update({ status: 'Review' });
+                                    }
+                                }
+                            }).catch(e => console.error("BG Kanban Sync Err:", e));
+                    }
 
-                // 🔥 V78: Show practice results immediately (only correct answers)
-                if (isPracticeMode) {
-                    isPracticeMode = false; // Reset flag
-                    setTimeout(() => {
-                        showPracticeResult(currentQuiz, correctCount, userAnswers);
-                    }, 100);
-                } else {
-                    // 🔥 V77.24: Dynamic Duration Adjustment (-10% of REMAINING time per submission)
-                    try {
-                        const quizDoc = await db.collection("quizzes").doc(currentQuiz.id).get();
-                        const qData = quizDoc.data();
-
+                    // B. Dynamic Duration Adjustment
+                    db.collection("quizzes").doc(currentQuiz.id).get().then(doc => {
+                        const qData = doc.data();
                         if (qData && qData.deadline) {
                             const nowTime = new Date();
                             const dead = qData.deadline.toDate();
-
                             if (dead > nowTime) {
-                                const remainingMs = dead.getTime() - nowTime.getTime();
-                                const reductionMs = remainingMs * 0.1; // 10% of REMAINING
-                                const newDeadlineMs = dead.getTime() - reductionMs;
-
-                                await db.collection("quizzes").doc(currentQuiz.id).update({
-                                    deadline: firebase.firestore.Timestamp.fromMillis(newDeadlineMs)
+                                const reductionMs = (dead.getTime() - nowTime.getTime()) * 0.1;
+                                db.collection("quizzes").doc(currentQuiz.id).update({
+                                    deadline: firebase.firestore.Timestamp.fromMillis(dead.getTime() - reductionMs)
                                 });
                             }
                         }
-                    } catch (errDuration) { console.error("Duration Adjustment Error:", errDuration); }
+                    }).catch(e => console.error("BG Duration Adj Err:", e));
+                }
 
+                // --- 6. Final UX Feedback ---
+                if (isPracticeMode) {
+                    isPracticeMode = false;
+                    setTimeout(() => showPracticeResult(currentQuiz, correctCount, userAnswers), 100);
+                } else {
                     setTimeout(() => {
                         alert(isPoll ? "ส่งโพลเรียบร้อย!" : `ส่งคำตอบเรียบร้อย!\nคะแนนที่คาดว่าจะได้รับ: ${pointsAwarded.toFixed(3)} แต้ม`);
                     }, 100);
@@ -2345,6 +2296,8 @@
                     btn.disabled = false;
                     btn.innerText = "คลิกเพื่อลองส่งอีกครั้ง";
                 }
+                if (btnPrev) btnPrev.disabled = false;
+                if (btnNext) btnNext.disabled = false;
             }
         }
 
