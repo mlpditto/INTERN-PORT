@@ -3061,6 +3061,33 @@
                 });
                 await b.commit();
                 showToast("Approved & Points added!");
+
+                // 🔥 V78.2: Auto-move linked Kanban card for homework
+                try {
+                    const quizId = attemptId.split('_')[0];
+                    const quiz = quizzesData.find(q => q.id === quizId);
+                    if (quiz && quiz.isHomework && quiz.assignedUsers) {
+                        const cards = await db.collection("side_quests")
+                            .where("linkedQuizId", "==", quizId).get();
+                        if (!cards.empty) {
+                            // Check if ALL assigned users are approved
+                            const allAttempts = await db.collection("quiz_attempts")
+                                .where("quizId", "==", quizId).get();
+                            const approvedUsers = new Set();
+                            allAttempts.forEach(d => {
+                                if (d.data().status === 'approved') approvedUsers.add(d.data().userId);
+                            });
+                            const allApproved = quiz.assignedUsers.every(u => approvedUsers.has(u));
+                            if (allApproved) {
+                                await cards.docs[0].ref.update({
+                                    status: 'Done',
+                                    doneAt: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+                                showToast("📚 ทุกคนทำการบ้านครบ → Card ย้ายไป Done!");
+                            }
+                        }
+                    }
+                } catch (hwErr) { console.error("HW card sync error:", hwErr); }
             } catch (e) { alert(e.message); }
         }
 
@@ -3391,13 +3418,62 @@
         async function saveHwAssign() {
             if (!hwModalQuizId) return;
             const users = [...hwModalSelectedUsers];
+            const q = quizzesData.find(x => x.id === hwModalQuizId);
+            if (!q) return;
+
             try {
+                // 1. Update quiz with homework assignment
                 await db.collection("quizzes").doc(hwModalQuizId).update({
                     isHomework: users.length > 0,
                     assignedUsers: users,
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                showToast(`📚 มอบการบ้านให้ ${users.length} คนแล้ว!`);
+
+                // 2. 🔥 V78.2: Auto-create/update Kanban card
+                const existingCards = await db.collection("side_quests")
+                    .where("linkedQuizId", "==", hwModalQuizId).get();
+
+                if (users.length > 0) {
+                    // Build assignees data from usersData
+                    const assignees = users.map(uid => {
+                        const u = usersData.find(x => x.id === uid);
+                        return {
+                            uid: uid,
+                            name: u ? (u.displayName || uid) : uid,
+                            pic: u ? (u.pictureUrl || '') : ''
+                        };
+                    });
+
+                    const cardData = {
+                        title: `📚 HW: ${q.shortTitle || q.title || 'Untitled'}`,
+                        description: q.title || '',
+                        priority: 'Medium',
+                        isProject: false,
+                        isHomeworkCard: true,
+                        linkedQuizId: hwModalQuizId,
+                        assigneeIds: users,
+                        assignees: assignees,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+
+                    if (!existingCards.empty) {
+                        // Update existing card
+                        await existingCards.docs[0].ref.update(cardData);
+                    } else {
+                        // Create new card in Backlog
+                        cardData.status = 'Backlog';
+                        cardData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                        await db.collection("side_quests").add(cardData);
+                    }
+                    showToast(`📚 มอบการบ้านให้ ${users.length} คน + สร้าง Kanban Card แล้ว!`);
+                } else {
+                    // No users = remove homework card if exists
+                    if (!existingCards.empty) {
+                        await existingCards.docs[0].ref.delete();
+                    }
+                    showToast(`📚 ยกเลิกการบ้านแล้ว`);
+                }
+
                 closeHwAssignModal();
             } catch (e) {
                 alert("Error: " + e.message);

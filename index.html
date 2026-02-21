@@ -1686,6 +1686,17 @@
                 } catch (e) { console.error("Start Quiz Error:", e); }
             }
 
+            // 🔥 V78.2: Auto-move linked Kanban card to "Doing" for homework
+            if (currentQuiz.isHomework && !isPracticeMode) {
+                try {
+                    const hwCards = await db.collection("side_quests")
+                        .where("linkedQuizId", "==", quizId).get();
+                    if (!hwCards.empty && hwCards.docs[0].data().status === 'Backlog') {
+                        await hwCards.docs[0].ref.update({ status: 'Doing' });
+                    }
+                } catch (hwErr) { console.error("HW card start sync:", hwErr); }
+            }
+
             // 🔥 V78: Generate shuffle map for all choice questions
             shuffleMap = [];
             currentQuiz.questions.forEach((q, idx) => {
@@ -2271,6 +2282,21 @@
                 tasks.push(attemptRef.set(submissionData, { merge: true }));
 
                 await Promise.all(tasks);
+
+                // 🔥 V78.2: Auto-move linked Kanban card for homework quizzes
+                if (currentQuiz.isHomework && !isPracticeMode) {
+                    try {
+                        const hwCards = await db.collection("side_quests")
+                            .where("linkedQuizId", "==", currentQuiz.id).get();
+                        if (!hwCards.empty) {
+                            const card = hwCards.docs[0];
+                            const cardStatus = card.data().status;
+                            if (cardStatus === 'Backlog' || cardStatus === 'Doing') {
+                                await card.ref.update({ status: 'Review' });
+                            }
+                        }
+                    } catch (hwErr) { console.error("HW card sync:", hwErr); }
+                }
 
                 clearTimeout(safetyTimeout);
                 isSubmittingQuiz = false;
