@@ -1073,6 +1073,9 @@
                         <tbody></tbody>
                     </table>
                 </div>
+                <!-- Inactive Quiz Pagination -->
+                <div id="inactive-quiz-pagination"
+                    style="display:flex; justify-content:center; align-items:center; margin-top:15px; gap:10px;"></div>
             </div>
         </div>
 
@@ -1607,6 +1610,7 @@
         let deleteCardId = null; let deleteTimer = null;
         let currentHistoryUserId = null;
         let certUser = null;
+        let inactiveQuizPage = 1; const INACTIVE_QUIZ_PER_PAGE = 10;
 
         function toggleTheme() { document.body.classList.toggle('dark-mode'); }
 
@@ -3181,7 +3185,7 @@
                 if (!q.isActive) {
                     statusInfo = '<span class="badge" style="background:#6c757d">Inactive</span>';
                 } else if (dead && now > dead) {
-                    statusInfo = `<span class="badge" style="background:#ef233c">Expired: ${dead.toLocaleString('th-TH')}</span>`;
+                    statusInfo = `<span class="badge" style="background:#6c757d">Inactive (Expired): ${dead.toLocaleString('th-TH')}</span>`;
                 } else {
                     if (start && now < start) {
                         statusInfo = `<span class="badge" style="background:#ff9f1c">Scheduled: ${start.toLocaleString('th-TH')}</span>`;
@@ -3240,10 +3244,30 @@
             // Render Active
             activeList.forEach(q => { tbodyActive.innerHTML += generateRow(q, true); });
 
-            // Render Inactive (Grouped & Sorted)
-            Object.values(inactiveGroups)
-                .sort((a, b) => b.time - a.time)
-                .forEach(group => { tbodyInactive.innerHTML += generateRow(group.data, false); });
+            // Render Inactive (Grouped & Sorted with Pagination)
+            const sortedInactive = Object.values(inactiveGroups).sort((a, b) => b.time - a.time);
+            const totalInactivePages = Math.ceil(sortedInactive.length / INACTIVE_QUIZ_PER_PAGE);
+
+            // Slice for current page
+            const startIdx = (inactiveQuizPage - 1) * INACTIVE_QUIZ_PER_PAGE;
+            const pageData = sortedInactive.slice(startIdx, startIdx + INACTIVE_QUIZ_PER_PAGE);
+
+            pageData.forEach(group => { tbodyInactive.innerHTML += generateRow(group.data, false); });
+
+            // Update Pagination Controls
+            const paginContainer = document.querySelector("#inactive-quiz-pagination");
+            if (paginContainer) {
+                paginContainer.innerHTML = `
+                    <button class="btn-sm btn-dark" ${inactiveQuizPage === 1 ? 'disabled' : ''} onclick="changeInactiveQuizPage(-1)">Prev</button>
+                    <span style="font-weight:bold; font-size:0.9em; margin:0 10px;">Page ${inactiveQuizPage} / ${totalInactivePages || 1}</span>
+                    <button class="btn-sm btn-dark" ${inactiveQuizPage >= totalInactivePages ? 'disabled' : ''} onclick="changeInactiveQuizPage(1)">Next</button>
+                `;
+            }
+        }
+
+        function changeInactiveQuizPage(dir) {
+            inactiveQuizPage += dir;
+            renderQuizzes();
         }
 
         async function repostQuiz(id) {
