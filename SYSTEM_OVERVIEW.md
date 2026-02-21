@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V78.2) Overview
+# MLP Internship Portfolio (V78.3) Overview
 
 ระบบเว็บแอปพลิเคชันสำหรับจัดการการฝึกงานและระบบ Gamification (สะสมคะแนน) เพื่อจูงใจและติดตามความก้าวหน้าของนักศึกษาฝึกงาน
 
@@ -89,6 +89,13 @@
 - **Priority & Assignee:** มอบหมายงานให้ผู้ใช้รายคนหรือเป็นกลุ่ม กำหนดความสำคัญ (Low/Medium/High)
 - **Project Flag:** กำหนดประเภทงานเป็น Project เพื่อการติดตามที่เข้มข้นขึ้น
 - **Archive System:** ย้ายงานที่เสร็จสิ้นแล้วเข้าสู่คลังจัดเก็บ (Archive) เพื่อลดความหนาแน่นของผู้ใช้งาน
+- **🔗 Kanban-Quiz Integration (V78.3):** ระบบเชื่อมโยง Kanban Board กับ Quiz/Homework แบบอัตโนมัติ:
+    - **Auto-create Card:** เมื่อ Admin มอบการบ้าน ระบบสร้าง Kanban Card (📚 HW: ชื่อ Quiz) ใน Backlog ให้อัตโนมัติ พร้อมรูปและชื่อผู้รับงาน
+    - **Auto-move Doing:** เมื่อ User เริ่มทำ Quiz การบ้าน → Card ขยับจาก Backlog ไป **Doing** อัตโนมัติ
+    - **Auto-move Review:** เมื่อ User ส่งคำตอบ → Card ขยับไป **Review** อัตโนมัติ
+    - **Auto-move Done:** เมื่อ Admin Approve คะแนนครบทุกคน → Card ขยับไป **Done** อัตโนมัติ
+    - **Linked Quiz ID:** Card เก็บ `linkedQuizId` ไว้เพื่อ Sync สถานะแบบ Real-time
+    - **Smart Cleanup:** ถ้ายกเลิกการบ้าน (ลบ User ออกหมด) → Card จะถูกลบออกจาก Board อัตโนมัติ
 
 ### 3. การจัดการแบบทดสอบ (Quiz Setup - V77)
 - **Enhanced UI (V77):** ปรับปรุงหน้าจอจัดการให้เป็นระเบียบและลดความผิดพลาด
@@ -170,6 +177,7 @@
     - **Homework Icon:** เปลี่ยน Icon จาก 🧠 เป็น 📚 (หนังสือสีเขียว) เมื่อเป็นการบ้าน
     - **Visibility Control:** เฉพาะ User ที่ถูก Assign เท่านั้นถึงจะเห็น Quiz ของการบ้าน
     - **Compact Action Buttons:** ปุ่ม Action ในตาราง Quiz ถูกจัดเป็น 2 แถวเพื่อลดความกว้าง
+    - **🔗 Kanban Integration (V78.3):** เชื่อมโยงกับ Kanban Board แบบอัตโนมัติ — Card จะถูกสร้างและขยับตามสถานะ (Backlog→Doing→Review→Done) ตาม Flow การทำการบ้านของ User (ดูรายละเอียดในหัวข้อ Kanban Management)
 
 ### 4. การจัดการผู้ใช้งาน (User & Leaderboard)
 - **User Search & Control:** ค้นหานักศึกษา ดูประวัติอย่างละเอียด
