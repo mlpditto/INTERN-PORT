@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V78.6) Overview
+# MLP Internship Portfolio (V78.7) Overview
 
 ระบบเว็บแอปพลิเคชันสำหรับจัดการการฝึกงานและระบบ Gamification (สะสมคะแนน) เพื่อจูงใจและติดตามความก้าวหน้าของนักศึกษาฝึกงาน
 
@@ -308,4 +308,4 @@ service cloud.firestore {
 ```
 
 ---
-*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V78.6) โดย Antigravity AI*
+*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V78.7) โดย Antigravity AI*
