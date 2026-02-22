@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP INTERNSHIP PORT V78.8</title>
+    <title>MLP INTERNSHIP PORT V78.9</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -4117,7 +4117,12 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="lb-mid" id="chart-${u.id}"></div>
+                        <div style="flex:3; display:flex; flex-direction:column; margin: 0 20px;">
+                    <div class="lb-mid" id="chart-${u.id}" style="margin:0; width:100%;"></div>
+                    <div class="lb-stat-row" id="stats-${u.id}" style="display:flex; justify-content:space-around; align-items:center; font-size:0.7em; color:#666; margin-top:8px; background:rgba(0,0,0,0.02); padding:4px; border-radius:5px;">
+                        <span style="opacity:0.5;">Calculating stats...</span>
+                    </div>
+                </div>
                         <div class="lb-right">
                             <div class="lb-score">${parseFloat((u.score || 0).toFixed(2))}</div>
                         </div>
@@ -4306,13 +4311,40 @@
                         const todayOffset = (today - start) / 86400000;
                         const todayPct = (todayOffset / totalDays) * 100;
                         const tMark = document.createElement('div');
-                        tMark.className = 'chart-marker';
+                        tMark.className = 'chart-marker today';
                         tMark.style.left = `${todayPct}%`;
-                        tMark.style.background = '#ffc107';
-                        tMark.style.height = '60%';
-                        tMark.style.zIndex = '2';
-                        tMark.title = "Today";
+                        tMark.style.background = '#ffd700';
+                        tMark.style.zIndex = '1';
+                        tMark.innerHTML = `<span>Today</span>`;
                         container.appendChild(tMark);
+                    }
+
+                    // --- Calculate & Post Stats (V78.8) ---
+                    const scores = Object.values(pointsMap).filter(s => s > 0);
+                    const minS = scores.length > 0 ? Math.min(...scores) : 0;
+                    const maxS = scores.length > 0 ? Math.max(...scores) : 0;
+
+                    let streak = 0;
+                    let checkD = new Date();
+                    checkD.setHours(12, 0, 0, 0); // Noon to avoid boundary issues
+
+                    const fmt = (d) => d.toISOString().split('T')[0];
+                    if (!pointsMap[fmt(checkD)]) checkD.setDate(checkD.getDate() - 1);
+
+                    while (streak < 1000) {
+                        if (pointsMap[fmt(checkD)] && pointsMap[fmt(checkD)] > 0) {
+                            streak++;
+                            checkD.setDate(checkD.getDate() - 1);
+                        } else { break; }
+                    }
+
+                    const sEl = document.getElementById(`stats-${u.id}`);
+                    if (sEl) {
+                        sEl.innerHTML = `
+                            <div style="display:flex; align-items:center; gap:3px;"><i class="fa-solid fa-arrow-down" style="color:#ef233c; font-size:0.8em;"></i> Min: <b>${minS.toFixed(2)}</b></div>
+                            <div style="display:flex; align-items:center; gap:3px;"><i class="fa-solid fa-arrow-up" style="color:#28a745; font-size:0.8em;"></i> Max: <b>${maxS.toFixed(2)}</b></div>
+                            <div style="display:flex; align-items:center; gap:3px; color:#333;"><i class="fa-solid fa-fire" style="color:#ff9f1c;"></i> Streak: <b style="color:#ff6b6b">${streak} วัน</b></div>
+                        `;
                     }
 
                 } catch (e) {
