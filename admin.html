@@ -29,6 +29,23 @@
         </div>
     </div>
 
+    <!-- Leaderboard Chart Popup (V78.92) -->
+    <div id="lbChartModal"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9998; justify-content:center; align-items:center; backdrop-filter:blur(4px);">
+        <div
+            style="background:white; border-radius:18px; width:90%; max-width:750px; padding:30px; box-shadow:0 20px 60px rgba(0,0,0,0.3); position:relative; margin:auto; margin-top:8vh;">
+            <span onclick="document.getElementById('lbChartModal').style.display='none'"
+                style="position:absolute; top:12px; right:18px; font-size:28px; cursor:pointer; color:#999; z-index:10;">&times;</span>
+            <div id="lb-popup-header" style="display:flex; align-items:center; gap:15px; margin-bottom:20px;"></div>
+            <div id="lb-popup-chart"
+                style="width:100%; height:200px; position:relative; border-bottom:2px solid #eee; display:flex; align-items:flex-end; margin-bottom:15px; background:#fafafa; border-radius:8px; padding:10px 10px 0 10px;">
+            </div>
+            <div id="lb-popup-stats"
+                style="display:flex; justify-content:space-around; align-items:center; font-size:1em; color:#444; padding:15px; background:#f8f9fa; border-radius:10px;">
+            </div>
+        </div>
+    </div>
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -828,7 +845,7 @@
                 <h2 style="margin:0;"><i class="fa-solid fa-user-shield"></i> Dashboard
                     <span
                         style="font-size:0.5em; background:#ff9f1c; padding:2px 8px; border-radius:10px; color:white; vertical-align:middle; font-weight:bold;">
-                        LIFF: V78.91 | Admin: V78.91
+                        LIFF: V78.92 | Admin: V78.92
                     </span>
                 </h2>
                 <span id="admin-email" style="font-size:0.8em; color:var(--text-sub);"></span>
@@ -4116,7 +4133,7 @@
                 }
                 const rankClass = i < 3 ? `rank-${i + 1}` : '';
                 container.innerHTML += `
-                    <div class="lb-row ${rankClass}">
+                    <div class="lb-row ${rankClass}" style="cursor:pointer;" onclick="openLbPopup('${u.id}')">
                         <div class="lb-left">
                             <div class="lb-rank">#${i + 1}</div>
                             <div class="lb-profile">
@@ -4128,11 +4145,11 @@
                             </div>
                         </div>
                         <div style="flex:3; display:flex; flex-direction:column; margin: 0 20px; min-width:0;">
-                    <div class="lb-mid" id="chart-${u.id}" style="margin:0; width:100%; height:60px; min-height:60px; flex:none;"></div>
-                    <div class="lb-stat-row" id="stats-${u.id}" style="display:flex; justify-content:space-around; align-items:center; font-size:0.7em; color:#666; margin-top:8px; background:rgba(0,0,0,0.02); padding:4px; border-radius:5px;">
-                        <span style="opacity:0.5;">Calculating stats...</span>
-                    </div>
-                </div>
+                            <div class="lb-mid" id="chart-${u.id}" style="margin:0; width:100%; height:60px; min-height:60px; flex:none;"></div>
+                            <div class="lb-stat-row" id="stats-${u.id}" style="display:flex; justify-content:space-around; align-items:center; font-size:0.7em; color:#666; margin-top:8px; background:rgba(0,0,0,0.02); padding:4px; border-radius:5px;">
+                                <span style="opacity:0.5;">Calculating stats...</span>
+                            </div>
+                        </div>
                         <div class="lb-right">
                             <div class="lb-score">${parseFloat((u.score || 0).toFixed(2))}</div>
                         </div>
@@ -4311,33 +4328,106 @@
                         createMark(tPct, 'Today', '#ff9f1c');
                     }
 
-                    // Stats (V78.91)
+                    // Stats (V78.92)
                     const scores = Object.values(pointsMap).filter(s => s > 0);
                     const minS = scores.length > 0 ? Math.min(...scores) : 0;
                     const maxS = scores.length > 0 ? Math.max(...scores) : 0;
 
-                    let streak = 0;
-                    let checkD = new Date();
-                    checkD.setHours(12, 0, 0, 0);
+                    // Longest Streak from startDate (V78.92)
                     const fmt = (dt) => dt.toISOString().split('T')[0];
-                    if (!pointsMap[fmt(checkD)]) checkD.setDate(checkD.getDate() - 1);
-                    while (streak < 365) {
-                        if (pointsMap[fmt(checkD)] && pointsMap[fmt(checkD)] > 0) {
-                            streak++;
-                            checkD.setDate(checkD.getDate() - 1);
-                        } else break;
+                    let longestStreak = 0, currentRun = 0;
+                    const scanStart = u.startDate ? new Date(u.startDate) : start;
+                    const scanEnd = new Date(); // up to today
+                    let scanD = new Date(scanStart);
+                    scanD.setHours(12, 0, 0, 0);
+                    while (scanD <= scanEnd) {
+                        if (pointsMap[fmt(scanD)] && pointsMap[fmt(scanD)] > 0) {
+                            currentRun++;
+                            if (currentRun > longestStreak) longestStreak = currentRun;
+                        } else {
+                            currentRun = 0;
+                        }
+                        scanD.setDate(scanD.getDate() + 1);
                     }
+
+                    // Store data for popup
+                    if (!window._lbChartCache) window._lbChartCache = {};
+                    window._lbChartCache[u.id] = { pointsMap, start, end, maxDaily, totalDays, minS, maxS, longestStreak, user: u };
 
                     const sEl = document.getElementById(`stats-${u.id}`);
                     if (sEl) {
                         sEl.innerHTML = `
                             <div style="display:flex; align-items:center; gap:3px;"><i class="fa-solid fa-arrow-down" style="color:#ef233c;"></i> Min: <b>${minS.toFixed(2)}</b></div>
                             <div style="display:flex; align-items:center; gap:3px;"><i class="fa-solid fa-arrow-up" style="color:#28a745;"></i> Max: <b>${maxS.toFixed(2)}</b></div>
-                            <div style="display:flex; align-items:center; gap:3px; color:#333;"><i class="fa-solid fa-fire" style="color:#ff9f1c;"></i> Streak: <b style="color:#ff6b6b">${streak} วัน</b></div>
+                            <div style="display:flex; align-items:center; gap:3px; color:#333;"><i class="fa-solid fa-fire" style="color:#ff9f1c;"></i> Streak: <b style="color:#ff6b6b">${longestStreak} วัน</b></div>
                         `;
                     }
                 } catch (e) { console.error("Chart Error:", e); }
             }
+        }
+
+        // Popup enlarged chart (V78.92)
+        function openLbPopup(userId) {
+            const cache = window._lbChartCache && window._lbChartCache[userId];
+            if (!cache) return;
+            const { pointsMap, start, end, maxDaily, totalDays, minS, maxS, longestStreak, user: u } = cache;
+
+            const modal = document.getElementById('lbChartModal');
+            modal.style.display = 'block';
+
+            // Header
+            const lv = Math.floor((u.score || 0) / 10) + 1;
+            document.getElementById('lb-popup-header').innerHTML = `
+                <img src="${u.pictureUrl}" style="width:60px; height:60px; border-radius:50%; object-fit:cover; border:3px solid #4361ee; box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+                <div>
+                    <div style="font-size:1.3em; font-weight:bold;">${u.displayName} <span style="font-size:0.6em; background:#eee; padding:2px 8px; border-radius:10px; color:#999;">Lv.${lv}</span></div>
+                    <div style="font-size:0.85em; color:#666;">${u.startDate || '?'} → ${u.endDate || '?'} | Score: <b style="color:#4361ee;">${(u.score || 0).toFixed(2)}</b></div>
+                </div>
+            `;
+
+            // Chart (enlarged)
+            const chart = document.getElementById('lb-popup-chart');
+            chart.innerHTML = '';
+            const fmt2 = (dt) => dt.toISOString().split('T')[0];
+
+            Object.keys(pointsMap).forEach(dateStr => {
+                const d = new Date(dateStr);
+                if (d < start || d > end) return;
+                const dayOffset = (d - start) / 86400000;
+                const leftPct = (dayOffset / totalDays) * 100;
+                const score = pointsMap[dateStr];
+                const heightPct = Math.min((Math.max(0, score) / maxDaily) * 100, 100);
+                if (heightPct > 0) {
+                    const bar = document.createElement('div');
+                    bar.style.cssText = `position:absolute; bottom:0; left:${leftPct}%; height:${Math.max(3, heightPct * 0.9)}%; width:${Math.max(1, 100 / totalDays)}%; background:#4361ee; opacity:0.75; border-radius:2px 2px 0 0; z-index:2; transition:opacity 0.2s;`;
+                    bar.title = `${dateStr}: ${score.toFixed(2)} pts`;
+                    bar.onmouseenter = () => bar.style.opacity = '1';
+                    bar.onmouseleave = () => bar.style.opacity = '0.75';
+                    chart.appendChild(bar);
+                }
+            });
+
+            // Markers in popup
+            const addMark = (pct, text, color) => {
+                const m = document.createElement('div');
+                m.style.cssText = `position:absolute; top:0; bottom:0; width:1px; background:${color}; left:${pct}%; opacity:0.5; z-index:1;`;
+                m.innerHTML = `<span style="position:absolute; top:-18px; left:50%; transform:translateX(-50%); font-size:10px; white-space:nowrap; color:${color}; font-weight:bold;">${text}</span>`;
+                chart.appendChild(m);
+            };
+            addMark(0, start.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }), '#28a745');
+            addMark(100, end.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }), '#ef233c');
+            const today = new Date();
+            if (today >= start && today <= end) {
+                addMark(((today - start) / 86400000 / totalDays) * 100, 'Today', '#ff9f1c');
+            }
+
+            // Stats in popup
+            document.getElementById('lb-popup-stats').innerHTML = `
+                <div style="text-align:center;"><i class="fa-solid fa-arrow-down" style="color:#ef233c; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Min Daily</span><br><b style="font-size:1.3em;">${minS.toFixed(2)}</b></div>
+                <div style="text-align:center;"><i class="fa-solid fa-arrow-up" style="color:#28a745; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Max Daily</span><br><b style="font-size:1.3em;">${maxS.toFixed(2)}</b></div>
+                <div style="text-align:center;"><i class="fa-solid fa-fire" style="color:#ff9f1c; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Longest Streak</span><br><b style="font-size:1.3em; color:#ff6b6b;">${longestStreak} วัน</b></div>
+                <div style="text-align:center;"><i class="fa-solid fa-calendar-check" style="color:#4361ee; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Active Days</span><br><b style="font-size:1.3em;">${Object.values(pointsMap).filter(s => s > 0).length}</b></div>
+            `;
         }
 
         function initKanban() {
