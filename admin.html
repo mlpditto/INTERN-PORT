@@ -845,7 +845,7 @@
                 <h2 style="margin:0;"><i class="fa-solid fa-user-shield"></i> Dashboard
                     <span
                         style="font-size:0.5em; background:#ff9f1c; padding:2px 8px; border-radius:10px; color:white; vertical-align:middle; font-weight:bold;">
-                        LIFF: V78.92 | Admin: V78.92
+                        LIFF: V78.93 | Admin: V78.93
                     </span>
                 </h2>
                 <span id="admin-email" style="font-size:0.8em; color:var(--text-sub);"></span>
@@ -4328,49 +4328,58 @@
                         createMark(tPct, 'Today', '#ff9f1c');
                     }
 
-                    // Stats (V78.92)
+                    // Stats (V78.93)
                     const scores = Object.values(pointsMap).filter(s => s > 0);
                     const minS = scores.length > 0 ? Math.min(...scores) : 0;
                     const maxS = scores.length > 0 ? Math.max(...scores) : 0;
 
-                    // Longest Streak from startDate (V78.92)
+                    // Longest Streak from startDate with date range (V78.93)
                     const fmt = (dt) => dt.toISOString().split('T')[0];
+                    const thDate = (dt) => dt.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
                     let longestStreak = 0, currentRun = 0;
+                    let streakStart = null, streakEnd = null;
+                    let runStart = null;
                     const scanStart = u.startDate ? new Date(u.startDate) : start;
-                    const scanEnd = new Date(); // up to today
+                    const scanEnd = new Date();
                     let scanD = new Date(scanStart);
                     scanD.setHours(12, 0, 0, 0);
                     while (scanD <= scanEnd) {
                         if (pointsMap[fmt(scanD)] && pointsMap[fmt(scanD)] > 0) {
+                            if (currentRun === 0) runStart = new Date(scanD);
                             currentRun++;
-                            if (currentRun > longestStreak) longestStreak = currentRun;
+                            if (currentRun > longestStreak) {
+                                longestStreak = currentRun;
+                                streakStart = new Date(runStart);
+                                streakEnd = new Date(scanD);
+                            }
                         } else {
                             currentRun = 0;
                         }
                         scanD.setDate(scanD.getDate() + 1);
                     }
+                    const streakRange = longestStreak > 0 ? `(${thDate(streakStart)} - ${thDate(streakEnd)})` : '';
 
                     // Store data for popup
                     if (!window._lbChartCache) window._lbChartCache = {};
-                    window._lbChartCache[u.id] = { pointsMap, start, end, maxDaily, totalDays, minS, maxS, longestStreak, user: u };
+                    window._lbChartCache[u.id] = { pointsMap, start, end, maxDaily, totalDays, minS, maxS, longestStreak, streakRange, user: u };
 
                     const sEl = document.getElementById(`stats-${u.id}`);
                     if (sEl) {
                         sEl.innerHTML = `
                             <div style="display:flex; align-items:center; gap:3px;"><i class="fa-solid fa-arrow-down" style="color:#ef233c;"></i> Min: <b>${minS.toFixed(2)}</b></div>
                             <div style="display:flex; align-items:center; gap:3px;"><i class="fa-solid fa-arrow-up" style="color:#28a745;"></i> Max: <b>${maxS.toFixed(2)}</b></div>
-                            <div style="display:flex; align-items:center; gap:3px; color:#333;"><i class="fa-solid fa-fire" style="color:#ff9f1c;"></i> Streak: <b style="color:#ff6b6b">${longestStreak} วัน</b></div>
+                            <div style="display:flex; align-items:center; gap:3px; color:#333;"><i class="fa-solid fa-fire" style="color:#ff9f1c;"></i> Streak: <b style="color:#ff6b6b">${longestStreak} วัน</b> <span style="font-size:0.85em; color:#999;">${streakRange}</span></div>
                         `;
                     }
                 } catch (e) { console.error("Chart Error:", e); }
             }
         }
 
-        // Popup enlarged chart (V78.92)
+        // Popup enlarged chart (V78.93)
         function openLbPopup(userId) {
             const cache = window._lbChartCache && window._lbChartCache[userId];
             if (!cache) return;
-            const { pointsMap, start, end, maxDaily, totalDays, minS, maxS, longestStreak, user: u } = cache;
+            const { pointsMap, start, end, maxDaily, totalDays, minS, maxS, longestStreak, streakRange, user: u } = cache;
 
             const modal = document.getElementById('lbChartModal');
             modal.style.display = 'block';
@@ -4388,7 +4397,6 @@
             // Chart (enlarged)
             const chart = document.getElementById('lb-popup-chart');
             chart.innerHTML = '';
-            const fmt2 = (dt) => dt.toISOString().split('T')[0];
 
             Object.keys(pointsMap).forEach(dateStr => {
                 const d = new Date(dateStr);
@@ -4425,7 +4433,7 @@
             document.getElementById('lb-popup-stats').innerHTML = `
                 <div style="text-align:center;"><i class="fa-solid fa-arrow-down" style="color:#ef233c; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Min Daily</span><br><b style="font-size:1.3em;">${minS.toFixed(2)}</b></div>
                 <div style="text-align:center;"><i class="fa-solid fa-arrow-up" style="color:#28a745; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Max Daily</span><br><b style="font-size:1.3em;">${maxS.toFixed(2)}</b></div>
-                <div style="text-align:center;"><i class="fa-solid fa-fire" style="color:#ff9f1c; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Longest Streak</span><br><b style="font-size:1.3em; color:#ff6b6b;">${longestStreak} วัน</b></div>
+                <div style="text-align:center;"><i class="fa-solid fa-fire" style="color:#ff9f1c; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Longest Streak</span><br><b style="font-size:1.3em; color:#ff6b6b;">${longestStreak} วัน</b><br><span style="font-size:0.7em; color:#aaa;">${streakRange}</span></div>
                 <div style="text-align:center;"><i class="fa-solid fa-calendar-check" style="color:#4361ee; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Active Days</span><br><b style="font-size:1.3em;">${Object.values(pointsMap).filter(s => s > 0).length}</b></div>
             `;
         }
