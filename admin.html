@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP INTERNSHIP PORT V78.6</title>
+    <title>MLP INTERNSHIP PORT V78.8</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -1246,14 +1246,23 @@
                     onclick="document.getElementById('certModal').style.display='none'">&times;</span>
                 <h2>🎓 Certificate</h2><input type="hidden" id="cert-uid"><input type="hidden" id="cert-uname">
                 <div style="margin-bottom:15px;">
-                    <label style="font-size:0.8em; color:#666;">Special Award (รางวัลพิเศษ):</label>
-                    <select id="cert-award" onchange="updateCertPreview()"
-                        style="width:100%; padding:10px; border-radius:8px; border:1px solid #ddd; font-weight:bold; color:var(--primary);">
-                        <option value="">-- No Special Award --</option>
-                        <option value="zero-to-one" style="color:#0077be;">🚀 Zero-to-One Award (Game Changer)</option>
-                        <option value="good-reporter" style="color:#2ecc71;">🎤 Good Reporter Award (Insightful)
-                        </option>
-                    </select>
+                    <label style="font-size:0.8em; color:#666; display:block; margin-bottom:5px;">Special Awards
+                        (รางวัลพิเศษ - เลือกได้หลายรายการ):</label>
+                    <div id="cert-awards-container"
+                        style="display:flex; flex-wrap:wrap; gap:10px; padding:10px; border:1px solid #ddd; border-radius:8px; background:var(--col-bg);">
+                        <label style="display:flex; align-items:center; gap:5px; cursor:pointer; font-size:0.85em;">
+                            <input type="checkbox" name="cert-award" value="zero-to-one" onchange="updateCertPreview()">
+                            🚀 <span style="color:#0077be;">Zero-to-One</span>
+                        </label>
+                        <label style="display:flex; align-items:center; gap:5px; cursor:pointer; font-size:0.85em;">
+                            <input type="checkbox" name="cert-award" value="good-reporter"
+                                onchange="updateCertPreview()"> 🎤 <span style="color:#2ecc71;">Good Reporter</span>
+                        </label>
+                        <label style="display:flex; align-items:center; gap:5px; cursor:pointer; font-size:0.85em;">
+                            <input type="checkbox" name="cert-award" value="beta-user" onchange="updateCertPreview()">
+                            🧪 <span style="color:#e91e63;">Beta User</span>
+                        </label>
+                    </div>
                 </div>
                 <div style="margin-bottom:15px;">
                     <label style="font-size:0.8em; color:#666;">Full Name (ชื่อ-สกุล):</label>
@@ -3869,7 +3878,14 @@
             document.getElementById('cert-fullname').value = u.fullName || u.displayName || "";
             document.getElementById('cert-start').value = u.startDate || "";
             document.getElementById('cert-end').value = u.endDate || "";
-            document.getElementById('cert-award').value = u.awardType || "";
+
+            // Handle multiple awards (u.awards) or legacy single award (u.awardType)
+            const currentAwards = u.awards || (u.awardType ? [u.awardType] : []);
+            const checkboxes = document.querySelectorAll('input[name="cert-award"]');
+            checkboxes.forEach(cb => {
+                cb.checked = currentAwards.includes(cb.value);
+            });
+
             updateCertPreview();
             document.getElementById('certModal').style.display = "block";
         }
@@ -3878,16 +3894,21 @@
             const s = document.getElementById('cert-start').value;
             const e = document.getElementById('cert-end').value;
             const fn = document.getElementById('cert-fullname').value;
-            const award = document.getElementById('cert-award').value;
+
+            const awardCheckboxes = document.querySelectorAll('input[name="cert-award"]:checked');
+            const awards = Array.from(awardCheckboxes).map(cb => cb.value);
+
             await db.collection("users").doc(certUser.uid).update({
                 startDate: s,
                 endDate: e,
                 fullName: fn,
-                awardType: award,
-                certRequested: false
+                awards: awards, // Save as array
+                awardType: awards.length > 0 ? awards[0] : "" // Legacy support
             });
-            showToast("Saved & Approved!");
-            document.getElementById('certModal').style.display = "none";
+            showToast("Saved!");
+            // Update local
+            const u = usersData.find(x => x.id === certUser.uid);
+            if (u) { u.startDate = s; u.endDate = e; u.fullName = fn; u.awards = awards; u.awardType = awards.length > 0 ? awards[0] : ""; }
         }
 
         async function showHistory(uid, name, total) {
@@ -4441,7 +4462,9 @@
         async function editQ(id, q) { const nq = prompt("Edit Q:", q); if (nq) await db.collection("quests").doc(id).update({ question: nq }); }
         async function stopQ(id) { if (confirm("Stop?")) await db.collection("quests").doc(id).update({ deadline: new Date() }); }
         async function delQ(id) { if (confirm("Del?")) await db.collection("quests").doc(id).delete(); }
-        function drawCertificate(ctx, name, dates, awardType) {
+        function drawCertificate(ctx, name, dates, awards) {
+            // Handle both array (multiple) and string (legacy)
+            const awardList = Array.isArray(awards) ? awards : (awards && awards !== 'none' ? [awards] : []);
             const w = 800, h = 600;
 
             // 1. Premium Background: Subtle Gradient & Texture
@@ -4523,7 +4546,7 @@
 
             // Dynamic Font Scaling Logic
             let fontSize = 72;
-            const maxWidth = w * 0.55; // กำหนดพื้นที่สูงสุดให้แสดงชื่อได้ (ประมาณ 440px)
+            const maxWidth = w * 0.55;
 
             ctx.font = `bold italic ${fontSize}px 'Montserrat', sans-serif`;
             while (ctx.measureText(recipientName).width > maxWidth && fontSize > 24) {
@@ -4602,7 +4625,6 @@
             // 13. Main Seal: EXCELLENCE AWARDS
             const sealX = w * 0.85, sealY = h * 0.78;
 
-            // Glow effect for seal
             ctx.shadowColor = "rgba(0,0,0,0.3)";
             ctx.shadowBlur = 15;
             const grdEx = ctx.createRadialGradient(sealX, sealY, 10, sealX, sealY, 65);
@@ -4613,7 +4635,7 @@
             ctx.beginPath();
             ctx.arc(sealX, sealY, 65, 0, Math.PI * 2);
             ctx.fill();
-            ctx.shadowBlur = 0; // Reset
+            ctx.shadowBlur = 0;
 
             ctx.strokeStyle = "#ffffff";
             ctx.lineWidth = 4;
@@ -4628,12 +4650,13 @@
             ctx.font = "bold 11px Montserrat";
             ctx.fillText("AWARDS", sealX, sealY + 22);
 
-            // 14. Optional Special Award Seal (Smaller, shown above)
-            if (awardType && awardType !== 'none') {
-                const specX = sealX, specY = sealY - 140;
+            // 14. Optional Special Award Seals (Multi-stack)
+            awardList.forEach((award, index) => {
+                const specX = sealX;
+                const specY = sealY - 140 - (index * 110); // Stack upwards
                 const r = 50;
 
-                if (awardType === 'zero-to-one') {
+                if (award === 'zero-to-one') {
                     const grd = ctx.createRadialGradient(specX, specY, 5, specX, specY, r);
                     grd.addColorStop(0, "#00d2ff");
                     grd.addColorStop(1, "#3a7bd5");
@@ -4657,7 +4680,7 @@
                     ctx.fillText("ZERO-TO-ONE", specX, specY + 12);
                     ctx.font = "7px Montserrat";
                     ctx.fillText("GAME CHANGER", specX, specY + 22);
-                } else if (awardType === 'good-reporter') {
+                } else if (award === 'good-reporter') {
                     const grd = ctx.createRadialGradient(specX, specY, 5, specX, specY, r);
                     grd.addColorStop(0, "#50c878");
                     grd.addColorStop(1, "#1b4d3e");
@@ -4676,29 +4699,50 @@
                     ctx.fillText("GOOD REPORTER", specX, specY + 12);
                     ctx.font = "7px Montserrat";
                     ctx.fillText("INSIGHTFUL", specX, specY + 22);
+                } else if (award === 'beta-user') {
+                    const grd = ctx.createRadialGradient(specX, specY, 5, specX, specY, r);
+                    grd.addColorStop(0, "#ff0080"); // Pink
+                    grd.addColorStop(1, "#7928ca"); // Purple
+
+                    ctx.fillStyle = grd;
+                    ctx.beginPath();
+                    // Hexagon shape for Beta User
+                    for (let i = 0; i < 6; i++) {
+                        ctx.lineTo(specX + r * Math.cos(i * Math.PI / 3), specY + r * Math.sin(i * Math.PI / 3));
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
+
+                    ctx.textAlign = "center";
+                    ctx.fillStyle = "#fff";
+                    ctx.font = "bold 24px Arial";
+                    ctx.fillText("🧪", specX, specY - 6);
+                    ctx.font = "bold 10px Montserrat";
+                    ctx.fillText("BETA USER", specX, specY + 12);
+                    ctx.font = "7px Montserrat";
+                    ctx.fillText("EARLY ADOPTER", specX, specY + 22);
                 }
-            }
+            });
         }
 
         async function updateCertPreview() {
             const c = document.getElementById('cert-canvas');
             const ctx = c.getContext('2d');
 
-            // 🔥 Fix: Handle High DPI Screens & Explicit Resolution
-            // Get the display size (CSS width)
-            // But for certificate generation, we want a fixed internal resolution of 800x600
-            // regardless of screen size, so the PDF/Image is consistent.
             c.width = 800;
             c.height = 600;
 
-            // Reset transform to avoid accumulation
             ctx.setTransform(1, 0, 0, 1, 0, 0);
 
             const s = document.getElementById('cert-start').value;
             const e = document.getElementById('cert-end').value;
             const fn = document.getElementById('cert-fullname').value;
-            const award = document.getElementById('cert-award').value;
-            drawCertificate(ctx, fn || certUser.name, s && e ? `${s} - ${e}` : "", award);
+
+            const awardCheckboxes = document.querySelectorAll('input[name="cert-award"]:checked');
+            const awards = Array.from(awardCheckboxes).map(cb => cb.value);
+
+            drawCertificate(ctx, fn || certUser.name, s && e ? `${s} - ${e}` : "", awards);
         }
         async function generateBulkCert() {
             const { jsPDF } = window.jspdf;
@@ -4718,7 +4762,8 @@
 
             for (let i = 0; i < users.length; i++) {
                 const u = users[i];
-                drawCertificate(ctx, u.fullName || u.displayName, `${u.startDate} - ${u.endDate}`, u.awardType);
+                const finalAwards = u.awards || (u.awardType ? [u.awardType] : []);
+                drawCertificate(ctx, u.fullName || u.displayName, `${u.startDate} - ${u.endDate}`, finalAwards);
 
                 const imgData = c.toDataURL('image/jpeg', 0.95);
                 if (i > 0) doc.addPage();
