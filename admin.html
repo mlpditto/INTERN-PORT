@@ -1101,6 +1101,16 @@
             <div
                 style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; max-width:900px; margin:0 auto 20px;">
                 <h3 style="margin:0;"><i class="fa-solid fa-ranking-star"></i> Rankings</h3>
+                <div
+                    style="display:flex; align-items:center; gap:10px; background:#f8f9fa; padding:10px 15px; border-radius:30px; border:1px solid #ddd; font-size:0.8em;">
+                    <i class="fa-solid fa-calendar-day" style="color:#666"></i>
+                    View Range:
+                    <input type="date" id="lb-global-start" onchange="renderLeaderboard()"
+                        style="padding:2px 5px; border:none; background:none; font-weight:bold;">
+                    -
+                    <input type="date" id="lb-global-end" onchange="renderLeaderboard()"
+                        style="padding:2px 5px; border:none; background:none; font-weight:bold;">
+                </div>
                 <button class="btn-sm btn-info" onclick="openDivisionsModal()"
                     style="background:#8338ec; box-shadow: 0 4px 10px rgba(131, 56, 236, 0.3);"><i
                         class="fa-solid fa-shield-halved"></i>
@@ -4117,8 +4127,8 @@
                                 </div>
                             </div>
                         </div>
-                        <div style="flex:3; display:flex; flex-direction:column; margin: 0 20px;">
-                    <div class="lb-mid" id="chart-${u.id}" style="margin:0; width:100%;"></div>
+                        <div style="flex:3; display:flex; flex-direction:column; margin: 0 20px; min-width:0;">
+                    <div class="lb-mid" id="chart-${u.id}" style="margin:0; width:100%; height:60px; min-height:60px; flex:none;"></div>
                     <div class="lb-stat-row" id="stats-${u.id}" style="display:flex; justify-content:space-around; align-items:center; font-size:0.7em; color:#666; margin-top:8px; background:rgba(0,0,0,0.02); padding:4px; border-radius:5px;">
                         <span style="opacity:0.5;">Calculating stats...</span>
                     </div>
@@ -4128,7 +4138,10 @@
                         </div>
                     </div>`;
             });
-            loadLeaderboardCharts(users);
+
+            const gStart = document.getElementById('lb-global-start').value;
+            const gEnd = document.getElementById('lb-global-end').value;
+            loadLeaderboardCharts(users, gStart, gEnd);
         }
 
         // 🔥 Division Management Functions (V77.8)
@@ -4207,26 +4220,14 @@
             } catch (e) { alert(e.message); }
         }
 
-        async function loadLeaderboardCharts(users) {
+        async function loadLeaderboardCharts(users, gStart = null, gEnd = null) {
             // Process individually to avoid complex composite index requirements
             for (const u of users) {
                 const container = document.getElementById(`chart-${u.id}`);
                 if (!container) continue;
 
                 try {
-                    // Default query range: last 120 days for performance.
-                    // If user's start date is more recent than 120 days ago, query from user's start date.
-                    let queryStart = new Date();
-                    queryStart.setDate(queryStart.getDate() - 120); // This is 120 days ago
-
-                    if (u.startDate) {
-                        const userStartDate = new Date(u.startDate);
-                        if (userStartDate > queryStart) { // If user's start date is more recent than 120 days ago
-                            queryStart = userStartDate;
-                        }
-                    }
-
-                    // Fetch data just for this user (Filtered in JS to avoid composite index requirement)
+                    // Fetch data just for this user
                     const [worksSnap, questsSnap, logsSnap] = await Promise.all([
                         db.collection("works").where("userId", "==", u.id).get(),
                         db.collection("quest_submissions").where("userId", "==", u.id).get(),
@@ -4238,7 +4239,6 @@
                     const addP = (dateObj, score) => {
                         if (!dateObj || score === undefined) return;
                         const dRaw = dateObj.toDate();
-                        if (dRaw < queryStart) return; // JS Filter
                         const d = dRaw.toISOString().split('T')[0];
                         if (!pointsMap[d]) pointsMap[d] = 0;
                         pointsMap[d] += parseFloat(score);
@@ -4248,18 +4248,20 @@
                     questsSnap.forEach(doc => { const d = doc.data(); addP(d.submittedAt, (d.earnedScore || 0) + (d.bonusGiven || 0)); });
                     logsSnap.forEach(doc => { const d = doc.data(); addP(d.timestamp, d.amount); });
 
-                    // 1. Reset and Range
                     container.innerHTML = "";
-                    const start = u.startDate ? new Date(u.startDate) : new Date(Date.now() - 90 * 86400000);
-                    let end = u.endDate ? new Date(u.endDate) : new Date();
+
+                    // Determine Display Range
+                    let start = gStart ? new Date(gStart) : (u.startDate ? new Date(u.startDate) : new Date(Date.now() - 90 * 86400000));
+                    let end = gEnd ? new Date(gEnd) : (u.endDate ? new Date(u.endDate) : new Date());
                     if (end < start) end = new Date();
+
                     const totalDays = Math.max(1, Math.ceil((end - start) / 86400000));
 
-                    // 2. Scaling
+                    // Scaling
                     let maxDaily = 0.5;
                     Object.values(pointsMap).forEach(s => { if (s > maxDaily) maxDaily = s; });
 
-                    // 3. Render Activity Bars (Explicit Visibility)
+                    // Render Bars (V78.92 Fix)
                     Object.keys(pointsMap).forEach(dateStr => {
                         const d = new Date(dateStr);
                         if (d < start || d > end) return;
@@ -4272,43 +4274,44 @@
                         if (heightPct > 0) {
                             const bar = document.createElement('div');
                             bar.className = 'chart-bar';
+                            bar.style.position = 'absolute';
+                            bar.style.bottom = '0';
                             bar.style.left = `${leftPct}%`;
-                            bar.style.height = `${heightPct * 0.9}%`;
-                            bar.style.width = `${Math.max(100 / totalDays, 1.5)}%`;
-                            bar.style.background = 'var(--primary)';
-                            bar.style.opacity = '0.75';
+                            bar.style.height = `${Math.max(2, heightPct * 0.9)}%`;
+                            bar.style.width = `${Math.max(1, 100 / totalDays)}%`;
+                            bar.style.background = '#4361ee'; // Explicit Primary
+                            bar.style.opacity = '0.7';
                             bar.style.zIndex = '2';
                             bar.title = `${dateStr}: ${score.toFixed(2)}`;
                             container.appendChild(bar);
                         }
                     });
 
-                    // 4. Markers
-                    const createMark = (pct, text, cls) => {
+                    // Markers
+                    const createMark = (pct, text, color) => {
                         const m = document.createElement('div');
-                        m.className = 'chart-marker ' + (cls || '');
+                        m.className = 'chart-marker';
+                        m.style.position = 'absolute';
+                        m.style.top = '0';
+                        m.style.bottom = '0';
+                        m.style.width = '1px';
+                        m.style.background = color;
                         m.style.left = `${pct}%`;
-                        m.innerHTML = `<span>${text}</span>`;
+                        m.style.opacity = '0.4';
+                        m.innerHTML = `<span style="position:absolute; top:-15px; left:50%; transform:translateX(-50%); font-size:9px; white-space:nowrap; color:${color}">${text}</span>`;
                         container.appendChild(m);
                     };
 
-                    createMark(0, start.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }), 'start');
-                    createMark(100, end.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }), '');
+                    createMark(0, start.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }), '#28a745');
+                    createMark(100, end.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }), '#ef233c');
 
                     const today = new Date();
                     if (today >= start && today <= end) {
                         const tPct = ((today - start) / 86400000 / totalDays) * 100;
-                        const tMark = document.createElement('div');
-                        tMark.className = 'chart-marker today';
-                        tMark.style.left = `${tPct}%`;
-                        tMark.style.background = '#ffc107';
-                        tMark.style.width = '2px';
-                        tMark.style.zIndex = '5';
-                        tMark.innerHTML = `<span style="color:#d4a017; font-weight:bold; font-size:10px;">Today</span>`;
-                        container.appendChild(tMark);
+                        createMark(tPct, 'Today', '#ff9f1c');
                     }
 
-                    // 5. Stats (V78.91)
+                    // Stats (V78.91)
                     const scores = Object.values(pointsMap).filter(s => s > 0);
                     const minS = scores.length > 0 ? Math.min(...scores) : 0;
                     const maxS = scores.length > 0 ? Math.max(...scores) : 0;
