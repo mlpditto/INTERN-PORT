@@ -4328,14 +4328,32 @@
                         createMark(tPct, 'Today', '#ff9f1c');
                     }
 
-                    // Stats (V78.93)
-                    const scores = Object.values(pointsMap).filter(s => s > 0);
-                    const minS = scores.length > 0 ? Math.min(...scores) : 0;
-                    const maxS = scores.length > 0 ? Math.max(...scores) : 0;
-
-                    // Longest Streak from startDate with date range (V78.93)
+                    // Stats (V78.95)
                     const fmt = (dt) => dt.toISOString().split('T')[0];
                     const thDate = (dt) => dt.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+
+                    // Find min/max with their dates
+                    let minS = Infinity, maxS = -Infinity, minDate = '', maxDate = '';
+                    let activeDays = 0;
+                    Object.entries(pointsMap).forEach(([dateStr, score]) => {
+                        if (score > 0) {
+                            activeDays++;
+                            if (score < minS) { minS = score; minDate = dateStr; }
+                            if (score > maxS) { maxS = score; maxDate = dateStr; }
+                        }
+                    });
+                    if (minS === Infinity) minS = 0;
+                    if (maxS === -Infinity) maxS = 0;
+                    const minDateTh = minDate ? thDate(new Date(minDate)) : '-';
+                    const maxDateTh = maxDate ? thDate(new Date(maxDate)) : '-';
+
+                    // Active days percentage
+                    const internStart = u.startDate ? new Date(u.startDate) : start;
+                    const internNow = new Date() < end ? new Date() : end;
+                    const elapsedDays = Math.max(1, Math.ceil((internNow - internStart) / 86400000));
+                    const activePct = Math.round((activeDays / elapsedDays) * 100);
+
+                    // Longest Streak from startDate with date range (V78.95)
                     let longestStreak = 0, currentRun = 0;
                     let streakStart = null, streakEnd = null;
                     let runStart = null;
@@ -4361,25 +4379,26 @@
 
                     // Store data for popup
                     if (!window._lbChartCache) window._lbChartCache = {};
-                    window._lbChartCache[u.id] = { pointsMap, start, end, maxDaily, totalDays, minS, maxS, longestStreak, streakRange, user: u };
+                    window._lbChartCache[u.id] = { pointsMap, start, end, maxDaily, totalDays, minS, maxS, minDateTh, maxDateTh, longestStreak, streakRange, activeDays, elapsedDays, activePct, user: u };
 
                     const sEl = document.getElementById(`stats-${u.id}`);
                     if (sEl) {
                         sEl.innerHTML = `
-                            <div style="display:flex; align-items:center; gap:3px;"><i class="fa-solid fa-arrow-down" style="color:#ef233c;"></i> Min: <b>${minS.toFixed(2)}</b></div>
-                            <div style="display:flex; align-items:center; gap:3px;"><i class="fa-solid fa-arrow-up" style="color:#28a745;"></i> Max: <b>${maxS.toFixed(2)}</b></div>
-                            <div style="display:flex; align-items:center; gap:3px; color:#333;"><i class="fa-solid fa-fire" style="color:#ff9f1c;"></i> Streak: <b style="color:#ff6b6b">${longestStreak} วัน</b> <span style="font-size:0.85em; color:#999;">${streakRange}</span></div>
+                            <div style="display:flex; align-items:center; gap:3px;" title="${minDate}"><i class="fa-solid fa-arrow-down" style="color:#ef233c;"></i> Min: <b>${minS.toFixed(2)}</b> <span style="font-size:0.8em;color:#999;">${minDateTh}</span></div>
+                            <div style="display:flex; align-items:center; gap:3px;" title="${maxDate}"><i class="fa-solid fa-arrow-up" style="color:#28a745;"></i> Max: <b>${maxS.toFixed(2)}</b> <span style="font-size:0.8em;color:#999;">${maxDateTh}</span></div>
+                            <div style="display:flex; align-items:center; gap:3px; color:#333;"><i class="fa-solid fa-fire" style="color:#ff9f1c;"></i> <b style="color:#ff6b6b">${longestStreak}d</b> <span style="font-size:0.8em;color:#999;">${streakRange}</span></div>
+                            <div style="display:flex; align-items:center; gap:3px;"><i class="fa-solid fa-calendar-check" style="color:#4361ee;"></i> <b>${activeDays}/${elapsedDays}</b> <span style="font-size:0.8em;color:#999;">(${activePct}%)</span></div>
                         `;
                     }
                 } catch (e) { console.error("Chart Error:", e); }
             }
         }
 
-        // Popup enlarged chart (V78.93)
+        // Popup enlarged chart (V78.95)
         function openLbPopup(userId) {
             const cache = window._lbChartCache && window._lbChartCache[userId];
             if (!cache) return;
-            const { pointsMap, start, end, maxDaily, totalDays, minS, maxS, longestStreak, streakRange, user: u } = cache;
+            const { pointsMap, start, end, maxDaily, totalDays, minS, maxS, minDateTh, maxDateTh, longestStreak, streakRange, activeDays, elapsedDays, activePct, user: u } = cache;
 
             const modal = document.getElementById('lbChartModal');
             modal.style.display = 'block';
@@ -4429,12 +4448,13 @@
                 addMark(((today - start) / 86400000 / totalDays) * 100, 'Today', '#ff9f1c');
             }
 
-            // Stats in popup
+            // Stats in popup (V78.95)
+            const pctColor = activePct >= 70 ? '#28a745' : activePct >= 40 ? '#ff9f1c' : '#ef233c';
             document.getElementById('lb-popup-stats').innerHTML = `
-                <div style="text-align:center;"><i class="fa-solid fa-arrow-down" style="color:#ef233c; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Min Daily</span><br><b style="font-size:1.3em;">${minS.toFixed(2)}</b></div>
-                <div style="text-align:center;"><i class="fa-solid fa-arrow-up" style="color:#28a745; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Max Daily</span><br><b style="font-size:1.3em;">${maxS.toFixed(2)}</b></div>
+                <div style="text-align:center;"><i class="fa-solid fa-arrow-down" style="color:#ef233c; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Min Daily</span><br><b style="font-size:1.3em;">${minS.toFixed(2)}</b><br><span style="font-size:0.7em; color:#aaa;">${minDateTh}</span></div>
+                <div style="text-align:center;"><i class="fa-solid fa-arrow-up" style="color:#28a745; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Max Daily</span><br><b style="font-size:1.3em;">${maxS.toFixed(2)}</b><br><span style="font-size:0.7em; color:#aaa;">${maxDateTh}</span></div>
                 <div style="text-align:center;"><i class="fa-solid fa-fire" style="color:#ff9f1c; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Longest Streak</span><br><b style="font-size:1.3em; color:#ff6b6b;">${longestStreak} วัน</b><br><span style="font-size:0.7em; color:#aaa;">${streakRange}</span></div>
-                <div style="text-align:center;"><i class="fa-solid fa-calendar-check" style="color:#4361ee; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Active Days</span><br><b style="font-size:1.3em;">${Object.values(pointsMap).filter(s => s > 0).length}</b></div>
+                <div style="text-align:center;"><i class="fa-solid fa-calendar-check" style="color:#4361ee; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Active Days</span><br><b style="font-size:1.3em;">${activeDays}<span style="font-size:0.6em;color:#999;">/${elapsedDays}</span></b><br><div style="width:60px;height:6px;background:#eee;border-radius:3px;margin:4px auto 0;"><div style="width:${Math.min(activePct, 100)}%;height:100%;background:${pctColor};border-radius:3px;"></div></div><span style="font-size:0.75em;color:${pctColor};font-weight:bold;">${activePct}%</span></div>
             `;
         }
 
