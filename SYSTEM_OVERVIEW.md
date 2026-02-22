@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V78.7) Overview
+# MLP Internship Portfolio (V78.93) Overview
 
 ระบบเว็บแอปพลิเคชันสำหรับจัดการการฝึกงานและระบบ Gamification (สะสมคะแนน) เพื่อจูงใจและติดตามความก้าวหน้าของนักศึกษาฝึกงาน
 
@@ -64,6 +64,11 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+- **🏅 Multi-Award Certificates (V78.8):**
+    - ระบบรองรับ **รางวัลพิเศษหลายรายการ** บนใบรับรองเดียว (เช่น Zero-to-One + Good Reporter + Beta User)
+    - Admin เลือกรางวัลผ่าน Checkbox แทน Radio Button
+    - ตราประทับรางวัลจะซ้อนกันแบบ Stacked Display
+    - เพิ่มรางวัล **"🧪 Beta User Award"** พร้อมดีไซน์ตราประทับสีพิเศษ (Pink-Purple Gradient)
 - **Approval Workflow:** เมื่อทำเสร็จ คะแนนจะขึ้นสถานะ **"รออนุมัติ (Pending)"** (แสดงเป็นทศนิยม 3 ตำแหน่ง) แต้มจะยังไม่เข้าระบบทันทีจนกว่าผู้ดูแลจะกดยืนยัน
 - **🛡️ Data Integrity & Stability (V78.4):** 
     - **Submission Fix:** แก้ไขปัญหาการส่งคำตอบแบบ Single Choice ให้เป็น Array เสมอ เพื่อป้องกันข้อผิดพลาดในการตรวจคำตอบอัตโนมัติ (Fix 0 Score Bug)
@@ -77,7 +82,7 @@
 - **Simple Form:** ส่งหัวข้องานและแนบลิงก์ผลงาน (เช่น Google Drive, GitHub)
 - **Status Tracking:** ติดตามสถานะ (รอตรวจ/แก้ไข/ตรวจแล้ว) พร้อมคะแนนที่ได้รับรายชิ้น
 
-### 6. ตารางอันดับ (Leaderboard V77.16)
+### 6. ตารางอันดับ (Leaderboard V78.93)
 - **Explicit Sorting:** ระบบจัดอันดับผู้ใช้งานตามคะแนนสูงสุด (Descending) อย่างชัดเจน
 - **Top 3 Highlights:** แสดงอันดับ 1 (ทอง), 2 (เงิน), 3 (ทองแดง) ด้วยสีเจาะจงเพื่อให้เห็นผู้ชนะชัดเจน
 - **Group Filtering:** แสดงผลอันดับภายในกลุ่มของตนเอง พร้อมตัวบ่งชี้ตำแหน่งที่ชัดเจน
@@ -205,10 +210,23 @@
     *   **Full Name Support (V73):** เพิ่มช่อง "ชื่อ-นามสกุล จริง" แยกต่างหากจาก Display Name เพื่อใช้สำหรับออกใบรับรองโดยเฉพาะ พร้อมระบบ Auto-save
     *   **✨ Dual Seal Layers (V77.21):** ระบบตราประทับแบบซ้อนชั้น โดยตรา **Excellence Award (สีทอง)** จะแสดงผลที่ตำแหน่งหลักเสมอ และหากได้รางวัลพิเศษ (**Special Award**) ตราพิเศษจะแสดงผลในขนาดที่เล็กลงอยู่ด้านบน เพื่อให้เห็นเกียรติประวัติทั้งสองส่วนบนใบเดียว
 
-### 6. ระบบวิเคราะห์และติดตามผล (Analytics & Leaderboard - V73)
-- **Daily Score Chart:** แสดงกราฟแท่งคะแนนรายวันในตาราง Leaderboard ทำให้เห็นพัฒนาการและความสม่ะเสมอของผู้ใช้งานแต่ละคน
+### 6. ระบบวิเคราะห์และติดตามผล (Analytics & Leaderboard - V78.93)
+- **Daily Score Chart:** แสดงกราฟแท่งคะแนนรายวันในตาราง Leaderboard ทำให้เห็นพัฒนาการและความสม่ำเสมอของผู้ใช้งานแต่ละคน
 - **Visual Milestones:** กราฟแสดงจุด Date Start และ Date End ของการฝึกงาน พร้อม Marker บอกตำแหน่ง "วันนี้" (Today) เพื่อให้ทราบความคืบหน้าของระยะเวลาฝึกงาน
 - **🛠️ Chart Data Fix (V77.20):** ปรับปรุงระบบการดึงข้อมูลกราฟให้ใช้การกรองฝั่ง Client แทนการใช้ Composite Index ของ Firebase เพื่อแก้ปัญหาหน้ากราฟไม่โหลดหรือ Error ในโครงการที่ยังไม่ได้ตั้งค่า Index
+- **📊 Performance Stats (V78.9):**
+    - **Min/Max Daily Score:** แสดงคะแนนรายวันต่ำสุดและสูงสุดของแต่ละ User ใต้กราฟ
+    - **🔥 Longest Streak (V78.93):** คำนวณจำนวนวันที่ได้คะแนนต่อเนื่องมากที่สุด โดย Scan ตั้งแต่วันเริ่มฝึกงาน (`startDate`) จนถึงวันปัจจุบัน พร้อม **แสดงช่วงวันที่** ของ Streak นั้น (เช่น `5 วัน (28 ม.ค. - 1 ก.พ.)`) เพื่อดูความขยันในแต่ละช่วง
+    - **Active Days:** นับจำนวนวันทั้งหมดที่มีกิจกรรม (คะแนน > 0)
+- **🔍 Popup Chart Viewer (V78.93):**
+    - กดที่แถว User ใน Leaderboard → เปิด **Modal Popup** แสดงกราฟขยาย ~3 เท่า (200px)
+    - แสดง Header (รูป + ชื่อ + Level + ช่วงฝึกงาน + Score)
+    - กราฟพร้อม Hover tooltip แสดงคะแนนรายวัน
+    - สถิติ 4 ตัว: Min Daily, Max Daily, Longest Streak (+ ช่วงวันที่), Active Days
+- **📅 Global Date Range (V78.92):**
+    - เพิ่มช่อง Input "View Range" (Start-End) ด้านบน Leaderboard
+    - ใช้กำหนดช่วงเวลาเปรียบเทียบกราฟของน้องทุกคนบน Timeline เดียวกัน
+    - หากไม่กรอก ระบบจะใช้ startDate/endDate ของแต่ละ User ตามปกติ
 
 ---
 
@@ -308,4 +326,4 @@ service cloud.firestore {
 ```
 
 ---
-*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V78.7) โดย Antigravity AI*
+*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V78.93) โดย Antigravity AI*

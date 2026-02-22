@@ -1,5 +1,35 @@
 # Project Tasks & Updates
 
+## [2026-02-23] Session Updates (V78.8 → V78.93)
+
+### 1. Certificate Multi-Award System (V78.8)
+- **Multi-Award Support:** Admin can select multiple special awards per user (Checkbox-based selection)
+- **New Award:** Added "🧪 Beta User Award" with Pink-Purple gradient seal design
+- **Stacked Seals:** Certificate now renders multiple award seals vertically stacked
+- **Backward Compatible:** `awards` array with `awardType` fallback for existing data
+
+### 2. Leaderboard Performance Stats (V78.9 → V78.93)
+- **Min/Max Daily Score:** Displayed below each user's chart showing lowest and highest daily scores
+- **🔥 Longest Streak (V78.93):** Calculates the longest consecutive run of active days from `startDate` to today, with **date range display** (e.g., `5 วัน (28 ม.ค. - 1 ก.พ.)`)
+- **Active Days:** Total count of days with score > 0 (shown in popup)
+- **🔍 Popup Chart Viewer:** Click any user row → opens enlarged chart modal (~3x size, 200px height) with hover tooltips and 4 stat cards
+
+### 3. Leaderboard Global Date Range (V78.92)
+- **View Range Inputs:** Added Start/End date pickers at top of Leaderboard section
+- **Timeline Synchronization:** When dates are set, all user charts render on the same timeline for fair comparison
+- **Fallback:** Uses individual user `startDate`/`endDate` when no global range is specified
+
+### 4. Chart Rendering Fix (V78.91 → V78.92)
+- **Explicit Bar Styling:** Fixed chart bars disappearing by setting absolute positioning, explicit colors (#4361ee), and minimum heights
+- **Marker Improvements:** Replaced class-based markers with inline-styled elements for consistent rendering
+- **Flexbox Fix:** Added `min-height: 60px` and `flex: none` to prevent chart container from collapsing
+
+### 5. Documentation
+- Updated `SYSTEM_OVERVIEW.md` to V78.93 with all new features documented
+- Updated `TASKS.md` with session changelog
+
+---
+
 ## [2026-02-21] Session Updates (V78.7)
 
 ### 1. Certificate System Enhancements
