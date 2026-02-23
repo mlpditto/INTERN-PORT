@@ -1,11 +1,14 @@
 # Project Tasks & Updates
 
-## [2026-02-23] Session Updates (V78.8 → V79.0)
+## [2026-02-23] Session Updates (V79.0 → V79.1)
 
-### 1. Quiz Review & Practice Mode (V79.0)
-- **Review Practice Answers:** Admin can now click a 🔍 **Magnifying Glass** icon in the "Quiz Participants" list to view answers for `practice_done` attempts.
-- **Improved Data Support:** Updated `reviewQuiz` logic to fetch from both `answers` (Real exam) and `practiceAnswers` (Practice mode).
-- **Score Visibility:** Practice scores are now displayed in the participants table with a `(P)` label and orange color coding.
+### 1. Quiz 0.00 Score Protection (V79.1)
+- **Hide Answers for 0.00:** In Dashboard, the "View Answers" button is now hidden if the user's score is 0.00 to prevent answer leaks.
+- **Request Retake Button:** Replaced "View Answers" with a "🔄 ขอสอบใหม่ (Request Retake)" button for 0.00 scores.
+- **Improved Request Logic:** Updated `requestLateQuiz` to handle retake requests specifically, with a dedicated confirmation message.
+- **Security Check:** Added a server-side check (logic-wise) in `viewQuizAnswers` to block viewing if the score is ≤ 0.
+
+## [2026-02-23] Session Updates (V78.8 → V79.0)
 
 ### 2. Certificate System & Special Awards (V78.8, V78.98)
 - **Multi-Award Support:** Admin can select multiple special awards per user.

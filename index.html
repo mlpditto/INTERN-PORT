@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V78.91)</title>
+    <title>Internship Portfolio (V79.1)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -658,7 +658,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V77.27 (Work History Consolidation)
+                V79.1 (Quiz Protection)
             </div>
         </div>
     </div>
@@ -1481,8 +1481,9 @@
 
                             let retryBtn = "";
                             const isExpired = (dead && new Date() > dead);
-                            if (isExpired && !isApproved) {
-                                retryBtn = `<button class="btn-sm btn-warning" onclick="requestLateQuiz('${q.id}')" style="margin-top:5px; width:100%;">🔄 ขอทำใหม่อีกครั้ง (Late Request)</button>`;
+                            // 🔥 V78.92: Show Retake button if score is 0.00 or expired
+                            if ((isExpired && !isApproved) || (isApproved && score <= 0)) {
+                                retryBtn = `<button class="btn-sm btn-warning" onclick="requestLateQuiz('${q.id}', ${score <= 0})" style="margin-top:5px; width:100%;">🔄 ขอสอบใหม่ (Request Retake)</button>`;
                             }
 
                             bodyHtml = `
@@ -1493,9 +1494,9 @@
                                 ${retryBtn}
                              `;
 
-                            // 🔥 Feature: View Answers Button (Only if Approved)
+                            // 🔥 Feature: View Answers Button (Only if Approved and score > 0)
                             let viewBtn = "";
-                            if (!isPending) {
+                            if (!isPending && score > 0) {
                                 viewBtn = `<button class="btn-sm btn-info" onclick="viewQuizAnswers('${q.id}')" style="margin-top:5px; width:100%; border-radius:6px;">👁️ ดูเฉลย (View Answers)</button>`;
                             }
 
@@ -1739,10 +1740,14 @@
             }
         });
 
-        async function requestLateQuiz(quizId) {
+        async function requestLateQuiz(quizId, isRetake = false) {
             const q = quizzesCache.find(x => x.id === quizId);
             if (!q) return;
-            if (!confirm(`ยืนยันการขออนุญาตทำแบบทดสอบ "${q.title}" หลังกำหนดเวลา?\n(แอดมินจะได้รับแจ้งและต้องอนุมัติก่อนเริ่มทำ)`)) return;
+            const msg = isRetake
+                ? `ยืนยันการขอสอบใหม่ "${q.title}"?\n(แอดมินจะได้รับแจ้งและต้องอนุมัติก่อนเริ่มทำอีกครั้ง)`
+                : `ยืนยันการขออนุญาตทำแบบทดสอบ "${q.title}" หลังกำหนดเวลา?\n(แอดมินจะได้รับแจ้งและต้องอนุมัติก่อนเริ่มทำ)`;
+
+            if (!confirm(msg)) return;
 
             try {
                 await db.collection("quiz_attempts").doc(`${quizId}_${userId}`).set({
@@ -1754,7 +1759,7 @@
                     requestTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
-                alert("ส่งคำขอเรียบร้อย! โปรดรอแอดมินอนุมัติครับ");
+                alert(isRetake ? "ส่งคำขอสอบใหม่เรียบร้อย! โปรดรอแอดมินอนุมัติครับ" : "ส่งคำขอเรียบร้อย! โปรดรอแอดมินอนุมัติครับ");
                 loadQuizzes();
             } catch (e) {
                 alert("Request Error: " + e.message);
@@ -1993,6 +1998,8 @@
             const attempt = quizAttemptsCache[quizId];
 
             if (!q || !attempt) return alert("Data not found");
+            const score = attempt.totalQuestions ? (attempt.correctCount / attempt.totalQuestions) * (q.totalPoints || 1.0) : 0;
+            if (score <= 0) return alert("คะแนนเป็น 0.00 ไม่สามารถดูเฉลยได้ครับ กรุณาขอสอบใหม่แทน");
 
             const container = document.getElementById('quiz-result-container');
             container.innerHTML = `<div style="text-align:center; padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>`;
