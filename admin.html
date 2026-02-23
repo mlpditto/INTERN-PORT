@@ -3125,7 +3125,11 @@
         }
 
         async function approveQuiz(attemptId, uid, score) {
-            if (!confirm(`อนุมัติแต้มจำนวน ${score.toFixed(3)} ให้กับผู้ใช้นี้?`)) return;
+            if (score <= 0) {
+                if (!confirm(`⚠️ คำเตือน: คะแนนที่กำลังจะอนุมัติคือ 0.000 แต้ม\nคุณแน่ใจหรือไม่ว่าต้องการอนุมัติคะแนนนี้? (อาจเกิดจากนักศึกษาไม่ได้ตอบข้อสอบเลย)`)) return;
+            } else {
+                if (!confirm(`อนุมัติแต้มจำนวน ${score.toFixed(3)} ให้กับผู้ใช้นี้?`)) return;
+            }
             try {
                 const b = db.batch();
                 b.update(db.collection("quiz_attempts").doc(attemptId), { status: 'approved', approvedAt: firebase.firestore.FieldValue.serverTimestamp() });

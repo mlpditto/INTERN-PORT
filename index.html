@@ -130,21 +130,23 @@
             top: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(6px);
+            /* Center-align content properly */
+            align-items: center;
+            justify-content: center;
         }
 
         .modal-content {
             background: white;
-            margin: 20% auto;
             padding: 20px;
-            /* 🔥 Fix for iPhone 11/X Safe Area & Button Visibility */
-            padding-bottom: calc(20px + env(safe-area-inset-bottom));
-            border-radius: 15px;
-            width: 85%;
-            max-width: 400px;
+            /* 🔥 Fix for iPhone Safe Area & Button Visibility */
+            padding-bottom: calc(25px + env(safe-area-inset-bottom));
+            border-radius: 20px;
+            width: 90%;
+            max-width: 450px;
             position: relative;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
             text-align: center;
             /* Ensure scrolling if content is tall */
             max-height: 80vh;
@@ -712,12 +714,13 @@
             <div id="quiz-run-container">
                 <!-- Quiz content dynamically injected -->
             </div>
-            <div id="quiz-run-footer" style="margin-top:20px; display:flex; gap:10px;">
+            <div id="quiz-run-footer" style="margin-top:25px; display:flex; gap:12px;">
                 <button id="btn-quiz-prev" class="btn-sm btn-dark" onclick="prevQuizStep()"
-                    style="display:none;">Previous</button>
-                <button id="btn-quiz-next" class="btn-sm btn-primary" onclick="nextQuizStep()">Next</button>
+                    style="display:none; flex:1; height:45px; font-weight:bold;">Previous</button>
+                <button id="btn-quiz-next" class="btn-sm btn-primary" onclick="nextQuizStep()"
+                    style="flex:1; height:45px; font-weight:bold;">Next</button>
                 <button id="btn-quiz-submit" class="btn-sm btn-success" onclick="submitQuiz()"
-                    style="display:none;">Submit (ยืนยันส่ง)</button>
+                    style="display:none; flex:1; height:45px; font-weight:bold;">Submit (ยืนยันส่ง)</button>
             </div>
         </div>
     </div>
@@ -1724,7 +1727,7 @@
             });
 
             document.getElementById('quiz-run-title').innerText = currentQuiz.title + (isPracticeMode ? ' (ฝึกซ้อม)' : '');
-            document.getElementById('quizModal').style.display = 'block';
+            document.getElementById('quizModal').style.display = 'flex';
             renderQuizStep(isResuming);
         }
 
@@ -1993,7 +1996,7 @@
 
             const container = document.getElementById('quiz-result-container');
             container.innerHTML = `<div style="text-align:center; padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>`;
-            document.getElementById('quizResultModal').style.display = 'block';
+            document.getElementById('quizResultModal').style.display = 'flex';
 
             let html = "";
             let totalScore = 0;
@@ -2106,6 +2109,7 @@
         }
 
         async function nextQuizStep() {
+            if (!currentQuiz) { console.error("No quiz active"); return; }
             if (currentStep < currentQuiz.questions.length - 1) {
                 // 🔥 V78.1: Only accumulate time in per-question mode
                 if (currentQuiz.timerMode !== 'total_time') {
@@ -2115,22 +2119,25 @@
                 }
 
                 currentStep++;
-                // In total_time mode, pass true to keep the running timer
+                console.log("Moving to step:", currentStep);
+
+                // Render before auto-save for immediate UI feedback
                 renderQuizStep(currentQuiz.timerMode === 'total_time');
-                // Optional: Save progress to Firestore
-                try {
-                    if (currentQuiz && userId) {
-                        const finalAnswers = userAnswers.map(ans => {
-                            if (Array.isArray(ans)) return ans.join("\n---\n");
-                            return ans;
-                        });
-                        db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
-                            answers: finalAnswers,
-                            lastActive: firebase.firestore.FieldValue.serverTimestamp(),
-                            accumulatedTime: accumulatedTime // Store for safety
-                        }, { merge: true }).catch(err => console.warn("Auto-save failed:", err));
-                    }
-                } catch (e) { console.error("Auto-save error:", e); }
+
+                // Async auto-save (non-blocking)
+                if (userId && !isPracticeMode) {
+                    const finalAnswers = userAnswers.map(ans => {
+                        if (ans === undefined) return null; // Firestore safety
+                        if (Array.isArray(ans)) return ans.join("\n---\n");
+                        return ans;
+                    });
+                    db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
+                        answers: finalAnswers,
+                        currentStep: currentStep,
+                        lastActive: firebase.firestore.FieldValue.serverTimestamp(),
+                        accumulatedTime: accumulatedTime
+                    }, { merge: true }).catch(err => console.warn("Auto-save failed:", err));
+                }
             }
         }
         // 🔥 V78.1: prevQuizStep also preserves timer in total_time mode
@@ -2382,7 +2389,7 @@
             `;
 
             container.innerHTML = html;
-            document.getElementById('quizResultModal').style.display = 'block';
+            document.getElementById('quizResultModal').style.display = 'flex';
         }
 
         // 🔥 V78: View practice answers (from saved attempt data)
@@ -2534,7 +2541,7 @@
         // --- Chat System ---
         let chatUnsub;
         function openChat(id, title) {
-            document.getElementById('chatModal').style.display = 'block';
+            document.getElementById('chatModal').style.display = 'flex';
             document.getElementById('chat-title').innerText = `💬 ${title}`;
             document.getElementById('chat-card-id').value = id;
             const box = document.getElementById('chat-box');

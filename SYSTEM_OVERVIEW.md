@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V78.93) Overview
+# MLP Internship Portfolio (V78.99) Overview
 
 ระบบเว็บแอปพลิเคชันสำหรับจัดการการฝึกงานและระบบ Gamification (สะสมคะแนน) เพื่อจูงใจและติดตามความก้าวหน้าของนักศึกษาฝึกงาน
 
@@ -54,11 +54,17 @@
         - **Per Question:** จับเวลาแยกแต่ละข้อ (Default)
         - **Total Time:** เวลารวมทั้งชุด ผู้ใช้บริหารเวลาเองได้อิสระ หมดเวลา Auto-submit
     - **Set All Timer:** ปุ่ม One-click ตั้งเวลาทุกข้อพร้อมกัน
+- **🧠 Quiz System (V78.91-V78.99)**:
+    - รองรับข้อสอบรุปแบบ Choice และ Short Answer (Tweetstorm style)
+    - ระบบสลับข้อสอบและตัวเลือกอัตโนมัติ (Shuffle)
+    - **V78.99 Update**: ปรับปรุง UI ให้รองรับมือถือ (Mobile Accessibility) โดยการขยายปุ่ม Next/Submit ให้ใหญ่ขึ้น (45px) และใช้ Flexbox Centering สำหรับ Modal เพื่อป้องกันปุ่มล้นหน้าจอ หรือกดไม่ได้บน iPhone/Safe Area
+    - ระบบ Auto-save ความคืบหน้าระหว่างทำข้อสอบ
+    - ระบบแจ้งเตือน Admin หากมีการอนุมัติคะแนน 0.00 เพื่อป้องกันความผิดพลาดทางเทคนิค
 - **✅ Multi-Correct & Smart Shuffle (V78.5):** 
-        - รองรับข้อสอบที่คำตอบถูกมากกว่า 1 ข้อ ระบบใช้ปุ่มแบบ Robust Checkbox และ Z-index Control
-        - **🔀 Smart Shuffle (Option 1+2):** 
-            - เพิ่ม Option ให้แอดมินเลือกเปิด/ปิดการสุ่มตัวเลือก (Shuffle Choices) ราย Quiz ได้
-            - หากเปิดการสุ่ม ระบบจะ **สุ่มเฉพาะข้อแรกๆ และล็อคข้อสุดท้าย (Anchor)** ไว้เสมอ เพื่อรองรับโจทย์ประเภท "ถูกทุกข้อ" หรือ "ไม่มีข้อใดถูก" ไม่ให้สับสน
+    - รองรับข้อสอบที่คำตอบถูกมากกว่า 1 ข้อ ระบบใช้ปุ่มแบบ Robust Checkbox และ Z-index Control
+    - **🔀 Smart Shuffle (Option 1+2):** 
+        - เพิ่ม Option ให้แอดมินเลือกเปิด/ปิดการสุ่มตัวเลือก (Shuffle Choices) ราย Quiz ได้
+        - หากเปิดการสุ่ม ระบบจะสุ่มเฉพาะข้อแรกๆ และล็อคข้อสุดท้าย (Anchor) ไว้เสมอ เพื่อรองรับโจทย์ประเภท "ถูกทุกข้อ" หรือ "ไม่มีข้อใดถูก" ไม่ให้สับสน
 - **🎓 Premium Electronic Certificate (V78.6):** 
     - ปรับปรุงดีไซน์ใบรับรองใหม่แบบ **บิณฑบาต (Bilingual)** ภาษาไทย-อังกฤษคู่ขนาน
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
