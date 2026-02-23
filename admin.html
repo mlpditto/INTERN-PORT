@@ -2940,8 +2940,17 @@
                     const u = usersData.find(x => x.id === att.userId);
                     const name = u ? u.displayName : (att.displayName || "Unknown");
                     const pic = u ? u.pictureUrl : (att.pictureUrl || "");
-                    const score = att.status === 'approved' ? (att.correctCount + "/" + (att.totalQuestions || "-")) : "-";
-                    const statusColor = att.status === 'approved' ? '#2ec4b6' : (att.status === 'requesting' ? '#ff9f1c' : '#666');
+
+                    let score = "-";
+                    if (att.status === 'approved') {
+                        score = (att.correctCount + "/" + (att.totalQuestions || "-"));
+                    } else if (att.status === 'practice_done') {
+                        score = `<span style="color:#f57f17;">${att.practiceScore || 0}/${att.practiceTotalQ || "-"} (P)</span>`;
+                    }
+
+                    const statusColor = att.status === 'approved' ? '#2ec4b6' :
+                        (att.status === 'practice_done' ? '#f57f17' :
+                            (att.status === 'requesting' ? '#ff9f1c' : '#666'));
                     const timeStr = att.timestamp ? att.timestamp.toDate().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : "-";
 
                     // Calculate Duration
@@ -2966,8 +2975,11 @@
                             <td style="text-align:center;"><span class="badge" style="background:${statusColor}; font-size:0.7em;">${att.status}</span></td>
                             <td style="font-size:0.8em; color:#666;">${timeStr}${durationStr}</td>
                             <td style="text-align:center; display:flex; gap:5px; justify-content:center;">
+                                <button class="btn-sm btn-info" onclick="reviewQuiz('${att.id}')" title="Review Answers" style="padding:4px; width:28px; height:28px; display:flex; align-items:center; justify-content:center;">
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                </button>
                                 <button class="btn-sm" onclick="dismissQuizAttempt('${att.id}', '${quizId}', ${!isDimmed})" 
-                                    title="${isDimmed ? 'Restore' : 'Dismiss'}" 
+                                    title="${isDimmed ? 'Restore to stats' : 'Dismiss (Hide from stats)'}" 
                                     style="padding:4px; background:${isDimmed ? '#6c757d' : '#f8f9fa'}; color:${isDimmed ? 'white' : '#666'}; border:1px solid #ddd; width:28px; height:28px; display:flex; align-items:center; justify-content:center;">
                                     <i class="fa-solid ${isDimmed ? 'fa-eye' : 'fa-eye-slash'}"></i>
                                 </button>
@@ -3007,7 +3019,7 @@
             container.innerHTML = "";
 
             quiz.questions.forEach((q, i) => {
-                const studentAns = att.answers[i];
+                const studentAns = (att.answers || att.practiceAnswers || [])[i];
                 const isChoice = (q.type || 'choice') === 'choice';
                 const isCorrect = isChoice ? (studentAns == q.correct) : (att.gradedAnswers && att.gradedAnswers[i]);
 

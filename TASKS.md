@@ -1,8 +1,13 @@
 # Project Tasks & Updates
 
-## [2026-02-23] Session Updates (V78.8 → V78.99)
+## [2026-02-23] Session Updates (V78.8 → V79.0)
 
-### 1. Certificate System & Special Awards (V78.8, V78.98)
+### 1. Quiz Review & Practice Mode (V79.0)
+- **Review Practice Answers:** Admin can now click a 🔍 **Magnifying Glass** icon in the "Quiz Participants" list to view answers for `practice_done` attempts.
+- **Improved Data Support:** Updated `reviewQuiz` logic to fetch from both `answers` (Real exam) and `practiceAnswers` (Practice mode).
+- **Score Visibility:** Practice scores are now displayed in the participants table with a `(P)` label and orange color coding.
+
+### 2. Certificate System & Special Awards (V78.8, V78.98)
 - **Multi-Award Support:** Admin can select multiple special awards per user.
 - **New Special Awards (V78.98):** Added 5 new premium awards (Iron Will, Quiz Master, Team Player, Rising Star, MVP) with unique seal designs, gradients, and custom shapes.
 - **Stacked Seals:** Certificate renders multiple award seals vertically stacked on the right side.

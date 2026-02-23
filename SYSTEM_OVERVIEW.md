@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V78.99) Overview
+# MLP Internship Portfolio (V79.0) Overview
 
 ระบบเว็บแอปพลิเคชันสำหรับจัดการการฝึกงานและระบบ Gamification (สะสมคะแนน) เพื่อจูงใจและติดตามความก้าวหน้าของนักศึกษาฝึกงาน
 
@@ -54,9 +54,10 @@
         - **Per Question:** จับเวลาแยกแต่ละข้อ (Default)
         - **Total Time:** เวลารวมทั้งชุด ผู้ใช้บริหารเวลาเองได้อิสระ หมดเวลา Auto-submit
     - **Set All Timer:** ปุ่ม One-click ตั้งเวลาทุกข้อพร้อมกัน
-- **🧠 Quiz System (V78.91-V78.99)**:
+- **🧠 Quiz System (V78.91-V79.0)**:
     - รองรับข้อสอบรุปแบบ Choice และ Short Answer (Tweetstorm style)
     - ระบบสลับข้อสอบและตัวเลือกอัตโนมัติ (Shuffle)
+    - **V79.0 Update**: เพิ่มปุ่ม **Review Practice** ในหน้า Admin (รูปแว่นขยาย) ให้แอดมินสามารถดูคำตอบที่ผู้ใช้ส่งในโหมดฝึกซ้อม (`practice_done`) ได้โดยตรง
     - **V78.99 Update**: ปรับปรุง UI ให้รองรับมือถือ (Mobile Accessibility) โดยการขยายปุ่ม Next/Submit ให้ใหญ่ขึ้น (45px) และใช้ Flexbox Centering สำหรับ Modal เพื่อป้องกันปุ่มล้นหน้าจอ หรือกดไม่ได้บน iPhone/Safe Area
     - ระบบ Auto-save ความคืบหน้าระหว่างทำข้อสอบ
     - ระบบแจ้งเตือน Admin หากมีการอนุมัติคะแนน 0.00 เพื่อป้องกันความผิดพลาดทางเทคนิค
