@@ -845,7 +845,7 @@
                 <h2 style="margin:0;"><i class="fa-solid fa-user-shield"></i> Dashboard
                     <span
                         style="font-size:0.5em; background:#ff9f1c; padding:2px 8px; border-radius:10px; color:white; vertical-align:middle; font-weight:bold;">
-                        LIFF: V79.4 | Admin: V79.5
+                        LIFF: V79.6 | Admin: V79.6
                     </span>
                 </h2>
                 <span id="admin-email" style="font-size:0.8em; color:var(--text-sub);"></span>
@@ -1104,6 +1104,9 @@
                     <span id="user-count-label" style="font-size:0.8em; color:#999;"></span>
                 </div>
                 <div style="display:flex; gap:8px;">
+                    <button class="btn-sm" onclick="openPreRegModal()"
+                        style="background:#6f42c1; color:white; border:none;"><i class="fa-solid fa-user-plus"></i>
+                        Pre-register</button>
                     <button class="btn-sm btn-warning" onclick="generateBulkCert()"
                         style="background:#e67e22; color:white; border:none;"><i class="fa-solid fa-file-pdf"></i> Bulk
                         Cert</button>
@@ -5399,7 +5402,138 @@
             };
             return icons[g] || "fa-users";
         }
+
+        // 🔥 V79.6: Pre-registration (Enrollment Code) System
+        let preRegData = [];
+
+        function openPreRegModal() {
+            document.getElementById('preRegModal').style.display = 'block';
+            loadPreRegList();
+        }
+
+        async function loadPreRegList() {
+            const container = document.getElementById('prereg-list');
+            container.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">Loading...</div>';
+            try {
+                const snap = await db.collection("pre_users").orderBy("createdAt", "desc").get();
+                preRegData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderPreRegList();
+            } catch (e) {
+                container.innerHTML = `<div style="color:#ef233c; padding:10px;">Error: ${e.message}</div>`;
+            }
+        }
+
+        function renderPreRegList() {
+            const container = document.getElementById('prereg-list');
+            if (preRegData.length === 0) {
+                container.innerHTML = '<div style="text-align:center; color:#999; padding:20px; font-size:0.9em;">ยังไม่มีรายการ Pre-register</div>';
+                return;
+            }
+            container.innerHTML = preRegData.map(p => {
+                const claimed = p.claimed ? `<span class="badge" style="background:#28a745; font-size:0.7em;">✅ Claimed</span>` : `<span class="badge" style="background:#ffc107; color:black; font-size:0.7em;">⏳ Waiting</span>`;
+                const claimedBy = p.claimedByName ? `<br><span style="font-size:0.7em; color:#666;">→ ${p.claimedByName}</span>` : '';
+                const groupColor = getGroupColor(p.group || 'Public');
+                return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid #eee; border-radius:10px; background:#fff; margin-bottom:6px;">
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-weight:bold; font-size:0.9em;">${p.fullName || '-'}</div>
+                        <div style="font-size:0.75em; color:#666;">
+                            <span style="background:${groupColor}; color:white; padding:1px 8px; border-radius:10px; font-size:0.85em;">${p.group || 'Public'}</span>
+                            ${p.startDate ? `${p.startDate} ~ ${p.endDate || ''}` : ''}
+                        </div>
+                    </div>
+                    <div style="text-align:center; min-width:80px;">
+                        <div onclick="copyCode('${p.code}')" style="font-family:monospace; font-weight:bold; font-size:1.1em; color:#6f42c1; cursor:pointer; background:#f3f0ff; padding:4px 10px; border-radius:8px; border:1px dashed #6f42c1;" title="Click to copy">${p.code}</div>
+                        <div style="margin-top:3px;">${claimed}${claimedBy}</div>
+                    </div>
+                    ${!p.claimed ? `<button class="btn-sm btn-danger" onclick="deletePreReg('${p.id}')" style="padding:4px 8px; font-size:0.7em;">✕</button>` : ''}
+                </div>`;
+            }).join('');
+        }
+
+        function copyCode(code) {
+            navigator.clipboard.writeText(code).then(() => showToast('📋 Copied: ' + code));
+        }
+
+        function generateCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I confusion
+            let code = '';
+            for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+            return code;
+        }
+
+        async function addPreRegUser() {
+            const fullName = document.getElementById('prereg-name').value.trim();
+            const group = document.getElementById('prereg-group').value.trim() || 'Junior';
+            const startDate = document.getElementById('prereg-start').value;
+            const endDate = document.getElementById('prereg-end').value;
+
+            if (!fullName) return alert("กรุณาระบุชื่อ-นามสกุล");
+
+            // Generate unique code (check collision)
+            let code = generateCode();
+            const existingCodes = preRegData.map(p => p.code);
+            while (existingCodes.includes(code)) code = generateCode();
+
+            try {
+                await db.collection("pre_users").add({
+                    fullName, group, startDate, endDate, code,
+                    claimed: false,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                showToast(`✅ Pre-registered: ${fullName} → Code: ${code}`);
+                document.getElementById('prereg-name').value = '';
+                loadPreRegList();
+            } catch (e) {
+                alert("Error: " + e.message);
+            }
+        }
+
+        async function deletePreReg(id) {
+            if (!confirm("ลบรายการ Pre-register นี้?")) return;
+            try {
+                await db.collection("pre_users").doc(id).delete();
+                showToast("Deleted");
+                loadPreRegList();
+            } catch (e) { alert(e.message); }
+        }
     </script>
+
+    <!-- Pre-registration Modal -->
+    <div id="preRegModal" class="modal">
+        <div class="modal-content" style="max-width:550px;">
+            <span class="close-modal"
+                onclick="document.getElementById('preRegModal').style.display='none'">&times;</span>
+            <h2 style="margin-bottom:5px;">📋 Pre-register Users</h2>
+            <p style="font-size:0.8em; color:#666; margin-top:0;">สร้างรหัสลงทะเบียนล่วงหน้า — User กรอกรหัสนี้ใน LIFF
+                เพื่อรับข้อมูลกลุ่ม/วันฝึกงานอัตโนมัติ</p>
+
+            <div
+                style="background:#f8f9fa; padding:15px; border-radius:12px; margin-bottom:15px; border:1px solid #eee;">
+                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <input type="text" id="prereg-name" placeholder="ชื่อ-นามสกุล (Full Name)"
+                        style="flex:2; margin:0;">
+                    <select id="prereg-group" style="flex:1; margin:0;">
+                        <option value="Junior">Junior</option>
+                        <option value="INTERN">INTERN</option>
+                        <option value="EXTERN">EXTERN</option>
+                        <option value="Public">Public</option>
+                    </select>
+                </div>
+                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <div style="flex:1;"><label style="font-size:0.75em; color:#666;">Start:</label><input type="date"
+                            id="prereg-start" style="margin:0;"></div>
+                    <div style="flex:1;"><label style="font-size:0.75em; color:#666;">End:</label><input type="date"
+                            id="prereg-end" style="margin:0;"></div>
+                </div>
+                <button class="magic-btn" onclick="addPreRegUser()" style="width:100%; background:#6f42c1;"><i
+                        class="fa-solid fa-user-plus"></i> สร้างรหัสลงทะเบียน</button>
+            </div>
+
+            <div style="font-size:0.85em; font-weight:bold; color:#333; margin-bottom:8px;">📃 รายการ Pre-registered
+            </div>
+            <div id="prereg-list" style="max-height:400px; overflow-y:auto;"></div>
+        </div>
+    </div>
 </body>
 
 </html>

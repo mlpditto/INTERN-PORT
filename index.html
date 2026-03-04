@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V79.4)</title>
+    <title>Internship Portfolio (V79.6)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -807,6 +807,24 @@
         </div>
     </div>
 
+    <!-- Enrollment Code Modal -->
+    <div id="enrollModal" class="modal" style="z-index:10000;">
+        <div class="modal-content" style="max-width:400px; text-align:center;">
+            <h3 style="margin-bottom:5px;">📋 ลงทะเบียนเข้าร่วม</h3>
+            <p style="font-size:0.85em; color:#666; margin-top:0;">กรอกรหัสลงทะเบียนที่ได้รับจากอาจารย์/ผู้ดูแล</p>
+            <input type="text" id="enroll-code-input" placeholder="เช่น A3X7K2" maxlength="6"
+                style="text-align:center; font-size:1.5em; font-family:monospace; font-weight:bold; letter-spacing:5px; text-transform:uppercase; padding:12px; border:2px solid #6f42c1; border-radius:12px; margin-bottom:10px;"
+                onkeypress="if(event.key==='Enter')claimEnrollmentCode()">
+            <div id="enroll-status" style="font-size:0.8em; min-height:20px; margin-bottom:10px;"></div>
+            <button class="btn-primary" onclick="claimEnrollmentCode()"
+                style="width:100%; background:#6f42c1; padding:12px; font-size:1em; border-radius:10px;"><i
+                    class="fa-solid fa-check"></i> ยืนยันรหัส</button>
+            <button onclick="skipEnrollment()"
+                style="width:100%; margin-top:8px; background:none; border:none; color:#999; font-size:0.82em; cursor:pointer; padding:8px;">ข้ามขั้นตอนนี้
+                (ไม่มีรหัส)</button>
+        </div>
+    </div>
+
     <script src="firebase-config.js?v=65"></script>
 
     <script>
@@ -1039,14 +1057,8 @@
                     checkGraduation(da);
                     updateDivisionAndVisibility(); // 🔥 Update UI
                 } else {
-                    // First time user
-                    r.set({
-                        displayName: userProfile.displayName,
-                        pictureUrl: userProfile.pictureUrl || "",
-                        score: 0,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    document.getElementById('date-alert').style.display = 'block'; // New user alert
+                    // First time user — show enrollment modal
+                    showEnrollmentModal();
                 }
             });
         }
@@ -1086,6 +1098,96 @@
             } catch (e) {
                 alert("Error saving: " + e.message);
             }
+        }
+
+        // 🔥 V79.6: Enrollment Code System
+        function showEnrollmentModal() {
+            document.getElementById('enrollModal').style.display = 'flex';
+            document.getElementById('enroll-code-input').value = '';
+            document.getElementById('enroll-status').innerHTML = '';
+            setTimeout(() => document.getElementById('enroll-code-input').focus(), 300);
+        }
+
+        async function claimEnrollmentCode() {
+            const codeInput = document.getElementById('enroll-code-input');
+            const statusEl = document.getElementById('enroll-status');
+            const code = codeInput.value.trim().toUpperCase();
+
+            if (!code || code.length < 4) {
+                statusEl.innerHTML = '<span style="color:#ef233c;">❌ กรุณากรอกรหัสให้ครบ</span>';
+                return;
+            }
+
+            statusEl.innerHTML = '<span style="color:#999;">🔍 กำลังตรวจสอบ...</span>';
+
+            try {
+                const snap = await db.collection("pre_users").where("code", "==", code).limit(1).get();
+
+                if (snap.empty) {
+                    statusEl.innerHTML = '<span style="color:#ef233c;">❌ ไม่พบรหัสนี้ในระบบ กรุณาตรวจสอบอีกครั้ง</span>';
+                    return;
+                }
+
+                const preDoc = snap.docs[0];
+                const preData = preDoc.data();
+
+                if (preData.claimed) {
+                    statusEl.innerHTML = '<span style="color:#ef233c;">❌ รหัสนี้ถูกใช้งานแล้ว</span>';
+                    return;
+                }
+
+                // Create user with pre-filled data
+                const userData = {
+                    displayName: userProfile.displayName,
+                    pictureUrl: userProfile.pictureUrl || "",
+                    score: 0,
+                    group: preData.group || "Public",
+                    fullName: preData.fullName || "",
+                    startDate: preData.startDate || "",
+                    endDate: preData.endDate || "",
+                    enrollmentCode: code,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                // Split fullName into first/last if possible
+                if (preData.fullName) {
+                    const parts = preData.fullName.trim().split(/\s+/);
+                    if (parts.length >= 2) {
+                        userData.firstName = parts[0];
+                        userData.lastName = parts.slice(1).join(' ');
+                    }
+                }
+
+                await db.collection("users").doc(userId).set(userData);
+
+                // Mark pre_user as claimed
+                await db.collection("pre_users").doc(preDoc.id).update({
+                    claimed: true,
+                    claimedBy: userId,
+                    claimedByName: userProfile.displayName,
+                    claimedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                statusEl.innerHTML = `<span style="color:#28a745;">✅ ลงทะเบียนสำเร็จ! ยินดีต้อนรับ ${preData.fullName}</span>`;
+                setTimeout(() => {
+                    document.getElementById('enrollModal').style.display = 'none';
+                }, 1500);
+            } catch (e) {
+                console.error("Enrollment error:", e);
+                statusEl.innerHTML = `<span style="color:#ef233c;">❌ Error: ${e.message}</span>`;
+            }
+        }
+
+        function skipEnrollment() {
+            // Create user normally without enrollment code
+            db.collection("users").doc(userId).set({
+                displayName: userProfile.displayName,
+                pictureUrl: userProfile.pictureUrl || "",
+                score: 0,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            document.getElementById('enrollModal').style.display = 'none';
+            document.getElementById('date-alert').style.display = 'block';
         }
 
         async function saveMyDates() {
