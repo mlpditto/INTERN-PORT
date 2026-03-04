@@ -1,5 +1,18 @@
 # Project Tasks & Updates
 
+## [2026-02-24] Session Updates (V79.2 → V79.3)
+
+### 1. Homework Countdown & Kanban Improvements (V79.3)
+- **12h Deadline:** When assigning homework, a 12-hour deadline is now automatically set for both the quiz and the Kanban card.
+- **User Countdown:** Users can now see a live countdown timer on their Kanban cards for homework.
+- **UI Cleanup:** Improved the Kanban card rendering to only show descriptions if they exist, providing a cleaner look.
+
+## [2026-02-24] Session Updates (V79.1 → V79.2)
+
+### 1. Admin Modal Visibility Fix (V79.2)
+- **Z-Index Fix:** Increased `z-index` for `quizReviewModal` and `pollResultModal` to ensure they appear on top of the `quizParticipantsModal`.
+- **Logic Correction:** Updated the correctness styling check in `reviewQuiz` to correctly handle multi-select (array) answers.
+
 ## [2026-02-23] Session Updates (V79.0 → V79.1)
 
 ### 1. Quiz 0.00 Score Protection (V79.1)

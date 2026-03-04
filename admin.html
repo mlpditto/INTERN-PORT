@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP INTERNSHIP PORT V79.1</title>
+    <title>MLP INTERNSHIP PORT V79.3</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -1363,6 +1363,7 @@
                             <option value="Intern">Intern</option>
                             <option value="Extern">Extern</option>
                             <option value="Audit">Audit</option>
+                            <option value="Junior">Junior</option>
                         </select>
                     </div>
                     <div style="flex:0.5; min-width: 80px;">
@@ -1516,7 +1517,7 @@
         </div>
 
         <!-- 🔥 Quiz Review Modal (Added to fix missing UI) -->
-        <div id="quizReviewModal" class="modal">
+        <div id="quizReviewModal" class="modal" style="z-index: 2500;">
             <div class="modal-content" style="max-width: 600px;">
                 <span class="close-modal"
                     onclick="document.getElementById('quizReviewModal').style.display='none'">&times;</span>
@@ -1532,7 +1533,7 @@
             </div>
         </div>
 
-        <div id="pollResultModal" class="modal">
+        <div id="pollResultModal" class="modal" style="z-index: 2500;">
             <div class="modal-content" style="max-width: 600px;">
                 <span class="close-modal"
                     onclick="document.getElementById('pollResultModal').style.display='none'">&times;</span>
@@ -1680,7 +1681,8 @@
             'Design': '#e83e8c',
             'Intern': '#00b4d8',
             'Extern': '#6610f2',
-            'Audit': '#fd7e14'
+            'Audit': '#fd7e14',
+            'Junior': '#17a2b8'
         };
 
         const groupIconMap = {
@@ -1693,7 +1695,8 @@
             'Design': 'fa-palette',
             'Intern': 'fa-user-graduate',
             'Extern': 'fa-user-md',
-            'Audit': 'fa-clipboard-check'
+            'Audit': 'fa-clipboard-check',
+            'Junior': 'fa-child'
         };
 
         function getGroupColor(group) {
@@ -3021,7 +3024,18 @@
             quiz.questions.forEach((q, i) => {
                 const studentAns = (att.answers || att.practiceAnswers || [])[i];
                 const isChoice = (q.type || 'choice') === 'choice';
-                const isCorrect = isChoice ? (studentAns == q.correct) : (att.gradedAnswers && att.gradedAnswers[i]);
+
+                let isCorrect = false;
+                if (isChoice) {
+                    const target = q.correct;
+                    if (Array.isArray(target)) {
+                        isCorrect = Array.isArray(studentAns) && target.length === studentAns.length && target.every(v => studentAns.includes(v));
+                    } else {
+                        isCorrect = (studentAns == target);
+                    }
+                } else {
+                    isCorrect = (att.gradedAnswers && att.gradedAnswers[i]);
+                }
 
                 let studentAnsText = "";
                 let correctAnsText = "";
@@ -3536,10 +3550,13 @@
             if (!q) return;
 
             try {
-                // 1. Update quiz with homework assignment
+                const deadlineDate = new Date(Date.now() + 12 * 60 * 60 * 1000);
+
+                // 1. Update quiz with homework assignment and 12h deadline
                 await db.collection("quizzes").doc(hwModalQuizId).update({
                     isHomework: users.length > 0,
                     assignedUsers: users,
+                    deadline: users.length > 0 ? firebase.firestore.Timestamp.fromDate(deadlineDate) : null,
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
@@ -3565,6 +3582,7 @@
                         isProject: false,
                         isHomeworkCard: true,
                         linkedQuizId: hwModalQuizId,
+                        deadline: firebase.firestore.Timestamp.fromDate(deadlineDate),
                         assigneeIds: users,
                         assignees: assignees,
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -4560,7 +4578,97 @@
             });
         }
 
-        function renderKanban(snap) { const cols = { "Backlog": document.getElementById("Backlog"), "Doing": document.getElementById("Doing"), "Review": document.getElementById("Review"), "Done": document.getElementById("Done") }; Object.values(cols).forEach(e => e.innerHTML = ""); const cnt = { "Backlog": 0, "Doing": 0, "Review": 0, "Done": 0 }; const filter = document.getElementById('board-search').value.toLowerCase(); snap.forEach(doc => { const q = doc.data(); sideQuestsCache[doc.id] = q; if (q.status === 'Archived') return; let match = q.title.toLowerCase().includes(filter); if (q.assignees) q.assignees.forEach(u => { if (u.name.toLowerCase().includes(filter)) match = true; }); if (!match) return; if (cols[q.status]) { cnt[q.status]++; const isProj = q.isProject === true; const d = document.createElement('div'); d.className = `kanban-card card-${q.status} ${q.isScored ? 'scored' : ''} ${isProj ? 'project' : ''}`; d.dataset.id = doc.id; let imgs = '<div class="assignee-stack">'; if (q.assignees) q.assignees.forEach(u => imgs += `<img src="${u.pic}" class="assignee-img" title="${u.name}">`); imgs += '</div>'; let timersHtml = ""; if (q.refQuestId && q.assigneeIds && q.assigneeIds.length > 0) { const globalQ = questsCache.find(x => x.id === q.refQuestId); const subKey = `${q.refQuestId}_${q.assigneeIds[0]}`; const sub = questsSubCache[subKey]; if (globalQ && globalQ.deadline && q.status !== 'Done') { timersHtml += `<span class="timer-global" data-dead="${globalQ.deadline.toDate().getTime()}">⏳ Exp: ...</span>`; } if (sub) { if (sub.status === 'received' && sub.deadline && q.status === 'Doing') { timersHtml += `<span class="timer-active" data-dead="${sub.deadline.toDate().getTime()}">⏱️ ...</span>`; } else if (sub.status === 'unsuccessful' && sub.cooldownUntil && q.status === 'Backlog') { timersHtml += `<span class="timer-cooldown" data-dead="${sub.cooldownUntil.toDate().getTime()}">❄️ Cool: ...</span>`; } } } let act = ""; if (q.status === 'Done' && q.doneAt) act = `<button class="btn-sm btn-dark" style="width:100%;margin-top:5px;" onclick="archiveSQ('${doc.id}')">📥 ar·chive</button>`; else if (!q.isScored && q.status !== 'Backlog' && q.status !== 'Done') { if (q.linkedQuizId) { act = `<div style="width:100%;margin-top:5px;padding:6px;background:linear-gradient(135deg,#e8f5e9,#e3f2fd);border-radius:8px;text-align:center;font-size:0.78em;color:#555;"><i class="fa-solid fa-link" style="color:#4361ee;"></i> คะแนนจาก Quiz อัตโนมัติ</div>`; } else { act = `<button class="btn-sm btn-success" style="width:100%;margin-top:5px;" onclick="giveScore('${doc.id}')">💰 ให้คะแนน</button>`; } } let chatBtn = ""; if (isProj) chatBtn = `<button class="btn-sm" style="color:var(--primary); font-size:1.1em;" onclick="openChat('${doc.id}', '${q.title}')"><i class="fa-solid fa-comments"></i></button>`; let arrows = `<div class="arrow-controls">`; if (q.status !== 'Backlog') arrows += `<button class="btn-arrow" onclick="moveCard('${doc.id}','prev')"><i class="fa-solid fa-chevron-left"></i></button>`; if (q.status !== 'Done') arrows += `<button class="btn-arrow" onclick="moveCard('${doc.id}','next')"><i class="fa-solid fa-chevron-right"></i></button>`; arrows += `</div>`; let pColor = '#17a2b8'; if (q.priority === 'Medium') pColor = '#ff9f1c'; if (q.priority === 'High') pColor = '#ef233c'; d.innerHTML = `<div class="card-header-row"><span class="badge" style="background:${pColor}">${q.priority}</span><div class="card-header-right">${imgs} ${arrows}</div></div><div style="font-weight:bold;">${isProj ? '<span class="badge" style="background:#e83e8c;font-size:0.6em;">PROJ</span>' : ''} ${q.title}</div><div class="card-timers">${timersHtml}</div><p style="font-size:0.85em; color:#666; margin-bottom:5px;">${q.description || '-'}</p><div class="card-tool-row"><div><button class="btn-sm btn-warning" onclick="openTaskModal('${doc.id}')"><i class="fa-solid fa-pen"></i></button><button class="btn-sm btn-danger" onclick="startDeleteCard('${doc.id}')"><i class="fa-solid fa-trash"></i></button></div>${chatBtn}</div>${act}`; cols[q.status].appendChild(d); } }); Object.keys(cnt).forEach(k => document.getElementById(`cnt-${k}`).innerText = cnt[k]); }
+        function renderKanban(snap) {
+            const cols = { "Backlog": document.getElementById("Backlog"), "Doing": document.getElementById("Doing"), "Review": document.getElementById("Review"), "Done": document.getElementById("Done") };
+            Object.values(cols).forEach(e => e.innerHTML = "");
+            const cnt = { "Backlog": 0, "Doing": 0, "Review": 0, "Done": 0 };
+            const filter = document.getElementById('board-search').value.toLowerCase();
+            snap.forEach(doc => {
+                const q = doc.data();
+                sideQuestsCache[doc.id] = q;
+                if (q.status === 'Archived') return;
+                let match = q.title.toLowerCase().includes(filter);
+                if (q.assignees) q.assignees.forEach(u => { if (u.name.toLowerCase().includes(filter)) match = true; });
+                if (!match) return;
+                if (cols[q.status]) {
+                    cnt[q.status]++;
+                    const isProj = q.isProject === true;
+                    const d = document.createElement('div');
+                    d.className = `kanban-card card-${q.status} ${q.isScored ? 'scored' : ''} ${isProj ? 'project' : ''}`;
+                    d.dataset.id = doc.id;
+                    let imgs = '<div class="assignee-stack">';
+                    if (q.assignees) q.assignees.forEach(u => imgs += `<img src="${u.pic}" class="assignee-img" title="${u.name}">`);
+                    imgs += '</div>';
+
+                    let timersHtml = "";
+                    // Support for both Quest-based timers and Generic Deadline timers (Homework)
+                    const nowMillis = Date.now();
+                    if (q.deadline) {
+                        const dl = q.deadline.toMillis ? q.deadline.toMillis() : new Date(q.deadline).getTime();
+                        if (q.status !== 'Done') {
+                            timersHtml += `<span class="timer-global" data-dead="${dl}">⏳ Exp: ...</span>`;
+                        }
+                    } else if (q.refQuestId && q.assigneeIds && q.assigneeIds.length > 0) {
+                        const globalQ = questsCache.find(x => x.id === q.refQuestId);
+                        const subKey = `${q.refQuestId}_${q.assigneeIds[0]}`;
+                        const sub = questsSubCache[subKey];
+                        if (globalQ && globalQ.deadline && q.status !== 'Done') {
+                            timersHtml += `<span class="timer-global" data-dead="${globalQ.deadline.toDate().getTime()}">⏳ Exp: ...</span>`;
+                        }
+                        if (sub) {
+                            if (sub.status === 'received' && sub.deadline && q.status === 'Doing') {
+                                timersHtml += `<span class="timer-active" data-dead="${sub.deadline.toDate().getTime()}">⏱️ ...</span>`;
+                            } else if (sub.status === 'unsuccessful' && sub.cooldownUntil && q.status === 'Backlog') {
+                                timersHtml += `<span class="timer-cooldown" data-dead="${sub.cooldownUntil.toDate().getTime()}">❄️ Cool: ...</span>`;
+                            }
+                        }
+                    }
+
+                    let act = "";
+                    if (q.status === 'Done' && q.doneAt) act = `<button class="btn-sm btn-dark" style="width:100%;margin-top:5px;" onclick="archiveSQ('${doc.id}')">📥 ar·chive</button>`;
+                    else if (!q.isScored && q.status !== 'Backlog' && q.status !== 'Done') {
+                        if (q.linkedQuizId) {
+                            act = `<div style="width:100%;margin-top:5px;padding:6px;background:linear-gradient(135deg,#e8f5e9,#e3f2fd);border-radius:8px;text-align:center;font-size:0.78em;color:#555;"><i class="fa-solid fa-link" style="color:#4361ee;"></i> คะแนนจาก Quiz อัตโนมัติ</div>`;
+                        } else {
+                            act = `<button class="btn-sm btn-success" style="width:100%;margin-top:5px;" onclick="giveScore('${doc.id}')">💰 ให้คะแนน</button>`;
+                        }
+                    }
+
+                    let chatBtn = "";
+                    if (isProj) chatBtn = `<button class="btn-sm" style="color:var(--primary); font-size:1.1em;" onclick="openChat('${doc.id}', '${q.title}')"><i class="fa-solid fa-comments"></i></button>`;
+
+                    let arrows = `<div class="arrow-controls">`;
+                    if (q.status !== 'Backlog') arrows += `<button class="btn-arrow" onclick="moveCard('${doc.id}','prev')"><i class="fa-solid fa-chevron-left"></i></button>`;
+                    if (q.status !== 'Done') arrows += `<button class="btn-arrow" onclick="moveCard('${doc.id}','next')"><i class="fa-solid fa-chevron-right"></i></button>`;
+                    arrows += `</div>`;
+
+                    let pColor = '#17a2b8';
+                    if (q.priority === 'Medium') pColor = '#ff9f1c';
+                    if (q.priority === 'High') pColor = '#ef233c';
+
+                    const descHtml = q.description ? `<p style="font-size:0.85em; color:#666; margin-bottom:5px;">${q.description}</p>` : "";
+
+                    d.innerHTML = `
+                        <div class="card-header-row">
+                            <span class="badge" style="background:${pColor}">${q.priority}</span>
+                            <div class="card-header-right">${imgs} ${arrows}</div>
+                        </div>
+                        <div style="font-weight:bold;">${isProj ? '<span class="badge" style="background:#e83e8c;font-size:0.6em;">PROJ</span>' : ''} ${q.title}</div>
+                        <div class="card-timers">${timersHtml}</div>
+                        ${descHtml}
+                        <div class="card-tool-row">
+                            <div>
+                                <button class="btn-sm btn-warning" onclick="openTaskModal('${doc.id}')"><i class="fa-solid fa-pen"></i></button>
+                                <button class="btn-sm btn-danger" onclick="startDeleteCard('${doc.id}')"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                            ${chatBtn}
+                        </div>
+                        ${act}`;
+                    cols[q.status].appendChild(d);
+                }
+            });
+            Object.keys(cnt).forEach(k => document.getElementById(`cnt-${k}`).innerText = cnt[k]);
+        }
         function updateRealtimeTimers() { const now = Date.now(); document.querySelectorAll('.timer-global').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) el.innerText = "⏳ Expired"; else { const h = Math.floor(diff / 3600000); const m = Math.floor((diff % 3600000) / 60000); el.innerText = `⏳ Ends: ${h}h ${m}m`; } }); document.querySelectorAll('.timer-active').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) { el.innerText = "⏱️ Time Up!"; const card = el.closest('.kanban-card'); if (card && card.parentElement.id === 'Doing') { db.collection("side_quests").doc(card.dataset.id).update({ status: 'Review' }); } } else { const m = Math.floor(diff / 60000); const s = Math.floor((diff % 60000) / 1000); el.innerText = `⏱️ ${m}m ${s}s`; } }); document.querySelectorAll('.timer-cooldown').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) el.innerText = "❄️ Ready"; else { const m = Math.floor(diff / 60000); const s = Math.floor((diff % 60000) / 1000); el.innerText = `❄️ Cool: ${m}m ${s}s`; } }); updateQuestTimers(); }
         function startDeleteCard(id) { deleteCardId = id; document.getElementById('delCardModal').style.display = 'block'; const btn = document.getElementById('btn-del-card-confirm'); btn.disabled = false; btn.style.background = '#ef233c'; let c = 5; btn.innerText = `Confirm (${c})`; if (deleteTimer) clearInterval(deleteTimer); deleteTimer = setInterval(() => { c--; btn.innerText = `Confirm (${c})`; if (c <= 0) { clearInterval(deleteTimer); document.getElementById('delCardModal').style.display = 'none'; showToast("Cancelled"); } }, 1000); btn.onclick = executeDeleteCard; }
         async function executeDeleteCard() { if (!deleteCardId) return; clearInterval(deleteTimer); document.getElementById('delCardModal').style.display = 'none'; const deduct = confirm("หักคะแนนผู้รับผิดชอบ?\nOK=หัก, Cancel=ไม่หัก"); try { const q = sideQuestsCache[deleteCardId]; const b = db.batch(); if (deduct && q.assigneeIds) { const s = prompt("Points to deduct (e.g., 0.5):"); if (s) { q.assigneeIds.forEach(u => { b.update(db.collection("users").doc(u), { score: firebase.firestore.FieldValue.increment(-parseFloat(s)) }); b.set(db.collection("checkin_logs").doc(), { userId: u, type: 'manual_adjust', amount: -parseFloat(s), note: `Del: ${q.title}`, timestamp: firebase.firestore.FieldValue.serverTimestamp() }); }); } } b.delete(db.collection("side_quests").doc(deleteCardId)); await b.commit(); showToast("Deleted!"); } catch (e) { alert(e.message); } }
@@ -5013,9 +5121,9 @@
                     ctx.fill();
                     ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
                     ctx.textAlign = "center"; ctx.fillStyle = "#5d4037";
-                    ctx.font = "bold 20px Arial"; ctx.fillText("🌟", specX, specY - 6);
-                    ctx.font = "bold 9px Montserrat"; ctx.fillText("RISING STAR", specX, specY + 12);
-                    ctx.font = "7px Montserrat"; ctx.fillText("RAPID GROWTH", specX, specY + 22);
+                    ctx.font = "bold 20px Arial"; ctx.fillText("🌟", specX, specY - 5);
+                    ctx.font = "bold 8.5px Montserrat"; ctx.fillText("RISING STAR", specX, specY + 11);
+                    ctx.font = "6.5px Montserrat"; ctx.fillText("RAPID GROWTH", specX, specY + 20);
 
                 } else if (award === 'mvp') {
                     // 👑 MVP — Double-ring circle, Gold-Crimson gradient
@@ -5141,7 +5249,8 @@
                 "Creative": "#6f42c1",
                 "Content": "#20c997",
                 "Data": "#17a2b8",
-                "Admin": "#343a40"
+                "Admin": "#343a40",
+                "Junior": "#17a2b8"
             };
             return colors[g] || "#6c757d";
         }
@@ -5158,7 +5267,8 @@
                 "Creative": "fa-palette",
                 "Content": "fa-pen-nib",
                 "Data": "fa-chart-pie",
-                "Admin": "fa-user-shield"
+                "Admin": "fa-user-shield",
+                "Junior": "fa-child"
             };
             return icons[g] || "fa-users";
         }

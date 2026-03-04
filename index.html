@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V79.1)</title>
+    <title>Internship Portfolio (V79.4)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -658,7 +658,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V79.1 (Quiz Protection)
+                V79.3 (HW Countdown)
             </div>
         </div>
     </div>
@@ -835,7 +835,8 @@
             'Design': '#e83e8c',
             'Intern': '#00b4d8',
             'Extern': '#6610f2',
-            'Audit': '#fd7e14'
+            'Audit': '#fd7e14',
+            'Junior': '#17a2b8'
         };
 
         const groupIconMap = {
@@ -848,7 +849,8 @@
             'Design': 'fa-palette',
             'Intern': 'fa-user-graduate',
             'Extern': 'fa-user-md',
-            'Audit': 'fa-clipboard-check'
+            'Audit': 'fa-clipboard-check',
+            'Junior': 'fa-child'
         };
 
         function getGroupColor(group) {
@@ -1734,7 +1736,7 @@
 
         // 🔥 Added V77.24: Mark as abandoned if user closes tab
         window.addEventListener('beforeunload', (event) => {
-            if (currentQuiz && document.getElementById('quizModal').style.display === 'block') {
+            if (currentQuiz && (document.getElementById('quizModal').style.display === 'flex' || document.getElementById('quizModal').style.display === 'block')) {
                 const docId = `${currentQuiz.id}_${userId}`;
                 db.collection("quiz_attempts").doc(docId).update({ status: 'abandoned' });
             }
@@ -1779,79 +1781,84 @@
         }
 
         function renderQuizStep(useExistingTime = false) {
-            clearInterval(quizTimerInterval);
-            const container = document.getElementById('quiz-run-container');
-            const question = currentQuiz.questions[currentStep];
-
-            // 🔥 Case Study Logic (V77.23)
-            const passageArea = document.getElementById('quiz-case-passage-area');
-            const passageBody = document.getElementById('quiz-case-content-body');
-            if (currentQuiz.quizType === 'case_study' && currentQuiz.caseContent) {
-                passageArea.style.display = 'block';
-                passageBody.innerText = currentQuiz.caseContent;
-                // Auto-show on first step
-                if (currentStep === 0 && !useExistingTime) {
-                    passageBody.style.display = 'block';
-                    document.getElementById('case-reader-icon').className = 'fa-solid fa-chevron-up';
+            try {
+                clearInterval(quizTimerInterval);
+                const container = document.getElementById('quiz-run-container');
+                if (!currentQuiz || !currentQuiz.questions || !currentQuiz.questions[currentStep]) {
+                    console.error('renderQuizStep: invalid quiz state', { currentStep, quiz: currentQuiz });
+                    return;
                 }
-            } else {
-                passageArea.style.display = 'none';
-            }
+                const question = currentQuiz.questions[currentStep];
 
-            // 🔥 V78.1: Timer logic based on mode
-            const isTotalTimeMode = currentQuiz.timerMode === 'total_time';
+                // 🔥 Case Study Logic (V77.23)
+                const passageArea = document.getElementById('quiz-case-passage-area');
+                const passageBody = document.getElementById('quiz-case-content-body');
+                if (currentQuiz.quizType === 'case_study' && currentQuiz.caseContent) {
+                    passageArea.style.display = 'block';
+                    passageBody.innerText = currentQuiz.caseContent;
+                    // Auto-show on first step
+                    if (currentStep === 0 && !useExistingTime) {
+                        passageBody.style.display = 'block';
+                        document.getElementById('case-reader-icon').className = 'fa-solid fa-chevron-up';
+                    }
+                } else {
+                    passageArea.style.display = 'none';
+                }
 
-            if (!useExistingTime && !isTotalTimeMode) {
-                // Per-question mode: accumulate remaining time from previous question
-                const baseTimer = question.timer || 60;
-                timeLeftForStep = baseTimer + (accumulatedTime || 0);
-                accumulatedTime = 0; // Reset after applying to base
-            }
-            // For total_time mode, timeLeftForStep keeps counting down without reset
-            updateTimerUI();
+                // 🔥 V78.1: Timer logic based on mode
+                const isTotalTimeMode = currentQuiz.timerMode === 'total_time';
 
-            quizTimerInterval = setInterval(() => {
-                timeLeftForStep--;
+                if (!useExistingTime && !isTotalTimeMode) {
+                    // Per-question mode: accumulate remaining time from previous question
+                    const baseTimer = question.timer || 60;
+                    timeLeftForStep = baseTimer + (accumulatedTime || 0);
+                    accumulatedTime = 0; // Reset after applying to base
+                }
+                // For total_time mode, timeLeftForStep keeps counting down without reset
                 updateTimerUI();
-                if (timeLeftForStep <= 0) {
-                    clearInterval(quizTimerInterval);
-                    if (isTotalTimeMode) {
-                        alert("🍭 หมดเวลารวมแล้ว! ระบบจะส่งคำตอบให้อัตโนมัติ");
-                        submitQuiz();
-                    } else {
-                        alert("🍭 หมดเวลาสำหรับข้อนี้!");
-                        if (currentStep < currentQuiz.questions.length - 1) {
-                            nextQuizStep();
-                        } else {
+
+                quizTimerInterval = setInterval(() => {
+                    timeLeftForStep--;
+                    updateTimerUI();
+                    if (timeLeftForStep <= 0) {
+                        clearInterval(quizTimerInterval);
+                        if (isTotalTimeMode) {
+                            alert("🍭 หมดเวลารวมแล้ว! ระบบจะส่งคำตอบให้อัตโนมัติ");
                             submitQuiz();
+                        } else {
+                            alert("🍭 หมดเวลาสำหรับข้อนี้!");
+                            if (currentStep < currentQuiz.questions.length - 1) {
+                                nextQuizStep();
+                            } else {
+                                submitQuiz();
+                            }
                         }
                     }
-                }
-            }, 1000);
+                }, 1000);
 
-            const isChoice = (question.type || 'choice') === 'choice';
-            let inputHtml = "";
+                const isChoice = (question.type || 'choice') === 'choice';
+                let inputHtml = "";
 
-            if (isChoice) {
-                const isMulti = Array.isArray(question.correct) && question.correct.length > 1;
-                if (isMulti && !Array.isArray(userAnswers[currentStep])) {
-                    userAnswers[currentStep] = []; // Initialize as array for multi
-                }
+                if (isChoice) {
+                    const isMulti = Array.isArray(question.correct) && question.correct.length > 1;
+                    if (isMulti && !Array.isArray(userAnswers[currentStep])) {
+                        userAnswers[currentStep] = []; // Initialize as array for multi
+                    }
 
-                // 🔥 V78: Use shuffleMap to display options in shuffled order
-                const sMap = shuffleMap[currentStep]; // [displayPos] => originalIndex
-                const displayOrder = sMap || question.options.map((_, i) => i); // Fallback to original order
+                    // 🔥 V78: Use shuffleMap to display options in shuffled order
+                    const sMap = shuffleMap[currentStep]; // [displayPos] => originalIndex
+                    const displayOrder = sMap || question.options.map((_, i) => i); // Fallback to original order
 
-                inputHtml = `
+                    inputHtml = `
                     <div style="display:flex; flex-direction:column; gap:10px;">
                         ${displayOrder.map((origIdx, displayIdx) => {
-                    const opt = question.options[origIdx];
-                    // userAnswers stores ORIGINAL indices
-                    const isChecked = isMulti
-                        ? (userAnswers[currentStep] || []).includes(origIdx)
-                        : userAnswers[currentStep] === origIdx;
+                        const opt = question.options[origIdx];
+                        // userAnswers stores ORIGINAL indices
+                        const isChecked = isMulti
+                            ? (userAnswers[currentStep] || []).includes(origIdx)
+                            : userAnswers[currentStep] === origIdx;
 
-                    return `
+                        return `
                                 <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #ddd; border-radius:8px; cursor:pointer; background:${isChecked ? '#f0f7ff' : '#fff'}; border-color:${isChecked ? '#4361ee' : '#ddd'};">
                                     <input type="${isMulti ? 'checkbox' : 'radio'}" name="q-opt" value="${displayIdx}"
                                         ${isChecked ? 'checked' : ''}
@@ -1860,16 +1867,16 @@
                                     ${opt}
                                 </label>
                             `;
-                }).join('')}
+                    }).join('')}
                     </div>
                 `;
-            }
-            else {
-                // Tweetstorm UI
-                if (!Array.isArray(userAnswers[currentStep])) {
-                    userAnswers[currentStep] = ['']; // Initialize with one empty tweet
                 }
-                inputHtml = `
+                else {
+                    // Tweetstorm UI
+                    if (!Array.isArray(userAnswers[currentStep])) {
+                        userAnswers[currentStep] = ['']; // Initialize with one empty tweet
+                    }
+                    inputHtml = `
                     <div id="tweetstorm-container" style="display:flex; flex-direction:column; gap:15px;">
                         ${renderTweetstormItems()}
                     </div>
@@ -1877,9 +1884,9 @@
                         <i class="fa-solid fa-plus"></i> Add Tweet
                     </button>
                 `;
-            }
+                }
 
-            container.innerHTML = `
+                container.innerHTML = `
                 <div style="margin-bottom:15px;">
                     <span class="badge" style="background:#4361ee; margin-bottom:10px;">ข้อที่ ${currentStep + 1} / ${currentQuiz.questions.length} (${isChoice ? 'Choice' : 'Short Answer'})</span>
                     <div style="font-weight:bold; font-size:1.1em; color:#333;">${question.q}</div>
@@ -1887,14 +1894,19 @@
                 ${inputHtml}
             `;
 
-            // Update footer buttons
-            document.getElementById('btn-quiz-prev').style.display = currentStep > 0 ? 'inline-block' : 'none';
-            if (currentStep === currentQuiz.questions.length - 1) {
-                document.getElementById('btn-quiz-next').style.display = 'none';
-                document.getElementById('btn-quiz-submit').style.display = 'inline-block';
-            } else {
-                document.getElementById('btn-quiz-next').style.display = 'inline-block';
-                document.getElementById('btn-quiz-submit').style.display = 'none';
+                // Update footer buttons
+                document.getElementById('btn-quiz-prev').style.display = currentStep > 0 ? 'inline-block' : 'none';
+                if (currentStep === currentQuiz.questions.length - 1) {
+                    document.getElementById('btn-quiz-next').style.display = 'none';
+                    document.getElementById('btn-quiz-submit').style.display = 'inline-block';
+                } else {
+                    document.getElementById('btn-quiz-next').style.display = 'inline-block';
+                    document.getElementById('btn-quiz-submit').style.display = 'none';
+                }
+                console.log(`[Quiz] Step ${currentStep + 1}/${currentQuiz.questions.length} rendered OK`);
+            } catch (err) {
+                console.error('[Quiz] renderQuizStep Error:', err);
+                alert('เกิดข้อผิดพลาดในการแสดงคำถาม กรุณาปิดแล้วเปิดใหม่\n' + err.message);
             }
         }
 
@@ -2116,35 +2128,45 @@
         }
 
         async function nextQuizStep() {
-            if (!currentQuiz) { console.error("No quiz active"); return; }
-            if (currentStep < currentQuiz.questions.length - 1) {
-                // 🔥 V78.1: Only accumulate time in per-question mode
-                if (currentQuiz.timerMode !== 'total_time') {
-                    if (timeLeftForStep > 0) {
-                        accumulatedTime += timeLeftForStep;
+            try {
+                if (!currentQuiz) { console.error("No quiz active"); return; }
+                if (!currentQuiz.questions || currentQuiz.questions.length === 0) { console.error("No questions in quiz"); return; }
+                console.log('[Quiz] nextQuizStep called, currentStep:', currentStep, 'total:', currentQuiz.questions.length);
+
+                if (currentStep < currentQuiz.questions.length - 1) {
+                    // 🔥 V78.1: Only accumulate time in per-question mode
+                    if (currentQuiz.timerMode !== 'total_time') {
+                        if (timeLeftForStep > 0) {
+                            accumulatedTime += timeLeftForStep;
+                        }
                     }
+
+                    currentStep++;
+                    console.log('[Quiz] Moving to step:', currentStep);
+
+                    // Render before auto-save for immediate UI feedback
+                    renderQuizStep(currentQuiz.timerMode === 'total_time');
+
+                    // Async auto-save (non-blocking)
+                    if (userId && !isPracticeMode) {
+                        const finalAnswers = userAnswers.map(ans => {
+                            if (ans === undefined) return null; // Firestore safety
+                            if (Array.isArray(ans)) return ans.join("\n---\n");
+                            return ans;
+                        });
+                        db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
+                            answers: finalAnswers,
+                            currentStep: currentStep,
+                            lastActive: firebase.firestore.FieldValue.serverTimestamp(),
+                            accumulatedTime: accumulatedTime
+                        }, { merge: true }).catch(err => console.warn("Auto-save failed:", err));
+                    }
+                } else {
+                    console.log('[Quiz] Already at last step, cannot go next');
                 }
-
-                currentStep++;
-                console.log("Moving to step:", currentStep);
-
-                // Render before auto-save for immediate UI feedback
-                renderQuizStep(currentQuiz.timerMode === 'total_time');
-
-                // Async auto-save (non-blocking)
-                if (userId && !isPracticeMode) {
-                    const finalAnswers = userAnswers.map(ans => {
-                        if (ans === undefined) return null; // Firestore safety
-                        if (Array.isArray(ans)) return ans.join("\n---\n");
-                        return ans;
-                    });
-                    db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
-                        answers: finalAnswers,
-                        currentStep: currentStep,
-                        lastActive: firebase.firestore.FieldValue.serverTimestamp(),
-                        accumulatedTime: accumulatedTime
-                    }, { merge: true }).catch(err => console.warn("Auto-save failed:", err));
-                }
+            } catch (err) {
+                console.error('[Quiz] nextQuizStep Error:', err);
+                alert('เกิดข้อผิดพลาดในการไปข้อถัดไป\n' + err.message);
             }
         }
         // 🔥 V78.1: prevQuizStep also preserves timer in total_time mode
@@ -2534,13 +2556,51 @@
                         const scBadge = (q.isScored && q.archiveScore) ? `<div class="score-badge">+${q.archiveScore}</div>` : '';
                         const pClass = `p-${q.priority}`;
 
+                        let timersHtml = "";
+                        if (q.deadline && q.status !== 'Done') {
+                            const dl = q.deadline.toMillis ? q.deadline.toMillis() : new Date(q.deadline).getTime();
+                            timersHtml = `<div class="card-timer timer-global" data-dead="${dl}" style="font-size:0.8em; color:#ef233c; font-weight:bold; margin-top:5px;">⏳ Expire: ...</div>`;
+                        }
+
+                        const descHtml = q.description ? `<div style="font-size:0.85em;color:#666;margin-bottom:10px;">${q.description}</div>` : "";
+
                         const c = document.createElement("div");
                         c.className = `sq-card status-${q.status} ${scClass} ${isProj ? 'project' : ''}`;
-                        c.innerHTML = `${scBadge} <div><span class="badge ${pClass}">${q.priority}</span> ${isProj ? '<span class="badge" style="background:#e83e8c">Proj</span>' : ''}</div><div style="font-weight:bold;margin-top:5px;">${q.title}</div><div style="font-size:0.85em;color:#666;margin-bottom:10px;">${q.description || ""}</div><div style="display:flex;">${btn}${chatBtn}</div>`;
+                        c.innerHTML = `
+                            ${scBadge} 
+                            <div><span class="badge ${pClass}">${q.priority}</span> ${isProj ? '<span class="badge" style="background:#e83e8c">Proj</span>' : ''}</div>
+                            <div style="font-weight:bold;margin-top:5px;">${q.title}</div>
+                            ${timersHtml}
+                            ${descHtml}
+                            <div style="display:flex;">${btn}${chatBtn}</div>
+                        `;
                         cols[q.status].appendChild(c)
                     }
                 })
-            })
+            });
+            // Start Realtime Timer update for User side
+            if (!window._sqTimerInterval) {
+                window._sqTimerInterval = setInterval(updateRealtimeTimers, 1000);
+            }
+        }
+
+        function updateRealtimeTimers() {
+            const now = Date.now();
+            document.querySelectorAll('.timer-global').forEach(el => {
+                const d = parseInt(el.dataset.dead);
+                const diff = d - now;
+                if (diff <= 0) {
+                    el.innerText = "⏳ Expired";
+                    el.style.color = "#999";
+                } else {
+                    const h = Math.floor(diff / 3600000);
+                    const m = Math.floor((diff % 3600000) / 60000);
+                    const s = Math.floor((diff % 60000) / 1000);
+                    // If less than 1 hour, show seconds
+                    if (h === 0) el.innerText = `⏳ Ends: ${m}m ${s}s`;
+                    else el.innerText = `⏳ Ends: ${h}h ${m}m`;
+                }
+            });
         }
 
         async function upSQ(id, s) { if (confirm("Move?")) await db.collection("side_quests").doc(id).update({ status: s }) }
@@ -2750,7 +2810,8 @@
                 "Creative": "#6f42c1",
                 "Content": "#20c997",
                 "Data": "#17a2b8",
-                "Admin": "#343a40"
+                "Admin": "#343a40",
+                "Junior": "#17a2b8"
             };
             return colors[g] || "#6c757d";
         }
@@ -2767,7 +2828,8 @@
                 "Creative": "fa-palette",
                 "Content": "fa-pen-nib",
                 "Data": "fa-chart-pie",
-                "Admin": "fa-user-shield"
+                "Admin": "fa-user-shield",
+                "Junior": "fa-child"
             };
             return icons[g] || "fa-users";
         }
