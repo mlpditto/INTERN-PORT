@@ -6,6 +6,9 @@
 - **Assignments Pagination:** The "Quizzes / แบบทดสอบ" section in LIFF is now paginated, displaying exactly 3 items per page.
 - **Scroll Optimization:** When switching pages, the view automatically scrolls to the top of the assignments section for a smoother mobile experience.
 
+### 2. Kanban Card UI Improvement (V79.7)
+- **Vertical Shrinkage / Collapsible Description:** Descriptions inside Kanban cards (both in LIFF and Admin panel) are now hidden by default. A toggle "ดูรายละเอียด (Description)" button has been added to expand and collapse the description, saving significant vertical space and reducing height of the boards.
+
 ## [2026-03-04] Session Updates (V79.5 → V79.6)
 
 ### 1. Pre-Registration System (V79.6)

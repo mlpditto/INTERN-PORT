@@ -4850,7 +4850,14 @@
                     if (q.priority === 'Medium') pColor = '#ff9f1c';
                     if (q.priority === 'High') pColor = '#ef233c';
 
-                    const descHtml = q.description ? `<p style="font-size:0.85em; color:#666; margin-bottom:5px;">${q.description}</p>` : "";
+                    const descId = 'admin-sq-desc-' + doc.id;
+                    const descHtml = q.description ? `
+                        <div onclick="toggleSqDesc('${descId}')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:#f1f3f5; padding:4px 8px; border-radius:6px; margin-bottom:5px; margin-top:5px; font-size:0.75em; color:#555;">
+                            <span><i class="fa-solid fa-align-left"></i> Description</span>
+                            <i id="icon-${descId}" class="fa-solid fa-chevron-down"></i>
+                        </div>
+                        <div id="${descId}" style="display:none; font-size:0.8em; color:#666; margin-bottom:5px; white-space:pre-wrap; background:#fafafa; padding:8px; border-radius:6px; border:1px solid #eee;">${q.description}</div>
+                    ` : "";
 
                     d.innerHTML = `
                         <div class="card-header-row">
@@ -4873,6 +4880,19 @@
             });
             Object.keys(cnt).forEach(k => document.getElementById(`cnt-${k}`).innerText = cnt[k]);
         }
+
+        function toggleSqDesc(id) {
+            const el = document.getElementById(id);
+            const icon = document.getElementById('icon-' + id);
+            if (el.style.display === 'none') {
+                el.style.display = 'block';
+                if (icon) icon.className = "fa-solid fa-chevron-up";
+            } else {
+                el.style.display = 'none';
+                if (icon) icon.className = "fa-solid fa-chevron-down";
+            }
+        }
+
         function updateRealtimeTimers() { const now = Date.now(); document.querySelectorAll('.timer-global').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) el.innerText = "⏳ Expired"; else { const h = Math.floor(diff / 3600000); const m = Math.floor((diff % 3600000) / 60000); el.innerText = `⏳ Ends: ${h}h ${m}m`; } }); document.querySelectorAll('.timer-active').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) { el.innerText = "⏱️ Time Up!"; const card = el.closest('.kanban-card'); if (card && card.parentElement.id === 'Doing') { db.collection("side_quests").doc(card.dataset.id).update({ status: 'Review' }); } } else { const m = Math.floor(diff / 60000); const s = Math.floor((diff % 60000) / 1000); el.innerText = `⏱️ ${m}m ${s}s`; } }); document.querySelectorAll('.timer-cooldown').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) el.innerText = "❄️ Ready"; else { const m = Math.floor(diff / 60000); const s = Math.floor((diff % 60000) / 1000); el.innerText = `❄️ Cool: ${m}m ${s}s`; } }); updateQuestTimers(); }
         function startDeleteCard(id) { deleteCardId = id; document.getElementById('delCardModal').style.display = 'block'; const btn = document.getElementById('btn-del-card-confirm'); btn.disabled = false; btn.style.background = '#ef233c'; let c = 5; btn.innerText = `Confirm (${c})`; if (deleteTimer) clearInterval(deleteTimer); deleteTimer = setInterval(() => { c--; btn.innerText = `Confirm (${c})`; if (c <= 0) { clearInterval(deleteTimer); document.getElementById('delCardModal').style.display = 'none'; showToast("Cancelled"); } }, 1000); btn.onclick = executeDeleteCard; }
         async function executeDeleteCard() { if (!deleteCardId) return; clearInterval(deleteTimer); document.getElementById('delCardModal').style.display = 'none'; const deduct = confirm("หักคะแนนผู้รับผิดชอบ?\nOK=หัก, Cancel=ไม่หัก"); try { const q = sideQuestsCache[deleteCardId]; const b = db.batch(); if (deduct && q.assigneeIds) { const s = prompt("Points to deduct (e.g., 0.5):"); if (s) { q.assigneeIds.forEach(u => { b.update(db.collection("users").doc(u), { score: firebase.firestore.FieldValue.increment(-parseFloat(s)) }); b.set(db.collection("checkin_logs").doc(), { userId: u, type: 'manual_adjust', amount: -parseFloat(s), note: `Del: ${q.title}`, timestamp: firebase.firestore.FieldValue.serverTimestamp() }); }); } } b.delete(db.collection("side_quests").doc(deleteCardId)); await b.commit(); showToast("Deleted!"); } catch (e) { alert(e.message); } }
