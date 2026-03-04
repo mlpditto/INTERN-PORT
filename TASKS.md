@@ -1,5 +1,17 @@
 # Project Tasks & Updates
 
+## [2026-03-04] Session Updates (V79.5 → V79.6)
+
+### 1. Pre-Registration System (V79.6)
+- **Pre-register Users:** Added ability to add pre-registered users with a "⏳" status before they claim their code.
+- **Dynamic User Integration:** Pre-registered users now display seamlessly in the Leaderboard alongside active users.
+- **AKA/Nickname Field:** Added a Nickname/AKA input field specifically for the pre-registration modal and inline-editing on the users table.
+
+### 2. Enhanced Certificate Generator (V79.6)
+- **Bilingual & Dual Names:** The Certificate modal now explicitly requests "Full Name (EN)" and "AKA/Nickname".
+- **Dynamic Render Logic:** `drawCertificate` automatically scales the Full Name and cleverly renders `( AKA : Nickname )` beneath the full name if provided.
+- **Bulk Export Support:** The dual-name logic is fully integrated into `generateBulkCert` for generating entire batches with nicknames.
+
 ## [2026-02-24] Session Updates (V79.2 → V79.3)
 
 ### 1. Homework Countdown & Kanban Improvements (V79.3)

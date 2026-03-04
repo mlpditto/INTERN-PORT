@@ -1416,10 +1416,16 @@
                         </label>
                     </div>
                 </div>
-                <div style="margin-bottom:15px;">
-                    <label style="font-size:0.8em; color:#666;">Full Name (ชื่อ-สกุล):</label>
-                    <input type="text" id="cert-fullname" placeholder="พิมพ์ชื่อ-นามสกุล ของนักศึกษา..."
-                        onkeyup="updateCertPreview()">
+                <div style="margin-bottom:15px; display:flex; gap:10px;">
+                    <div style="flex:2;">
+                        <label style="font-size:0.8em; color:#666;">Full Name (EN) (ชื่อ-สกุล อังกฤษ):</label>
+                        <input type="text" id="cert-fullname" placeholder="พิมพ์ชื่อ-นามสกุลภาษาอังกฤษ..."
+                            onkeyup="updateCertPreview()">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:0.8em; color:#666;">AKA/Nickname:</label>
+                        <input type="text" id="cert-nickname" placeholder="ชื่อเล่น..." onkeyup="updateCertPreview()">
+                    </div>
                 </div>
                 <div style="display:flex; gap:10px; margin-bottom:10px;">
                     <div style="flex:1"><label>Start:</label><input type="date" id="cert-start"
@@ -3791,6 +3797,15 @@
                 if (doc.exists) divisionConfig = doc.data();
                 renderLeaderboard();
             });
+
+            // 🔥 Load Pre-registered Users (V79.6)
+            db.collection("pre_users").orderBy("createdAt", "desc").onSnapshot(s => {
+                preRegData = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                if (document.getElementById('preRegModal').style.display === 'block') {
+                    renderPreRegList();
+                }
+                renderTable('users');
+            });
         }
 
         async function allowLateQuiz(id) {
@@ -3949,12 +3964,14 @@
         function renderUserGroupTabs() {
             const container = document.getElementById('user-group-tabs');
             if (!container) return;
-            const groups = [...new Set(usersData.map(u => u.group || 'Public'))].sort();
+            const unclaimedPre = preRegData.filter(p => !p.claimed).map(p => ({ group: p.group || 'Public' }));
+            const allUsersAndPre = [...usersData, ...unclaimedPre];
+            const groups = [...new Set(allUsersAndPre.map(u => u.group || 'Public'))].sort();
             const allGroups = ['All', ...groups];
 
             container.innerHTML = allGroups.map(g => {
                 const isActive = g === activeUserGroup;
-                const count = g === 'All' ? usersData.length : usersData.filter(u => (u.group || 'Public') === g).length;
+                const count = g === 'All' ? allUsersAndPre.length : allUsersAndPre.filter(u => (u.group || 'Public') === g).length;
                 const color = g === 'All' ? '#333' : getGroupColor(g);
                 const icon = g === 'All' ? 'fa-users' : getGroupIcon(g);
                 return `<button onclick="setUserGroupFilter('${g}')" style="
@@ -3984,6 +4001,20 @@
                 }
             }
             if (type === 'users') {
+                const unclaimedPre = preRegData.filter(p => !p.claimed).map(p => ({
+                    id: p.id,
+                    isPreReg: true,
+                    displayName: p.fullName || 'Pre-register',
+                    fullName: p.fullName,
+                    group: p.group || 'Public',
+                    startDate: p.startDate,
+                    endDate: p.endDate,
+                    code: p.code,
+                    score: 0,
+                    pictureUrl: 'https://cdn-icons-png.flaticon.com/512/847/847969.png'
+                }));
+                data = [...usersData, ...unclaimedPre];
+
                 const t = document.getElementById('userSearch').value.toLowerCase();
                 if (t) data = data.filter(u => (u.displayName || '').toLowerCase().includes(t));
                 if (activeUserGroup !== 'All') data = data.filter(u => (u.group || 'Public') === activeUserGroup);
@@ -4045,12 +4076,30 @@
                     }
                 }
                 else {
+                    if (d.isPreReg) {
+                        const dateStr = (d.startDate && d.endDate) ? `${d.startDate} ~ ${d.endDate}` : '<span style="color:#ccc; font-size:0.8em;">-</span>';
+                        tbody.innerHTML += `<tr style="background:#fcfcfc;">
+                            <td><img src="${d.pictureUrl}" class="user-pic"> <span style="font-weight:bold; color:#777;">⏳ ${d.displayName}</span><div style="font-size:0.75em; color:var(--primary); margin-top:3px; padding-left:40px;">Code: <b style="background:#f3f0ff; padding:2px 8px; border-radius:10px; border:1px dashed var(--primary); font-family:monospace;">${d.code}</b></div></td>
+                            <td><span class="badge" style="background:${getGroupColor(d.group)}; color:white; font-size:0.8em;"><i class="fa-solid ${getGroupIcon(d.group)}"></i> ${d.group}</span></td>
+                            <td>-</td>
+                            <td><span class="badge" style="background:#ffc107; color:black;"><i class="fa-solid fa-hourglass-half"></i> Pending Reg.</span></td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td style="font-size:0.78em; white-space:nowrap;">${dateStr}</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td><button class="btn-sm btn-danger" onclick="deletePreReg('${d.id}')">Del</button></td>
+                        </tr>`;
+                        return;
+                    }
+
                     const ignored = d.isIgnored;
                     const lv = Math.floor((d.score || 0) / 10) + 1;
                     const group = d.group || "Public";
                     const dateStr = (d.startDate && d.endDate) ? `${d.startDate} ~ ${d.endDate}` : '<span style="color:#ccc; font-size:0.8em;">-</span>';
                     const certStatus = d.certRequested ? '<span class="badge" style="background:#ffc107;color:black;font-size:0.7em;">🔔</span>' : '';
-                    const certNameInput = `<input type="text" style="width:100%; max-width:130px; padding:3px 6px; margin:0; font-size:0.82em; border:1px solid #eee; border-radius:4px;" placeholder="ชื่อจริง" value="${(d.fullName || '').replace(/"/g, '&quot;')}" onchange="updateFullName('${d.id}', this.value)">`;
+                    const certNameInput = `<input type="text" style="width:100%; max-width:130px; padding:3px 6px; margin:0 0 4px 0; font-size:0.82em; border:1px solid #eee; border-radius:4px;" placeholder="Full Name (EN)" title="Full Name (English)" value="${(d.fullName || '').replace(/"/g, '&quot;')}" onchange="updateFullName('${d.id}', this.value)">
+                    <input type="text" style="width:100%; max-width:130px; padding:3px 6px; margin:0; font-size:0.82em; border:1px solid #eee; border-radius:4px;" placeholder="Nickname/AKA" title="Nickname/AKA" value="${(d.nickname || '').replace(/"/g, '&quot;')}" onchange="updateNickname('${d.id}', this.value)">`;
                     const certBtn = `<button class="btn-sm btn-warning" onclick="openCertModal('${d.id}')" style="font-size:0.7em; padding:2px 8px;">🎓</button>`;
 
                     tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}">
@@ -4088,11 +4137,26 @@
                 alert("Save failed: " + e.message);
             }
         }
+        async function updateNickname(uid, newName) {
+            try {
+                await db.collection("users").doc(uid).update({ nickname: newName });
+                showToast("Nickname Saved!");
+                // Update local data
+                const user = usersData.find(u => u.id === uid);
+                if (user) user.nickname = newName;
+            } catch (e) {
+                console.error(e);
+                alert("Save failed: " + e.message);
+            }
+        }
         function openCertModal(uid) {
             const u = usersData.find(x => x.id === uid);
             if (!u) return;
             certUser = { uid: u.id, name: u.displayName };
             document.getElementById('cert-fullname').value = u.fullName || u.displayName || "";
+            if (document.getElementById('cert-nickname')) {
+                document.getElementById('cert-nickname').value = u.nickname || "";
+            }
             document.getElementById('cert-start').value = u.startDate || "";
             document.getElementById('cert-end').value = u.endDate || "";
 
@@ -4111,21 +4175,25 @@
             const s = document.getElementById('cert-start').value;
             const e = document.getElementById('cert-end').value;
             const fn = document.getElementById('cert-fullname').value;
+            const nn = document.getElementById('cert-nickname') ? document.getElementById('cert-nickname').value : '';
 
             const awardCheckboxes = document.querySelectorAll('input[name="cert-award"]:checked');
             const awards = Array.from(awardCheckboxes).map(cb => cb.value);
 
-            await db.collection("users").doc(certUser.uid).update({
+            const updateData = {
                 startDate: s,
                 endDate: e,
                 fullName: fn,
                 awards: awards, // Save as array
                 awardType: awards.length > 0 ? awards[0] : "" // Legacy support
-            });
+            };
+            if (nn !== undefined) updateData.nickname = nn;
+
+            await db.collection("users").doc(certUser.uid).update(updateData);
             showToast("Saved!");
             // Update local
             const u = usersData.find(x => x.id === certUser.uid);
-            if (u) { u.startDate = s; u.endDate = e; u.fullName = fn; u.awards = awards; u.awardType = awards.length > 0 ? awards[0] : ""; }
+            if (u) { u.startDate = s; u.endDate = e; u.fullName = fn; u.nickname = nn || u.nickname; u.awards = awards; u.awardType = awards.length > 0 ? awards[0] : ""; }
         }
 
         async function showHistory(uid, name, total) {
@@ -5002,7 +5070,9 @@
             ctx.fillText("This is to certify that", 75, 258);
 
             // 8. Recipient Name (Dynamic Fitting & Bold Italic)
-            const recipientName = name || "Student Name";
+            const recipientNameArray = name ? name.split('|') : ["Student Name"];
+            const recipientName = recipientNameArray[0].trim();
+            const recipientNickname = recipientNameArray.length > 1 ? recipientNameArray[1].trim() : "";
             ctx.textAlign = "center";
             ctx.fillStyle = "#222";
 
@@ -5021,8 +5091,18 @@
             ctx.shadowBlur = 4;
             ctx.shadowOffsetX = 2;
             ctx.shadowOffsetY = 2;
-            ctx.fillText(recipientName, w * 0.38, 345);
-            ctx.shadowColor = "transparent"; // Reset shadow
+
+            if (recipientNickname) {
+                ctx.fillText(recipientName, w * 0.38, 335);
+                ctx.shadowColor = "transparent"; // Reset shadow
+                ctx.font = `bold italic ${fontSize * 0.4}px 'Montserrat', sans-serif`;
+                ctx.fillStyle = "#444";
+                ctx.fillText(`( AKA : ${recipientNickname} )`, w * 0.38, 370);
+            } else {
+                ctx.fillText(recipientName, w * 0.38, 345);
+                ctx.shadowColor = "transparent"; // Reset shadow
+            }
+
 
             // 9. Premium Underline
             const grad = ctx.createLinearGradient(w * 0.1, 0, w * 0.65, 0);
@@ -5032,18 +5112,18 @@
             ctx.strokeStyle = grad;
             ctx.lineWidth = 4;
             ctx.beginPath();
-            ctx.moveTo(w * 0.1, 375);
-            ctx.lineTo(w * 0.65, 375);
+            ctx.moveTo(w * 0.1, recipientNickname ? 395 : 375);
+            ctx.lineTo(w * 0.65, recipientNickname ? 395 : 375);
             ctx.stroke();
 
             // 10. Description (Bilingual)
             ctx.textAlign = "center";
             ctx.fillStyle = "#333";
             ctx.font = "500 16px Montserrat, sans-serif";
-            ctx.fillText("ได้รับเกียรติบัตรเนื่องในโอกาสสำเร็จการฝึกงานด้วยความมุ่งมั่นและวิริยะอุตสาหะ", w * 0.38, 415);
+            ctx.fillText("ได้รับเกียรติบัตรเนื่องในโอกาสสำเร็จการฝึกงานด้วยความมุ่งมั่นและวิริยะอุตสาหะ", w * 0.38, recipientNickname ? 435 : 415);
             ctx.font = "12px Montserrat, sans-serif";
             ctx.fillStyle = "#666";
-            ctx.fillText("(Successfully completed the internship program with excellence and dedication)", w * 0.38, 435);
+            ctx.fillText("(Successfully completed the internship program with excellence and dedication)", w * 0.38, recipientNickname ? 455 : 435);
 
             // 11. Dates & Signature Area
             ctx.textAlign = "left";
@@ -5295,11 +5375,17 @@
             const s = document.getElementById('cert-start').value;
             const e = document.getElementById('cert-end').value;
             const fn = document.getElementById('cert-fullname').value;
+            const nn = document.getElementById('cert-nickname') ? document.getElementById('cert-nickname').value : '';
 
             const awardCheckboxes = document.querySelectorAll('input[name="cert-award"]:checked');
             const awards = Array.from(awardCheckboxes).map(cb => cb.value);
 
-            drawCertificate(ctx, fn || certUser.name, s && e ? `${s} - ${e}` : "", awards);
+            let displayNameForCert = fn || certUser.name;
+            if (nn) {
+                displayNameForCert += `|${nn}`;
+            }
+
+            drawCertificate(ctx, displayNameForCert, s && e ? `${s} - ${e}` : "", awards);
         }
         async function generateBulkCert() {
             const { jsPDF } = window.jspdf;
@@ -5320,7 +5406,13 @@
             for (let i = 0; i < users.length; i++) {
                 const u = users[i];
                 const finalAwards = u.awards || (u.awardType ? [u.awardType] : []);
-                drawCertificate(ctx, u.fullName || u.displayName, `${u.startDate} - ${u.endDate}`, finalAwards);
+
+                let displayNameForCert = u.fullName || u.displayName;
+                if (u.nickname) {
+                    displayNameForCert += `|${u.nickname}`;
+                }
+
+                drawCertificate(ctx, displayNameForCert, `${u.startDate} - ${u.endDate}`, finalAwards);
 
                 const imgData = c.toDataURL('image/jpeg', 0.95);
                 if (i > 0) doc.addPage();
@@ -5414,19 +5506,7 @@
 
         function openPreRegModal() {
             document.getElementById('preRegModal').style.display = 'block';
-            loadPreRegList();
-        }
-
-        async function loadPreRegList() {
-            const container = document.getElementById('prereg-list');
-            container.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">Loading...</div>';
-            try {
-                const snap = await db.collection("pre_users").orderBy("createdAt", "desc").get();
-                preRegData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                renderPreRegList();
-            } catch (e) {
-                container.innerHTML = `<div style="color:#ef233c; padding:10px;">Error: ${e.message}</div>`;
-            }
+            renderPreRegList();
         }
 
         function renderPreRegList() {
@@ -5441,7 +5521,7 @@
                 const groupColor = getGroupColor(p.group || 'Public');
                 return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid #eee; border-radius:10px; background:#fff; margin-bottom:6px;">
                     <div style="flex:1; min-width:0;">
-                        <div style="font-weight:bold; font-size:0.9em;">${p.fullName || '-'}</div>
+                        <div style="font-weight:bold; font-size:0.9em;">${p.fullName || '-'} <span style="font-size:0.85em; font-weight:normal; color:#666;">${p.nickname ? `(${p.nickname})` : ''}</span></div>
                         <div style="font-size:0.75em; color:#666;">
                             <span style="background:${groupColor}; color:white; padding:1px 8px; border-radius:10px; font-size:0.85em;">${p.group || 'Public'}</span>
                             ${p.startDate ? `${p.startDate} ~ ${p.endDate || ''}` : ''}
@@ -5469,6 +5549,7 @@
 
         async function addPreRegUser() {
             const fullName = document.getElementById('prereg-name').value.trim();
+            const nickname = document.getElementById('prereg-nick').value.trim();
             const group = document.getElementById('prereg-group').value.trim() || 'Junior';
             const startDate = document.getElementById('prereg-start').value;
             const endDate = document.getElementById('prereg-end').value;
@@ -5482,13 +5563,13 @@
 
             try {
                 await db.collection("pre_users").add({
-                    fullName, group, startDate, endDate, code,
+                    fullName, nickname, group, startDate, endDate, code,
                     claimed: false,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                showToast(`✅ Pre-registered: ${fullName} → Code: ${code}`);
+                showToast(`✅ Pre-registered: ${nickname ? nickname : fullName} → Code: ${code}`);
                 document.getElementById('prereg-name').value = '';
-                loadPreRegList();
+                document.getElementById('prereg-nick').value = '';
             } catch (e) {
                 alert("Error: " + e.message);
             }
@@ -5499,7 +5580,6 @@
             try {
                 await db.collection("pre_users").doc(id).delete();
                 showToast("Deleted");
-                loadPreRegList();
             } catch (e) { alert(e.message); }
         }
     </script>
@@ -5516,8 +5596,10 @@
             <div
                 style="background:#f8f9fa; padding:15px; border-radius:12px; margin-bottom:15px; border:1px solid #eee;">
                 <div style="display:flex; gap:8px; margin-bottom:8px;">
-                    <input type="text" id="prereg-name" placeholder="ชื่อ-นามสกุล (Full Name)"
-                        style="flex:2; margin:0;">
+                    <input type="text" id="prereg-name" placeholder="Full Name (ภาษาอังกฤษ)" style="flex:2; margin:0;"
+                        title="ชื่อ-นามสกุลภาษาอังกฤษ เพื่อออก Certificate">
+                    <input type="text" id="prereg-nick" placeholder="ชื่อเล่น/AKA" style="flex:1; margin:0;"
+                        title="ชื่อเล่น/AKA">
                     <select id="prereg-group" style="flex:1; margin:0;">
                         <option value="Junior">Junior</option>
                         <option value="INTERN">INTERN</option>
