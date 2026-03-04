@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V79.6)</title>
+    <title>Internship Portfolio (V79.7)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -658,7 +658,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V79.3 (HW Countdown)
+                V79.7 (Quiz Pagination)
             </div>
         </div>
     </div>
@@ -835,6 +835,7 @@
         let quizzesCache = [], quizAttemptsCache = {}, allUsersData = [], divisionConfig = {}, groupSettings = {}; // 🔥 Added Settings V69
         let shuffleMap = []; // 🔥 V78: Shuffle mapping per question [questionIndex] => [originalIndex0, originalIndex1, ...]
         let isPracticeMode = false; // 🔥 V78: ONE-TIME practice mode flag
+        let assignmentPage = 1; // 🔥 V79.7: Track current page for assignments
 
         // --- Initialization ---
         function updateStatus(msg) {
@@ -1449,7 +1450,16 @@
                 return;
             }
 
-            allItems.forEach(item => {
+            // Pagination Logic (V79.7)
+            const ITEMS_PER_PAGE = 3;
+            const totalPages = Math.ceil(allItems.length / ITEMS_PER_PAGE);
+            if (assignmentPage > totalPages) assignmentPage = totalPages;
+            if (assignmentPage < 1) assignmentPage = 1;
+
+            const startIndex = (assignmentPage - 1) * ITEMS_PER_PAGE;
+            const paginatedItems = allItems.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+            paginatedItems.forEach(item => {
                 const card = document.createElement('div');
                 card.className = "assignment-card";
 
@@ -1653,6 +1663,33 @@
 
                 container.appendChild(card);
             });
+
+            // Make sure pages > 1 before displaying pagination
+            if (totalPages > 1) {
+                const pag = document.createElement('div');
+                pag.style.display = 'flex';
+                pag.style.justifyContent = 'center';
+                pag.style.alignItems = 'center';
+                pag.style.gap = '10px';
+                pag.style.marginTop = '15px';
+
+                const prevDisabled = assignmentPage === 1 ? 'disabled' : '';
+                const nextDisabled = assignmentPage === totalPages ? 'disabled' : '';
+
+                pag.innerHTML = `
+                    <button class="btn-sm" style="flex:1; background:${assignmentPage === 1 ? '#f8f9fa' : '#fff'}; color:${assignmentPage === 1 ? '#aaa' : '#333'}; border:1px solid #ddd;" onclick="changeAssignmentPage(-1)" ${prevDisabled}><i class="fa-solid fa-chevron-left"></i> ย้อนกลับ</button>
+                    <div style="font-size:0.85em; font-weight:bold; color:#666; padding:0 10px;">หน้า ${assignmentPage} / ${totalPages}</div>
+                    <button class="btn-sm" style="flex:1; background:${assignmentPage === totalPages ? '#f8f9fa' : '#fff'}; color:${assignmentPage === totalPages ? '#aaa' : '#333'}; border:1px solid #ddd;" onclick="changeAssignmentPage(1)" ${nextDisabled}>ถัดไป <i class="fa-solid fa-chevron-right"></i></button>
+                `;
+                container.appendChild(pag);
+            }
+        }
+
+        function changeAssignmentPage(dir) {
+            assignmentPage += dir;
+            renderAssignments();
+            // Scroll to top of assignments section smoothly
+            document.getElementById('section-assignments').scrollIntoView({ behavior: 'smooth' });
         }
 
         let quizTimerInterval = null;

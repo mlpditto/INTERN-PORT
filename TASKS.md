@@ -1,5 +1,11 @@
 # Project Tasks & Updates
 
+## [2026-03-04] Session Updates (V79.6 → V79.7)
+
+### 1. Quiz Pagination (V79.7)
+- **Assignments Pagination:** The "Quizzes / แบบทดสอบ" section in LIFF is now paginated, displaying exactly 3 items per page.
+- **Scroll Optimization:** When switching pages, the view automatically scrolls to the top of the assignments section for a smoother mobile experience.
+
 ## [2026-03-04] Session Updates (V79.5 → V79.6)
 
 ### 1. Pre-Registration System (V79.6)
