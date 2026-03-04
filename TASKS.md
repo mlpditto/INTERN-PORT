@@ -9,6 +9,10 @@
 ### 2. Kanban Card UI Improvement (V79.7)
 - **Vertical Shrinkage / Collapsible Description:** Descriptions inside Kanban cards (both in LIFF and Admin panel) are now hidden by default. A toggle "ดูรายละเอียด (Description)" button has been added to expand and collapse the description, saving significant vertical space and reducing height of the boards.
 
+### 3. User Management UI Simplification (V79.7)
+- **Integrated Cert Name Editing:** Moved the "Full Name (EN)" and "Nickname/AKA" inputs out of the Users table replacing them with a cleaner static display.
+- **Unified Management Modal:** Editing the user's Group or clicking the new edit icon now opens a unified "จัดการข้อมูล (Manage Info)" modal, allowing admins to edit the user's Group, Full Name, and Nickname all in one place.
+
 ## [2026-03-04] Session Updates (V79.5 → V79.6)
 
 ### 1. Pre-Registration System (V79.6)

@@ -1706,31 +1706,41 @@
         <div class="modal-content" style="max-width:350px; text-align: left;">
             <span class="close-modal"
                 onclick="document.getElementById('groupSelectModal').style.display='none'">&times;</span>
-            <h3 style="margin-top:0;">🏷️ เลือกกลุ่มให้ <span id="gs-title-name"
+            <h3 style="margin-top:0;">🏷️ จัดการข้อมูล: <span id="gs-title-name"
                     style="color:var(--primary);">...</span></h3>
             <input type="hidden" id="gs-uid">
+
+            <div
+                style="margin-bottom:15px; background:#f8f9fa; padding:12px; border-radius:8px; border:1px solid #eee;">
+                <label style="font-size:0.85em; color:#666; font-weight:bold;">🎓 ข้อมูล Certificate
+                    (ภาษาอังกฤษ)</label>
+                <input type="text" id="gs-cert-fullname" placeholder="พิมพ์ชื่อ-นามสกุล..."
+                    style="margin-top:5px; width:100%; box-sizing:border-box; margin-bottom:8px; font-size:0.9em; padding:8px;">
+                <input type="text" id="gs-cert-nickname" placeholder="ชื่อเล่น/AKA..."
+                    style="width:100%; box-sizing:border-box; font-size:0.9em; padding:8px;">
+            </div>
+
             <div style="margin-bottom:15px;">
-                <label style="font-size:0.85em; color:#666;">พิมพ์กลุ่มใหม่ หรือเลือกจากรายการ:</label>
+                <label style="font-size:0.85em; color:#666; font-weight:bold;">🏷️ กลุ่ม (Group)</label>
                 <input type="text" id="gs-input" placeholder="พิมพ์ชื่อกลุ่ม..." list="gs-suggestions"
-                    style="margin-top:5px; width:100%; box-sizing:border-box;">
+                    style="margin-top:5px; width:100%; box-sizing:border-box; padding:8px;">
                 <datalist id="gs-suggestions">
                     <!-- Dynamic suggestions injected here -->
                 </datalist>
             </div>
             <div style="font-size:0.8em; color:#999; margin-bottom:8px;">กลุ่มที่มีในระบบ (เลือกได้ทันที):</div>
             <div id="gs-list"
-                style="max-height:200px; overflow-y:auto; border:1px solid #eee; border-radius:8px; padding:8px; margin-bottom:15px; display:flex; flex-direction:column; gap:8px; background:#fcfcfc;">
+                style="max-height:150px; overflow-y:auto; border:1px solid #eee; border-radius:8px; padding:8px; margin-bottom:15px; display:flex; flex-direction:column; gap:8px; background:#fcfcfc;">
                 <!-- Quick select items -->
             </div>
 
             <div
                 style="background:#fff9db; padding:10px; border-radius:8px; border:1px solid #fab005; font-size:0.8em; margin-bottom:15px; color:#862e00;">
                 <i class="fa-solid fa-circle-info"></i> <b>การจัดกลุ่ม (Groups):</b><br>
-                ใช้สำหรับแยกสายงานเพื่อมอบหมายงาน/ข้อสอบให้ตรงสาย (เช่น IT จะเห็นข้อสอบเฉพาะของ IT เท่านั้น)
+                ใช้สำหรับแยกสายงานเพื่อมอบหมายงาน/ข้อสอบให้ตรงสาย
             </div>
 
-            <button class="magic-btn" style="width:100%;" onclick="confirmSetGroup()">💾 บันทึกกลุ่ม (Save
-                Group)</button>
+            <button class="magic-btn" style="width:100%;" onclick="confirmSetGroup()">💾 บันทึกข้อมูล (Save)</button>
             <button class="btn-sm"
                 style="width:100%; background:none; border:none; color:#999; margin-top:10px; cursor:pointer;"
                 onclick="openGroupSettingsUI()">⚙️ จัดการสิทธิ์การมองเห็นกลุ่ม (Group Visibility)</button>
@@ -3826,6 +3836,10 @@
             document.getElementById('gs-uid').value = uid;
             document.getElementById('gs-title-name').innerText = userName;
 
+            // Load cert names
+            document.getElementById('gs-cert-fullname').value = (user && user.fullName) ? user.fullName : '';
+            document.getElementById('gs-cert-nickname').value = (user && user.nickname) ? user.nickname : '';
+
             const input = document.getElementById('gs-input');
             const list = document.getElementById('gs-list');
             input.value = current || "Public";
@@ -3911,11 +3925,20 @@
         async function confirmSetGroup() {
             const uid = document.getElementById('gs-uid').value;
             const newGroup = document.getElementById('gs-input').value.trim() || "Public";
+            const newFullName = document.getElementById('gs-cert-fullname').value.trim();
+            const newNickname = document.getElementById('gs-cert-nickname').value.trim();
+
+            if (!uid) return;
+
             try {
-                await db.collection("users").doc(uid).update({ group: newGroup });
-                showToast("User Group Updated!");
+                await db.collection("users").doc(uid).update({
+                    group: newGroup,
+                    fullName: newFullName,
+                    nickname: newNickname
+                });
+                showToast("ข้อมูลผู้ใช้อัปเดตสำเร็จ!");
                 document.getElementById('groupSelectModal').style.display = 'none';
-            } catch (e) { alert(e.message); }
+            } catch (e) { alert("Error setting user data: " + e.message); }
         }
 
         async function deleteGroupGlobally(groupName) {
@@ -4098,8 +4121,14 @@
                     const group = d.group || "Public";
                     const dateStr = (d.startDate && d.endDate) ? `${d.startDate} ~ ${d.endDate}` : '<span style="color:#ccc; font-size:0.8em;">-</span>';
                     const certStatus = d.certRequested ? '<span class="badge" style="background:#ffc107;color:black;font-size:0.7em;">🔔</span>' : '';
-                    const certNameInput = `<input type="text" style="width:100%; max-width:130px; padding:3px 6px; margin:0 0 4px 0; font-size:0.82em; border:1px solid #eee; border-radius:4px;" placeholder="Full Name (EN)" title="Full Name (English)" value="${(d.fullName || '').replace(/"/g, '&quot;')}" onchange="updateFullName('${d.id}', this.value)">
-                    <input type="text" style="width:100%; max-width:130px; padding:3px 6px; margin:0; font-size:0.82em; border:1px solid #eee; border-radius:4px;" placeholder="Nickname/AKA" title="Nickname/AKA" value="${(d.nickname || '').replace(/"/g, '&quot;')}" onchange="updateNickname('${d.id}', this.value)">`;
+
+                    const certNameDisplay = `
+                        <div style="cursor:pointer;" onclick="setUserGroup('${d.id}', '${group}')">
+                            <div style="font-size:0.85em; font-weight:bold; color:#333; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px;" title="${(d.fullName || '-').replace(/"/g, '&quot;')}">${d.fullName || '-'} <i class="fa-solid fa-pen" style="font-size:0.8em; color:#ccc;"></i></div>
+                            <div style="font-size:0.75em; color:#888;" title="${(d.nickname || '-').replace(/"/g, '&quot;')}">${d.nickname || '-'}</div>
+                        </div>
+                    `;
+
                     const certBtn = `<button class="btn-sm btn-warning" onclick="openCertModal('${d.id}')" style="font-size:0.7em; padding:2px 8px;">🎓</button>`;
 
                     tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}">
@@ -4108,7 +4137,7 @@
                             <td><button class="btn-sm" onclick="toggleIgnoreUser('${d.id}',${ignored})">${ignored ? '🚫' : '👁️'}</button></td>
                             <td><span class="badge" style="background:#eee;color:#333;margin-right:5px;">Lv.${lv}</span><span style="font-weight:bold;color:var(--primary);">${parseFloat((d.score || 0).toFixed(2))}</span></td>
                             <td><div style="display:flex;"><input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:70px;margin:0;" onkeypress="if(event.key==='Enter')adjDec('${d.id}')"><button class="btn-sm btn-success" onclick="adjDec('${d.id}')">Adj</button></div></td>
-                            <td>${certNameInput}</td>
+                            <td>${certNameDisplay}</td>
                             <td style="font-size:0.78em; white-space:nowrap;">${dateStr} ${certStatus}</td>
                             <td>${certBtn}</td>
                             <td><button class="btn-sm btn-dark" onclick="showHistory('${d.id}','${d.displayName}',${d.score || 0})">📜</button></td>
