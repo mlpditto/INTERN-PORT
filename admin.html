@@ -1119,16 +1119,13 @@
                 <table id="usersTable">
                     <thead>
                         <tr>
-                            <th>User</th>
+                            <th>User (Cert Name)</th>
                             <th>Group</th>
                             <th>Status</th>
                             <th>Score</th>
                             <th>Adjust</th>
-                            <th>Cert Name</th>
                             <th>Period</th>
-                            <th>Cert</th>
-                            <th>History</th>
-                            <th>Del</th>
+                            <th>Actions (Cert / History / Del)</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -3853,15 +3850,18 @@
             const suggestions = document.getElementById('gs-suggestions');
             suggestions.innerHTML = allGroups.map(g => `<option value="${g}">`).join('');
 
-            list.innerHTML = allGroups.map(g => `
+            list.innerHTML = allGroups.map(g => {
+                const activeCount = usersData.filter(u => !u.isIgnored && (u.group || "Public") === g).length;
+                return `
                     <div style="display:flex; gap:5px; align-items:stretch;">
                         <button class="btn-sm" style="flex:1; background:${getGroupColor(g)}; color:white; border:none; text-align:left; padding:10px 15px; font-size:0.95em; border-radius:8px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="document.getElementById('gs-input').value='${g}'">
-                            <span><i class="fa-solid ${getGroupIcon(g)}" style="width:20px; margin-right:8px; opacity:0.8;"></i> ${g}</span>
+                            <span style="display:flex; align-items:center;"><i class="fa-solid ${getGroupIcon(g)}" style="width:20px; margin-right:8px; opacity:0.8;"></i> ${g} <span style="font-size:0.75em; background:rgba(255,255,255,0.25); padding:2px 6px; border-radius:10px; margin-left:8px;"><i class="fa-solid fa-user"></i> ${activeCount}</span></span>
                             <i class="fa-solid fa-chevron-right" style="font-size:0.7em; opacity:0.7;"></i>
                         </button>
                         ${g !== 'Public' ? `<button class="btn-sm btn-danger" style="width:40px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:#ff4d4f; border:none; color:white;" onclick="deleteGroupGlobally('${g}')" title="ลบกลุ่มนี้ออกจากระบบ"><i class="fa-solid fa-trash-can"></i></button>` : ''}
                     </div>
-                `).join('');
+                `;
+            }).join('');
 
             document.getElementById('groupSelectModal').style.display = 'flex';
             setTimeout(() => input.select(), 100);
@@ -4123,25 +4123,29 @@
                     const certStatus = d.certRequested ? '<span class="badge" style="background:#ffc107;color:black;font-size:0.7em;">🔔</span>' : '';
 
                     const certNameDisplay = `
-                        <div style="cursor:pointer;" onclick="setUserGroup('${d.id}', '${group}')">
-                            <div style="font-size:0.85em; font-weight:bold; color:#333; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px;" title="${(d.fullName || '-').replace(/"/g, '&quot;')}">${d.fullName || '-'} <i class="fa-solid fa-pen" style="font-size:0.8em; color:#ccc;"></i></div>
-                            <div style="font-size:0.75em; color:#888;" title="${(d.nickname || '-').replace(/"/g, '&quot;')}">${d.nickname || '-'}</div>
+                        <div style="cursor:pointer; margin-left: 35px; margin-top: 5px; background: #f8f9fa; padding: 4px 8px; border-radius: 6px; border: 1px dashed #ddd; display: inline-block;" onclick="setUserGroup('${d.id}', '${group}')">
+                            <div style="font-size:0.8em; font-weight:bold; color:#444; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px;" title="${(d.fullName || '-').replace(/"/g, '&quot;')}">${d.fullName || '-'} <i class="fa-solid fa-pen" style="font-size:0.8em; color:#ccc;"></i></div>
+                            <div style="font-size:0.7em; color:#888;" title="${(d.nickname || '-').replace(/"/g, '&quot;')}">${d.nickname || '-'}</div>
                         </div>
                     `;
 
-                    const certBtn = `<button class="btn-sm btn-warning" onclick="openCertModal('${d.id}')" style="font-size:0.7em; padding:2px 8px;">🎓</button>`;
+                    const certBtn = `<button class="btn-sm btn-warning" onclick="openCertModal('${d.id}')" style="font-size:0.7em; padding:4px 8px; border-radius:4px;" title="Certificate">🎓</button>`;
+                    const historyBtn = `<button class="btn-sm btn-dark" onclick="showHistory('${d.id}','${d.displayName}',${d.score || 0})" style="font-size:0.7em; padding:4px 8px; border-radius:4px;" title="History">📜</button>`;
+                    const delBtn = `<button class="btn-sm btn-danger" onclick="delUser('${d.id}')" style="font-size:0.75em; padding:4px 8px; border-radius:4px;" title="Delete User"><i class="fa-solid fa-trash-can"></i></button>`;
+
+                    const actionsGroup = `<div style="display:flex; gap:4px;">${certBtn}${historyBtn}${delBtn}</div>`;
 
                     tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}">
-                            <td><img src="${d.pictureUrl}" class="user-pic"> ${d.displayName}</td>
+                            <td>
+                                <div><img src="${d.pictureUrl}" class="user-pic" style="vertical-align: middle;"> <span style="font-weight:bold;">${d.displayName}</span></div>
+                                ${certNameDisplay}
+                            </td>
                             <td><button class="btn-sm" style="font-size:0.75em; padding:2px 8px; background:${getGroupColor(group)}; color:white; border:none; display:flex; align-items:center; gap:5px;" onclick="setUserGroup('${d.id}', '${group}')"><i class="fa-solid ${getGroupIcon(group)}"></i> ${group}</button></td>
                             <td><button class="btn-sm" onclick="toggleIgnoreUser('${d.id}',${ignored})">${ignored ? '🚫' : '👁️'}</button></td>
                             <td><span class="badge" style="background:#eee;color:#333;margin-right:5px;">Lv.${lv}</span><span style="font-weight:bold;color:var(--primary);">${parseFloat((d.score || 0).toFixed(2))}</span></td>
                             <td><div style="display:flex;"><input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:70px;margin:0;" onkeypress="if(event.key==='Enter')adjDec('${d.id}')"><button class="btn-sm btn-success" onclick="adjDec('${d.id}')">Adj</button></div></td>
-                            <td>${certNameDisplay}</td>
                             <td style="font-size:0.78em; white-space:nowrap;">${dateStr} ${certStatus}</td>
-                            <td>${certBtn}</td>
-                            <td><button class="btn-sm btn-dark" onclick="showHistory('${d.id}','${d.displayName}',${d.score || 0})">📜</button></td>
-                            <td><button class="btn-sm btn-danger" onclick="delUser('${d.id}')">Del</button></td>
+                            <td>${actionsGroup}</td>
                         </tr>`;
                 }
             });
