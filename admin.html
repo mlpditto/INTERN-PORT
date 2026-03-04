@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP INTERNSHIP PORT V79.3</title>
+    <title>MLP INTERNSHIP PORT V79.5</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -868,7 +868,6 @@
             <button class="tab-btn" onclick="switchTab('tab-assignments')">📦 Assignments</button>
             <button class="tab-btn" onclick="switchTab('tab-users')">👥 Users</button>
             <button class="tab-btn" onclick="switchTab('tab-leaderboard')">🏆 Leaderboard</button>
-            <button class="tab-btn" onclick="switchTab('tab-certs')">🎓 Certificates</button>
         </div>
 
         <!-- Old tab-works removed -->
@@ -1097,21 +1096,41 @@
         </div>
 
         <div id="tab-users" class="tab-content">
-            <input type="text" id="userSearch" placeholder="🔍 Search..." onkeyup="filterUsers()">
-            <table id="usersTable">
-                <thead>
-                    <tr>
-                        <th>User</th>
-                        <th>Group</th>
-                        <th>Status</th>
-                        <th>Score</th>
-                        <th>Adjust</th>
-                        <th>History</th>
-                        <th>Del</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+                <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:200px;">
+                    <input type="text" id="userSearch" placeholder="🔍 Search..." onkeyup="filterUsers()"
+                        style="margin:0; flex:1; max-width:300px;">
+                    <span id="user-count-label" style="font-size:0.8em; color:#999;"></span>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn-sm btn-warning" onclick="generateBulkCert()"
+                        style="background:#e67e22; color:white; border:none;"><i class="fa-solid fa-file-pdf"></i> Bulk
+                        Cert</button>
+                </div>
+            </div>
+            <div id="user-group-tabs"
+                style="display:flex; gap:8px; overflow-x:auto; padding-bottom:10px; margin-bottom:15px; border-bottom:2px solid #f0f0f0;">
+            </div>
+            <div style="overflow-x:auto;">
+                <table id="usersTable">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Group</th>
+                            <th>Status</th>
+                            <th>Score</th>
+                            <th>Adjust</th>
+                            <th>Cert Name</th>
+                            <th>Period</th>
+                            <th>Cert</th>
+                            <th>History</th>
+                            <th>Del</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </div>
 
         <div id="tab-leaderboard" class="tab-content">
@@ -1140,26 +1159,7 @@
             <div id="leaderboardList" class="lb-container" style="max-width:900px; margin:0 auto;"></div>
         </div>
 
-        <div id="tab-certs" class="tab-content">
-            <div style="text-align:right; margin-bottom:15px;">
-                <button class="magic-btn" onclick="generateBulkCert()" style="background:#e67e22;"><i
-                        class="fa-solid fa-file-pdf"></i> 📦 Bulk Export All</button>
-            </div>
-            <div style="overflow-x:auto;">
-                <table id="certsTable">
-                    <thead>
-                        <tr>
-                            <th>User</th>
-                            <th>Full Name (Certificate)</th>
-                            <th>Internship Period</th>
-                            <th>Status</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-        </div>
+        <!-- Certificates tab removed, merged into Users -->
 
         <div id="taskModal" class="modal">
             <div class="modal-content"><span class="close-modal"
@@ -3832,6 +3832,34 @@
             }
         }
 
+        let activeUserGroup = 'All'; // 🔥 V79.5: Group filter for Users tab
+
+        function renderUserGroupTabs() {
+            const container = document.getElementById('user-group-tabs');
+            if (!container) return;
+            const groups = [...new Set(usersData.map(u => u.group || 'Public'))].sort();
+            const allGroups = ['All', ...groups];
+
+            container.innerHTML = allGroups.map(g => {
+                const isActive = g === activeUserGroup;
+                const count = g === 'All' ? usersData.length : usersData.filter(u => (u.group || 'Public') === g).length;
+                const color = g === 'All' ? '#333' : getGroupColor(g);
+                const icon = g === 'All' ? 'fa-users' : getGroupIcon(g);
+                return `<button onclick="setUserGroupFilter('${g}')" style="
+                    padding:6px 16px; border-radius:20px; border:2px solid ${isActive ? color : '#ddd'};
+                    background:${isActive ? color : '#fff'}; color:${isActive ? '#fff' : color};
+                    font-size:0.82em; font-weight:bold; cursor:pointer; white-space:nowrap;
+                    display:flex; align-items:center; gap:5px; transition:all 0.2s;
+                "><i class="fa-solid ${icon}"></i> ${g} <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${count}</span></button>`;
+            }).join('');
+        }
+
+        function setUserGroupFilter(group) {
+            activeUserGroup = group;
+            renderUserGroupTabs();
+            renderTable('users');
+        }
+
         function renderTable(type) {
             const tbody = document.querySelector(`#${type}Table tbody`);
             let data = (type === 'works') ? [...worksData] : [...usersData];
@@ -3843,7 +3871,14 @@
                     data = data.filter(d => d.status !== 'ตรวจแล้ว');
                 }
             }
-            if (type === 'users') { const t = document.getElementById('userSearch').value.toLowerCase(); if (t) data = data.filter(u => u.displayName.toLowerCase().includes(t)); }
+            if (type === 'users') {
+                const t = document.getElementById('userSearch').value.toLowerCase();
+                if (t) data = data.filter(u => (u.displayName || '').toLowerCase().includes(t));
+                if (activeUserGroup !== 'All') data = data.filter(u => (u.group || 'Public') === activeUserGroup);
+                renderUserGroupTabs();
+                const countLabel = document.getElementById('user-count-label');
+                if (countLabel) countLabel.innerText = `${data.length} users`;
+            }
             tbody.innerHTML = "";
             data.slice(0, 50).forEach(d => {
                 if (type === 'works') {
@@ -3901,12 +3936,20 @@
                     const ignored = d.isIgnored;
                     const lv = Math.floor((d.score || 0) / 10) + 1;
                     const group = d.group || "Public";
+                    const dateStr = (d.startDate && d.endDate) ? `${d.startDate} ~ ${d.endDate}` : '<span style="color:#ccc; font-size:0.8em;">-</span>';
+                    const certStatus = d.certRequested ? '<span class="badge" style="background:#ffc107;color:black;font-size:0.7em;">🔔</span>' : '';
+                    const certNameInput = `<input type="text" style="width:100%; max-width:130px; padding:3px 6px; margin:0; font-size:0.82em; border:1px solid #eee; border-radius:4px;" placeholder="ชื่อจริง" value="${(d.fullName || '').replace(/"/g, '&quot;')}" onchange="updateFullName('${d.id}', this.value)">`;
+                    const certBtn = `<button class="btn-sm btn-warning" onclick="openCertModal('${d.id}')" style="font-size:0.7em; padding:2px 8px;">🎓</button>`;
+
                     tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}">
                             <td><img src="${d.pictureUrl}" class="user-pic"> ${d.displayName}</td>
                             <td><button class="btn-sm" style="font-size:0.75em; padding:2px 8px; background:${getGroupColor(group)}; color:white; border:none; display:flex; align-items:center; gap:5px;" onclick="setUserGroup('${d.id}', '${group}')"><i class="fa-solid ${getGroupIcon(group)}"></i> ${group}</button></td>
                             <td><button class="btn-sm" onclick="toggleIgnoreUser('${d.id}',${ignored})">${ignored ? '🚫' : '👁️'}</button></td>
                             <td><span class="badge" style="background:#eee;color:#333;margin-right:5px;">Lv.${lv}</span><span style="font-weight:bold;color:var(--primary);">${parseFloat((d.score || 0).toFixed(2))}</span></td>
                             <td><div style="display:flex;"><input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:70px;margin:0;" onkeypress="if(event.key==='Enter')adjDec('${d.id}')"><button class="btn-sm btn-success" onclick="adjDec('${d.id}')">Adj</button></div></td>
+                            <td>${certNameInput}</td>
+                            <td style="font-size:0.78em; white-space:nowrap;">${dateStr} ${certStatus}</td>
+                            <td>${certBtn}</td>
                             <td><button class="btn-sm btn-dark" onclick="showHistory('${d.id}','${d.displayName}',${d.score || 0})">📜</button></td>
                             <td><button class="btn-sm btn-danger" onclick="delUser('${d.id}')">Del</button></td>
                         </tr>`;
@@ -3917,27 +3960,8 @@
         async function adjDec(id) { try { const valInput = document.getElementById(`adj-${id}`); let v = valInput.value; if (!v) return alert("กรุณาระบุคะแนน"); v = v.replace(',', '.'); const scoreVal = parseFloat(v); if (isNaN(scoreVal)) return alert("ค่าคะแนนไม่ถูกต้อง"); const n = prompt("เหตุผล (Note):"); if (!n) return; await db.collection("users").doc(id).update({ score: firebase.firestore.FieldValue.increment(scoreVal) }); await db.collection("checkin_logs").add({ userId: id, type: 'manual_adjust', amount: scoreVal, note: n, timestamp: firebase.firestore.FieldValue.serverTimestamp() }); showToast("Saved!"); valInput.value = ""; valInput.blur(); } catch (e) { alert("Error saving score: " + e.message); } }
 
         function renderCertTable() {
-            const t = document.querySelector("#certsTable tbody"); t.innerHTML = "";
-            if (!usersData.length) { t.innerHTML = "<tr><td colspan='5'>No data.</td></tr>"; return; }
-            const sortedUsers = usersData.filter(u => !u.isIgnored).sort((a, b) => (b.certRequested ? 1 : 0) - (a.certRequested ? 1 : 0));
-            sortedUsers.forEach(u => {
-                let dateStr = (u.startDate && u.endDate) ? `${u.startDate} - ${u.endDate}` : '<span style="color:#ccc">Waiting Dates</span>';
-                let status = u.certRequested ? '<span class="badge" style="background:#ffc107;color:black;">🔔 Requesting</span>' : '-';
-                let btn = `<button class="btn-sm btn-warning" onclick="openCertModal('${u.id}')">Preview / Edit</button>`;
-
-                // Full Name Input with Auto-Save
-                let nameInput = `<input type="text" class="form-input" style="width:100%; max-width:200px; padding:5px; margin:0;" 
-                    placeholder="ชื่อ-นามสกุล จริง" value="${u.fullName || ''}" 
-                    onchange="updateFullName('${u.id}', this.value)">`;
-
-                t.innerHTML += `<tr>
-                    <td><img src="${u.pictureUrl}" class="user-pic"> ${u.displayName}</td>
-                    <td>${nameInput}</td>
-                    <td>${dateStr}</td>
-                    <td>${status}</td>
-                    <td>${btn}</td>
-                </tr>`;
-            });
+            // 🔥 V79.5: Certificates merged into Users tab — this is now a no-op
+            // Kept for backward compatibility with onSnapshot listener
         }
 
         async function updateFullName(uid, newName) {
