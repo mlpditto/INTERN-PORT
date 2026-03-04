@@ -13,6 +13,11 @@
 - **Integrated Cert Name Editing:** Moved the "Full Name (EN)" and "Nickname/AKA" inputs out of the Users table replacing them with a cleaner static display.
 - **Unified Management Modal:** Editing the user's Group or clicking the new edit icon now opens a unified "จัดการข้อมูล (Manage Info)" modal, allowing admins to edit the user's Group, Full Name, and Nickname all in one place.
 
+### 4. Quiz Visibility Logic (V79.7)
+- **Filtered Assignments:** Only quizzes that are **Active**, **In Progress** (Requesting/Allowed), or completed with **0 points** are shown in the LIFF Assignments section.
+- **Auto-Hide Expired:** Quizzes that reach their deadline are automatically hidden unless the administrator explicitly sets them back to **Active** (reactivated).
+- **Completion Logic:** Quizzes with scores > 0 are moved to the History section once approved/pending.
+
 ## [2026-03-04] Session Updates (V79.5 → V79.6)
 
 ### 1. Pre-Registration System (V79.6)

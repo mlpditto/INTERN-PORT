@@ -1392,48 +1392,39 @@
             // 2. Process Quizzes
             quizzesCache.forEach(q => {
                 const attempt = quizAttemptsCache[q.id];
+                const now = new Date();
                 const start = q.startTime ? q.startTime.toDate() : null;
                 const dead = q.deadline ? q.deadline.toDate() : null;
 
-                // 🔥 Audience Group Filter (V77.7)
+                // --- 1. Basic Filters (Group & Homework) ---
                 const target = q.targetGroup || "Public";
                 if (target !== "Public" && target !== myGroup) return;
 
-                // 🔥 V78.2: Homework user-level filter
                 if (q.isHomework && q.assignedUsers && q.assignedUsers.length > 0) {
                     if (!q.assignedUsers.includes(userId)) return;
                 }
 
-                // Visibility logic
-                if (start && now < start) return;
-
-                // 🔥 Fix: Allow if user has attempt, even if expired or inactive
-                // Only hide if (Expired OR Inactive) AND No Attempt
-                // Note: q.isActive might be undefined in old data, assume true if missing? or false?
-                // Let's check logic: if q.isActive is explicitly false, it's inactive.
-
+                // --- 2. Visibility Logic (New Requirements) ---
                 const isExpired = (dead && now > dead);
-                const isInactive = (q.isActive === false);
-                const isApproved = (attempt && attempt.status === 'approved');
+                const isActive = (q.isActive !== false); // Default to true if missing
+                const hasStarted = (start && now >= start) || !start;
 
-                // 🔥 V77.27: Hide if completed (moves to history)
-                if (attempt && (attempt.status === 'pending' || attempt.status === 'approved')) return;
+                if (!hasStarted) return; // Not yet started
 
-                // Visibility logic
-                if (start && now < start) return;
+                // If attempt exists, get status and score
+                const status = attempt ? attempt.status : 'none'; // none, requesting, allowed, pending, approved
+                const score = attempt ? (attempt.score || 0) : 0;
 
-                // 🔥 V77.4: Show if active OR (expired AND not approved)
-                if (isInactive && !attempt) return;
-                if (isExpired && isApproved) return; // Hide completed ones if expired
-                if (isExpired && !attempt && !isInactive) {
-                    // Show expired ones that haven't been done yet
-                } else if (isExpired && attempt && !isApproved) {
-                    // Show expired ones that are not approved (failed or pending)
-                } else if (isExpired) {
-                    // Fallback hide
-                    if (!attempt) return;
+                // 🛑 RULE: Hide if Expired AND NOT Active (unless in progress)
+                if (isExpired && !isActive) {
+                    if (status !== 'requesting' && status !== 'allowed') return;
                 }
 
+                // 🛑 RULE: Hide if Completed (Approved/Pending) AND Score > 0
+                // This moves them to History. Score 0 stays in Assignments to encourage retake/request.
+                if ((status === 'approved' || status === 'pending') && score > 0) return;
+
+                // ✅ Show: Active quizzes, Quizzes in progress (requesting/allowed), or Completed with 0 points
                 allItems.push({ type: 'quiz', data: q, myData: attempt, sortDate: dead || new Date(8640000000000000) });
             });
 
