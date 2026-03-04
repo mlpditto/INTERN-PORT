@@ -3134,9 +3134,9 @@
                 if (isChoice) {
                     const target = q.correct;
                     if (Array.isArray(target)) {
-                        isCorrect = Array.isArray(studentAns) && target.length === studentAns.length && target.every(v => studentAns.includes(v));
+                        isCorrect = Array.isArray(studentAns) && target.length === studentAns.length && target.every(v => studentAns.map(String).includes(String(v)));
                     } else {
-                        isCorrect = (studentAns == target);
+                        isCorrect = (studentAns !== undefined && studentAns !== null && String(studentAns) === String(target));
                     }
                 } else {
                     isCorrect = (att.gradedAnswers && att.gradedAnswers[i]);
@@ -3146,8 +3146,10 @@
                 let correctAnsText = "";
 
                 if (isChoice) {
-                    studentAnsText = `<b>${q.options[studentAns] || '-'}</b> (Choice ${studentAns + 1})`;
-                    correctAnsText = `<span style="color:green;">${q.options[q.correct]}</span> (Choice ${q.correct + 1})`;
+                    const sIdx = parseInt(studentAns);
+                    const cIdx = parseInt(q.correct);
+                    studentAnsText = `<b>${q.options[sIdx] || '-'}</b> (Choice ${isNaN(sIdx) ? '-' : sIdx + 1})`;
+                    correctAnsText = `<span style="color:green;">${q.options[cIdx]}</span> (Choice ${isNaN(cIdx) ? '-' : cIdx + 1})`;
                 } else {
                     // Handle Tweetstorm (Array) or Flattened string
                     let ansArray = [];
@@ -3173,9 +3175,13 @@
                     correctAnsText = `<span style="color:#666;">(Subjective Answer - No fixed correct answer)</span>`;
                 }
 
+                const cardBg = isCorrect ? '#d4edda' : '#f8d7da';
+                const cardBorder = isCorrect ? '#28a745' : '#dc3545';
+                const cardIcon = isCorrect ? '✅' : '❌';
+
                 container.innerHTML += `
-                    <div style="border:1px solid #ddd; padding:10px; margin-bottom:10px; border-radius:8px; background:${isCorrect ? '#d4edda' : '#f8d7da'}">
-                        <b>Q${i + 1}: ${q.q}</b> <span class="badge" style="background:#6c757d; font-size:0.7em;">${isChoice ? 'Choice' : 'Short Answer'}</span><br>
+                    <div style="border:2px solid ${cardBorder}; padding:12px; margin-bottom:10px; border-radius:10px; background:${cardBg}; border-left:5px solid ${cardBorder};">
+                        <b>${cardIcon} Q${i + 1}: ${q.q}</b> <span class="badge" style="background:#6c757d; font-size:0.7em;">${isChoice ? 'Choice' : 'Short Answer'}</span><br>
                         <div style="margin-top:5px; font-size:0.9em;">
                              Student: ${studentAnsText} <br>
                              Correct: ${correctAnsText}
