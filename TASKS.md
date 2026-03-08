@@ -3,6 +3,14 @@
 > [!IMPORTANT]
 > **📢 Version Policy:** ทุกการ Commit หรือการปรับปรุงชุดคำสั่ง ต้องมีการขยับเวอร์ชัน (Versioning) เสมอ ทั้งในหน้า UI และในเอกสาร Markdown นี้ เพื่อป้องกันความสับสนในการ Deploy
 
+## [2026-03-08] Session Updates (V81.1 → V81.2)
+
+### 1. Collapsed Expired Quizzes (V81.2)
+- **Compact View:** Quizzes that have passed their deadline and are in a 'Not Started' state are now automatically collapsed into a slim header.
+- **Improved Focus:** This keeps the Assignments list organized, showing full cards only for active tasks that currently require the intern's attention.
+- **Expandable Detail:** Users can click the header to see the description, deadline details, and the "Request Late Submission" button.
+- **Interactive States:** Quizzes that are 'In Progress' (Started/Allowed) remain fully visible even if they've technically expired, ensuring users can easily complete them.
+
 ## [2026-03-08] Session Updates (V81.0 → V81.1)
 
 ### 1. Poll-only Timer (V81.1)

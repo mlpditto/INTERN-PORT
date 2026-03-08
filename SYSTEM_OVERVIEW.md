@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V81.1) Overview
+# MLP Internship Portfolio (V81.2) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -76,6 +76,14 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+## [2026-03-08] Session Updates (V81.1 → V81.2)
+
+### 1. Collapsed Expired Quizzes (V81.2)
+- **Compact View:** Quizzes that have passed their deadline and are in a 'Not Started' state are now automatically collapsed into a slim header.
+- **Improved Focus:** This keeps the Assignments list organized, showing full cards only for active tasks that currently require the intern's attention.
+- **Expandable Detail:** Users can click the header to see the description, deadline details, and the "Request Late Submission" button.
+- **Interactive States:** Quizzes that are 'In Progress' (Started/Allowed) remain fully visible even if they've technically expired, ensuring users can easily complete them.
+
 ## [2026-03-08] Session Updates (V81.0 → V81.1)
 
 ### 1. Poll-only Timer (V81.1)
@@ -103,10 +111,8 @@
     - **Customizable Char Limits:** แอดมินสามารถกำหนดขีดจำกัดตัวอักษรต่อข้อความได้ (280 ตัวอักษรสำหรับ Standard หรือ 4000 ตัวอักษรสำหรับเนื้อหาเชั้นสูง)
     - **Admin Review:** แอดมินสามารถตรวจอ่าน Feedback ทั้งหมดที่เรียงต่อกันแบบสรุป (Flattened Feed) พร้อมระบบให้เหรียญรางวัลพิเศษ (Beta User) สำหรับความเห็นที่ยอดเยี่ยม
     - **Approval Workflow:** เมื่อส่ง Reflection ระบบจะตั้งสถานะเป็น 'Pending' เพื่อรอการตรวจสอบและอนุมัติคะแนนจากผู้สอนโดยตรง
+    - **Collapsed Expired Quiz (V81.2):** ระบบ "ยุบบัตรแบบทดสอบที่หมดเวลา" (Collapse Expired) ในหน้า Assignments โดยแบบทดสอบที่เลยกำหนดส่งแล้วจะแสดงผลในรูปแบบแถวสั้น (Header-only) เพื่อไม่ให้รกพื้นที่ แต่ผู้เรียนยังสามารถกดขยาย (Expand) เพื่อขออนุญาตแอดมินทำเลทได้ตามปกติ
     - **Interactive Poll Reveal (V81.1):** ฟีเจอร์ "ตอบเพื่อเปิดเผย" (Choice to Reveal) ในโหมด Read-only
-        - **Poll-only Timer:** ระบบจับเวลาจะทำงานเฉพาะในช่วง "กำลังตอบ Poll" เท่านั้น เมื่อผู้เรียนตอบแล้ว (หรือหมดเวลา) ระบบจะหยุดนับเวลาทันทีเพื่อให้ผู้เรียนอ่านเนื้อหาบทเรียนได้โดยไม่ถูกบีบคั้น
-        - **Auto-Reveal:** หากเวลาหมดก่อนตอบ ระบบจะทำการเปิดเผยเนื้อหาให้อัตโนมัติเพื่อให้การเรียนรู้ดำเนินต่อได้
-        - **Animations:** การเปิดเนื้อหามาพร้อมอนิเมชั่น `fadeInUp` เพื่อความสวยงาม
 - **📝 Subjective Exam:** รองรับคำถามแบบข้อเขียน (Short Answer) โดยผู้ใช้สามารถพิมพ์ตอบได้ยาวตามต้องการ และระบบตรวจจับการส่งแบบหลายบรรทัด (Tweetstorm) โดยจะทำการ Flatten ข้อมูลให้อัตโนมัติเพื่อป้องกัน Error ของ Firestore แต่ยังคงการแสดงผลที่สวยงามในหน้าแอดมิน (V72.2)
 
 ### 5. การส่งงานทั่วไป (General Works)

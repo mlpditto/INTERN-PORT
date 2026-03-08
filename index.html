@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V81.1)</title>
+    <title>Internship Portfolio (V81.2)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -701,7 +701,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V81.1 (Poll-only Timer)
+                V81.2 (Collapsed Expired Quiz)
             </div>
         </div>
     </div>
@@ -1726,16 +1726,23 @@
                         }
                     }
 
+                    const isExpired = (dead && now > dead);
+                    const isStarted = attempt && attempt.status === 'started';
+                    const isRequesting = attempt && attempt.status === 'requesting';
+                    const isAllowed = attempt && attempt.status === 'allowed';
+                    const isCollapsed = isExpired && !isStarted && !isRequesting && !isAllowed;
+
                     card.innerHTML = `
-                        <div class="assign-header">
+                        <div class="assign-header" ${isCollapsed ? 'onclick="toggleAssignmentCard(this)" style="cursor:pointer; opacity:0.75;"' : ''}>
                             ${icon}
                             <div class="assign-info">
-                                <h4>${qTitle}</h4>
+                                <h4 style="${isCollapsed ? 'font-size:0.95em; color:#666;' : ''}">${qTitle} ${isCollapsed ? '<small style="color:#ef233c; font-weight:normal; margin-left:5px;">(หมดเวลา)</small>' : ''}</h4>
                                 ${statusBadge}
                             </div>
+                            ${isCollapsed ? '<i class="fa-solid fa-chevron-down" style="color:#ccc; font-size:0.9em; margin-left:10px;"></i>' : ''}
                         </div>
-                        <div class="assign-body">${bodyHtml}</div>
-                        <div class="assign-footer">${actionHtml}</div>
+                        <div class="assign-body" style="${isCollapsed ? 'display:none;' : ''}">${bodyHtml}</div>
+                        <div class="assign-footer" style="${isCollapsed ? 'display:none;' : ''}">${actionHtml}</div>
                     `;
                 }
 
@@ -1996,6 +2003,28 @@
             } else {
                 body.style.display = 'none';
                 icon.className = 'fa-solid fa-chevron-down';
+            }
+        }
+
+        function toggleAssignmentCard(el) {
+            const card = el.closest('.assignment-card');
+            const body = card.querySelector('.assign-body');
+            const footer = card.querySelector('.assign-footer');
+            const icon = card.querySelector('.assign-header i.fa-solid'); // Look for chevron icon in header
+
+            if (body.style.display === 'none') {
+                body.style.display = 'block';
+                footer.style.display = 'block';
+                // Find specifically the chevron icon to toggle
+                const chevron = el.querySelector('.fa-chevron-down, .fa-chevron-up');
+                if (chevron) chevron.className = 'fa-solid fa-chevron-up';
+                el.style.opacity = "1";
+            } else {
+                body.style.display = 'none';
+                footer.style.display = 'none';
+                const chevron = el.querySelector('.fa-chevron-down, .fa-chevron-up');
+                if (chevron) chevron.className = 'fa-solid fa-chevron-down';
+                el.style.opacity = "0.7";
             }
         }
 
