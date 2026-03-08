@@ -701,7 +701,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V81.0 (Interactive Poll Reveal)
+                V81.1 (Poll-only Timer)
             </div>
         </div>
     </div>
@@ -2086,10 +2086,38 @@
                 }
             }
             if (btnSubmit) btnSubmit.style.display = 'none';
+
+            // 🔥 V81.1: Timer logic for Read-only Poll Reveal
+            // Stop existing timer first
+            clearInterval(quizTimerInterval);
+            document.getElementById('quiz-q-timer').innerText = "";
+
+            if (isPoll && !isAnswered && !isPracticeMode) {
+                startReadOnlyTimer(page.timer || 60);
+            }
+        }
+
+        function startReadOnlyTimer(sec) {
+            timeLeftForStep = sec;
+            updateTimerUI();
+            quizTimerInterval = setInterval(() => {
+                timeLeftForStep--;
+                updateTimerUI();
+                if (timeLeftForStep <= 0) {
+                    clearInterval(quizTimerInterval);
+                    alert("⏰ หมดเวลาในการตอบ Poll! ระบบจะทำการเปิดเผยเนื้อหาให้ทันทีครับ");
+                    // Auto-Reveal: Use a placeholder answer to reveal content
+                    selectReadOnlyPoll(-1);
+                }
+            }, 1000);
         }
 
         function selectReadOnlyPoll(idx) {
             userAnswers[currentStep] = idx;
+            // Stop timer when answered
+            clearInterval(quizTimerInterval);
+            document.getElementById('quiz-q-timer').innerText = "";
+
             renderReadOnlyUI(); // Re-render to show reveal
 
             // Auto-save progress

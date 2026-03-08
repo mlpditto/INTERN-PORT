@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V80.1) Overview
+# MLP Internship Portfolio (V81.1) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -76,7 +76,15 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
-- **🏅 Multi-Award Certificates (V78.8):**
+## [2026-03-08] Session Updates (V81.0 → V81.1)
+
+### 1. Poll-only Timer (V81.1)
+- **Timer Refinement:** The `Timer (sec)` for Read-only pages now applies ONLY to the Poll phase. 
+- **Auto-Stop:** Once a user selects an option, the timer stops immediately, allowing unlimited reading time for the revealed content.
+- **Auto-Reveal on Timeout:** If the timer expires, the system alerts the user and automatically reveals the content so learning is not blocked.
+- **Stress-free Reading:** Removed timers from "Standard Page" (Reading style) to promote careful consumption of material.
+
+## [2026-03-08] Session Updates (V80.1 → V81.0):**
     - ระบบรองรับ **รางวัลพิเศษหลายรายการ** บนใบรับรองเดียว (เช่น Zero-to-One + Good Reporter + Beta User)
     - Admin เลือกรางวัลผ่าน Checkbox แทน Radio Button
     - ตราประทับรางวัลจะซ้อนกันแบบ Stacked Display
@@ -95,7 +103,10 @@
     - **Customizable Char Limits:** แอดมินสามารถกำหนดขีดจำกัดตัวอักษรต่อข้อความได้ (280 ตัวอักษรสำหรับ Standard หรือ 4000 ตัวอักษรสำหรับเนื้อหาเชั้นสูง)
     - **Admin Review:** แอดมินสามารถตรวจอ่าน Feedback ทั้งหมดที่เรียงต่อกันแบบสรุป (Flattened Feed) พร้อมระบบให้เหรียญรางวัลพิเศษ (Beta User) สำหรับความเห็นที่ยอดเยี่ยม
     - **Approval Workflow:** เมื่อส่ง Reflection ระบบจะตั้งสถานะเป็น 'Pending' เพื่อรอการตรวจสอบและอนุมัติคะแนนจากผู้สอนโดยตรง
-    - **Interactive Poll Reveal (V81.0):** ฟีเจอร์ "ตอบเพื่อเปิดเผย" (Choice to Reveal) ในโหมด Read-only โดยผู้เรียนต้องเลือกคำโหวตหรือเดาคำตอบก่อน ระบบจึงจะค่อยๆ แสดงเนื้อหาบทเรียน (Page Content) ออกมาพร้อมอนิเมชั่น เพื่อกระตุ้นความอยากรู้อยากเห็น (Curiosity-driven Learning)
+    - **Interactive Poll Reveal (V81.1):** ฟีเจอร์ "ตอบเพื่อเปิดเผย" (Choice to Reveal) ในโหมด Read-only
+        - **Poll-only Timer:** ระบบจับเวลาจะทำงานเฉพาะในช่วง "กำลังตอบ Poll" เท่านั้น เมื่อผู้เรียนตอบแล้ว (หรือหมดเวลา) ระบบจะหยุดนับเวลาทันทีเพื่อให้ผู้เรียนอ่านเนื้อหาบทเรียนได้โดยไม่ถูกบีบคั้น
+        - **Auto-Reveal:** หากเวลาหมดก่อนตอบ ระบบจะทำการเปิดเผยเนื้อหาให้อัตโนมัติเพื่อให้การเรียนรู้ดำเนินต่อได้
+        - **Animations:** การเปิดเนื้อหามาพร้อมอนิเมชั่น `fadeInUp` เพื่อความสวยงาม
 - **📝 Subjective Exam:** รองรับคำถามแบบข้อเขียน (Short Answer) โดยผู้ใช้สามารถพิมพ์ตอบได้ยาวตามต้องการ และระบบตรวจจับการส่งแบบหลายบรรทัด (Tweetstorm) โดยจะทำการ Flatten ข้อมูลให้อัตโนมัติเพื่อป้องกัน Error ของ Firestore แต่ยังคงการแสดงผลที่สวยงามในหน้าแอดมิน (V72.2)
 
 ### 5. การส่งงานทั่วไป (General Works)

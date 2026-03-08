@@ -3,6 +3,14 @@
 > [!IMPORTANT]
 > **📢 Version Policy:** ทุกการ Commit หรือการปรับปรุงชุดคำสั่ง ต้องมีการขยับเวอร์ชัน (Versioning) เสมอ ทั้งในหน้า UI และในเอกสาร Markdown นี้ เพื่อป้องกันความสับสนในการ Deploy
 
+## [2026-03-08] Session Updates (V81.0 → V81.1)
+
+### 1. Poll-only Timer (V81.1)
+- **Timer Refinement:** The `Timer (sec)` for Read-only pages now applies ONLY to the Poll phase. 
+- **Auto-Stop:** Once a user selects an option, the timer stops immediately, allowing unlimited reading time for the revealed content.
+- **Auto-Reveal on Timeout:** If the timer expires, the system alerts the user and automatically reveals the content so learning is not blocked.
+- **Stress-free Reading:** Removed timers from "Standard Page" (Reading style) to promote careful consumption of material.
+
 ## [2026-03-08] Session Updates (V80.1 → V81.0)
 
 ### 1. Interactive Poll Reveal (V81.0)
