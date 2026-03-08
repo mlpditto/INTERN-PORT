@@ -1538,9 +1538,14 @@
                     const dead = q.deadline ? q.deadline.toDate() : null;
                     const qTitle = q.shortTitle || q.title;
 
-                    let icon = q.isHomework
-                        ? `<div class="assign-icon" style="background:linear-gradient(135deg, #2e7d32, #66bb6a); color:white; border-radius:12px; width:42px; height:42px; display:flex; align-items:center; justify-content:center; font-size:1.2em;"><i class="fa-solid fa-book"></i></div>`
-                        : `<div class="assign-icon icon-quiz"><i class="fa-solid fa-brain"></i></div>`;
+                    let icon = "";
+                    if (q.quizType === 'read_only') {
+                        icon = `<div class="assign-icon" style="background:linear-gradient(135deg, #1565c0, #42a5f5); color:white; border-radius:12px; width:42px; height:42px; display:flex; align-items:center; justify-content:center; font-size:1.2em;"><i class="fa-solid fa-book-open"></i></div>`;
+                    } else if (q.isHomework) {
+                        icon = `<div class="assign-icon" style="background:linear-gradient(135deg, #2e7d32, #66bb6a); color:white; border-radius:12px; width:42px; height:42px; display:flex; align-items:center; justify-content:center; font-size:1.2em;"><i class="fa-solid fa-book"></i></div>`;
+                    } else {
+                        icon = `<div class="assign-icon icon-quiz"><i class="fa-solid fa-brain"></i></div>`;
+                    }
                     let statusBadge = "";
                     let bodyHtml = "";
                     let actionHtml = "";
@@ -1623,19 +1628,33 @@
                         const oneTimeBadge = isOneTime ? '<span class="badge" style="background:#f57f17; color:white; font-size:0.75em; margin-left:5px;">🔄 ONE-TIME</span>' : '';
                         const homeworkBadge = isHomework ? '<span class="badge" style="background:#2e7d32; color:white; font-size:0.75em; margin-left:5px;">📚 การบ้าน</span>' : '';
 
-                        bodyHtml = `
-                            <div class="assign-meta">
+                        // 🔥 V80: Read-only Meta
+                        let metaHtml = "";
+                        if (q.quizType === 'read_only') {
+                            metaHtml = `
+                                <div class="meta-item"><i class="fa-solid fa-eye"></i> อ่านเพื่อเรียนรู้</div>
+                                <div class="meta-item"><i class="fa-solid fa-star"></i> ${q.totalPoints || 1} pts</div>
+                            `;
+                        } else {
+                            metaHtml = `
                                 <div class="meta-item"><i class="fa-solid fa-list-ol"></i> ${q.questions ? q.questions.length : '?'} ข้อ</div>
                                 <div class="meta-item"><i class="fa-solid fa-trophy"></i> ${q.totalPoints || 1} pts</div>
+                            `;
+                        }
+
+                        bodyHtml = `
+                            <div class="assign-meta">
+                                ${metaHtml}
                                 ${deadlineHtml}
                             </div>
-                            <div style="margin-top:10px; font-size:0.9em;">${q.description || "แบบทดสอบวัดความรู้"} ${oneTimeBadge} ${homeworkBadge}</div>
+                            <div style="margin-top:10px; font-size:0.9em;">${q.description || (q.quizType === 'read_only' ? "สื่อการเรียนรู้แบบอ่าน" : "แบบทดสอบวัดความรู้")} ${oneTimeBadge} ${homeworkBadge}</div>
                         `;
                         const isExpired = (dead && new Date() > dead);
                         if (isExpired) {
                             actionHtml = `<button class="btn-warning" onclick="requestLateQuiz('${q.id}')" style="background:linear-gradient(135deg, #f39c12 0%, #e67e22 100%); border:none;">📨 ขออนุญาตทำเลท</button>`;
                         } else {
-                            actionHtml = `<button class="btn-primary" onclick="confirmRunQuiz('${q.id}')" style="background:linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%); border:none;">🚀 เริ่มทำแบบทดสอบ</button>`;
+                            const btnText = q.quizType === 'read_only' ? '📖 เริ่มการเรียนรู้' : '🚀 เริ่มทำแบบทดสอบ';
+                            actionHtml = `<button class="btn-primary" onclick="confirmRunQuiz('${q.id}')" style="background:linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%); border:none;">${btnText}</button>`;
                         }
                     }
 
@@ -1807,12 +1826,14 @@
             } else {
                 currentStep = 0;
                 accumulatedTime = 0;
-                userAnswers = new Array(currentQuiz.questions.length).fill(null);
+                userAnswers = new Array(currentQuiz.questions ? currentQuiz.questions.length : 1).fill(null);
                 // 🔥 V78.1: Timer initialization based on mode
-                if (currentQuiz.timerMode === 'total_time') {
+                if (currentQuiz.quizType === 'read_only') {
+                    timeLeftForStep = 3600; // 1 hr for reading (usually enough)
+                } else if (currentQuiz.timerMode === 'total_time') {
                     timeLeftForStep = currentQuiz.totalTimer || 300;
                 } else {
-                    timeLeftForStep = (currentQuiz.questions[0].timer || 60);
+                    timeLeftForStep = (currentQuiz.questions && currentQuiz.questions[0]) ? (currentQuiz.questions[0].timer || 60) : 60;
                 }
 
                 try {
@@ -1910,11 +1931,67 @@
             }
         }
 
+        // 🔥 V80: UI for Read-only Learning Mode
+        function renderReadOnlyUI() {
+            const container = document.getElementById('quiz-run-container');
+            const passageArea = document.getElementById('quiz-case-passage-area');
+            const passageBody = document.getElementById('quiz-case-content-body');
+
+            // Hide the redundant passage area since we will show content in the main container
+            passageArea.style.display = 'none';
+
+            container.innerHTML = `
+                <div style="background:#fff; border-radius:12px; padding:20px; box-shadow:0 4px 15px rgba(0,0,0,0.05); border:1px solid #eee; margin-bottom:20px;">
+                    <h3 style="margin-top:0; color:var(--primary); display:flex; align-items:center; gap:10px;">
+                        <i class="fa-solid fa-book-open"></i> ${currentQuiz.shortTitle || currentQuiz.title}
+                    </h3>
+                    <div style="font-size:1.1em; line-height:1.6; color:#333; margin-bottom:25px; white-space:pre-wrap; background:#f9f9f9; padding:20px; border-radius:10px; border-left:5px solid var(--primary);">
+                        ${currentQuiz.caseContent || "ไม่มีเนื้อหา"}
+                    </div>
+                    
+                    <div style="border-top:1px solid #eee; padding-top:20px;">
+                        <label style="font-weight:bold; color:#555; display:block; margin-bottom:10px;">
+                            ✍️ Feedback / สรุปความเข้าใจหลังอ่านจบ:
+                        </label>
+                        <textarea id="read-only-feedback" rows="5" 
+                            style="width:100%; border-radius:10px; border:2px solid #ddd; padding:15px; font-family:inherit; font-size:1em;"
+                            placeholder="พิมพ์สิ่งที่ได้เรียนรู้จากสื่อฉบับนี้..."
+                            oninput="userAnswers[0] = this.value">${userAnswers[0] || ""}</textarea>
+                    </div>
+                </div>
+            `;
+
+            if (!userAnswers[0]) userAnswers[0] = "";
+
+            // Update UI buttons - Hide next/prev, show submit
+            const btnPrev = document.getElementById('btn-quiz-prev');
+            const btnNext = document.getElementById('btn-quiz-next');
+            const btnSubmit = document.getElementById('btn-quiz-submit');
+
+            if (btnPrev) btnPrev.style.display = 'none';
+            if (btnNext) btnNext.style.display = 'none';
+            if (btnSubmit) {
+                btnSubmit.style.display = 'block';
+                btnSubmit.innerText = "ส่งข้อคิดเห็นและจบการเรียนรู้ (Submit)";
+                btnSubmit.style.width = "100%";
+            }
+        }
+
         function renderQuizStep(useExistingTime = false) {
             try {
                 clearInterval(quizTimerInterval);
-                const container = document.getElementById('quiz-run-container');
-                if (!currentQuiz || !currentQuiz.questions || !currentQuiz.questions[currentStep]) {
+                if (!currentQuiz) {
+                    console.error('renderQuizStep: no currentQuiz');
+                    return;
+                }
+
+                // 🔥 V80: Read-only Learning Mode UI
+                if (currentQuiz.quizType === 'read_only') {
+                    renderReadOnlyUI();
+                    return;
+                }
+
+                if (!currentQuiz.questions || !currentQuiz.questions[currentStep]) {
                     console.error('renderQuizStep: invalid quiz state', { currentStep, quiz: currentQuiz });
                     return;
                 }
@@ -2367,19 +2444,28 @@
 
                 // --- 1. Calculate Score ---
                 let correctCount = 0;
-                currentQuiz.questions.forEach((q, i) => {
-                    const isChoice = (q.type || 'choice') === 'choice';
-                    if (isChoice) {
-                        const target = Array.isArray(q.correct) ? q.correct : [q.correct];
-                        let mine = userAnswers[i];
-                        let mineArray = Array.isArray(mine) ? mine : (mine !== null && mine !== undefined ? [mine] : []);
-                        if (target.length === mineArray.length && target.every(val => mineArray.includes(val))) {
-                            correctCount++;
-                        }
-                    }
-                });
+                let totalQ = 0;
 
-                const pointsAwarded = (correctCount / (currentQuiz.questions ? currentQuiz.questions.length : 1)) * (currentQuiz.totalPoints || 1.0);
+                if (currentQuiz.quizType === 'read_only') {
+                    // Read-only always counts as 100% complete if submitted
+                    correctCount = 1;
+                    totalQ = 1;
+                } else {
+                    totalQ = currentQuiz.questions ? currentQuiz.questions.length : 1;
+                    currentQuiz.questions.forEach((q, i) => {
+                        const isChoice = (q.type || 'choice') === 'choice';
+                        if (isChoice) {
+                            const target = Array.isArray(q.correct) ? q.correct : [q.correct];
+                            let mine = userAnswers[i];
+                            let mineArray = Array.isArray(mine) ? mine : (mine !== null && mine !== undefined ? [mine] : []);
+                            if (target.length === mineArray.length && target.every(val => mineArray.includes(val))) {
+                                correctCount++;
+                            }
+                        }
+                    });
+                }
+
+                const pointsAwarded = (correctCount / totalQ) * (currentQuiz.totalPoints || 1.0);
                 const isPoll = currentQuiz.isPoll === true;
                 const finalAnswers = userAnswers.map(ans => Array.isArray(ans) ? ans.join("\n---\n") : ans);
 
@@ -2388,7 +2474,7 @@
                 if (isPracticeMode) {
                     submissionData = {
                         practiceScore: correctCount,
-                        practiceTotalQ: currentQuiz.questions.length,
+                        practiceTotalQ: totalQ,
                         practiceAnswers: finalAnswers,
                         status: 'practice_done',
                         isPractice: true,
@@ -2396,8 +2482,10 @@
                     };
                 } else if (isPoll) {
                     submissionData = { isPoll: true, status: 'pending', timestamp: firebase.firestore.FieldValue.serverTimestamp(), answers: [] };
+                } else if (currentQuiz.quizType === 'read_only') {
+                    submissionData = { correctCount: 1, totalQuestions: 1, answers: finalAnswers, status: 'pending', timestamp: firebase.firestore.FieldValue.serverTimestamp() };
                 } else {
-                    submissionData = { correctCount, totalQuestions: currentQuiz.questions.length, answers: finalAnswers, status: 'pending', timestamp: firebase.firestore.FieldValue.serverTimestamp() };
+                    submissionData = { correctCount, totalQuestions: totalQ, answers: finalAnswers, status: 'pending', timestamp: firebase.firestore.FieldValue.serverTimestamp() };
                 }
 
                 // --- 3. Core Submission ---

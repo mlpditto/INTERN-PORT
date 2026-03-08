@@ -1540,9 +1540,10 @@
                             style="padding:8px; border-radius:6px; font-weight:bold; color:var(--primary);">
                             <option value="standard">Standard Quiz</option>
                             <option value="case_study">📖 Case Study (Reading)</option>
+                            <option value="read_only">📚 Read-only Learning (อ่านอย่างเดียว)</option>
                         </select>
                     </div>
-                    <div style="flex:2;" id="case-content-area" style="display:none;">
+                    <div style="flex:2; display:none;" id="case-content-area">
                         <label style="font-size:0.8em; color:#666;">📖 Case Content (Passage)</label>
                         <textarea id="quiz-case-content" placeholder="ใส่เนื้อหาสำหรับอ่าน 4-5 บรรทัดที่นี่..."
                             style="height:80px;"></textarea>
@@ -2170,7 +2171,28 @@
 
         function toggleCaseUI() {
             const type = document.getElementById('quiz-type').value;
-            document.getElementById('case-content-area').style.display = (type === 'case_study') ? 'block' : 'none';
+            document.getElementById('case-content-area').style.display = (type === 'case_study' || type === 'read_only') ? 'block' : 'none';
+
+            // 🔥 V80: Hint for Read-only mode
+            const qArea = document.getElementById('quiz-questions-container').parentElement;
+            const hintId = 'read-only-hint';
+            let hint = document.getElementById(hintId);
+
+            if (type === 'read_only') {
+                if (!hint) {
+                    hint = document.createElement('div');
+                    hint.id = hintId;
+                    hint.style = "background:#e3f2fd; color:#0d47a1; padding:15px; border-radius:10px; margin-top:10px; font-size:0.9em; border:1px solid #bbdefb; margin-bottom:15px;";
+                    hint.innerHTML = `<i class="fa-solid fa-circle-info"></i> <b>Read-only Mode:</b> ระบบจะแสดงเนื้อหาให้อ่าน และมีช่องให้ผู้เรียนพิมพ์ Feedback/สรุปหลังอ่านจบอัตโนมัติ (ไม่ต้องเพิ่มข้อสอบด้านล่าง)`;
+                    qArea.insertBefore(hint, document.getElementById('quiz-questions-container'));
+                }
+                document.getElementById('quiz-questions-container').style.opacity = '0.3';
+                document.getElementById('quiz-questions-container').style.pointerEvents = 'none';
+            } else {
+                if (hint) hint.remove();
+                document.getElementById('quiz-questions-container').style.opacity = '1';
+                document.getElementById('quiz-questions-container').style.pointerEvents = 'auto';
+            }
         }
 
         // 🔥 V78.1: Timer Mode UI Toggle
@@ -3146,6 +3168,24 @@
             document.getElementById('review-attempt-id').value = attemptId;
             const container = document.getElementById('review-quiz-container');
             container.innerHTML = "";
+
+            // 🔥 V80: Read-only Review Display
+            if (quiz.quizType === 'read_only') {
+                const feedback = (att.answers || [])[0] || 'No feedback provided.';
+                container.innerHTML = `
+                    <div style="background:#f0f7ff; border:1px solid #4361ee; padding:20px; border-radius:15px; border-left:8px solid #4361ee; margin-bottom:20px;">
+                        <b style="font-size:1.1em; color:#0d47a1; display:flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-book-open"></i> Read-only Feedback / Reflection
+                        </b>
+                        <div style="margin-top:15px; background:#fff; padding:15px; border-radius:10px; border:1px solid #eee; white-space:pre-wrap; font-size:1.05em; color:#333; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02); min-height:80px;">${feedback}</div>
+                        <div style="margin-top:15px; color:#666; font-size:0.85em; font-style:italic;">
+                            * ข้อความด้านบนเป็นสิ่งที่คุณเรียนรู้/สรุปหลังอ่านจบ (ระบบอนุมัติคะแนนเต็มปกติ)
+                        </div>
+                    </div>
+                `;
+                document.getElementById('quizReviewModal').style.display = 'block';
+                return;
+            }
 
             quiz.questions.forEach((q, i) => {
                 const studentAns = (att.answers || att.practiceAnswers || [])[i];
