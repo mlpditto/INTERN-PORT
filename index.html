@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V81.2)</title>
+    <title>Internship Portfolio (V81.3)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -2057,28 +2057,70 @@
             const currentAns = userAnswers[currentStep];
             const isAnswered = currentAns !== undefined && currentAns !== null;
 
+            // 🔥 Read-only Reveal Logic (Correct Answers vs Polls)
+            const hasCorrect = page.correct !== undefined && page.correct !== null;
+            let statusBadge = "";
+            let pollFeedback = "";
+
+            if (isAnswered && isPoll) {
+                if (hasCorrect) {
+                    const isRight = (Array.isArray(page.correct) ? page.correct.includes(currentAns) : page.correct == currentAns);
+                    statusBadge = isRight
+                        ? '<span style="background:#dcfce7; color:#15803d; padding:2px 8px; border-radius:10px; font-size:0.8em; font-weight:bold;">✅ ถูกต้อง!</span>'
+                        : '<span style="background:#fee2e2; color:#b91c1c; padding:2px 8px; border-radius:10px; font-size:0.8em; font-weight:bold;">❌ ผิดไปนิดเดียว!</span>';
+
+                    const correctText = Array.isArray(page.correct)
+                        ? page.correct.map(idx => page.options[idx]).join(', ')
+                        : page.options[page.correct];
+
+                    if (!isRight) {
+                        pollFeedback = `<div style="margin-top:10px; font-size:0.85em; color:#b91c1c;">เฉลยคือ: <b>${correctText}</b></div>`;
+                    }
+                } else {
+                    statusBadge = '<span style="background:#fdf2f8; color:#d81b60; padding:2px 8px; border-radius:10px; font-size:0.8em; font-weight:bold;">📮 บันทึกโพลแล้ว</span>';
+                }
+            }
+
             let pollHtml = "";
             if (isPoll && page.options && page.options.length > 0) {
                 pollHtml = `
                     <div style="margin: 20px 0; padding: 18px; background: #fdf2f8; border-radius: 15px; border: 1px dashed #d81b60;">
-                        <div style="font-weight:bold; color:#d81b60; margin-bottom:12px; font-size:0.9em; display:flex; align-items:center; gap:8px;">
-                            <i class="fa-solid fa-square-poll-vertical"></i> 
-                            ${isAnswered ? 'บันทึกการโหวตของคุณแล้ว' : 'แชร์ความคิดเห็นหรือเดาคำตอบเพื่ออ่านต่อ:'}
+                        <div style="font-weight:bold; color:#d81b60; margin-bottom:12px; font-size:0.9em; display:flex; align-items:center; justify-content:space-between;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <i class="fa-solid fa-square-poll-vertical"></i> 
+                                ${isAnswered ? 'แชร์ความเห็นแล้ว:' : 'แชร์ความคิดเห็นหรือเดาคำตอบเพื่ออ่านต่อ:'}
+                            </div>
+                            ${statusBadge}
                         </div>
                         <div style="display:flex; flex-direction:column; gap:8px;">
                             ${page.options.map((opt, idx) => {
                     const isSelected = currentAns === idx;
+                    let borderCol = "#eee";
+                    let bgCol = "white";
+                    if (isSelected) {
+                        if (hasCorrect) {
+                            const isRight = (Array.isArray(page.correct) ? page.correct.includes(idx) : page.correct == idx);
+                            borderCol = isRight ? "#22c55e" : "#ef4444";
+                            bgCol = isRight ? "#f0fdf4" : "#fef2f2";
+                        } else {
+                            borderCol = "#d81b60";
+                            bgCol = "#fdf2f8";
+                        }
+                    }
+
                     return `
                                     <button onclick="selectReadOnlyPoll(${idx})" 
                                         ${isAnswered ? 'disabled' : ''}
-                                        class="poll-option-btn ${isSelected ? 'selected' : ''}">
+                                        class="poll-option-btn ${isSelected ? 'selected' : ''}"
+                                        style="${isSelected ? `border-color:${borderCol}; background:${bgCol}; color:#333;` : ''}">
                                         <i class="fa-regular ${isSelected ? 'fa-circle-dot' : 'fa-circle'}"></i>
                                         <span style="flex:1;">${opt}</span>
-                                        ${isSelected ? '<i class="fa-solid fa-check"></i>' : ''}
+                                        ${isSelected ? (hasCorrect && !(Array.isArray(page.correct) ? page.correct.includes(idx) : page.correct == idx) ? '<i class="fa-solid fa-xmark"></i>' : '<i class="fa-solid fa-check"></i>') : ''}
                                     </button>
                                 `;
                 }).join('')}
                         </div>
+                        ${pollFeedback}
                     </div>
                 `;
             }
@@ -2708,26 +2750,34 @@
                 let correctCount = 0;
                 let totalQ = 0;
 
-                if (currentQuiz.quizType === 'read_only') {
-                    // Read-only always counts as 100% complete if submitted
-                    correctCount = 1;
-                    totalQ = 1;
-                } else {
-                    totalQ = currentQuiz.questions ? currentQuiz.questions.length : 1;
-                    currentQuiz.questions.forEach((q, i) => {
-                        const isChoice = (q.type || 'choice') === 'choice';
-                        if (isChoice) {
+                totalQ = currentQuiz.questions ? currentQuiz.questions.length : 1;
+                currentQuiz.questions.forEach((q, i) => {
+                    const isChoice = (q.type || 'choice') === 'choice';
+                    const hasCorrect = q.correct !== undefined && q.correct !== null;
+                    const mine = userAnswers[i];
+
+                    if (isChoice) {
+                        if (hasCorrect) {
                             const target = Array.isArray(q.correct) ? q.correct : [q.correct];
-                            let mine = userAnswers[i];
-                            let mineArray = Array.isArray(mine) ? mine : (mine !== null && mine !== undefined ? [mine] : []);
-                            if (target.length === mineArray.length && target.every(val => mineArray.includes(val))) {
+                            const mineArray = Array.isArray(mine) ? mine : (mine !== null && mine !== undefined ? [mine] : []);
+                            if (target.length > 0 && target.length === mineArray.length && target.every(val => mineArray.includes(val))) {
+                                correctCount++;
+                            }
+                        } else {
+                            // Pure poll: counts as "correct" if answered/voted
+                            if (mine !== null && mine !== undefined) {
                                 correctCount++;
                             }
                         }
-                    });
-                }
+                    } else if (q.type === 'tweetstorm') {
+                        // Reflection/Tweetstorm steps
+                        if (Array.isArray(mine) && mine.some(txt => txt && txt.trim().length > 0)) {
+                            correctCount++;
+                        }
+                    }
+                });
 
-                const pointsAwarded = (correctCount / totalQ) * (currentQuiz.totalPoints || 1.0);
+                const pointsAwarded = (correctCount / (totalQ || 1)) * (currentQuiz.totalPoints || 1.0);
                 const isPoll = currentQuiz.isPoll === true;
                 const finalAnswers = userAnswers.map(ans => Array.isArray(ans) ? ans.join("\n---\n") : ans);
 
@@ -2744,9 +2794,8 @@
                     };
                 } else if (isPoll) {
                     submissionData = { isPoll: true, status: 'pending', timestamp: firebase.firestore.FieldValue.serverTimestamp(), answers: [] };
-                } else if (currentQuiz.quizType === 'read_only') {
-                    submissionData = { correctCount: 1, totalQuestions: 1, answers: finalAnswers, status: 'pending', timestamp: firebase.firestore.FieldValue.serverTimestamp() };
                 } else {
+                    // Includes read_only and normal quizzes
                     submissionData = { correctCount, totalQuestions: totalQ, answers: finalAnswers, status: 'pending', timestamp: firebase.firestore.FieldValue.serverTimestamp() };
                 }
 

@@ -3,6 +3,19 @@
 > [!IMPORTANT]
 > **📢 Version Policy:** ทุกการ Commit หรือการปรับปรุงชุดคำสั่ง ต้องมีการขยับเวอร์ชัน (Versioning) เสมอ ทั้งในหน้า UI และในเอกสาร Markdown นี้ เพื่อป้องกันความสับสนในการ Deploy
 
+## [2026-03-08] Session Updates (V81.2 → V81.3)
+
+### 1. Read-only Interactive Scoring (V81.3)
+- **Points & Feedback:** Read-only mode now supports "Correct/Incorrect" feedback if a `correct` index is defined in the quiz settings.
+- **Participation Points:** Pure polls (no correct answer) award points just for voting, encouraging engagement. 
+- **Scoring Logic:** Updated `submitQuiz` to accurately calculate scores for Read-only quizzes based on user performance on individual pages.
+- **Improved Revelation UI:** Content (The Revelation) is strictly hidden until the user selects an option or the timer ends, ensuring the interactive element is not bypassed.
+
+### 2. UI/UX Refinements (V81.3)
+- **Smart Sorting:** The Assignments list now sorts by `timestamp` (Newest First) instead of urgency, helping users see newly added tasks at the top.
+- **Text Formatting:** Added `text-align: justify` and `trim()` to content revelation blocks for a more polished, professional appearance.
+- **Robustness:** Fixed JavaScript reference errors (Can't find variable: container) by isolating variable scopes in rendering functions.
+
 ## [2026-03-08] Session Updates (V81.1 → V81.2)
 
 ### 1. Collapsed Expired Quizzes (V81.2)
