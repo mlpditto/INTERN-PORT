@@ -2331,12 +2331,11 @@
                     if (type === 'choice') {
                         optionsArea.style.display = 'flex';
                         optionsActions.style.display = 'block';
-                        correctArea.style.display = 'flex'; // V81.3: Enable correct answers for Read-only Polls
+                        // Visibility already handled by updatePollUI() called at start of this function
                         qTypeSelect.title = "Interactive Poll: User must answer to see content below (Optional: select correct answers for scoring).";
                     } else {
                         optionsArea.style.display = 'none';
                         optionsActions.style.display = 'none';
-                        correctArea.style.display = 'none';
                         qTypeSelect.title = "Standard Page: Content shown immediately.";
                     }
                 } else {
@@ -2346,7 +2345,7 @@
                     const type = qTypeSelect.value;
                     optionsArea.style.display = type === 'choice' ? 'flex' : 'none';
                     optionsActions.style.display = type === 'choice' ? 'block' : 'none';
-                    correctArea.style.display = (type === 'choice' && !document.getElementById('quiz-is-poll').checked) ? 'flex' : 'none';
+                    // Visibility already handled by updatePollUI() called at start of this function
                 }
 
                 // Highlight options based on correct answer
@@ -2668,14 +2667,24 @@
         }
 
         function updatePollUI() {
-            const isPoll = document.getElementById('quiz-is-poll').checked;
+            const isGlobalPoll = document.getElementById('quiz-is-poll').checked;
+            const quizType = document.getElementById('quiz-type').value;
+
             document.querySelectorAll('.quiz-q-item').forEach(item => {
-                const type = item.querySelector('.q-type').value;
+                const qType = item.querySelector('.q-type').value;
                 const correctContainer = item.querySelector('.correct-container');
-                if (isPoll || type === 'short_answer') {
-                    correctContainer.style.display = 'none';
+
+                // Show correct container if:
+                // 1. Not a global poll AND not a short answer
+                // 2. OR it's a Read-only poll (V81.3)
+                if (quizType === 'read_only') {
+                    correctContainer.style.display = (qType === 'choice') ? 'flex' : 'none';
                 } else {
-                    correctContainer.style.display = 'flex';
+                    if (isGlobalPoll || qType === 'short_answer') {
+                        correctContainer.style.display = 'none';
+                    } else {
+                        correctContainer.style.display = 'flex';
+                    }
                 }
             });
         }
