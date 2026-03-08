@@ -1,5 +1,19 @@
 # Project Tasks & Updates
 
+## [2026-03-08] Session Updates (V79.7 → V80.0)
+
+### 1. Read-only Learning Mode (V80.0)
+- **New Quiz Type:** Added "Read-only Learning" mode that allows providing educational content (Passage) without multiple-choice questions.
+- **Dynamic Feedback UI:** Users automatically get a reflection/feedback text area after reading the content.
+- **Admin Review Integration:** Read-only submissions display the user's feedback in a premium blue stylized box in the quiz review modal, making it distinct from standard quiz results.
+- **Automated Score Logic:** Systems assigns full points (100% completion) upon submitting feedback, moving it to 'pending' for admin review.
+- **UI Enhancements:**
+    - Dedicated "Book Open" icon in assignments list.
+    - Added "📚 เริ่มการเรียนรู้" button for read-only items.
+    - Hints and logic in Admin Panel to automatically hide question creation when in read-only mode to prevent confusion.
+- **Deployment:** Successfully pushed to production branch.
+
+
 ## [2026-03-04] Session Updates (V79.6 → V79.7)
 
 ### 1. Quiz Pagination (V79.7)
