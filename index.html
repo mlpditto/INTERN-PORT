@@ -1454,7 +1454,12 @@
                 // Don't show completed/submitted quests (they go to history)
                 if (status === 'submitted') return;
 
-                allItems.push({ type: 'quest', data: q, myData: myQ, sortDate: q.deadline ? q.deadline.toDate() : new Date(8640000000000000) });
+                allItems.push({
+                    type: 'quest',
+                    data: q,
+                    myData: myQ,
+                    timestamp: q.timestamp ? q.timestamp.toDate() : (q.deadline ? q.deadline.toDate() : new Date(0))
+                });
             });
 
             // 2. Process Quizzes
@@ -1493,11 +1498,20 @@
                 if ((status === 'approved' || status === 'pending') && score > 0) return;
 
                 // ✅ Show: Active quizzes, Quizzes in progress (requesting/allowed), or Completed with 0 points
-                allItems.push({ type: 'quiz', data: q, myData: attempt, sortDate: dead || new Date(8640000000000000) });
+                allItems.push({
+                    type: 'quiz',
+                    data: q,
+                    myData: attempt,
+                    timestamp: q.timestamp ? q.timestamp.toDate() : (dead || new Date(0))
+                });
             });
 
-            // 3. Sort: Urgent First
-            allItems.sort((a, b) => a.sortDate - b.sortDate);
+            // 3. Sort: Newest First (V81.2)
+            allItems.sort((a, b) => {
+                const tA = a.timestamp ? a.timestamp.getTime() : 0;
+                const tB = b.timestamp ? b.timestamp.getTime() : 0;
+                return tB - tA;
+            });
 
             // 4. Render
             if (allItems.length === 0) {
@@ -2041,7 +2055,7 @@
             const page = currentQuiz.questions[currentStep];
             const isPoll = page.type === 'choice';
             const currentAns = userAnswers[currentStep];
-            const isAnswered = currentAns !== undefined;
+            const isAnswered = currentAns !== undefined && currentAns !== null;
 
             let pollHtml = "";
             if (isPoll && page.options && page.options.length > 0) {
@@ -2087,9 +2101,9 @@
                     ${pollHtml}
 
                     <div id="read-only-content-reveal" class="${isAnswered || !isPoll ? 'reveal-active' : ''}" 
-                         style="display:${isAnswered || !isPoll ? 'block' : 'none'}; font-size:1.05em; line-height:1.7; color:#333; margin-top:15px; white-space:pre-wrap;">
+                         style="display:${isAnswered || !isPoll ? 'block' : 'none'}; font-size:1.05em; line-height:1.7; color:#333; margin-top:15px; white-space:pre-wrap; text-align:justify;">
                         ${isPoll ? '<div style="font-weight:bold; color:var(--primary); margin-bottom:10px; border-top:1px solid #eee; padding-top:15px; font-size:0.9em;">✨ เฉลย/เนื้อหาเพิ่มเติม (The Revelation):</div>' : ''}
-                        ${page.content || "เนื้อหาสำหรับหน้านี้..."}
+                        ${(page.content || "เนื้อหาสำหรับหน้านี้...").trim()}
                     </div>
                 </div>
             `;
