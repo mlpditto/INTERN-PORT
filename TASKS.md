@@ -1,16 +1,17 @@
 # Project Tasks & Updates
 
-## [2026-03-08] Session Updates (V79.7 → V80.0)
+## [2026-03-08] Session Updates (V79.7 → V80.1)
 
-### 1. Read-only Learning Mode (V80.0)
-- **New Quiz Type:** Added "Read-only Learning" mode that allows providing educational content (Passage) without multiple-choice questions.
-- **Dynamic Feedback UI:** Users automatically get a reflection/feedback text area after reading the content.
-- **Admin Review Integration:** Read-only submissions display the user's feedback in a premium blue stylized box in the quiz review modal, making it distinct from standard quiz results.
-- **Automated Score Logic:** Systems assigns full points (100% completion) upon submitting feedback, moving it to 'pending' for admin review.
-- **UI Enhancements:**
-    - Dedicated "Book Open" icon in assignments list.
-    - Added "📚 เริ่มการเรียนรู้" button for read-only items.
-    - Hints and logic in Admin Panel to automatically hide question creation when in read-only mode to prevent confusion.
+### 1. Read-only Learning Mode (V80.1)
+- **Multi-page Support:** Refactored "Read-only Learning" to support multiple content pages. Each "question" in the admin panel now acts as a dedicated page of lesson content.
+- **Interactive Discussions:** Added a per-page discussion feature where users can engage in real-time commentary within a dedicated modal, fostering interactive learning.
+- **Tweetstorm Feedback:** Final step of read-only lessons now uses a "Tweetstorm" style reflection (multiple short messages) instead of a single textarea.
+- **Customizable Char Limits:** Admins can now choose between **280** (Standard) or **4000** (Premium) character limits for user feedback per tweet.
+- **Admin Interface:**
+    - New "Feedback Limit" setting in quiz configuration.
+    - Updated Page Content editor for each page/question item.
+    - Removed legacy "Case Study (Reading)" quiz type to unify the reading experience.
+- **Score Logic:** Points are moved to 'pending' upon successful submission of the final reflection, requiring admin review.
 - **Deployment:** Successfully pushed to production branch.
 
 

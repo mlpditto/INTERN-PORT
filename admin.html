@@ -1539,8 +1539,15 @@
                         <select id="quiz-type" onchange="toggleCaseUI()"
                             style="padding:8px; border-radius:6px; font-weight:bold; color:var(--primary);">
                             <option value="standard">Standard Quiz</option>
-                            <option value="case_study">📖 Case Study (Reading)</option>
-                            <option value="read_only">📚 Read-only Learning (อ่านอย่างเดียว)</option>
+                            <option value="read_only">📚 Read-only Learning (Multi-page)</option>
+                        </select>
+                    </div>
+                    <div style="flex:1; min-width: 200px;" id="feedback-limit-area">
+                        <label style="font-size:0.8em; color:#666;">💬 Feedback Limit</label>
+                        <select id="quiz-feedback-limit"
+                            style="padding:8px; border-radius:6px; font-weight:bold; color:#d81b60;">
+                            <option value="280">280 Characters (Standard)</option>
+                            <option value="4000">4000 Characters (Premium)</option>
                         </select>
                     </div>
                     <div style="flex:2; display:none;" id="case-content-area">
@@ -2171,28 +2178,32 @@
 
         function toggleCaseUI() {
             const type = document.getElementById('quiz-type').value;
-            document.getElementById('case-content-area').style.display = (type === 'case_study' || type === 'read_only') ? 'block' : 'none';
+            const area = document.getElementById('case-content-area');
+            const limitArea = document.getElementById('feedback-limit-area');
 
-            // 🔥 V80: Hint for Read-only mode
-            const qArea = document.getElementById('quiz-questions-container').parentElement;
+            area.style.display = (type === 'case_study') ? 'block' : 'none';
+            limitArea.style.display = (type === 'read_only') ? 'block' : 'none';
+
             const hintId = 'read-only-hint';
             let hint = document.getElementById(hintId);
 
             if (type === 'read_only') {
                 if (!hint) {
+                    const qArea = document.getElementById('quiz-questions-container').parentElement;
                     hint = document.createElement('div');
                     hint.id = hintId;
                     hint.style = "background:#e3f2fd; color:#0d47a1; padding:15px; border-radius:10px; margin-top:10px; font-size:0.9em; border:1px solid #bbdefb; margin-bottom:15px;";
-                    hint.innerHTML = `<i class="fa-solid fa-circle-info"></i> <b>Read-only Mode:</b> ระบบจะแสดงเนื้อหาให้อ่าน และมีช่องให้ผู้เรียนพิมพ์ Feedback/สรุปหลังอ่านจบอัตโนมัติ (ไม่ต้องเพิ่มข้อสอบด้านล่าง)`;
+                    hint.innerHTML = `<i class="fa-solid fa-circle-info"></i> <b>Read-only Mode:</b> แต่ละข้อด้านล่างจะกลายเป็น <b>"หน้าเนื้อหา"</b> (Pages) — ยิ่งเพิ่มข้อมาก ยิ่งมีหลายหน้า และระบบจะสรุป Feedback ด้วย Tweetstorm ในหน้าสุดท้ายครับ`;
                     qArea.insertBefore(hint, document.getElementById('quiz-questions-container'));
                 }
-                document.getElementById('quiz-questions-container').style.opacity = '0.3';
-                document.getElementById('quiz-questions-container').style.pointerEvents = 'none';
+                document.getElementById('quiz-questions-container').style.opacity = '1';
+                document.getElementById('quiz-questions-container').style.pointerEvents = 'auto';
             } else {
                 if (hint) hint.remove();
                 document.getElementById('quiz-questions-container').style.opacity = '1';
                 document.getElementById('quiz-questions-container').style.pointerEvents = 'auto';
             }
+            updateQuizPagination();
         }
 
         // 🔥 V78.1: Timer Mode UI Toggle
@@ -2246,12 +2257,14 @@
             const totalTimer = parseInt(document.getElementById('quiz-total-timer').value) || 300;
             const shuffleChoices = document.getElementById('quiz-shuffle-choices').checked;
             const quizType = document.getElementById('quiz-type').value;
+            const feedbackLimit = parseInt(document.getElementById('quiz-feedback-limit').value) || 280;
             const caseContent = document.getElementById('quiz-case-content').value;
 
             const qItems = document.querySelectorAll('.quiz-q-item');
             const questions = [];
             qItems.forEach(item => {
                 const qText = item.querySelector('.q-text').value;
+                const qContent = item.querySelector('.q-page-content') ? item.querySelector('.q-page-content').value : "";
                 const qType = item.querySelector('.q-type').value;
                 let opts = [];
                 let correct = 0;
@@ -2263,11 +2276,11 @@
                 }
 
                 const timer = parseInt(item.querySelector('.q-timer').value) || 60;
-                questions.push({ q: qText, type: qType, options: opts, correct, timer });
+                questions.push({ q: qText, content: qContent, type: qType, options: opts, correct, timer });
             });
 
             return {
-                title, shortTitle, targetGroup, description, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, quizType, caseContent, questions,
+                title, shortTitle, targetGroup, description, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, quizType, feedbackLimit, caseContent, questions,
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
             };
@@ -2283,6 +2296,31 @@
 
             items.forEach((item, i) => {
                 item.style.display = (i === quizQPageIndex) ? 'block' : 'none';
+
+                // 🔥 V80: Read-only Mode Logic
+                const quizType = document.getElementById('quiz-type').value;
+                const contentArea = item.querySelector('.q-page-content-area');
+                const optionsArea = item.querySelector('.options-container');
+                const optionsActions = item.querySelector('.options-actions');
+                const correctArea = item.querySelector('.correct-container');
+                const qTypeSelect = item.querySelector('.q-type');
+
+                if (quizType === 'read_only') {
+                    contentArea.style.display = 'block';
+                    optionsArea.style.display = 'none';
+                    optionsActions.style.display = 'none';
+                    correctArea.style.display = 'none';
+                    qTypeSelect.disabled = true;
+                    qTypeSelect.value = 'short_answer'; // Default for internal logic
+                } else {
+                    contentArea.style.display = 'none';
+                    qTypeSelect.disabled = false;
+                    // Restore visibility based on question type
+                    const type = qTypeSelect.value;
+                    optionsArea.style.display = type === 'choice' ? 'flex' : 'none';
+                    optionsActions.style.display = type === 'choice' ? 'block' : 'none';
+                    correctArea.style.display = (type === 'choice' && !document.getElementById('quiz-is-poll').checked) ? 'flex' : 'none';
+                }
 
                 // Highlight options based on correct answer
                 const qType = item.querySelector('.q-type').value;
@@ -2375,6 +2413,11 @@
                     <textarea class="q-text" onpaste="handleQuestionPaste(event, this)" placeholder="พิมพ์โจทย์ที่นี่ หรือวางโจทย์พร้อมตัวเลือก (A., B., C.) เพื่อแยกให้อัตโนมัติ..." style="height:80px; font-size:1em;">${data ? data.q : ''}</textarea>
                 </div>
                 
+                <div class="q-page-content-area" style="display:none; margin-bottom:15px;">
+                    <label style="font-size:0.9em; font-weight:bold; color:var(--primary);">📖 Page Content (เนื้อหาบทเรียน):</label>
+                    <textarea class="q-page-content" placeholder="ใส่เนื้อหาสำหรับหน้านี้... (รองรับ HTML เบื้องต้น)" style="height:150px; font-size:0.95em; border:1px solid var(--primary);">${data ? (data.content || '') : ''}</textarea>
+                </div>
+
                 <div class="options-container" style="display:${qType === 'choice' ? 'flex' : 'none'}; flex-direction:column; gap:8px; margin-bottom:15px;">
                     ${options.map((opt, i) => `
                         <div class="q-opt-row" style="display:flex; align-items:center; gap:8px;">
@@ -2643,6 +2686,8 @@
                 timerMode: formData.timerMode || 'per_question',
                 totalTimer: formData.totalTimer || 300,
                 shuffleChoices: formData.shuffleChoices !== undefined ? formData.shuffleChoices : true,
+                quizType: formData.quizType || 'standard',
+                feedbackLimit: formData.feedbackLimit || 280,
                 questions: validQuestions,
                 startTime: convertDate(formData.startTime),
                 deadline: convertDate(formData.deadline),

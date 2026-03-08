@@ -736,6 +736,31 @@
         </div>
     </div>
 
+    <!-- 🔥 V80: Discussion Modal for Read-only Mode -->
+    <div id="discussion-modal" class="modal" style="z-index: 10001;">
+        <div class="modal-content"
+            style="max-width:450px; padding:0; overflow:hidden; display:flex; flex-direction:column; height:80vh; max-height:600px;">
+            <div
+                style="background:var(--primary); color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
+                <h4 id="discussion-modal-title" style="margin:0;"><i class="fa-regular fa-comments"></i> Discussion</h4>
+                <span onclick="document.getElementById('discussion-modal').style.display='none'"
+                    style="cursor:pointer; font-size:1.5em; line-height:1;">&times;</span>
+            </div>
+            <div id="discussion-comments-box"
+                style="flex:1; overflow-y:auto; padding:15px; display:flex; flex-direction:column; gap:12px; background:#f8f9fa;">
+                <!-- Comments injected here -->
+            </div>
+            <div style="padding:15px; background:white; border-top:1px solid #eee; display:flex; gap:8px;">
+                <input type="text" id="discussion-input" placeholder="แชร์ความคิดเห็นของคุณ..."
+                    style="flex:1; margin:0; border-radius:20px; padding:10px 15px; font-size:0.9em;">
+                <button onclick="sendDiscussionComment()"
+                    style="width:40px; height:40px; border-radius:50%; background:var(--primary); color:white; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div id="confirmModal" class="modal" style="z-index:10000;">
         <div class="modal-content">
             <h2 style="color:#ef233c;">⚠️ ยืนยันรับภารกิจ</h2>
@@ -1935,46 +1960,100 @@
         function renderReadOnlyUI() {
             const container = document.getElementById('quiz-run-container');
             const passageArea = document.getElementById('quiz-case-passage-area');
-            const passageBody = document.getElementById('quiz-case-content-body');
+            const totalSteps = (currentQuiz.questions || []).length;
 
-            // Hide the redundant passage area since we will show content in the main container
             passageArea.style.display = 'none';
 
+            // Show Feedback/Final Reflection on the Step AFTER all question pages
+            if (currentStep >= totalSteps) {
+                renderFinalReflectionUI();
+                return;
+            }
+
+            const page = currentQuiz.questions[currentStep];
             container.innerHTML = `
-                <div style="background:#fff; border-radius:12px; padding:20px; box-shadow:0 4px 15px rgba(0,0,0,0.05); border:1px solid #eee; margin-bottom:20px;">
-                    <h3 style="margin-top:0; color:var(--primary); display:flex; align-items:center; gap:10px;">
-                        <i class="fa-solid fa-book-open"></i> ${currentQuiz.shortTitle || currentQuiz.title}
-                    </h3>
-                    <div style="font-size:1.1em; line-height:1.6; color:#333; margin-bottom:25px; white-space:pre-wrap; background:#f9f9f9; padding:20px; border-radius:10px; border-left:5px solid var(--primary);">
-                        ${currentQuiz.caseContent || "ไม่มีเนื้อหา"}
+                <div style="background:#fff; border-radius:12px; padding:20px; box-shadow:0 4px 15px rgba(0,0,0,0.05); border:1px solid #eee; margin-bottom:20px; position:relative;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #f0f0f0; padding-bottom:10px;">
+                        <span style="background:#e3f2fd; color:#0d47a1; padding:4px 10px; border-radius:15px; font-size:0.75em; font-weight:bold;">
+                            PAGE ${currentStep + 1} / ${totalSteps}
+                        </span>
+                        <button onclick="openPageDiscussion()" style="background:#f1f3f4; color:#3c4043; border:none; padding:6px 12px; border-radius:15px; font-size:0.8em; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:5px;">
+                            <i class="fa-regular fa-comment-dots"></i> Discussion
+                        </button>
                     </div>
+
+                    <h3 style="margin-top:0; color:var(--primary); font-size:1.15em;">
+                        ${page.q}
+                    </h3>
                     
-                    <div style="border-top:1px solid #eee; padding-top:20px;">
-                        <label style="font-weight:bold; color:#555; display:block; margin-bottom:10px;">
-                            ✍️ Feedback / สรุปความเข้าใจหลังอ่านจบ:
-                        </label>
-                        <textarea id="read-only-feedback" rows="5" 
-                            style="width:100%; border-radius:10px; border:2px solid #ddd; padding:15px; font-family:inherit; font-size:1em;"
-                            placeholder="พิมพ์สิ่งที่ได้เรียนรู้จากสื่อฉบับนี้..."
-                            oninput="userAnswers[0] = this.value">${userAnswers[0] || ""}</textarea>
+                    <div class="read-only-content" style="font-size:1.05em; line-height:1.7; color:#333; margin-bottom:20px; white-space:pre-wrap;">
+                        ${page.content || "เนื้อหาสำหรับหน้านี้..."}
                     </div>
                 </div>
             `;
 
-            if (!userAnswers[0]) userAnswers[0] = "";
-
-            // Update UI buttons - Hide next/prev, show submit
+            // Navigation
             const btnPrev = document.getElementById('btn-quiz-prev');
             const btnNext = document.getElementById('btn-quiz-next');
             const btnSubmit = document.getElementById('btn-quiz-submit');
 
-            if (btnPrev) btnPrev.style.display = 'none';
-            if (btnNext) btnNext.style.display = 'none';
-            if (btnSubmit) {
-                btnSubmit.style.display = 'block';
-                btnSubmit.innerText = "ส่งข้อคิดเห็นและจบการเรียนรู้ (Submit)";
-                btnSubmit.style.width = "100%";
+            if (btnPrev) btnPrev.style.display = currentStep > 0 ? 'inline-block' : 'none';
+            if (btnNext) {
+                btnNext.style.display = 'inline-block';
+                btnNext.innerText = (currentStep === totalSteps - 1) ? "📚 ไปยังหน้าสรุป (Next)" : "ถัดไป (Next)";
             }
+            if (btnSubmit) btnSubmit.style.display = 'none';
+        }
+
+        function renderFinalReflectionUI() {
+            const container = document.getElementById('quiz-run-container');
+            const charLimit = currentQuiz.feedbackLimit || 280;
+
+            // Re-initialize userAnswers for Tweetstorm if it's the feedback step (last step index)
+            if (!Array.isArray(userAnswers[currentStep])) {
+                userAnswers[currentStep] = [''];
+            }
+
+            container.innerHTML = `
+                <div style="background:#fff; border-radius:12px; padding:20px; box-shadow:0 4px 15px rgba(0,0,0,0.05); border:1px solid #eee; margin-bottom:20px;">
+                    <h3 style="margin-top:0; color:#d81b60; display:flex; align-items:center; gap:10px; border-bottom:1px solid #fee2e2; padding-bottom:12px;">
+                        <i class="fa-solid fa-feather-pointed"></i> ✍️ Reflection (สรุปบทเรียน)
+                    </h3>
+                    <p style="color:#666; font-size:0.9em; margin-bottom:20px;">
+                        ยอดเยี่ยม! คุณอ่านครบทุกหน้าแล้ว ช่วยพิมพ์สรุปสิ่งที่ได้เรียนรู้/ข้อคิดเห็นในรูปแบบ **Tweetstorm** ด้านล่างเพื่อจบการเรียนรู้ครับ (จำกัด ${charLimit} อักษรต่อข้อความ)
+                    </p>
+
+                    <div id="read-only-tweetstorm-container" style="display:flex; flex-direction:column; gap:15px;">
+                        ${renderTweetstormItems(currentStep)}
+                    </div>
+
+                    <button class="btn-sm btn-dark" onclick="addTweet()" style="margin-top:20px; width:auto; padding:10px 20px; border-radius:25px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+                        <i class="fa-solid fa-plus"></i> เพิ่มข้อความสั้น (Add Tweet)
+                    </button>
+                </div>
+            `;
+
+            // Final Navigation
+            document.getElementById('btn-quiz-prev').style.display = 'inline-block';
+            document.getElementById('btn-quiz-next').style.display = 'none';
+            const btnSubmit = document.getElementById('btn-quiz-submit');
+            if (btnSubmit) {
+                btnSubmit.style.display = 'inline-block';
+                btnSubmit.innerText = "ส่งข้อคิดเห็นและรับคะแนน (Submit)";
+                btnSubmit.style.width = "100%";
+                btnSubmit.style.marginTop = "10px";
+            }
+        }
+
+        async function openPageDiscussion() {
+            // Discussion Modal UI (Simplified for brevity, using same style as Kanban chat if possible)
+            // Stored in: quiz_discussions/{quizId}_{currentStep}/comments
+            const discussionId = `${currentQuiz.id}_${currentStep}`;
+            activeDiscussionId = discussionId; // Global tracker
+
+            document.getElementById('discussion-modal-title').innerText = `💬 Discussion Page ${currentStep + 1}`;
+            document.getElementById('discussion-modal').style.display = 'flex';
+            loadDiscussionComments(discussionId);
         }
 
         function renderQuizStep(useExistingTime = false) {
@@ -2103,14 +2182,20 @@
 
                 // Update footer buttons
                 document.getElementById('btn-quiz-prev').style.display = currentStep > 0 ? 'inline-block' : 'none';
-                if (currentStep === currentQuiz.questions.length - 1) {
+
+                const isReadOnly = currentQuiz.quizType === 'read_only';
+                const totalSteps = currentQuiz.questions.length;
+
+                if (isReadOnly) {
+                    // Logic handled in renderReadOnlyUI (including Reflection step)
+                } else if (currentStep === totalSteps - 1) {
                     document.getElementById('btn-quiz-next').style.display = 'none';
                     document.getElementById('btn-quiz-submit').style.display = 'inline-block';
                 } else {
                     document.getElementById('btn-quiz-next').style.display = 'inline-block';
                     document.getElementById('btn-quiz-submit').style.display = 'none';
                 }
-                console.log(`[Quiz] Step ${currentStep + 1}/${currentQuiz.questions.length} rendered OK`);
+                console.log(`[Quiz] Step ${currentStep + 1}/${totalSteps} rendered OK`);
             } catch (err) {
                 console.error('[Quiz] renderQuizStep Error:', err);
                 alert('เกิดข้อผิดพลาดในการแสดงคำถาม กรุณาปิดแล้วเปิดใหม่\n' + err.message);
@@ -2179,8 +2264,11 @@
         }
 
         // --- Tweetstorm Helpers ---
-        function renderTweetstormItems() {
-            const tweets = userAnswers[currentStep];
+        function renderTweetstormItems(stepIndex = null) {
+            const targetStep = stepIndex !== null ? stepIndex : currentStep;
+            const tweets = userAnswers[targetStep] || [''];
+            const charLimit = currentQuiz.feedbackLimit || 280;
+
             return tweets.map((text, i) => `
                 <div class="tweet-item" style="position:relative; background:#fff; border:1px solid #1da1f2; border-radius:12px; padding:12px; padding-bottom:30px; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
                     <div style="display:flex; gap:10px; align-items:flex-start;">
@@ -2188,14 +2276,14 @@
                         <div style="flex:1;">
                             <div style="font-weight:bold; font-size:0.9em; margin-bottom:5px;">${userProfile.displayName} <span style="font-weight:normal; color:#666;">@${i + 1}/${tweets.length}</span></div>
                             <textarea oninput="updateTweet(${i}, this.value)" 
-                                      maxlength="280"
+                                      maxlength="${charLimit}"
                                       placeholder="What's happening?" 
                                       style="width:100%; border:none; outline:none; resize:none; font-family:inherit; font-size:1.05em; margin:0; padding:0; background:transparent;">${text}</textarea>
                         </div>
                         ${tweets.length > 1 ? `<button onclick="removeTweet(${i})" style="width:auto; background:transparent; color:#999; border:none; padding:0; min-height:0;">✕</button>` : ''}
                     </div>
-                    <div style="position:absolute; bottom:8px; right:12px; font-size:0.75em; color:${text.length > 250 ? '#ef233c' : '#999'};">
-                        ${text.length} / 280
+                    <div style="position:absolute; bottom:8px; right:12px; font-size:0.75em; color:${text.length > (charLimit * 0.9) ? '#ef233c' : '#999'};">
+                        ${text.length} / ${charLimit}
                     </div>
                 </div>
             `).join('');
@@ -2314,17 +2402,19 @@
             container.innerHTML = html;
         }
 
-        function updateTweet(i, val) {
-            userAnswers[currentStep][i] = val;
-            const counters = document.querySelectorAll('.tweet-item');
-            const counter = counters[i].querySelector('div[style*="position:absolute"]');
-            counter.innerText = `${val.length} / 280`;
-            counter.style.color = val.length > 250 ? '#ef233c' : '#999';
+        function refreshTweetstormUI() {
+            const container = document.getElementById('read-only-tweetstorm-container') || document.getElementById('tweetstorm-container');
+            if (container) container.innerHTML = renderTweetstormItems();
         }
 
-        function refreshTweetstormUI() {
-            const container = document.getElementById('tweetstorm-container');
-            if (container) container.innerHTML = renderTweetstormItems();
+        function updateTweet(i, val) {
+            userAnswers[currentStep][i] = val;
+            const charLimit = currentQuiz.feedbackLimit || 280;
+            const counters = document.querySelectorAll('.tweet-item');
+            if (!counters[i]) return;
+            const counter = counters[i].querySelector('div[style*="position:absolute"]');
+            counter.innerText = `${val.length} / ${charLimit}`;
+            counter.style.color = val.length > (charLimit * 0.9) ? '#ef233c' : '#999';
         }
 
         function closeQuiz() {
@@ -2340,7 +2430,10 @@
                 if (!currentQuiz.questions || currentQuiz.questions.length === 0) { console.error("No questions in quiz"); return; }
                 console.log('[Quiz] nextQuizStep called, currentStep:', currentStep, 'total:', currentQuiz.questions.length);
 
-                if (currentStep < currentQuiz.questions.length - 1) {
+                const isReadOnly = currentQuiz.quizType === 'read_only';
+                const maxSteps = isReadOnly ? currentQuiz.questions.length : (currentQuiz.questions.length - 1);
+
+                if (currentStep < maxSteps) {
                     // 🔥 V78.1: Only accumulate time in per-question mode
                     if (currentQuiz.timerMode !== 'total_time') {
                         if (timeLeftForStep > 0) {
@@ -3081,6 +3174,64 @@
                 alert("LIFF SDK Failed to Load. Please check your internet connection and refresh.");
             }
         });
+        // --- V80: Discussion Logic ---
+        let activeDiscussionId = "";
+        let discussionUnsubscribe = null;
+
+        function loadDiscussionComments(discussionId) {
+            const box = document.getElementById('discussion-comments-box');
+            box.innerHTML = '<div style="text-align:center; padding:20px; color:#999;"><i class="fa-solid fa-spinner fa-spin"></i> Loading comments...</div>';
+
+            if (discussionUnsubscribe) discussionUnsubscribe();
+
+            discussionUnsubscribe = db.collection("quiz_discussions").doc(discussionId)
+                .collection("comments").orderBy("createdAt", "asc")
+                .onSnapshot(snap => {
+                    box.innerHTML = snap.empty ? '<div style="text-align:center; padding:30px; color:#999; font-size:0.9em;">ยังไม่มีใครเริ่มคุย มาเป็นคนแรกกัน!</div>' : "";
+                    snap.forEach(doc => {
+                        const c = doc.data();
+                        const isMe = c.userId === userId;
+                        const time = c.createdAt ? c.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "...";
+
+                        const div = document.createElement('div');
+                        div.style.alignSelf = isMe ? 'flex-end' : 'flex-start';
+                        div.style.maxWidth = '85%';
+                        div.innerHTML = `
+                            <div style="display:flex; flex-direction:${isMe ? 'row-reverse' : 'row'}; gap:8px; align-items:flex-end;">
+                                <img src="${c.pictureUrl}" style="width:28px; height:28px; border-radius:50%; border:1px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                                <div style="background:${isMe ? 'var(--primary)' : '#fff'}; color:${isMe ? 'white' : '#333'}; padding:8px 12px; border-radius:${isMe ? '15px 15px 2px 15px' : '15px 15px 15px 2px'}; box-shadow:0 1px 3px rgba(0,0,0,0.05); font-size:0.9em; position:relative;">
+                                    <div style="font-size:0.7em; opacity:0.8; margin-bottom:2px; font-weight:bold;">${isMe ? 'You' : c.displayName}</div>
+                                    ${c.text}
+                                    <div style="font-size:0.6em; margin-top:4px; text-align:right; opacity:0.7;">${time}</div>
+                                </div>
+                            </div>
+                        `;
+                        box.appendChild(div);
+                    });
+                    box.scrollTop = box.scrollHeight;
+                });
+        }
+
+        async function sendDiscussionComment() {
+            const input = document.getElementById('discussion-input');
+            const text = input.value.trim();
+            if (!text || !activeDiscussionId) return;
+
+            input.value = "";
+            try {
+                await db.collection("quiz_discussions").doc(activeDiscussionId)
+                    .collection("comments").add({
+                        userId,
+                        displayName: userProfile.displayName,
+                        pictureUrl: userProfile.pictureUrl,
+                        text,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+            } catch (err) {
+                console.error("Discussion post error:", err);
+                alert("Cannot send comment: " + err.message);
+            }
+        }
     </script>
 </body>
 
