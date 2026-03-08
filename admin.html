@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLP INTERNSHIP PORT V80.1</title>
+    <title>MLP INTERNSHIP PORT V81.0</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -845,7 +845,7 @@
                 <h2 style="margin:0;"><i class="fa-solid fa-user-shield"></i> Dashboard
                     <span
                         style="font-size:0.5em; background:#ff9f1c; padding:2px 8px; border-radius:10px; color:white; vertical-align:middle; font-weight:bold;">
-                        LIFF: V80.1 | Admin: V80.1
+                        LIFF: V81.0 | Admin: V81.0
                     </span>
                 </h2>
                 <span id="admin-email" style="font-size:0.8em; color:var(--text-sub);"></span>
@@ -2203,6 +2203,22 @@
                 document.getElementById('quiz-questions-container').style.opacity = '1';
                 document.getElementById('quiz-questions-container').style.pointerEvents = 'auto';
             }
+            // V81: Refresh labels for all questions to match the mode
+            document.querySelectorAll('.quiz-q-item').forEach(item => {
+                const sel = item.querySelector('.q-type');
+                if (sel) {
+                    const optChoice = sel.querySelector('option[value="choice"]');
+                    const optShort = sel.querySelector('option[value="short_answer"]');
+                    if (type === 'read_only') {
+                        if (optChoice) optChoice.innerText = "Interactive Poll (Reveal)";
+                        if (optShort) optShort.innerText = "Standard Page";
+                    } else {
+                        if (optChoice) optChoice.innerText = "Choice";
+                        if (optShort) optShort.innerText = "Short Answer";
+                    }
+                }
+            });
+
             updateQuizPagination();
         }
 
@@ -2307,11 +2323,20 @@
 
                 if (quizType === 'read_only') {
                     contentArea.style.display = 'block';
-                    optionsArea.style.display = 'none';
-                    optionsActions.style.display = 'none';
-                    correctArea.style.display = 'none';
-                    qTypeSelect.disabled = true;
-                    qTypeSelect.value = 'short_answer'; // Default for internal logic
+                    qTypeSelect.disabled = false; // V81: Allow Poll-to-reveal
+
+                    const type = qTypeSelect.value;
+                    if (type === 'choice') {
+                        optionsArea.style.display = 'flex';
+                        optionsActions.style.display = 'block';
+                        correctArea.style.display = 'none'; // For Read-only Poll, no correct answer display needed in editor
+                        qTypeSelect.title = "Interactive Poll: User must answer to see content below.";
+                    } else {
+                        optionsArea.style.display = 'none';
+                        optionsActions.style.display = 'none';
+                        correctArea.style.display = 'none';
+                        qTypeSelect.title = "Standard Page: Content shown immediately.";
+                    }
                 } else {
                     contentArea.style.display = 'none';
                     qTypeSelect.disabled = false;
@@ -2395,8 +2420,8 @@
                     <b style="color:var(--primary); font-size:1.1em;">คำถาม Question</b>
                     <div style="display:flex; align-items:center; gap:10px;">
                         <select class="q-type" onchange="toggleQType(this)" style="width:auto; margin:0; padding:4px; font-size:0.85em;">
-                            <option value="choice" ${qType === 'choice' ? 'selected' : ''}>Choice</option>
-                            <option value="short_answer" ${qType === 'short_answer' ? 'selected' : ''}>Short Answer</option>
+                            <option value="choice" ${qType === 'choice' ? 'selected' : ''}>${document.getElementById('quiz-type').value === 'read_only' ? 'Interactive Poll (Reveal)' : 'Choice'}</option>
+                            <option value="short_answer" ${qType === 'short_answer' ? 'selected' : ''}>${document.getElementById('quiz-type').value === 'read_only' ? 'Standard Page' : 'Short Answer'}</option>
                         </select>
                         <label style="font-size:0.8em; color:#666;">Timer (sec):</label>
                         <input type="number" class="q-timer" value="${data ? (data.timer || 60) : 60}" style="width:70px; margin:0; padding:4px;">

@@ -3,6 +3,15 @@
 > [!IMPORTANT]
 > **📢 Version Policy:** ทุกการ Commit หรือการปรับปรุงชุดคำสั่ง ต้องมีการขยับเวอร์ชัน (Versioning) เสมอ ทั้งในหน้า UI และในเอกสาร Markdown นี้ เพื่อป้องกันความสับสนในการ Deploy
 
+## [2026-03-08] Session Updates (V80.1 → V81.0)
+
+### 1. Interactive Poll Reveal (V81.0)
+- **Interactive Reading:** Added "Interactive Poll" type to Read-only pages. Users must engage with a poll/question before the lesson content is revealed.
+- **Engage-to-Learn:** Designed to stimulate curiosity by asking for opinions or guesses before providing the "The Revelation" (Explanation).
+- **Smooth Animation:** Added `fadeInUp` animation when content is revealed for a premium feel.
+- **Admin Control:** Admins can now toggle between "Standard Page" (Immediate display) and "Interactive Poll (Reveal)" for each lesson page.
+- **State Persistence:** User's poll choices are saved and synced, allowing them to resume exactly where they left off with content already revealed.
+
 ## [2026-03-08] Session Updates (V79.7 → V80.1)
 
 ### 1. Read-only Learning Mode (V80.1)

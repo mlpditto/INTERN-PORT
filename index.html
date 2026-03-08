@@ -514,6 +514,49 @@
                 transform: rotate(360deg);
             }
         }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .reveal-active {
+            animation: fadeInUp 0.8s ease-out forwards;
+        }
+
+        .poll-option-btn {
+            text-align: left;
+            padding: 12px 15px;
+            border-radius: 12px;
+            border: 2px solid #eee;
+            background: white;
+            color: #333;
+            font-size: 0.95em;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .poll-option-btn:hover:not(:disabled) {
+            border-color: var(--primary);
+            background: #f0f4ff;
+        }
+
+        .poll-option-btn.selected {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(67, 97, 238, 0.3);
+        }
     </style>
 </head>
 
@@ -658,7 +701,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V80.1 (Multi-page Learning & Discussion)
+                V81.0 (Interactive Poll Reveal)
             </div>
         </div>
     </div>
@@ -1956,21 +1999,47 @@
             }
         }
 
-        // 🔥 V80: UI for Read-only Learning Mode
+        // 🔥 V81: UI for Read-only Learning Mode (Enhanced with Poll Reveal)
         function renderReadOnlyUI() {
             const container = document.getElementById('quiz-run-container');
-            const passageArea = document.getElementById('quiz-case-passage-area');
             const totalSteps = (currentQuiz.questions || []).length;
 
-            passageArea.style.display = 'none';
-
-            // Show Feedback/Final Reflection on the Step AFTER all question pages
             if (currentStep >= totalSteps) {
                 renderFinalReflectionUI();
                 return;
             }
 
             const page = currentQuiz.questions[currentStep];
+            const isPoll = page.type === 'choice';
+            const currentAns = userAnswers[currentStep];
+            const isAnswered = currentAns !== undefined;
+
+            let pollHtml = "";
+            if (isPoll && page.options && page.options.length > 0) {
+                pollHtml = `
+                    <div style="margin: 20px 0; padding: 18px; background: #fdf2f8; border-radius: 15px; border: 1px dashed #d81b60;">
+                        <div style="font-weight:bold; color:#d81b60; margin-bottom:12px; font-size:0.9em; display:flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-square-poll-vertical"></i> 
+                            ${isAnswered ? 'บันทึกการโหวตของคุณแล้ว' : 'แชร์ความคิดเห็นหรือเดาคำตอบเพื่ออ่านต่อ:'}
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            ${page.options.map((opt, idx) => {
+                    const isSelected = currentAns === idx;
+                    return `
+                                    <button onclick="selectReadOnlyPoll(${idx})" 
+                                        ${isAnswered ? 'disabled' : ''}
+                                        class="poll-option-btn ${isSelected ? 'selected' : ''}">
+                                        <i class="fa-regular ${isSelected ? 'fa-circle-dot' : 'fa-circle'}"></i>
+                                        <span style="flex:1;">${opt}</span>
+                                        ${isSelected ? '<i class="fa-solid fa-check"></i>' : ''}
+                                    </button>
+                                `;
+                }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
             container.innerHTML = `
                 <div style="background:#fff; border-radius:12px; padding:20px; box-shadow:0 4px 15px rgba(0,0,0,0.05); border:1px solid #eee; margin-bottom:20px; position:relative;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #f0f0f0; padding-bottom:10px;">
@@ -1982,11 +2051,15 @@
                         </button>
                     </div>
 
-                    <h3 style="margin-top:0; color:var(--primary); font-size:1.15em;">
+                    <h3 style="margin-top:0; color:var(--primary); font-size:1.15em; line-height:1.4;">
                         ${page.q}
                     </h3>
                     
-                    <div class="read-only-content" style="font-size:1.05em; line-height:1.7; color:#333; margin-bottom:20px; white-space:pre-wrap;">
+                    ${pollHtml}
+
+                    <div id="read-only-content-reveal" class="${isAnswered || !isPoll ? 'reveal-active' : ''}" 
+                         style="display:${isAnswered || !isPoll ? 'block' : 'none'}; font-size:1.05em; line-height:1.7; color:#333; margin-top:15px; white-space:pre-wrap;">
+                        ${isPoll ? '<div style="font-weight:bold; color:var(--primary); margin-bottom:10px; border-top:1px solid #eee; padding-top:15px; font-size:0.9em;">✨ เฉลย/เนื้อหาเพิ่มเติม (The Revelation):</div>' : ''}
                         ${page.content || "เนื้อหาสำหรับหน้านี้..."}
                     </div>
                 </div>
@@ -2001,8 +2074,32 @@
             if (btnNext) {
                 btnNext.style.display = 'inline-block';
                 btnNext.innerText = (currentStep === totalSteps - 1) ? "📚 ไปยังหน้าสรุป (Next)" : "ถัดไป (Next)";
+                // V81: Lock Next if poll not answered
+                if (isPoll && !isAnswered) {
+                    btnNext.disabled = true;
+                    btnNext.style.opacity = '0.5';
+                    btnNext.title = "กรุณาเลือกคำแนะนำหรือตอบคำถามก่อน";
+                } else {
+                    btnNext.disabled = false;
+                    btnNext.style.opacity = '1';
+                    btnNext.title = "";
+                }
             }
             if (btnSubmit) btnSubmit.style.display = 'none';
+        }
+
+        function selectReadOnlyPoll(idx) {
+            userAnswers[currentStep] = idx;
+            renderReadOnlyUI(); // Re-render to show reveal
+
+            // Auto-save progress
+            if (userId && !isPracticeMode) {
+                db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
+                    answers: userAnswers,
+                    currentStep: currentStep,
+                    lastActive: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            }
         }
 
         function renderFinalReflectionUI() {
