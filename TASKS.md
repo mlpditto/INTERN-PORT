@@ -1,5 +1,8 @@
 # Project Tasks & Updates
 
+> [!IMPORTANT]
+> **📢 Version Policy:** ทุกการ Commit หรือการปรับปรุงชุดคำสั่ง ต้องมีการขยับเวอร์ชัน (Versioning) เสมอ ทั้งในหน้า UI และในเอกสาร Markdown นี้ เพื่อป้องกันความสับสนในการ Deploy
+
 ## [2026-03-08] Session Updates (V79.7 → V80.1)
 
 ### 1. Read-only Learning Mode (V80.1)

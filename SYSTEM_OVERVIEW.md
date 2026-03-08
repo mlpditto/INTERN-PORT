@@ -1,4 +1,7 @@
-# MLP Internship Portfolio (V80.0) Overview
+# MLP Internship Portfolio (V80.1) Overview
+
+> [!IMPORTANT]
+> **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
 
 ระบบเว็บแอปพลิเคชันสำหรับจัดการการฝึกงานและระบบ Gamification (สะสมคะแนน) เพื่อจูงใจและติดตามความก้าวหน้าของนักศึกษาฝึกงาน
 
