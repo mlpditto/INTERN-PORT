@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V81.3)</title>
+    <title>Internship Portfolio (V82.0)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -117,6 +117,57 @@
             padding: 2px 8px;
             border-radius: 10px;
             font-weight: bold;
+        }
+
+        /* --- Kanban Compact Tabs (V81.5) --- */
+        .sq-tabs {
+            display: flex;
+            background: #eceff1;
+            border-radius: 14px;
+            padding: 5px;
+            margin-bottom: 12px;
+            gap: 5px;
+        }
+        .sq-tab-btn {
+            flex: 1;
+            padding: 8px 2px;
+            border-radius: 10px;
+            font-size: 0.72em;
+            font-weight: 600;
+            color: #78909c;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: none;
+            background: transparent;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: auto;
+            line-height: 1.2;
+        }
+        .sq-tab-btn.active {
+            background: white;
+            color: #4361ee;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+        }
+        .sq-tab-count {
+            font-size: 1.1em;
+            font-weight: 800;
+            display: block;
+        }
+        .sq-hint {
+            font-size: 0.72em;
+            color: #90a4ae;
+            text-align: center;
+            margin-bottom: 12px;
+            background: #fdfdfd;
+            padding: 6px;
+            border-radius: 10px;
+            border: 1px dashed #cfd8dc;
+        }
+        #sq-Backlog, #sq-Doing, #sq-Review, #sq-Done {
+            transition: opacity 0.3s;
         }
 
         /* -----------------------
@@ -557,6 +608,49 @@
             border-color: var(--primary);
             box-shadow: 0 4px 12px rgba(67, 97, 238, 0.3);
         }
+
+        /* --- Ordering & Flashcard UI (V81.6) --- */
+        .order-btn {
+            position: relative;
+            text-align: left;
+            padding-left: 50px !important;
+        }
+        .order-number {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 30px;
+            background: #eee;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .order-btn.active .order-number {
+            background: white;
+            color: var(--primary);
+        }
+        .flash-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .flash-btn {
+            height: 150px;
+            font-size: 1.5em;
+            flex-direction: column;
+            border-radius: 20px;
+            border: 4px solid rgba(0,0,0,0.05);
+        }
+        .flash-btn i { font-size: 2em; margin-bottom: 10px; }
+        .flash-true { background: #2ec4b6; color: white; }
+        .flash-false { background: #ef233c; color: white; }
     </style>
 </head>
 
@@ -653,22 +747,45 @@
             </div>
 
             <div id="section-kanban">
-                <h3><i class="fa-solid fa-map"></i> ภารกิจ (Kanban)</h3>
-                <div class="sq-container">
-                    <div class="sq-col">
-                        <div style="font-weight:bold;margin-bottom:10px;">📌 Backlog</div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h3 style="margin:0;"><i class="fa-solid fa-map"></i> ภารกิจ (Side Quests)</h3>
+                    <span style="font-size:0.7em; color:#999; font-weight:bold; background:#eee; padding:2px 8px; border-radius:10px;">KANBAN</span>
+                </div>
+                
+                <div class="sq-hint">
+                    <i class="fa-solid fa-circle-info"></i> เลือกดูสถานะภารกิจ และกด "Start/Send" เพื่ออัปเดตงาน
+                </div>
+
+                <div class="sq-tabs">
+                    <button class="sq-tab-btn active" id="tab-Backlog" onclick="switchSqTab('Backlog')">
+                        <span class="sq-tab-count" id="cnt-Backlog">0</span>
+                        <span>Backlog</span>
+                    </button>
+                    <button class="sq-tab-btn" id="tab-Doing" onclick="switchSqTab('Doing')">
+                        <span class="sq-tab-count" id="cnt-Doing">0</span>
+                        <span>Doing</span>
+                    </button>
+                    <button class="sq-tab-btn" id="tab-Review" onclick="switchSqTab('Review')">
+                        <span class="sq-tab-count" id="cnt-Review">0</span>
+                        <span>Review</span>
+                    </button>
+                    <button class="sq-tab-btn" id="tab-Done" onclick="switchSqTab('Done')">
+                        <span class="sq-tab-count" id="cnt-Done">0</span>
+                        <span>Done</span>
+                    </button>
+                </div>
+
+                <div class="sq-container" style="display:block; overflow:visible;">
+                    <div id="col-Backlog" class="sq-col" style="min-width:100%; display:block; padding:0; background:transparent; border:none;">
                         <div id="sq-Backlog"></div>
                     </div>
-                    <div class="sq-col">
-                        <div style="font-weight:bold;margin-bottom:10px;">🚧 Doing</div>
+                    <div id="col-Doing" class="sq-col" style="min-width:100%; display:none; padding:0; background:transparent; border:none;">
                         <div id="sq-Doing"></div>
                     </div>
-                    <div class="sq-col">
-                        <div style="font-weight:bold;margin-bottom:10px;">👀 Review</div>
+                    <div id="col-Review" class="sq-col" style="min-width:100%; display:none; padding:0; background:transparent; border:none;">
                         <div id="sq-Review"></div>
                     </div>
-                    <div class="sq-col">
-                        <div style="font-weight:bold;margin-bottom:10px;">✅ Done</div>
+                    <div id="col-Done" class="sq-col" style="min-width:100%; display:none; padding:0; background:transparent; border:none;">
                         <div id="sq-Done"></div>
                     </div>
                 </div>
@@ -1454,11 +1571,13 @@
                 // Don't show completed/submitted quests (they go to history)
                 if (status === 'submitted') return;
 
+                const isExpired = q.deadline ? (now > q.deadline.toDate()) : false;
                 allItems.push({
                     type: 'quest',
                     data: q,
                     myData: myQ,
-                    timestamp: q.timestamp ? q.timestamp.toDate() : (q.deadline ? q.deadline.toDate() : new Date(0))
+                    isExpired: isExpired,
+                    timestamp: q.createdAt ? q.createdAt.toDate() : (q.timestamp ? q.timestamp.toDate() : (q.deadline ? q.deadline.toDate() : new Date(0)))
                 });
             });
 
@@ -1502,12 +1621,19 @@
                     type: 'quiz',
                     data: q,
                     myData: attempt,
-                    timestamp: q.timestamp ? q.timestamp.toDate() : (dead || new Date(0))
+                    isExpired: isExpired,
+                    timestamp: q.createdAt ? q.createdAt.toDate() : (q.timestamp ? q.timestamp.toDate() : (dead || new Date(0)))
                 });
             });
 
-            // 3. Sort: Newest First (V81.2)
+            // 3. Sort: Active First, then Newest First (V81.4)
             allItems.sort((a, b) => {
+                // Priority 1: Not Expired items on top
+                const expA = a.isExpired ? 1 : 0;
+                const expB = b.isExpired ? 1 : 0;
+                if (expA !== expB) return expA - expB;
+
+                // Priority 2: Newest timestamp first
                 const tA = a.timestamp ? a.timestamp.getTime() : 0;
                 const tB = b.timestamp ? b.timestamp.getTime() : 0;
                 return tB - tA;
@@ -1619,6 +1745,21 @@
                     const attempt = item.myData;
                     const dead = q.deadline ? q.deadline.toDate() : null;
                     const qTitle = q.shortTitle || q.title;
+
+                    // 🔥 Better Type Tags (V82.0)
+                    const typeTags = [];
+                    if (q.quizType === 'read_only') {
+                        typeTags.push(`<span class="assign-tag" style="background:#e3f2fd; color:#0d47a1;"><i class="fa-solid fa-book-open"></i> Learning Mode</span>`);
+                    } else {
+                        typeTags.push(`<span class="assign-tag" style="background:#fff0f3; color:#c9184a;"><i class="fa-solid fa-certificate"></i> Graded Quiz</span>`);
+                    }
+                    if (q.questions && q.questions.some(x => x.type === 'ordering')) {
+                        typeTags.push(`<span class="assign-tag" style="background:#f3e5f5; color:#7b1fa2;"><i class="fa-solid fa-sort-numeric-up"></i> Sequence</span>`);
+                    }
+                    if (q.questions && q.questions.some(x => x.type === 'flashcard')) {
+                        typeTags.push(`<span class="assign-tag" style="background:#e0f2f1; color:#00796b;"><i class="fa-solid fa-bolt-lightning"></i> Fast Flash</span>`);
+                    }
+                    if (q.oneTimeMode) typeTags.push(`<span class="assign-tag" style="background:#fff3cd; color:#856404;"><i class="fa-solid fa-lock"></i> One-Time</span>`);
 
                     let icon = "";
                     if (q.quizType === 'read_only') {
@@ -1751,7 +1892,10 @@
                             ${icon}
                             <div class="assign-info">
                                 <h4 style="${isCollapsed ? 'font-size:0.95em; color:#666;' : ''}">${qTitle} ${isCollapsed ? '<small style="color:#ef233c; font-weight:normal; margin-left:5px;">(หมดเวลา)</small>' : ''}</h4>
-                                ${statusBadge}
+                                <div style="display:flex; flex-wrap:wrap; gap:4px;">
+                                    ${statusBadge}
+                                    ${typeTags.join('')}
+                                </div>
                             </div>
                             ${isCollapsed ? '<i class="fa-solid fa-chevron-down" style="color:#ccc; font-size:0.9em; margin-left:10px;"></i>' : ''}
                         </div>
@@ -1794,6 +1938,7 @@
         let quizTimerInterval = null;
         let timeLeftForStep = 0;
         let accumulatedTime = 0; // 🔥 Added for V77.24 Carrying over time
+        let lastBonusTime = 0;   // 🔥 V81.3: Track bonus for UI display
 
         function confirmRunQuiz(quizId) {
             const q = quizzesCache.find(x => x.id === quizId);
@@ -2053,7 +2198,7 @@
             }
 
             const page = currentQuiz.questions[currentStep];
-            const isPoll = page.type === 'choice';
+            const isPoll = (page.type === 'choice' || page.type === 'ordering' || page.type === 'flashcard');
             const currentAns = userAnswers[currentStep];
             const isAnswered = currentAns !== undefined && currentAns !== null;
 
@@ -2082,33 +2227,57 @@
             }
 
             let pollHtml = "";
-            if (isPoll && page.options && page.options.length > 0) {
-                pollHtml = `
-                    <div style="margin: 20px 0; padding: 18px; background: #fdf2f8; border-radius: 15px; border: 1px dashed #d81b60;">
-                        <div style="font-weight:bold; color:#d81b60; margin-bottom:12px; font-size:0.9em; display:flex; align-items:center; justify-content:space-between;">
-                            <div style="display:flex; align-items:center; gap:8px;">
-                                <i class="fa-solid fa-square-poll-vertical"></i> 
-                                ${isAnswered ? 'แชร์ความเห็นแล้ว:' : 'แชร์ความคิดเห็นหรือเดาคำตอบเพื่ออ่านต่อ:'}
-                            </div>
-                            ${statusBadge}
+            if (isPoll) {
+                let innerHtml = "";
+                if (page.type === 'ordering') {
+                    const ansArr = Array.isArray(currentAns) ? currentAns : [];
+                    innerHtml = `
+                        <div style="margin-bottom:10px; font-size:0.85em; color:#666;">📝 เรียงลำดับขั้นตอนเพื่ออ่านต่อ:</div>
+                        <div style="display:flex; flex-direction:column; gap:10px;">
+                            ${page.options.map((opt, idx) => {
+                        const orderIdx = ansArr.indexOf(idx);
+                        const isActive = orderIdx !== -1;
+                        return `
+                                    <button class="order-btn ${isActive ? 'active btn-primary' : 'btn-outline'}" 
+                                            style="border:1px solid #ddd; ${isActive ? 'background:var(--primary); color:white;' : 'background:white; color:#333;'}"
+                                            onclick="handleReadOnlyOrdering(${idx})" ${isAnswered ? 'disabled' : ''}>
+                                        <div class="order-number">${isActive ? (orderIdx + 1) : ''}</div>
+                                        ${opt}
+                                    </button>
+                                `;
+                    }).join('')}
                         </div>
+                        ${!isAnswered ? `<button class="btn-sm btn-primary" onclick="selectReadOnlyOrdering()" style="margin-top:10px; width:100%;">ยืนยันลำดับ (Confirm Order)</button>` : ''}
+                    `;
+                } else if (page.type === 'flashcard') {
+                    innerHtml = `
+                        <div class="flash-container">
+                            <button class="flash-btn flash-true" onclick="selectReadOnlyPoll(0)" ${isAnswered ? 'disabled' : ''}>
+                                <i class="fa-solid fa-circle-check"></i>
+                                <span>ถูก (TRUE)</span>
+                            </button>
+                            <button class="flash-btn flash-false" onclick="selectReadOnlyPoll(1)" ${isAnswered ? 'disabled' : ''}>
+                                <i class="fa-solid fa-circle-xmark"></i>
+                                <span>ผิด (FALSE)</span>
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    innerHtml = `
                         <div style="display:flex; flex-direction:column; gap:8px;">
                             ${page.options.map((opt, idx) => {
-                    const isSelected = currentAns === idx;
-                    let borderCol = "#eee";
-                    let bgCol = "white";
-                    if (isSelected) {
-                        if (hasCorrect) {
-                            const isRight = (Array.isArray(page.correct) ? page.correct.includes(idx) : page.correct == idx);
-                            borderCol = isRight ? "#22c55e" : "#ef4444";
-                            bgCol = isRight ? "#f0fdf4" : "#fef2f2";
-                        } else {
-                            borderCol = "#d81b60";
-                            bgCol = "#fdf2f8";
+                        const isSelected = currentAns === idx;
+                        let borderCol = "#eee", bgCol = "white";
+                        if (isSelected) {
+                            if (hasCorrect) {
+                                const isRight = (Array.isArray(page.correct) ? page.correct.includes(idx) : page.correct == idx);
+                                borderCol = isRight ? "#22c55e" : "#ef4444";
+                                bgCol = isRight ? "#f0fdf4" : "#fef2f2";
+                            } else {
+                                borderCol = "#d81b60"; bgCol = "#fdf2f8";
+                            }
                         }
-                    }
-
-                    return `
+                        return `
                                     <button onclick="selectReadOnlyPoll(${idx})" 
                                         ${isAnswered ? 'disabled' : ''}
                                         class="poll-option-btn ${isSelected ? 'selected' : ''}"
@@ -2118,8 +2287,21 @@
                                         ${isSelected ? (hasCorrect && !(Array.isArray(page.correct) ? page.correct.includes(idx) : page.correct == idx) ? '<i class="fa-solid fa-xmark"></i>' : '<i class="fa-solid fa-check"></i>') : ''}
                                     </button>
                                 `;
-                }).join('')}
+                    }).join('')}
                         </div>
+                    `;
+                }
+
+                pollHtml = `
+                    <div style="margin: 20px 0; padding: 18px; background: #fdf2f8; border-radius: 15px; border: 1px dashed #d81b60;">
+                        <div style="font-weight:bold; color:#d81b60; margin-bottom:12px; font-size:0.9em; display:flex; align-items:center; justify-content:space-between;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <i class="fa-solid fa-square-poll-vertical"></i> 
+                                ${isAnswered ? 'บันทึกคำตอบแล้ว:' : 'แชร์ความเห็นหรือทดสอบเพื่ออ่านต่อ:'}
+                            </div>
+                            ${statusBadge}
+                        </div>
+                        ${innerHtml}
                         ${pollFeedback}
                     </div>
                 `;
@@ -2159,7 +2341,7 @@
             if (btnNext) {
                 btnNext.style.display = 'inline-block';
                 btnNext.innerText = (currentStep === totalSteps - 1) ? "📚 ไปยังหน้าสรุป (Next)" : "ถัดไป (Next)";
-                // V81: Lock Next if poll not answered
+                // V82: Lock Next if poll not answered
                 if (isPoll && !isAnswered) {
                     btnNext.disabled = true;
                     btnNext.style.opacity = '0.5';
@@ -2172,7 +2354,7 @@
             }
             if (btnSubmit) btnSubmit.style.display = 'none';
 
-            // 🔥 V81.1: Timer logic for Read-only Poll Reveal
+            // 🔥 V82.0: Timer logic for Read-only Poll Reveal
             // Stop existing timer first
             clearInterval(quizTimerInterval);
             document.getElementById('quiz-q-timer').innerText = "";
@@ -2207,12 +2389,27 @@
 
             // Auto-save progress
             if (userId && !isPracticeMode) {
+                const saveVal = Array.isArray(idx) ? idx.join("\n---\n") : idx;
                 db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
-                    answers: userAnswers,
+                    answers: userAnswers.map(ans => Array.isArray(ans) ? ans.join("\n---\n") : ans),
                     currentStep: currentStep,
                     lastActive: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
             }
+        }
+
+        function handleReadOnlyOrdering(idx) {
+            if (!Array.isArray(userAnswers[currentStep])) userAnswers[currentStep] = [];
+            const pos = userAnswers[currentStep].indexOf(idx);
+            if (pos !== -1) userAnswers[currentStep].splice(pos, 1);
+            else userAnswers[currentStep].push(idx);
+            renderReadOnlyUI();
+        }
+
+        function selectReadOnlyOrdering() {
+            const ans = userAnswers[currentStep];
+            if (!Array.isArray(ans) || ans.length === 0) return alert("กรุณาเรียงลำดับก่อนกดยืนยันครับ");
+            selectReadOnlyPoll(ans);
         }
 
         function renderFinalReflectionUI() {
@@ -2308,7 +2505,8 @@
                 if (!useExistingTime && !isTotalTimeMode) {
                     // Per-question mode: accumulate remaining time from previous question
                     const baseTimer = question.timer || 60;
-                    timeLeftForStep = baseTimer + (accumulatedTime || 0);
+                    lastBonusTime = (accumulatedTime || 0);
+                    timeLeftForStep = baseTimer + lastBonusTime;
                     accumulatedTime = 0; // Reset after applying to base
                 }
                 // For total_time mode, timeLeftForStep keeps counting down without reset
@@ -2333,10 +2531,10 @@
                     }
                 }, 1000);
 
-                const isChoice = (question.type || 'choice') === 'choice';
+                const qType = question.type || 'choice';
                 let inputHtml = "";
 
-                if (isChoice) {
+                if (qType === 'choice') {
                     const isMulti = Array.isArray(question.correct) && question.correct.length > 1;
                     if (isMulti && !Array.isArray(userAnswers[currentStep])) {
                         userAnswers[currentStep] = []; // Initialize as array for multi
@@ -2367,8 +2565,43 @@
                     }).join('')}
                     </div>
                 `;
-                }
-                else {
+                } else if (qType === 'ordering') {
+                    // Initialize as empty array for ordering
+                    if (!Array.isArray(userAnswers[currentStep])) userAnswers[currentStep] = [];
+
+                    // Fixed display order for ordering (don't shuffle because it's a sequence task)
+                    inputHtml = `
+                        <div style="margin-bottom:10px; font-size:0.85em; color:#666;">📝 แตะตัวเลือกตามลำดับขั้นตอน (Tap to set order):</div>
+                        <div style="display:flex; flex-direction:column; gap:10px;">
+                            ${question.options.map((opt, idx) => {
+                        const orderIdx = userAnswers[currentStep].indexOf(idx);
+                        const isActive = orderIdx !== -1;
+                        return `
+                                    <button class="order-btn ${isActive ? 'active btn-primary' : 'btn-outline'}" 
+                                            style="border:1px solid #ddd; border-bottom:3px solid #ccc; background:${isActive ? 'var(--primary)' : 'white'}; color:${isActive ? 'white' : '#333'};"
+                                            onclick="handleOrderingClick(${idx})">
+                                        <div class="order-number">${isActive ? (orderIdx + 1) : ''}</div>
+                                        ${opt}
+                                    </button>
+                                `;
+                    }).join('')}
+                        </div>
+                        <button class="btn-sm btn-danger" onclick="userAnswers[currentStep]=[]; renderQuizStep(true);" style="margin-top:10px; width:auto; background:#eee; color:#666;">ล้างลำดับ (Reset Order)</button>
+                    `;
+                } else if (qType === 'flashcard') {
+                    inputHtml = `
+                        <div class="flash-container">
+                            <button class="flash-btn flash-true" onclick="confirmFlashAnswer(0)">
+                                <i class="fa-solid fa-circle-check"></i>
+                                <span>ถูก (TRUE)</span>
+                            </button>
+                            <button class="flash-btn flash-false" onclick="confirmFlashAnswer(1)">
+                                <i class="fa-solid fa-circle-xmark"></i>
+                                <span>ผิด (FALSE)</span>
+                            </button>
+                        </div>
+                    `;
+                } else {
                     // Tweetstorm UI
                     if (!Array.isArray(userAnswers[currentStep])) {
                         userAnswers[currentStep] = ['']; // Initialize with one empty tweet
@@ -2385,7 +2618,7 @@
 
                 quizRunContainer.innerHTML = `
                 <div style="margin-bottom:15px;">
-                    <span class="badge" style="background:#4361ee; margin-bottom:10px;">ข้อที่ ${currentStep + 1} / ${currentQuiz.questions.length} (${isChoice ? 'Choice' : 'Short Answer'})</span>
+                    <span class="badge" style="background:#4361ee; margin-bottom:10px;">ข้อที่ ${currentStep + 1} / ${currentQuiz.questions.length} (${qType.toUpperCase()})</span>
                     <div style="font-weight:bold; font-size:1.1em; color:#333;">${question.q}</div>
                 </div>
                 ${inputHtml}
@@ -2424,7 +2657,8 @@
                 el.style.color = timeLeftForStep <= 30 ? '#ef233c' : '#e67e22';
                 el.style.fontSize = '1.3em';
             } else {
-                el.innerText = `⏱ ${timeLeftForStep}s`;
+                const bonusText = lastBonusTime > 0 ? ` (+${lastBonusTime}s)` : "";
+                el.innerHTML = `⏱ ${timeLeftForStep}s${bonusText ? `<span style="font-size:0.6em; color:#2ec4b6; margin-left:3px; vertical-align:middle;">${bonusText}</span>` : ""}`;
                 el.style.color = timeLeftForStep <= 10 ? '#ef233c' : '';
                 el.style.fontSize = '1.2em';
             }
@@ -2448,6 +2682,12 @@
 
         function renderQuizStepUIOnly() {
             const labels = document.querySelectorAll('#quiz-run-container label');
+            const qType = currentQuiz.questions[currentStep].type || 'choice';
+
+            if (qType === 'ordering' || qType === 'flashcard') {
+                renderQuizStep(true); 
+                return;
+            }
             if (labels.length === 0) return;
 
             const question = currentQuiz.questions[currentStep];
@@ -2472,6 +2712,32 @@
                     if (input) input.checked = false;
                 }
             });
+        }
+
+        function handleOrderingClick(idx) {
+            if (!Array.isArray(userAnswers[currentStep])) userAnswers[currentStep] = [];
+            const pos = userAnswers[currentStep].indexOf(idx);
+            if (pos !== -1) {
+                userAnswers[currentStep].splice(pos, 1);
+            } else {
+                userAnswers[currentStep].push(idx);
+            }
+            renderQuizStepUIOnly();
+
+            if (userId && !isPracticeMode) {
+                const finalAnswers = userAnswers.map(ans => Array.isArray(ans) ? ans.join("\n---\n") : ans);
+                db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
+                    answers: finalAnswers,
+                    currentStep: currentStep,
+                    lastActive: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            }
+        }
+
+        function confirmFlashAnswer(idx) {
+            userAnswers[currentStep] = idx;
+            if (currentStep < currentQuiz.questions.length - 1) nextQuizStep();
+            else submitQuiz();
         }
 
         // --- Tweetstorm Helpers ---
@@ -2529,31 +2795,27 @@
             q.questions.forEach((question, i) => {
                 const userAns = attempt.answers[i];
                 const isChoice = (question.type || 'choice') === 'choice';
-
-                // Logic to determine correctness
-                // For Choice: Compare index
-                // For Subjective: Look at 'gradedAnswers' map if available, or just show text
-
+                const isFlash = question.type === 'flashcard';
+                const isOrdering = question.type === 'ordering';
                 let isCorrect = false;
                 let isGraded = false; // For subjective
 
-                if (isChoice) {
+                if (isChoice || isFlash) {
                     if (Array.isArray(question.correct)) {
-                        // Multi-select
-                        // Check if arrays have same elements
                         const correctArr = question.correct.sort().join(',');
                         const userArr = (Array.isArray(userAns) ? userAns : [userAns]).sort().join(',');
                         isCorrect = (correctArr === userArr);
                     } else {
                         isCorrect = (userAns == question.correct);
                     }
+                } else if (isOrdering) {
+                    // For ordering, correct is usually just 0,1,2,3... unless defined otherwise
+                    const target = question.correct || question.options.map((_, i) => i);
+                    isCorrect = Array.isArray(userAns) && target.join(',') === userAns.join(',');
                 } else {
                     // Subjective
-                    // In admin.html, gradedAnswers[i] is true if marked correct
-                    if (attempt.gradedAnswers && attempt.gradedAnswers[i]) {
-                        isCorrect = true;
-                    }
-                    isGraded = true; // Always considered "graded" if approved, but might be wrong
+                    if (attempt.gradedAnswers && attempt.gradedAnswers[i]) isCorrect = true;
+                    isGraded = true;
                 }
 
                 const bg = isCorrect ? '#d4edda' : '#f8d7da';
@@ -2562,12 +2824,14 @@
 
                 // Render User Answer
                 let userAnsText = "";
-                if (isChoice) {
+                if (isChoice || isFlash) {
                     if (Array.isArray(userAns)) {
                         userAnsText = userAns.map(idx => question.options[idx] || '-').join(', ');
                     } else {
                         userAnsText = question.options[userAns] || '-';
                     }
+                } else if (isOrdering) {
+                    userAnsText = Array.isArray(userAns) ? userAns.map((idx, i) => `${i + 1}. ${question.options[idx]}`).join('<br>') : '-';
                 } else {
                     // Tweetstorm
                     if (Array.isArray(userAns)) {
@@ -2583,14 +2847,13 @@
                 // Render Correct Answer (if wrong)
                 let correctAnsText = "";
                 if (!isCorrect) {
-                    if (isChoice) {
-                        if (Array.isArray(question.correct)) {
-                            correctAnsText = `<div style="margin-top:5px; color:#155724; font-size:0.9em;"><b>เฉลย:</b> ${question.correct.map(idx => question.options[idx]).join(', ')}</div>`;
-                        } else {
-                            correctAnsText = `<div style="margin-top:5px; color:#155724; font-size:0.9em;"><b>เฉลย:</b> ${question.options[question.correct]}</div>`;
-                        }
+                    if (isChoice || isFlash) {
+                        const targetArr = Array.isArray(question.correct) ? question.correct : [question.correct];
+                        correctAnsText = `<div style="margin-top:5px; color:#155724; font-size:0.9em;"><b>เฉลย:</b> ${targetArr.map(idx => question.options[idx]).join(', ')}</div>`;
+                    } else if (isOrdering) {
+                        const target = question.correct || question.options.map((_, i) => i);
+                        correctAnsText = `<div style="margin-top:5px; color:#155724; font-size:0.9em;"><b>ลำดับที่ถูก:</b><br>${target.map((idx, i) => `${i + 1}. ${question.options[idx]}`).join('<br>')}</div>`;
                     } else {
-                        // Subjective usually has no "fixed" correct answer display, maybe a note?
                         correctAnsText = `<div style="margin-top:5px; color:#666; font-size:0.9em;">(Subjective: ขึ้นอยู่กับดุลยพินิจผู้ตรวจ)</div>`;
                     }
                 }
@@ -2752,25 +3015,27 @@
 
                 totalQ = currentQuiz.questions ? currentQuiz.questions.length : 1;
                 currentQuiz.questions.forEach((q, i) => {
-                    const isChoice = (q.type || 'choice') === 'choice';
-                    const hasCorrect = q.correct !== undefined && q.correct !== null;
+                    const qType = q.type || 'choice';
                     const mine = userAnswers[i];
+                    const hasCorrect = q.correct !== undefined && q.correct !== null;
 
-                    if (isChoice) {
+                    if (qType === 'choice' || qType === 'flashcard') {
                         if (hasCorrect) {
                             const target = Array.isArray(q.correct) ? q.correct : [q.correct];
-                            const mineArray = Array.isArray(mine) ? mine : (mine !== null && mine !== undefined ? [mine] : []);
+                            const mineArray = Array.isArray(mine) ? (Array.isArray(mine) ? mine : [mine]) : (mine !== null && mine !== undefined ? [mine] : []);
                             if (target.length > 0 && target.length === mineArray.length && target.every(val => mineArray.includes(val))) {
                                 correctCount++;
                             }
-                        } else {
-                            // Pure poll: counts as "correct" if answered/voted
-                            if (mine !== null && mine !== undefined) {
-                                correctCount++;
-                            }
+                        } else if (mine !== null && mine !== undefined) {
+                            correctCount++; // poll
                         }
-                    } else if (q.type === 'tweetstorm') {
-                        // Reflection/Tweetstorm steps
+                    } else if (qType === 'ordering') {
+                        const target = q.correct || q.options.map((_, idx) => idx);
+                        if (Array.isArray(mine) && target.join(',') === mine.join(',')) {
+                            correctCount++;
+                        }
+                    } else {
+                        // Subjective/Tweetstorm
                         if (Array.isArray(mine) && mine.some(txt => txt && txt.trim().length > 0)) {
                             correctCount++;
                         }
@@ -3065,21 +3330,35 @@
         }
 
         // --- Side Quests & Kanban ---
+        let activeSqTab = 'Backlog';
+        function switchSqTab(s) {
+            activeSqTab = s;
+            document.querySelectorAll('.sq-col').forEach(c => c.style.display = 'none');
+            document.querySelectorAll('.sq-tab-btn').forEach(b => b.classList.remove('active'));
+            
+            const targetCol = document.getElementById('col-' + s);
+            const targetTab = document.getElementById('tab-' + s);
+            if(targetCol) targetCol.style.display = 'block';
+            if(targetTab) targetTab.classList.add('active');
+        }
+
         function loadSideQuests() {
             db.collection("side_quests").where("assigneeIds", "array-contains", userId).onSnapshot(s => {
                 const cols = { "Backlog": document.getElementById("sq-Backlog"), "Doing": document.getElementById("sq-Doing"), "Review": document.getElementById("sq-Review"), "Done": document.getElementById("sq-Done") };
+                const counts = { "Backlog": 0, "Doing": 0, "Review": 0, "Done": 0 };
                 Object.values(cols).forEach(c => c.innerHTML = "");
 
                 s.forEach(d => {
                     const q = d.data();
                     if (cols[q.status]) {
+                        counts[q.status]++;
                         const isProj = q.isProject === true;
                         let btn = "", chatBtn = "";
 
-                        if (q.status === "Backlog") btn = `<button class="btn-sm btn-primary" onclick="upSQ('${d.id}','Doing')">Start</button>`;
-                        else if (q.status === "Doing") btn = `<button class="btn-sm btn-warning" onclick="upSQ('${d.id}','Review')">Send</button>`;
+                        if (q.status === "Backlog") btn = `<button class="btn-sm btn-primary" onclick="upSQ('${d.id}','Doing')">Start Mission</button>`;
+                        else if (q.status === "Doing") btn = `<button class="btn-sm btn-warning" onclick="upSQ('${d.id}','Review')">Send for Review</button>`;
 
-                        if (isProj) chatBtn = `<button class="btn-sm" style="background:#e83e8c;color:white;margin-left:5px;" onclick="openChat('${d.id}','${q.title}')">💬</button>`;
+                        if (isProj) chatBtn = `<button class="btn-sm" style="background:#e83e8c;color:white;margin-left:5px;" onclick="openChat('${d.id}','${q.title}')"><i class="fa-solid fa-comments"></i> Chat</button>`;
 
                         const scClass = q.isScored ? 'scored' : '';
                         const scBadge = (q.isScored && q.archiveScore) ? `<div class="score-badge">+${q.archiveScore}</div>` : '';
@@ -3104,15 +3383,27 @@
                         c.className = `sq-card status-${q.status} ${scClass} ${isProj ? 'project' : ''}`;
                         c.innerHTML = `
                             ${scBadge} 
-                            <div><span class="badge ${pClass}">${q.priority}</span> ${isProj ? '<span class="badge" style="background:#e83e8c">Proj</span>' : ''}</div>
-                            <div style="font-weight:bold;margin-top:5px;">${q.title}</div>
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                                <div><span class="badge ${pClass}">${q.priority}</span> ${isProj ? '<span class="badge" style="background:#e83e8c">Proj</span>' : ''}</div>
+                                <span style="font-size:0.65em; font-weight:bold; color:#aaa;">ID: ${d.id.slice(0,5)}</span>
+                            </div>
+                            <div style="font-weight:bold;margin-top:5px; font-size:1.05em; color:#333;">${q.title}</div>
                             ${timersHtml}
-                            ${descHtml}
-                            <div style="display:flex;">${btn}${chatBtn}</div>
+                            <div style="margin-top:10px;">${descHtml}</div>
+                            <div style="display:flex; gap:5px; margin-top:5px;">${btn}${chatBtn}</div>
                         `;
                         cols[q.status].appendChild(c)
                     }
-                })
+                });
+
+                // Update count badges
+                for (const [status, count] of Object.entries(counts)) {
+                    const el = document.getElementById('cnt-' + status);
+                    if (el) el.innerText = count;
+                }
+
+                // If currently showing a tab with 0 items, and there's another with > 0, maybe auto-switch?
+                // For now, keep it simple.
             });
             // Start Realtime Timer update for User side
             if (!window._sqTimerInterval) {
@@ -3272,8 +3563,15 @@
                     const score = att.correctCount !== undefined ?
                         (att.correctCount / (att.totalQuestions || 1)) * (quiz ? (quiz.totalPoints || 1) : 1) : 0;
 
+                    let qTypePrefix = "";
+                    if (quiz) {
+                        if (quiz.quizType === 'read_only') qTypePrefix = "📚 ";
+                        else if (quiz.questions && quiz.questions.some(x => x.type === 'ordering')) qTypePrefix = "🔢 ";
+                        else if (quiz.questions && quiz.questions.some(x => x.type === 'flashcard')) qTypePrefix = "⚡ ";
+                    }
+
                     items.push({
-                        title: qTitle,
+                        title: qTypePrefix + qTitle,
                         type: 'Quiz',
                         timestamp: att.timestamp,
                         status: att.status === 'pending' ? 'รอตรวจ' : 'ตรวจแล้ว',
