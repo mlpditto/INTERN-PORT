@@ -1632,6 +1632,8 @@
                     style="display:flex; align-items:center; gap:6px; margin-bottom:10px; background:var(--col-bg); padding:8px 10px; border-radius:8px;">
                     <button class="btn-sm btn-dark" onclick="addQuestionUI()" title="Add New Question"
                         style="min-width:30px; height:30px; padding:0; font-size:1.1em; display:flex; align-items:center; justify-content:center; flex-shrink:0;">+</button>
+                    <button class="btn-sm" onclick="openImportQuizModal()" title="Import from another Quiz"
+                        style="min-width:30px; height:30px; padding:0; font-size:1.1em; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:#2196f3; color:white; border:none; border-radius:4px;"><i class="fa-solid fa-file-import" style="font-size:0.8em;"></i></button>
                     <div id="quiz-q-nav" style="display:flex; gap:4px; padding:0; flex-wrap:wrap; flex:1;"></div>
                     <div id="quiz-pagination-controls"
                         style="display:flex; gap:4px; align-items:center; flex-shrink:0;">
@@ -1775,6 +1777,20 @@
             <button class="btn-sm"
                 style="width:100%; background:none; border:none; color:#999; margin-top:10px; cursor:pointer;"
                 onclick="openGroupSettingsUI()">⚙️ จัดการสิทธิ์การมองเห็นกลุ่ม (Group Visibility)</button>
+        </div>
+    </div>
+
+    <div id="importQuizModal" class="modal" style="z-index:4200;">
+        <div class="modal-content" style="max-width:500px; text-align: left;">
+            <span class="close-modal" onclick="document.getElementById('importQuizModal').style.display='none'">&times;</span>
+            <h3 style="margin-top:0;">📥 ดึงข้อสอบ (Import Questions)</h3>
+            <p style="font-size:0.85em; color:#666; margin-bottom:15px;">
+                เลือกรหัสแบบทดสอบอื่น เพื่อคัดลอกข้อสอบเดิมมาต่อท้ายข้อสอบชุดปัจจุบัน (สร้างคลังข้อสอบผสม)
+            </p>
+            <label style="font-size:0.9em; font-weight:bold;">เลือกข้อสอบ (Select Quiz):</label>
+            <select id="import-quiz-select" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; margin-top:5px; margin-bottom:15px; font-size:0.9em;">
+            </select>
+            <button class="magic-btn" style="width:100%;" onclick="executeImportQuiz()">➕ นำเข้าข้อสอบ (Import Selected)</button>
         </div>
     </div>
 
@@ -2519,6 +2535,32 @@
                 quizQPageIndex = total - 1;
             }
             updateQuizPagination();
+        }
+
+        function openImportQuizModal() {
+            const select = document.getElementById('import-quiz-select');
+            select.innerHTML = '<option value="">-- เลือกแบบทดสอบที่ต้องการ --</option>';
+            quizzesData.forEach(q => {
+                const opt = document.createElement('option');
+                opt.value = q.id;
+                opt.innerText = `${q.title} (${q.questions ? q.questions.length : 0} items)`;
+                select.appendChild(opt);
+            });
+            document.getElementById('importQuizModal').style.display = 'block';
+        }
+
+        function executeImportQuiz() {
+            const id = document.getElementById('import-quiz-select').value;
+            if (!id) return alert("โปรดเลือกแบบทดสอบก่อน");
+            const q = quizzesData.find(x => x.id === id);
+            if (!q || !q.questions || q.questions.length === 0) return alert("ข้อสอบชุดนี้ไม่มีคำถาม");
+            
+            if (confirm(`ระบบจะนำเข้าคำถามทั้งหมด ${q.questions.length} ข้อ มาต่อท้ายข้อสอบชุดนี้ ดำเนินการต่อหรือไม่?`)) {
+                q.questions.forEach(item => addQuestionUI(item));
+                document.getElementById('importQuizModal').style.display = 'none';
+                showToast("นำเข้าข้อสอบสำเร็จ!");
+                triggerAutoSave();
+            }
         }
 
         function toggleQType(el) {
