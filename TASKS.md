@@ -3,6 +3,19 @@
 > [!IMPORTANT]
 > **📢 Version Policy:** ทุกการ Commit หรือการปรับปรุงชุดคำสั่ง ต้องมีการขยับเวอร์ชัน (Versioning) เสมอ ทั้งในหน้า UI และในเอกสาร Markdown นี้ เพื่อป้องกันความสับสนในการ Deploy
 
+## [2026-03-09] Session Updates (V82.0 → V82.1)
+
+### 1. Quiz Review UI (V82.1)
+- **Enhanced Visual Feedback:** Added green background (`#d1e7dd`) specifically for correct answers in the Review Attempt modal. 
+- **Card-Style Layout:** Redesigned question review cards with subtle shadows, rounded corners, and clear "Student vs Correct" side-by-side comparison.
+- **Improved Comparison Logic:** Fixed a common bug where single-select vs multi-select data structures caused false "Incorrect" markings.
+
+### 2. Admin Dashboard UI (V82.1)
+- **Color-Coded Badges:** 
+    - **Items Count:** Automatically colors the count badge (Green for 40+, Blue for 20+, Gray for standard) to help identify quiz length.
+    - **Score Weighting:** Highlights quizzes with >1.0 total points using colored borders and badges to signify weighted assessments.
+- **Layout:** Optimized vertical alignment and spacing in the main quiz management tables for better professional appearance.
+
 ## [2026-03-08] Session Updates (V81.2 → V81.3)
 
 ### 1. Read-only Interactive Scoring (V81.3)
