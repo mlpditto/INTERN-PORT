@@ -3,6 +3,14 @@
 > [!IMPORTANT]
 > **📢 Version Policy:** ทุกการ Commit หรือการปรับปรุงชุดคำสั่ง ต้องมีการขยับเวอร์ชัน (Versioning) เสมอ ทั้งในหน้า UI และในเอกสาร Markdown นี้ เพื่อป้องกันความสับสนในการ Deploy
 
+## [2026-03-10] Session Updates (V82.2 → V83.0)
+
+### 1. Unified Compact Profile Dates (V83.0)
+- **Compact UI Integration:** Moved the "Start Date" and "End Date" inputs natively into the user's profile header, placing them elegantly beneath the user's name and division badging to save vertical space.
+- **Removed "BE" (Buddhist Era) Artifacts:** Replaced standard native `<input type="date">` visible UI with a custom formatted text span (e.g., "16 Mar 2026") that reliably hides OS-level Buddhist Era formatting across all iOS/Safari locales.
+- **Stylized Countdown Display:** Enhanced the internship countdown visual with a new professional, compact inline-block design featuring a soft background layer for improved aesthetics.
+- **Version Bump:** Updated version to V83.0 globally to signify these UI structural updates.
+
 ## [2026-03-09] Session Updates (V82.0 → V82.1)
 
 ### 1. Quiz Review UI (V82.1)
