@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V83.0)</title>
+    <title>Internship Portfolio (V83.1)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -1752,10 +1752,17 @@
 
             <div
                 style="margin-bottom:15px; background:#f8f9fa; padding:12px; border-radius:8px; border:1px solid #eee;">
-                <label style="font-size:0.85em; color:#666; font-weight:bold;">🎓 ข้อมูล Certificate
-                    (ภาษาอังกฤษ)</label>
-                <input type="text" id="gs-cert-fullname" placeholder="พิมพ์ชื่อ-นามสกุล..."
-                    style="margin-top:5px; width:100%; box-sizing:border-box; margin-bottom:8px; font-size:0.9em; padding:8px;">
+                <label style="font-size:0.85em; color:#666; font-weight:bold;">🎓 ข้อมูล Certificate (ภาษาอังกฤษ)</label>
+                <div style="display:flex; gap:5px; margin-top:5px;">
+                    <input type="text" id="gs-firstname-en" placeholder="FIRST NAME"
+                        style="flex:2; font-size:0.9em; padding:8px;">
+                    <input type="text" id="gs-middlename-en" placeholder="MIDDLE"
+                        style="flex:1; font-size:0.9em; padding:8px;">
+                    <input type="text" id="gs-lastname-en" placeholder="LAST NAME"
+                        style="flex:2; font-size:0.9em; padding:8px;">
+                </div>
+                <input type="text" id="gs-cert-fullname" placeholder="Full Name (Combined Preview)" readonly
+                    style="margin-top:8px; width:100%; box-sizing:border-box; margin-bottom:8px; font-size:0.9em; padding:8px; background:#f0f0f0; border:1px solid #ddd;">
                 <input type="text" id="gs-cert-nickname" placeholder="ชื่อเล่น/AKA..."
                     style="width:100%; box-sizing:border-box; font-size:0.9em; padding:8px;">
             </div>
@@ -4174,8 +4181,23 @@
             document.getElementById('gs-title-name').innerText = userName;
 
             // Load cert names
-            document.getElementById('gs-cert-fullname').value = (user && user.fullName) ? user.fullName : '';
-            document.getElementById('gs-cert-nickname').value = (user && user.nickname) ? user.nickname : '';
+            document.getElementById('gs-firstname-en').value = user?.firstNameEn || '';
+            document.getElementById('gs-middlename-en').value = user?.middleNameEn || '';
+            document.getElementById('gs-lastname-en').value = user?.lastNameEn || '';
+            document.getElementById('gs-cert-fullname').value = user?.fullNameEn || user?.fullName || '';
+            document.getElementById('gs-cert-nickname').value = user?.nickname || user?.nickName || '';
+
+            // Helper to update full name preview
+            const updateGsFullname = () => {
+                const fn = document.getElementById('gs-firstname-en').value.trim();
+                const mn = document.getElementById('gs-middlename-en').value.trim();
+                const ln = document.getElementById('gs-lastname-en').value.trim();
+                const full = mn ? `${fn} ${mn} ${ln}` : (fn ? `${fn} ${ln}` : document.getElementById('gs-cert-fullname').value);
+                if (fn || ln) document.getElementById('gs-cert-fullname').value = full;
+            };
+            document.getElementById('gs-firstname-en').oninput = updateGsFullname;
+            document.getElementById('gs-middlename-en').oninput = updateGsFullname;
+            document.getElementById('gs-lastname-en').oninput = updateGsFullname;
 
             const input = document.getElementById('gs-input');
             const list = document.getElementById('gs-list');
@@ -4260,6 +4282,9 @@
         async function confirmSetGroup() {
             const uid = document.getElementById('gs-uid').value;
             const newGroup = document.getElementById('gs-input').value.trim() || "Public";
+            const fnameEn = document.getElementById('gs-firstname-en').value.trim();
+            const mnameEn = document.getElementById('gs-middlename-en').value.trim();
+            const lnameEn = document.getElementById('gs-lastname-en').value.trim();
             const newFullName = document.getElementById('gs-cert-fullname').value.trim();
             const newNickname = document.getElementById('gs-cert-nickname').value.trim();
 
@@ -4268,7 +4293,10 @@
             try {
                 await db.collection("users").doc(uid).update({
                     group: newGroup,
-                    fullName: newFullName,
+                    firstNameEn: fnameEn,
+                    middleNameEn: mnameEn,
+                    lastNameEn: lnameEn,
+                    fullNameEn: newFullName,
                     nickname: newNickname
                 });
                 showToast("ข้อมูลผู้ใช้อัปเดตสำเร็จ!");
@@ -4460,6 +4488,7 @@
                     const certNameDisplay = `
                         <div style="cursor:pointer; margin-left: 35px; margin-top: 5px; background: #f8f9fa; padding: 4px 8px; border-radius: 6px; border: 1px dashed #ddd; display: inline-block;" onclick="setUserGroup('${d.id}', '${group}')">
                             <div style="font-size:0.8em; font-weight:bold; color:#444; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px;" title="${(d.fullName || '-').replace(/"/g, '&quot;')}">${d.fullName || '-'} <i class="fa-solid fa-pen" style="font-size:0.8em; color:#ccc;"></i></div>
+                            ${d.fullNameEn ? `<div style="font-size:0.75em; color:var(--primary); font-style:italic; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px;" title="${d.fullNameEn.replace(/"/g, '&quot;')}">${d.fullNameEn}</div>` : ''}
                             <div style="font-size:0.7em; color:#888;" title="${(d.nickname || '-').replace(/"/g, '&quot;')}">${d.nickname || '-'}</div>
                         </div>
                     `;
@@ -4521,9 +4550,9 @@
             const u = usersData.find(x => x.id === uid);
             if (!u) return;
             certUser = { uid: u.id, name: u.displayName };
-            document.getElementById('cert-fullname').value = u.fullName || u.displayName || "";
+            document.getElementById('cert-fullname').value = u.fullNameEn || u.fullName || u.displayName || "";
             if (document.getElementById('cert-nickname')) {
-                document.getElementById('cert-nickname').value = u.nickname || "";
+                document.getElementById('cert-nickname').value = u.nickname || u.nickName || "";
             }
             document.getElementById('cert-start').value = u.startDate || "";
             document.getElementById('cert-end').value = u.endDate || "";
@@ -4551,7 +4580,7 @@
             const updateData = {
                 startDate: s,
                 endDate: e,
-                fullName: fn,
+                fullNameEn: fn, // Save back as En if it came from there
                 awards: awards, // Save as array
                 awardType: awards.length > 0 ? awards[0] : "" // Legacy support
             };
@@ -4561,7 +4590,7 @@
             showToast("Saved!");
             // Update local
             const u = usersData.find(x => x.id === certUser.uid);
-            if (u) { u.startDate = s; u.endDate = e; u.fullName = fn; u.nickname = nn || u.nickname; u.awards = awards; u.awardType = awards.length > 0 ? awards[0] : ""; }
+            if (u) { u.startDate = s; u.endDate = e; u.fullNameEn = fn; u.nickname = nn || u.nickname; u.awards = awards; u.awardType = awards.length > 0 ? awards[0] : ""; }
         }
 
         async function showHistory(uid, name, total) {
@@ -5797,7 +5826,7 @@
                 const u = users[i];
                 const finalAwards = u.awards || (u.awardType ? [u.awardType] : []);
 
-                let displayNameForCert = u.fullName || u.displayName;
+                let displayNameForCert = u.fullNameEn || u.fullName || u.displayName;
                 if (u.nickname) {
                     displayNameForCert += `|${u.nickname}`;
                 }
