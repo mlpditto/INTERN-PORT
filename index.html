@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V83.1)</title>
+    <title>Internship Portfolio</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -766,9 +766,18 @@
                 <div id="status-row" style="display: none;"></div>
             </div>
 
-            <div id="section-assignments">
-                <h3><i class="fa-solid fa-clipboard-list"></i> 퀴즈 แบบทดสอบ</h3>
-                <div id="assignments-container"></div>
+            <div id="section-assignments" style="margin-bottom: 20px;">
+                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #8e44ad;">
+                    <div onclick="toggleAssignmentList()"
+                        style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fdf2ff;">
+                        <h4 style="margin: 0; font-size: 1.1em; color: #8e44ad;"><i class="fa-solid fa-clipboard-list"></i> แบบทดสอบ (Quizzes)</h4>
+                        <i id="assign-list-icon" class="fa-solid fa-chevron-down" style="color: #8e44ad; transition: 0.3s; font-size: 0.9em;"></i>
+                    </div>
+                    <div id="assignments-content" style="display: none; padding: 15px; border-top: 1px solid #f0f0f0; background: #fff;">
+                        <div id="assignments-container"></div>
+                        <div id="assign-pagination" style="margin-top:15px; display:flex; justify-content:center; gap:10px;"></div>
+                    </div>
+                </div>
             </div>
 
             <div id="section-kanban">
@@ -879,11 +888,17 @@
             </div>
 
             <div id="section-general-work">
-                <div class="card">
-                    <h4><i class="fa-solid fa-upload"></i> ส่งงานทั่วไป</h4>
-                    <input type="text" id="w-title" placeholder="หัวข้องาน...">
-                    <input type="url" id="w-link" placeholder="ลิงก์งาน (ถ้ามี)...">
-                    <button class="btn-success" onclick="submitWork()">ยืนยันส่งงาน</button>
+                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #28a745;">
+                    <div onclick="toggleWorkForm()"
+                        style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #f8fff9;">
+                        <h4 style="margin: 0; font-size: 1.1em; color: #28a745;"><i class="fa-solid fa-upload"></i> ส่งงานทั่วไป</h4>
+                        <i id="work-form-icon" class="fa-solid fa-chevron-down" style="color: #28a745; transition: 0.3s; font-size: 0.9em;"></i>
+                    </div>
+                    <div id="work-form-content" style="display: none; padding: 15px; border-top: 1px solid #f0f0f0; background: #fff;">
+                        <input type="text" id="w-title" placeholder="หัวข้องาน...">
+                        <input type="url" id="w-link" placeholder="ลิงก์งาน (ถ้ามี)...">
+                        <button class="btn-success" onclick="submitWork()" style="width:100%; font-weight:bold; border-radius:12px; height:45px;">ยืนยันส่งงาน</button>
+                    </div>
                 </div>
 
                 <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0;">
@@ -1745,10 +1760,8 @@
                 const status = attempt ? attempt.status : 'none'; // none, requesting, allowed, pending, approved
                 const score = attempt ? (attempt.score || 0) : 0;
 
-                // 🛑 RULE: Hide if Expired AND NOT Active (unless in progress)
-                if (isExpired && !isActive) {
-                    if (status !== 'requesting' && status !== 'allowed') return;
-                }
+                // 🛑 RULE: Hide if NOT Active (New requirement: only show active quizzes)
+                if (!isActive) return;
 
                 // 🛑 RULE: Hide if Completed (Approved/Pending) AND Score > 0
                 // This moves them to History. Score 0 stays in Assignments to encourage retake/request.
@@ -1778,12 +1791,14 @@
             });
 
             // 4. Render
+            const paginationContainer = document.getElementById('assign-pagination');
             if (allItems.length === 0) {
                 assignmentContainer.innerHTML = `
                     <div style="text-align:center; padding:40px 20px; color:#999; opacity:0.8;">
                         <i class="fa-solid fa-mug-hot" style="font-size:3em; margin-bottom:10px;"></i><br>
                         🎉 เย้! ไม่มีภารกิจค้างแล้ว<br><small>พักผ่อนได้เลย</small>
                     </div>`;
+                if (paginationContainer) paginationContainer.innerHTML = "";
                 return;
             }
 
@@ -2045,24 +2060,19 @@
                 assignmentContainer.appendChild(card);
             });
 
-            // Make sure pages > 1 before displaying pagination
-            if (totalPages > 1) {
-                const pag = document.createElement('div');
-                pag.style.display = 'flex';
-                pag.style.justifyContent = 'center';
-                pag.style.alignItems = 'center';
-                pag.style.gap = '10px';
-                pag.style.marginTop = '15px';
-
-                const prevDisabled = assignmentPage === 1 ? 'disabled' : '';
-                const nextDisabled = assignmentPage === totalPages ? 'disabled' : '';
-
-                pag.innerHTML = `
-                    <button class="btn-sm" style="flex:1; background:${assignmentPage === 1 ? '#f8f9fa' : '#fff'}; color:${assignmentPage === 1 ? '#aaa' : '#333'}; border:1px solid #ddd;" onclick="changeAssignmentPage(-1)" ${prevDisabled}><i class="fa-solid fa-chevron-left"></i> ย้อนกลับ</button>
-                    <div style="font-size:0.85em; font-weight:bold; color:#666; padding:0 10px;">หน้า ${assignmentPage} / ${totalPages}</div>
-                    <button class="btn-sm" style="flex:1; background:${assignmentPage === totalPages ? '#f8f9fa' : '#fff'}; color:${assignmentPage === totalPages ? '#aaa' : '#333'}; border:1px solid #ddd;" onclick="changeAssignmentPage(1)" ${nextDisabled}>ถัดไป <i class="fa-solid fa-chevron-right"></i></button>
-                `;
-                assignmentContainer.appendChild(pag);
+            // Render Pagination to specific container (V83.1)
+            if (paginationContainer) {
+                if (totalPages > 1) {
+                    const prevDisabled = assignmentPage === 1 ? 'disabled' : '';
+                    const nextDisabled = assignmentPage === totalPages ? 'disabled' : '';
+                    paginationContainer.innerHTML = `
+                        <button class="btn-sm" style="flex:1; background:${assignmentPage === 1 ? '#f8f9fa' : '#fff'}; color:${assignmentPage === 1 ? '#aaa' : '#333'}; border:1px solid #ddd;" onclick="changeAssignmentPage(-1)" ${prevDisabled}><i class="fa-solid fa-chevron-left"></i> ย้อนกลับ</button>
+                        <div style="font-size:0.85em; font-weight:bold; color:#666; padding:0 10px;">หน้า ${assignmentPage} / ${totalPages}</div>
+                        <button class="btn-sm" style="flex:1; background:${assignmentPage === totalPages ? '#f8f9fa' : '#fff'}; color:${assignmentPage === totalPages ? '#aaa' : '#333'}; border:1px solid #ddd;" onclick="changeAssignmentPage(1)" ${nextDisabled}>ถัดไป <i class="fa-solid fa-chevron-right"></i></button>
+                    `;
+                } else {
+                    paginationContainer.innerHTML = "";
+                }
             }
         }
 
@@ -3389,6 +3399,32 @@
             if (content.style.display === 'none') {
                 content.style.display = 'block';
                 icon.style.transform = 'rotate(180deg)';
+            } else {
+                content.style.display = 'none';
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function toggleWorkForm() {
+            const content = document.getElementById('work-form-content');
+            const icon = document.getElementById('work-form-icon');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.style.transform = 'rotate(180deg)';
+                setTimeout(() => document.getElementById('w-title').focus(), 100);
+            } else {
+                content.style.display = 'none';
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function toggleAssignmentList() {
+            const content = document.getElementById('assignments-content');
+            const icon = document.getElementById('assign-list-icon');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.style.transform = 'rotate(180deg)';
+                renderAssignments();
             } else {
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
