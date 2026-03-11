@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio</title>
+    <title>Internship Portfolio (V83.1)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -1741,7 +1741,6 @@
                 const start = q.startTime ? q.startTime.toDate() : null;
                 const dead = q.deadline ? q.deadline.toDate() : null;
 
-                // --- 1. Basic Filters (Group & Homework) ---
                 const target = q.targetGroup || "Public";
                 if (target !== "Public" && target !== myGroup) return;
 
@@ -1749,25 +1748,18 @@
                     if (!q.assignedUsers.includes(userId)) return;
                 }
 
-                // --- 2. Visibility Logic (New Requirements) ---
+                const isActive = (q.isActive !== false);
                 const isExpired = (dead && now > dead);
-                const isActive = (q.isActive !== false); // Default to true if missing
                 const hasStarted = (start && now >= start) || !start;
 
-                if (!hasStarted) return; // Not yet started
-
-                // If attempt exists, get status and score
-                const status = attempt ? attempt.status : 'none'; // none, requesting, allowed, pending, approved
-                const score = attempt ? (attempt.score || 0) : 0;
-
-                // 🛑 RULE: Hide if NOT Active (New requirement: only show active quizzes)
+                if (!hasStarted) return;
                 if (!isActive) return;
 
-                // 🛑 RULE: Hide if Completed (Approved/Pending) AND Score > 0
-                // This moves them to History. Score 0 stays in Assignments to encourage retake/request.
+                const status = attempt ? attempt.status : 'none';
+                const score = attempt ? (attempt.score || 0) : 0;
+
                 if ((status === 'approved' || status === 'pending') && score > 0) return;
 
-                // ✅ Show: Active quizzes, Quizzes in progress (requesting/allowed), or Completed with 0 points
                 allItems.push({
                     type: 'quiz',
                     data: q,
