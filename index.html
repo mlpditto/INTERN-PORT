@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V84.1)</title>
+    <title>Internship Portfolio (V84.2)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -918,7 +918,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V84.1 (Quiz UI & Mode Refactor)
+                V84.2 (Quiz UI & Mode Refactor)
             </div>
         </div>
     </div>
@@ -1029,9 +1029,35 @@
         </div>
     </div>
 
+    <div id="quizFeedbackModal" class="modal">
+        <div class="modal-content" style="max-width:450px; text-align: left;">
+            <h3 style="color:var(--primary); margin-top:0;"><i class="fa-solid fa-comment-heart"></i> ส่งความเห็นหลังทำ (Feedback)</h3>
+            <div id="feedback-score-display" style="text-align:center; padding:15px; background:#f0f7ff; border-radius:12px; margin-bottom:15px;">
+                <div style="font-size:0.9em; color:#666;">คะแนนที่คุณได้รับ:</div>
+                <div id="feedback-score-val" style="font-size:2.5em; font-weight:800; color:var(--primary);">0.00</div>
+                <div id="feedback-time-val" style="font-size:0.9em; color:#e67e22; font-weight:bold; margin-top:5px;">🕒 เวลาที่ใช้: 00:00 นาที</div>
+            </div>
+            
+            <label style="font-weight:bold; display:block; margin-bottom:5px;">⭐ ให้คะแนนชุดข้อสอบนี้ (0-10 ดาว):</label>
+            <input type="range" id="fb-rating" min="0" max="10" step="1" value="10" 
+                   oninput="document.getElementById('fb-rating-num').innerText = this.value"
+                   style="width:100%; margin:10px 0; accent-color:var(--primary);">
+            <div style="text-align:center; font-weight:bold; color:var(--primary); margin-bottom:15px;">
+                <span id="fb-rating-num" style="font-size:1.5em;">10</span> / 10
+            </div>
+
+            <label style="font-weight:bold; display:block; margin-bottom:5px;">🎯 ชุดข้อสอบต่อไปที่อยากทำ?</label>
+            <input type="text" id="fb-next-topic" placeholder="เช่น ขั้นตอนการจ่ายยา, การดูแลเคส..." style="width:100%;">
+
+            <label style="font-weight:bold; display:block; margin-bottom:5px;">💬 ความเห็นอื่นๆ (Optional):</label>
+            <textarea id="fb-comment" rows="3" placeholder="ระบุความยาก-ง่าย หรือข้อเสนอแนะ..." style="width:100%; resize:none;"></textarea>
+
+            <button class="btn-primary" onclick="submitFeedback()" style="width:100%; margin-top:10px; font-weight:bold; height:50px; border-radius:15px; background:linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%);">
+                ส่งความเห็น (Submit Feedback)
+            </button>
+        </div>
     </div>
-    </div>
-    </div>
+
 
     <!-- 🔥 Leaderboard Modal (V77.8) -->
     <div id="leaderboardModal" class="modal">
@@ -1139,6 +1165,9 @@
         let shuffleMap = []; // 🔥 V78: Shuffle mapping per question [questionIndex] => [originalIndex0, originalIndex1, ...]
         let isPracticeMode = false; // 🔥 V78: ONE-TIME practice mode flag
         let assignmentPage = 1; // 🔥 V79.7: Track current page for assignments
+        let quizTotalStartTime = null; // 🔥 V84.1: Track when quiz actually started
+        let currentQuizIdForFeedback = null;
+        let currentPointsForFeedback = 0;
 
         // --- Initialization ---
         function updateStatus(msg) {
@@ -2154,6 +2183,7 @@
         async function runQuiz(quizId) {
             currentQuiz = quizzesCache.find(x => x.id === quizId);
             if (!currentQuiz) return;
+            quizTotalStartTime = new Date(); // 🔥 V84.1: Track start time
 
             if (currentQuiz.deadline && new Date() > currentQuiz.deadline.toDate()) {
                 const existing = quizAttemptsCache[quizId];
@@ -3261,6 +3291,25 @@
                 if (isPracticeMode) {
                     isPracticeMode = false;
                     setTimeout(() => showPracticeResult(currentQuiz, correctCount, userAnswers), 100);
+                } else if (currentQuiz.quizType === 'standard' || !currentQuiz.quizType) {
+                    // 🔥 V84.1: Show Feedback Modal for Normal Quiz (standard)
+                    currentQuizIdForFeedback = currentQuiz.id;
+                    currentPointsForFeedback = pointsAwarded;
+
+                    const timeUsed = quizTotalStartTime ? Math.floor((new Date() - quizTotalStartTime) / 1000) : 0;
+                    const mins = Math.floor(timeUsed / 60);
+                    const secs = timeUsed % 60;
+
+                    document.getElementById('feedback-score-val').innerText = pointsAwarded.toFixed(2);
+                    document.getElementById('feedback-time-val').innerText = `🕒 เวลาที่ใช้: ${mins}:${secs.toString().padStart(2, '0')} นาที`;
+                    document.getElementById('fb-rating').value = 10;
+                    document.getElementById('fb-rating-num').innerText = "10";
+                    document.getElementById('fb-next-topic').value = "";
+                    document.getElementById('fb-comment').value = "";
+
+                    setTimeout(() => {
+                        document.getElementById('quizFeedbackModal').style.display = 'flex';
+                    }, 100);
                 } else {
                     setTimeout(() => {
                         alert(isPoll ? "ส่งโพลเรียบร้อย!" : `ส่งคำตอบเรียบร้อย!\nคะแนนที่คาดว่าจะได้รับ: ${pointsAwarded.toFixed(3)} แต้ม`);
@@ -3355,6 +3404,37 @@
 
             resultContainer.innerHTML = html;
             document.getElementById('quizResultModal').style.display = 'flex';
+        }
+
+        // 🔥 V84.1: Submit Quiz Feedback
+        async function submitFeedback() {
+            const rating = document.getElementById('fb-rating').value;
+            const nextTopic = document.getElementById('fb-next-topic').value;
+            const comment = document.getElementById('fb-comment').value;
+
+            if (!currentQuizIdForFeedback) return;
+
+            try {
+                const timeUsed = quizTotalStartTime ? Math.floor((new Date() - quizTotalStartTime) / 1000) : 0;
+                await db.collection("quiz_feedback").add({
+                    quizId: currentQuizIdForFeedback,
+                    userId: userId,
+                    displayName: userProfile.displayName,
+                    rating: parseInt(rating),
+                    nextTopic: nextTopic,
+                    comment: comment,
+                    timeUsedSeconds: timeUsed,
+                    pointsEarned: currentPointsForFeedback,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                document.getElementById('quizFeedbackModal').style.display = 'none';
+                alert("🙏 ขอบคุณสำหรับความเห็นครับ! ข้อมูลของคุณถูกบันทึกเรียบร้อยแล้ว");
+                currentQuizIdForFeedback = null;
+                quizTotalStartTime = null;
+            } catch (e) {
+                alert("Feedback Error: " + e.message);
+            }
         }
 
         // 🔥 V78: View practice answers (from saved attempt data)
