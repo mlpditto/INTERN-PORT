@@ -3,6 +3,26 @@
 > [!IMPORTANT]
 > **📢 Version Policy:** ทุกการ Commit หรือการปรับปรุงชุดคำสั่ง ต้องมีการขยับเวอร์ชัน (Versioning) เสมอ ทั้งในหน้า UI และในเอกสาร Markdown นี้ เพื่อป้องกันความสับสนในการ Deploy
 
+## [2026-03-12] Session Updates (V83.0 → V84.3)
+
+### 1. Enrollment Flow Overhaul (V84.3)
+- **Multi-Step Enrollment Modal:** Introduced a new three-phase enrollment flow for users:
+    - **Code Entry:** Users can enter a 6-digit enrollment code for instant access.
+    - **Access Request:** Users without a code can submit a request with their full name, nickname, target group, and internship dates.
+    - **Pending Status:** Displays a clear "Pending Review" screen once a request is submitted, preventing access until approved.
+- **Strict Registration:** Removed the ability to "Skip" the enrollment process, ensuring all users are identified and approved before participating.
+- **Improved Security:** Access requests are stored securely in the `reports` collection for admin review.
+
+### 2. Admin Access Management (V84.3)
+- **Pending Requests Dashboard:** Added a new specialized section in the Admin Panel to view and manage incoming access requests.
+- **Real-time Review:** Integrated a dedicated listener for `access_request` reports.
+- **One-Click Approval:** Admins can approve requests with a single click, which automatically creates the user's profile and grants access.
+- **Rejection Flow:** Admins can easily reject and remove invalid requests from the queue.
+
+### 3. Quiz Visibility Refinement (V84.3)
+- **Auto-Hide Expired/Unstarted:** Quizzes that have passed their deadline and haven't been started by the user are now hidden from the "Assignments" list to reduce clutter.
+- **Clean Dashboard:** Focuses the user's attention on active and in-progress tasks.
+
 ## [2026-03-10] Session Updates (V82.2 → V83.0)
 
 ### 1. Unified Compact Profile Dates (V83.0)

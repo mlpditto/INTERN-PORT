@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V84.2)</title>
+    <title>Internship Portfolio (V84.3)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -1136,21 +1136,109 @@
         </div>
     </div>
 
-    <!-- Enrollment Code Modal -->
-    <div id="enrollModal" class="modal" style="z-index:10000;">
-        <div class="modal-content" style="max-width:400px; text-align:center;">
-            <h3 style="margin-bottom:5px;">📋 ลงทะเบียนเข้าร่วม</h3>
-            <p style="font-size:0.85em; color:#666; margin-top:0;">กรอกรหัสลงทะเบียนที่ได้รับจากอาจารย์/ผู้ดูแล</p>
-            <input type="text" id="enroll-code-input" placeholder="เช่น A3X7K2" maxlength="6"
-                style="text-align:center; font-size:1.5em; font-family:monospace; font-weight:bold; letter-spacing:5px; text-transform:uppercase; padding:12px; border:2px solid #6f42c1; border-radius:12px; margin-bottom:10px;"
-                onkeypress="if(event.key==='Enter')claimEnrollmentCode()">
-            <div id="enroll-status" style="font-size:0.8em; min-height:20px; margin-bottom:10px;"></div>
-            <button class="btn-primary" onclick="claimEnrollmentCode()"
-                style="width:100%; background:#6f42c1; padding:12px; font-size:1em; border-radius:10px;"><i
-                    class="fa-solid fa-check"></i> ยืนยันรหัส</button>
-            <button onclick="skipEnrollment()"
-                style="width:100%; margin-top:8px; background:none; border:none; color:#999; font-size:0.82em; cursor:pointer; padding:8px;">ข้ามขั้นตอนนี้
-                (ไม่มีรหัส)</button>
+    <!-- Enrollment Code Modal (V84.3 Upgrade) -->
+    <div id="enrollModal" class="modal" style="display:none; z-index:10000; background: rgba(0,0,0,0.95);">
+        <div class="modal-content" style="max-width:400px; text-align:center; padding: 25px;">
+            
+            <!-- View 1: Initial Entry (Code) -->
+            <div id="enroll-initial-view">
+                <h3 style="margin-bottom:8px; color:#6f42c1;"><i class="fa-solid fa-id-card"></i> ลงทะเบียนเข้าร่วม</h3>
+                <p style="font-size:0.87em; color:#666; margin-top:0; line-height:1.4;">ยินดีต้อนรับ! กรุณากรอกรหัสลงทะเบียนที่คุณได้รับจากผู้ดูแลระบบ</p>
+                
+                <div style="margin: 20px 0;">
+                    <input type="text" id="enroll-code-input" placeholder="รหัส 6 หลัก" maxlength="6"
+                        style="text-align:center; font-size:1.6em; font-family:'Courier New', monospace; font-weight:900; letter-spacing:6px; text-transform:uppercase; padding:15px; border:2px solid #6f42c1; border-radius:14px; width: 100%; box-shadow: 0 4px 12px rgba(111, 66, 193, 0.15);"
+                        onkeypress="if(event.key==='Enter')claimEnrollmentCode()">
+                </div>
+
+                <div id="enroll-status" style="font-size:0.85em; min-height:24px; margin-bottom:15px; font-weight:500;"></div>
+                
+                <button class="btn-primary" onclick="claimEnrollmentCode()"
+                    style="width:100%; background:linear-gradient(135deg, #6f42c1 0%, #4361ee 100%); padding:14px; font-size:1.1em; border-radius:12px; border:none; box-shadow: 0 4px 15px rgba(111, 66, 193, 0.3);">
+                    <i class="fa-solid fa-unlock-keyhole"></i> ตรวจสอบรหัส
+                </button>
+                
+                <div style="margin-top:25px; border-top:1px solid #eee; padding-top:20px;">
+                    <p style="font-size:0.82em; color:#999; margin-bottom:10px;">หากคุณยังไม่มีรหัสลงทะเบียน</p>
+                    <button class="btn-sm" onclick="showRequestView()" 
+                        style="background:white; color:#6f42c1; border:1px solid #6f42c1; width:100%; font-weight:600; padding:12px; border-radius:10px; cursor:pointer; transition: 0.2s;">
+                        <i class="fa-solid fa-paper-plane"></i> ขอรหัสเข้าใช้งาน (Request Access)
+                    </button>
+                </div>
+            </div>
+
+            <!-- View 2: Request Form -->
+            <div id="enroll-request-view" style="display:none;">
+                <h3 style="margin-bottom:5px; color:#e67e22;"><i class="fa-solid fa-user-plus"></i> ขอสิทธิ์เข้าใช้งาน</h3>
+                <p style="font-size:0.82em; color:#666; margin-bottom:15px;">กรุณากรอกข้อมูลเพื่อส่งให้ผู้ดูแลอนุมัติ</p>
+                
+                <div style="text-align:left; display:flex; flex-direction:column; gap:8px;">
+                    <div>
+                        <label style="font-size:0.75em; font-weight:800; color:#444; text-transform:uppercase;">ชื่อ-นามสกุล (ภาษาไทย)</label>
+                        <input type="text" id="req-name" placeholder="เช่น นายสมชาย ใจดี" style="margin:4px 0 0 0; padding:10px;">
+                    </div>
+                    
+                    <div>
+                        <label style="font-size:0.75em; font-weight:800; color:#444; text-transform:uppercase;">ชื่อเล่น</label>
+                        <input type="text" id="req-nickname" placeholder="เช่น ก้อง" style="margin:4px 0 0 0; padding:10px;">
+                    </div>
+                    
+                    <div>
+                        <label style="font-size:0.75em; font-weight:800; color:#444; text-transform:uppercase;">กลุ่ม/สายงาน</label>
+                        <select id="req-group" style="width:100%; padding:10px; border-radius:8px; border:1px solid #ddd; margin-top:4px; font-family:'Kanit'; font-size:0.95em; background:white;">
+                            <option value="Intern">Intern (นศ.ฝึกงานทั่วไป)</option>
+                            <option value="Extern">Extern (นศภ. ผลัดปฏิบัติงาน)</option>
+                            <option value="Junior">Junior (น้องใหม่/ฝึกงานระยะสั้น)</option>
+                            <option value="Pharmacists">Pharmacists</option>
+                            <option value="IT">IT / Dev</option>
+                            <option value="Public">อื่นๆ (Public)</option>
+                        </select>
+                    </div>
+
+                    <div class="date-input-group" style="margin-top:5px;">
+                        <div>
+                            <label style="font-size:0.75em; font-weight:800; color:#444;">วันเริ่มฝึกงาน</label>
+                            <input type="date" id="req-start" class="grad-date-input" style="padding:10px; margin-top:4px;">
+                        </div>
+                        <div>
+                            <label style="font-size:0.75em; font-weight:800; color:#444;">วันสิ้นสุด</label>
+                            <input type="date" id="req-end" class="grad-date-input" style="padding:10px; margin-top:4px;">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="req-status" style="font-size:0.82em; min-height:20px; margin-top:10px;"></div>
+                
+                <button class="btn-primary" onclick="submitAccessRequest()" 
+                    style="background:linear-gradient(135deg, #e67e22 0%, #d35400 100%); margin-top:10px; width:100%; font-size:1em; border:none; padding:12px; border-radius:10px;">
+                    ส่งคำขอ (Submit Request)
+                </button>
+                
+                <button class="btn-sm" onclick="showInitialView()" 
+                    style="background:none; color:#999; margin-top:10px; border:none; cursor:pointer;">
+                    <i class="fa-solid fa-arrow-left"></i> ย้อนกลับไปกรอกรหัส
+                </button>
+            </div>
+            
+            <!-- View 3: Pending Approval -->
+            <div id="enroll-pending-view" style="display:none; padding:20px 0;">
+                <div style="width:80px; height:80px; background:#fff3cd; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px;">
+                    <i class="fa-solid fa-hourglass-half" style="font-size:2.5em; color:#f39c12; animation: pulse 2s infinite;"></i>
+                </div>
+                <h3 style="color:#856404; margin-bottom:10px;">ส่งคำขอสำเร็จ</h3>
+                <p style="font-size:0.92em; color:#666; line-height:1.6;">
+                    กรุณารอผู้ดูแลระบบตรวจสอบและอนุมัติสิทธิ์ <br>
+                    เมื่ออนุมัติแล้วคุณจะสามารถเข้าใช้งานได้ทันทีครับ
+                </p>
+                <div style="background:#f8f9fa; padding:15px; border-radius:12px; margin-top:20px; text-align:left;">
+                    <div style="font-size:0.8em; color:#999; margin-bottom:5px;">UID: <code id="req-uid-display" style="color:#555;"></code></div>
+                    <div id="req-info-summary" style="font-size:0.85em; color:#444; font-weight:600;"></div>
+                </div>
+                <button class="btn-sm" onclick="location.reload()" 
+                    style="background:#4361ee; color:white; border:none; margin-top:20px; width:100%; padding:14px; border-radius:12px; font-weight:bold;">
+                    <i class="fa-solid fa-rotate"></i> ตรวจสอบสถานะการอนุมัติ
+                </button>
+            </div>
         </div>
     </div>
 
@@ -1466,12 +1554,86 @@
             }
         }
 
-        // 🔥 V79.6: Enrollment Code System
+        // 🔥 V79.6 & V84.3: Enrollment Code & Request System
         function showEnrollmentModal() {
             document.getElementById('enrollModal').style.display = 'flex';
             document.getElementById('enroll-code-input').value = '';
             document.getElementById('enroll-status').innerHTML = '';
+            showInitialView();
+            
+            // 🔥 V84.3: Check if already has pending request
+            checkPendingAccessRequest();
+        }
+
+        function showInitialView() {
+            document.getElementById('enroll-initial-view').style.display = 'block';
+            document.getElementById('enroll-request-view').style.display = 'none';
+            document.getElementById('enroll-pending-view').style.display = 'none';
             setTimeout(() => document.getElementById('enroll-code-input').focus(), 300);
+        }
+
+        function showRequestView() {
+            document.getElementById('enroll-initial-view').style.display = 'none';
+            document.getElementById('enroll-request-view').style.display = 'block';
+            document.getElementById('enroll-pending-view').style.display = 'none';
+        }
+
+        async function checkPendingAccessRequest() {
+            const snap = await db.collection("reports")
+                .where("userId", "==", userId)
+                .where("type", "==", "access_request")
+                .limit(1).get();
+            
+            if (!snap.empty) {
+                const req = snap.docs[0].data();
+                showPendingView(req);
+            }
+        }
+
+        function showPendingView(data) {
+            document.getElementById('enroll-initial-view').style.display = 'none';
+            document.getElementById('enroll-request-view').style.display = 'none';
+            document.getElementById('enroll-pending-view').style.display = 'block';
+            document.getElementById('req-uid-display').innerText = userId.substring(0, 10) + "...";
+            document.getElementById('req-info-summary').innerText = `ส่งคำขอสำหรับ: ${data.displayName || 'รอยืนยัน'}`;
+        }
+
+        async function submitAccessRequest() {
+            const name = document.getElementById('req-name').value.trim();
+            const nick = document.getElementById('req-nickname').value.trim();
+            const group = document.getElementById('req-group').value;
+            const start = document.getElementById('req-start').value;
+            const end = document.getElementById('req-end').value;
+            const statusEl = document.getElementById('req-status');
+
+            if (!name || !nick || !start || !end) {
+                statusEl.innerHTML = '<span style="color:#ef233c; font-weight:bold;">❌ กรุณากรอกข้อมูลให้ครบทุกช่องครับ</span>';
+                return;
+            }
+
+            statusEl.innerHTML = '<span style="color:#4361ee;">🚀 กำลังส่งคำขอ...</span>';
+
+            try {
+                const requestData = {
+                    userId: userId,
+                    displayName: name,
+                    pictureUrl: userProfile.pictureUrl || "",
+                    nickName: nick,
+                    group: group,
+                    startDate: start,
+                    endDate: end,
+                    type: "access_request",
+                    subject: `🚩 ขอสิทธิ์เข้าใช้งานใหม่ (${group})`,
+                    message: `ขอลงทะเบียน: ${name} (${nick})\nกลุ่ม: ${group}\nวันที่: ${start} ถึง ${end}`,
+                    status: "รอตรวจ",
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                await db.collection("reports").add(requestData);
+                showPendingView(requestData);
+            } catch (e) {
+                statusEl.innerHTML = `<span style="color:#ef233c;">❌ Error: ${e.message}</span>`;
+            }
         }
 
         async function claimEnrollmentCode() {
@@ -1484,13 +1646,13 @@
                 return;
             }
 
-            statusEl.innerHTML = '<span style="color:#999;">🔍 กำลังตรวจสอบ...</span>';
+            statusEl.innerHTML = '<span style="color:#999;">🔍 กำลังตรวจสอบรหัส...</span>';
 
             try {
                 const snap = await db.collection("pre_users").where("code", "==", code).limit(1).get();
 
                 if (snap.empty) {
-                    statusEl.innerHTML = '<span style="color:#ef233c;">❌ ไม่พบรหัสนี้ในระบบ กรุณาตรวจสอบอีกครั้ง</span>';
+                    statusEl.innerHTML = '<span style="color:#ef233c;">❌ ไม่พบรหัสนี้ กรุณาย้อนไป "ขอรหัส" หากไม่มี</span>';
                     return;
                 }
 
@@ -1498,7 +1660,7 @@
                 const preData = preDoc.data();
 
                 if (preData.claimed) {
-                    statusEl.innerHTML = '<span style="color:#ef233c;">❌ รหัสนี้ถูกใช้งานแล้ว</span>';
+                    statusEl.innerHTML = '<span style="color:#ef233c;">❌ รหัสนี้ถูกใช้งานไปแล้วครับ</span>';
                     return;
                 }
 
@@ -1521,6 +1683,9 @@
                     if (parts.length >= 2) {
                         userData.firstName = parts[0];
                         userData.lastName = parts.slice(1).join(' ');
+                    } else {
+                        userData.firstName = preData.fullName;
+                        userData.lastName = "";
                     }
                 }
 
@@ -1533,27 +1698,20 @@
                     claimedByName: userProfile.displayName,
                     claimedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
+                
+                // 🔥 If they had a request, mark it as processed (Optional but good)
+                const reqSnap = await db.collection("reports").where("userId", "==", userId).where("type", "==", "access_request").get();
+                reqSnap.forEach(doc => doc.ref.delete());
 
-                statusEl.innerHTML = `<span style="color:#28a745;">✅ ลงทะเบียนสำเร็จ! ยินดีต้อนรับ ${preData.fullName}</span>`;
+                statusEl.innerHTML = `<span style="color:#28a745; font-weight:bold;">✅ สำเร็จ! ยินดีต้อนรับ ${preData.fullName || userProfile.displayName}</span>`;
                 setTimeout(() => {
                     document.getElementById('enrollModal').style.display = 'none';
+                    // Main app will handle unhiding via checkUser
                 }, 1500);
             } catch (e) {
                 console.error("Enrollment error:", e);
                 statusEl.innerHTML = `<span style="color:#ef233c;">❌ Error: ${e.message}</span>`;
             }
-        }
-
-        function skipEnrollment() {
-            // Create user normally without enrollment code
-            db.collection("users").doc(userId).set({
-                displayName: userProfile.displayName,
-                pictureUrl: userProfile.pictureUrl || "",
-                score: 0,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            document.getElementById('enrollModal').style.display = 'none';
-            document.getElementById('date-alert').style.display = 'block';
         }
 
         async function saveMyDates() {
@@ -1784,6 +1942,9 @@
 
                 const status = attempt ? attempt.status : 'none';
                 const score = attempt ? (attempt.score || 0) : 0;
+
+                // 🔥 V84.3 Fix: Hide expired quizzes that haven't been started to reduce clutter
+                if (isExpired && status === 'none') return;
 
                 if ((status === 'approved' || status === 'pending') && score > 0) return;
 

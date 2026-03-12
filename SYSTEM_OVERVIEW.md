@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V81.3) Overview
+# MLP Internship Portfolio (V84.3) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -369,5 +369,10 @@ service cloud.firestore {
 }
 ```
 
+### 7. ระบบขอเข้าใช้งาน (Access Request System - V84.3)
+- **Pending Review Interface:** ส่วนจัดการคำขอเข้าใช้งานใหม่ที่ผู้ใช้ส่งมาจากหน้า LIFF
+- **One-click Approval:** ระบบอนุมัติพร้อมสร้าง User Profile ให้อัตโนมัติ (Automated User Onboarding)
+- **Live Sync:** ดึงข้อมูลจากคอลเลกชัน `reports` (ประเภท `access_request`) แบบ Real-time
+
 ---
-*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V80.0) โดย Antigravity AI*
+*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V84.3) โดย Antigravity AI*

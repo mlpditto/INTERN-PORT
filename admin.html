@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Management ADMIN (V84.2)</title>
+    <title>Internship Management ADMIN (V84.3)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -969,11 +969,32 @@
             <div class="header-row"
                 style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <div class="header">
-                    <h2><i class="fa-solid fa-gauge-high"></i> IP Admin Dashboard <small>(V84.2)</small></h2>
+                    <h2><i class="fa-solid fa-gauge-high"></i> IP Admin Dashboard <small>(V84.3)</small></h2>
                 </div>
                 <button id="btn-toggle-work-archive" class="btn-toggle active" onclick="toggleWorkArchive()">
                     <i class="fa-solid fa-box-archive"></i> fin·ished
                 </button>
+            </div>
+
+            <!-- 🔥 Access Request Section (V84.3) -->
+            <div id="access-request-section" style="margin-bottom:30px; display:none;">
+                <h4 style="color:#6f42c1; margin-bottom:10px;"><i class="fa-solid fa-user-plus"></i>
+                    คำขอเข้าใช้งานใหม่ (Pending Access Requests)</h4>
+                <div style="overflow-x:auto;">
+                    <table id="accessRequestTable" style="border-top: 3px solid #6f42c1;">
+                        <thead>
+                            <tr style="background:#f3f0ff;">
+                                <th>Time</th>
+                                <th>Name / Nickname</th>
+                                <th>Group</th>
+                                <th>Internship Period</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <hr style="margin:20px 0; border:0; border-top:1px solid #ddd;">
             </div>
 
             <!-- Quiz Pending Review Section -->
@@ -4267,7 +4288,6 @@
                 renderLeaderboard();
             });
 
-            // 🔥 Load Pre-registered Users (V79.6)
             db.collection("pre_users").orderBy("createdAt", "desc").onSnapshot(s => {
                 preRegData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 if (document.getElementById('preRegModal').style.display === 'block') {
@@ -4275,6 +4295,92 @@
                 }
                 renderTable('users');
             });
+
+            // 🔥 Access Request Listener (V84.3)
+            db.collection("reports").where("type", "==", "access_request").where("status", "==", "รอตรวจ")
+                .onSnapshot(s => {
+                    renderAccessRequests(s.docs.map(d => ({ id: d.id, ...d.data() })));
+                });
+        }
+
+        function renderAccessRequests(data) {
+            const tbody = document.querySelector("#accessRequestTable tbody");
+            const section = document.getElementById('access-request-section');
+            if (data.length === 0) {
+                section.style.display = "none";
+                return;
+            }
+            section.style.display = "block";
+            tbody.innerHTML = "";
+            
+            data.forEach(req => {
+                const time = req.timestamp ? req.timestamp.toDate().toLocaleString('th-TH') : '-';
+                tbody.innerHTML += `
+                    <tr>
+                        <td style="font-size:0.8em;">${time}</td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <img src="${req.pictureUrl || 'https://via.placeholder.com/40'}" style="width:30px; height:30px; border-radius:50%;">
+                                <div>
+                                    <div style="font-weight:bold;">${req.displayName}</div>
+                                    <div style="font-size:0.75em; color:#666;">AKA: ${req.nickName || '-'}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td><span class="badge" style="background:#6f42c1;">${req.group}</span></td>
+                        <td style="font-size:0.85em;">
+                            ${req.startDate} <br> <span style="color:#999;font-size:0.9em;"> ถึง </span> <br> ${req.endDate}
+                        </td>
+                        <td>
+                            <div style="display:flex; gap:5px;">
+                                <button class="btn-sm btn-success" onclick="approveAccessRequest('${req.id}')">Approve</button>
+                                <button class="btn-sm btn-danger" onclick="rejectAccessRequest('${req.id}')">Reject</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function approveAccessRequest(id) {
+            const reqDoc = await db.collection("reports").doc(id).get();
+            if (!reqDoc.exists) return;
+            const data = reqDoc.data();
+
+            if (!confirm(`อนุมัติสิทธิ์ให้คุณ ${data.displayName} เข้าใช้งานล่วงหน้า?`)) return;
+
+            try {
+                const batch = db.batch();
+                
+                // 1. Create User
+                const userRef = db.collection("users").doc(data.userId);
+                batch.set(userRef, {
+                    displayName: data.displayName,
+                    pictureUrl: data.pictureUrl || "",
+                    nickName: data.nickName || "",
+                    group: data.group || "Public",
+                    startDate: data.startDate || "",
+                    endDate: data.endDate || "",
+                    score: 0,
+                    status: "active",
+                    approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    registrationType: "request"
+                });
+
+                // 2. Mark Report as Done (or Delete)
+                batch.update(db.collection("reports").doc(id), { status: "อนุมัติแล้ว", approvedAt: firebase.firestore.FieldValue.serverTimestamp() });
+
+                await batch.commit();
+                showToast("User Approved & Created!");
+            } catch (e) { alert(e.message); }
+        }
+
+        async function rejectAccessRequest(id) {
+            if (!confirm("ปฏิเสธคำขอนี้? (รายการจะถูกลบ)")) return;
+            try {
+                await db.collection("reports").doc(id).delete();
+                showToast("Request Rejected");
+            } catch (e) { alert(e.message); }
         }
 
         async function allowLateQuiz(id) {
