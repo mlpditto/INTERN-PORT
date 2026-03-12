@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Management ADMIN (V84.3)</title>
+    <title>Internship Management ADMIN (V84.4)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -4716,9 +4716,10 @@
 
                     const certBtn = `<button class="btn-sm btn-warning" onclick="openCertModal('${d.id}')" style="font-size:0.7em; padding:4px 8px; border-radius:4px;" title="Certificate">🎓</button>`;
                     const historyBtn = `<button class="btn-sm btn-dark" onclick="showHistory('${d.id}','${d.displayName}',${d.score || 0})" style="font-size:0.7em; padding:4px 8px; border-radius:4px;" title="History">📜</button>`;
+                    const keyBtn = `<button class="btn-sm" onclick="regenPreRegCode('${d.id}')" style="font-size:0.75em; padding:4px 8px; border-radius:4px; background:#6f42c1; color:white;" title="Gen Enrollment Code from this User"><i class="fa-solid fa-key"></i></button>`;
                     const delBtn = `<button class="btn-sm btn-danger" onclick="delUser('${d.id}')" style="font-size:0.75em; padding:4px 8px; border-radius:4px;" title="Delete User"><i class="fa-solid fa-trash-can"></i></button>`;
 
-                    const actionsGroup = `<div style="display:flex; gap:4px;">${certBtn}${historyBtn}${delBtn}</div>`;
+                    const actionsGroup = `<div style="display:flex; gap:4px;">${certBtn}${historyBtn}${keyBtn}${delBtn}</div>`;
 
                     tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}">
                             <td>
@@ -6185,6 +6186,34 @@
                 await db.collection("pre_users").doc(id).delete();
                 showToast("Deleted");
             } catch (e) { alert(e.message); }
+        }
+
+        async function regenPreRegCode(uid) {
+            const user = usersData.find(u => u.id === uid);
+            if (!user) return;
+            if (!confirm(`สร้างรหัสลงทะเบียนใหม่โดยใช้ข้อมูลของคุณ ${user.displayName}? (ระบบจะสร้างรายการ Pre-register ใหม่จากชื่อและกลุ่มเดิม)`)) return;
+
+            let code = generateCode();
+            const existingCodes = preRegData.map(p => p.code);
+            while (existingCodes.includes(code)) code = generateCode();
+
+            try {
+                await db.collection("pre_users").add({
+                    fullName: user.fullName || user.displayName,
+                    nickname: user.nickname || "",
+                    group: user.group || "Public",
+                    startDate: user.startDate || "",
+                    endDate: user.endDate || "",
+                    code: code,
+                    claimed: false,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    sourceUserId: uid
+                });
+                showToast(`✅ Code Generated: ${code}`);
+                openPreRegModal(); // Show the code list
+            } catch (e) {
+                alert("Error: " + e.message);
+            }
         }
     </script>
 

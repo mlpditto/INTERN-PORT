@@ -3,6 +3,13 @@
 > [!IMPORTANT]
 > **📢 Version Policy:** ทุกการ Commit หรือการปรับปรุงชุดคำสั่ง ต้องมีการขยับเวอร์ชัน (Versioning) เสมอ ทั้งในหน้า UI และในเอกสาร Markdown นี้ เพื่อป้องกันความสับสนในการ Deploy
 
+## [2026-03-12] Session Updates (V84.3 → V84.4)
+
+### 1. Existing User Reset / Gen Code (V84.4)
+- **Gen Enrollment Code for Active Users:** Added a new action button (🔑) in the Users table. 
+- **Automated Pre-filling:** Clicking the key button generates a new registration code pre-filled with the existing user's name, group, and dates. This is perfect for users who lost access or need to re-link their profile.
+- **Workflow Integration:** Once generated, the admin is automatically navigated to the Pre-registration list to see the code.
+
 ## [2026-03-12] Session Updates (V83.0 → V84.3)
 
 ### 1. Enrollment Flow Overhaul (V84.3)
