@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V84.7)</title>
+    <title>Internship Portfolio (V84.8)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -766,6 +766,52 @@
                 <div id="status-row" style="display: none;"></div>
             </div>
 
+            <!-- 🔥 V84.8: Reflective Log Section (Daily Mission) -->
+            <div id="section-reflective-log" style="margin-bottom: 20px;">
+                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #e67e22;">
+                    <div onclick="toggleReflectiveSection()"
+                        style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fffbf5;">
+                        <h4 style="margin: 0; font-size: 1.1em; color: #e67e22;">
+                            <i class="fa-solid fa-book-journal-whills"></i> Reflective Log
+                            <span id="rl-streak-badge" style="font-size:0.7em; background:#fef3cd; color:#856404; padding:2px 8px; border-radius:10px; margin-left:8px; display:none;">🔥 0 วัน</span>
+                        </h4>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span id="rl-today-status" style="font-size:0.8em; color:#999;"></span>
+                            <i id="rl-section-icon" class="fa-solid fa-chevron-down" style="color: #e67e22; transition: 0.3s; font-size: 0.9em;"></i>
+                        </div>
+                    </div>
+                    <div id="rl-section-content" style="display: none; border-top: 1px solid #f0f0f0; background: #fff;">
+                        <!-- Form -->
+                        <div id="rl-form-area" style="padding: 20px; border-bottom: 1px solid #f9f9f9;">
+                            <h5 style="margin-top:0; color:#e67e22;">
+                                <i class="fa-solid fa-pen-fancy"></i> บันทึกสะท้อนตัวเองวันนี้
+                                <small style="color:#999; font-weight:normal;">(+0.1 pts อัตโนมัติ)</small>
+                            </h5>
+                            <textarea id="rl-content" rows="4" placeholder="วันนี้ฉันได้เรียนรู้อะไร? เจอปัญหาอะไร? แก้ไขอย่างไร? พรุ่งนี้จะทำอะไรต่อ?" style="margin:0; border-radius:10px; resize:none;"></textarea>
+                            <div style="display:flex; gap:10px; margin-top:10px; align-items:center;">
+                                <select id="rl-mood" style="margin:0; width:auto; border-radius:20px; padding:8px 15px; font-size:0.9em;">
+                                    <option value="😊">😊 ดี</option>
+                                    <option value="😐">😐 เฉยๆ</option>
+                                    <option value="😓">😓 เหนื่อย</option>
+                                    <option value="🤔">🤔 สับสน</option>
+                                    <option value="💪">💪 มีกำลังใจ</option>
+                                    <option value="🎉">🎉 สำเร็จ!</option>
+                                </select>
+                                <div style="flex-grow:1;"></div>
+                                <button id="rl-submit-btn" class="btn-primary" onclick="submitReflectiveLog()" style="border-radius:20px; padding:8px 25px; font-weight:bold; background:linear-gradient(135deg, #e67e22 0%, #f39c12 100%); border:none;">
+                                    <i class="fa-solid fa-paper-plane"></i> ส่งบันทึก
+                                </button>
+                            </div>
+                        </div>
+                        <!-- History -->
+                        <div style="padding: 20px; background: #fffdf8;">
+                            <h5 style="margin-top:0; color:#333;"><i class="fa-solid fa-clock-rotate-left"></i> บันทึกย้อนหลัง (7 วัน)</h5>
+                            <div id="rl-history-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="section-assignments" style="margin-bottom: 20px;">
                 <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #8e44ad;">
                     <div onclick="toggleAssignmentList()"
@@ -891,6 +937,8 @@
                 </div>
             </div>
 
+            <!-- Moved: Reflective Log is now above Assignments -->
+
             <div id="section-general-work">
                 <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #28a745;">
                     <div onclick="toggleWorkSection()"
@@ -918,7 +966,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V84.7 (Quest Fix & UI Update)
+                V84.8 (Scheduled Quest & Reflective Log)
             </div>
         </div>
     </div>
@@ -1403,6 +1451,7 @@
                 loadDivisionConfig();
                 loadGroupSettings();
                 loadMyCases(); // 🔥 Added V84.1
+                loadReflectiveLogs(); // 🔥 Added V84.8
 
                 // Start Timer Loop
                 setInterval(checkExpiry, 1000);
@@ -1870,6 +1919,10 @@
         }
 
         // --- Quest System (V56 Logic) ---
+        function getQuestTagColor(tag) {
+            const colors = { DIS:'#3b82f6', INFOGRAPHIC:'#8b5cf6', WRITING:'#10b981', CASE_STUDY:'#f59e0b', PRESENTATION:'#ef4444', RESEARCH:'#06b6d4', REVIEW:'#6366f1', OTHER:'#6b7280' };
+            return colors[tag] || '#6b7280';
+        }
         function loadAllQuests() { db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(s => { questsCache = s.docs.map(doc => ({ id: doc.id, ...doc.data() })); renderAssignments(); renderHistory(); }); }
         function loadMySubmissions() { db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => { mySubmissionsCache = {}; s.forEach(doc => { mySubmissionsCache[doc.data().questId] = { id: doc.id, ...doc.data() }; }); renderAssignments(); renderHistory(); }); }
 
@@ -1907,6 +1960,12 @@
                 // 🔥 Audience Group Filter (V77.7)
                 const target = q.targetGroup || "Public";
                 if (target !== "Public" && target !== myGroup) return;
+
+                // 🔥 V84.8: Scheduled Quest Filter — don't show if startTime hasn't arrived
+                if (q.startTime) {
+                    const st = q.startTime.toDate ? q.startTime.toDate() : new Date(q.startTime);
+                    if (now < st) return;
+                }
 
                 // Filter expired if not interactable
                 if (status === 'none' && q.deadline && now > q.deadline.toDate()) return;
@@ -2035,7 +2094,7 @@
                         } else {
                             // Pre-start info
                             bodyHtml += `<div style="margin-top:10px; font-size:0.9em; color:#666;">${deadlineText}</div>`;
-                            actionHtml = `<button class="btn-primary" id="btn-recv-${qId}" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border:none;" onclick="openConfirmStart('${qId}', '${q.question.replace(/'/g, "")}', ${q.durationMinutes || 30})">⚡ Start Quest</button>`;
+                            actionHtml = `<button class="btn-primary" id="btn-recv-${qId}" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border:none;" onclick="openConfirmStart('${qId}', '${q.question.replace(/'/g, "").replace(/\n/g, " ")}', ${q.durationMinutes || 30})">⚡ Start Quest</button>`;
                         }
                     } else if (status === 'received') {
                         const dl = myQ.deadline ? myQ.deadline.toDate().getTime() : 0;
@@ -2057,7 +2116,7 @@
                         bodyHtml = `<div style="color:#ef233c; font-weight:bold; text-align:center;">❌ ภารกิจล้มเหลว (Failed)</div>`;
                         const cd = myQ.cooldownUntil ? myQ.cooldownUntil.toDate() : null;
                         if (cd && now >= cd) {
-                            actionHtml = `<button class="btn-warning" onclick="openConfirmStart('${qId}', '${q.question.replace(/'/g, "")}', ${q.durationMinutes || 30})">🔄 เริ่มใหม่ (Retry)</button>`;
+                            actionHtml = `<button class="btn-warning" onclick="openConfirmStart('${qId}', '${q.question.replace(/'/g, "").replace(/\n/g, " ")}', ${q.durationMinutes || 30})">🔄 เริ่มใหม่ (Retry)</button>`;
                         } else {
                             actionHtml = `<button class="btn-dark" disabled>🚫 ติด Cooldown</button>`;
                         }
@@ -2067,9 +2126,10 @@
                     card.innerHTML = `
                         <div class="assign-header">
                             <div class="assign-icon icon-quest"><i class="fa-solid fa-scroll"></i></div>
-                            <div class="assign-info">
-                                <h4>${q.question}</h4>
+                            <div class="assign-info" style="min-width:0;">
+                                <div style="font-weight:bold; font-size:1.1em; color:#333; line-height:1.4; white-space:pre-wrap; word-break:break-word;">${q.question}</div>
                                 <span class="assign-tag">Daily Quest</span>
+                                ${q.tag ? `<span class="assign-tag" style="background:${getQuestTagColor(q.tag)}; color:white; margin-left:4px;">${q.tag}</span>` : ''}
                             </div>
                         </div>
                         <div class="assign-body">${bodyHtml}</div>
@@ -3707,6 +3767,165 @@
             } else {
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        // --- 🔥 V84.8: Reflective Log System ---
+        let reflectiveLogsCache = [];
+        function toggleReflectiveSection() {
+            const content = document.getElementById('rl-section-content');
+            const icon = document.getElementById('rl-section-icon');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.style.transform = 'rotate(180deg)';
+                renderReflectiveLogs();
+            } else {
+                content.style.display = 'none';
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function loadReflectiveLogs() {
+            db.collection("reflective_logs")
+                .where("userId", "==", userId)
+                .orderBy("timestamp", "desc")
+                .limit(10)
+                .onSnapshot(s => {
+                    reflectiveLogsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                    renderReflectiveLogs();
+                });
+        }
+
+        function renderReflectiveLogs() {
+            const list = document.getElementById('rl-history-list');
+            const status = document.getElementById('rl-today-status');
+            const formArea = document.getElementById('rl-form-area');
+            const streakBadge = document.getElementById('rl-streak-badge');
+            
+            if (!list) return;
+            list.innerHTML = "";
+
+            const now = new Date();
+            const todayStr = now.toLocaleDateString('en-CA'); // YYYY-MM-DD
+            
+            let doneToday = false;
+            let streak = 0;
+            let lastDate = null;
+
+            // Sorting by date descending for streak calculation
+            const sortedLogs = [...reflectiveLogsCache].sort((a,b) => b.timestamp?.toDate() - a.timestamp?.toDate());
+
+            sortedLogs.forEach((log, i) => {
+                if (!log.timestamp) return;
+                const d = log.timestamp.toDate();
+                const dStr = d.toLocaleDateString('en-CA');
+                
+                if (dStr === todayStr) doneToday = true;
+
+                // Render Item
+                if (i < 7) { // Show only last 7 items in list
+                    const item = document.createElement('div');
+                    item.style = "padding:12px; border-bottom:1px solid #eee; font-size:0.9em;";
+                    item.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                            <span style="font-weight:bold; color:#e67e22;">${log.mood || '😊'} ${d.toLocaleDateString('th-TH', {day:'numeric', month:'short'})}</span>
+                            <span style="color:#28a745; font-size:0.85em;">+0.1 pts</span>
+                        </div>
+                        <div style="color:#555; white-space:pre-wrap;">${log.content}</div>
+                        ${log.adminComment ? `<div style="margin-top:8px; padding:8px; background:#f0f7ff; border-radius:8px; font-size:0.9em; color:#0056b3; border-left:3px solid #0056b3;"><i class="fa-solid fa-reply"></i> <b>Admin:</b> ${log.adminComment} ${log.adminBonus ? `<span style="font-weight:bold;">(+${log.adminBonus})</span>` : ''}</div>` : ''}
+                    `;
+                    list.appendChild(item);
+                }
+            });
+
+            // Streak Logic (Simple Version)
+            let checkDate = new Date();
+            // If already done today, start from today, if not start from yesterday
+            let streakCheckDateStr = doneToday ? todayStr : new Date(Date.now() - 86400000).toLocaleDateString('en-CA');
+            
+            for (let log of sortedLogs) {
+                if (!log.timestamp) continue;
+                const logDateStr = log.timestamp.toDate().toLocaleDateString('en-CA');
+                if (logDateStr === streakCheckDateStr) {
+                    streak++;
+                    // Move to previous day
+                    let prev = new Date(new Date(streakCheckDateStr).getTime() - 86400000);
+                    streakCheckDateStr = prev.toLocaleDateString('en-CA');
+                } else if (new Date(logDateStr) < new Date(streakCheckDateStr)) {
+                    break;
+                }
+            }
+
+            if (streak > 0) {
+                streakBadge.innerText = `🔥 ${streak} วัน`;
+                streakBadge.style.display = 'inline-block';
+            } else {
+                streakBadge.style.display = 'none';
+            }
+
+            if (doneToday) {
+                status.innerHTML = '<span style="color:#28a745;"><i class="fa-solid fa-check-circle"></i> เรียบร้อย</span>';
+                formArea.style.opacity = '0.5';
+                formArea.style.pointerEvents = 'none';
+                document.getElementById('rl-submit-btn').innerText = 'ส่งแล้ว (Done)';
+            } else {
+                status.innerText = 'ยังไม่ได้ส่ง';
+                formArea.style.opacity = '1';
+                formArea.style.pointerEvents = 'auto';
+            }
+        }
+
+        async function submitReflectiveLog() {
+            const content = document.getElementById('rl-content').value.trim();
+            const mood = document.getElementById('rl-mood').value;
+            const btn = document.getElementById('rl-submit-btn');
+
+            if (!content) return alert("กรุณาบันทึกเนื้อหาด้วยครับ");
+            if (content.length < 10) return alert("รบกวนช่วยเขียนบันทึกยาวกว่านี้อีกนิดครับ (อย่างน้อย 10 ตัวอักษร)");
+
+            btn.disabled = true;
+            btn.innerText = "กำลังส่ง...";
+
+            try {
+                const b = db.batch();
+                const logRef = db.collection("reflective_logs").doc();
+                const userRef = db.collection("users").doc(userId);
+
+                b.set(logRef, {
+                    userId,
+                    displayName: userProfile.displayName,
+                    pictureUrl: userProfile.pictureUrl || "",
+                    content,
+                    mood,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    status: 'pending',
+                    autoScore: 0.1
+                });
+
+                // Add 0.1 pts immediately
+                b.update(userRef, {
+                    score: firebase.firestore.FieldValue.increment(0.1)
+                });
+
+                // Log score change
+                const scoreLogRef = db.collection("checkin_logs").doc();
+                b.set(scoreLogRef, {
+                    userId,
+                    type: 'reflective_log',
+                    amount: 0.1,
+                    note: 'Daily Reflective Log',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                await b.commit();
+                document.getElementById('rl-content').value = "";
+                alert("✨ บันทึกสำเร็จ! ได้รับ 0.1 คะแนนครับ");
+            } catch (e) {
+                console.error(e);
+                alert("Error: " + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "ส่งบันทึก";
             }
         }
 
