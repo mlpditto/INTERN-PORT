@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V84.5)</title>
+    <title>Internship Portfolio (V84.7)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -918,7 +918,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V84.2 (Quiz UI & Mode Refactor)
+                V84.7 (Quest Fix & UI Update)
             </div>
         </div>
     </div>
@@ -1026,8 +1026,10 @@
             <h2 style="color:#ef233c;">⚠️ ยืนยันรับภารกิจ</h2>
             <p>เวลานับถอยหลังจะเริ่มทันที</p>
             <button id="btn-confirm-start" class="btn-danger" style="width:100%; font-size:1.2em;">ยืนยัน (5)</button>
+            <button class="btn-sm" style="width:100%; margin-top:8px; background:#f8f9fa; color:#666; border:1px solid #ddd;" onclick="document.getElementById('confirmModal').style.display='none'; if(confirmCountdown) clearInterval(confirmCountdown);">ยกเลิก (Cancel)</button>
         </div>
     </div>
+
 
     <div id="quizFeedbackModal" class="modal">
         <div class="modal-content" style="max-width:450px; text-align: left;">
@@ -1039,11 +1041,11 @@
             </div>
             
             <label style="font-weight:bold; display:block; margin-bottom:5px;">⭐ ให้คะแนนชุดข้อสอบนี้ (0-10 ดาว):</label>
-            <input type="range" id="fb-rating" min="0" max="10" step="1" value="10" 
+            <input type="range" id="fb-rating" min="0" max="10" step="1" value="0" 
                    oninput="document.getElementById('fb-rating-num').innerText = this.value"
                    style="width:100%; margin:10px 0; accent-color:var(--primary);">
             <div style="text-align:center; font-weight:bold; color:var(--primary); margin-bottom:15px;">
-                <span id="fb-rating-num" style="font-size:1.5em;">10</span> / 10
+                <span id="fb-rating-num" style="font-size:1.5em;">0</span> / 10
             </div>
 
             <label style="font-weight:bold; display:block; margin-bottom:5px;">🎯 ชุดข้อสอบต่อไปที่อยากทำ?</label>
@@ -1256,6 +1258,7 @@
         let quizTotalStartTime = null; // 🔥 V84.1: Track when quiz actually started
         let currentQuizIdForFeedback = null;
         let currentPointsForFeedback = 0;
+        let isAdmin = false; // 🔥 V84.6: Track admin status for history deletion
 
         // --- Initialization ---
         function updateStatus(msg) {
@@ -1374,6 +1377,7 @@
                 // 🔥 Admin Auto-Redirect logic
                 const idToken = liff.getDecodedIDToken();
                 if (idToken && idToken.email === "medlifeplus@gmail.com") {
+                    isAdmin = true;
                     // Show a quick message before redirecting
                     document.getElementById('loading-overlay').innerHTML = "<h3 style='color:white;text-align:center;margin-top:200px;'>🔐 Redirecting to Admin Portal...</h3>";
                     window.location.replace("admin.html");
@@ -1867,7 +1871,7 @@
 
         // --- Quest System (V56 Logic) ---
         function loadAllQuests() { db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(s => { questsCache = s.docs.map(doc => ({ id: doc.id, ...doc.data() })); renderAssignments(); renderHistory(); }); }
-        function loadMySubmissions() { db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => { mySubmissionsCache = {}; s.forEach(doc => { mySubmissionsCache[doc.data().questId] = doc.data(); }); renderAssignments(); renderHistory(); }); }
+        function loadMySubmissions() { db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => { mySubmissionsCache = {}; s.forEach(doc => { mySubmissionsCache[doc.data().questId] = { id: doc.id, ...doc.data() }; }); renderAssignments(); renderHistory(); }); }
 
         // --- Quiz System ---
         // (Variables declared globally)
@@ -3778,6 +3782,79 @@
             try { await b.commit(); } catch (e) { }
         }
 
+        // --- Quest: Confirm Start & Submit (Restored) ---
+        let pendingQuestId = null;
+        let confirmCountdown = null;
+
+        function openConfirmStart(qId, title, duration) {
+            pendingQuestId = qId;
+            const modal = document.getElementById('confirmModal');
+            const btn = document.getElementById('btn-confirm-start');
+            modal.style.display = 'flex';
+
+            let sec = 5;
+            btn.disabled = true;
+            btn.innerText = `ยืนยัน (${sec})`;
+            btn.style.opacity = '0.6';
+
+            if (confirmCountdown) clearInterval(confirmCountdown);
+            confirmCountdown = setInterval(() => {
+                sec--;
+                if (sec <= 0) {
+                    clearInterval(confirmCountdown);
+                    btn.disabled = false;
+                    btn.innerText = `⚡ ยืนยันรับภารกิจ`;
+                    btn.style.opacity = '1';
+                } else {
+                    btn.innerText = `ยืนยัน (${sec})`;
+                }
+            }, 1000);
+
+            btn.onclick = async function () {
+                btn.disabled = true;
+                btn.innerText = '🔄 กำลังรับภารกิจ...';
+                try {
+                    const dl = new Date(Date.now() + (duration || 30) * 60000);
+                    await db.collection("quest_submissions").doc(`${qId}_${userId}`).set({
+                        questId: qId,
+                        userId: userId,
+                        displayName: userProfile.displayName,
+                        pictureUrl: userProfile.pictureUrl || "",
+                        status: 'received',
+                        deadline: firebase.firestore.Timestamp.fromDate(dl),
+                        startedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                    modal.style.display = 'none';
+                } catch (e) {
+                    alert("Error: " + e.message);
+                    btn.disabled = false;
+                    btn.innerText = `⚡ ยืนยันรับภารกิจ`;
+                }
+            };
+        }
+
+        async function subQ(qId, baseScore) {
+            const ans = document.getElementById(`ans-${qId}`);
+            const text = ans ? ans.value.trim() : "";
+            if (!text) { alert("กรุณาพิมพ์คำตอบก่อนส่งครับ"); return; }
+
+            const btn = document.getElementById(`btn-sub-${qId}`);
+            if (btn) { btn.disabled = true; btn.innerText = '🔄 กำลังส่ง...'; }
+
+            try {
+                await db.collection("quest_submissions").doc(`${qId}_${userId}`).update({
+                    status: 'submitted',
+                    answer: text,
+                    baseScore: baseScore || 0,
+                    submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                alert("✅ ส่งคำตอบเรียบร้อย!");
+            } catch (e) {
+                alert("Error: " + e.message);
+                if (btn) { btn.disabled = false; btn.innerText = 'ส่งคำตอบ (Submit)'; }
+            }
+        }
+
         // --- Side Quests & Kanban ---
         let activeSqTab = 'Backlog';
         function switchSqTab(s) {
@@ -3978,6 +4055,24 @@
             })
         }
 
+        // --- Delete History Item (V84.6) ---
+        async function deleteHistoryItem(id, type) {
+            if (!confirm(`ยืนยันลบประวัติ ${type} นี้?`)) return;
+            try {
+                let col = "";
+                if (type === 'Quest') col = "quest_submissions";
+                else if (type === 'Quiz') col = "quiz_attempts";
+                else if (type === 'Work') col = "works";
+
+                if (col) {
+                    await db.collection(col).doc(id).delete();
+                    alert("ลบสำเร็จ (Deleted successfully)");
+                }
+            } catch (e) {
+                alert("Delete Error: " + e.message);
+            }
+        }
+
         // --- Organize Work History (V77.27) ---
         function renderHistory() {
             const historyContainer = document.getElementById('work-list');
@@ -3991,6 +4086,7 @@
                 const quest = questsCache.find(x => x.id === qid);
                 if (sub) {
                     items.push({
+                        id: sub.id,
                         title: quest ? quest.title : (sub.questTitle || "ภารกิจ (Quest)"),
                         type: 'Quest',
                         timestamp: sub.timestamp,
@@ -4020,6 +4116,7 @@
                     }
 
                     items.push({
+                        id: `${qid}_${userId}`,
                         title: qTypePrefix + qTitle,
                         type: 'Quiz',
                         timestamp: att.timestamp,
@@ -4036,6 +4133,7 @@
             const works = usersWorksCache || [];
             works.forEach(w => {
                 items.push({
+                    id: w.id,
                     title: w.title,
                     type: 'Work',
                     timestamp: w.timestamp,
@@ -4068,8 +4166,18 @@
                     ? `<span class="badge" style="background:#fff3cd; color:#856404; font-size:0.7em;">⏳ รอตรวจ</span>`
                     : `<span class="badge" style="background:#d4edda; color:#155724; font-size:0.7em;">✅ ตรวจแล้ว</span>`;
 
-                const scoreDisplay = item.isPoll ? '📊' : `${parseFloat(item.score).toFixed(2)}`;
+                const scoreVal = parseFloat(item.score);
+                const isZeroOrNan = isNaN(scoreVal) || scoreVal <= 0;
+                const scoreDisplay = item.isPoll ? '📊' : `${scoreVal.toFixed(2)}`;
                 const linkHtml = item.link ? `<a href="${item.link}" target="_blank" style="color:${item.color}; font-size:0.8em; text-decoration:none;"><i class="fa-solid fa-link"></i></a>` : "";
+
+                // 🔥 V84.6: Delete Button for user/admin if score is 0 or NaN
+                const deleteBtn = (isZeroOrNan || isAdmin) ? `
+                    <button class="btn-sm" onclick="deleteHistoryItem('${item.id}', '${item.type}')" 
+                            style="width:28px; height:28px; border-radius:50%; padding:0; background:#fff1f2; color:#ef233c; border:1px solid #fecaca; display:flex; align-items:center; justify-content:center; min-height:auto; font-size:0.8em; margin-left:5px;">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                ` : "";
 
                 return `
                     <div style="background:#fff; border-radius:12px; padding:12px; margin-bottom:10px; display:flex; align-items:center; gap:12px; border:1px solid #f0f0f0; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
@@ -4082,9 +4190,12 @@
                                 ${date} • ${statusBadge}
                             </div>
                         </div>
-                        <div style="text-align:right; flex-shrink:0;">
-                            <div style="font-weight:800; color:${item.color}; font-size:1.05em;">${scoreDisplay}</div>
-                            ${linkHtml}
+                        <div style="text-align:right; flex-shrink:0; display:flex; align-items:center; gap:5px;">
+                            <div style="display:flex; flex-direction:column; align-items:flex-end;">
+                                <div style="font-weight:800; color:${item.color}; font-size:1.05em;">${scoreDisplay}</div>
+                                ${linkHtml}
+                            </div>
+                            ${deleteBtn}
                         </div>
                     </div>
                 `;
