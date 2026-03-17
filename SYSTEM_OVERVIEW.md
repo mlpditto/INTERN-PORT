@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V84.3) Overview
+# MLP Internship Portfolio (V84.8) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -284,6 +284,7 @@
 - `works`: ข้อมูลการส่งงานทั่วไป
 - `checkin_logs`: บันทึกประวัติการได้/เสียคะแนนทั้งหมด (Audit Trail)
 - `poll_responses`: (NEW!) คำตอบแบบไม่ระบุตัวตนจากโหมด Poll
+- `reflective_logs`: (NEW! V84.8) บันทึกสะท้อนคิดรายวัน พร้อมอารมณ์และคอมเมนต์จากแอดมิน
 
 ---
 
@@ -365,14 +366,26 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow update, delete: if false;
     }
+
+    // 🔥 11. Reflective Logs (V84.8)
+    match /reflective_logs/{docId} {
+      allow read, create: if true;
+      allow update, delete: if true; 
+    }
   }
 }
 ```
 
-### 7. ระบบขอเข้าใช้งาน (Access Request System - V84.3)
+### 7. ระบบบันทึกสะท้อนคิดรายวัน (Reflective Log - V84.8)
+- **Daily Mission Integration:** รวมอยู่ในส่วน "ภารกิจ (Side Quests)" เพื่อให้นักศึกษาบันทึกสิ่งที่ได้เรียนรู้ในแต่ละวันได้ทันที
+- **Gamification:** รับ 0.1 คะแนนอัตโนมัติทันทีที่ส่ง พร้อมระบบสะสม **Streak (🔥)** เพื่อกระตุ้นความสม่ำเสมอ
+- **Feedback Loop:** แอดมินสามารถคอมเมนต์ตอบกลับและให้คะแนนโบนัสพิเศษ (Bonus Point) รายคนได้
+- **Emoji Mood:** เลือกสถานะอารมณ์ประจำวันเพื่อสื่อสารความรู้สึกกับผู้ดูแล
+
+### 8. ระบบขอเข้าใช้งาน (Access Request System - V84.3)
 - **Pending Review Interface:** ส่วนจัดการคำขอเข้าใช้งานใหม่ที่ผู้ใช้ส่งมาจากหน้า LIFF
 - **One-click Approval:** ระบบอนุมัติพร้อมสร้าง User Profile ให้อัตโนมัติ (Automated User Onboarding)
 - **Live Sync:** ดึงข้อมูลจากคอลเลกชัน `reports` (ประเภท `access_request`) แบบ Real-time
 
 ---
-*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V84.3) โดย Antigravity AI*
+*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V84.8) โดย Antigravity AI*

@@ -3,6 +3,22 @@
 > [!IMPORTANT]
 > **📢 Version Policy:** ทุกการ Commit หรือการปรับปรุงชุดคำสั่ง ต้องมีการขยับเวอร์ชัน (Versioning) เสมอ ทั้งในหน้า UI และในเอกสาร Markdown นี้ เพื่อป้องกันความสับสนในการ Deploy
 
+## [2026-03-17] Session Updates (V84.7 → V84.8)
+
+### 1. Reflective Log System (V84.8)
+- **Daily Reflection Mission:** Integrated a new daily reflection log into the "Side Quests (Kanban)" section for users.
+- **Gamification & Streaks:** Automated awarding of 0.1 points per entry and implemented a consecutive day streak (🔥) counter.
+- **Admin Review Portal:** Dedicated section in the admin panel to review logs, provide text feedback, and award bonus points directly.
+- **User History:** Displays last 7 days of reflections with admin comments directly in the app.
+
+### 2. Admin Quest UI Overhaul (V84.8)
+- **Detail-rich Inputs:** Replaced single-line quest inputs with Multi-line Textareas to support complex mission descriptions.
+- **Grid Layout:** Reorganized the quest creation form using a modern grid system for better field grouping (Media, Link, Dates, Tags).
+- **User Scaling:** Updated `index.html` to support `white-space: pre-wrap` for displaying multi-line quest details from admin.
+
+### 3. Version Alignment
+- Updated all project instances and documentations to V84.8.
+
 ## [2026-03-12] Session Updates (V84.3 → V84.4)
 
 ### 1. Existing User Reset / Gen Code (V84.4)
