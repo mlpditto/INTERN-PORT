@@ -3,6 +3,22 @@
 > [!IMPORTANT]
 > **📢 Version Policy:** ทุกการ Commit หรือการปรับปรุงชุดคำสั่ง ต้องมีการขยับเวอร์ชัน (Versioning) เสมอ ทั้งในหน้า UI และในเอกสาร Markdown นี้ เพื่อป้องกันความสับสนในการ Deploy
 
+## [2026-03-18] Session Updates (V84.8 → V84.9)
+
+### 1. Admin Dashboard Tabs & Group Focus (V84.9)
+- **Dynamic Group Tabs:** Implemented a new tabbed navigation in the Admin Dashboard that dynamically generates tabs based on user groups (Junior, INTERN, EXTERN, etc.).
+- **Focused Kanban/Review:** The board now automatically filters cards and reflective logs based on the selected group, allowing admins to prioritize their review.
+- **Reflective Log Review Integration:** Integrated the Reflective Log table directly into the Dashboard (below stat chips) for immediate accessibility during daily workflows.
+
+### 2. Laugh Tale - The Great Story Collection (V84.9)
+- **Permanent Archive:** Created "LAUGH TALE 웃음 이야기", a premium collection for keeping and showcasing high-quality student reflections.
+- **Collection Workflow:** Added a "💎 Collect" button to reviewed logs, allowing them to be "archived" into the gallery.
+- **Masonry Grid UI:** Built a beautiful, masonry-like vertical grid with student badges, profile highlights, and admin response cards.
+- **State Management:** Logs in Laugh Tale are hidden from the active review board to maintain a clean workspace.
+
+### 3. Versioning & Documentation
+- Updated version to V84.9 across `admin.html`, `index.html`, and all markdown documents.
+
 ## [2026-03-17] Session Updates (V84.7 → V84.8)
 
 ### 1. Reflective Log System (V84.8)

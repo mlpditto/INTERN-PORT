@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Management ADMIN (V84.8)</title>
+    <title>Internship Management ADMIN (V84.9)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -966,6 +966,20 @@
             color: #f57f17;
             margin: 0;
         }
+        .laugh-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1) !important;
+        }
+        .laugh-card::before {
+            content: '웃음';
+            position: absolute;
+            bottom: -20px;
+            right: -10px;
+            font-size: 8em;
+            color: rgba(0,0,0,0.02);
+            font-weight: 900;
+            pointer-events: none;
+        }
     </style>
 </head>
 
@@ -1026,7 +1040,7 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal 
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">V84.8</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">V84.9</span>
                 </h1>
                 <span id="admin-email" style="font-size:0.85em; color:var(--text-sub); border-left:1px solid #ddd; padding-left:15px; margin-left:5px;"></span>
             </div>
@@ -1051,6 +1065,7 @@
             <button class="tab-btn" onclick="switchTab('tab-assignments')">📦 Assignments</button>
             <button class="tab-btn" onclick="switchTab('tab-users')">👥 Users</button>
             <button class="tab-btn" onclick="switchTab('tab-leaderboard')">🏆 Leaderboard</button>
+            <button class="tab-btn" onclick="switchTab('tab-laughtale')">🏝️ Laugh Tale</button>
         </div>
 
         <!-- Old tab-works removed -->
@@ -1152,8 +1167,8 @@
                 <hr style="margin:20px 0; border:0; border-top:1px solid #ddd;">
             </div>
 
-            <!-- General Works Section -->
-            <div id="general-work-review-section" class="review-card">
+            <!-- General Works Section (Hidden, Integrated into Kanban) -->
+            <div id="general-work-review-section" class="review-card" style="display:none;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <h4 style="color:var(--success); margin:0; border:0; padding:0;"><i class="fa-solid fa-briefcase"></i> งานทั่วไป (General Works)</h4>
                     <button id="btn-toggle-work-archive" class="btn-sm btn-dark" style="border-radius:20px; padding:4px 12px; font-size:0.75em;" onclick="toggleWorkArchive()">
@@ -1181,14 +1196,21 @@
             <hr style="margin:20px 0; border:0; border-top:2px dashed #eee;">
 
             <!-- Kanban Board Section -->
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                <div style="display:flex; gap:10px; align-items:center;">
-                    <h4 style="margin:0; color:var(--primary);"><i class="fa-solid fa-layer-group"></i> Kanban Tasks</h4>
-                    <input type="text" id="board-search" placeholder="🔍 Search board..." onkeyup="filterBoard()" style="margin:0; width:180px; padding:5px 12px; font-size:0.85em; border-radius:30px;">
-                </div>
-                <div style="display:flex; gap:8px;">
-                    <button class="btn-sm btn-primary" onclick="openTaskModal()"><i class="fa-solid fa-plus-circle"></i> Create</button>
-                    <button class="btn-sm btn-dark" onclick="openArchiveModal()"><i class="fa-solid fa-box-archive"></i> Archive</button>
+            <div style="margin-bottom:20px;">
+                <div style="display:flex; flex-direction:column; gap:10px; flex:1;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <h4 style="margin:0; color:var(--primary);"><i class="fa-solid fa-layer-group"></i> Dashboard Kanban</h4>
+                            <input type="text" id="board-search" placeholder="🔍 Search board..." onkeyup="filterBoard()" style="margin:0; width:180px; padding:5px 12px; font-size:0.85em; border-radius:30px;">
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn-sm btn-primary" onclick="openTaskModal()"><i class="fa-solid fa-plus-circle"></i> Create</button>
+                            <button class="btn-sm btn-dark" onclick="openArchiveModal()"><i class="fa-solid fa-box-archive"></i> Archive</button>
+                        </div>
+                    </div>
+                    <div id="board-group-tabs" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:10px; border-bottom:1px solid #eee; margin-top:5px;">
+                        <!-- Groups injected here -->
+                    </div>
                 </div>
             </div>
             <div class="kanban-board" style="min-height: 450px;">
@@ -1462,6 +1484,19 @@
                 <!-- Division Buttons injected here -->
             </div>
             <div id="leaderboardList" class="lb-container" style="max-width:900px; margin:0 auto;"></div>
+        </div>
+
+        <div id="tab-laughtale" class="tab-content" style="background:#f0f4f8; padding:30px 15px; border-radius:30px;">
+            <div style="max-width:1000px; margin:0 auto;">
+                <div style="text-align:center; margin-bottom:40px;">
+                    <h1 style="font-family:'Cormorant Garamond', serif; font-size:3em; color:#0a192f; margin-bottom:5px;">LAUGH TALE</h1>
+                    <div style="font-size:1.2em; color:#d35400; font-weight:bold; letter-spacing:3px;">웃음 이야기 : THE TREASURE BOX</div>
+                    <p style="color:#666; font-style:italic; margin-top:10px;">"The collection of greatest stories, reflections, and hearts."</p>
+                </div>
+                <div id="laughtale-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:20px;">
+                    <!-- Archived Reflective Logs injected here -->
+                </div>
+            </div>
         </div>
 
         <!-- Certificates tab removed, merged into Users -->
@@ -1958,6 +1993,42 @@
             </div>
         </div>
 
+        <!-- 🔥 Reflective Review Modal -->
+        <div id="reflectiveReviewModal" class="modal" style="z-index: 2501;">
+            <div class="modal-content" style="max-width: 500px; border-top: 5px solid #d35400; border-radius: 12px;">
+                <span class="close-modal" onclick="document.getElementById('reflectiveReviewModal').style.display='none'">&times;</span>
+                <h3 style="color:#d35400; margin-bottom:15px;"><i class="fa-solid fa-comment-medical"></i> Review Reflective Log</h3>
+                
+                <div id="reflective-review-user-info" style="background:#f8f9fa; padding:12px; border-radius:10px; margin-bottom:15px; border:1px solid #eee;">
+                    <!-- User Info injected by JS -->
+                </div>
+
+                <input type="hidden" id="reflective-review-id">
+                <input type="hidden" id="reflective-review-uid">
+                <input type="hidden" id="reflective-review-uname">
+
+                <div style="margin-bottom:15px;">
+                    <label style="display:block; font-size:0.85em; font-weight:bold; color:#555; margin-bottom:5px;">💰 Bonus Points:</label>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <input type="number" id="reflective-review-bonus" value="0.5" step="0.1" min="0" 
+                            style="flex:1; padding:10px; border:1.5px solid #eee; border-radius:8px; font-weight:bold; font-size:1.1em; color:#d35400;">
+                        <span style="color:#999; font-size:0.9em;">Pts</span>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; font-size:0.85em; font-weight:bold; color:#555; margin-bottom:5px;">💬 Admin Feedback / Comment:</label>
+                    <textarea id="reflective-review-comment" placeholder="ส่งคำแนะนำให้ผู้อื่น... (เช่น สู้ๆนะ, ทำได้ดีมาก!)" 
+                        style="width:100%; height:100px; padding:12px; border:1.5px solid #eee; border-radius:8px; font-size:0.95em;"></textarea>
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <button class="magic-btn" style="flex:2; background:#d35400;" onclick="saveReflectiveReview()">💾 บันทึก & ให้คะแนน</button>
+                    <button class="btn-sm btn-dark" style="flex:1;" onclick="document.getElementById('reflectiveReviewModal').style.display='none'">ยกเลิก</button>
+                </div>
+            </div>
+        </div>
+
         <div id="pollResultModal" class="modal" style="z-index: 2500;">
             <div class="modal-content" style="max-width: 600px;">
                 <span class="close-modal"
@@ -2120,12 +2191,15 @@
         const auth = firebase.auth();
 
         let usersData = [], worksData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {};
+        let reflectiveLogsCache = []; // Shared cache for Kanban and Table
         let hideCompletedWorks = true;
         let historyCache = []; let historyPage = 1; const HISTORY_PER_PAGE = 10;
         let archiveCache = []; let archivePage = 1; const ARCHIVE_PER_PAGE = 10;
         let deleteCardId = null; let deleteTimer = null;
         let currentHistoryUserId = null;
         let certUser = null;
+        let activeUserGroup = 'All'; // 🔥 V79.5: Group filter for Users tab
+        let activeBoardGroup = 'All'; // 🔥 Global for Dashboard/Kanban Filtering
         let inactiveQuizPage = 1; const INACTIVE_QUIZ_PER_PAGE = 10;
 
         function toggleTheme() { document.body.classList.toggle('dark-mode'); }
@@ -4434,6 +4508,8 @@
                 renderKanban();
                 renderTable('works');
                 // Pending quizzes update automatically via listener, but we can force check if needed
+            } else if (id === 'tab-laughtale') {
+                renderLaughTale();
             }
         }
 
@@ -4447,8 +4523,20 @@
                 if (doc.exists) groupSettings = doc.data();
             });
 
-            db.collection("works").orderBy("timestamp", "desc").limit(100).onSnapshot(s => { worksData = s.docs.map(d => ({ id: d.id, ...d.data() })); renderTable('works'); });
-            db.collection("users").orderBy("score", "desc").onSnapshot(s => { usersData = s.docs.map(d => ({ id: d.id, ...d.data() })); renderTable('users'); renderLeaderboard(); updateAssigneeList(); renderCertTable(); });
+            db.collection("works").orderBy("timestamp", "desc").limit(100).onSnapshot(s => { 
+                worksData = s.docs.map(d => ({ id: d.id, ...d.data() })); 
+                renderTable('works'); 
+                drawKanban(); 
+            });
+            db.collection("users").orderBy("score", "desc").onSnapshot(s => { 
+                usersData = s.docs.map(d => ({ id: d.id, ...d.data() })); 
+                renderUserGroupTabs();
+                renderBoardGroupTabs();
+                renderTable('users'); 
+                renderLeaderboard(); 
+                updateAssigneeList(); 
+                renderCertTable(); 
+            });
             db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban);
             db.collection("quests").onSnapshot(s => { questsCache = s.docs.map(d => ({ id: d.id, ...d.data() })); loadActiveQuests(); loadQuestHistory(); loadReflectiveLogsAdmin(); });
             db.collection("quizzes").onSnapshot(s => { quizzesData = s.docs.map(d => ({ id: d.id, ...d.data() })); renderQuizzes(); });
@@ -4494,6 +4582,7 @@
                 if (document.getElementById('preRegModal').style.display === 'block') {
                     renderPreRegList();
                 }
+                renderUserGroupTabs();
                 renderTable('users');
             });
 
@@ -4769,7 +4858,7 @@
             }
         }
 
-        let activeUserGroup = 'All'; // 🔥 V79.5: Group filter for Users tab
+        // Removed redundant activeUserGroup definition
 
         function renderUserGroupTabs() {
             const container = document.getElementById('user-group-tabs');
@@ -4791,6 +4880,32 @@
                     display:flex; align-items:center; gap:5px; transition:all 0.2s;
                 "><i class="fa-solid ${icon}"></i> ${g} <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${count}</span></button>`;
             }).join('');
+        }
+
+        function renderBoardGroupTabs() {
+            const container = document.getElementById('board-group-tabs');
+            if (!container) return;
+            const groups = [...new Set(usersData.map(u => u.group || 'Public'))].sort();
+            const allGroups = ['All', ...groups];
+
+            container.innerHTML = allGroups.map(g => {
+                const isActive = g === activeBoardGroup;
+                const count = g === 'All' ? usersData.length : usersData.filter(u => (u.group || 'Public') === g).length;
+                const color = g === 'All' ? '#333' : getGroupColor(g);
+                const icon = g === 'All' ? 'fa-users' : getGroupIcon(g);
+                return `<button onclick="setBoardGroupFilter('${g}')" style="
+                    padding:5px 14px; border-radius:20px; border:2px solid ${isActive ? color : '#ddd'};
+                    background:${isActive ? color : '#fff'}; color:${isActive ? '#fff' : color};
+                    font-size:0.78em; font-weight:bold; cursor:pointer; white-space:nowrap;
+                    display:flex; align-items:center; gap:5px; transition:all 0.2s;
+                "><i class="fa-solid ${icon}"></i> ${g} <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.8em;">${count}</span></button>`;
+            }).join('');
+        }
+
+        function setBoardGroupFilter(group) {
+            activeBoardGroup = group;
+            renderBoardGroupTabs();
+            drawKanban();
         }
 
         function setUserGroupFilter(group) {
@@ -5613,77 +5728,78 @@
             });
         }
 
-        function renderKanban(snap) {
-            const cols = { "Backlog": document.getElementById("Backlog"), "Doing": document.getElementById("Doing"), "Review": document.getElementById("Review"), "Done": document.getElementById("Done") };
+        function drawKanban() {
+            const cols = { 
+                "Backlog": document.getElementById("Backlog"), 
+                "Doing": document.getElementById("Doing"), 
+                "Review": document.getElementById("Review"), 
+                "Done": document.getElementById("Done") 
+            };
+            
+            // Safety Check
+            if (!cols.Backlog) return;
+
             Object.values(cols).forEach(e => e.innerHTML = "");
             const cnt = { "Backlog": 0, "Doing": 0, "Review": 0, "Done": 0 };
             const filter = document.getElementById('board-search').value.toLowerCase();
-            snap.forEach(doc => {
-                const q = doc.data();
-                sideQuestsCache[doc.id] = q;
+
+            // 1. Render Side Quests
+            Object.keys(sideQuestsCache).forEach(id => {
+                const q = sideQuestsCache[id];
                 if (q.status === 'Archived') return;
+
                 let match = q.title.toLowerCase().includes(filter);
                 if (q.assignees) q.assignees.forEach(u => { if (u.name.toLowerCase().includes(filter)) match = true; });
                 if (!match) return;
+
+                // Group filtering for Side Quests (If any assignee belongs to the group)
+                if (activeBoardGroup !== 'All') {
+                    let groupMatch = false;
+                    if (q.assigneeIds) {
+                        q.assigneeIds.forEach(uid => {
+                            const u = usersData.find(x => x.id === uid);
+                            if ((u?.group || 'Public') === activeBoardGroup) groupMatch = true;
+                        });
+                    }
+                    if (!groupMatch) return;
+                }
+
                 if (cols[q.status]) {
                     cnt[q.status]++;
                     const isProj = q.isProject === true;
                     const d = document.createElement('div');
                     d.className = `kanban-card card-${q.status} ${q.isScored ? 'scored' : ''} ${isProj ? 'project' : ''}`;
-                    d.dataset.id = doc.id;
+                    d.dataset.id = id;
+
                     let imgs = '<div class="assignee-stack">';
                     if (q.assignees) q.assignees.forEach(u => imgs += `<img src="${u.pic}" class="assignee-img" title="${u.name}">`);
                     imgs += '</div>';
 
                     let timersHtml = "";
-                    // Support for both Quest-based timers and Generic Deadline timers (Homework)
-                    const nowMillis = Date.now();
                     if (q.deadline) {
                         const dl = q.deadline.toMillis ? q.deadline.toMillis() : new Date(q.deadline).getTime();
-                        if (q.status !== 'Done') {
-                            timersHtml += `<span class="timer-global" data-dead="${dl}">⏳ Exp: ...</span>`;
-                        }
-                    } else if (q.refQuestId && q.assigneeIds && q.assigneeIds.length > 0) {
-                        const globalQ = questsCache.find(x => x.id === q.refQuestId);
-                        const subKey = `${q.refQuestId}_${q.assigneeIds[0]}`;
-                        const sub = questsSubCache[subKey];
-                        if (globalQ && globalQ.deadline && q.status !== 'Done') {
-                            timersHtml += `<span class="timer-global" data-dead="${globalQ.deadline.toDate().getTime()}">⏳ Exp: ...</span>`;
-                        }
-                        if (sub) {
-                            if (sub.status === 'received' && sub.deadline && q.status === 'Doing') {
-                                timersHtml += `<span class="timer-active" data-dead="${sub.deadline.toDate().getTime()}">⏱️ ...</span>`;
-                            } else if (sub.status === 'unsuccessful' && sub.cooldownUntil && q.status === 'Backlog') {
-                                timersHtml += `<span class="timer-cooldown" data-dead="${sub.cooldownUntil.toDate().getTime()}">❄️ Cool: ...</span>`;
-                            }
-                        }
+                        if (q.status !== 'Done') timersHtml += `<span class="timer-global" data-dead="${dl}">⏳ Exp: ...</span>`;
                     }
 
                     let act = "";
-                    if (q.status === 'Done' && q.doneAt) act = `<button class="btn-sm btn-dark" style="width:100%;margin-top:5px;" onclick="archiveSQ('${doc.id}')">📥 ar·chive</button>`;
+                    if (q.status === 'Done' && q.doneAt) act = `<button class="btn-sm btn-dark" style="width:100%;margin-top:5px;" onclick="archiveSQ('${id}')">📥 archive</button>`;
                     else if (!q.isScored && q.status !== 'Backlog' && q.status !== 'Done') {
                         if (q.linkedQuizId) {
                             act = `<div style="width:100%;margin-top:5px;padding:6px;background:linear-gradient(135deg,#e8f5e9,#e3f2fd);border-radius:8px;text-align:center;font-size:0.78em;color:#555;"><i class="fa-solid fa-link" style="color:#4361ee;"></i> คะแนนจาก Quiz อัตโนมัติ</div>`;
                         } else {
-                            act = `<button class="btn-sm btn-success" style="width:100%;margin-top:5px;" onclick="giveScore('${doc.id}')">💰 ให้คะแนน</button>`;
+                            act = `<button class="btn-sm btn-success" style="width:100%;margin-top:5px;" onclick="giveScore('${id}')">💰 ให้คะแนน</button>`;
                         }
                     }
 
-                    let chatBtn = "";
-                    if (isProj) chatBtn = `<button class="btn-sm" style="color:var(--primary); font-size:1.1em;" onclick="openChat('${doc.id}', '${q.title}')"><i class="fa-solid fa-comments"></i></button>`;
-
                     let arrows = `<div class="arrow-controls">`;
-                    if (q.status !== 'Backlog') arrows += `<button class="btn-arrow" onclick="moveCard('${doc.id}','prev')"><i class="fa-solid fa-chevron-left"></i></button>`;
-                    if (q.status !== 'Done') arrows += `<button class="btn-arrow" onclick="moveCard('${doc.id}','next')"><i class="fa-solid fa-chevron-right"></i></button>`;
+                    if (q.status !== 'Backlog') arrows += `<button class="btn-arrow" onclick="moveCard('${id}','prev')"><i class="fa-solid fa-chevron-left"></i></button>`;
+                    if (q.status !== 'Done') arrows += `<button class="btn-arrow" onclick="moveCard('${id}','next')"><i class="fa-solid fa-chevron-right"></i></button>`;
                     arrows += `</div>`;
 
-                    let pColor = '#17a2b8';
-                    if (q.priority === 'Medium') pColor = '#ff9f1c';
-                    if (q.priority === 'High') pColor = '#ef233c';
-
-                    const descId = 'admin-sq-desc-' + doc.id;
+                    const pColor = q.priority === 'High' ? '#ef233c' : (q.priority === 'Medium' ? '#ff9f1c' : '#17a2b8');
+                    const descId = 'admin-sq-desc-' + id;
                     const descHtml = q.description ? `
-                        <div onclick="toggleSqDesc('${descId}')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:#f1f3f5; padding:4px 8px; border-radius:6px; margin-bottom:5px; margin-top:5px; font-size:0.75em; color:#555;">
+                        <div onclick="toggleSqDesc('${descId}')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:#f1f3f5; padding:4px 8px; border-radius:6px; margin-top:5px; font-size:0.75em; color:#555;">
                             <span><i class="fa-solid fa-align-left"></i> Description</span>
                             <i id="icon-${descId}" class="fa-solid fa-chevron-down"></i>
                         </div>
@@ -5699,17 +5815,105 @@
                         <div class="card-timers">${timersHtml}</div>
                         ${descHtml}
                         <div class="card-tool-row">
-                            <div>
-                                <button class="btn-sm btn-warning" onclick="openTaskModal('${doc.id}')"><i class="fa-solid fa-pen"></i></button>
-                                <button class="btn-sm btn-danger" onclick="startDeleteCard('${doc.id}')"><i class="fa-solid fa-trash"></i></button>
-                            </div>
-                            ${chatBtn}
+                            <button class="btn-sm btn-warning" onclick="openTaskModal('${id}')"><i class="fa-solid fa-pen"></i></button>
+                            <button class="btn-sm btn-danger" onclick="startDeleteCard('${id}')"><i class="fa-solid fa-trash"></i></button>
                         </div>
                         ${act}`;
                     cols[q.status].appendChild(d);
                 }
             });
-            Object.keys(cnt).forEach(k => document.getElementById(`cnt-${k}`).innerText = cnt[k]);
+
+            // 2. Render Pending Reflective Logs in "Review"
+            reflectiveLogsCache.forEach(log => {
+                const isPending = !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null);
+                if (log.isArchived) return; // Never show archived in Kanban
+                if (isPending) {
+                    const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
+                    const time = log.timestamp?.toDate() || new Date();
+                    
+                    if (filter && !log.content.toLowerCase().includes(filter) && !(log.userName || '').toLowerCase().includes(filter)) return;
+
+                    // Group filtering for Reflective Logs
+                    if (activeBoardGroup !== 'All') {
+                        const user = usersData.find(u => u.id === log.userId);
+                        if ((user?.group || 'Public') !== activeBoardGroup) return;
+                    }
+
+                    cnt["Review"]++;
+                    const d = document.createElement('div');
+                    d.className = 'kanban-card card-Review reflective-card';
+                    d.style.borderLeft = "4px solid #d35400";
+                    d.style.background = "#fffcf5";
+                    
+                    d.innerHTML = `
+                        <div class="card-header-row">
+                            <span class="badge" style="background:#d35400;">Reflective</span>
+                            <div class="card-header-right"><img src="${log.pictureUrl || ''}" class="assignee-img" title="${log.userName}"></div>
+                        </div>
+                        <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${log.userName}</div>
+                        <div style="font-size:0.85em; color:#444; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${moodEmoji} ${log.content}</div>
+                        <div style="margin-top:8px;">
+                            <button class="btn-sm" style="width:100%; background:#d35400; color:white;" onclick="reviewReflective('${log.id}', '${log.userName.replace(/'/g, "")}', '${log.userId}')">
+                                <i class="fa-solid fa-comment-dots"></i> Review & Score
+                            </button>
+                        </div>
+                    `;
+                    cols["Review"].appendChild(d);
+                }
+            });
+
+            // 3. Render Pending General Works in "Review"
+            worksData.forEach(work => {
+                const isPending = work.status !== 'ตรวจแล้ว';
+                if (isPending && !work.isQuiz && !work.isPollResponse) {
+                    if (filter && !work.title.toLowerCase().includes(filter) && !(work.displayName || '').toLowerCase().includes(filter)) return;
+
+                    // Group filtering for Works
+                    if (activeBoardGroup !== 'All') {
+                        const user = usersData.find(u => u.id === work.userId);
+                        if ((user?.group || 'Public') !== activeBoardGroup) return;
+                    }
+
+                    cnt["Review"]++;
+                    const d = document.createElement('div');
+                    d.className = 'kanban-card card-Review work-card';
+                    d.style.borderLeft = "4px solid var(--success)";
+                    
+                    let linkHtml = "";
+                    if (work.link) {
+                        const href = work.link.startsWith('http') ? work.link : 'https://' + work.link;
+                        linkHtml = `<button class="btn-sm btn-dark" style="flex:1;" onclick="window.open('${href}', '_blank')"><i class="fa-solid fa-link"></i> Link</button>`;
+                    }
+
+                    d.innerHTML = `
+                        <div class="card-header-row">
+                            <span class="badge" style="background:var(--success);">Work</span>
+                            <div class="card-header-right"><img src="${work.pictureUrl || ''}" class="assignee-img" title="${work.displayName}"></div>
+                        </div>
+                        <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${work.displayName}</div>
+                        <div style="font-size:0.85em; color:#444; font-weight:500;">📁 ${work.title}</div>
+                        <div style="margin-top:8px; display:flex; gap:5px;">
+                            ${linkHtml}
+                            <button class="btn-sm btn-primary" style="flex:1;" onclick="svSc('${work.id}', '${work.userId}')">
+                                <i class="fa-solid fa-check"></i> Score
+                            </button>
+                        </div>
+                    `;
+                    cols["Review"].appendChild(d);
+                }
+            });
+
+            Object.keys(cnt).forEach(k => {
+                const badge = document.getElementById(`cnt-${k}`);
+                if (badge) badge.innerText = cnt[k];
+            });
+        }
+
+        // Maintain backward compatibility for onSnapshot calls
+        function renderKanban(snap) {
+            sideQuestsCache = {};
+            snap.forEach(doc => sideQuestsCache[doc.id] = doc.data());
+            drawKanban();
         }
 
         function toggleSqDesc(id) {
@@ -5778,7 +5982,7 @@
         async function delWork(id) { if (confirm("Del?")) await db.collection("works").doc(id).delete(); }
         function toggleIgnoreUser(id, s) { db.collection("users").doc(id).update({ isIgnored: !s }); }
         function toggleForm() { const f = document.getElementById('sq-form'); f.style.display = f.style.display === 'none' ? 'block' : 'none'; }
-        function filterBoard() { renderKanban({ forEach: cb => { Object.values(sideQuestsCache).forEach(q => cb({ data: () => q, id: Object.keys(sideQuestsCache).find(k => sideQuestsCache[k] === q) })) } }); }
+        function filterBoard() { drawKanban(); }
         function filterUsers() { renderTable('users'); }
         function openShareModal() { document.getElementById('shareModal').style.display = 'block'; }
         async function copyLB(showName) {
@@ -6448,59 +6652,159 @@
                 .where("timestamp", ">=", new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)) // LAST 14 DAYS
                 .orderBy("timestamp", "desc")
                 .onSnapshot(snapshot => {
+                    reflectiveLogsCache = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                    
                     const tbody = document.querySelector("#reflectiveLogTable tbody");
-                    tbody.innerHTML = "";
-                    let pendingCount = 0;
+                    if (tbody) {
+                        tbody.innerHTML = "";
+                        if (snapshot.empty) {
+                            tbody.innerHTML = "<tr><td colspan='3' style='text-align:center;color:#999;padding:20px;'>No logs recently</td></tr>";
+                        } else {
+                            snapshot.forEach(doc => {
+                                const log = doc.data();
+                                const id = doc.id;
+                                if (log.isArchived) return; // Skip archived in this section
 
-                    if (snapshot.empty) {
-                        tbody.innerHTML = "<tr><td colspan='3' style='text-align:center;color:#999;padding:20px;'>No logs recently (ไม่มีบันทึกใหม่ใน 3 วันนี้)</td></tr>";
-                        document.getElementById('stat-reflective-count').innerText = 0;
-                        return;
+                                const dateObj = log.timestamp?.toDate() || log.createdAt?.toDate() || new Date();
+                                const timeStr = dateObj.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'numeric', year: '2-digit' }) + ' ' + dateObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+                                const isPending = !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null);
+                                const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
+
+                                const row = document.createElement("tr");
+                                if (isPending) row.style.background = "#fff9db";
+                                row.innerHTML = `
+                                    <td>
+                                        <b>${log.displayName || log.userName || 'Unknown'}</b><br>
+                                        <small style="color:#888;">${timeStr}</small>
+                                    </td>
+                                    <td>
+                                        <div style="font-size:1.1em; margin-bottom:5px;">${moodEmoji} ${log.content}</div>
+                                        ${log.adminComment ? `<div style="font-size:0.85em; color:var(--success); background:#e6fffa; padding:5px 8px; border-radius:5px; margin-top:5px;"><i class="fa-solid fa-reply"></i> ${log.adminComment} ${log.adminBonus ? `(+${log.adminBonus})` : ''}</div>` : ''}
+                                    </td>
+                                    <td>
+                                        <div style="display:flex; flex-direction:column; gap:5px;">
+                                            <button class="btn-sm btn-primary" onclick="reviewReflective('${id}', '${log.userName}', '${log.userId}')">
+                                                <i class="fa-solid fa-comment-dots"></i> Review
+                                            </button>
+                                            ${log.adminComment ? `<button class="btn-sm" style="background:#0a192f; color:white;" onclick="archiveReflective('${id}')" title="Collect to Laugh Tale">
+                                                <i class="fa-solid fa-gem"></i> Collect
+                                            </button>` : ''}
+                                            <button class="btn-sm btn-danger" onclick="deleteReflective('${id}')" title="Delete">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                `;
+                                tbody.appendChild(row);
+                            });
+                        }
                     }
 
-                    snapshot.forEach(doc => {
-                        const log = doc.data();
-                        const id = doc.id;
-                        const dateObj = log.timestamp?.toDate() || log.createdAt?.toDate() || new Date();
-                        const timeStr = dateObj.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'numeric', year: '2-digit' }) + ' ' + dateObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-
-                        // Check if pending (no comment or bonus yet)
-                        const isPending = !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null);
-                        if (isPending) pendingCount++;
-
-                        const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
-
-                        const row = document.createElement("tr");
-                        if (isPending) row.style.background = "#fff9db";
-
-                        row.innerHTML = `
-                            <td>
-                                <b>${log.displayName || log.userName || 'Unknown'}</b><br>
-                                <small style="color:#888;">${timeStr}</small>
-                            </td>
-                            <td>
-                                <div style="font-size:1.1em; margin-bottom:5px;">${moodEmoji} ${log.content}</div>
-                                ${log.adminComment ? `<div style="font-size:0.85em; color:var(--success); background:#e6fffa; padding:5px 8px; border-radius:5px; margin-top:5px;"><i class="fa-solid fa-reply"></i> ${log.adminComment} ${log.adminBonus ? `(+${log.adminBonus})` : ''}</div>` : ''}
-                            </td>
-                            <td>
-                                <button class="btn-sm btn-primary" onclick="reviewReflective('${id}', '${log.userName}', '${log.userId}')">
-                                    <i class="fa-solid fa-comment-dots"></i> ตรวจ
-                                </button>
-                                <button class="btn-sm btn-danger" onclick="deleteReflective('${id}')" title="Delete">
-                                    <i class="fa-solid fa-trash"></i>
-                                </button>
-                            </td>
-                        `;
-                        tbody.appendChild(row);
-                    });
-                    
+                    const pendingCount = reflectiveLogsCache.filter(log => !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null)).length;
                     document.getElementById('stat-reflective-count').innerText = pendingCount;
+                    
+                    if (document.getElementById('tab-laughtale').classList.contains('active')) renderLaughTale();
+                    drawKanban(); // Sync with Kanban
                 });
         }
+
+        function renderLaughTale() {
+            const container = document.getElementById('laughtale-grid');
+            if (!container) return;
+            
+            const archived = reflectiveLogsCache.filter(l => l.isArchived).sort((a,b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
+            
+            if (archived.length === 0) {
+                container.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align:center; padding:100px 20px; background:rgba(255,255,255,0.5); border:2px dashed #ccc; border-radius:20px;">
+                        <i class="fa-solid fa-box-open" style="font-size:3em; color:#ccc; margin-bottom:20px;"></i>
+                        <h3 style="color:#999;">No treasures found yet.</h3>
+                        <p style="color:#aaa;">Review logs and click "Collect" to add them to Laugh Tale.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = archived.map(log => {
+                const dateObj = log.timestamp?.toDate() || new Date();
+                const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
+                const groupColor = getGroupColor(usersData.find(u => u.id === log.userId)?.group || 'Public');
+
+                return `
+                    <div class="laugh-card" style="background:#fff; border-radius:20px; box-shadow:0 10px 25px rgba(0,0,0,0.05); padding:20px; position:relative; overflow:hidden; border:1px solid #eee; transition:all 0.3s ease;">
+                        <div style="position:absolute; top:0; left:0; width:100%; height:8px; background:${groupColor};"></div>
+                        <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px;">
+                            <img src="${log.pictureUrl || ''}" style="width:45px; height:45px; border-radius:50%; border:3px solid #fff; box-shadow:0 0 10px rgba(0,0,0,0.1);">
+                            <div style="flex:1;">
+                                <div style="font-weight:bold; font-size:1em;">${log.userName}</div>
+                                <div style="font-size:0.7em; color:#999; text-transform:uppercase;">${dateObj.toLocaleDateString('th-TH')} • ${moodEmoji}</div>
+                            </div>
+                            <div style="font-size:1.2em;">✨</div>
+                        </div>
+                        <div style="font-size:0.95em; color:#444; line-height:1.6; font-style:italic; margin-bottom:15px; background:#f9f9f9; padding:15px; border-radius:12px; border-left:4px solid #d35400;">
+                            "${log.content}"
+                        </div>
+                        <div style="border-top:1px solid #f0f0f0; pt:15px; margin-top:5px; padding-top:10px;">
+                            <div style="font-size:0.75em; font-weight:bold; color:#d35400; text-transform:uppercase; margin-bottom:5px;">Admin Feedack:</div>
+                            <div style="font-size:0.88em; color:#0a192f; line-height:1.4;">
+                                <i class="fa-solid fa-quote-left" style="opacity:0.2; margin-right:5px;"></i>
+                                ${log.adminComment}
+                                <i class="fa-solid fa-quote-right" style="opacity:0.2; margin-left:5px;"></i>
+                            </div>
+                            ${log.adminBonus ? `<div style="margin-top:10px; text-align:right;"><span style="background:#e6fffa; color:#00b894; padding:2px 10px; border-radius:20px; font-weight:bold; font-size:0.8em;">+${log.adminBonus} PTS</span></div>` : ''}
+                        </div>
+                        <button onclick="unarchiveReflective('${log.id}')" style="position:absolute; top:12px; right:12px; background:none; border:none; color:#ddd; cursor:pointer;" title="Unarchive"><i class="fa-solid fa-rotate-left"></i></button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function archiveReflective(id) {
+            try {
+                await db.collection("reflective_logs").doc(id).update({ isArchived: true });
+                showToast("Collected to Laugh Tale! 🏝️");
+            } catch (e) { alert(e.message); }
+        }
+
+        async function unarchiveReflective(id) {
+            try {
+                await db.collection("reflective_logs").doc(id).update({ isArchived: false });
+                showToast("Moved back to Dashboard");
+            } catch (e) { alert(e.message); }
+        }
         async function reviewReflective(id, name, uid) {
-            const bonus = parseFloat(prompt(`Bonus points for ${name}? (e.g. 0.1, 0.5):`, "0"));
-            const comment = prompt(`Comment to ${name}:`);
-            if (comment === null) return;
+            const log = reflectiveLogsCache.find(l => l.id === id);
+            if (!log) return;
+
+            document.getElementById('reflective-review-id').value = id;
+            document.getElementById('reflective-review-uid').value = uid;
+            document.getElementById('reflective-review-uname').value = name;
+            
+            const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
+            document.getElementById('reflective-review-user-info').innerHTML = `
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                    <img src="${log.pictureUrl || ''}" style="width:40px; height:40px; border-radius:50%; border:2px solid #d35400;">
+                    <div>
+                        <div style="font-weight:bold; color:#d35400;">${name}</div>
+                        <div style="font-size:0.75em; color:#888;">${log.timestamp?.toDate().toLocaleString('th-TH')}</div>
+                    </div>
+                </div>
+                <div style="font-size:1.05em; color:#333; line-height:1.4;">${moodEmoji} ${log.content}</div>
+            `;
+
+            document.getElementById('reflective-review-bonus').value = "0.5";
+            document.getElementById('reflective-review-comment').value = "";
+            document.getElementById('reflectiveReviewModal').style.display = 'block';
+        }
+
+        async function saveReflectiveReview() {
+            const id = document.getElementById('reflective-review-id').value;
+            const uid = document.getElementById('reflective-review-uid').value;
+            const name = document.getElementById('reflective-review-uname').value;
+            const bonus = parseFloat(document.getElementById('reflective-review-bonus').value) || 0;
+            const comment = document.getElementById('reflective-review-comment').value.trim();
+
+            if (!comment) return alert("กรุณาใส่ความคิดเห็น/ฟีดแบ็กสั้นๆ เพื่อให้กำลังใจนักศึกษาครับ");
 
             try {
                 const b = db.batch();
@@ -6509,7 +6813,7 @@
 
                 const upData = { 
                     adminComment: comment,
-                    adminBonus: bonus || 0,
+                    adminBonus: bonus,
                     reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
 
@@ -6517,21 +6821,21 @@
 
                 if (bonus > 0) {
                     b.update(userRef, { score: firebase.firestore.FieldValue.increment(bonus) });
-                    
                     const scoreLogRef = db.collection("checkin_logs").doc();
                     b.set(scoreLogRef, {
                         userId: uid,
                         type: 'reflective_bonus',
                         amount: bonus,
-                        note: 'Bonus from Reflective Log: ' + (comment.substring(0, 30)),
+                        note: 'Reflective Bonus: ' + (comment.substring(0, 50)),
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 }
 
                 await b.commit();
-                showToast("Reviewed!");
+                showToast("Reviewed & Points Assigned!");
+                document.getElementById('reflectiveReviewModal').style.display = 'none';
             } catch (e) {
-                alert(e.message);
+                alert("Error: " + e.message);
             }
         }
 

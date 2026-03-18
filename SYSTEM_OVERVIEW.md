@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V84.8) Overview
+# MLP Internship Portfolio (V84.9) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -136,11 +136,17 @@
 - **✨ UI Preview (V77.17):** ระบบจำลองหน้าจอ LIFF (Mobile View) บน Admin Dashboard ช่วยให้สามารถตรวจสอบการแสดงผลของฝั่งผู้ใช้งานได้ทันทีโดยไม่ต้องใช้โทรศัพท์จริง
 - **✨ Visual Review Pipeline (V77.22):** เพิ่มการแสดงภาพ Profile ของผู้ส่งงานในตาราง **"รออนุมัติ (Pending Review)"** และตารางงานทั่วไป เพื่อให้ผู้ดูแลสามารถเห็นตัวตนผู้ส่งได้ทันที พร้อมระบบ Auto-lookup ภาพล่าสุดจากฐานข้อมูลผู้ใช้กรณีข้อมูลเก่าไม่มีรูปแนบ
 
-### 2. การจัดการภารกิจ (Kanban Management)
+### 2. การจัดการภารกิจ (Kanban Management & Focused Review)
 - **Drag & Drop Console:** ย้ายสถานะงานของนักศึกษาได้ทันทีผ่านหน้า Admin
+- **✨ Admin Dashboard Tabs (V84.9):** ระบบแท็บแยกตามกลุ่ม (Junior, INTERN, EXTERN) ช่วยให้แอดมินโฟกัสการตรวจงานได้รวดเร็วขึ้น พร้อมแท็บ "ALL" เพื่อดูภาพรวมทั้งหมด
+- **✨ Reflective Log Review (Dashboard):** รวมส่วนตรวจบันทึกสะท้อนคิดรายวันไว้ที่หน้า Dashboard หลัก เพื่อให้แอดมินให้คะแนนและคอมเมนต์ได้ทันที สะดวกกว่าเดิม
 - **Priority & Assignee:** มอบหมายงานให้ผู้ใช้รายคนหรือเป็นกลุ่ม กำหนดความสำคัญ (Low/Medium/High)
 - **Project Flag:** กำหนดประเภทงานเป็น Project เพื่อการติดตามที่เข้มข้นขึ้น
 - **Archive System:** ย้ายงานที่เสร็จสิ้นแล้วเข้าสู่คลังจัดเก็บ (Archive) เพื่อลดความหนาแน่นของผู้ใช้งาน
+- **🏝️ Laugh Tale웃음 이야기 (V84.9):** 
+    - ระบบจัดเก็บ "เรื่องราวดีๆ" (Great Stories) ที่แอดมินคัดเลือกมาจาก Reflective Logs
+    - แอดมินกด "Collect" เพื่อย้ายบันทึกที่ตรวจแล้วเข้าสู่คลังแสดงผลแบบพรีเมียม (Masonry Grid)
+    - ช่วยสร้างแรงบันดาลใจและเก็บรักษาโมเมนต์การเรียนรู้ที่ยอดเยี่ยมไว้ในระบบอย่างถาวร
 - **🔗 Kanban-Quiz Integration (V78.3):** ระบบเชื่อมโยง Kanban Board กับ Quiz/Homework แบบอัตโนมัติ:
     - **Auto-create Card:** เมื่อ Admin มอบการบ้าน ระบบสร้าง Kanban Card (📚 HW: ชื่อ Quiz) ใน Backlog ให้อัตโนมัติ พร้อมรูปและชื่อผู้รับงาน
     - **Auto-move Doing:** เมื่อ User เริ่มทำ Quiz การบ้าน → Card ขยับจาก Backlog ไป **Doing** อัตโนมัติ
@@ -388,4 +394,4 @@ service cloud.firestore {
 - **Live Sync:** ดึงข้อมูลจากคอลเลกชัน `reports` (ประเภท `access_request`) แบบ Real-time
 
 ---
-*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V84.8) โดย Antigravity AI*
+*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V84.9) โดย Antigravity AI*

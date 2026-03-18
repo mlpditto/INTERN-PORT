@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V84.8)</title>
+    <title>Internship Portfolio (V84.9)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -1444,6 +1444,7 @@
                 loadAllQuests();
                 loadMySubmissions();
                 loadMyWorks();
+                loadMyReflectiveLogs();
                 loadSideQuests();
                 loadQuizzes();
                 loadDivisionConfig();
@@ -3187,6 +3188,21 @@
             let html = "";
             let totalScore = 0;
 
+            // 🔥 Feedback Display (V84.6)
+            if (attempt.adminComment) {
+                html += `
+                <div style="background:var(--primary); color:white; padding:15px; border-radius:12px; margin-bottom:20px; box-shadow:0 4px 15px rgba(67,97,238,0.2); position:relative; overflow:hidden;">
+                    <div style="position:absolute; top:-10px; right:-10px; font-size:4em; opacity:0.1;"><i class="fa-solid fa-comment-dots"></i></div>
+                    <div style="font-weight:bold; font-size:1.1em; display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                        <i class="fa-solid fa-user-shield"></i> Admin Feedback
+                    </div>
+                    <div style="font-size:0.95em; line-height:1.4; background:rgba(255,255,255,0.1); padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.2);">
+                        "${attempt.adminComment}"
+                    </div>
+                    ${attempt.adminBonus ? `<div style="margin-top:8px; font-weight:bold; font-size:0.85em; display:flex; align-items:center; gap:5px;"><i class="fa-solid fa-coins"></i> +${attempt.adminBonus} Bonus Points</div>` : ''}
+                </div>`;
+            }
+
             q.questions.forEach((question, i) => {
                 const userAns = attempt.answers[i];
                 const isChoice = (question.type || 'choice') === 'choice';
@@ -4272,6 +4288,13 @@
             })
         }
 
+        function loadMyReflectiveLogs() {
+            db.collection("reflective_logs").where("userId", "==", userId).orderBy("timestamp", "desc").onSnapshot(s => {
+                window.myReflectiveLogsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderHistory();
+            });
+        }
+
         // --- Delete History Item (V84.6) ---
         async function deleteHistoryItem(id, type) {
             if (!confirm(`ยืนยันลบประวัติ ${type} นี้?`)) return;
@@ -4341,7 +4364,9 @@
                         score: score,
                         icon: 'fa-brain',
                         color: '#8e44ad',
-                        isPoll: att.isPoll
+                        isPoll: att.isPoll,
+                        adminComment: att.adminComment,
+                        quizId: qid
                     });
                 }
             });
@@ -4358,9 +4383,28 @@
                     score: w.score || 0,
                     link: w.link,
                     icon: 'fa-file-lines',
-                    color: '#4361ee'
+                    color: '#4361ee',
+                    adminComment: w.adminComment
                 });
             });
+
+            // 4. Reflective Logs (Daily Logs)
+            if (window.myReflectiveLogsCache) {
+                window.myReflectiveLogsCache.forEach(log => {
+                    const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
+                    items.push({
+                        id: log.id,
+                        title: `${moodEmoji} Daily Reflective: ${log.content.substring(0, 30)}...`,
+                        type: 'Reflective',
+                        timestamp: log.timestamp,
+                        status: (log.adminComment || log.adminBonus) ? 'ตรวจแล้ว' : 'รอตรวจ',
+                        score: log.adminBonus || 0,
+                        icon: 'fa-book-journal-whills',
+                        color: '#d35400',
+                        adminComment: log.adminComment
+                    });
+                });
+            }
 
             // Sort: Newest First
             items.sort((a, b) => {
@@ -4396,24 +4440,34 @@
                     </button>
                 ` : "";
 
+                const commentHtml = item.adminComment ? `
+                    <div style="margin-top:8px; padding:10px; background:${item.color}08; border-left:3px solid ${item.color}; border-radius:6px; font-size:0.82em; color:#555; position:relative;">
+                        <i class="fa-solid fa-quote-left" style="color:${item.color}; opacity:0.3; margin-right:5px;"></i>
+                            ${item.adminComment}
+                    </div>
+                ` : "";
+
                 return `
-                    <div style="background:#fff; border-radius:12px; padding:12px; margin-bottom:10px; display:flex; align-items:center; gap:12px; border:1px solid #f0f0f0; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
-                        <div style="width:38px; height:38px; border-radius:10px; background:${item.color}15; color:${item.color}; display:flex; align-items:center; justify-content:center; font-size:1.1em; flex-shrink:0;">
-                            <i class="fa-solid ${item.icon}"></i>
-                        </div>
-                        <div style="flex:1; min-width:0;">
-                            <div style="font-weight:600; font-size:0.9em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#333;">${item.title}</div>
-                            <div style="font-size:0.7em; color:#999; display:flex; align-items:center; gap:5px;">
-                                ${date} • ${statusBadge}
+                    <div style="background:#fff; border-radius:12px; padding:12px; margin-bottom:12px; border:1px solid #f0f0f0; box-shadow:0 4px 6px rgba(0,0,0,0.02); transition:0.2s;">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <div style="width:40px; height:40px; border-radius:12px; background:${item.color}15; color:${item.color}; display:flex; align-items:center; justify-content:center; font-size:1.15em; flex-shrink:0;">
+                                <i class="fa-solid ${item.icon}"></i>
+                            </div>
+                            <div style="flex:1; min-width:0;">
+                                <div style="font-weight:700; font-size:0.92em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#1a1a1a;">${item.title}</div>
+                                <div style="font-size:0.72em; color:#888; display:flex; align-items:center; gap:6px; margin-top:2px;">
+                                    ${date} • ${statusBadge}
+                                </div>
+                            </div>
+                            <div style="text-align:right; flex-shrink:0; display:flex; align-items:center; gap:10px;">
+                                <div style="display:flex; flex-direction:column; align-items:flex-end;">
+                                    <div style="font-weight:900; color:${item.color}; font-size:1.15em; font-family: 'Montserrat', sans-serif;">${scoreDisplay}</div>
+                                    ${linkHtml}
+                                </div>
+                                ${deleteBtn}
                             </div>
                         </div>
-                        <div style="text-align:right; flex-shrink:0; display:flex; align-items:center; gap:5px;">
-                            <div style="display:flex; flex-direction:column; align-items:flex-end;">
-                                <div style="font-weight:800; color:${item.color}; font-size:1.05em;">${scoreDisplay}</div>
-                                ${linkHtml}
-                            </div>
-                            ${deleteBtn}
-                        </div>
+                        ${commentHtml}
                     </div>
                 `;
             }).join('');
