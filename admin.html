@@ -3358,7 +3358,7 @@
 
                 tbody.innerHTML += `
                     <tr style="${isRequest ? 'background:#fff8e1;' : ''}">
-                        <td>${att.timestamp ? att.timestamp.toDate().toLocaleString('th-TH') : '-'}</td>
+                        <td>${att.timestamp ? att.timestamp.toDate().toLocaleString('th-TH', { weekday: 'short', day: 'numeric', month: 'numeric', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
                         <td style="display:flex; align-items:center; gap:8px;"><img src="${uImg}" class="user-pic"> <span>${uName}</span></td>
                         <td>${qTitle}</td>
                         <td>${isPoll || isRequest ? '-' : `${att.correctCount}/${att.totalQuestions}`}</td>
@@ -4861,7 +4861,7 @@
                             }
                         }
 
-                        tbody.innerHTML += `<tr><td>${d.timestamp?.toDate().toLocaleString() || '-'}</td><td><img src="${uImg}" class="user-pic">${uName}</td><td>📝 ${isPoll ? 'Poll' : 'Quiz'}: ${qTitle}</td><td>${reviewBtn}</td><td><span class="badge" style="background:${st}">Approved</span></td><td><b style="color:var(--primary);">${points.toFixed(2)}</b></td><td><button class="btn-sm btn-danger" onclick="delQuizAttempt('${d.id}', '${d.collection}')">Del</button></td></tr>`;
+                        tbody.innerHTML += `<tr><td>${d.timestamp?.toDate().toLocaleString('th-TH', { weekday: 'short', day: 'numeric', month: 'numeric', year: '2-digit', hour: '2-digit', minute: '2-digit' }) || '-'}</td><td><img src="${uImg}" class="user-pic">${uName}</td><td>📝 ${isPoll ? 'Poll' : 'Quiz'}: ${qTitle}</td><td>${reviewBtn}</td><td><span class="badge" style="background:${st}">Approved</span></td><td><b style="color:var(--primary);">${points.toFixed(2)}</b></td><td><button class="btn-sm btn-danger" onclick="delQuizAttempt('${d.id}', '${d.collection}')">Del</button></td></tr>`;
                     } else {
                         // 🔥 Link Fix
                         let linkUrl = d.link || "";
@@ -4888,7 +4888,7 @@
                             }
                         }
 
-                        tbody.innerHTML += `<tr><td>${d.timestamp?.toDate().toLocaleString() || '-'}</td><td><img src="${uImg}" class="user-pic">${uName}</td><td>${d.title}</td><td><a ${hrefAttr} ${onclickAttr} class="${btnClass}">Link</a></td><td><span class="badge" style="background:${st}">${d.status}</span></td><td><div style="display:flex;"><input type="number" id="sc-${d.id}" value="${d.score || 0}" style="width:60px;"><button class="btn-sm btn-primary" onclick="svSc('${d.id}','${d.userId}')">Save</button></div></td><td><button class="btn-sm btn-danger" onclick="delWork('${d.id}')">Del</button></td></tr>`;
+                        tbody.innerHTML += `<tr><td>${d.timestamp?.toDate().toLocaleString('th-TH', { weekday: 'short', day: 'numeric', month: 'numeric', year: '2-digit', hour: '2-digit', minute: '2-digit' }) || '-'}</td><td><img src="${uImg}" class="user-pic">${uName}</td><td>${d.title}</td><td><a ${hrefAttr} ${onclickAttr} class="${btnClass}">Link</a></td><td><span class="badge" style="background:${st}">${d.status}</span></td><td><div style="display:flex;"><input type="number" id="sc-${d.id}" value="${d.score || 0}" style="width:60px;"><button class="btn-sm btn-primary" onclick="svSc('${d.id}','${d.userId}')">Save</button></div></td><td><button class="btn-sm btn-danger" onclick="delWork('${d.id}')">Del</button></td></tr>`;
                     }
                 }
                 else {
@@ -5074,6 +5074,8 @@
                     const x = d.data();
                     if (x.type === 'streak') all.push({ t: x.timestamp?.toDate(), type: 'bonus', text: `🔥 Streak`, score: x.amount, docId: d.id, source: 'checkin_logs' });
                     if (x.type === 'manual_adjust' || x.type === 'manual') all.push({ t: x.timestamp?.toDate(), type: 'manual', text: `🛠️ ${x.note}`, score: x.amount, docId: d.id, source: 'checkin_logs' });
+                    if (x.type === 'reflective_log') all.push({ t: x.timestamp?.toDate(), type: 'bonus', text: `📝 ${x.note || 'Reflective Log'}`, score: x.amount, docId: d.id, source: 'checkin_logs' });
+                    if (x.type === 'reflective_bonus') all.push({ t: x.timestamp?.toDate(), type: 'bonus', text: `🎁 Reflective Bonus: ${x.note}`, score: x.amount, docId: d.id, source: 'checkin_logs' });
                 });
                 all.sort((a, b) => (b.t || 0) - (a.t || 0));
                 historyCache = all; // 🔥 Fix: Latest first (removed .reverse())
@@ -5766,7 +5768,7 @@
         async function delArchiveDoc(id) { if (confirm("Del?")) await db.collection("side_quests").doc(id).delete(); openArchiveModal(); }
         async function restoreSQ(id, t) { await db.collection("side_quests").doc(id).update({ status: t, doneAt: firebase.firestore.FieldValue.serverTimestamp() }); openArchiveModal(); showToast("Restored"); }
         function confirmClearArchive() { document.getElementById('clearConfirmModal').style.display = 'block'; const btn = document.getElementById('btn-confirm-clear'); btn.disabled = true; btn.style.background = '#ccc'; let c = 5; btn.innerText = `Confirm (${c})`; const t = setInterval(() => { c--; btn.innerText = `Confirm (${c})`; if (c <= 0) { clearInterval(t); btn.disabled = false; btn.style.background = '#ef233c'; btn.innerText = "CLEAR ALL"; btn.onclick = async () => { document.getElementById('clearConfirmModal').style.display = 'none'; const s = await db.collection("side_quests").where("status", "==", "Archived").get(); const b = db.batch(); s.forEach(d => b.delete(d.ref)); await b.commit(); showToast("Cleared!"); openArchiveModal(); } } }, 1000); }
-        function renderHistoryPage() { const l = document.getElementById("history-list"); const c = document.getElementById("history-controls"); l.innerHTML = ""; c.innerHTML = ""; const s = (historyPage - 1) * HISTORY_PER_PAGE; const p = historyCache.slice(s, s + HISTORY_PER_PAGE); const t = Math.ceil(historyCache.length / HISTORY_PER_PAGE); p.forEach(e => { const d = e.t ? e.t.toLocaleString('th-TH') : '-'; let cls = e.type === 'bonus' ? 'bonus' : (e.type === 'manual' ? 'manual' : ''); let delBtn = ""; if (e.source === 'checkin_logs' && e.docId) { delBtn = `<button class="btn-del-hist" onclick="deleteHistoryLog('${e.docId}', ${e.score})">✕ Delete</button>`; } l.innerHTML += `<li style="padding:10px;border-bottom:1px solid #eee;" class="${cls}"><div style="display:flex;justify-content:space-between;align-items:center;"><div>${e.text} ${delBtn}</div><span style="font-weight:bold;">${e.score > 0 ? '+' : ''}${parseFloat(e.score).toFixed(2)}</span></div><small style="color:#888">${d}</small></li>` }); if (t > 1) { c.innerHTML = `<button class="btn-sm btn-dark" ${historyPage === 1 ? 'disabled' : ''} onclick="historyPage--;renderHistoryPage()">< Prev</button> <span style="align-self:center;">${historyPage}/${t}</span> <button class="btn-sm btn-dark" ${historyPage === t ? 'disabled' : ''} onclick="historyPage++;renderHistoryPage()">Next ></button>`; } }
+        function renderHistoryPage() { const l = document.getElementById("history-list"); const c = document.getElementById("history-controls"); l.innerHTML = ""; c.innerHTML = ""; const s = (historyPage - 1) * HISTORY_PER_PAGE; const p = historyCache.slice(s, s + HISTORY_PER_PAGE); const t = Math.ceil(historyCache.length / HISTORY_PER_PAGE); p.forEach(e => { const d = e.t ? e.t.toLocaleString('th-TH', { weekday: 'short', day: 'numeric', month: 'numeric', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'; let cls = e.type === 'bonus' ? 'bonus' : (e.type === 'manual' ? 'manual' : ''); let delBtn = ""; if (e.source === 'checkin_logs' && e.docId) { delBtn = `<button class="btn-del-hist" onclick="deleteHistoryLog('${e.docId}', ${e.score})">✕ Delete</button>`; } l.innerHTML += `<li style="padding:10px;border-bottom:1px solid #eee;" class="${cls}"><div style="display:flex;justify-content:space-between;align-items:center;"><div>${e.text} ${delBtn}</div><span style="font-weight:bold;">${e.score > 0 ? '+' : ''}${parseFloat(e.score).toFixed(2)}</span></div><small style="color:#888">${d}</small></li>` }); if (t > 1) { c.innerHTML = `<button class="btn-sm btn-dark" ${historyPage === 1 ? 'disabled' : ''} onclick="historyPage--;renderHistoryPage()">< Prev</button> <span style="align-self:center;">${historyPage}/${t}</span> <button class="btn-sm btn-dark" ${historyPage === t ? 'disabled' : ''} onclick="historyPage++;renderHistoryPage()">Next ></button>`; } }
         async function deleteHistoryLog(logId, amount) { if (!confirm(`Delete log and revert ${amount} points?`)) return; try { await db.collection("users").doc(currentHistoryUserId).update({ score: firebase.firestore.FieldValue.increment(-amount) }); await db.collection("checkin_logs").doc(logId).delete(); showToast("Reverted!"); const user = usersData.find(u => u.id === currentHistoryUserId); showHistory(currentHistoryUserId, user ? user.displayName : 'User', (user ? user.score : 0) - amount); } catch (e) { alert(e.message); } }
         function updateAssigneeList() { const d = document.getElementById('sq-user-list'); d.innerHTML = ""; usersData.forEach(u => { if (!u.isIgnored) d.innerHTML += `<label style="margin-right:5px"><input type="checkbox" class="sq-user-check" value="${u.id}" data-name="${u.displayName}" data-pic="${u.pictureUrl}"> ${u.displayName}</label>` }); }
         async function moveCard(id, dir) { const q = sideQuestsCache[id]; const f = ['Backlog', 'Doing', 'Review', 'Done']; const c = f.indexOf(q.status); let n = q.status; if (dir === 'next' && c < 3) n = f[c + 1]; if (dir === 'prev' && c > 0) n = f[c - 1]; if (n !== q.status) { const u = { status: n }; if (n === 'Done') u.doneAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").doc(id).update(u); } }
@@ -6443,8 +6445,8 @@
         // --- 🔥 V84.8: Reflective Log System (Admin) ---
         function loadReflectiveLogsAdmin() {
             db.collection("reflective_logs")
-                .where("createdAt", ">=", new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)) // Last 3 days
-                .orderBy("createdAt", "desc")
+                .where("timestamp", ">=", new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)) // LAST 14 DAYS
+                .orderBy("timestamp", "desc")
                 .onSnapshot(snapshot => {
                     const tbody = document.querySelector("#reflectiveLogTable tbody");
                     tbody.innerHTML = "";
@@ -6459,8 +6461,8 @@
                     snapshot.forEach(doc => {
                         const log = doc.data();
                         const id = doc.id;
-                        const dateObj = log.createdAt?.toDate() || new Date();
-                        const timeStr = dateObj.toLocaleDateString('th-TH') + ' ' + dateObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+                        const dateObj = log.timestamp?.toDate() || log.createdAt?.toDate() || new Date();
+                        const timeStr = dateObj.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'numeric', year: '2-digit' }) + ' ' + dateObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
 
                         // Check if pending (no comment or bonus yet)
                         const isPending = !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null);
@@ -6473,7 +6475,7 @@
 
                         row.innerHTML = `
                             <td>
-                                <b>${log.userName || 'Unknown'}</b><br>
+                                <b>${log.displayName || log.userName || 'Unknown'}</b><br>
                                 <small style="color:#888;">${timeStr}</small>
                             </td>
                             <td>
