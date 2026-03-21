@@ -1114,35 +1114,35 @@
 
             <!-- 🔥 Lean UI: Stat Chips (Horizontal Cards) -->
             <div class="stat-chips">
-                <div class="stat-card" style="border-left: 3px solid #6f42c1;" onclick="openQuickReview('access')">
+                <div id="chip-access" class="stat-card" style="display:none; border-left: 3px solid #6f42c1;" onclick="openQuickReview('access')">
                     <div class="stat-icon" style="background:#f3f0ff; color:#6f42c1;"><i class="fa-solid fa-user-plus"></i></div>
                     <div class="stat-info">
                         <span class="stat-label">Access Requests</span>
                         <span class="stat-value" style="color:#6f42c1;" id="stat-access-count">0</span>
                     </div>
                 </div>
-                <div class="stat-card" style="border-left: 3px solid #d35400;" onclick="openQuickReview('reflective')">
+                <div id="chip-reflective" class="stat-card" style="display:none; border-left: 3px solid #d35400;" onclick="openQuickReview('reflective')">
                     <div class="stat-icon" style="background:#fff5eb; color:#d35400;"><i class="fa-solid fa-book-journal-whills"></i></div>
                     <div class="stat-info">
                         <span class="stat-label">Reflective Review</span>
                         <span class="stat-value" style="color:#d35400;" id="stat-reflective-count">0</span>
                     </div>
                 </div>
-                <div class="stat-card" style="border-left: 3px solid #00b894;" onclick="openQuickReview('claimed')">
+                <div id="chip-claimed" class="stat-card" style="display:none; border-left: 3px solid #00b894;" onclick="openQuickReview('claimed')">
                     <div class="stat-icon" style="background:#e6fffa; color:#00b894;"><i class="fa-solid fa-hand-holding-dollar"></i></div>
                     <div class="stat-info">
                         <span class="stat-label">Points Claimed</span>
                         <span class="stat-value" style="color:#00b894;" id="stat-claimed-count">0</span>
                     </div>
                 </div>
-                <div class="stat-card" style="border-left: 3px solid var(--primary);" onclick="openQuickReview('quiz')">
+                <div id="chip-quiz" class="stat-card" style="display:none; border-left: 3px solid var(--primary);" onclick="openQuickReview('quiz')">
                     <div class="stat-icon" style="background:#eef2ff; color:var(--primary);"><i class="fa-solid fa-clock-rotate-left"></i></div>
                     <div class="stat-info">
                         <span class="stat-label">Quiz Review</span>
                         <span class="stat-value" style="color:var(--primary);" id="stat-quiz-count">0</span>
                     </div>
                 </div>
-                <div class="stat-card" style="border-left: 3px solid var(--success);" onclick="openQuickReview('work')">
+                <div id="chip-work" class="stat-card" style="display:none; border-left: 3px solid var(--success);" onclick="openQuickReview('work')">
                     <div class="stat-icon" style="background:#f0fdf4; color:var(--success);"><i class="fa-solid fa-briefcase"></i></div>
                     <div class="stat-info">
                         <span class="stat-label">General Works</span>
@@ -1240,27 +1240,7 @@
 
 
 
-                        <!-- 🔥 Reflective Log Review Section -->
-                        <div id="reflective-log-review-section" class="review-card" style="background:#fffcf5; border-color:#f9e79f; border-radius:12px; margin-bottom:15px;">
-                            <h4 style="color:#d35400; font-size:1em; border-bottom:1px solid #fff5eb; padding-bottom:8px;">
-                                <i class="fa-solid fa-book-journal-whills"></i> Reflective Logs
-                                <small style="font-size:0.7em; color:#888; font-weight:normal; margin-left:auto;">(Daily Logs)</small>
-                            </h4>
-                            <div style="overflow-x:auto;">
-                                <table id="reflectiveLogTable" class="admin-table">
-                                    <thead>
-                                        <tr>
-                                            <th style="width:150px;">Date/User</th>
-                                            <th>Content</th>
-                                            <th style="width:180px;">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr><td colspan="3" style="text-align:center;">Loading Reflective Logs...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+
 
                         <!-- Quiz Pending Review Section -->
                         <div id="quiz-pending-section" class="review-card" style="display:none; border-color:#b8daff; border-radius:12px; margin-bottom:15px;">
@@ -3443,10 +3423,12 @@
             const section = document.getElementById('quiz-pending-section');
             if (data.length === 0) {
                 section.style.display = "none";
+                document.getElementById('chip-quiz').style.display = "none";
                 drawKanban(); // Refresh Kanban to remove cards
                 return;
             }
             section.style.display = "block";
+            document.getElementById('chip-quiz').style.display = "flex";
             const statEl = document.getElementById('stat-quiz-count');
             if (statEl) statEl.innerText = data.length;
             tbody.innerHTML = "";
@@ -4690,11 +4672,13 @@
             if (data.length === 0) {
                 section.style.display = "none";
                 document.getElementById('stat-access-count').innerText = 0;
+                document.getElementById('chip-access').style.display = "none";
                 drawKanban();
                 return;
             }
             section.style.display = "block";
             document.getElementById('stat-access-count').innerText = data.length;
+            document.getElementById('chip-access').style.display = "flex";
             tbody.innerHTML = "";
             drawKanban();
             
@@ -5044,7 +5028,10 @@
             // 🔥 Stat Chip: General Work Count (Pending only)
             if (type === 'works') {
                 const pendingWorks = worksData.filter(d => d.status !== 'ตรวจแล้ว').length;
-                document.getElementById('stat-work-count').innerText = pendingWorks;
+                const countEl = document.getElementById('stat-work-count');
+                countEl.innerText = pendingWorks;
+                document.getElementById('chip-work').style.display = pendingWorks > 0 ? "flex" : "none";
+                document.getElementById('general-work-review-section').style.display = pendingWorks > 0 ? "block" : "none";
             }
 
             tbody.innerHTML = "";
@@ -6856,54 +6843,10 @@
                 .onSnapshot(snapshot => {
                     reflectiveLogsCache = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                     
-                    const tbody = document.querySelector("#reflectiveLogTable tbody");
-                    if (tbody) {
-                        tbody.innerHTML = "";
-                        if (snapshot.empty) {
-                            tbody.innerHTML = "<tr><td colspan='3' style='text-align:center;color:#999;padding:20px;'>No logs recently</td></tr>";
-                        } else {
-                            snapshot.forEach(doc => {
-                                const log = doc.data();
-                                const id = doc.id;
-                                if (log.isArchived) return; // Skip archived in this section
-
-                                const dateObj = log.timestamp?.toDate() || log.createdAt?.toDate() || new Date();
-                                const timeStr = dateObj.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'numeric', year: '2-digit' }) + ' ' + dateObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-                                const isPending = !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null);
-                                const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
-
-                                const row = document.createElement("tr");
-                                if (isPending) row.style.background = "#fff9db";
-                                row.innerHTML = `
-                                    <td>
-                                        <b>${log.displayName || log.userName || 'Unknown'}</b><br>
-                                        <small style="color:#888;">${timeStr}</small>
-                                    </td>
-                                    <td>
-                                        <div style="font-size:1.1em; margin-bottom:5px;">${moodEmoji} ${log.content}</div>
-                                        ${log.adminComment ? `<div style="font-size:0.85em; color:var(--success); background:#e6fffa; padding:5px 8px; border-radius:5px; margin-top:5px;"><i class="fa-solid fa-reply"></i> ${log.adminComment} ${log.adminBonus ? `(+${log.adminBonus})` : ''} ${log.adminBonus > 0 ? (log.pointsClaimed ? '<span style="background:#00b894; color:white; padding:2px 8px; border-radius:10px; font-size:0.8em; margin-left:5px;">✅ Claimed</span>' : '<span style="background:#ffc107; color:black; padding:2px 8px; border-radius:10px; font-size:0.8em; margin-left:5px;">⏳ รอรับ</span>') : ''}</div>` : ''}
-                                    </td>
-                                    <td>
-                                        <div style="display:flex; flex-direction:column; gap:5px;">
-                                            <button class="btn-sm btn-primary" onclick="reviewReflective('${id}', '${log.displayName || log.userName || "Unknown"}', '${log.userId}')">
-                                                <i class="fa-solid fa-comment-dots"></i> Review
-                                            </button>
-                                            ${log.adminComment ? `<button class="btn-sm" style="background:#0a192f; color:white;" onclick="archiveReflective('${id}')" title="Collect to Laugh Tale">
-                                                <i class="fa-solid fa-gem"></i> Collect
-                                            </button>` : ''}
-                                            <button class="btn-sm btn-danger" onclick="deleteReflective('${id}')" title="Delete">
-                                                <i class="fa-solid fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                `;
-                                tbody.appendChild(row);
-                            });
-                        }
-                    }
 
                     const pendingCount = reflectiveLogsCache.filter(log => !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null)).length;
                     document.getElementById('stat-reflective-count').innerText = pendingCount;
+                    document.getElementById('chip-reflective').style.display = pendingCount > 0 ? "flex" : "none";
                     
                     if (document.getElementById('tab-laughtale').classList.contains('active')) renderLaughTale();
                     drawKanban(); // Sync with Kanban
@@ -7041,12 +6984,14 @@
                     if (snapshot.empty) {
                         section.style.display = "none";
                         countEl.innerText = 0;
+                        document.getElementById('chip-claimed').style.display = "none";
                         drawKanban();
                         return;
                     }
 
                     section.style.display = "block";
                     countEl.innerText = snapshot.size;
+                    document.getElementById('chip-claimed').style.display = "flex";
                     tbody.innerHTML = "";
                     drawKanban();
 
