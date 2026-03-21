@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Management ADMIN (V84.9)</title>
+    <title>Internship Management ADMIN (V85.1)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -245,11 +245,13 @@
             gap: 12px;
             border: 1px solid var(--border-color);
             transition: 0.2s;
+            cursor: pointer;
         }
 
         .stat-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            background: var(--col-bg);
         }
 
         .stat-card .stat-info {
@@ -1040,7 +1042,7 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal 
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">V84.9</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">V85.0</span>
                 </h1>
                 <span id="admin-email" style="font-size:0.85em; color:var(--text-sub); border-left:1px solid #ddd; padding-left:15px; margin-left:5px;"></span>
             </div>
@@ -1074,33 +1076,61 @@
 
             <!-- 🔥 Lean UI: Stat Chips (Horizontal Cards) -->
             <div class="stat-chips">
-                <div class="stat-card" style="border-left: 3px solid #6f42c1;">
+                <div class="stat-card" style="border-left: 3px solid #6f42c1;" onclick="openQuickReview('access')">
                     <div class="stat-icon" style="background:#f3f0ff; color:#6f42c1;"><i class="fa-solid fa-user-plus"></i></div>
                     <div class="stat-info">
                         <span class="stat-label">New Access</span>
                         <span class="stat-value" style="color:#6f42c1;" id="stat-access-count">0</span>
                     </div>
                 </div>
-                <div class="stat-card" style="border-left: 3px solid #d35400;">
+                <div class="stat-card" style="border-left: 3px solid #d35400;" onclick="openQuickReview('reflective')">
                     <div class="stat-icon" style="background:#fff5eb; color:#d35400;"><i class="fa-solid fa-book-journal-whills"></i></div>
                     <div class="stat-info">
                         <span class="stat-label">Reflective</span>
                         <span class="stat-value" style="color:#d35400;" id="stat-reflective-count">0</span>
                     </div>
                 </div>
-                <div class="stat-card" style="border-left: 3px solid var(--primary);">
+                <div class="stat-card" style="border-left: 3px solid #00b894;" onclick="openQuickReview('claimed')">
+                    <div class="stat-icon" style="background:#e6fffa; color:#00b894;"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-label">ผู้ที่รับคะแนน</span>
+                        <span class="stat-value" style="color:#00b894;" id="stat-claimed-count">0</span>
+                    </div>
+                </div>
+                <div class="stat-card" style="border-left: 3px solid var(--primary);" onclick="openQuickReview('quiz')">
                     <div class="stat-icon" style="background:#eef2ff; color:var(--primary);"><i class="fa-solid fa-clock-rotate-left"></i></div>
                     <div class="stat-info">
                         <span class="stat-label">Pending Quizzes</span>
                         <span class="stat-value" style="color:var(--primary);" id="stat-quiz-count">0</span>
                     </div>
                 </div>
-                <div class="stat-card" style="border-left: 3px solid var(--success);">
+                <div class="stat-card" style="border-left: 3px solid var(--success);" onclick="openQuickReview('work')">
                     <div class="stat-icon" style="background:#f0fdf4; color:var(--success);"><i class="fa-solid fa-briefcase"></i></div>
                     <div class="stat-info">
                         <span class="stat-label">General Works</span>
                         <span class="stat-value" style="color:var(--success);" id="stat-work-count">0</span>
                     </div>
+                </div>
+            </div>
+
+            <!-- 🔥 Points Claimed Notification Section -->
+            <div id="points-claimed-section" class="review-card" style="display:none; background:#e6fffa; border-color:#b2dfdb;">
+                <h4 style="color:#00b894;">
+                    <i class="fa-solid fa-hand-holding-dollar"></i> แจ้งเตือน: User กดรับ Points แล้ว
+                    <small style="font-size:0.7em; color:#888; font-weight:normal; margin-left:auto;">(Reflective Log Bonus)</small>
+                </h4>
+                <div style="overflow-x:auto;">
+                    <table id="pointsClaimedTable" class="admin-table">
+                        <thead>
+                            <tr style="background:#e0f7f1;">
+                                <th>เวลา</th>
+                                <th>ผู้ใช้งาน</th>
+                                <th>คะแนน</th>
+                                <th>จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
                 </div>
             </div>
 
@@ -1425,8 +1455,14 @@
             <div
                 style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
                 <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:200px;">
-                    <input type="text" id="userSearch" placeholder="🔍 Search..." onkeyup="filterUsers()"
-                        style="margin:0; flex:1; max-width:300px;">
+                    <input type="text" id="userSearch" placeholder="🔍 Search Users / ID..." onkeyup="filterUsers()"
+                        style="margin:0; flex:1; max-width:250px; font-size:0.9em; padding:8px 12px; border-radius:10px; border:1px solid #ddd;">
+                    <div style="display:flex; background:#f8f9fa; border:1px solid #ddd; border-radius:10px; overflow:hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <input type="text" id="preview-id-input" placeholder="User ID..." style="margin:0; border:none; background:transparent; padding:0 10px; width:120px; font-size:0.8em; font-family:monospace;" onkeypress="if(event.key==='Enter')openLiffPreview(this.value.trim())">
+                        <button class="btn-sm btn-info" style="border-radius:0; border-left:1px solid #ddd; padding:8px 15px; background:#4cc9f0; color:white;" onclick="openLiffPreview(document.getElementById('preview-id-input').value.trim())">
+                            <i class="fa-solid fa-eye"></i> Preview
+                        </button>
+                    </div>
                     <span id="user-count-label" style="font-size:0.8em; color:#999;"></span>
                 </div>
                 <div style="display:flex; gap:8px;">
@@ -4591,6 +4627,9 @@
                 .onSnapshot(s => {
                     renderAccessRequests(s.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
+
+            // 🔥 Points Claimed Notifications
+            loadPointsClaimedNotifications();
         }
 
         function renderAccessRequests(data) {
@@ -4625,6 +4664,7 @@
                         </td>
                         <td>
                             <div style="display:flex; gap:5px;">
+                                <button class="btn-sm btn-info" onclick="openLiffPreview('${req.userId}')" title="Preview as this User"><i class="fa-solid fa-eye"></i> Preview</button>
                                 <button class="btn-sm btn-success" onclick="approveAccessRequest('${req.id}')">Approve</button>
                                 <button class="btn-sm btn-danger" onclick="rejectAccessRequest('${req.id}')">Reject</button>
                             </div>
@@ -5043,7 +5083,8 @@
                     const keyBtn = `<button class="btn-sm" onclick="regenPreRegCode('${d.id}')" style="font-size:0.75em; padding:4px 8px; border-radius:4px; background:#6f42c1; color:white;" title="Gen Enrollment Code from this User"><i class="fa-solid fa-key"></i></button>`;
                     const delBtn = `<button class="btn-sm btn-danger" onclick="delUser('${d.id}')" style="font-size:0.75em; padding:4px 8px; border-radius:4px;" title="Delete User"><i class="fa-solid fa-trash-can"></i></button>`;
 
-                    const actionsGroup = `<div style="display:flex; gap:4px;">${certBtn}${historyBtn}${keyBtn}${delBtn}</div>`;
+                    const previewBtn = `<button class="btn-sm btn-info" onclick="openLiffPreview('${d.id}')" style="font-size:0.75em; padding:4px 8px; border-radius:4px;" title="Preview LIFF as this User"><i class="fa-solid fa-eye"></i></button>`;
+                    const actionsGroup = `<div style="display:flex; gap:4px;">${previewBtn}${certBtn}${historyBtn}${keyBtn}${delBtn}</div>`;
 
                     tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}">
                             <td>
@@ -6523,10 +6564,13 @@
         }
 
         // --- LIFF Preview ---
-        function openLiffPreview() {
+        function openLiffPreview(userId = '') {
             document.getElementById('liffPreviewModal').style.display = 'flex';
             // Use current origin + index.html + preview mode
-            const url = window.location.href.replace('admin.html', 'index.html?mode=preview');
+            let url = window.location.href.replace('admin.html', 'index.html?mode=preview');
+            if (userId) {
+                url += `&userId=${userId}`;
+            }
             document.getElementById('liff-frame').src = url;
         }
 
@@ -6679,7 +6723,7 @@
                                     </td>
                                     <td>
                                         <div style="font-size:1.1em; margin-bottom:5px;">${moodEmoji} ${log.content}</div>
-                                        ${log.adminComment ? `<div style="font-size:0.85em; color:var(--success); background:#e6fffa; padding:5px 8px; border-radius:5px; margin-top:5px;"><i class="fa-solid fa-reply"></i> ${log.adminComment} ${log.adminBonus ? `(+${log.adminBonus})` : ''}</div>` : ''}
+                                        ${log.adminComment ? `<div style="font-size:0.85em; color:var(--success); background:#e6fffa; padding:5px 8px; border-radius:5px; margin-top:5px;"><i class="fa-solid fa-reply"></i> ${log.adminComment} ${log.adminBonus ? `(+${log.adminBonus})` : ''} ${log.adminBonus > 0 ? (log.pointsClaimed ? '<span style="background:#00b894; color:white; padding:2px 8px; border-radius:10px; font-size:0.8em; margin-left:5px;">✅ Claimed</span>' : '<span style="background:#ffc107; color:black; padding:2px 8px; border-radius:10px; font-size:0.8em; margin-left:5px;">⏳ รอรับ</span>') : ''}</div>` : ''}
                                     </td>
                                     <td>
                                         <div style="display:flex; flex-direction:column; gap:5px;">
@@ -6807,36 +6851,81 @@
             if (!comment) return alert("กรุณาใส่ความคิดเห็น/ฟีดแบ็กสั้นๆ เพื่อให้กำลังใจนักศึกษาครับ");
 
             try {
-                const b = db.batch();
                 const logRef = db.collection("reflective_logs").doc(id);
-                const userRef = db.collection("users").doc(uid);
 
                 const upData = { 
                     adminComment: comment,
                     adminBonus: bonus,
-                    reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    pointsClaimed: false // 🔥 User must claim the points
                 };
 
-                b.update(logRef, upData);
-
-                if (bonus > 0) {
-                    b.update(userRef, { score: firebase.firestore.FieldValue.increment(bonus) });
-                    const scoreLogRef = db.collection("checkin_logs").doc();
-                    b.set(scoreLogRef, {
-                        userId: uid,
-                        type: 'reflective_bonus',
-                        amount: bonus,
-                        note: 'Reflective Bonus: ' + (comment.substring(0, 50)),
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                }
-
-                await b.commit();
-                showToast("Reviewed & Points Assigned!");
+                await logRef.update(upData);
+                showToast("ตรวจแล้ว! รอผู้ใช้งานกดรับคะแนน ✨");
                 document.getElementById('reflectiveReviewModal').style.display = 'none';
             } catch (e) {
                 alert("Error: " + e.message);
             }
+        }
+
+        // 🔥 Points Claimed Notification Listener
+        function loadPointsClaimedNotifications() {
+            db.collection("reflective_logs")
+                .where("pointsClaimed", "==", true)
+                .where("adminAcknowledged", "==", false)
+                .onSnapshot(snapshot => {
+                    const section = document.getElementById('points-claimed-section');
+                    const tbody = document.querySelector("#pointsClaimedTable tbody");
+                    const countEl = document.getElementById('stat-claimed-count');
+
+                    if (snapshot.empty) {
+                        section.style.display = "none";
+                        countEl.innerText = 0;
+                        return;
+                    }
+
+                    section.style.display = "block";
+                    countEl.innerText = snapshot.size;
+                    tbody.innerHTML = "";
+
+                    snapshot.forEach(doc => {
+                        const log = doc.data();
+                        const time = log.claimedAt ? log.claimedAt.toDate().toLocaleString('th-TH') : '-';
+                        const uImg = log.pictureUrl || 'https://via.placeholder.com/40';
+                        const uName = log.displayName || log.userName || 'Unknown';
+
+                        tbody.innerHTML += `
+                            <tr style="background:#f0fdf9;">
+                                <td style="font-size:0.8em;">${time}</td>
+                                <td>
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <img src="${uImg}" style="width:30px; height:30px; border-radius:50%;">
+                                        <div>
+                                            <div style="font-weight:bold;">${uName}</div>
+                                            <div style="font-size:0.75em; color:#666;">รับโบนัสไปแล้ว +${log.adminBonus || 0} pts</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><span style="font-weight:bold; color:#00b894; font-size:1.1em;">+${log.adminBonus || 0}</span></td>
+                                <td>
+                                    <button class="btn-sm btn-success" onclick="acknowledgeClaimedPoints('${doc.id}')" style="background:#00b894; border:none;">
+                                        <i class="fa-solid fa-check"></i> รับทราบ
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                });
+        }
+
+        async function acknowledgeClaimedPoints(id) {
+            try {
+                await db.collection("reflective_logs").doc(id).update({
+                    adminAcknowledged: true,
+                    acknowledgedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                showToast("รับทราบแล้ว ✅");
+            } catch (e) { alert(e.message); }
         }
 
         async function deleteReflective(id) {
@@ -6845,7 +6934,92 @@
                 showToast("Deleted");
             }
         }
+
+        // 🔥 V85.1: Quick Review Modal Logic
+        function openQuickReview(type) {
+            const modal = document.getElementById('quickReviewModal');
+            const titleEl = document.getElementById('quick-review-title');
+            const container = document.getElementById('quick-review-container');
+            
+            let sourceId = "";
+            let title = "";
+            let icon = "";
+            let accentColor = "";
+            
+            if (type === 'access') {
+                sourceId = 'access-request-section';
+                title = "New Access Requests";
+                icon = "fa-user-plus";
+                accentColor = "#6f42c1";
+            } else if (type === 'reflective') {
+                sourceId = 'reflective-log-review-section';
+                title = "Reflective Log Review";
+                icon = "fa-book-journal-whills";
+                accentColor = "#d35400";
+            } else if (type === 'claimed') {
+                sourceId = 'points-claimed-section';
+                title = "Points Claimed Notification";
+                icon = "fa-hand-holding-dollar";
+                accentColor = "#00b894";
+            } else if (type === 'quiz') {
+                sourceId = 'quiz-pending-section';
+                title = "Pending Quizzes (Review / Request)";
+                icon = "fa-clock-rotate-left";
+                accentColor = "var(--primary)";
+            } else if (type === 'work') {
+                sourceId = 'general-work-review-section';
+                title = "General Works Management";
+                icon = "fa-briefcase";
+                accentColor = "var(--success)";
+            }
+            
+            const source = document.getElementById(sourceId);
+            if (!source) return;
+            
+            // Setup Modal Header
+            titleEl.innerHTML = `<i class="fa-solid ${icon}"></i> ${title}`;
+            modal.querySelector('.modal-content').style.borderTop = `5px solid ${accentColor}`;
+            
+            // Cache original position to return it later
+            window.lastReviewSource = source;
+            window.lastReviewParent = source.parentElement;
+            window.lastReviewNextSibling = source.nextElementSibling;
+            
+            // Move into modal
+            container.innerHTML = "";
+            container.appendChild(source);
+            source.style.display = "block"; // Show if it was hidden
+            
+            modal.style.display = "block";
+        }
+
+        function closeQuickReview() {
+            const modal = document.getElementById('quickReviewModal');
+            const source = window.lastReviewSource;
+            if (source && window.lastReviewParent) {
+                // Return to original position
+                window.lastReviewParent.insertBefore(source, window.lastReviewNextSibling);
+                
+                // If it was hidden because it's empty, and it's still empty, let the listeners handle it
+                // Most of these sections have logic to display:none if data.length === 0 in their respective render functions
+            }
+            modal.style.display = "none";
+        }
     </script>
+
+    <!-- Quick Review Modal -->
+    <div id="quickReviewModal" class="modal">
+        <div class="modal-content" style="max-width:1100px;">
+            <span class="close-modal" onclick="closeQuickReview()">&times;</span>
+            <h2 id="quick-review-title" style="margin-top:0; border-bottom:2px solid #eee; padding-bottom:10px;">Quick Review</h2>
+            <div id="quick-review-container" style="margin-top:20px;">
+                <!-- Section will be moved here -->
+            </div>
+            <div style="margin-top:20px; text-align:right;">
+                <button class="btn-sm btn-dark" onclick="closeQuickReview()" style="padding:10px 25px; border-radius:25px;">Close Popup</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Pre-registration Modal -->
     <div id="preRegModal" class="modal">

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V84.9)</title>
+    <title>Internship Portfolio (V85.1)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -17,6 +17,11 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
     <style>
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
         /* -----------------------
            1. Global Styles
            ----------------------- */
@@ -964,7 +969,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V84.8 (Scheduled Quest & Reflective Log)
+                V85.0 (Claim Points & Reflective Log Improvements)
             </div>
         </div>
     </div>
@@ -1305,6 +1310,7 @@
         let currentQuizIdForFeedback = null;
         let currentPointsForFeedback = 0;
         let isAdmin = false; // 🔥 V84.6: Track admin status for history deletion
+        let isPreview = false; // 🔥 Global flag for preview mode
 
         // --- Initialization ---
         function updateStatus(msg) {
@@ -1357,19 +1363,42 @@
 
         async function main() {
             try {
-                // 🔥 CHECK PREVIEW MODE (V77.23)
                 const urlParams = new URLSearchParams(window.location.search);
                 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-                if (urlParams.get('mode') === 'preview' || isLocal) {
-                    console.log("Entering Preview Mode...");
+                isPreview = urlParams.get('mode') === 'preview' || isLocal;
 
-                    // Mock User Profile
-                    userProfile = {
-                        userId: "preview-admin",
-                        displayName: "Admin Preview",
-                        pictureUrl: "https://via.placeholder.com/150/000000/FFFFFF/?text=Admin"
-                    };
-                    userId = "preview-admin";
+                if (isPreview) {
+                    console.log("Entering Preview Mode...");
+                    const forcedUserId = urlParams.get('userId');
+
+                    if (forcedUserId) {
+                        userId = forcedUserId;
+                        updateStatus("Fetching Preview User Data...");
+                        // Fetch user profile from Firestore if userId is provided
+                        const userDoc = await db.collection("users").doc(userId).get();
+                        if (userDoc.exists) {
+                            const data = userDoc.data();
+                            userProfile = {
+                                userId: userId,
+                                displayName: data.displayName || "Unknown User",
+                                pictureUrl: data.pictureUrl || "https://via.placeholder.com/150/000000/FFFFFF/?text=User"
+                            };
+                        } else {
+                            userProfile = {
+                                userId: userId,
+                                displayName: "User Not Found",
+                                pictureUrl: "https://via.placeholder.com/150/000000/FFFFFF/?text=?"
+                            };
+                        }
+                    } else {
+                        // Default Mock User Profile
+                        userProfile = {
+                            userId: "preview-admin",
+                            displayName: "Admin Preview",
+                            pictureUrl: "https://via.placeholder.com/150/000000/FFFFFF/?text=Admin"
+                        };
+                        userId = "preview-admin";
+                    }
 
                     // Hide Loading
                     document.getElementById('loading-overlay').classList.add('hidden');
@@ -1377,19 +1406,29 @@
 
                     // Show Preview Badge
                     const badge = document.createElement('div');
-                    badge.innerHTML = "👀 Preview Mode";
-                    badge.style.cssText = "position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#ffc107; color:black; padding:5px 15px; border-radius:20px; font-weight:bold; z-index:9999; box-shadow:0 2px 5px rgba(0,0,0,0.2);";
+                    badge.innerHTML = `👀 Preview: ${userProfile.displayName}`;
+                    badge.style.cssText = "position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#ffc107; color:black; padding:5px 15px; border-radius:20px; font-weight:bold; z-index:9999; box-shadow:0 2px 5px rgba(0,0,0,0.2); font-size: 0.8em;";
                     document.body.appendChild(badge);
 
                     // Set UI
                     document.getElementById('u-img').src = userProfile.pictureUrl;
                     document.getElementById('u-name').innerText = userProfile.displayName;
 
-                    // Load Mock/Real Data (Read-only mostly)
+                    // Load Data
                     checkUser();
                     loadAllQuests();
-                    loadQuizzes(); // Ensure quizzes load
-                    // Skip personal submissions to avoid errors or show empty
+                    loadMySubmissions(); // Load submissions for the previewed user
+                    loadMyWorks();
+                    loadMyReflectiveLogs();
+                    loadSideQuests();
+                    loadQuizzes();
+                    loadDivisionConfig();
+                    loadGroupSettings();
+                    loadMyCases();
+                    loadReflectiveLogs();
+                    
+                    // Exit main after loading data for preview
+                    setInterval(checkExpiry, 1000);
                     return;
                 }
 
@@ -1473,27 +1512,32 @@
         function checkUser() {
             const r = db.collection("users").doc(userId);
 
-            // Sync Profile (If Changed)
-            r.get().then(doc => {
-                if (doc.exists) {
-                    const data = doc.data();
-                    const newPic = userProfile.pictureUrl || "";
-                    const newName = userProfile.displayName || "";
+            if (isPreview) {
+                console.log("Preview Mode: Skipping Profile Sync");
+                // Skip sync in preview mode
+            } else {
+                // Sync Profile (If Changed)
+                r.get().then(doc => {
+                    if (doc.exists) {
+                        const data = doc.data();
+                        const newPic = userProfile.pictureUrl || "";
+                        const newName = userProfile.displayName || "";
 
-                    // Check diff
-                    if (data.pictureUrl !== newPic || data.displayName !== newName) {
-                        console.log("Profile updated, syncing to DB...");
-                        r.update({
-                            pictureUrl: newPic,
-                            displayName: newName,
-                            lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                    } else {
-                        // Just update lastSeen for activity tracking
-                        r.update({ lastSeen: firebase.firestore.FieldValue.serverTimestamp() });
+                        // Check diff
+                        if (data.pictureUrl !== newPic || data.displayName !== newName) {
+                            console.log("Profile updated, syncing to DB...");
+                            r.update({
+                                pictureUrl: newPic,
+                                displayName: newName,
+                                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        } else {
+                            // Just update lastSeen for activity tracking
+                            r.update({ lastSeen: firebase.firestore.FieldValue.serverTimestamp() });
+                        }
                     }
-                }
-            });
+                });
+            }
 
             r.onSnapshot(d => {
                 if (d.exists) {
@@ -3840,6 +3884,23 @@
                 if (i < 7) { // Show only last 7 items in list
                     const item = document.createElement('div');
                     item.style = "padding:12px; border-bottom:1px solid #eee; font-size:0.9em;";
+
+                    // 🔥 Check if admin reviewed and points not yet claimed
+                    const hasBonus = log.adminBonus > 0 && log.adminComment;
+                    const canClaim = hasBonus && log.pointsClaimed !== true;
+                    const alreadyClaimed = hasBonus && log.pointsClaimed === true;
+
+                    const claimBtn = canClaim ? `
+                        <button onclick="claimReflectivePoints('${log.id}')" 
+                            style="margin-top:8px; width:100%; padding:10px; background:linear-gradient(135deg, #00b894, #55efc4); color:white; border:none; border-radius:10px; font-weight:bold; font-size:0.95em; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 15px rgba(0,184,148,0.3); animation: pulse 2s infinite;">
+                            <i class="fa-solid fa-gift"></i> กดรับ +${log.adminBonus} Points
+                        </button>` : '';
+
+                    const claimedBadge = alreadyClaimed ? `
+                        <div style="margin-top:8px; text-align:center; padding:6px; background:#e6fffa; border-radius:8px; font-size:0.85em; color:#00b894; font-weight:bold;">
+                            ✅ รับแล้ว +${log.adminBonus} pts
+                        </div>` : '';
+
                     item.innerHTML = `
                         <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
                             <span style="font-weight:bold; color:#e67e22;">${log.mood || '😊'} ${d.toLocaleDateString('th-TH', {day:'numeric', month:'short'})}</span>
@@ -3847,6 +3908,8 @@
                         </div>
                         <div style="color:#555; white-space:pre-wrap;">${log.content}</div>
                         ${log.adminComment ? `<div style="margin-top:8px; padding:8px; background:#f0f7ff; border-radius:8px; font-size:0.9em; color:#0056b3; border-left:3px solid #0056b3;"><i class="fa-solid fa-reply"></i> <b>Admin:</b> ${log.adminComment} ${log.adminBonus ? `<span style="font-weight:bold;">(+${log.adminBonus})</span>` : ''}</div>` : ''}
+                        ${claimBtn}
+                        ${claimedBadge}
                     `;
                     list.appendChild(item);
                 }
@@ -3940,6 +4003,50 @@
             } finally {
                 btn.disabled = false;
                 btn.innerText = "ส่งบันทึก";
+            }
+        }
+
+        // 🔥 Claim Reflective Log Bonus Points
+        async function claimReflectivePoints(logId) {
+            const log = (window.myReflectiveLogsCache || []).find(l => l.id === logId);
+            if (!log) return alert("ไม่พบข้อมูล กรุณารีเฟรชหน้าแล้วลองใหม่ครับ");
+            if (log.pointsClaimed) return alert("รับ Points ไปแล้วครับ");
+            if (!log.adminBonus || log.adminBonus <= 0) return;
+
+            const bonus = log.adminBonus;
+
+            try {
+                const b = db.batch();
+                const logRef = db.collection("reflective_logs").doc(logId);
+                const userRef = db.collection("users").doc(userId);
+
+                // 1. Mark as claimed
+                b.update(logRef, {
+                    pointsClaimed: true,
+                    claimedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    adminAcknowledged: false // 🔥 Notify admin
+                });
+
+                // 2. Add score to user
+                b.update(userRef, {
+                    score: firebase.firestore.FieldValue.increment(bonus)
+                });
+
+                // 3. Log the score change
+                const scoreLogRef = db.collection("checkin_logs").doc();
+                b.set(scoreLogRef, {
+                    userId: userId,
+                    type: 'reflective_bonus',
+                    amount: bonus,
+                    note: 'โบนัสบันทึกรายวัน: ' + (log.adminComment || '').substring(0, 50),
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                await b.commit();
+                alert(`✨ รับ +${bonus} คะแนนเรียบร้อยครับ!`);
+            } catch (e) {
+                console.error(e);
+                alert("Error: " + e.message);
             }
         }
 
@@ -4392,6 +4499,8 @@
             if (window.myReflectiveLogsCache) {
                 window.myReflectiveLogsCache.forEach(log => {
                     const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
+                    const hasBonus = log.adminBonus > 0 && log.adminComment;
+                    const canClaim = hasBonus && log.pointsClaimed !== true;
                     items.push({
                         id: log.id,
                         title: `${moodEmoji} Daily Reflective: ${log.content.substring(0, 30)}...`,
@@ -4401,7 +4510,10 @@
                         score: log.adminBonus || 0,
                         icon: 'fa-book-journal-whills',
                         color: '#d35400',
-                        adminComment: log.adminComment
+                        adminComment: log.adminComment,
+                        canClaimPoints: canClaim,
+                        pointsClaimed: log.pointsClaimed === true,
+                        claimBonus: log.adminBonus || 0
                     });
                 });
             }
@@ -4447,8 +4559,20 @@
                     </div>
                 ` : "";
 
+                // 🔥 Claim Points Button for Reflective Logs
+                const claimHtml = item.canClaimPoints ? `
+                    <button onclick="claimReflectivePoints('${item.id}')" 
+                        style="margin-top:8px; width:100%; padding:10px; background:linear-gradient(135deg, #00b894, #55efc4); color:white; border:none; border-radius:10px; font-weight:bold; font-size:0.9em; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 15px rgba(0,184,148,0.3); animation: pulse 2s infinite;">
+                        <i class="fa-solid fa-gift"></i> กดรับ +${item.claimBonus} Points
+                    </button>
+                ` : (item.pointsClaimed ? `
+                    <div style="margin-top:8px; text-align:center; padding:6px; background:#e6fffa; border-radius:8px; font-size:0.8em; color:#00b894; font-weight:bold;">
+                        ✅ รับแล้ว +${item.claimBonus} pts
+                    </div>
+                ` : "");
+
                 return `
-                    <div style="background:#fff; border-radius:12px; padding:12px; margin-bottom:12px; border:1px solid #f0f0f0; box-shadow:0 4px 6px rgba(0,0,0,0.02); transition:0.2s;">
+                    <div style="background:#fff; border-radius:12px; padding:12px; margin-bottom:12px; border:1px solid ${item.canClaimPoints ? '#55efc4' : '#f0f0f0'}; box-shadow:0 4px 6px rgba(0,0,0,0.02); transition:0.2s;${item.canClaimPoints ? ' background:linear-gradient(135deg, #fff 0%, #f0fff9 100%);' : ''}">
                         <div style="display:flex; align-items:center; gap:12px;">
                             <div style="width:40px; height:40px; border-radius:12px; background:${item.color}15; color:${item.color}; display:flex; align-items:center; justify-content:center; font-size:1.15em; flex-shrink:0;">
                                 <i class="fa-solid ${item.icon}"></i>
@@ -4468,6 +4592,7 @@
                             </div>
                         </div>
                         ${commentHtml}
+                        ${claimHtml}
                     </div>
                 `;
             }).join('');

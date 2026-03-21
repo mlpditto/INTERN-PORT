@@ -3,6 +3,38 @@
 > [!IMPORTANT]
 > **📢 Version Policy:** ทุกการ Commit หรือการปรับปรุงชุดคำสั่ง ต้องมีการขยับเวอร์ชัน (Versioning) เสมอ ทั้งในหน้า UI และในเอกสาร Markdown นี้ เพื่อป้องกันความสับสนในการ Deploy
 
+## [2026-03-21] Session Updates (V85.0 → V85.1)
+
+### 1. Individual User LIFF Preview (V85.1)
+- **Targeted Preview:** Admins can now launch the LIFF interface specifically as a selected user. This is integrated into:
+    - **Users Table:** New eye icon in the actions group.
+    - **Access Requests:** Preview button for applicants awaiting approval.
+    - **Manual ID Entry:** Dedicated input field for previewing any specific User ID from Firestore.
+- **Accurate Profile Mocking:** The preview mode now fetches and displays the actual user's profile name and picture from Firestore instead of generic admin placeholders.
+- **Safety Mode:** Implemented an `isPreview` global flag that disables activities like "Last Seen" updates and profile auto-syncing during active previews to ensure data integrity.
+- **Improved UI Transparency:** Added a prominent banner in the preview window showing the name of the user being simulated.
+
+### 2. Admin Portal Quick Review (V85.0)
+- **Clickable Stat Cards:** Dashboard stat cards (Quizzes, Works, etc.) are now interactive. Clicking them opens a specialized **"Quick Review Modal"** that surface-loads the relevant section for immediate action.
+
+### 3. Version Alignment
+- Synchronized all project components (admin, index, docs) to V85.1.
+
+## [2026-03-20] Session Updates (V84.9 → V85.0)
+
+### 1. Reflective Log Points Claim System (V85.0)
+- **User Acknowledgement:** Modified the point awarding flow. Admin feedback and bonus points are now saved as "Pending" until the user manually clicks the **"กดรับ Point"** (Claim) button.
+- **Interactive UI:** Added a vibrant, pulsing claim button in both the Reflective Log list and user History to draw attention to new rewards.
+- **Admin Notification Toggle:** When a user claims points, a notification is sent to the Admin Dashboard. Admins can then "Acknowledge" the claim to clear the notification.
+- **Real-time Stats:** Added a new "Points Claimed" stat chip in the admin header to track pending acknowledgements.
+- **Engagement Loop:** Ensures users read admin feedback before receiving rewards.
+
+### 2. Localization & Multi-language Support (V85.0)
+- **TH/EN Translation:** Translated newly added UI elements, toast notifications, and stat labels into Thai to maintain consistency.
+
+### 3. Global Version Sync
+- Synchronized all project instances to V85.0 across `admin.html`, `index.html`, and documentation.
+
 ## [2026-03-18] Session Updates (V84.8 → V84.9)
 
 ### 1. Admin Dashboard Tabs & Group Focus (V84.9)
