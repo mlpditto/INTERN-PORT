@@ -1060,7 +1060,7 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal 
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">V85.94</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">V85.95</span>
                 </h1>
                 <span id="admin-email" style="font-size:0.85em; color:var(--text-sub); border-left:1px solid #ddd; padding-left:15px; margin-left:5px;"></span>
             </div>
@@ -2232,7 +2232,7 @@
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyzing...';
                 
                 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                let model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
                 
                 const prompt = `คุณคืออาจารย์ที่ปรึกษา (Mentor) ที่ใจดีและให้คำแนะนำเก่งมาก 
                 นี่คือบันทึกสะท้อนคิด (Reflective Log) ของนักศึกษาฝึกงาน:
@@ -2241,7 +2241,14 @@
                 ช่วยเขียนคำชมเชยและฟีดแบ็กสั้นๆ (ไม่เกิน 2-3 ประโยค) ที่แสดงถึงความเข้าใจและให้กำลังใจ 
                 ให้เป็นกันเองแต่สุภาพ (ภาษาไทย) และไม่ต้องมีคำอธิบายอื่นนอกจากตัวเนื้อหาฟีดแบ็ก`;
                 
-                const result = await model.generateContent(prompt);
+                let result;
+                try {
+                    result = await model.generateContent(prompt);
+                } catch (e) {
+                    console.log("Gemini 1.5 Flash failed, trying gemini-pro...", e);
+                    model = genAI.getGenerativeModel({ model: "gemini-pro" });
+                    result = await model.generateContent(prompt);
+                }
                 const response = await result.response;
                 const text = response.text().trim();
                 
@@ -2277,9 +2284,7 @@
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
                 
                 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-                const model = genAI.getGenerativeModel({ 
-                    model: "gemini-1.5-flash"
-                });
+                let model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
                 
                 const prompt = `You are an expert educator. Your task is to:
                 1. Translate the following multiple-choice question and its options from Thai to professional, high-quality English.
@@ -2298,7 +2303,14 @@
                 }
                 If the order of options changes, make sure "correctIndices" points at the English translated version of the original correct answers.`;
                 
-                const result = await model.generateContent(prompt);
+                let result;
+                try {
+                    result = await model.generateContent(prompt);
+                } catch (err) {
+                    console.warn("Retrying with gemini-pro due to error:", err);
+                    model = genAI.getGenerativeModel({ model: "gemini-pro" });
+                    result = await model.generateContent(prompt);
+                }
                 const response = await result.response;
                 
                 // Robust parsing for JSON
