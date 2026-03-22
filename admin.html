@@ -1060,7 +1060,7 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal 
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">V85.96</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">V85.97</span>
                 </h1>
                 <span id="admin-email" style="font-size:0.85em; color:var(--text-sub); border-left:1px solid #ddd; padding-left:15px; margin-left:5px;"></span>
             </div>
@@ -2036,7 +2036,12 @@
 
                 <div style="margin-bottom:20px;">
                     <label style="display:block; font-size:0.85em; font-weight:bold; color:#555; margin-bottom:5px;">💬 Admin Feedback / Comment:</label>
-                    <div style="display:flex; justify-content:flex-end; margin-bottom:5px;">
+                    <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-bottom:5px;">
+                        <span id="ai-quota-text" style="font-size:0.7em; color:#888;">AI Usage: <b id="ai-usage-count">0</b></span>
+                        <select id="ai-model-review" style="padding:2px 5px; font-size:0.7em; border-radius:10px; border:1px solid #ccc; background:#f9f9f9; color:#555;">
+                            <option value="gemini-1.5-flash">⚡ Flash (~1.5k/D)</option>
+                            <option value="gemini-pro">🧠 Pro (~50/D)</option>
+                        </select>
                         <button class="btn-sm" id="btn-ai-suggest" onclick="getAISuggestion()" style="background:#8e44ad; color:white; border:none; border-radius:15px; padding:4px 12px; font-size:0.75em; cursor:pointer; display:flex; align-items:center; gap:5px;">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> 🤖 AI Suggest
                         </button>
@@ -2219,11 +2224,39 @@
     <script type="module">
         import { GoogleGenerativeAI } from "@google/generative-ai";
         
-        // --- 🤖 Gemini AI Integration (V85.5) ---
+        // --- 📊 AI Quota Tracker (V85.97) ---
+        window.updateAIUsage = function() {
+            const today = new Date().toISOString().split('T')[0];
+            let usage = JSON.parse(localStorage.getItem('geminiAIUsage') || '{}');
+            
+            if (usage.date !== today) {
+                usage = { date: today, count: 0 };
+            }
+            
+            usage.count++;
+            localStorage.setItem('geminiAIUsage', JSON.stringify(usage));
+            
+            const countEls = document.querySelectorAll('#ai-usage-count');
+            countEls.forEach(el => el.innerText = usage.count);
+            return usage.count;
+        };
+
+        window.initAIUsageDisplay = function() {
+            const today = new Date().toISOString().split('T')[0];
+            let usage = JSON.parse(localStorage.getItem('geminiAIUsage') || '{}');
+            if (usage.date !== today) usage = { date: today, count: 0 };
+            
+            const countEls = document.querySelectorAll('#ai-usage-count');
+            countEls.forEach(el => el.innerText = usage.count);
+        };
+
+        // --- 🤖 Gemini AI Integration (V85.97) ---
         window.getAISuggestion = async function() {
             const logContent = document.getElementById('reflective-review-user-info').innerText;
             const btn = document.getElementById('btn-ai-suggest');
             const textarea = document.getElementById('reflective-review-comment');
+            const modelSelect = document.getElementById('ai-model-review');
+            const selectedModelName = modelSelect ? modelSelect.value : "gemini-1.5-flash";
             
             if (!logContent || logContent.length < 5) return alert("ไม่พบข้อมูลเนื้อหาบันทึกที่จะวิเคราะห์");
             
@@ -2232,7 +2265,7 @@
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyzing...';
                 
                 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-                let model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                let model = genAI.getGenerativeModel({ model: selectedModelName });
                 
                 const prompt = `คุณคืออาจารย์ที่ปรึกษา (Mentor) ที่ใจดีและให้คำแนะนำเก่งมาก 
                 นี่คือบันทึกสะท้อนคิด (Reflective Log) ของนักศึกษาฝึกงาน:
@@ -2254,6 +2287,7 @@
                 
                 textarea.value = text;
                 showToast("✨ AI suggested feedback!");
+                updateAIUsage(); // Track Usage
                 
             } catch (error) {
                 console.error("Gemini Error:", error);
@@ -2269,6 +2303,8 @@
             const questionTextarea = item.querySelector('.q-text');
             const optionTextareas = item.querySelectorAll('.q-opt');
             const correctChecks = item.querySelectorAll('.q-correct-check');
+            const modelSelect = item.querySelector('.ai-model-quiz');
+            const selectedModelName = modelSelect ? modelSelect.value : "gemini-1.5-flash";
             
             const questionText = questionTextarea.value.trim();
             const options = Array.from(optionTextareas).map(ta => ta.value.trim());
@@ -2284,7 +2320,7 @@
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
                 
                 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-                let model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                let model = genAI.getGenerativeModel({ model: selectedModelName });
                 
                 const prompt = `You are an expert educator. Your task is to:
                 1. Translate the following multiple-choice question and its options from Thai to professional, high-quality English.
