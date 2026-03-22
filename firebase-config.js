@@ -10,7 +10,7 @@ const firebaseConfig = {
 };
 
 // Gemini API Key (V85.5)
-const GEMINI_API_KEY = "AIzaSyAiyes7Ym7fCbwdwaNZUjf9Itb3Zl-otpw";
+const GEMINI_API_KEY = "__GEMINI_API_KEY__";
 
 // เริ่มต้นการทำงาน Firebase
 firebase.initializeApp(firebaseConfig);
