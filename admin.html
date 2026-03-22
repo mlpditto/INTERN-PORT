@@ -2278,8 +2278,7 @@
                 
                 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
                 const model = genAI.getGenerativeModel({ 
-                    model: "gemini-1.5-flash",
-                    generationConfig: { responseMimeType: "application/json" }
+                    model: "gemini-1.5-flash"
                 }, { apiVersion: "v1" });
                 
                 const prompt = `You are an expert educator. Your task is to:
@@ -2291,17 +2290,23 @@
                 Original Options: ${JSON.stringify(options)}
                 The current correct option index is: ${JSON.stringify(correctIndices)} (0-indexed)
                 
-                OUTPUT MUST BE A JSON OBJECT:
+                IMPORTANT: YOUR OUTPUT MUST BE ONLY A RAW JSON STRING WITHOUT ANY MARKDOWN CODE BLOCKS OR OTHER EXPLANATIONS.
                 {
                   "question": "English version of the question",
                   "options": ["Enhanced Eng Opt 1", "Enhanced Eng Opt 2", ...],
-                  "correctIndices": [indexes of correct answers in the new list]
+                  "correctIndices": [indices of correct answers in the new list]
                 }
-                If the order of options changes, make sure "correctIndices" points to the correct English translated version of the original correct answers.`;
+                If the order of options changes, make sure "correctIndices" points at the English translated version of the original correct answers.`;
                 
                 const result = await model.generateContent(prompt);
                 const response = await result.response;
-                const data = JSON.parse(response.text());
+                
+                // Robust parsing for JSON
+                let cleanJson = response.text().trim();
+                if (cleanJson.includes("```")) {
+                    cleanJson = cleanJson.replace(/```json|```/g, "").trim();
+                }
+                const data = JSON.parse(cleanJson);
                 
                 // Update UI
                 questionTextarea.value = data.question;
