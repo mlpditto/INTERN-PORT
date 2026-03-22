@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V85.1) Overview
+# MLP Internship Portfolio (V85.9) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -98,6 +98,15 @@
     - ตราประทับรางวัลจะซ้อนกันแบบ Stacked Display
     - เพิ่มรางวัล **"🧪 Beta User Award"** พร้อมดีไซน์ตราประทับสีพิเศษ (Pink-Purple Gradient)
 - **Approval Workflow:** เมื่อทำเสร็จ คะแนนจะขึ้นสถานะ **"รออนุมัติ (Pending)"** (แสดงเป็นทศนิยม 3 ตำแหน่ง) แต้มจะยังไม่เข้าระบบทันทีจนกว่าผู้ดูแลจะกดยืนยัน
+
+### 5. 🤖 Gemini AI Integration (V85.8)
+- **AI-Powered Mentor Feedback:** บูรณาการ Gemini 1.5 Flash API ในหน้า Admin เพื่อช่วยวิเคราะห์และเสนอแนะคำติชม (Feedback) สำหรับบันทึกสะท้อนคิด (Reflective Logs) ของนักศึกษา
+- **One-Click Suggestion:** ปุ่ม "AI Suggest" ในหน้าต่างตรวจงาน จะส่งเนื้อหาบันทึกไปประมวลผลและสร้างข้อความให้กำลังใจ/แนะนำที่สุภาพและเหมาะสมให้อัตโนมัติ
+- **AI Quiz Translation & Enhancement (V85.9):** 
+    - เพิ่มปุ่ม **"AI English"** ใน Quiz Editor สำหรับแปลโจทย์และตัวเลือกจากไทยเป็นอังกฤษ
+    - ระบบจะปรับปรุงตัวเลือก (Distractors) ให้มีความท้าทายและเป็นภาษาที่เป็นทางการมากขึ้นโดยอัตโนมัติ
+    - ใช้ Gemini JSON Mode เพื่อรักษาความถูกต้องของโครงสร้างข้อมูลและเฉลยเดิม
+- **Developer Security:** เก็บ API Key ไว้ใน `firebase-config.js` (Client-side) เพื่อการพัฒนาที่รวดเร็ว (สำหรับ Production แนะนำให้ย้ายไป Firebase Functions)
 - **🛡️ Data Integrity & Stability (V78.4):** 
     - **Submission Fix:** แก้ไขปัญหาการส่งคำตอบแบบ Single Choice ให้เป็น Array เสมอ เพื่อป้องกันข้อผิดพลาดในการตรวจคำตอบอัตโนมัติ (Fix 0 Score Bug)
     - **Robust Submission (V78.4):** เพิ่มระบบป้องการการกด Submit ซ้ำ (Button Lock) และการล็อคปุ่มนำทาง (Prev/Next) ขณะกำลังประมวลผล เพื่อป้องกันสถานะไฟล์ขัดแย้ง
