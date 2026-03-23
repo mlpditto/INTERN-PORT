@@ -11,6 +11,7 @@ const firebaseConfig = {
 
 // Gemini API Key (V85.5)
 const GEMINI_API_KEY = "__GEMINI_API_KEY__";
+const TYPHOON_API_KEY = "__TYPHOON_API_KEY__";
 
 // เริ่มต้นการทำงาน Firebase
 firebase.initializeApp(firebaseConfig);
