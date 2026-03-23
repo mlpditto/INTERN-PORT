@@ -2302,8 +2302,14 @@
             <button class="btn-primary" onclick="saveAIKeys()" style="width:100%; font-weight:700; padding:12px; border-radius:10px;">
                 <i class="fa-solid fa-save"></i> Save Locally
             </button>
-            <button class="btn-sm" onclick="checkGeminiModels()" style="width:100%; margin-top:10px; background:#f8f9fa; color:#666; border:1px solid #ddd;">
-                <i class="fa-solid fa-stethoscope"></i> Check Available Gemini Models
+            
+            <div id="ai-usage-details" style="margin-top:15px; background:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #eee; font-size:0.75em; color:#555;">
+                <div style="font-weight:bold; margin-bottom:5px; color:#8e44ad;"><i class="fa-solid fa-chart-line"></i> Today's AI Usage (Tokens)</div>
+                <div id="usage-list">Loading usage...</div>
+            </div>
+
+            <button class="btn-sm" onclick="checkGeminiModels()" style="width:100%; margin-top:10px; background:none; color:#999; border:1px solid #ddd; font-size:0.8em;">
+                <i class="fa-solid fa-stethoscope"></i> Check Available Models
             </button>
             <p style="font-size:0.75em; color:#999; margin-top:10px; font-style:italic;">
                 * These keys exist only on this computer/browser. If you clear cache, you'll need to re-enter them.
@@ -2342,29 +2348,40 @@
         };
         
         // --- AI Quota Tracker (V86.14) ---
-        window.updateAIUsage = function() {
+        window.updateAIUsage = function(provider, tokens) {
             const today = new Date().toISOString().split('T')[0];
-            let usage = JSON.parse(localStorage.getItem('geminiAIUsage') || '{}');
+            let usage = JSON.parse(localStorage.getItem('aiDetailedUsage') || '{}');
             
             if (usage.date !== today) {
-                usage = { date: today, count: 0 };
+                usage = { date: today, totals: {}, count: 0 };
             }
             
-            usage.count++;
-            localStorage.setItem('geminiAIUsage', JSON.stringify(usage));
+            usage.count = (usage.count || 0) + 1;
+            const key = provider.toLowerCase().includes('gemini') ? 'Gemini' : (provider.toLowerCase().includes('gpt') ? 'OpenAI' : 'Typhoon');
+            usage.totals[key] = (usage.totals[key] || 0) + tokens;
             
-            const countEls = document.querySelectorAll('.ai-usage-count');
-            countEls.forEach(el => el.innerText = usage.count);
-            return usage.count;
+            localStorage.setItem('aiDetailedUsage', JSON.stringify(usage));
+            initAIUsageDisplay();
         };
 
         window.initAIUsageDisplay = function() {
             const today = new Date().toISOString().split('T')[0];
-            let usage = JSON.parse(localStorage.getItem('geminiAIUsage') || '{}');
-            if (usage.date !== today) usage = { date: today, count: 0 };
-            
-            const countEls = document.querySelectorAll('.ai-usage-count');
-            countEls.forEach(el => el.innerText = usage.count);
+            const usage = JSON.parse(localStorage.getItem('aiDetailedUsage') || '{}');
+            const count = usage.date === today ? (usage.count || 0) : 0;
+
+            const usageList = document.getElementById('usage-list');
+            if (usageList) {
+                if (usage.date !== today || !usage.totals || Object.keys(usage.totals).length === 0) {
+                    usageList.innerHTML = "No usage recorded today.";
+                } else {
+                    let html = "";
+                    for (const [provider, total] of Object.entries(usage.totals)) {
+                        html += `<div style="display:flex; justify-content:space-between; margin-bottom:2px;"><span>${provider}:</span> <b>${total.toLocaleString()} tokens</b></div>`;
+                    }
+                    usageList.innerHTML = html;
+                }
+            }
+            return count;
         };
 
         // --- 🌐 Universal AI Provider Handler (V86.14) ---
@@ -2380,9 +2397,11 @@
             const badge = document.getElementById('ai-status-badge');
             if(badge) {
                 const hasAny = (GEMINI_API_KEY.startsWith('AIza') || GEMINI_API_KEY.length > 20 || OPENAI_API_KEY.startsWith('sk-'));
-                badge.style.background = hasAny ? "#dcfce7" : "#fefce8";
-                badge.style.color = hasAny ? "#15803d" : "#a16207";
-                badge.innerText = hasAny ? "✅ AI Ready" : "⚠️ AI Setup";
+                const count = initAIUsageDisplay();
+                badge.style.background = hasAny ? "#8e44ad" : "#fefce8";
+                badge.style.color = "#white";
+                if (!hasAny) badge.style.color = "#a16207";
+                badge.innerHTML = `<i class="fa-solid fa-bolt"></i> AI: ${count} ${hasAny ? '(Ready)' : '(Setup)'}`;
             }
         };
 
@@ -2431,6 +2450,8 @@
                         result = await model.generateContent(prompt);
                     }
                     const response = await result.response;
+                    const tokens = response.usageMetadata ? response.usageMetadata.totalTokenCount : 0;
+                    updateAIUsage('Gemini', tokens);
                     const text = response.text();
                     if (!text) throw new Error("Empty response from Gemini AI");
                     return text.trim();
@@ -2461,6 +2482,8 @@
                         throw new Error("AI returned an empty or malformed response. Please try again or check your quota.");
                     }
                     
+                    const tokens = data.usage ? data.usage.total_tokens : 0;
+                    updateAIUsage('Typhoon', tokens);
                     return data.choices[0].message.content.trim();
                 } else if (modelName.includes('gpt')) {
                     if (OPENAI_API_KEY.includes('__')) throw new Error("Please setup OpenAI API Key in 'AI Keys' menu first.");
@@ -2472,7 +2495,7 @@
                         },
                         body: JSON.stringify({
                             model: modelName,
-                            messages: [{ role: 'user', content: prompt }],
+                            messages: [{ role: "user", content: prompt }],
                             response_format: isJson ? { type: "json_object" } : undefined,
                             temperature: 0.7
                         })
@@ -2483,6 +2506,8 @@
                         const errMsg = data.error?.message || `OpenAI Error ${response.status}`;
                         throw new Error(errMsg);
                     }
+                    const tokens = data.usage ? data.usage.total_tokens : 0;
+                    updateAIUsage('OpenAI', tokens);
                     return data.choices[0].message.content.trim();
                 }
                 throw new Error("Unknown AI Model Provider selected.");
