@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V85.103)</title>
+    <title>Internship Portfolio (V85.104)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -1060,7 +1060,7 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal 
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">V85.103</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">V85.104</span>
                     <span id="ai-status-badge" style="font-size:0.5em; background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:3px;">
                         <i class="fa-solid fa-microchip"></i> Gemini 2.5 Flash
                     </span>
@@ -1163,6 +1163,27 @@
 
                     <!-- 🔥 Relocated Review Sections inside Dashboard Kanban area -->
                     <div id="review-sections-container" style="margin-top:10px;">
+                        <!-- 🔥 Reflective Log Review Section -->
+                        <div id="reflective-log-review-section" class="review-card" style="display:none; background:#fffcf5; border-color:#f9e79f; border-radius:12px; margin-bottom:15px;">
+                            <h4 style="color:#d35400; font-size:1em; border-bottom:1px solid #fdf2d0; padding-bottom:8px;">
+                                <i class="fa-solid fa-book-journal-whills"></i> Reflective Review
+                            </h4>
+                            <div style="overflow-x:auto;">
+                                <table id="reflectiveLogsTable" class="admin-table">
+                                    <thead>
+                                        <tr style="background:#fdf2d0;">
+                                            <th>Time</th>
+                                            <th>User</th>
+                                            <th>Mood</th>
+                                            <th style="width:40%">Content</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+
                         <!-- 🔥 Points Claimed Notification Section -->
                         <div id="points-claimed-section" class="review-card" style="display:none; background:#e6fffa; border-color:#b2dfdb; border-radius:12px; margin-bottom:15px;">
                             <h4 style="color:#00b894; font-size:1em; border-bottom:1px solid #e6fffa; padding-bottom:8px;">
@@ -7111,10 +7132,44 @@
                 .onSnapshot(snapshot => {
                     reflectiveLogsCache = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                     
-
-                    const pendingCount = reflectiveLogsCache.filter(log => !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null)).length;
+                    const pendingLogs = reflectiveLogsCache.filter(log => !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null) && !log.isArchived);
+                    const pendingCount = pendingLogs.length;
+                    
                     document.getElementById('stat-reflective-count').innerText = pendingCount;
                     document.getElementById('chip-reflective').style.display = pendingCount > 0 ? "flex" : "none";
+                    
+                    // --- Restore Table UI for Modal ---
+                    const section = document.getElementById('reflective-log-review-section');
+                    const tbody = document.querySelector("#reflectiveLogsTable tbody");
+                    if (section && tbody) {
+                        section.style.display = pendingCount > 0 ? "block" : "none";
+                        tbody.innerHTML = "";
+                        pendingLogs.forEach(log => {
+                            const time = log.timestamp?.toDate().toLocaleString('th-TH') || '-';
+                            const uImg = log.pictureUrl || 'https://via.placeholder.com/40';
+                            const uName = log.userName || log.displayName || 'Unknown';
+                            const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
+                            
+                            tbody.innerHTML += `
+                                <tr>
+                                    <td style="font-size:0.8em;">${time}</td>
+                                    <td>
+                                        <div style="display:flex; align-items:center; gap:8px;">
+                                            <img src="${uImg}" style="width:30px; height:30px; border-radius:50%;">
+                                            <div style="font-weight:bold;">${uName}</div>
+                                        </div>
+                                    </td>
+                                    <td style="font-size:1.5em; text-align:center;">${moodEmoji}</td>
+                                    <td style="font-size:0.85em; color:#444;">${log.content}</td>
+                                    <td>
+                                        <button class="btn-sm" style="background:#d35400; color:white; border:none;" onclick="reviewReflective('${log.id}', '${uName.replace(/'/g, "")}', '${log.userId}')">
+                                            <i class="fa-solid fa-comment-dots"></i> Review
+                                        </button>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                    }
                     
                     if (document.getElementById('tab-laughtale').classList.contains('active')) renderLaughTale();
                     drawKanban(); // Sync with Kanban
