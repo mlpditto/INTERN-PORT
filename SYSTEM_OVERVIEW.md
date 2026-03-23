@@ -411,6 +411,11 @@ service cloud.firestore {
 - **OpenAI Compatible:** ใช้มาตรฐาน OpenAI API สำหรับการเชื่อมต่อกับ OpenTyphoon เพื่อความรวดเร็วและแม่นยำในภาษาไทย
 - **Automated Work Feedback:** ระบบช่วยเขียนคอมเมนต์และฟีดแบ็กให้นักศึกษาอัตโนมัติ (getAISuggestion)
 - **Quiz Intelligence:** ระบบแปลภาษาและยกระดับคุณภาพของคำถามใน Quiz เพื่อมาตรฐานระดับสากล (aiEnhanceQuestion)
+- **Global Localization (V86.14.a):**
+    - **Full English Admin UI:** แปลภาษาในหน้า Admin Dashboard (`admin.html`) เป็นภาษาอังกฤษทั้งหมด 100% เพื่อรองรับการใช้งานระดับสากล
+    - **Standardized Messaging:** ปรับปรุงข้อความแจ้งเตือน (Alerts), กล่องยืนยัน (Confirmation Prompts) และข้อความแนะนำ (Placeholders) ให้เป็นภาษาอังกฤษที่กระชับและเข้าใจง่าย
+    - **Visual Cleanup:** แก้ไขปัญหาการแสดงผลตัวอักษรผิดเพี้ยน (Broken Encoding) และเปลี่ยนไอคอนสัญลักษณ์จากอักขระพิเศษเป็น Emojis และ Font Awesome Icons ที่เป็นมาตรฐาน
+    - **Date & Time Formatting:** ปรับการแสดงผลวันที่และเวลาให้ใช้รูปแบบ `en-US` (เช่น Mar 23, 2026) ทั่วทั้งระบบเพื่อความสม่ำเสมอ
 
 ---
 *บันทึกภาพรวมระบบฉบับสมบูรณ์ (V86.14) โดย Antigravity AI*
