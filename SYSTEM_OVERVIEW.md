@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V85.104) Overview
+# MLP Internship Portfolio (V85.105) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -102,10 +102,10 @@
 ### 5. 🤖 Gemini AI Integration (V85.8)
 - **AI-Powered Mentor Feedback:** บูรณาการ Gemini 1.5 Flash API ในหน้า Admin เพื่อช่วยวิเคราะห์และเสนอแนะคำติชม (Feedback) สำหรับบันทึกสะท้อนคิด (Reflective Logs) ของนักศึกษา
 - **One-Click Suggestion:** ปุ่ม "AI Suggest" ในหน้าต่างตรวจงาน จะส่งเนื้อหาบันทึกไปประมวลผลและสร้างข้อความให้กำลังใจ/แนะนำที่สุภาพและเหมาะสมให้อัตโนมัติ
-- **AI Quiz Translation & Enhancement (V85.9):** 
-    - เพิ่มปุ่ม **"AI English"** ใน Quiz Editor สำหรับแปลโจทย์และตัวเลือกจากไทยเป็นอังกฤษ
-    - ระบบจะปรับปรุงตัวเลือก (Distractors) ให้มีความท้าทายและเป็นภาษาที่เป็นทางการมากขึ้นโดยอัตโนมัติ
-    - ใช้ Gemini JSON Mode เพื่อรักษาความถูกต้องของโครงสร้างข้อมูลและเฉลยเดิม
+- **AI Quiz Translation & Enhancement (V85.105):** 
+    - เพิ่มปุ่ม **"AI Suggest"** พร้อมตัวเลือกภาษา (**EN, Chinese, Korean, Japanese**) ใน Quiz Editor
+    - ระบบจะแปลโจทย์และตัวเลือกจากไทยเป็นภาษาเป้าหมาย พร้อมปรับปรุงเนื้อหาให้มีความเป็นทางการและท้าทายมากขึ้น
+    - ใช้ Gemini JSON Mode เพื่อรักษาโครงสร้างของชุดข้อสอบและลำดับเฉลยให้ถูกต้องแม่นยำ
 - **Developer Security:** เก็บ API Key ไว้ใน `firebase-config.js` (Client-side) เพื่อการพัฒนาที่รวดเร็ว (สำหรับ Production แนะนำให้ย้ายไป Firebase Functions)
 - **🛡️ Data Integrity & Stability (V78.4):** 
     - **Submission Fix:** แก้ไขปัญหาการส่งคำตอบแบบ Single Choice ให้เป็น Array เสมอ เพื่อป้องกันข้อผิดพลาดในการตรวจคำตอบอัตโนมัติ (Fix 0 Score Bug)
@@ -400,8 +400,8 @@ service cloud.firestore {
 
 ### 8. ระบบขอเข้าใช้งาน (Access Request System - V84.3)
 - **Pending Review Interface:** ส่วนจัดการคำขอเข้าใช้งานใหม่ที่ผู้ใช้ส่งมาจากหน้า LIFF
-- **One-click Approval:** ระบบอนุมัติพร้อมสร้าง User Profile ให้อัตโนมัติ (Automated User Onboarding)
+- **Automated User Onboarding:** ระบบอนุมัติพร้อมสร้าง User Profile ให้อัตโนมัติ พร้อมรองรับข้อมูล **"สถาบัน / ที่ทำงาน (Institute)"** (V85.105)
 - **Live Sync:** ดึงข้อมูลจากคอลเลกชัน `reports` (ประเภท `access_request`) แบบ Real-time
 
 ---
-*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V85.104) โดย Antigravity AI*
+*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V85.105) โดย Antigravity AI*

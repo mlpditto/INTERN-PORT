@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V85.104)</title>
+    <title>Internship Portfolio (V85.105)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -1060,7 +1060,7 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal 
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">V85.104</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">V85.105</span>
                     <span id="ai-status-badge" style="font-size:0.5em; background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:3px;">
                         <i class="fa-solid fa-microchip"></i> Gemini 2.5 Flash
                     </span>
@@ -1075,6 +1075,9 @@
                     <i class="fa-solid fa-box-archive"></i> <span class="hide-mobile">Archive</span>
                 </button>
                 <div style="width:1px; height:20px; background:#ddd; margin:0 5px;"></div>
+                <button class="btn-sm" style="background:#4b6584; color:white; border:none; border-radius:8px;" onclick="checkGeminiModels()" title="Test Gemini API & List Models">
+                    <i class="fa-solid fa-stethoscope"></i> <span class="hide-mobile">Test API</span>
+                </button>
                 <button class="btn-sm btn-info" onclick="openLiffPreview()" title="UI Preview">
                     <i class="fa-solid fa-mobile-screen"></i> <span class="hide-mobile">UI</span>
                 </button>
@@ -2026,14 +2029,14 @@
             <div class="modal-content" style="max-width: 600px;">
                 <span class="close-modal"
                     onclick="document.getElementById('quizReviewModal').style.display='none'">&times;</span>
-                <h3 style="color:var(--primary);"><i class="fa-solid fa-magnifying-glass"></i> Review Quiz Attempt</h3>
+                <h3 style="color:var(--primary);"><i class="fa-solid fa-magnifying-glass"></i> ตรวจสอบการทำแบบทดสอบ</h3>
                 <input type="hidden" id="review-attempt-id">
                 <div id="review-quiz-container" style="max-height: 500px; overflow-y: auto; margin-top: 15px;">
                     <!-- Content injected by JS renderPendingQuizzes -> reviewQuiz -->
                 </div>
                 <div style="margin-top: 15px; text-align: right;">
                     <button class="btn-sm btn-dark"
-                        onclick="document.getElementById('quizReviewModal').style.display='none'">Close</button>
+                        onclick="document.getElementById('quizReviewModal').style.display='none'">ปิด</button>
                 </div>
             </div>
         </div>
@@ -2042,7 +2045,7 @@
         <div id="reflectiveReviewModal" class="modal" style="z-index: 2501;">
             <div class="modal-content" style="max-width: 500px; border-top: 5px solid #d35400; border-radius: 12px;">
                 <span class="close-modal" onclick="document.getElementById('reflectiveReviewModal').style.display='none'">&times;</span>
-                <h3 style="color:#d35400; margin-bottom:15px;"><i class="fa-solid fa-comment-medical"></i> Review Reflective Log</h3>
+                <h3 style="color:#d35400; margin-bottom:15px;"><i class="fa-solid fa-comment-medical"></i> ตรวจสอบบันทึกสะท้อนคิด</h3>
                 
                 <div id="reflective-review-user-info" style="background:#f8f9fa; padding:12px; border-radius:10px; margin-bottom:15px; border:1px solid #eee;">
                     <!-- User Info injected by JS -->
@@ -2170,6 +2173,8 @@
                 <input type="text" id="gs-cert-fullname" placeholder="Full Name (Combined Preview)" readonly
                     style="margin-top:8px; width:100%; box-sizing:border-box; margin-bottom:8px; font-size:0.9em; padding:8px; background:#f0f0f0; border:1px solid #ddd;">
                 <input type="text" id="gs-cert-nickname" placeholder="ชื่อเล่น/AKA..."
+                    style="width:100%; box-sizing:border-box; font-size:0.9em; padding:8px; margin-bottom:8px;">
+                <input type="text" id="gs-institute" placeholder="สถาบัน / ที่ทำงาน..."
                     style="width:100%; box-sizing:border-box; font-size:0.9em; padding:8px;">
             </div>
 
@@ -2353,7 +2358,9 @@
             const optionTextareas = item.querySelectorAll('.q-opt');
             const correctChecks = item.querySelectorAll('.q-correct-check');
             const modelSelect = item.querySelector('.ai-model-quiz');
+            const langSelect = item.querySelector('.ai-lang-quiz');
             const selectedModelName = modelSelect ? modelSelect.value : "gemini-2.5-flash";
+            const targetLang = langSelect ? langSelect.value : "English";
             
             const questionText = questionTextarea.value.trim();
             const options = Array.from(optionTextareas).map(ta => ta.value.trim());
@@ -2372,7 +2379,7 @@
                 let model = genAI.getGenerativeModel({ model: selectedModelName });
                 
                 const prompt = `You are an expert educator. Your task is to:
-                1. Translate the following multiple-choice question and its options from Thai to professional, high-quality English.
+                1. Translate the following multiple-choice question and its options from Thai to professional, high-quality ${targetLang}.
                 2. Enhance the options to make them more challenging and professional (avoid obvious distractors).
                 3. Maintain the logical meaning of the original question and the correct answers.
                 
@@ -2382,11 +2389,11 @@
                 
                 IMPORTANT: YOUR OUTPUT MUST BE ONLY A RAW JSON STRING WITHOUT ANY MARKDOWN CODE BLOCKS OR OTHER EXPLANATIONS.
                 {
-                  "question": "English version of the question",
-                  "options": ["Enhanced Eng Opt 1", "Enhanced Eng Opt 2", ...],
+                  "question": "${targetLang} version of the question",
+                  "options": ["Enhanced ${targetLang} Opt 1", "Enhanced ${targetLang} Opt 2", ...],
                   "correctIndices": [indices of correct answers in the new list]
                 }
-                If the order of options changes, make sure "correctIndices" points at the English translated version of the original correct answers.`;
+                If the order of options changes, make sure "correctIndices" points at the ${targetLang} translated version of the original correct answers.`;
                 
                 let result;
                 try {
@@ -3170,8 +3177,14 @@
                             <button type="button" class="btn-sm" onclick="triggerSmartPaste(this)" title="วางโจทย์ที่มีตัวเลือก A. B. C. เพื่อแยกให้อัตโนมัติ" style="background:#e3f2fd; color:var(--primary); font-size:0.72em; padding:2px 10px; border:none; border-radius:20px; font-weight:700;">
                                 <i class="fa-solid fa-wand-magic-sparkles"></i> Smart Paste
                             </button>
-                            <button type="button" class="btn-sm btn-ai-enhance" onclick="aiEnhanceQuestion(this)" title="Translate to English & Enhance" style="background:#f3e5f5; color:#7b1fa2; font-size:0.72em; padding:2px 10px; border:none; border-radius:20px; font-weight:700;">
-                                <i class="fa-solid fa-brain"></i> AI English
+                            <select class="ai-lang-quiz" style="font-size:0.7em; padding:2px 8px; border-radius:20px; border:1px solid #ddd; background:#fff; font-weight:bold; cursor:pointer;" title="Target Language">
+                                <option value="English">EN</option>
+                                <option value="Chinese">CN</option>
+                                <option value="Korean">KO</option>
+                                <option value="Japanese">JP</option>
+                            </select>
+                            <button type="button" class="btn-sm btn-ai-enhance" onclick="aiEnhanceQuestion(this)" title="Translate & Enhance with AI" style="background:#f3e5f5; color:#7b1fa2; font-size:0.72em; padding:2px 10px; border:none; border-radius:20px; font-weight:700;">
+                                <i class="fa-solid fa-brain"></i> AI Suggest
                             </button>
                         </div>
                     </div>
@@ -3698,7 +3711,8 @@
 
                     // Use calculated correct count if questions exist, otherwise fallback
                     const finalCorrect = q.questions ? calcCorrect : att.correctCount;
-                    pointsToAdd = isPoll ? (q.totalPoints || 1.0) : (finalCorrect / (att.totalQuestions || q.questions.length)) * (q.totalPoints || 1.0);
+                    const totalQ = att.totalQuestions || (q.questions ? q.questions.length : 1);
+                    pointsToAdd = isPoll ? (q.totalPoints || 1.0) : (finalCorrect / totalQ) * (q.totalPoints || 1.0);
 
                     actionHtml = `
                             ${isPoll ? '<span class="badge" style="background:#6c757d">Poll Response</span>' : `<button class="btn-sm btn-info" onclick="reviewQuiz('${att.id}')">Review</button>`}
@@ -3708,6 +3722,7 @@
 
                     // Update display column to show Recalculated/Total
                     att.correctCount = finalCorrect; // Update local obj for display below
+                    att.totalQuestions = totalQ;
                 }
 
                 let uImg = att.pictureUrl || '';
@@ -4247,9 +4262,9 @@
 
         async function approveQuiz(attemptId, uid, score) {
             if (score <= 0) {
-                if (!confirm(`⚠️ คำเตือน: คะแนนที่กำลังจะอนุมัติคือ 0.000 แต้ม\nคุณแน่ใจหรือไม่ว่าต้องการอนุมัติคะแนนนี้? (อาจเกิดจากนักศึกษาไม่ได้ตอบข้อสอบเลย)`)) return;
+                if (!confirm(`⚠️ คำเตือน: คะแนนที่จะอนุมัติคือ 0.00 แต้ม\nยืนยันการอนุมัติหรือไม่? (อาจเกิดจาก นศ. ไม่ได้ทำข้อที่ระบุไว้)`)) return;
             } else {
-                if (!confirm(`อนุมัติแต้มจำนวน ${score.toFixed(3)} ให้กับผู้ใช้นี้?`)) return;
+                if (!confirm(`ยืนยันการอนุมัติ ${score.toFixed(3)} แต้ม ให้กับผู้ใช้นี้?`)) return;
             }
             try {
                 const b = db.batch();
@@ -4914,6 +4929,7 @@
                                 <div>
                                     <div style="font-weight:bold;">${req.displayName}</div>
                                     <div style="font-size:0.75em; color:#666;">AKA: ${req.nickName || '-'}</div>
+                                    ${req.institute ? `<div style="font-size:0.7em; color:#888;"><i class="fa-solid fa-university"></i> ${req.institute}</div>` : ''}
                                 </div>
                             </div>
                         </td>
@@ -4948,6 +4964,7 @@
                     displayName: data.displayName,
                     pictureUrl: data.pictureUrl || "",
                     nickName: data.nickName || "",
+                    institute: data.institute || "",
                     group: data.group || "Public",
                     startDate: data.startDate || "",
                     endDate: data.endDate || "",
@@ -4998,6 +5015,7 @@
             document.getElementById('gs-lastname-en').value = user?.lastNameEn || '';
             document.getElementById('gs-cert-fullname').value = user?.fullNameEn || user?.fullName || '';
             document.getElementById('gs-cert-nickname').value = user?.nickname || user?.nickName || '';
+            document.getElementById('gs-institute').value = user?.institute || '';
 
             // Helper to update full name preview
             const updateGsFullname = () => {
@@ -5099,6 +5117,7 @@
             const lnameEn = document.getElementById('gs-lastname-en').value.trim();
             const newFullName = document.getElementById('gs-cert-fullname').value.trim();
             const newNickname = document.getElementById('gs-cert-nickname').value.trim();
+            const newInstitute = document.getElementById('gs-institute').value.trim();
 
             if (!uid) return;
 
@@ -5109,7 +5128,8 @@
                     middleNameEn: mnameEn,
                     lastNameEn: lnameEn,
                     fullNameEn: newFullName,
-                    nickname: newNickname
+                    nickname: newNickname,
+                    institute: newInstitute
                 });
                 showToast("ข้อมูลผู้ใช้อัปเดตสำเร็จ!");
                 document.getElementById('groupSelectModal').style.display = 'none';
@@ -5341,6 +5361,7 @@
                             ${d.fullNameEn ? `<div style="font-size:0.75em; color:var(--primary); font-style:italic; margin-bottom:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px;" title="${d.fullNameEn.replace(/"/g, '&quot;')}">${d.fullNameEn}</div>` : ''}
                             ${codeDisplay}
                             <div style="font-size:0.7em; color:#888;" title="${(d.nickname || '-').replace(/"/g, '&quot;')}">${d.nickname || '-'}</div>
+                            ${d.institute ? `<div style="font-size:0.65em; color:#999; margin-top:2px;" title="${d.institute.replace(/"/g, '&quot;')}"><i class="fa-solid fa-university"></i> ${d.institute}</div>` : ''}
                         </div>
                     `;
 
@@ -6159,7 +6180,7 @@
                         <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${log.userName}</div>
                         <div style="font-size:0.85em; color:#444; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${moodEmoji} ${log.content}</div>
                         <div style="margin-top:8px;">
-                            <button class="btn-sm" style="width:100%; background:#d35400; color:white;" onclick="reviewReflective('${log.id}', '${log.userName.replace(/'/g, "")}', '${log.userId}')">
+                            <button class="btn-sm" style="width:100%; background:#d35400; color:white; border:none;" onclick="reviewReflective('${log.id}', '${log.userName.replace(/'/g, "")}', '${log.userId}')">
                                 <i class="fa-solid fa-comment-dots"></i> Review & Score
                             </button>
                         </div>
