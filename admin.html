@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V86.14.a)</title>
+    <title>Internship Portfolio (V86.16)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -2098,7 +2098,26 @@
 
                 <div style="display:flex; gap:10px;">
                     <button class="magic-btn" style="flex:2; background:#d35400;" onclick="saveReflectiveReview()">💾 Save & Score</button>
-                    <button class="btn-sm btn-dark" style="flex:1;" onclick="document.getElementById('reflectiveReviewModal').style.display='none'">Cancel</button>
+                    <button class="btn-sm btn-dark" style="flex:1; border-radius:8px;" onclick="document.getElementById('reflectiveReviewModal').style.display='none'">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🔥 Reflective Detail Modal (V86.16) -->
+        <div id="reflectiveDetailModal" class="modal" style="z-index: 2502;">
+            <div class="modal-content" style="max-width: 500px; border-top: 5px solid var(--primary); border-radius: 12px;">
+                <span class="close-modal" onclick="document.getElementById('reflectiveDetailModal').style.display='none'">&times;</span>
+                <h3 id="reflective-detail-title" style="color:var(--primary); margin-bottom:15px;"><i class="fa-solid fa-book"></i> Reflective Log Detail</h3>
+                <div id="reflective-detail-content" style="background:#f8f9fa; padding:15px; border-radius:10px; line-height:1.6; font-size:1.1em; color:#333; min-height:100px; white-space: pre-wrap; margin-bottom:15px;">
+                    <!-- Content injected here -->
+                </div>
+                <div id="reflective-detail-feedback" style="display:none; background:#fff8e1; padding:12px; border-radius:10px; margin-bottom:15px; border:1px solid #ffe082;">
+                    <div style="font-weight:bold; color:#f57c00; font-size:0.85em; margin-bottom:5px;"><i class="fa-solid fa-comment-dots"></i> Admin Feedback:</div>
+                    <div id="reflective-detail-feedback-text" style="font-size:0.95em; color:#5d4037;"></div>
+                </div>
+                <div id="reflective-detail-footer" style="font-size:0.85em; color:#888; border-top:1px solid #eee; padding-top:10px; display:flex; justify-content:space-between;">
+                    <span id="reflective-detail-date"></span>
+                    <span id="reflective-detail-score" style="font-weight:bold; color:var(--primary);"></span>
                 </div>
             </div>
         </div>
@@ -5608,7 +5627,10 @@
                         text: `📔 Reflective Log (${status}): ${x.content?.substring(0, 50)}...`,
                         score: x.adminBonus || 0,
                         isReflective: true,
-                        docId: d.id
+                        docId: d.id,
+                        fullContent: x.content,
+                        adminComment: x.adminComment || "",
+                        moodEmoji: { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[x.mood] || '📝'
                     });
                 });
 
@@ -6545,7 +6567,68 @@
         async function delArchiveDoc(id) { if (confirm("Del?")) await db.collection("side_quests").doc(id).delete(); openArchiveModal(); }
         async function restoreSQ(id, t) { await db.collection("side_quests").doc(id).update({ status: t, doneAt: firebase.firestore.FieldValue.serverTimestamp() }); openArchiveModal(); showToast("Restored"); }
         function confirmClearArchive() { document.getElementById('clearConfirmModal').style.display = 'block'; const btn = document.getElementById('btn-confirm-clear'); btn.disabled = true; btn.style.background = '#ccc'; let c = 5; btn.innerText = `Confirm (${c})`; const t = setInterval(() => { c--; btn.innerText = `Confirm (${c})`; if (c <= 0) { clearInterval(t); btn.disabled = false; btn.style.background = '#ef233c'; btn.innerText = "CLEAR ALL"; btn.onclick = async () => { document.getElementById('clearConfirmModal').style.display = 'none'; const s = await db.collection("side_quests").where("status", "==", "Archived").get(); const b = db.batch(); s.forEach(d => b.delete(d.ref)); await b.commit(); showToast("Cleared!"); openArchiveModal(); } } }, 1000); }
-        function renderHistoryPage() { const l = document.getElementById("history-list"); const c = document.getElementById("history-controls"); l.innerHTML = ""; c.innerHTML = ""; const s = (historyPage - 1) * HISTORY_PER_PAGE; const p = historyCache.slice(s, s + HISTORY_PER_PAGE); const t = Math.ceil(historyCache.length / HISTORY_PER_PAGE); p.forEach(e => { const d = e.t ? e.t.toLocaleString('en-US', { weekday: 'short', day: 'numeric', month: 'numeric', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'; let cls = e.type === 'bonus' ? 'bonus' : (e.type === 'manual' ? 'manual' : ''); let delBtn = ""; if (e.source === 'checkin_logs' && e.docId) { delBtn = `<button class="btn-del-hist" onclick="deleteHistoryLog('${e.docId}', ${e.score})">✕ Delete</button>`; } l.innerHTML += `<li style="padding:10px;border-bottom:1px solid #eee;" class="${cls}"><div style="display:flex;justify-content:space-between;align-items:center;"><div>${e.text} ${delBtn}</div><span style="font-weight:bold;">${e.score > 0 ? '+' : ''}${parseFloat(e.score).toFixed(2)}</span></div><small style="color:#888">${d}</small></li>` }); if (t > 1) { c.innerHTML = `<button class="btn-sm btn-dark" ${historyPage === 1 ? 'disabled' : ''} onclick="historyPage--;renderHistoryPage()">< Prev</button> <span style="align-self:center;">${historyPage}/${t}</span> <button class="btn-sm btn-dark" ${historyPage === t ? 'disabled' : ''} onclick="historyPage++;renderHistoryPage()">Next ></button>`; } }
+        function renderHistoryPage() {
+            const l = document.getElementById("history-list");
+            const c = document.getElementById("history-controls");
+            l.innerHTML = "";
+            c.innerHTML = "";
+            const s = (historyPage - 1) * HISTORY_PER_PAGE;
+            const p = historyCache.slice(s, s + HISTORY_PER_PAGE);
+            const t = Math.ceil(historyCache.length / HISTORY_PER_PAGE);
+            p.forEach((e, idx) => {
+                const globalIdx = s + idx;
+                const d = e.t ? e.t.toLocaleString('en-US', { weekday: 'short', day: 'numeric', month: 'numeric', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-';
+                let cls = e.type === 'bonus' ? 'bonus' : (e.type === 'manual' ? 'manual' : '');
+                let delBtn = "";
+                if (e.source === 'checkin_logs' && e.docId) {
+                    delBtn = `<button class="btn-del-hist" onclick="deleteHistoryLog('${e.docId}', ${e.score})">✕ Delete</button>`;
+                }
+                
+                let extraStyles = "";
+                let clickAction = "";
+                if (e.isReflective) {
+                    extraStyles = "cursor:pointer; background:rgba(67, 97, 238, 0.05);";
+                    clickAction = `onclick="viewHistoryDetail(${globalIdx})"`;
+                }
+
+                l.innerHTML += `<li style="padding:10px;border-bottom:1px solid #eee; ${extraStyles}" class="${cls}" ${clickAction}>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>${e.text} ${delBtn}</div>
+                        <span style="font-weight:bold;">${e.score > 0 ? '+' : ''}${parseFloat(e.score).toFixed(2)}</span>
+                    </div>
+                    <small style="color:#888">${d}</small>
+                </li>`
+            });
+            if (t > 1) {
+                c.innerHTML = `<button class="btn-sm btn-dark" ${historyPage === 1 ? 'disabled' : ''} onclick="historyPage--;renderHistoryPage()">< Prev</button> 
+                <span style="align-self:center;">${historyPage}/${t}</span> 
+                <button class="btn-sm btn-dark" ${historyPage === t ? 'disabled' : ''} onclick="historyPage++;renderHistoryPage()">Next ></button>`;
+            }
+        }
+
+        function viewHistoryDetail(idx) {
+            const item = historyCache[idx];
+            if (!item || !item.isReflective) return;
+
+            const modal = document.getElementById('reflectiveDetailModal');
+            document.getElementById('reflective-detail-content').innerText = item.fullContent || "No content found.";
+            
+            const feedbackSection = document.getElementById('reflective-detail-feedback');
+            if (item.adminComment) {
+                feedbackSection.style.display = 'block';
+                document.getElementById('reflective-detail-feedback-text').innerText = item.adminComment;
+            } else {
+                feedbackSection.style.display = 'none';
+            }
+
+            const dateStr = item.t ? item.t.toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+            document.getElementById('reflective-detail-date').innerHTML = `<i class="fa-regular fa-clock"></i> ${dateStr}`;
+            document.getElementById('reflective-detail-score').innerHTML = `<i class="fa-solid fa-star"></i> Bonus: +${parseFloat(item.score).toFixed(2)}`;
+            
+            document.getElementById('reflective-detail-title').innerHTML = `${item.moodEmoji || '📝'} Reflective Log Detail`;
+            
+            modal.style.display = 'block';
+        }
         async function deleteHistoryLog(logId, amount) { if (!confirm(`Delete log and revert ${amount} points?`)) return; try { await db.collection("users").doc(currentHistoryUserId).update({ score: firebase.firestore.FieldValue.increment(-amount) }); await db.collection("checkin_logs").doc(logId).delete(); showToast("Reverted!"); const user = usersData.find(u => u.id === currentHistoryUserId); showHistory(currentHistoryUserId, user ? user.displayName : 'User', (user ? user.score : 0) - amount); } catch (e) { alert(e.message); } }
         function updateAssigneeList() { const d = document.getElementById('sq-user-list'); d.innerHTML = ""; usersData.forEach(u => { if (!u.isIgnored) d.innerHTML += `<label style="margin-right:5px"><input type="checkbox" class="sq-user-check" value="${u.id}" data-name="${u.displayName}" data-pic="${u.pictureUrl}"> ${u.displayName}</label>` }); }
         async function moveCard(id, dir) { const q = sideQuestsCache[id]; const f = ['Backlog', 'Doing', 'Review', 'Done']; const c = f.indexOf(q.status); let n = q.status; if (dir === 'next' && c < 3) n = f[c + 1]; if (dir === 'prev' && c > 0) n = f[c - 1]; if (n !== q.status) { const u = { status: n }; if (n === 'Done') u.doneAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").doc(id).update(u); } }
