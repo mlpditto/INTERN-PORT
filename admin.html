@@ -2302,6 +2302,9 @@
             <button class="btn-primary" onclick="saveAIKeys()" style="width:100%; font-weight:700; padding:12px; border-radius:10px;">
                 <i class="fa-solid fa-save"></i> Save Locally
             </button>
+            <button class="btn-sm" onclick="checkGeminiModels()" style="width:100%; margin-top:10px; background:#f8f9fa; color:#666; border:1px solid #ddd;">
+                <i class="fa-solid fa-stethoscope"></i> Check Available Gemini Models
+            </button>
             <p style="font-size:0.75em; color:#999; margin-top:10px; font-style:italic;">
                 * These keys exist only on this computer/browser. If you clear cache, you'll need to re-enter them.
             </p>
@@ -2410,14 +2413,19 @@
                 if (modelName.includes('gemini')) {
                     if (GEMINI_API_KEY.includes('__')) throw new Error("Please setup Gemini API Key in 'AI Keys' menu first.");
                     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-                    // Handle potential version typos (2.5 -> 2.0 or 1.5)
-                    let actualModelName = modelName.replace('2.5', '2.0'); 
+                    
+                    // 🔥 Fixed V86.19: Safe Model Mapping
+                    let actualModelName = "gemini-1.5-flash"; 
+                    if (modelName.includes('pro')) actualModelName = "gemini-1.5-pro";
+                    else if (modelName.includes('1.5-flash')) actualModelName = "gemini-1.5-flash";
+                    else if (modelName.includes('2.0-flash')) actualModelName = "gemini-2.0-flash-exp";
+
                     let model = genAI.getGenerativeModel({ model: actualModelName });
                     let result;
                     try {
                         result = await model.generateContent(prompt);
                     } catch (e) {
-                        console.warn("AI Generation failed, trying fallback...", e);
+                        console.warn("AI Generation failed, trying fallback to gemini-1.5-flash", e);
                         model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
                         result = await model.generateContent(prompt);
                     }
@@ -3329,7 +3337,7 @@
                         
                         <div style="display:flex; align-items:center; gap:5px; background:#fff; padding:4px 10px; border-radius:10px; border:1px solid #e0e0e0; flex-shrink:0; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
                             <label style="font-size:0.8em; color:#666; font-weight:bold;">⏱️</label>
-                            <input type="number" class="q-timer" value="${data ? (data.timer || 60) : (document.getElementById('quiz-set-all-timer') ? document.getElementById('quiz-set-all-timer').value : 60)}" style="width:45px; margin:0; padding:2px; border:none; background:transparent; font-weight:bold; text-align:center; font-size:1em; color:var(--primary);">
+                            <input type="number" class="q-timer" value="${data ? (data.timer || 60) : (document.getElementById('quiz-set-all-timer') ? document.getElementById('quiz-set-all-timer').value : 60)}" style="width:70px; margin:0; padding:2px; border:none; background:transparent; font-weight:bold; text-align:center; font-size:1em; color:var(--primary);">
                         </div>
                         <button class="btn-sm btn-danger" onclick="if(confirm('Delete this question?')){this.closest('.quiz-q-item').remove(); updateQuizPagination();}" style="width:34px; height:34px; padding:0; border-radius:10px; flex-shrink:0; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(239,35,60,0.2);"><i class="fa-solid fa-trash-can" style="font-size:0.9em;"></i></button>
                     </div>
