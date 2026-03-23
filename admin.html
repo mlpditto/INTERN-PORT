@@ -1059,7 +1059,7 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal 
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">V86.22</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">V86.26</span>
                     <span id="ai-status-badge" onclick="openAIKeysModal()" style="font-size:0.5em; background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:3px; cursor:pointer;">
                         <i class="fa-solid fa-key"></i> AI Keys Setup
                     </span>
@@ -1977,22 +1977,6 @@
                 </div>
                 <hr>
                 <h3>Questions (<span id="quiz-q-counter">0</span>)</h3>
-                <!-- 🔥 V78.1: Timer Controls -->
-                <div class="timer-bar-compact">
-                    <div class="section">
-                        <label>⏱️ Timer:</label>
-                        <select id="quiz-timer-mode" onchange="toggleTimerModeUI()"
-                            style="width:auto; margin:0; padding:4px 8px; font-size:0.85em; font-weight:bold; border-radius:8px; border:1.5px solid #ffb74d; background: white; cursor: pointer;">
-                            <option value="per_question">⏱️ Per Question</option>
-                            <option value="total_time">⌛ Total Time</option>
-                        </select>
-                    </div>
-                    <div id="timer-total-area" style="display:none; align-items:center; gap:8px;">
-                        <label>Total Sec:</label>
-                        <input type="number" id="quiz-total-timer" value="300" min="10"
-                            style="width:70px; margin:0; padding:4px; font-weight:bold; border: 1.5px solid #ffb74d; border-radius: 8px;">
-                    </div>
-                    <div id="timer-perq-area" style="display:flex; align-items:center; gap:8px;">
                         <label>per Q:</label>
                         <input type="number" id="quiz-set-all-timer" value="60" min="5"
                             style="width:55px; margin:0; padding:4px; border: 1.5px solid #ffb74d; border-radius: 8px; text-align: center;">
@@ -2422,6 +2406,52 @@
             loadAIKeys();
             document.getElementById('aiKeysModal').style.display = 'none';
             alert("✅ Keys saved locally!");
+        };
+
+        window.analyzeQuizAI = async function() {
+            const items = document.querySelectorAll('.quiz-q-item');
+            if (items.length < 2) return alert("Add at least 2 questions to analyze.");
+            
+            const qList = [...items].map((it, i) => `Q${i+1}: ${it.querySelector('.q-text').value}`).join('\n\n');
+            const btn = event.target.closest('button');
+            const oldText = btn.innerHTML;
+            
+            try {
+                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analyzing...`;
+                btn.disabled = true;
+                
+                const prompt = `Analyze these quiz questions for similarity, redundancy, and variety. 
+                Focus on identifying questions that are too similar or test the same concept repeatedly. 
+                Suggest improvements or how to diversify the questions to cover broader topics.
+                
+                Questions list:
+                ${qList}
+                
+                Output as a clear summary in Thai. Use bullet points. Keep it professional.`;
+                
+                const analysis = await callUniversalAI('gemini-flash-latest', prompt);
+                
+                // Show in a styled popup
+                const resultDiv = document.createElement('div');
+                resultDiv.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:85%; max-width:800px; max-height:80vh; background:white; padding:30px; border-radius:20px; box-shadow:0 10px 40px rgba(0,0,0,0.2); z-index:10001; overflow-y:auto; font-family:sans-serif;";
+                resultDiv.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:15px; margin-bottom:15px;">
+                        <h2 style="margin:0; color:var(--primary);"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Quiz Analysis</h2>
+                        <button onclick="this.parentElement.parentElement.remove()" style="border:none; background:none; font-size:1.5em; cursor:pointer;">✕</button>
+                    </div>
+                    <div style="white-space:pre-wrap; line-height:1.6; color:#444;">${analysis}</div>
+                    <div style="margin-top:25px; text-align:center;">
+                        <button class="btn-primary" onclick="this.parentElement.parentElement.remove()" style="padding:10px 30px; border-radius:12px;">Understood</button>
+                    </div>
+                `;
+                document.body.appendChild(resultDiv);
+                
+            } catch (e) {
+                alert("Analysis error: " + e.message);
+            } finally {
+                btn.innerHTML = oldText;
+                btn.disabled = false;
+            }
         };
 
         window.callUniversalAI = async function(modelName, prompt, isJson = false) {
