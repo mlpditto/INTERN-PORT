@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V85.113) Overview
+# MLP Internship Portfolio (V85.114) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -109,7 +109,8 @@
     - ระบบจะแปลโจทย์และตัวเลือกจากไทยเป็นภาษาเป้าหมาย พร้อมปรับปรุงเนื้อหาให้มีความเป็นทางการและท้าทายมากขึ้น
     - ใช้ Gemini JSON Mode เพื่อรักษาโครงสร้างของชุดข้อสอบและลำดับเฉลยให้ถูกต้องแม่นยำ
 - **Developer Security:** เก็บ API Key ไว้ใน `firebase-config.js` (Client-side) เพื่อการพัฒนาที่รวดเร็ว (สำหรับ Production แนะนำให้ย้ายไป Firebase Functions)
-- **🛡️ Data Integrity & Stability (V85.113):** 
+- **🛡️ Data Integrity & Stability (V85.114):** 
+    - **CRITICAL FIX:** แก้ไขบั๊กหน้าจอการทำข้อสอบค้างที่ 0s และกด Next ไม่ได้ ซึ่งเกิดจาก Syntax Error ของฟังก์ชันบันทึกเวลาที่ไปซ้อนทับกัน
     - **UI Decluttering:** ถอดปุ่ม "Test API" ออกจาก Header เพื่อความสวยงามและลดความซับซ้อน (เนื่องจากรุ่น AI ได้รับการยืนยันแล้ว)
     - **Go-Live Optimization:** ปรับปรุงปุ่ม "On" (Go Live) ให้ฉลาดขึ้น หากแอดมินเปิดใช้งานแบบทดสอบที่หมดเวลาแล้ว ระบบจะเสนอให้รีเซ็ต Deadline ทันที เพื่อให้งานย้ายไปอยู่ตาราง Active และผู้ใช้เข้าทำได้
     - **Gemini 2.5 Upgrade:** ปรับปรุงชื่อรุ่น AI เป็น **Gemini 2.5 Flash/Pro** ตามสิทธิ์การใช้งานจริงใน Google AI Studio เพื่อรองรับฟีเจอร์ใหม่และประสิทธิภาพที่สูงขึ้น
@@ -410,4 +411,4 @@ service cloud.firestore {
 - **Live Sync:** ดึงข้อมูลจากคอลเลกชัน `reports` (ประเภท `access_request`) แบบ Real-time
 
 ---
-*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V85.113) โดย Antigravity AI*
+*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V85.114) โดย Antigravity AI*
