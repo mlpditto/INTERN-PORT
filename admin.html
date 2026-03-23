@@ -7496,7 +7496,14 @@
             const container = document.getElementById('laughtale-grid');
             if (!container) return;
             
-            const archived = reflectiveLogsCache.filter(l => l.isArchived).sort((a,b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
+            // 🔥 V86.17: Automatic Laugh Tale - Show all logs with admin feedback, 
+            // but allow manual unarchiving (isArchived === false)
+            const archived = reflectiveLogsCache.filter(l => {
+                const isReviewed = l.adminComment || (l.adminBonus !== undefined && l.adminBonus !== null);
+                // If it was manually hidden from Laugh Tale (isArchived === false), don't show it if it is not explicitly marked as Archived
+                if (l.isArchived === false) return false; 
+                return isReviewed || l.isArchived === true;
+            }).sort((a,b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
             
             if (archived.length === 0) {
                 container.innerHTML = `
