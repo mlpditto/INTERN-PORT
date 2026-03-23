@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V86.14) Overview
+# MLP Internship Portfolio (V86.16) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -76,6 +76,17 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+## [2026-03-23] Session Updates (V86.14 → V86.16)
+
+### 1. Reflective Log Detail View (Admin)
+- **Interactive History:** Admin can now click on any 'Reflective Log' entry in the User History list to open a detailed modal.
+- **Full Content & Feedback:** The modal displays the original log content, student's mood, and the admin's feedback/score, making it easier to review past entries.
+
+### 2. Mandatory Feedback Reading (User)
+- **Feedback-First Claiming:** Reflective log feedback and bonus points are now hidden behind a "Read Feedback & Claim Points" button in the user's history.
+- **Acknowledge points:** Users must open the feedback modal to read the mentor's comments before they can click the button to claim their bonus points.
+- **Auto-Closing Modal:** The feedback modal automatically closes after a successful claim to provide a smooth experience.
+
 ## [2026-03-08] Session Updates (V81.1 → V81.2)
 
 ### 1. Collapsed Expired Quizzes (V81.2)
@@ -151,7 +162,9 @@
 
 ### 2. การจัดการภารกิจ (Kanban Management & Focused Review)
 - **Drag & Drop Console:** ย้ายสถานะงานของนักศึกษาได้ทันทีผ่านหน้า Admin
-- **[Points] Reflective Log Points Claim (V86.14):** ระบบใหม่ที่ให้ผู้ใช้อ่านฟีดแบ็กจากแอดมินก่อนกดรับคะแนน พร้อมระบบแจ้งเตือนแอดมินเมื่อมีการขอรับรางวัล- **✨ Admin Dashboard Tabs (V84.9):** ระบบแท็บแยกตามกลุ่ม (Junior, INTERN, EXTERN) ช่วยให้แอดมินโฟกัสการตรวจงานได้รวดเร็วขึ้น พร้อมแท็บ "ALL" เพื่อดูภาพรวมทั้งหมด
+- **[Points] Reflective Log Points Claim (V86.16):** ระบบใหม่ที่บังคับให้ผู้ใช้งานต้องเปิดอ่านฟีดแบ็กจากแอดมินก่อนจึงจะกดรับคะแนนโบนัสได้ เพื่อกระตุ้นการสื่อสารระหว่างพี่เลี้ยงและนักศึกษา
+- **✨ Reflective Log Detail Viewer:** แอดมินสามารถคลิกดูเนื้อหาบันทึกฉบับเต็มและคอมเมนต์ย้อนหลังได้โดยตรงจากตารางประวัติ (History Table)
+- **✨ Admin Dashboard Tabs (V84.9):** ระบบแท็บแยกตามกลุ่ม (Junior, INTERN, EXTERN) ช่วยให้แอดมินโฟกัสการตรวจงานได้รวดเร็วขึ้น พร้อมแท็บ "ALL" เพื่อดูภาพรวมทั้งหมด
 - **✨ Reflective Log Review (Dashboard):** รวมส่วนตรวจบันทึกสะท้อนคิดรายวันไว้ที่หน้า Dashboard หลัก เพื่อให้แอดมินให้คะแนนและคอมเมนต์ได้ทันที สะดวกกว่าเดิม
 - **Priority & Assignee:** มอบหมายงานให้ผู้ใช้รายคนหรือเป็นกลุ่ม กำหนดความสำคัญ (Low/Medium/High)
 - **Project Flag:** กำหนดประเภทงานเป็น Project เพื่อการติดตามที่เข้มข้นขึ้น
@@ -418,4 +431,4 @@ service cloud.firestore {
     - **Date & Time Formatting:** ปรับการแสดงผลวันที่และเวลาให้ใช้รูปแบบ `en-US` (เช่น Mar 23, 2026) ทั่วทั้งระบบเพื่อความสม่ำเสมอ
 
 ---
-*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V86.14) โดย Antigravity AI*
+*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V86.16) โดย Antigravity AI*
