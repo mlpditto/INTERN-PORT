@@ -1060,7 +1060,7 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal 
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">V85.111</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">V85.112</span>
                     <span id="ai-status-badge" style="font-size:0.5em; background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:3px;">
                         <i class="fa-solid fa-microchip"></i> Gemini 2.5 Flash
                     </span>
@@ -4610,9 +4610,28 @@
 
         async function toggleQuizStatus(id, current) {
             const updates = { isActive: !current };
+            
+            // 🔥 V85.112: If turning ON an expired quiz, suggest resetting deadline
+            if (!current) {
+                const q = quizzesData.find(x => x.id === id);
+                if (q && q.deadline) {
+                    const dead = q.deadline.toDate();
+                    if (new Date() > dead) {
+                        if (confirm(`แบบทดสอบนี้หมดเวลาไปเมื่อ ${dead.toLocaleString('th-TH')}\nต้องการ "รีเซ็ตเวลา" เพื่อให้คนเริ่มเข้าทำได้ทันทีหรือไม่?`)) {
+                            updates.deadline = null;
+                            updates.startTime = null;
+                        } else {
+                            // User cancelled reset, but still want to turn on? 
+                            // Usually, if they don't reset, it stays Expired.
+                        }
+                    }
+                }
+            }
+
             // If ending (deactivating), mark as template
             if (current) updates.isTemplate = true;
             await db.collection("quizzes").doc(id).update(updates);
+            showToast(updates.isActive ? "Quiz Started!" : "Quiz Ended!");
         }
         async function deleteQuiz(id) { if (confirm("Delete this quiz?")) await db.collection("quizzes").doc(id).delete(); }
 
