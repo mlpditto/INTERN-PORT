@@ -2456,30 +2456,31 @@
                     if (!text) throw new Error("Empty response from Gemini AI");
                     return text.trim();
                 } else if (modelName.includes('typhoon')) {
-                    const response = await fetch('https://api.opentyphoon.ai/v1/chat/completions', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${TYPHOON_API_KEY}`
-                        },
-                        body: JSON.stringify({
-                            model: modelName,
-                            messages: [{ role: 'user', content: prompt }],
-                            response_format: isJson ? { type: "json_object" } : undefined,
-                            temperature: 0.7
-                        })
-                    });
+                    if (TYPHOON_API_KEY.includes('__')) throw new Error("Please setup Typhoon API Key in 'AI Keys' menu first.");
                     
-                    const data = await response.json();
-                    
-                    if (!response.ok) {
-                        const errMsg = data.error?.message || data.message || `HTTP Error ${response.status}`;
-                        throw new Error(errMsg);
-                    }
-                    
-                    if (!data.choices || data.choices.length === 0 || !data.choices[0].message) {
-                        console.error("Malformed AI Response:", data);
-                        throw new Error("AI returned an empty or malformed response. Please try again or check your quota.");
+                    const callTyphoon = async (mName) => {
+                        const response = await fetch('https://api.opentyphoon.ai/v1/chat/completions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${TYPHOON_API_KEY}` },
+                            body: JSON.stringify({
+                                model: mName,
+                                messages: [{ role: 'user', content: prompt }],
+                                temperature: 0.6,
+                                max_tokens: 2000
+                                // Removed response_format strictly for Typhoon to avoid 400 errors
+                            })
+                        });
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(data.error?.message || `Typhoon Error ${response.status}`);
+                        return data;
+                    };
+
+                    let data;
+                    try {
+                        data = await callTyphoon(modelName);
+                    } catch (e) {
+                        console.warn("Typhoon primary failed, trying fallback to v1.5-instruct", e);
+                        data = await callTyphoon("typhoon-v1.5-instruct");
                     }
                     
                     const tokens = data.usage ? data.usage.total_tokens : 0;
@@ -3373,24 +3374,26 @@
                         <label class="q-label-text" style="font-size:0.85em; font-weight:bold;">Question (Select correct answer):</label>
                         <div style="display:flex; gap:5px; align-items:center;">
                              <!-- 🔥 Liquid Glass AI Toggle -->
-                             <div class="glass-toggle-container ai-model-toggle" style="background: rgba(142,68,173,0.1); transform: scale(0.85); transform-origin: right center; flex-shrink:0; padding:2px; border:1px solid rgba(142,68,173,0.2);">
+                             <div class="glass-toggle-container ai-model-toggle" style="background: rgba(142,68,173,0.1); transform: scale(0.8); transform-origin: right center; flex-shrink:0; padding:2px; border:1px solid rgba(142,68,173,0.2);">
                                 <div class="glass-toggle-item active" data-value="gemini-flash-latest" onclick="selectAiToggle(this, 'gemini-flash-latest')" title="Gemini Flash (Latest)">⚡</div>
                                 <div class="glass-toggle-item" data-value="gpt-4o-mini" onclick="selectAiToggle(this, 'gpt-4o-mini')" title="GPT-4o Mini">🟢</div>
                                 <div class="glass-toggle-item" data-value="typhoon-v2.5-30b-a3b-instruct" onclick="selectAiToggle(this, 'typhoon-v2.5-30b-a3b-instruct')" title="Typhoon 2.5">🌀</div>
                              </div>
                              <input type="hidden" class="ai-model-quiz" value="gemini-flash-latest">
 
-                            <select class="ai-lang-quiz" style="font-size:0.75em; padding:2px 8px; border-radius:20px; border:1px solid #ddd; background:#fff; font-weight:bold; cursor:pointer;" title="Target Language">
-                                <option value="Thai">TH</option>
-                                <option value="English">EN</option>
-                                <option value="Chinese">CN</option>
-                                <option value="Korean">KO</option>
-                                <option value="Japanese">JP</option>
-                            </select>
+                             <!-- 🔥 Liquid Glass Lang Toggle -->
+                             <div class="glass-toggle-container ai-lang-toggle" style="background: rgba(0,0,0,0.05); transform: scale(0.8); transform-origin: right center; flex-shrink:0; padding:2px; border:1px solid rgba(0,0,0,0.1);">
+                                <div class="glass-toggle-item active" data-value="Thai" onclick="selectAiToggle(this, 'Thai')" title="Thai">🇹🇭</div>
+                                <div class="glass-toggle-item" data-value="English" onclick="selectAiToggle(this, 'English')" title="English">🇺🇸</div>
+                                <div class="glass-toggle-item" data-value="Chinese" onclick="selectAiToggle(this, 'Chinese')" title="Chinese">🇨🇳</div>
+                                <div class="glass-toggle-item" data-value="Korean" onclick="selectAiToggle(this, 'Korean')" title="Korean">🇰🇷</div>
+                                <div class="glass-toggle-item" data-value="Japanese" onclick="selectAiToggle(this, 'Japanese')" title="Japanese">🇯🇵</div>
+                             </div>
+                             <input type="hidden" class="ai-lang-quiz" value="Thai">
                             
                             <!-- 🔥 Compact AI Emoji Button -->
-                            <button type="button" class="btn-sm btn-ai-enhance" onclick="aiEnhanceQuestion(this)" title="AI Suggestion" style="background:#8e44ad; color:white; width:34px; height:34px; padding:0; border:none; border-radius:50%; font-size:1.1em; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 10px rgba(142,68,173,0.3); transition:all 0.2s;">
-                                🧠
+                            <button type="button" class="btn-sm btn-ai-enhance" onclick="aiEnhanceQuestion(this)" title="AI Suggestion (Translate/Enhance)" style="background:#8e44ad; color:white; width:34px; height:34px; padding:0; border:none; border-radius:50%; font-size:1.1em; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 10px rgba(142,68,173,0.3); transition:all 0.2s; flex-shrink:0;">
+                                🤖
                             </button>
                         </div>
                     </div>
