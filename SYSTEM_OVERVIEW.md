@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V85.105) Overview
+# MLP Internship Portfolio (V85.106) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -107,7 +107,8 @@
     - ระบบจะแปลโจทย์และตัวเลือกจากไทยเป็นภาษาเป้าหมาย พร้อมปรับปรุงเนื้อหาให้มีความเป็นทางการและท้าทายมากขึ้น
     - ใช้ Gemini JSON Mode เพื่อรักษาโครงสร้างของชุดข้อสอบและลำดับเฉลยให้ถูกต้องแม่นยำ
 - **Developer Security:** เก็บ API Key ไว้ใน `firebase-config.js` (Client-side) เพื่อการพัฒนาที่รวดเร็ว (สำหรับ Production แนะนำให้ย้ายไป Firebase Functions)
-- **🛡️ Data Integrity & Stability (V78.4):** 
+- **🛡️ Data Integrity & Stability (V85.106):** 
+    - **Per-question Duration Tracking:** เพิ่มระบบบันทึกระยะเวลาที่ผู้ใช้ใช้ในแต่ละข้อ (Second-level precision) และแสดงผลในหน้า Admin ตอนตรวจงาน เพื่อช่วยวิเคราะห์พฤติกรรมการทำข้อสอบ
     - **Submission Fix:** แก้ไขปัญหาการส่งคำตอบแบบ Single Choice ให้เป็น Array เสมอ เพื่อป้องกันข้อผิดพลาดในการตรวจคำตอบอัตโนมัติ (Fix 0 Score Bug)
     - **Robust Submission (V78.4):** เพิ่มระบบป้องการการกด Submit ซ้ำ (Button Lock) และการล็อคปุ่มนำทาง (Prev/Next) ขณะกำลังประมวลผล เพื่อป้องกันสถานะไฟล์ขัดแย้ง
     - **Non-blocking BG Tasks:** แยกการทำงานเบื้องหลัง (เช่น Kanban Sync, Duration Adjustment) ออกจากการประมวลผลหลัก ทำให้ผู้ใช้งานได้รับผลลัพธ์การส่งทันทีโดยไม่ต้องรอระบบอื่น
@@ -404,4 +405,4 @@ service cloud.firestore {
 - **Live Sync:** ดึงข้อมูลจากคอลเลกชัน `reports` (ประเภท `access_request`) แบบ Real-time
 
 ---
-*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V85.105) โดย Antigravity AI*
+*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V85.106) โดย Antigravity AI*
