@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V85.106) Overview
+# MLP Internship Portfolio (V85.107) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -101,7 +101,9 @@
 
 ### 5. 🤖 Gemini AI Integration (V85.8)
 - **AI-Powered Mentor Feedback:** บูรณาการ Gemini 1.5 Flash API ในหน้า Admin เพื่อช่วยวิเคราะห์และเสนอแนะคำติชม (Feedback) สำหรับบันทึกสะท้อนคิด (Reflective Logs) ของนักศึกษา
-- **One-Click Suggestion:** ปุ่ม "AI Suggest" ในหน้าต่างตรวจงาน จะส่งเนื้อหาบันทึกไปประมวลผลและสร้างข้อความให้กำลังใจ/แนะนำที่สุภาพและเหมาะสมให้อัตโนมัติ
+- **One-Click Suggestion (V85.107):** 
+    - ปุ่ม "AI Suggest" ในหน้าต่างตรวจบันทึกสะท้อนคิด เพิ่มตัวเลือกภาษา (**TH, EN, CN, KO, JP**)
+    - ระบบจะวิเคราะห์เนื้อหาและสร้างฟีดแบ็กสั้นๆ (2-3 ประโยค) ในภาษาที่เลือกให้อัตโนมัติ เพื่อรองรับนักศึกษาต่างชาติ
 - **AI Quiz Translation & Enhancement (V85.105):** 
     - เพิ่มปุ่ม **"AI Suggest"** พร้อมตัวเลือกภาษา (**EN, Chinese, Korean, Japanese**) ใน Quiz Editor
     - ระบบจะแปลโจทย์และตัวเลือกจากไทยเป็นภาษาเป้าหมาย พร้อมปรับปรุงเนื้อหาให้มีความเป็นทางการและท้าทายมากขึ้น
@@ -405,4 +407,4 @@ service cloud.firestore {
 - **Live Sync:** ดึงข้อมูลจากคอลเลกชัน `reports` (ประเภท `access_request`) แบบ Real-time
 
 ---
-*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V85.106) โดย Antigravity AI*
+*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V85.107) โดย Antigravity AI*
