@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V86.33) Overview
+# MLP Internship Portfolio (V86.35) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -118,6 +118,12 @@
     - ระบบจะแปลโจทย์และตัวเลือกจากไทยเป็นภาษาเป้าหมาย พร้อมปรับปรุงเนื้อหาให้มีความเป็นทางการและท้าทายมากขึ้น
     - ใช้ Gemini JSON Mode เพื่อรักษาโครงสร้างของชุดข้อสอบและลำดับเฉลยให้ถูกต้องแม่นยำ
 - **Developer Security:** เก็บ API Key ไว้ใน `firebase-config.js` (Client-side) เพื่อการพัฒนาที่รวดเร็ว (สำหรับ Production แนะนำให้ย้ายไป Firebase Functions)
+
+### 6. [AI] Research Assistant & Knowledge Base (V86.35 - Active)
+- **Intelligent Knowledge Base:** ระบบจัดการฐานความรู้ (Knowledge Base) ในหน้า Research แอดมินสามารถอัพโหลดเอกสาร (Text, PDF Metadata) เพื่อใช้เป็นแหล่งข้อมูลในการอ้างอิง (Grounded Data)
+- **Grounded Q&A (RAG):** ระบบถาม-ตอบอัจฉริยะที่ใช้หลักการ Retrieval-Augmented Generation โดย AI จะค้นหาเนื้อหาที่เกี่ยวข้องจาก Knowledge Base ก่อนนำไปประมวลผลคำตอบ เพื่อความถูกต้องและแม่นยำ (NotebookLM Experience)
+- **Premium Research UI:** อินเทอร์เฟซหน้าจอวิจัยระดับพรีเมียม พร้อมระบบ Chat-style Interaction และแถบจัดการแหล่งข้อมูล (Active Sources) ที่ใช้งานง่าย
+- **Source-aware AI:** AI สามารถระบุสถานะการใช้งานแหล่งข้อมูล (Knowledge Base Source Used) ในคำตอบ เพื่อให้แอดมินทราบว่าข้อมูลนั้นถูกดึงมาจากไฟล์ที่อัพโหลดจริง
 - **[Security] Data Integrity & Stability (V86.14):**     - **Quiz UI Optimization (V86.14):** ย้ายกลุ่มปุ่ม Smart Paste และ AI Controls ขึ้นไปบรรทัดเดียวกับหัวข้อ "Question" เพื่อประหยัดพื้นที่แนวตั้งและทำให้การทำงานไหลลื่นขึ้น
     - **CRITICAL FIX:** แก้ไขบั๊กหน้าจอการทำข้อสอบค้างที่ 0s และกด Next ไม่ได้ ซึ่งเกิดจาก Syntax Error ของฟังก์ชันบันทึกเวลาที่ไปซ้อนทับกัน
     - **UI Decluttering (V86.14):** ถอดปุ่ม "Test API" ออกจาก Header เพื่อความสวยงามและลดความซับซ้อน (เนื่องจากรุ่น AI ได้รับการยืนยันแล้ว)
