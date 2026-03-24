@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V86.50)</title>
+    <title>Internship Portfolio (V86.52)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -1065,7 +1065,7 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.50</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.52</span>
                 </h1>
                     <span id="ai-status-badge" onclick="openAIKeysModal()" style="font-size:0.5em; background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:3px; cursor:pointer; margin-left:5px;">
                         <i class="fa-solid fa-key"></i> AI Keys Setup
@@ -4950,15 +4950,32 @@
                 msgDiv.style = "align-self: flex-end; max-width: 80%; background:var(--primary); color:white; padding:12px 18px; border-radius:20px 20px 5px 20px; box-shadow:0 4px 10px rgba(67, 97, 238, 0.2); margin-top:10px;";
                 msgDiv.innerHTML = text;
             } else {
-                msgDiv.style = "align-self: flex-start; max-width: 85%; background:white; color:#2c3e50; padding:15px 20px; border-radius:20px 20px 20px 5px; border:1px solid #f1f3f5; box-shadow:0 2px 10px rgba(0,0,0,0.02); position:relative; margin-top:10px;";
                 let sourceBadge = sourceLabel ? `<div style="font-size:0.65em; color:var(--primary); background:#ebf0ff; display:inline-block; padding:2px 8px; border-radius:10px; margin-bottom:8px; font-weight:bold;"><i class="fa-solid fa-shield-check"></i> ${sourceLabel}</div>` : '';
                 
                 let html = text;
+                // 1. Detect Mermaid Blocks and render them
                 const mermaidRegex = /```mermaid([\s\S]*?)```/g;
                 let match;
                 while ((match = mermaidRegex.exec(text)) !== null) {
-                    const mermaidCode = match[1].trim();
+                    let mermaidCode = match[1].trim();
                     const chartId = `mermaid-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                    
+                    // --- 🛠️ V86.52: Mermaid Autocorrect & Sanitizer ---
+                    function sanitizeMermaid(code) {
+                        let lines = code.split('\n');
+                        return lines.map(line => {
+                            let trimmed = line.trim();
+                            // Fix: NodeID[Label with brackets] -> NodeID["Label with brackets"]
+                            // This detects unquoted labels containing [ or ] or ( or )
+                            return line.replace(/(\w+)(\[[^"]*[\[\]\(\)][^"]*\])/g, '$1["$2"]')
+                                       .replace(/(\w+)(\([^"]*[\[\]\(\)][^"]*\))/g, '$1("$2")');
+                        }).join('\n');
+                    }
+                    if (!mermaidCode.match(/^(graph|flowchart|sequenceDiagram|gantt|classDiagram|stateDiagram|pie|erDiagram|journey|gitGraph)/i)) {
+                        mermaidCode = "graph TD\n" + mermaidCode;
+                    }
+                    const cleanCode = sanitizeMermaid(mermaidCode);
+
                     const replacement = `
                         <div class="mermaid-block" style="margin:15px 0; background:#fdfdfd; padding:15px; border-radius:15px; border:1px solid #eee; position:relative;">
                             <div style="position:absolute; top:10px; right:10px; z-index:10; display:flex; gap:5px;">
@@ -4970,9 +4987,14 @@
                                     <i class="fa-solid fa-circle-notch fa-spin"></i> Rendering visual...
                                 </div>
                             </div>
+                            <div id="${chartId}-error" style="display:none; padding:10px; font-size:0.7em; color:#e74c3c; background:#fdf2f2; border-radius:10px; margin-top:10px;">
+                                <p><i class="fa-solid fa-triangle-exclamation"></i> Diagram Logic Error. Content preserved below.</p>
+                                <pre style="font-size:0.8em; white-space:pre-wrap; opacity:0.7;">${cleanCode}</pre>
+                            </div>
                         </div>
                     `;
                     html = html.replace(match[0], replacement);
+                    
                     setTimeout(async () => {
                         try {
                             const { svg } = await mermaid.render(`${chartId}-svg`, mermaidCode);
