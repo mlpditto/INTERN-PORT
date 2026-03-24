@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V86.36) Overview
+# MLP Internship Portfolio (V86.60) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -124,6 +124,14 @@
 - **Grounded Q&A (RAG):** ระบบถาม-ตอบอัจฉริยะที่ใช้หลักการ Retrieval-Augmented Generation โดย AI จะค้นหาเนื้อหาที่เกี่ยวข้องจาก Knowledge Base ก่อนนำไปประมวลผลคำตอบ เพื่อความถูกต้องและแม่นยำ (NotebookLM Experience)
 - **Premium Research UI:** อินเทอร์เฟซหน้าจอวิจัยระดับพรีเมียม พร้อมระบบ Chat-style Interaction และแถบจัดการแหล่งข้อมูล (Active Sources) ที่ใช้งานง่าย
 - **Source-aware AI:** AI สามารถระบุสถานะการใช้งานแหล่งข้อมูล (Knowledge Base Source Used) ในคำตอบ เพื่อให้แอดมินทราบว่าข้อมูลนั้นถูกดึงมาจากไฟล์ที่อัพโหลดจริง
+
+### 7. [AI] Design Lab & Infographic Assets (V86.60 - Active)
+- **AI-Powered Visualization:** ระบบสร้างภาพและอินโฟกราฟิกอัจฉริยะ (AI Design Lab) เพื่อใช้ในการตกแต่งใบเซอร์ติฟิเคต กิจกรรม หรือการสร้างคอนเทนต์ในระบบ
+- **Google Vertex AI Integration:** รองรับการเชื่อมต่อกับ **Google Vertex AI (Imagen 3)** โดยตรงผ่าน REST API เพื่อสร้างภาพคุณภาพสูงในระดับสตูดิโอ (Studio-grade generation)
+- **Multi-Model Engine:** แอดมินสามารถเลือกใช้เครื่องมือสร้างภาพได้หลากหลาย เช่น **OpenAI DALL-E 3** หรือ **Imagen 3** ตามความเหมาะสมของงาน
+- **Visual Styles & Templates:** มาพร้อมตัวเลือกสไตล์สำเร็จรูป (Lifestyle, Vector, 3D Illust, Infographic) ที่ช่วยควบคุมอารมณ์ของภาพให้คงเส้นคงวากับตัวโปรเจกต์
+- **Story Visualization:** ฟีเจอร์ "Visualize Story" ในหน้า Laugh Tale ช่วยให้แอดมินสามารถเปลี่ยนข้อความ Reflection ของอินเทิร์นให้กลายเป็นภาพประกอบ (Illustrated Card) ได้ทันทีในคลิกเดียว
+- **Seamless Asset Management:** ภาพที่สร้างขึ้นสามารถพรีวิว ดาวน์โหลด หรือคัดลอก Base64 เพื่อนำไปใช้เป็น Quest Image ในระบบ Daily Quest ได้อย่างรวดเร็ว
 - **[Security] Data Integrity & Stability (V86.14):**     - **Quiz UI Optimization (V86.14):** ย้ายกลุ่มปุ่ม Smart Paste และ AI Controls ขึ้นไปบรรทัดเดียวกับหัวข้อ "Question" เพื่อประหยัดพื้นที่แนวตั้งและทำให้การทำงานไหลลื่นขึ้น
     - **CRITICAL FIX:** แก้ไขบั๊กหน้าจอการทำข้อสอบค้างที่ 0s และกด Next ไม่ได้ ซึ่งเกิดจาก Syntax Error ของฟังก์ชันบันทึกเวลาที่ไปซ้อนทับกัน
     - **UI Decluttering (V86.14):** ถอดปุ่ม "Test API" ออกจาก Header เพื่อความสวยงามและลดความซับซ้อน (เนื่องจากรุ่น AI ได้รับการยืนยันแล้ว)
