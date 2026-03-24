@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V86.47)</title>
+    <title>Internship Portfolio (V86.49)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -1065,7 +1065,7 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.47</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.49</span>
                 </h1>
                     <span id="ai-status-badge" onclick="openAIKeysModal()" style="font-size:0.5em; background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:3px; cursor:pointer; margin-left:5px;">
                         <i class="fa-solid fa-key"></i> AI Keys Setup
@@ -4670,7 +4670,7 @@
             document.getElementById('quizReviewModal').style.display = 'block';
         }
 
-        // --- 🔥 V86.35: Research Assistant & Knowledge Base (RAG) ---
+        // --- 🔥 V86.48: Research Assistant & Knowledge Base (RAG) ---
         let knowledgeBaseCache = [];
         let researchChatHistory = [];
 
@@ -4686,20 +4686,15 @@
                                          .orderBy("createdAt", "desc")
                                          .limit(20)
                                          .get();
-                
                 if (snapshot.empty) return;
-                
-                historyEl.innerHTML = ""; // Clear loader
-                // Documents to array then reverse to get asc display
+                historyEl.innerHTML = "";
                 const docs = snapshot.docs.reverse();
                 docs.forEach(doc => {
                     const data = doc.data();
-                    appendResearchMessageLocalOnly(data.role, data.text, data.sourceLabel);
+                    appendResearchMessage(data.role, data.text, data.sourceLabel, data.question, true);
                 });
                 historyEl.scrollTop = historyEl.scrollHeight;
-            } catch (err) {
-                console.error("History load error:", err);
-            }
+            } catch (err) { console.error("History error:", err); }
         }
 
         function renderKnowledgeBase() {
@@ -4853,7 +4848,7 @@
             const useGrounding = document.getElementById('research-grounding-toggle').checked;
 
             // 1. Append User Message
-            appendResearchMessage('user', question);
+            appendResearchMessage('user', question, null, question);
             inputEl.value = '';
             
             // 2. Show Typing
@@ -4899,7 +4894,7 @@
                 }
                 
                 typingEl.style.display = 'none';
-                appendResearchMessage('ai', aiResponse, hasContext ? "Knowledge Base Source Used" : null);
+                appendResearchMessage('ai', aiResponse, hasContext ? "Knowledge Base Source Used" : null, question);
                 
             } catch (err) {
                 typingEl.style.display = 'none';
@@ -4924,106 +4919,7 @@
             return relevantDocs.map(d => `SOURCE: ${d.name}\nCONTENT: ${d.content.substring(0, 2000)}`).join('\n\n---\n\n');
         }
 
-        function appendResearchMessage(role, text, sourceLabel) {
-            const historyEl = document.getElementById('research-chat-history');
-            const msgDiv = document.createElement('div');
-            
-            if (role === 'user') {
-                msgDiv.style = "align-self: flex-end; max-width: 80%; background:var(--primary); color:white; padding:12px 18px; border-radius:20px 20px 5px 20px; box-shadow:0 4px 10px rgba(67, 97, 238, 0.2);";
-                msgDiv.innerHTML = text;
-            } else {
-                msgDiv.style = "align-self: flex-start; max-width: 85%; background:white; color:#2c3e50; padding:15px 20px; border-radius:20px 20px 20px 5px; border:1px solid #f1f3f5; box-shadow:0 2px 10px rgba(0,0,0,0.02); position:relative;";
-                
-                let sourceBadge = sourceLabel ? `<div style="font-size:0.65em; color:var(--primary); background:#ebf0ff; display:inline-block; padding:2px 8px; border-radius:10px; margin-bottom:8px; font-weight:bold;"><i class="fa-solid fa-shield-check"></i> ${sourceLabel}</div>` : '';
-                
-                // --- 🔥 V86.44: Advanced Rendering (Markdown + Mermaid) ---
-                let html = text;
-                
-                // 1. Detect Mermaid Blocks and render them
-                const mermaidRegex = /```mermaid([\s\S]*?)```/g;
-                let match;
-                while ((match = mermaidRegex.exec(text)) !== null) {
-                    const mermaidCode = match[1].trim();
-                    const chartId = `mermaid-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-                    
-                    const replacement = `
-                        <div class="mermaid-block" style="margin:15px 0; background:#fdfdfd; padding:15px; border-radius:15px; border:1px solid #eee; position:relative;">
-                            <div style="position:absolute; top:10px; right:10px; z-index:10; display:flex; gap:5px;">
-                                <button onclick="downloadMermaidSvg('${chartId}')" style="background:white; border:1px solid #ddd; width:28px; height:28px; border-radius:6px; cursor:pointer; color:#666;" title="Download"><i class="fa-solid fa-download"></i></button>
-                                <button onclick="zoomMermaid('${chartId}')" style="background:white; border:1px solid #ddd; width:28px; height:28px; border-radius:6px; cursor:pointer; color:#666;" title="Zoom"><i class="fa-solid fa-maximize"></i></button>
-                            </div>
-                            <div id="${chartId}" style="cursor:zoom-in; overflow:hidden;" onclick="zoomMermaid('${chartId}')">
-                                <div class="mermaid-code-loading" style="padding:20px; text-align:center; font-size:0.8em; color:#95a5a6;">
-                                    <i class="fa-solid fa-circle-notch fa-spin"></i> Rendering visual...
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    html = html.replace(match[0], replacement);
-                    
-                    // Actual Render
-                    setTimeout(async () => {
-                        try {
-                            const { svg } = await mermaid.render(`${chartId}-svg`, mermaidCode);
-                            document.getElementById(chartId).innerHTML = svg;
-                        } catch (err) {
-                            console.error("Mermaid error:", err);
-                            document.getElementById(chartId).innerHTML = `<div style="color:red; font-size:0.8em;">Diagram Error</div>`;
-                        }
-                    }, 50);
-                }
-
-                // 2. Simple Markdown Support (Bold and Newlines)
-                html = html.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
-                
-                msgDiv.innerHTML = `${sourceBadge}<div style="line-height:1.6;">${html}</div>`;
-                
-                // --- 🎨 Artistic Mode Button (V86.46) ---
-                if (html.length > 300 && !html.includes('dall-e-image')) {
-                    const creativeBtn = document.createElement('button');
-                    creativeBtn.className = 'btn-sm';
-                    creativeBtn.style = "margin-top:10px; background:#f72585; color:white; border:none; border-radius:20px; font-size:0.7em; padding:5px 15px; cursor:pointer;";
-                    creativeBtn.innerHTML = `<i class="fa-solid fa-palette"></i> Generate Artistic Infographic (DALL-E 3)`;
-                    creativeBtn.onclick = async () => {
-                        creativeBtn.disabled = true;
-                        creativeBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Designing Artistic Image...`;
-                        try {
-                            const dallePrompt = `A high-quality, professional medical infographic about: ${question.substring(0, 100)}. Style is minimalist, clean, 3D medical style, stunning visual, 4k resolution. Content from prompt: ${text.substring(0, 500)}. No misspelling.`;
-                            const imgUrl = await window.callUniversalAI('dalle', dallePrompt);
-                            const imgContainer = document.createElement('div');
-                            imgContainer.className = 'dall-e-image';
-                            imgContainer.style = "margin-top:15px; text-align:center;";
-                            imgContainer.innerHTML = `
-                                <img src="${imgUrl}" style="width:100%; border-radius:15px; box-shadow:0 10px 30px rgba(0,0,0,0.1); cursor:zoom-in;" onclick="window.open('${imgUrl}', '_blank')">
-                                <p style="font-size:0.7em; color:#888; margin-top:5px;">AI-Generated Artistic Concept Art (Click to view full size)</p>
-                            `;
-                            msgDiv.appendChild(imgContainer);
-                            creativeBtn.style.display = 'none';
-                        } catch (err) {
-                            showToast("Creative Error: " + err.message);
-                            creativeBtn.disabled = false;
-                            creativeBtn.innerHTML = `<i class="fa-solid fa-palette"></i> Retry Creative Gen`;
-                        }
-                    };
-                    msgDiv.appendChild(creativeBtn);
-                }
-            }
-            
-            historyEl.appendChild(msgDiv);
-            historyEl.scrollTop = historyEl.scrollHeight;
-            
-            // Sync to Firestore (V86.47)
-            db.collection("research_chat").add({
-                role: role,
-                text: text,
-                sourceLabel: sourceLabel || null,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-
-            researchChatHistory.push({ role, text });
-        }
-
-        function appendResearchMessageLocalOnly(role, text, sourceLabel) {
+        function appendResearchMessage(role, text, sourceLabel, originalQuestion, skipSync = false) {
             const historyEl = document.getElementById('research-chat-history');
             const msgDiv = document.createElement('div');
             
@@ -5043,10 +4939,14 @@
                     const replacement = `
                         <div class="mermaid-block" style="margin:15px 0; background:#fdfdfd; padding:15px; border-radius:15px; border:1px solid #eee; position:relative;">
                             <div style="position:absolute; top:10px; right:10px; z-index:10; display:flex; gap:5px;">
-                                <button onclick="downloadMermaidSvg('${chartId}')" style="background:white; border:1px solid #ddd; width:28px; height:28px; border-radius:6px; cursor:pointer; color:#666;"><i class="fa-solid fa-download"></i></button>
-                                <button onclick="zoomMermaid('${chartId}')" style="background:white; border:1px solid #ddd; width:28px; height:28px; border-radius:6px; cursor:pointer; color:#666;"><i class="fa-solid fa-maximize"></i></button>
+                                <button onclick="downloadMermaidSvg('${chartId}')" style="background:white; border:1px solid #ddd; width:28px; height:28px; border-radius:6px; cursor:pointer; color:#666;" title="Download"><i class="fa-solid fa-download"></i></button>
+                                <button onclick="zoomMermaid('${chartId}')" style="background:white; border:1px solid #ddd; width:28px; height:28px; border-radius:6px; cursor:pointer; color:#666;" title="Zoom"><i class="fa-solid fa-maximize"></i></button>
                             </div>
-                            <div id="${chartId}" onclick="zoomMermaid('${chartId}')">${mermaidCode}</div>
+                            <div id="${chartId}" style="cursor:zoom-in; overflow:hidden;" onclick="zoomMermaid('${chartId}')">
+                                <div class="mermaid-code-loading" style="padding:20px; text-align:center; font-size:0.8em; color:#95a5a6;">
+                                    <i class="fa-solid fa-circle-notch fa-spin"></i> Rendering visual...
+                                </div>
+                            </div>
                         </div>
                     `;
                     html = html.replace(match[0], replacement);
@@ -5055,12 +4955,42 @@
                             const { svg } = await mermaid.render(`${chartId}-svg`, mermaidCode);
                             document.getElementById(chartId).innerHTML = svg;
                         } catch (err) { console.error(err); }
-                    }, 100);
+                    }, 50);
                 }
                 html = html.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
                 msgDiv.innerHTML = `${sourceBadge}<div style="line-height:1.6;">${html}</div>`;
+                
+                // --- 🎨 Artistic Mode Button (V86.49: Perfect Logic) ---
+                if (html.length > 200 && !html.includes('dall-e-image')) {
+                    const creativeBtn = document.createElement('button');
+                    creativeBtn.className = 'btn-sm';
+                    creativeBtn.style = "margin-top:10px; background:#f72585; color:white; border:none; border-radius:20px; font-size:0.7em; padding:5px 15px; cursor:pointer;";
+                    creativeBtn.innerHTML = `<i class="fa-solid fa-palette"></i> Generate Artistic Infographic (DALL-E 3)`;
+                    creativeBtn.onclick = async () => {
+                        creativeBtn.disabled = true;
+                        creativeBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Designing...`;
+                        try {
+                            const qTextForDalle = originalQuestion || "Medical Research Summary";
+                            const dallePrompt = `Professional medical infographic about: ${qTextForDalle}. High-quality 3D render style, clean, stunning aesthetic, 4k resolution. Infographic elements. No errors.`;
+                            const imgUrl = await window.callUniversalAI('dalle', dallePrompt);
+                            const imgContainer = document.createElement('div');
+                            imgContainer.style = "margin-top:15px; text-align:center;";
+                            imgContainer.innerHTML = `<img src="${imgUrl}" style="width:100%; border-radius:15px; box-shadow:0 10px 30px rgba(0,0,0,0.1); cursor:zoom-in;" onclick="window.open('${imgUrl}', '_blank')">`;
+                            msgDiv.appendChild(imgContainer);
+                            creativeBtn.remove();
+                        } catch (err) { showToast(err.message); creativeBtn.disabled = false; creativeBtn.innerHTML = "Retry Creative"; }
+                    };
+                    msgDiv.appendChild(creativeBtn);
+                }
             }
             historyEl.appendChild(msgDiv);
+            historyEl.scrollTop = historyEl.scrollHeight;
+            if (!skipSync) {
+                db.collection("research_chat").add({
+                    role, text, question: originalQuestion || null, sourceLabel: sourceLabel || null, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            researchChatHistory.push({ role, text });
         }
 
         window.pendingAttachedImage = null;
