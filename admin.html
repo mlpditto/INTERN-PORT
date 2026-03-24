@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V86.41)</title>
+    <title>Internship Portfolio (V86.42)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -1065,7 +1065,7 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.41</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.42</span>
                 </h1>
                     <span id="ai-status-badge" onclick="openAIKeysModal()" style="font-size:0.5em; background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:3px; cursor:pointer; margin-left:5px;">
                         <i class="fa-solid fa-key"></i> AI Keys Setup
@@ -2663,14 +2663,24 @@
                     if (GEMINI_API_KEY.includes('__')) throw new Error("Please setup Gemini API Key first.");
                     // prompt: { text, imageBase64 }
                     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-                    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                    let actualVisionModel = "gemini-1.5-flash-latest"; // Default
                     
                     const parts = [
                         { text: prompt.text },
                         { inlineData: { data: prompt.imageBase64.split(',')[1], mimeType: "image/jpeg" } }
                     ];
+
+                    let result;
+                    try {
+                        const model = genAI.getGenerativeModel({ model: actualVisionModel });
+                        result = await model.generateContent(parts);
+                    } catch (e) {
+                        console.warn(`Vision AI [${actualVisionModel}] failed, trying fallback...`, e);
+                        actualVisionModel = "gemini-1.5-flash"; // Try standard
+                        const model = genAI.getGenerativeModel({ model: actualVisionModel });
+                        result = await model.generateContent(parts);
+                    }
                     
-                    const result = await model.generateContent(parts);
                     const response = await result.response;
                     text = response.text();
                     tokens = response.usageMetadata ? response.usageMetadata.totalTokenCount : 0;
