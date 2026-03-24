@@ -2765,6 +2765,27 @@
                     updateAIUsage('OpenAI', tokens);
                     text = data.choices[0].message.content.trim();
                     actualModelName = modelName === 'gpt-4o' ? 'gpt-4o' : (data.model || modelName);
+                } else if (modelName === 'dalle') {
+                    // 🔥 DALL-E 3 Image Generation (V86.51)
+                    if (OPENAI_API_KEY.includes('__')) throw new Error("Please setup OpenAI API Key first.");
+                    const response = await fetch('https://api.openai.com/v1/images/generations', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${OPENAI_API_KEY}`
+                        },
+                        body: JSON.stringify({
+                            model: "dall-e-3",
+                            prompt: prompt,
+                            n: 1,
+                            size: "1024x1024"
+                        })
+                    });
+                    const data = await response.json();
+                    if (data.error) throw new Error(data.error.message);
+                    text = data.data[0].url;
+                    updateAIUsage('OpenAI', 1);
+                    actualModelName = 'dall-e-3';
                 } else {
                     throw new Error("Unknown AI Model Provider selected.");
                 }
