@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V86.43)</title>
+    <title>Internship Portfolio (V86.44)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -1065,7 +1065,7 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.43</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.44</span>
                 </h1>
                     <span id="ai-status-badge" onclick="openAIKeysModal()" style="font-size:0.5em; background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:3px; cursor:pointer; margin-left:5px;">
                         <i class="fa-solid fa-key"></i> AI Keys Setup
@@ -4816,7 +4816,14 @@
         async function sendResearchQuestion() {
             const inputEl = document.getElementById('research-chat-input');
             const question = inputEl.value.trim();
+            const selectedModel = document.getElementById('research-model-select').value;
             if (!question) return;
+
+            // Model Capability Check (V86.44)
+            if (window.pendingAttachedImage && selectedModel.includes('typhoon')) {
+                alert("⚠️ Typhoon model currently doesn't support Image Analysis. Please switch to Gemini 1.5 or GPT-4o to analyze this image.");
+                return;
+            }
 
             const chatHistoryEl = document.getElementById('research-chat-history');
             const typingEl = document.getElementById('research-chat-typing');
@@ -4855,20 +4862,19 @@
                 
                 Keep answers structured, premium, and concise.`;
 
-                const fullPrompt = `${systemPrompt}\n\nUSER QUESTION: ${question}`;
-                const selectedModel = document.getElementById('research-model-select').value;
-                
                 let aiResponse = "";
+                
                 if (window.pendingAttachedImage) {
                     const visionPrompt = {
-                        text: fullPrompt,
+                        text: systemPrompt + "\n\nUser: " + question, // Combine system prompt and user question
                         imageBase64: window.pendingAttachedImage
                     };
                     const responseObj = await callUniversalAI('multimodal', visionPrompt);
                     aiResponse = responseObj.text;
                     window.clearAttachedImage(); // Reset
                 } else {
-                    const responseObj = await callUniversalAI(selectedModel, fullPrompt); 
+                    const fullPrompt = systemPrompt + "\n\nUser: " + question;
+                    const responseObj = await window.callUniversalAI(selectedModel, fullPrompt); 
                     aiResponse = responseObj.text;
                 }
                 
@@ -4909,27 +4915,41 @@
                 
                 let sourceBadge = sourceLabel ? `<div style="font-size:0.65em; color:var(--primary); background:#ebf0ff; display:inline-block; padding:2px 8px; border-radius:10px; margin-bottom:8px; font-weight:bold;"><i class="fa-solid fa-shield-check"></i> ${sourceLabel}</div>` : '';
                 
-                // --- 🔥 V86.36: Advanced Rendering (Markdown + Mermaid) ---
+                // --- 🔥 V86.44: Advanced Rendering (Markdown + Mermaid) ---
                 let html = text;
                 
-                // 1. Detect Mermaid Blocks
+                // 1. Detect Mermaid Blocks and render them
                 const mermaidRegex = /```mermaid([\s\S]*?)```/g;
                 let match;
                 while ((match = mermaidRegex.exec(text)) !== null) {
                     const mermaidCode = match[1].trim();
                     const chartId = `mermaid-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-                    html = html.replace(match[0], `<div class="mermaid-container" style="margin:15px 0; background:#f8f9fa; padding:10px; border-radius:12px; border:1px solid #eee; overflow-x:auto;"><div class="mermaid" id="${chartId}">${mermaidCode}</div></div>`);
                     
-                    // Render later
+                    const replacement = `
+                        <div class="mermaid-block" style="margin:15px 0; background:#fdfdfd; padding:15px; border-radius:15px; border:1px solid #eee; position:relative;">
+                            <div style="position:absolute; top:10px; right:10px; z-index:10; display:flex; gap:5px;">
+                                <button onclick="downloadMermaidSvg('${chartId}')" style="background:white; border:1px solid #ddd; width:28px; height:28px; border-radius:6px; cursor:pointer; color:#666;" title="Download"><i class="fa-solid fa-download"></i></button>
+                                <button onclick="zoomMermaid('${chartId}')" style="background:white; border:1px solid #ddd; width:28px; height:28px; border-radius:6px; cursor:pointer; color:#666;" title="Zoom"><i class="fa-solid fa-maximize"></i></button>
+                            </div>
+                            <div id="${chartId}" style="cursor:zoom-in; overflow:hidden;" onclick="zoomMermaid('${chartId}')">
+                                <div class="mermaid-code-loading" style="padding:20px; text-align:center; font-size:0.8em; color:#95a5a6;">
+                                    <i class="fa-solid fa-circle-notch fa-spin"></i> Rendering visual...
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    html = html.replace(match[0], replacement);
+                    
+                    // Actual Render
                     setTimeout(async () => {
                         try {
                             const { svg } = await mermaid.render(`${chartId}-svg`, mermaidCode);
                             document.getElementById(chartId).innerHTML = svg;
                         } catch (err) {
-                            console.error("Mermaid Render Error:", err);
-                            document.getElementById(chartId).innerHTML = `<div style="color:red; font-size:0.8em;"><i class="fa-solid fa-triangle-exclamation"></i> Error rendering chart.</div>`;
+                            console.error("Mermaid error:", err);
+                            document.getElementById(chartId).innerHTML = `<div style="color:red; font-size:0.8em;">Diagram Error</div>`;
                         }
-                    }, 100);
+                    }, 50);
                 }
 
                 // 2. Simple Markdown Support (Bold and Newlines)
@@ -4963,6 +4983,37 @@
             window.pendingAttachedImage = null;
             document.getElementById('research-image-preview-container').style.display = 'none';
         }
+
+        window.zoomMermaid = function(id) {
+            const svgSource = document.getElementById('svg-' + id).innerHTML;
+            const modal = document.createElement('div');
+            modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:11000; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px;";
+            modal.onclick = (e) => { if(e.target === modal) modal.remove(); };
+            
+            modal.innerHTML = `
+                <div style="width:100%; height:100%; background:white; border-radius:20px; padding:40px; overflow:auto; display:flex; align-items:center; justify-content:center; position:relative;">
+                    <button onclick="this.parentElement.parentElement.remove()" style="position:absolute; top:20px; right:20px; background:#f1f3f5; border:none; width:40px; height:40px; border-radius:50%; font-size:20px; cursor:pointer;">✕</button>
+                    <div style="width:100%; height:100%;">${svgSource}</div>
+                </div>
+                <div style="margin-top:20px; color:white; font-size:0.9em;">Tip: Use mouse wheel to scroll if diagram is large. Click outside to close.</div>
+            `;
+            document.body.appendChild(modal);
+        };
+
+        window.downloadMermaidSvg = function(id) {
+            const svgElement = document.querySelector('#svg-' + id + ' svg');
+            if(!svgElement) return;
+            const svgData = new XMLSerializer().serializeToString(svgElement);
+            const svgBlob = new Blob([svgData], {type:"image/svg+xml;charset=utf-8"});
+            const svgUrl = URL.createObjectURL(svgBlob);
+            const downloadLink = document.createElement("a");
+            downloadLink.href = svgUrl;
+            downloadLink.download = `intern_infographic_${Date.now()}.svg`;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            showToast("📥 Infographic Downloaded (SVG)!");
+        };
 
         async function manualCorrectAns(attemptId, qIndex, isChecked) {
             // Updated V77.16: Robust Score Recalculation
