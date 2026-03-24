@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V86.39)</title>
+    <title>Internship Portfolio (V86.40)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -1061,7 +1061,7 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.39</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.40</span>
                 </h1>
                     <span id="ai-status-badge" onclick="openAIKeysModal()" style="font-size:0.5em; background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:3px; cursor:pointer; margin-left:5px;">
                         <i class="fa-solid fa-key"></i> AI Keys Setup
@@ -2621,7 +2621,8 @@
 
         window.callUniversalAI = async function(modelName, prompt, isJson = false) {
             loadAIKeys(); // Ensure we have latest keys
-            console.log(`🤖 AI Request [${modelName}]: ${prompt.substring(0, 100)}...`);
+            const logPrompt = (typeof prompt === 'string') ? prompt.substring(0, 100) : "[Multimodal Object]";
+            console.log(`🤖 AI Request [${modelName}]: ${logPrompt}...`);
             
             try {
                 let actualModelName = modelName;
@@ -4701,53 +4702,64 @@
         }
 
         async function handleKbFileUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
 
-            const reader = new FileReader();
-            const fileName = file.name;
-            const fileType = file.name.split('.').pop().toLowerCase();
-            const isImage = file.type.startsWith('image/');
+            showToast(`📤 Batch Upload Started: ${files.length} items...`);
 
-            reader.onload = async (e) => {
-                const rawResult = e.target.result;
-                let content = rawResult;
-                
-                try {
-                    showToast("📤 Uploading & Processing...");
-                    
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const reader = new FileReader();
+                const fileName = file.name;
+                const fileType = file.name.split('.').pop().toLowerCase();
+                const isImage = file.type.startsWith('image/');
+
+                // Use Promise to handle loops correctly with FileReader
+                await new Promise((resolve) => {
+                    reader.onload = async (e) => {
+                        const rawResult = e.target.result;
+                        let content = rawResult;
+                        
+                        try {
+                            const progressText = `(${i + 1}/${files.length}) ${fileName}`;
+                            showToast(`⌛ Processing: ${progressText}`);
+                            
+                            if (isImage) {
+                                // Use AI Vision to transcribe image to text for indexing
+                                const visionPrompt = {
+                                    text: "Please transcribe all visible information, text, and data from this image into a detailed and structured text format. If it's a document (like a medication list or report), preserve the layout and columns in text form. If it's a visual, describe it in detail. DO NOT omit any technical data.",
+                                    imageBase64: rawResult
+                                };
+                                const { text: transcription } = await callUniversalAI('multimodal', visionPrompt);
+                                content = transcription; 
+                            }
+
+                            await db.collection("knowledge_base").add({
+                                name: fileName,
+                                type: fileType,
+                                content: content,
+                                isImage: isImage,
+                                charCount: content.length,
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                            showToast(`✅ Indexed: ${fileName}`);
+                        } catch (err) {
+                            console.error("Upload Error for " + fileName, err);
+                            showToast(`❌ Error: ${fileName}`, 'error');
+                        }
+                        resolve();
+                    };
+
                     if (isImage) {
-                        showToast("👁️ AI is transcribing image content...");
-                        // Use AI Vision to transcribe image to text for indexing
-                        const visionPrompt = {
-                            text: "Please transcribe all visible information, text, and data from this image into a detailed and structured text format. If it's a document (like a medication list or report), preserve the layout and columns in text form. If it's a visual, describe it in detail. DO NOT omit any technical data.",
-                            imageBase64: rawResult
-                        };
-                        const { text: transcription } = await callUniversalAI('multimodal', visionPrompt);
-                        content = transcription; 
+                        reader.readAsDataURL(file); 
+                    } else {
+                        reader.readAsText(file);
                     }
-
-                    await db.collection("knowledge_base").add({
-                        name: fileName,
-                        type: fileType,
-                        content: content,
-                        isImage: isImage,
-                        originalUrl: isImage ? null : null, // Future: storage link
-                        charCount: content.length,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    showToast(`✅ ${isImage ? 'Image transcribed & indexed' : 'File added'}!`);
-                    event.target.value = ''; // Reset input
-                } catch (err) {
-                    alert("Upload Error: " + err.message);
-                }
-            };
-
-            if (isImage) {
-                reader.readAsDataURL(file); // For vision API
-            } else {
-                reader.readAsText(file);
+                });
             }
+
+            event.target.value = ''; // Reset input
+            showToast("🏁 All files processed!");
         }
 
         async function deleteKbDoc(id) {
@@ -8513,7 +8525,7 @@
                 <i class="fa-solid fa-cloud-arrow-up" style="font-size:2.5em; color:#bdc3c7; margin-bottom:15px;"></i>
                 <div style="font-weight:bold; color:#2c3e50; margin-bottom:5px;">Drag & Drop documents here</div>
                 <div style="font-size:0.8em; color:#7f8c8d; margin-bottom:15px;">Supports PDF (Metadata) and Plain Text. Max 5MB.</div>
-                <input type="file" id="kb-file-input" style="display:none;" onchange="handleKbFileUpload(event)">
+                <input type="file" id="kb-file-input" style="display:none;" multiple onchange="handleKbFileUpload(event)">
                 <button class="btn-primary" onclick="document.getElementById('kb-file-input').click()" style="padding:10px 25px; border-radius:30px; font-weight:bold;">
                     <i class="fa-solid fa-plus"></i> Select Files
                 </button>
