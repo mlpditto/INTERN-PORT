@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V86.36)</title>
+    <title>Internship Portfolio (V86.38)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -1061,7 +1061,7 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.36</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.38</span>
                 </h1>
                     <span id="ai-status-badge" onclick="openAIKeysModal()" style="font-size:0.5em; background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:3px; cursor:pointer; margin-left:5px;">
                         <i class="fa-solid fa-key"></i> AI Keys Setup
@@ -1481,11 +1481,20 @@
                         </div>
                         <div style="margin-top:20px; padding-top:15px; border-top:1px solid #f1f3f5;">
                             <div style="font-size:0.75em; color:#95a5a6; margin-bottom:10px; font-weight:bold;">AI SETTINGS</div>
-                            <div style="display:flex; flex-direction:column; gap:10px;">
+                            <div style="display:flex; flex-direction:column; gap:12px;">
                                 <label style="display:flex; align-items:center; gap:10px; font-size:0.85em; color:#34495e; cursor:pointer;">
                                     <input type="checkbox" id="research-grounding-toggle" checked style="width:20px; height:20px; accent-color:var(--primary);">
                                     Use Knowledge Base
                                 </label>
+                                
+                                <div style="margin-top:5px;">
+                                    <div style="font-size:0.65em; color:#95a5a6; text-transform:uppercase; font-weight:bold; margin-bottom:8px; letter-spacing:1px;">Select AI Model</div>
+                                    <select id="research-model-select" style="width:100%; padding:8px 12px; border-radius:10px; border:1px solid #ddd; font-size:0.85em; background:white; color:#333; cursor:pointer; outline:none; transition:0.2s;" onchange="showToast('Model switched: ' + this.value)">
+                                        <option value="gemini-1.5-flash" selected>Gemini 1.5 Flash (Fast)</option>
+                                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (Deep Analysis)</option>
+                                        <option value="typhoon-v1.5x-70b-instruct">Typhoon 1.5x (Thai Spec)</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1517,8 +1526,21 @@
                             <i class="fa-solid fa-circle-notch fa-spin"></i> Researching Knowledge Base...
                         </div>
 
+                        <!-- Image Preview Area -->
+                        <div id="research-image-preview-container" style="display:none; padding:10px 25px; border-top:1px solid #eee; background:#fafafa; align-items:center; gap:10px;">
+                            <div style="position:relative;">
+                                <img id="research-image-preview" src="" style="width:60px; height:60px; object-fit:cover; border-radius:8px; border:2px solid var(--primary);">
+                                <button onclick="clearAttachedImage()" style="position:absolute; top:-5px; right:-5px; background:red; color:white; border:none; width:18px; height:18px; border-radius:50%; font-size:10px; cursor:pointer;">✕</button>
+                            </div>
+                            <span style="font-size:0.8em; color:#666;">Image attached. Ask your question below.</span>
+                        </div>
+
                         <div style="padding:20px 25px; background:white; border-top:1px solid #eee;">
                             <div style="display:flex; gap:12px; align-items:center; background:#f4f6f8; padding:8px 15px; border-radius:30px; border:1px solid #e0e6ed;">
+                                <input type="file" id="research-image-input" style="display:none;" accept="image/*" onchange="handleResearchImageAttach(event)">
+                                <button onclick="document.getElementById('research-image-input').click()" style="background:none; border:none; color:#95a5a6; cursor:pointer; font-size:1.2em;" title="Attach Image">
+                                    <i class="fa-solid fa-paperclip"></i>
+                                </button>
                                 <input type="text" id="research-chat-input" placeholder="Type your research question..." 
                                     style="flex:1; background:transparent; border:none; outline:none; padding:10px 5px; font-size:0.95em; color:#2c3e50;"
                                     onkeypress="if(event.key==='Enter') sendResearchQuestion()">
@@ -2630,6 +2652,23 @@
                     updateAIUsage('Gemini', tokens);
                     text = response.text();
                     if (!text) throw new Error("Empty response from Gemini AI");
+                } else if (modelName.includes('multimodal')) {
+                    // 🔥 Multi-modal Support (Image + Text)
+                    if (GEMINI_API_KEY.includes('__')) throw new Error("Please setup Gemini API Key first.");
+                    // prompt: { text, imageBase64 }
+                    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+                    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                    
+                    const parts = [
+                        { text: prompt.text },
+                        { inlineData: { data: prompt.imageBase64.split(',')[1], mimeType: "image/jpeg" } }
+                    ];
+                    
+                    const result = await model.generateContent(parts);
+                    const response = await result.response;
+                    text = response.text();
+                    tokens = response.usageMetadata ? response.usageMetadata.totalTokenCount : 0;
+                    updateAIUsage('Gemini', tokens);
                 } else if (modelName.includes('typhoon')) {
                     if (TYPHOON_API_KEY.includes('__')) throw new Error("Please setup Typhoon API Key in 'AI Keys' menu first.");
                     
@@ -4656,32 +4695,46 @@
             if (!file) return;
 
             const reader = new FileReader();
+            const fileName = file.name;
+            const fileType = file.name.split('.').pop().toLowerCase();
+            const isImage = file.type.startsWith('image/');
+
             reader.onload = async (e) => {
-                const content = e.target.result;
-                const fileName = file.name;
-                const fileType = file.name.split('.').pop().toLowerCase();
+                const rawResult = e.target.result;
+                let content = rawResult;
                 
                 try {
                     showToast("📤 Uploading & Processing...");
+                    
+                    if (isImage) {
+                        showToast("👁️ AI is transcribing image content...");
+                        // Use AI Vision to transcribe image to text for indexing
+                        const visionPrompt = {
+                            text: "Please transcribe all visible information, text, and data from this image into a detailed and structured text format. If it's a document (like a medication list or report), preserve the layout and columns in text form. If it's a visual, describe it in detail. DO NOT omit any technical data.",
+                            imageBase64: rawResult
+                        };
+                        const { text: transcription } = await callUniversalAI('multimodal', visionPrompt);
+                        content = transcription; 
+                    }
+
                     await db.collection("knowledge_base").add({
                         name: fileName,
                         type: fileType,
                         content: content,
+                        isImage: isImage,
+                        originalUrl: isImage ? null : null, // Future: storage link
                         charCount: content.length,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
-                    showToast("✅ Added to Knowledge Base");
+                    showToast(`✅ ${isImage ? 'Image transcribed & indexed' : 'File added'}!`);
                     event.target.value = ''; // Reset input
                 } catch (err) {
                     alert("Upload Error: " + err.message);
                 }
             };
 
-            if (file.type === "application/pdf") {
-                // PDF processing (Simple implementation: just take file name for now as metadata/placeholder)
-                // In a real RAG with PDF, we'd use a PDF parser here.
-                alert("Note: PDF content extraction is limited in this version. Filename will be used for metadata.");
-                reader.readAsText(file); // This might fail for binary PDF but works for OCR/Text PDFs
+            if (isImage) {
+                reader.readAsDataURL(file); // For vision API
             } else {
                 reader.readAsText(file);
             }
@@ -4750,8 +4803,21 @@
                 Keep answers structured, premium, and concise.`;
 
                 const fullPrompt = `${systemPrompt}\n\nUSER QUESTION: ${question}`;
-                const responseObj = await callUniversalAI('gemini-1.5-flash', fullPrompt); 
-                const aiResponse = responseObj.text;
+                const selectedModel = document.getElementById('research-model-select').value;
+                
+                let aiResponse = "";
+                if (window.pendingAttachedImage) {
+                    const visionPrompt = {
+                        text: fullPrompt,
+                        imageBase64: window.pendingAttachedImage
+                    };
+                    const responseObj = await callUniversalAI('multimodal', visionPrompt);
+                    aiResponse = responseObj.text;
+                    window.clearAttachedImage(); // Reset
+                } else {
+                    const responseObj = await callUniversalAI(selectedModel, fullPrompt); 
+                    aiResponse = responseObj.text;
+                }
                 
                 typingEl.style.display = 'none';
                 appendResearchMessage('ai', aiResponse, context ? "Knowledge Base Source Used" : null);
@@ -4824,6 +4890,25 @@
             
             // Track for history (optional)
             researchChatHistory.push({ role, text });
+        }
+
+        window.pendingAttachedImage = null;
+        function handleResearchImageAttach(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                window.pendingAttachedImage = e.target.result;
+                const preview = document.getElementById('research-image-preview');
+                preview.src = e.target.result;
+                preview.parentElement.style.display = 'flex';
+                showToast("📎 Image attached for analysis!");
+            };
+            reader.readAsDataURL(file);
+        }
+        function clearAttachedImage() {
+            window.pendingAttachedImage = null;
+            document.getElementById('research-image-preview-container').style.display = 'none';
         }
 
         async function manualCorrectAns(attemptId, qIndex, isChecked) {
