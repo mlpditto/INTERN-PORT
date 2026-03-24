@@ -1065,7 +1065,7 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.60</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.70</span>
                 </h1>
                     <span id="ai-status-badge" onclick="openAIKeysModal()" style="font-size:0.5em; background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:3px; cursor:pointer; margin-left:5px;">
                         <i class="fa-solid fa-key"></i> AI Keys Setup
@@ -1634,7 +1634,7 @@
                                     <span>Infographic</span>
                                 </div>
                                 <div class="style-option" data-style="japanese manga style, monochrome ink, screentone, professional lineart" onclick="selectDesignStyle(this)">
-                                    <div style="height:50px; background:#eee; border-radius:10px; margin-bottom:5px; background-image:url('https://images.unsplash.com/photo-1578632738908-4521c726eebf?w=100'); background-size:cover;"></div>
+                                    <div style="height:50px; background:#eee; border-radius:10px; margin-bottom:5px; background-image:url('https://images.unsplash.com/photo-1613323593608-abc90fec84ff?w=100'); background-size:cover;"></div>
                                     <span>Manga (B&W)</span>
                                 </div>
                                 <div class="style-option" data-style="high quality anime art, vibrant colors, studio ghibli style, detailed scenery" onclick="selectDesignStyle(this)">
@@ -2999,12 +2999,30 @@
             const previewContainer = document.getElementById('design-preview-container');
             const actions = document.getElementById('design-actions');
 
-            const fullPrompt = `Style: ${style}. Content: ${promptInput.value}`;
-
             if (!promptInput.value.trim()) return alert("Please describe what to generate.");
 
             try {
                 btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Refining...';
+                
+                // Step 1: AI Translation & Enhancement (Refinement)
+                const enhancerPrompt = `You are an expert AI Prompt Engineer.
+                Translate the following user prompt (e.g. from Thai) into professional English and enhance it with artistic details (lighting, composition, mood) suitable for ${engine}.
+                Style: ${style}
+                User Prompt: "${promptInput.value}"
+                
+                OUTPUT ONLY THE ENHANCED ENGLISH PROMPT STRING. NO EXPLANATIONS.`;
+                
+                const { text: enhancedPrompt } = await callUniversalAI('gemini-2.0-flash', enhancerPrompt);
+                
+                // Step 2: Show Confirmation Modal
+                const userConfirmed = confirm("✨ AI has refined your request for better results:\n\n\"" + enhancedPrompt + "\"\n\nGenerate masterpiece image now?");
+                if (!userConfirmed) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Create Masterpiece';
+                    return;
+                }
+
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Manifesting...';
                 previewContainer.innerHTML = `
                     <div class="loader-container" style="text-align:center;">
@@ -3014,7 +3032,7 @@
                     </div>
                 `;
 
-                const { text: imageUrl } = await callUniversalAI(engine, fullPrompt);
+                const { text: imageUrl } = await callUniversalAI(engine, enhancedPrompt);
 
                 previewContainer.innerHTML = `<img src="${imageUrl}" id="generated-image" style="max-width:100%; max-height:100%; border-radius:15px; box-shadow:0 10px 40px rgba(0,0,0,0.15);">`;
                 actions.style.display = "flex";
