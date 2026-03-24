@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V86.35)</title>
+    <title>Internship Portfolio (V86.36)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -1001,6 +1001,8 @@
             pointer-events: none;
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>mermaid.initialize({ startOnLoad: false, theme: 'neutral' });</script>
 </head>
 
 <body>
@@ -1059,7 +1061,8 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.35</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.36</span>
+                </h1>
                     <span id="ai-status-badge" onclick="openAIKeysModal()" style="font-size:0.5em; background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:3px; cursor:pointer; margin-left:5px;">
                         <i class="fa-solid fa-key"></i> AI Keys Setup
                     </span>
@@ -4732,6 +4735,15 @@
                 Answer the user question based on the provided Knowledge Base context. 
                 If the answer is not in the context, say you don't know based on the files provided, but offer general advice.
                 
+                VISUALIZATION SUPPORT:
+                You can generate diagrams/infographics using Mermaid.js syntax. 
+                If the user asks for a chart, flowchart, or visual summary, use a mermaid code block:
+                \`\`\`mermaid
+                graph TD
+                A[Start] --> B[Process]
+                \`\`\`
+                Supported: graph, pie, gantt, sequenceDiagram, etc.
+                
                 RESEARCH CONTEXT:
                 ${context || "No context provided/Use general knowledge."}
                 
@@ -4778,9 +4790,33 @@
                 
                 let sourceBadge = sourceLabel ? `<div style="font-size:0.65em; color:var(--primary); background:#ebf0ff; display:inline-block; padding:2px 8px; border-radius:10px; margin-bottom:8px; font-weight:bold;"><i class="fa-solid fa-shield-check"></i> ${sourceLabel}</div>` : '';
                 
-                // Simple Markdown Support
-                const formattedText = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
-                msgDiv.innerHTML = `${sourceBadge}<div style="line-height:1.6;">${formattedText}</div>`;
+                // --- 🔥 V86.36: Advanced Rendering (Markdown + Mermaid) ---
+                let html = text;
+                
+                // 1. Detect Mermaid Blocks
+                const mermaidRegex = /```mermaid([\s\S]*?)```/g;
+                let match;
+                while ((match = mermaidRegex.exec(text)) !== null) {
+                    const mermaidCode = match[1].trim();
+                    const chartId = `mermaid-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                    html = html.replace(match[0], `<div class="mermaid-container" style="margin:15px 0; background:#f8f9fa; padding:10px; border-radius:12px; border:1px solid #eee; overflow-x:auto;"><div class="mermaid" id="${chartId}">${mermaidCode}</div></div>`);
+                    
+                    // Render later
+                    setTimeout(async () => {
+                        try {
+                            const { svg } = await mermaid.render(`${chartId}-svg`, mermaidCode);
+                            document.getElementById(chartId).innerHTML = svg;
+                        } catch (err) {
+                            console.error("Mermaid Render Error:", err);
+                            document.getElementById(chartId).innerHTML = `<div style="color:red; font-size:0.8em;"><i class="fa-solid fa-triangle-exclamation"></i> Error rendering chart.</div>`;
+                        }
+                    }, 100);
+                }
+
+                // 2. Simple Markdown Support (Bold and Newlines)
+                html = html.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+                
+                msgDiv.innerHTML = `${sourceBadge}<div style="line-height:1.6;">${html}</div>`;
             }
             
             historyEl.appendChild(msgDiv);
