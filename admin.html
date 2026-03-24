@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V86.46)</title>
+    <title>Internship Portfolio (V86.47)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -1065,7 +1065,7 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.46</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.47</span>
                 </h1>
                     <span id="ai-status-badge" onclick="openAIKeysModal()" style="font-size:0.5em; background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:3px; cursor:pointer; margin-left:5px;">
                         <i class="fa-solid fa-key"></i> AI Keys Setup
@@ -4674,9 +4674,32 @@
         let knowledgeBaseCache = [];
         let researchChatHistory = [];
 
-        function loadKnowledgeBase() {
-            // Already handled by onSnapshot in loadData()
-            renderKnowledgeBase();
+        async function initResearchTab() {
+            loadKbDocs();
+            await loadResearchHistory(); // V86.47
+        }
+
+        async function loadResearchHistory() {
+            try {
+                const historyEl = document.getElementById('research-chat-history');
+                const snapshot = await db.collection("research_chat")
+                                         .orderBy("createdAt", "desc")
+                                         .limit(20)
+                                         .get();
+                
+                if (snapshot.empty) return;
+                
+                historyEl.innerHTML = ""; // Clear loader
+                // Documents to array then reverse to get asc display
+                const docs = snapshot.docs.reverse();
+                docs.forEach(doc => {
+                    const data = doc.data();
+                    appendResearchMessageLocalOnly(data.role, data.text, data.sourceLabel);
+                });
+                historyEl.scrollTop = historyEl.scrollHeight;
+            } catch (err) {
+                console.error("History load error:", err);
+            }
         }
 
         function renderKnowledgeBase() {
@@ -4989,8 +5012,55 @@
             historyEl.appendChild(msgDiv);
             historyEl.scrollTop = historyEl.scrollHeight;
             
-            // Track for history (optional)
+            // Sync to Firestore (V86.47)
+            db.collection("research_chat").add({
+                role: role,
+                text: text,
+                sourceLabel: sourceLabel || null,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
             researchChatHistory.push({ role, text });
+        }
+
+        function appendResearchMessageLocalOnly(role, text, sourceLabel) {
+            const historyEl = document.getElementById('research-chat-history');
+            const msgDiv = document.createElement('div');
+            
+            if (role === 'user') {
+                msgDiv.style = "align-self: flex-end; max-width: 80%; background:var(--primary); color:white; padding:12px 18px; border-radius:20px 20px 5px 20px; box-shadow:0 4px 10px rgba(67, 97, 238, 0.2); margin-top:10px;";
+                msgDiv.innerHTML = text;
+            } else {
+                msgDiv.style = "align-self: flex-start; max-width: 85%; background:white; color:#2c3e50; padding:15px 20px; border-radius:20px 20px 20px 5px; border:1px solid #f1f3f5; box-shadow:0 2px 10px rgba(0,0,0,0.02); position:relative; margin-top:10px;";
+                let sourceBadge = sourceLabel ? `<div style="font-size:0.65em; color:var(--primary); background:#ebf0ff; display:inline-block; padding:2px 8px; border-radius:10px; margin-bottom:8px; font-weight:bold;"><i class="fa-solid fa-shield-check"></i> ${sourceLabel}</div>` : '';
+                
+                let html = text;
+                const mermaidRegex = /```mermaid([\s\S]*?)```/g;
+                let match;
+                while ((match = mermaidRegex.exec(text)) !== null) {
+                    const mermaidCode = match[1].trim();
+                    const chartId = `mermaid-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                    const replacement = `
+                        <div class="mermaid-block" style="margin:15px 0; background:#fdfdfd; padding:15px; border-radius:15px; border:1px solid #eee; position:relative;">
+                            <div style="position:absolute; top:10px; right:10px; z-index:10; display:flex; gap:5px;">
+                                <button onclick="downloadMermaidSvg('${chartId}')" style="background:white; border:1px solid #ddd; width:28px; height:28px; border-radius:6px; cursor:pointer; color:#666;"><i class="fa-solid fa-download"></i></button>
+                                <button onclick="zoomMermaid('${chartId}')" style="background:white; border:1px solid #ddd; width:28px; height:28px; border-radius:6px; cursor:pointer; color:#666;"><i class="fa-solid fa-maximize"></i></button>
+                            </div>
+                            <div id="${chartId}" onclick="zoomMermaid('${chartId}')">${mermaidCode}</div>
+                        </div>
+                    `;
+                    html = html.replace(match[0], replacement);
+                    setTimeout(async () => {
+                        try {
+                            const { svg } = await mermaid.render(`${chartId}-svg`, mermaidCode);
+                            document.getElementById(chartId).innerHTML = svg;
+                        } catch (err) { console.error(err); }
+                    }, 100);
+                }
+                html = html.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+                msgDiv.innerHTML = `${sourceBadge}<div style="line-height:1.6;">${html}</div>`;
+            }
+            historyEl.appendChild(msgDiv);
         }
 
         window.pendingAttachedImage = null;
