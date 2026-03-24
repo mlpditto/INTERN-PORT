@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V86.16)</title>
+    <title>Internship Portfolio (V86.33)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -1059,12 +1059,12 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.29</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.33</span>
                     <span id="ai-status-badge" onclick="openAIKeysModal()" style="font-size:0.5em; background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:3px; cursor:pointer; margin-left:5px;">
                         <i class="fa-solid fa-key"></i> AI Keys Setup
                     </span>
-                    <span style="font-size:0.5em; background:#4b6584; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:5px;" title="AI Usage Today">
-                        <i class="fa-solid fa-bolt"></i> AI: <b class="ai-usage-count">0</b>
+                    <span id="ai-token-usage-badge" style="font-size:0.5em; background:#4b6584; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:5px;" title="AI Usage Today">
+                        <i class="fa-solid fa-bolt"></i> <span id="ai-usage-breakdown">AI: 0</span>
                     </span>
                 </h1>
                 <span id="admin-email" style="font-size:0.85em; color:var(--text-sub); border-left:1px solid #ddd; padding-left:15px; margin-left:5px;"></span>
@@ -2141,6 +2141,25 @@
             </div>
         </div>
 
+        <!-- Quiz Discussion Modal (V86.29) -->
+        <div id="quizDiscussionModal" class="modal" style="z-index: 2500;">
+            <div class="modal-content" style="max-width: 800px; border-top: 5px solid #8e44ad;">
+                <span class="close-modal"
+                    onclick="document.getElementById('quizDiscussionModal').style.display='none'">&times;</span>
+                <h3 style="margin-top:0; display:flex; align-items:center; gap:10px; color:#8e44ad;">
+                    <i class="fa-solid fa-comments"></i> Quiz Discussion Feed
+                </h3>
+                <div id="quiz-discussion-info" style="color:#666; font-size:0.9em; margin-bottom:20px;"></div>
+                <div id="quiz-discussion-container" style="max-height: 500px; overflow-y: auto; padding: 10px; background: #f8f9fa; border-radius: 12px; border: 1px solid #eee;">
+                    <!-- Comments injected here -->
+                </div>
+                <div style="text-align:right; margin-top:20px;">
+                    <button class="btn-sm btn-dark"
+                        onclick="document.getElementById('quizDiscussionModal').style.display='none'">Close</button>
+                </div>
+            </div>
+        </div>
+
         <div id="quizParticipantsModal" class="modal">
             <div class="modal-content" style="max-width: 1000px;">
                 <span class="close-modal"
@@ -2373,16 +2392,26 @@
             const count = usage.date === today ? (usage.count || 0) : 0;
 
             const usageList = document.getElementById('usage-list');
-            if (usageList) {
-                if (usage.date !== today || !usage.totals || Object.keys(usage.totals).length === 0) {
-                    usageList.innerHTML = "No usage recorded today.";
-                } else {
-                    let html = "";
-                    for (const [provider, total] of Object.entries(usage.totals)) {
-                        html += `<div style="display:flex; justify-content:space-between; margin-bottom:2px;"><span>${provider}:</span> <b>${total.toLocaleString()} tokens</b></div>`;
-                    }
-                    usageList.innerHTML = html;
+            const badgeBreakdown = document.getElementById('ai-usage-breakdown');
+
+            if (usage.date !== today || !usage.totals || Object.keys(usage.totals).length === 0) {
+                if (usageList) usageList.innerHTML = "No usage recorded today.";
+                if (badgeBreakdown) badgeBreakdown.innerHTML = "AI: 0";
+            } else {
+                let listHtml = "";
+                let badgeStr = "";
+                
+                // Providers: Gemini, OpenAI, Typhoon
+                for (const [provider, total] of Object.entries(usage.totals)) {
+                    listHtml += `<div style="display:flex; justify-content:space-between; margin-bottom:2px;"><span>${provider}:</span> <b>${total.toLocaleString()} tokens</b></div>`;
+                    
+                    const shortName = provider.substring(0, 1).toUpperCase(); // G, O, T
+                    const kVal = total >= 1000 ? (total/1000).toFixed(1) + 'k' : total;
+                    badgeStr += (badgeStr ? ' ' : '') + `${shortName}:${kVal}`;
                 }
+                
+                if (usageList) usageList.innerHTML = listHtml;
+                if (badgeBreakdown) badgeBreakdown.innerHTML = badgeStr;
             }
             return count;
         };
@@ -2443,12 +2472,17 @@
                 Focus on identifying questions that are too similar or test the same concept repeatedly. 
                 Suggest improvements or how to diversify the questions to cover broader topics.
                 
+                Also, based on the content of these questions, suggest:
+                - A professional Full Title (Thai/English)
+                - A catchy Short Title (max 40 chars)
+                
                 Questions list:
                 ${qList}
                 
-                Output as a clear summary in Thai. Use bullet points. Keep it professional.`;
+                Output as a clear summary in Thai. Use bullet points. Keep it professional.
+                Include the suggested titles at the top under "### 🎯 Suggested Titles".`;
                 
-                const analysis = await callUniversalAI('gemini-flash-latest', prompt);
+                const { text: analysis, tokens: aiTokens, model: aiModel } = await callUniversalAI('gemini-pro-latest', prompt);
                 
                 // Show in a styled popup
                 const resultDiv = document.createElement('div');
@@ -2461,6 +2495,10 @@
                     <div style="white-space:pre-wrap; line-height:1.6; color:#444;">${analysis}</div>
                     <div style="margin-top:25px; text-align:center;">
                         <button class="btn-primary" onclick="this.parentElement.parentElement.remove()" style="padding:10px 30px; border-radius:12px;">Understood</button>
+                    </div>
+                    <div style="margin-top:15px; padding-top:10px; border-top:1px solid #eee; font-size:0.75em; color:#999; display:flex; justify-content:space-between; align-items:center;">
+                        <span><i class="fa-solid fa-microchip"></i> Model: <b>${aiModel}</b></span>
+                        <span><i class="fa-solid fa-coins"></i> Tokens: <b>${aiTokens.toLocaleString()}</b></span>
                     </div>
                 `;
                 document.body.appendChild(resultDiv);
@@ -2478,16 +2516,19 @@
             console.log(`🤖 AI Request [${modelName}]: ${prompt.substring(0, 100)}...`);
             
             try {
+                let actualModelName = modelName;
+                let tokens = 0;
+                let text = "";
+
                 if (modelName.includes('gemini')) {
                     if (GEMINI_API_KEY.includes('__')) throw new Error("Please setup Gemini API Key in 'AI Keys' menu first.");
                     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
                     
-                    // 🔥 Fixed V86.22: Mapping to your specific available models
-                    let actualModelName = "gemini-flash-latest"; 
                     if (modelName.includes('pro')) actualModelName = "gemini-pro-latest";
                     else if (modelName.includes('2.5')) actualModelName = "gemini-2.5-flash"; 
                     else if (modelName.includes('2.0')) actualModelName = "gemini-2.0-flash";
                     else if (modelName.includes('flash')) actualModelName = "gemini-flash-latest";
+                    else actualModelName = "gemini-flash-latest";
 
                     let model = genAI.getGenerativeModel({ model: actualModelName });
                     let result;
@@ -2495,15 +2536,15 @@
                         result = await model.generateContent(prompt);
                     } catch (e) {
                         console.warn("AI Generation failed, trying fallback to gemini-flash-latest", e);
-                        model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+                        actualModelName = "gemini-flash-latest";
+                        model = genAI.getGenerativeModel({ model: actualModelName });
                         result = await model.generateContent(prompt);
                     }
                     const response = await result.response;
-                    const tokens = response.usageMetadata ? response.usageMetadata.totalTokenCount : 0;
+                    tokens = response.usageMetadata ? response.usageMetadata.totalTokenCount : 0;
                     updateAIUsage('Gemini', tokens);
-                    const text = response.text();
+                    text = response.text();
                     if (!text) throw new Error("Empty response from Gemini AI");
-                    return text.trim();
                 } else if (modelName.includes('typhoon')) {
                     if (TYPHOON_API_KEY.includes('__')) throw new Error("Please setup Typhoon API Key in 'AI Keys' menu first.");
                     
@@ -2516,7 +2557,6 @@
                                 messages: [{ role: 'user', content: prompt }],
                                 temperature: 0.6,
                                 max_tokens: 2000
-                                // Removed response_format strictly for Typhoon to avoid 400 errors
                             })
                         });
                         const data = await response.json();
@@ -2529,12 +2569,13 @@
                         data = await callTyphoon(modelName);
                     } catch (e) {
                         console.warn("Typhoon primary failed, trying fallback to v1.5-instruct", e);
-                        data = await callTyphoon("typhoon-v1.5-instruct");
+                        actualModelName = "typhoon-v1.5-instruct";
+                        data = await callTyphoon(actualModelName);
                     }
                     
-                    const tokens = data.usage ? data.usage.total_tokens : 0;
+                    tokens = data.usage ? data.usage.total_tokens : 0;
                     updateAIUsage('Typhoon', tokens);
-                    return data.choices[0].message.content.trim();
+                    text = data.choices[0].message.content.trim();
                 } else if (modelName.includes('gpt')) {
                     if (OPENAI_API_KEY.includes('__')) throw new Error("Please setup OpenAI API Key in 'AI Keys' menu first.");
                     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -2556,11 +2597,15 @@
                         const errMsg = data.error?.message || `OpenAI Error ${response.status}`;
                         throw new Error(errMsg);
                     }
-                    const tokens = data.usage ? data.usage.total_tokens : 0;
+                    tokens = data.usage ? data.usage.total_tokens : 0;
                     updateAIUsage('OpenAI', tokens);
-                    return data.choices[0].message.content.trim();
+                    text = data.choices[0].message.content.trim();
+                    actualModelName = modelName;
+                } else {
+                    throw new Error("Unknown AI Model Provider selected.");
                 }
-                throw new Error("Unknown AI Model Provider selected.");
+                
+                return { text: text.trim(), tokens, model: actualModelName };
             } catch (err) {
                 console.error("callUniversalAI Error:", err);
                 throw err;
@@ -2591,7 +2636,7 @@
                 Keep it friendly but professional. Response must be in "${targetLang}" only. 
                 Do not include any explanation other than the feedback body.`;
                 
-                const text = await window.callUniversalAI(selectedModelName, prompt);
+                const { text } = await window.callUniversalAI(selectedModelName, prompt);
                 
                 textarea.value = text;
                 showToast("✨ AI suggested feedback!");
@@ -2646,7 +2691,7 @@
                 }
                 If the order of options changes, make sure "correctIndices" points at the ${targetLang} translated version of the original correct answers.`;
                 
-                const aiResponse = await window.callUniversalAI(selectedModelName, prompt, true);
+                const { text: aiResponse } = await window.callUniversalAI(selectedModelName, prompt, true);
                 
                 // Robust parsing for JSON
                 let cleanJson = aiResponse.trim();
@@ -4352,13 +4397,14 @@
 
             // 🔥 V80: Read-only Review Display
             if (quiz.quizType === 'read_only') {
-                const feedback = (att.answers || [])[0] || 'No feedback provided.';
+                const rawFeedback = (att.answers || [])[att.answers.length - 1] || 'No feedback provided.';
+                const feedbackText = Array.isArray(rawFeedback) ? rawFeedback.join("\n---\n") : rawFeedback;
                 container.innerHTML = `
                     <div style="background:#f0f7ff; border:1px solid #4361ee; padding:20px; border-radius:15px; border-left:8px solid #4361ee; margin-bottom:20px;">
                         <b style="font-size:1.1em; color:#0d47a1; display:flex; align-items:center; gap:8px;">
                             <i class="fa-solid fa-book-open"></i> Read-only Feedback / Reflection
                         </b>
-                        <div style="margin-top:15px; background:#fff; padding:15px; border-radius:10px; border:1px solid #eee; white-space:pre-wrap; font-size:1.05em; color:#333; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02); min-height:80px;">${feedback}</div>
+                        <div style="margin-top:15px; background:#fff; padding:15px; border-radius:10px; border:1px solid #eee; white-space:pre-wrap; font-size:1.05em; color:#333; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02); min-height:80px;">${feedbackText}</div>
                         <div style="margin-top:15px; color:#666; font-size:0.85em; font-style:italic;">
                             * The text above is what you learned/summarized after reading. (System will approve full points upon approval).
                         </div>
@@ -4525,6 +4571,84 @@
                 console.error(e);
                 alert(e.message);
             }
+        }
+
+        async function showQuizDiscussions(quizId) {
+            const quiz = quizzesData.find(x => x.id === quizId);
+            if (!quiz) return;
+
+            document.getElementById('quizDiscussionModal').style.display = 'block';
+            const container = document.getElementById('quiz-discussion-container');
+            const info = document.getElementById('quiz-discussion-info');
+            container.innerHTML = "<p style='text-align:center; padding:20px;'><i class='fa-solid fa-spinner fa-spin'></i> Scanning for discussions...</p>";
+            info.innerText = `Quiz: ${quiz.title}`;
+
+            try {
+                const discussionCount = (quiz.questions || []).length;
+                let allComments = [];
+
+                const fetchPromises = [];
+                for (let i = 0; i < discussionCount; i++) {
+                    const dId = `${quizId}_${i}`;
+                    fetchPromises.push(
+                        db.collection("quiz_discussions").doc(dId).collection("comments").get()
+                            .then(snap => snap.docs.map(doc => ({ 
+                                ...doc.data(), 
+                                stepIndex: i, 
+                                id: doc.id,
+                                discussionId: dId
+                            })))
+                    );
+                }
+
+                const results = await Promise.all(fetchPromises);
+                allComments = results.flat().sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+                if (allComments.length === 0) {
+                    container.innerHTML = "<p style='text-align:center; padding:50px; color:#999;'>No user discussion or feedback found for this quiz.</p>";
+                    return;
+                }
+
+                container.innerHTML = "";
+                allComments.forEach(c => {
+                    const time = c.createdAt ? c.createdAt.toDate().toLocaleString('th-TH', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : "...";
+                    const stepLabel = quiz.quizType === 'read_only' ? `Page ${c.stepIndex + 1}` : `Question ${c.stepIndex + 1}`;
+                    const qText = quiz.questions[c.stepIndex]?.q || '-';
+
+                    const div = document.createElement('div');
+                    div.style = "background:white; border:1px solid #eee; border-radius:12px; padding:15px; margin-bottom:12px; box-shadow:0 2px 5px rgba(0,0,0,0.02);";
+                    div.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px; border-bottom:1px dashed #eee; padding-bottom:8px;">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <img src="${c.pictureUrl}" style="width:32px; height:32px; border-radius:50%; border:2px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                                <div>
+                                    <div style="font-weight:bold; font-size:0.95em;">${c.displayName} <span style="font-weight:normal; color:#999; font-size:0.8em;">to ${stepLabel}</span></div>
+                                    <div style="font-size:0.7em; color:#8e44ad; font-weight:bold;">${qText}</div>
+                                </div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="font-size:0.75em; color:#999;">${time}</div>
+                                <button onclick="deleteDiscussionComment('${c.discussionId}', '${c.id}', '${quizId}')" style="background:none; border:none; color:#ff7675; cursor:pointer; font-size:0.8em; padding:0; margin-top:4px;">Delete</button>
+                            </div>
+                        </div>
+                        <div style="font-size:0.95em; line-height:1.5; color:#333; white-space:pre-wrap;">${c.text}</div>
+                    `;
+                    container.appendChild(div);
+                });
+
+            } catch (e) {
+                console.error("Show Discussion Error:", e);
+                container.innerHTML = `<p style="color:red; text-align:center; padding:20px;">Error loading feedback: ${e.message}</p>`;
+            }
+        }
+
+        async function deleteDiscussionComment(discussionId, commentId, quizId) {
+            if (!confirm("Delete this comment permanently?")) return;
+            try {
+                await db.collection("quiz_discussions").doc(discussionId).collection("comments").doc(commentId).delete();
+                showToast("Feedback Deleted");
+                showQuizDiscussions(quizId);
+            } catch (e) { alert(e.message); }
         }
 
         async function approveQuiz(attemptId, uid, score) {
@@ -4759,6 +4883,7 @@
                                 <button class="btn-sm" style="background:#009688; color:white; padding:2px 6px;" onclick="duplicateQuiz('${q.id}')" title="Copy"><i class="fa-solid fa-copy"></i></button>
                                 <button class="btn-sm" style="background:#2e7d32; color:white; padding:2px 6px;" onclick="openHomeworkAssignModal('${q.id}')" title="Homework"><i class="fa-solid fa-book"></i></button>
                                 ${(q.isPoll || hasWriting) ? `<button class="btn-sm" style="background:#8e44ad; color:white; padding:2px 6px;" onclick="showPollResults('${q.id}')" title="Result">📊</button>` : ''}
+                                <button class="btn-sm" style="background:#8e44ad; color:white; padding:2px 6px;" onclick="showQuizDiscussions('${q.id}')" title="Discussion">💬</button>
                                 ${(!isActiveSection) ? `<button class="btn-sm btn-warning" style="padding:2px 6px; font-size:0.75em;" onclick="repostQuiz('${q.id}')">♻️</button>` : ''}
                                 <button class="btn-sm btn-danger" style="padding:2px 6px;" onclick="deleteQuiz('${q.id}')">Del</button>
                             </div>
