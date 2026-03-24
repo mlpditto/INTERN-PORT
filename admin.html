@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V86.45)</title>
+    <title>Internship Portfolio (V86.46)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -1065,7 +1065,7 @@
             <div style="display:flex; align-items:center; gap:15px;">
                 <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px;">
                     🚀 Intern Admin Portal
-                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.45</span>
+                    <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.46</span>
                 </h1>
                     <span id="ai-status-badge" onclick="openAIKeysModal()" style="font-size:0.5em; background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; display:flex; align-items:center; gap:3px; cursor:pointer; margin-left:5px;">
                         <i class="fa-solid fa-key"></i> AI Keys Setup
@@ -4838,35 +4838,32 @@
             chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
 
             try {
-                let context = "";
+                let sourceText = "No context provided/Use general knowledge.";
+                let hasContext = false;
                 if (useGrounding && knowledgeBaseCache.length > 0) {
-                    // Simple Semantic Search (Keyword based for now)
-                    context = queryKnowledgeBaseLocal(question);
+                    sourceText = queryKnowledgeBaseLocal(question);
+                    hasContext = true;
                 }
 
-                const systemPrompt = `You are a Research Assistant for an Internship Management System. 
-                Answer the user question based on the provided Knowledge Base context. 
-                If the answer is not in the context, say you don't know based on the files provided, but offer general advice.
+                const systemPrompt = `You are the MedLifePlus Research Assistant. 
+                Your goal is to provide medical-grade, structured, and visually stunning information.
                 
-                VISUALIZATION SUPPORT:
-                You can generate diagrams/infographics using Mermaid.js syntax. 
-                If the user asks for a chart, flowchart, or visual summary, use a mermaid code block:
-                \`\`\`mermaid
-                graph TD
-                A[Start] --> B[Process]
-                \`\`\`
-                Supported: graph, pie, gantt, sequenceDiagram, etc.
+                VISUAL PRESENTATION RULES (IMPORTANT):
+                1. If requested to make a visual/infographic, ALWAYS use Mermaid.js.
+                2. Use the 'Premium Infographic' style for Mermaid:
+                   - Use high-contrast colors (e.g., #4361ee, #f72585, #4cc9f0, #fb5607).
+                   - Use 'subgraph' to group related categories.
+                   - Use Emoji icons in node labels (e.g., "💊 Medication A").
+                   - Apply 'style' commands (e.g. style NODE_ID fill:#COLOR,stroke:#333) to make it beautiful.
+                3. Keep answers structured with Bold headings and clean bullet points.
                 
-                RESEARCH CONTEXT:
-                ${context || "No context provided/Use general knowledge."}
-                
-                Keep answers structured, premium, and concise.`;
+                RESOURCES: ${sourceText}`;
 
                 let aiResponse = "";
                 
                 if (window.pendingAttachedImage) {
                     const visionPrompt = {
-                        text: systemPrompt + "\n\nUser: " + question, // Combine system prompt and user question
+                        text: systemPrompt + "\n\nUser Question: " + question,
                         imageBase64: window.pendingAttachedImage
                     };
                     const responseObj = await callUniversalAI('multimodal', visionPrompt);
@@ -4879,10 +4876,11 @@
                 }
                 
                 typingEl.style.display = 'none';
-                appendResearchMessage('ai', aiResponse, context ? "Knowledge Base Source Used" : null);
+                appendResearchMessage('ai', aiResponse, hasContext ? "Knowledge Base Source Used" : null);
                 
             } catch (err) {
                 typingEl.style.display = 'none';
+                console.error("Research Error:", err);
                 appendResearchMessage('ai', "❌ Error processing research: " + err.message);
             }
         }
@@ -4956,6 +4954,36 @@
                 html = html.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
                 
                 msgDiv.innerHTML = `${sourceBadge}<div style="line-height:1.6;">${html}</div>`;
+                
+                // --- 🎨 Artistic Mode Button (V86.46) ---
+                if (html.length > 300 && !html.includes('dall-e-image')) {
+                    const creativeBtn = document.createElement('button');
+                    creativeBtn.className = 'btn-sm';
+                    creativeBtn.style = "margin-top:10px; background:#f72585; color:white; border:none; border-radius:20px; font-size:0.7em; padding:5px 15px; cursor:pointer;";
+                    creativeBtn.innerHTML = `<i class="fa-solid fa-palette"></i> Generate Artistic Infographic (DALL-E 3)`;
+                    creativeBtn.onclick = async () => {
+                        creativeBtn.disabled = true;
+                        creativeBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Designing Artistic Image...`;
+                        try {
+                            const dallePrompt = `A high-quality, professional medical infographic about: ${question.substring(0, 100)}. Style is minimalist, clean, 3D medical style, stunning visual, 4k resolution. Content from prompt: ${text.substring(0, 500)}. No misspelling.`;
+                            const imgUrl = await window.callUniversalAI('dalle', dallePrompt);
+                            const imgContainer = document.createElement('div');
+                            imgContainer.className = 'dall-e-image';
+                            imgContainer.style = "margin-top:15px; text-align:center;";
+                            imgContainer.innerHTML = `
+                                <img src="${imgUrl}" style="width:100%; border-radius:15px; box-shadow:0 10px 30px rgba(0,0,0,0.1); cursor:zoom-in;" onclick="window.open('${imgUrl}', '_blank')">
+                                <p style="font-size:0.7em; color:#888; margin-top:5px;">AI-Generated Artistic Concept Art (Click to view full size)</p>
+                            `;
+                            msgDiv.appendChild(imgContainer);
+                            creativeBtn.style.display = 'none';
+                        } catch (err) {
+                            showToast("Creative Error: " + err.message);
+                            creativeBtn.disabled = false;
+                            creativeBtn.innerHTML = `<i class="fa-solid fa-palette"></i> Retry Creative Gen`;
+                        }
+                    };
+                    msgDiv.appendChild(creativeBtn);
+                }
             }
             
             historyEl.appendChild(msgDiv);
