@@ -89,8 +89,18 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["OPENAI_API_KEY", "GEMIN
             const apiKey = process.env.GEMINI_API_KEY;
             const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
             
+            const parts = [{ text: prompt }];
+            if (req.body.visionData) {
+                parts.push({
+                    inlineData: {
+                        mimeType: req.body.visionData.image_mimetype || "image/png",
+                        data: req.body.visionData.image_base64
+                    }
+                });
+            }
+
             const response = await axios.post(endpoint, {
-                contents: [{ parts: [{ text: prompt }] }],
+                contents: [{ parts: parts }],
                 generationConfig: isJson ? { responseMimeType: "application/json" } : {}
             });
 
