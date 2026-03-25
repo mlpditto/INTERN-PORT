@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V87.12)</title>
+    <title>Internship Portfolio (V87.16)</title>
     <!-- V87.12: Quiz Editor UI (Blended Toolkit) -->
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -944,10 +944,17 @@
         }
 
         .glass-toggle-item.active {
-            background: white;
-            color: var(--primary);
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-            border: 1px solid rgba(67, 97, 238, 0.1);
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(67, 97, 238, 0.25);
+            border: 1.5px solid var(--primary);
+            transform: translateY(-1px);
+        }
+
+        .ai-analyzer-model .glass-toggle-item.active {
+            background: #8e44ad !important;
+            border-color: #8e44ad !important;
+            box-shadow: 0 4px 12px rgba(142, 68, 173, 0.25);
         }
 
         body.dark-mode .glass-toggle-container {
@@ -2208,58 +2215,65 @@
                         users</div>
                 </div>
                 <hr>
-                <div style="background:var(--bg-card); border:1.5px solid var(--border-color); border-radius:20px; padding:15px 20px; margin-top:20px; margin-bottom:20px; box-shadow:0 10px 40px rgba(0,0,0,0.03); display:flex; align-items:center; flex-wrap:wrap; gap:12px;">
-                    <!-- Title & Count -->
-                    <h3 style="margin:0; font-size:1.2em; display:flex; align-items:center; gap:8px; color:var(--text-main); margin-right:10px; white-space:nowrap;">
-                        <i class="fa-solid fa-list-ol" style="color:var(--primary);"></i> Questions ( <span id="quiz-q-counter">0</span> )
-                    </h3>
+                <div style="background:var(--bg-card); border:1.5px solid var(--border-color); border-radius:20px; padding:12px 20px; margin-top:20px; margin-bottom:20px; box-shadow:0 10px 40px rgba(0,0,0,0.03); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:20px;">
                     
-                    <!-- Timer Configuration -->
-                    <div style="display:flex; align-items:center; gap:10px; background:rgba(255,193,7,0.08); padding:5px 12px; border-radius:15px; border:1px solid rgba(255,193,7,0.15);">
-                        <label style="font-size:0.85em; font-weight:bold; color:#856404; display:flex; align-items:center; gap:5px; margin:0;">
-                            <i class="fa-solid fa-stopwatch"></i> Timer Mode:
-                        </label>
-                        <select id="quiz-timer-mode" onchange="toggleTimerModeUI()" style="font-size:0.85em; padding:3px 8px; border-radius:8px; border:1px solid #ddd; background:#fff; width:auto; margin:0;">
-                            <option value="per_question">⏳ Per Question</option>
-                            <option value="total_time">🏁 Overall Quiz</option>
-                        </select>
-                        <div id="timer-perq-area" style="display:flex; align-items:center; gap:5px;">
-                            <input type="number" id="quiz-set-all-timer" value="60" style="width:50px; padding:3px; border-radius:8px; border:1px solid #ddd; font-weight:bold; text-align:center; margin:0; font-size:0.85em;">
-                            <button class="btn-sm" onclick="setAllQuestionTimers()" style="background:#f39c12; color:white; border:none; padding:4px 10px; border-radius:10px; font-weight:bold; font-size:0.75em;">Apply</button>
+                    <!-- Group 1: Question Core & Navigation (V87.16) -->
+                    <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
+                        <!-- Title & Count -->
+                        <h3 style="margin:0; font-size:1.15em; display:flex; align-items:center; gap:8px; color:var(--text-main); white-space:nowrap;">
+                            <i class="fa-solid fa-list-ol" style="color:var(--primary);"></i> Questions ( <span id="quiz-q-counter">0</span> )
+                        </h3>
+
+                        <div style="width:2px; height:24px; background:rgba(0,0,0,0.05);"></div>
+
+                        <!-- Actions -->
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <button class="btn-sm btn-dark" onclick="addQuestionUI()" title="Add New Question" style="width:34px; height:34px; padding:0; border-radius:10px; font-size:1.1em; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 10px rgba(0,0,0,0.1);"><i class="fa-solid fa-plus"></i></button>
+                            <button class="btn-sm" onclick="openImportQuizModal()" title="Import Quiz" style="width:34px; height:34px; padding:0; border-radius:10px; background:#2196f3; color:white; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 10px rgba(33,150,243,0.3);"><i class="fa-solid fa-file-import"></i></button>
                         </div>
-                        <div id="timer-total-area" style="display:none; align-items:center; gap:5px;">
-                            <input type="number" id="quiz-total-timer" value="300" style="width:65px; padding:3px; border-radius:8px; border:1px solid #ddd; font-weight:bold; text-align:center; margin:0; font-size:0.85em;">
+
+                        <!-- Pagination Navigation -->
+                        <div id="quiz-pagination-controls" style="display:flex; gap:6px; align-items:center; padding:4px; background:rgba(0,0,0,0.03); border-radius:12px;">
+                            <button class="btn-sm" onclick="moveQuizQ(-1)" title="Previous" style="width:32px; height:32px; border-radius:50%; background:#fff; color:#333; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.05);"><i class="fa-solid fa-chevron-left"></i></button>
+                            <div id="quiz-q-nav" style="display:flex; gap:4px; align-items:center;"></div>
+                            <button class="btn-sm" onclick="moveQuizQ(1)" title="Next" style="width:32px; height:32px; border-radius:50%; background:#fff; color:#333; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.05);"><i class="fa-solid fa-chevron-right"></i></button>
+                        </div>
+
+                        <div style="width:2px; height:24px; background:rgba(0,0,0,0.05);"></div>
+
+                        <!-- Timer Configuration -->
+                        <div style="display:flex; align-items:center; gap:10px; background:rgba(255,193,7,0.08); padding:5px 12px; border-radius:15px; border:1px solid rgba(255,193,7,0.15);">
+                            <label style="font-size:0.8em; font-weight:800; color:#856404; display:flex; align-items:center; gap:5px; margin:0; text-transform:uppercase; letter-spacing:0.5px;">
+                                <i class="fa-solid fa-stopwatch"></i> Timer Mode
+                            </label>
+                            <select id="quiz-timer-mode" onchange="toggleTimerModeUI()" style="font-size:0.85em; padding:3px 8px; border-radius:8px; border:1px solid #ddd; background:#fff; width:auto; margin:0; font-weight:600;">
+                                <option value="per_question">⏳ Per Question</option>
+                                <option value="total_time">🏁 Overall Quiz</option>
+                            </select>
+                            <div id="timer-perq-area" style="display:flex; align-items:center; gap:5px;">
+                                <input type="number" id="quiz-set-all-timer" value="60" style="width:45px; padding:3px; border-radius:8px; border:1px solid #ddd; font-weight:bold; text-align:center; margin:0; font-size:0.85em;">
+                                <button class="btn-sm" onclick="setAllQuestionTimers()" style="background:#f39c12; color:white; border:none; padding:4px 12px; border-radius:10px; font-weight:bold; font-size:0.75em; box-shadow:0 4px 6px rgba(243,156,18,0.2);">Apply</button>
+                            </div>
+                            <div id="timer-total-area" style="display:none; align-items:center; gap:5px;">
+                                <input type="number" id="quiz-total-timer" value="300" style="width:65px; padding:3px; border-radius:8px; border:1px solid #ddd; font-weight:bold; text-align:center; margin:0; font-size:0.85em;">
+                            </div>
                         </div>
                     </div>
 
-                    <!-- AI Analysis Configuration -->
-                    <div style="display:flex; align-items:center; gap:10px; background:rgba(142,68,173,0.06); padding:5px 12px; border-radius:15px; border:1px solid rgba(142,68,173,0.12);">
-                        <div class="glass-toggle-container ai-analyzer-model" style="transform:scale(0.85); transform-origin:center; flex-shrink:0; margin:0;">
+                    <!-- Group 2: AI Toolkit (V87.16) -->
+                    <div style="display:flex; align-items:center; gap:12px; background:rgba(142,68,173,0.06); padding:6px 15px; border-radius:20px; border:1.5px solid rgba(142,68,173,0.15); box-shadow:0 4px 15px rgba(142,68,173,0.08);">
+                        <label style="font-size:0.75em; font-weight:800; color:#8e44ad; text-transform:uppercase; letter-spacing:1px; margin-right:5px;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Analyzer</label>
+                        <div class="glass-toggle-container ai-analyzer-model" style="transform:scale(0.9); transform-origin:center; flex-shrink:0; margin:0; background:rgba(255,255,255,0.5);">
                             <div class="glass-toggle-item active" data-value="gemini-1.5-pro" onclick="selectAiToggle(this, 'gemini-1.5-pro')" title="Gemini 1.5 Pro">🧠 Pro</div>
                             <div class="glass-toggle-item" data-value="gemini-flash-latest" onclick="selectAiToggle(this, 'gemini-flash-latest')" title="Gemini 1.5 Flash">⚡ Flash</div>
                             <div class="glass-toggle-item" data-value="gpt-4o" onclick="selectAiToggle(this, 'gpt-4o')" title="GPT-4o">🟢 4o</div>
                             <div class="glass-toggle-item" data-value="typhoon-v1.5x-70b-instruct" onclick="selectAiToggle(this, 'typhoon-v1.5x-70b-instruct')" title="Typhoon 70B">🌀 T</div>
                         </div>
                         <input type="hidden" id="ai-analyzer-model-val" value="gemini-1.5-pro">
-                        <button class="btn-sm" onclick="analyzeQuizAI(this)" style="background:#8e44ad; color:white; border:none; padding:5px 12px; border-radius:10px; font-weight:bold; font-size:0.8em; display:flex; align-items:center; gap:5px;">
-                            <i class="fa-solid fa-brain"></i> <span class="btn-text">AI Analyze</span>
+                        <button class="btn-sm" onclick="analyzeQuizAI(this)" style="background:#8e44ad; color:white; border:none; padding:8px 18px; border-radius:12px; font-weight:bold; font-size:0.85em; display:flex; align-items:center; gap:8px; box-shadow:0 6px 15px rgba(142,68,173,0.25); transition:transform 0.2s;">
+                            <i class="fa-solid fa-brain"></i> <span class="btn-text">AI Analyze Quiz</span>
                         </button>
                     </div>
-
-                    <div style="width:1.5px; height:25px; background:var(--border-color); margin:0 5px;"></div>
-
-                    <!-- Navigation & Actions -->
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <button class="btn-sm btn-dark" onclick="addQuestionUI()" title="Add New Question" style="width:34px; height:34px; padding:0; border-radius:8px; font-size:1.1em; display:flex; align-items:center; justify-content:center;">+</button>
-                        <button class="btn-sm" onclick="openImportQuizModal()" title="Import Quiz" style="width:34px; height:34px; padding:0; border-radius:8px; background:#2196f3; color:white; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-file-import"></i></button>
-                        
-                        <div id="quiz-pagination-controls" style="display:flex; gap:5px; align-items:center;">
-                            <button class="btn-sm" onclick="moveQuizQ(-1)" title="Previous" style="width:34px; height:34px; border-radius:50%; background:var(--col-bg); color:var(--text-main); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-arrow-left"></i></button>
-                            <button class="btn-sm" onclick="moveQuizQ(1)" title="Next" style="width:34px; height:34px; border-radius:50%; background:var(--col-bg); color:var(--text-main); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-arrow-right"></i></button>
-                        </div>
-                    </div>
-
-                    <div id="quiz-q-nav" style="display:flex; gap:6px; flex-wrap:wrap; padding:2px 0;"></div>
                 </div>
                 <div id="quiz-questions-container"
                     style="min-height: 200px; text-align: left; padding: 10px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; background:#fff;">
@@ -2767,55 +2781,106 @@
 
         window.analyzeQuizAI = async function() {
             const formData = getQuizFormData();
-            if (formData.questions.length < 2) return alert("Add at least 2 questions to analyze.");
+            if (formData.questions.length < 1) return alert("Add at least 1 question to analyze.");
             
             const qList = formData.questions.map((q, i) => `Q${i+1} (${q.type}): ${q.q}\nOptions: ${q.options ? q.options.join(', ') : 'N/A'}`).join('\n\n');
-            const btn = event.target.closest('button');
-            const oldText = btn.innerHTML;
+            const btn = (event && event.target) ? event.target.closest('button') : null;
+            const oldText = btn ? btn.innerHTML : "Analyze";
             
             try {
-                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analyzing...`;
-                btn.disabled = true;
+                if (btn) {
+                    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analyzing...`;
+                    btn.disabled = true;
+                }
                 
-                const prompt = `Analyze these quiz questions for similarity, redundancy, and variety. 
-                Focus on identifying questions that are too similar or test the same concept repeatedly. 
-                Suggest improvements or how to diversify the questions to cover broader topics.
-                
-                Also, based on the content of these questions, suggest:
-                - A professional Full Title (Thai/English)
-                - A catchy Short Title (max 40 chars)
-                
-                Questions list:
-                ${qList}
-                
-                Output as a clear summary in Thai. Use bullet points. Keep it professional.
-                Include the suggested titles at the top under "### 🎯 Suggested Titles".`;
+                const prompt = `Analyze these quiz questions for similarity, redundancy, variety, and quality.\nIdentify specific questions that need improvement (wording, clarity, or removing duplicates).\n\nQuestions list:\n${qList}\n\nOUTPUT FORMAT (MANDATORY JSON):\n{\n  "suggestedTitles": { "full": "...", "short": "..." },\n  "analysisText": "Professional detailed summary in Thai (markdown enabled)...",\n  "items": [\n    {\n      "index": 0,\n      "issue": "Explanation of issue for Q1 (e.g. too simple, redundant with Q2)",\n      "suggestion": "How to improve it",\n      "improvedQuestion": {\n        "q": "Improved question text...",\n        "type": "choice",\n        "options": ["A", "B", "C", "D"],\n        "correct": [0],\n        "timer": 60\n      }\n    }\n  ]\n}\n\nImportant: If a question is perfect, omit it from the "items" array. Always use Thai for analysis and improved text.\nInclude suggested titles at the top of analysisText as well.`;
                 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-1.5-pro';
                 
-                const { text: analysis, tokens: aiTokens, model: aiModel } = await callUniversalAI(selectedModel, prompt);
+                const { text: resultRaw, tokens: aiTokens, model: aiModel } = await callUniversalAI(selectedModel, prompt, true);
+                
+                let result;
+                try {
+                    const cleanJson = resultRaw.replace(/```json/g, "").replace(/```/g, "").trim();
+                    result = JSON.parse(cleanJson);
+                } catch(e) {
+                    console.error("JSON Parse Error:", resultRaw);
+                    throw new Error("AI returned invalid data format. Please try again.");
+                }
+
+                const analysis = result.analysisText || "Analysis complete.";
                 const qDataJson = JSON.stringify(formData.questions);
 
                 // Show in a styled popup
                 const resultDiv = document.createElement('div');
                 resultDiv.id = "ai-analysis-popup";
-                resultDiv.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:85%; max-width:800px; max-height:85vh; background:white; padding:30px; border-radius:30px; box-shadow:0 20px 60px rgba(0,0,0,0.3); z-index:10001; overflow-y:auto; font-family:'Inter', sans-serif; border: 1px solid #eee;";
+                resultDiv.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:850px; max-height:85vh; background:white; padding:30px; border-radius:30px; box-shadow:0 20px 60px rgba(0,0,0,0.3); z-index:10001; overflow-y:auto; font-family:'Inter', sans-serif; border: 1px solid #eee;";
+                
+                let improvementsHtml = "";
+                if (result.items && result.items.length > 0) {
+                    improvementsHtml = `
+                        <div style="margin-top:25px; border-top:2px solid #f8f9fa; padding-top:20px;">
+                            <h4 style="color:var(--primary); margin-bottom:15px;"><i class="fa-solid fa-list-check"></i> Individual Improvements (${result.items.length})</h4>
+                            <div style="display:flex; flex-direction:column; gap:12px;">
+                                ${result.items.map(item => {
+                                    const qIdx = item.index;
+                                    const improvedJson = JSON.stringify(item.improvedQuestion).replace(/\\/g, '\\\\').replace(/`/g, "\\`").replace(/"/g, "&quot;");
+                                    return `
+                                        <div style="background:#fcfdff; border:1.5px solid #edf2f7; border-radius:15px; padding:15px; border-left:5px solid #4361ee;">
+                                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                                                <b style="color:#2d3748;">Q${qIdx + 1} Issue</b>
+                                                <button class="btn-sm" style="background:#4361ee; color:white; border:none; padding:4px 12px; border-radius:8px; font-weight:bold; font-size:0.75em;"
+                                                    onclick="applySingleAiFix(${qIdx}, '${improvedJson}')">
+                                                    <i class="fa-solid fa-check-double"></i> Fix Q${qIdx + 1}
+                                                </button>
+                                            </div>
+                                            <div style="font-size:0.9em; color:#4a5568; margin-bottom:8px;">⚠️ <b>Issue:</b> ${item.issue}</div>
+                                            <div style="font-size:0.9em; color:#4361ee;">✨ <b>Suggestion:</b> ${item.suggestion}</div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                const titleSection = result.suggestedTitles ? `
+                    <div style="background:#f5f3ff; border:1px solid #ddd6fe; border-radius:15px; padding:15px; margin-bottom:20px;">
+                        <h4 style="margin:0 0 10px 0; color:#5b21b6; font-size:0.9em;"><i class="fa-solid fa-tag"></i> Suggested Titles</h4>
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:8px 12px; border-radius:10px; border:1px solid #ede9fe;">
+                                <span style="font-size:0.9em; color:#4c1d95; font-weight:600;">Full: ${result.suggestedTitles.full}</span>
+                                <button class="btn-sm" style="background:#8b5cf6; color:white; border:none; padding:3px 10px; border-radius:6px; font-size:0.7em;" onclick="document.getElementById('quiz-title').value='${result.suggestedTitles.full.replace(/'/g, "\\'")}'; showToast('Title Updated');">Apply</button>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:8px 12px; border-radius:10px; border:1px solid #ede9fe;">
+                                <span style="font-size:0.9em; color:#4c1d95; font-weight:600;">Short: ${result.suggestedTitles.short}</span>
+                                <button class="btn-sm" style="background:#8b5cf6; color:white; border:none; padding:3px 10px; border-radius:6px; font-size:0.7em;" onclick="document.getElementById('quiz-short-title').value='${result.suggestedTitles.short.replace(/'/g, "\\'")}'; showToast('Short Title Updated');">Apply</button>
+                            </div>
+                        </div>
+                    </div>
+                ` : '';
+
                 resultDiv.innerHTML = `
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f8f9fa; padding-bottom:15px; margin-bottom:15px;">
                         <h2 style="margin:0; color:var(--primary); font-size:1.5em;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Quiz Analysis</h2>
                         <button onclick="this.parentElement.parentElement.remove()" style="border:none; background:#f8f9fa; color:#666; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">✕</button>
                     </div>
-                    <div style="white-space:pre-wrap; line-height:1.8; color:#333; font-size:1em; margin-bottom:20px;">${analysis}</div>
                     
-                    <div style="background:#f0f7ff; padding:20px; border-radius:20px; border:1px solid #cce3ff; margin-bottom:25px;">
+                    ${titleSection}
+
+                    <div style="white-space:pre-wrap; line-height:1.8; color:#333; font-size:1em; margin-bottom:20px; background:#fafafa; padding:20px; border-radius:20px; border:1px solid #f0f0f0;">${analysis.replace(/### 🎯 Suggested Titles[\s\S]*?(?=###|$)/i, '')}</div>
+                    
+                    ${improvementsHtml}
+
+                    <div style="background:#f0f7ff; padding:20px; border-radius:20px; border:1px solid #cce3ff; margin-top:25px; margin-bottom:25px;">
                         <h4 style="margin:0 0 10px 0; color:#0056b3; display:flex; align-items:center; gap:8px;">
-                            <i class="fa-solid fa-lightbulb"></i> Auto-Improvement (Experimental)
+                            <i class="fa-solid fa-magic"></i> Bulk Auto-Improvement (All Questions)
                         </h4>
-                        <p style="font-size:0.85em; color:#555; margin-bottom:15px;">The AI can magically rewrite and improve these questions based on the analysis above. <b>Note:</b> This will replace all current questions.</p>
+                        <p style="font-size:0.85em; color:#555; margin-bottom:15px;">The AI will magically rewrite and diversify all questions. <b>Note:</b> This process is independent of the single fixes above and will regenerate the entire quiz.</p>
                         <div style="display:flex; gap:10px; justify-content:flex-start;">
                             <button id="btn-apply-ai-improve" class="btn-primary" style="padding:10px 25px; border-radius:12px; font-weight:700; background:#0056b3;" 
                                 onclick="applyQuizImprovements(\`${analysis.replace(/`/g, '\\`').replace(/\$\{/g, '\\${')}\`, \`${qDataJson.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$\{/g, '\\${')}\`)">
-                                <i class="fa-solid fa-magic"></i> Apply Suggestions to Quiz
+                                <i class="fa-solid fa-sparkles"></i> Magic Overhaul (All Items)
                             </button>
                         </div>
                     </div>
@@ -2826,17 +2891,21 @@
                     
                     <div style="margin-top:20px; padding-top:15px; border-top:1px solid #eee; font-size:0.7em; color:#999; display:flex; justify-content:space-between;">
                         <span>🚀 Model: <b>${aiModel}</b> | 💡 Tokens: <b>${aiTokens.toLocaleString()}</b></span>
-                        <span style="opacity:0.6">V86.98 Smart Analysis</span>
+                        <span style="opacity:0.6">V87.13 Smart Analysis</span>
                     </div>
                 `;
                 document.body.appendChild(resultDiv);
                 
             } catch (e) {
                 alert("Analysis error: " + e.message);
+                console.error(e);
             } finally {
-                btn.innerHTML = oldText;
-                btn.disabled = false;
+                if (btn) {
+                    btn.innerHTML = oldText;
+                    btn.disabled = false;
+                }
             }
+
         };
 
         window.applyQuizImprovements = async function(analysis, originalQsJson) {
@@ -3268,6 +3337,48 @@
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-robot"></i> <span class="btn-text">AI Suggest</span>';
             }
+        };
+
+        window.copyQuestionToClipboard = function(btn) {
+            const item = btn.closest('.quiz-q-item');
+            const question = item.querySelector('.q-text').value.trim();
+            const optionTextareas = item.querySelectorAll('.q-opt');
+            const options = Array.from(optionTextareas).map((ta, i) => `${i + 1}. ${ta.value.trim()}`).filter(o => o.length > 3);
+            
+            let text = `Question: ${question}`;
+            if (options.length > 0) {
+                text += `\n\nOptions:\n${options.join('\n')}`;
+            }
+            
+            navigator.clipboard.writeText(text).then(() => {
+                showToast("Copied content to clipboard!");
+                const icon = btn.querySelector('i');
+                const oldIcon = icon.className;
+                icon.className = 'fa-solid fa-check';
+                btn.style.color = '#2ecc71';
+                setTimeout(() => {
+                    icon.className = oldIcon;
+                    btn.style.color = '';
+                }, 2000);
+            }).catch(err => {
+                console.error("Clipboard Error:", err);
+                alert("Failed to copy to clipboard. Please select and copy manually.");
+            });
+        };
+
+        window.duplicateQuestion = function(btn) {
+            const item = btn.closest('.quiz-q-item');
+            const data = {
+                q: item.querySelector('.q-text').value.trim(),
+                type: item.querySelector('.q-type').value,
+                timer: parseInt(item.querySelector('.q-timer').value) || 60,
+                options: Array.from(item.querySelectorAll('.q-opt')).map(ia => ia.value.trim()),
+                correct: Array.from(item.querySelectorAll('.q-correct-check'))
+                             .map((cb, idx) => cb.checked ? idx : null)
+                             .filter(idx => idx !== null)
+            };
+            addQuestionUI(data);
+            showToast("Question Duplicated!");
         };
 
         window.aiEnhanceQuestion = async function(btn) {
@@ -4059,11 +4170,11 @@
             const correct = Array.isArray(rawCorrect) ? rawCorrect.map(v => parseInt(v)) : [parseInt(rawCorrect)];
 
             div.innerHTML = `
-                <!-- Consolidated Question Header & AI Tools (V87.0) -->
+                <!-- Reorganized Question Card Header (V87.16) -->
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; background:#f8faff; border:1px solid #e1e7f0; border-radius:18px; padding:10px 15px; flex-wrap:wrap; gap:12px; box-shadow:0 4px 6px rgba(0,0,0,0.02);">
                     
-                    <!-- Left: Identity & Core Tools -->
-                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <!-- Group A: Core Tools (Index, Type, Timer) -->
+                    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
                         <span style="background:var(--primary); color:white; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.85em; box-shadow:0 2px 4px rgba(67,97,238,0.3);" class="q-index-badge">?</span>
                         
                         <div class="glass-toggle-container q-type-toggle" style="background: rgba(0,0,0,0.05); transform: scale(0.9); transform-origin: left center; flex-shrink:0;" title="Select the interaction type for this question">
@@ -4074,47 +4185,54 @@
                         </div>
                         <input type="hidden" class="q-type" value="${qType}">
 
-                        <button type="button" class="btn-sm" onclick="triggerSmartPaste(this)" title="Smart Paste: Automatically split text from your clipboard into Question and Options" style="background:#fff; color:var(--primary); font-size:0.75em; padding:6px 12px; border:1px solid #d0d7de; border-radius:12px; font-weight:700; display:flex; align-items:center; gap:6px; transition:all 0.2s; white-space:nowrap; box-shadow:0 2px 4px rgba(0,0,0,0.03);">
-                           <i class="fa-solid fa-paste"></i> <span>Smart Paste</span>
-                        </button>
+                        <div style="width:2px; height:20px; background:rgba(0,0,0,0.05); margin:0 5px;"></div>
+
+                        <div style="display:flex; align-items:center; gap:8px; background:#fff; padding:4px 12px; border-radius:12px; border:1px solid #d0d7de; flex-shrink:0;" title="Individual Timer for this question (seconds)">
+                            <label style="font-size:0.75em; color:#adb5bd; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;"><i class="fa-solid fa-clock"></i></label>
+                            <input type="number" class="q-timer" value="${data ? (data.timer || 60) : (document.getElementById('quiz-set-all-timer') ? document.getElementById('quiz-set-all-timer').value : 60)}" style="width:45px; margin:0; padding:0; border:none; background:transparent; font-weight:bold; text-align:center; font-size:1em; color:var(--primary); outline:none;">
+                        </div>
                     </div>
 
-                    <!-- Right: AI Controls & Meta -->
+                    <!-- Group B: AI Toolkit & Actions -->
                     <div style="display:flex; align-items:center; gap:12px; flex-wrap:nowrap; justify-content:flex-end;">
-                        <!-- AI Model Group -->
-                        <div style="display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.7); padding:4px 10px; border-radius:14px; border:1px solid #eee;" title="AI Model for Enhancement Suggestions">
-                            <span style="font-size:0.65em; color:#888; font-weight:800; letter-spacing:0.5px;">MODEL:</span>
-                            <div class="glass-toggle-container ai-model-toggle" style="background:transparent; transform:scale(0.85); transform-origin:left center; padding:0; gap:2px;">
-                                <div class="glass-toggle-item active" data-value="gemini-flash-latest" onclick="selectAiToggle(this, 'gemini-flash-latest')" title="Gemini 1.5 Flash (Fastest)">⚡</div>
-                                <div class="glass-toggle-item" data-value="gpt-4o-mini" onclick="selectAiToggle(this, 'gpt-4o-mini')" title="GPT-4o Mini (Very Smart)">🟢</div>
-                                <div class="glass-toggle-item" data-value="typhoon-v2.5-30b-a3b-instruct" onclick="selectAiToggle(this, 'typhoon-v2.5-30b-a3b-instruct')" title="Typhoon 2.5 (Regional Expert)">🌀</div>
+                        <!-- AI Tools (Grouped) -->
+                        <div style="display:flex; align-items:center; gap:8px; background:rgba(67,97,238,0.03); padding:4px 10px; border-radius:15px; border:1px solid rgba(67,97,238,0.1);">
+                            <button type="button" class="btn-sm" onclick="triggerSmartPaste(this)" title="Smart Paste" style="background:#fff; color:var(--primary); font-size:0.7em; padding:6px 12px; border:1px solid #d0d7de; border-radius:10px; font-weight:700; white-space:nowrap; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
+                               <i class="fa-solid fa-paste"></i> <span>Paste</span>
+                            </button>
+
+                            <div style="display:flex; align-items:center; gap:6px;" title="AI Model selection">
+                                <div class="glass-toggle-container ai-model-toggle" style="background:transparent; transform:scale(0.8); transform-origin:left center; padding:0; gap:2px;">
+                                    <div class="glass-toggle-item active" data-value="gemini-flash-latest" onclick="selectAiToggle(this, 'gemini-flash-latest')" title="Flash">⚡</div>
+                                    <div class="glass-toggle-item" data-value="gpt-4o-mini" onclick="selectAiToggle(this, 'gpt-4o-mini')" title="Smart">🟢</div>
+                                    <div class="glass-toggle-item" data-value="typhoon-v2.5-30b-a3b-instruct" onclick="selectAiToggle(this, 'typhoon-v2.5-30b-a3b-instruct')" title="Regional">🌀</div>
+                                </div>
+                                <input type="hidden" class="ai-model-quiz" value="gemini-flash-latest">
                             </div>
-                            <input type="hidden" class="ai-model-quiz" value="gemini-flash-latest">
-                        </div>
 
-                        <!-- AI Language Group -->
-                        <div style="display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.7); padding:4px 10px; border-radius:14px; border:1px solid #eee;" title="Output Language for AI results">
-                            <span style="font-size:0.65em; color:#888; font-weight:800; letter-spacing:0.5px;">LANG:</span>
-                            <div class="glass-toggle-container ai-lang-toggle" style="background:transparent; transform:scale(0.85); transform-origin:left center; padding:0; gap:2px;">
-                                <div class="glass-toggle-item active" data-value="Thai" onclick="selectAiToggle(this, 'Thai')" title="Thai Language">🇹🇭</div>
-                                <div class="glass-toggle-item" data-value="English" onclick="selectAiToggle(this, 'English')" title="English Language">🇺🇸</div>
+                            <div style="display:flex; align-items:center; gap:6px;" title="Language selection">
+                                <div class="glass-toggle-container ai-lang-toggle" style="background:transparent; transform:scale(0.8); transform-origin:left center; padding:0; gap:2px;">
+                                    <div class="glass-toggle-item active" data-value="Thai" onclick="selectAiToggle(this, 'Thai')" title="Thai">🇹🇭</div>
+                                    <div class="glass-toggle-item" data-value="English" onclick="selectAiToggle(this, 'English')" title="English">🇺🇸</div>
+                                </div>
+                                <input type="hidden" class="ai-lang-quiz" value="Thai">
                             </div>
-                            <input type="hidden" class="ai-lang-quiz" value="Thai">
+
+                            <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Enhance" style="background:linear-gradient(135deg, var(--primary), #6366f1); color:white; padding:8px 14px; border:none; border-radius:12px; font-weight:bold; font-size:0.7em; display:flex; align-items:center; gap:5px; box-shadow:0 4px 10px rgba(67,97,238,0.25); transition:transform 0.2s;">
+                                <i class="fa-solid fa-robot"></i> <span class="btn-text">Enhance</span>
+                            </button>
                         </div>
 
-                        <!-- AI Enhance Button -->
-                        <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Enhance: Click to auto-translate and optimize this question using selected AI" style="background:linear-gradient(135deg, var(--primary), #6366f1); color:white; padding:8px 16px; border:none; border-radius:14px; font-weight:bold; font-size:0.75em; display:flex; align-items:center; gap:6px; box-shadow:0 4px 10px rgba(67,97,238,0.25); transition:transform 0.2s;">
-                            <i class="fa-solid fa-robot"></i> <span class="btn-text">AI Enhance</span>
-                        </button>
-
-                        <div style="width:1px; height:24px; background:#e0e0e0; margin:0 5px;"></div>
-
-                        <div style="display:flex; align-items:center; gap:5px; background:#fff; padding:4px 12px; border-radius:12px; border:1px solid #d0d7de; flex-shrink:0;" title="Individual Timer for this question (seconds)">
-                            <label style="font-size:0.8em; color:#adb5bd; font-weight:bold;"><i class="fa-solid fa-clock"></i></label>
-                            <input type="number" class="q-timer" value="${data ? (data.timer || 60) : (document.getElementById('quiz-set-all-timer') ? document.getElementById('quiz-set-all-timer').value : 60)}" style="width:50px; margin:0; padding:0; border:none; background:transparent; font-weight:bold; text-align:center; font-size:1em; color:var(--primary); outline:none;">
+                        <!-- Actions -->
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <button type="button" class="btn-sm" onclick="copyQuestionToClipboard(this)" title="Copy Content" style="width:32px; height:32px; border-radius:10px; background:#fff; border:1px solid #d0d7de; color:#6366f1; padding:0; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
+                                <i class="fa-solid fa-copy" style="font-size:0.85em;"></i>
+                            </button>
+                            <button type="button" class="btn-sm" onclick="duplicateQuestion(this)" title="Clone Question" style="width:32px; height:32px; border-radius:10px; background:#fff; border:1px solid #d0d7de; color:#2ecc71; padding:0; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
+                                <i class="fa-solid fa-clone" style="font-size:0.85em;"></i>
+                            </button>
+                            <button class="btn-sm btn-danger" onclick="if(confirm('Delete this question?')){this.closest('.quiz-q-item').remove(); updateQuizPagination();}" style="width:32px; height:32px; padding:0; border-radius:10px; flex-shrink:0; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(239,35,60,0.15);" title="Remove Question"><i class="fa-solid fa-trash-can" style="font-size:0.85em;"></i></button>
                         </div>
-
-                        <button class="btn-sm btn-danger" onclick="if(confirm('Delete this question?')){this.closest('.quiz-q-item').remove(); updateQuizPagination();}" style="width:34px; height:34px; padding:0; border-radius:12px; flex-shrink:0; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(239,35,60,0.15);" title="Remove Question"><i class="fa-solid fa-trash-can" style="font-size:0.9em;"></i></button>
                     </div>
                 </div>
 
@@ -9140,6 +9258,32 @@
             }
         });
         
+        window.applySingleAiFix = function(index, improvedQJson) {
+            try {
+                // Decode &quot; back to "
+                const improvedQ = JSON.parse(improvedQJson.replace(/&quot;/g, '"'));
+                const items = document.querySelectorAll('.quiz-q-item');
+                if (index >= items.length) return alert("Question index out of sync. Please refresh or try again.");
+                
+                if (!confirm(`Apply improved version to Question ${index + 1}?`)) return;
+
+                const allQs = getQuizFormData().questions;
+                allQs[index] = improvedQ;
+                
+                const container = document.getElementById('quiz-questions-container');
+                container.innerHTML = "";
+                allQs.forEach(q => addQuestionUI(q));
+                
+                quizQPageIndex = index;
+                updateQuizPagination();
+                showToast(`✅ Q${index + 1} Fixed with AI!`);
+                triggerAutoSave();
+            } catch(e) {
+                console.error("Single fix error:", e);
+                alert("Error applying fix: " + e.message);
+            }
+        };
+
         if (window.loadAIKeys) window.loadAIKeys();
     </script>
 

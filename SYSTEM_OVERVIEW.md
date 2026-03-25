@@ -76,6 +76,35 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+## [2026-03-25] Session Updates (V87.15 → V87.16)
+
+### 1. Logical UI Reorganization (V87.16)
+- **Tool Grouping:** Reorganized the main toolbar and question cards into two distinct sections: **Core Tools** (Type, Count, Timer, Navigation) and **AI Toolkit** (Smart Paste, Model/Language selection, AI Analysis).
+- **Consolidated AI Toolkit:** Grouped all AI-related interactions into a singular, unified "Smart Bar" with a custom background and distinct iconography.
+- **Workflow Optimization:** Moved question-specific timers next to the type selector for better content-focused editing. Consolidated navigation controls for faster quiz traversal.
+
+## [2026-03-25] Session Updates (V87.14 → V87.15)
+
+### 1. High-Contrast Selector UI (V87.15)
+- **Enhanced Toggle Selection:** Replaced the subtle white-on-gray selection with a distinct, high-contrast style.
+- **Color Coding:** Active items now feature a solid primary background (Blue for individual questions, Purple for the main Quiz Analyzer).
+- **Clear Visual State:** Added a 1.5px border and a slight lift effect (`translateY`) to clearly distinguish the selected AI Model or Language from other options.
+
+## [2026-03-25] Session Updates (V87.13 → V87.14)
+
+### 1. One-Click Copy & Duplicate (V87.14)
+- **Content Copy:** Added a "Copy" button to each question header to quickly copy the question and all its options to the clipboard.
+- **Instant Duplication:** Added a "Clone" button to duplicate any question (including options and timer settings) with a single click.
+- **Visual Feedback:** Added icon transitions (checkmark) and toast notifications to confirm successful copy/duplicate actions.
+
+## [2026-03-25] Session Updates (V87.12 → V87.13)
+
+### 1. Smart AI Item Fixes (V87.13)
+- **Structured Analysis:** AI now returns structured JSON results, allowing the UI to parse and display specific improvement cards.
+- **Individual Question Fixes:** Added "Fix Qx" buttons for each item identified by AI as redundant or sub-optimal, enabling targeted improvements without replacing the entire quiz.
+- **Title Suggestions:** AI now suggests both a Full Title and a Short Title, with "Apply" buttons to quickly update quiz metadata.
+- **Improved Popup UI:** Modernized the analysis result display with clear separation between general summary, individual improvements, and bulk actions.
+
 ## [2026-03-25] Session Updates (V87.11 → V87.12)
 
 ### 1. Blended Quiz Toolkit UI (V87.12)
