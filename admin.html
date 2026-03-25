@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V86.96)</title>
+    <title>Internship Portfolio (V86.97)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -1066,7 +1066,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.96</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.97</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -2721,10 +2721,10 @@
         };
 
         window.analyzeQuizAI = async function() {
-            const items = document.querySelectorAll('.quiz-q-item');
-            if (items.length < 2) return alert("Add at least 2 questions to analyze.");
+            const formData = getQuizFormData();
+            if (formData.questions.length < 2) return alert("Add at least 2 questions to analyze.");
             
-            const qList = [...items].map((it, i) => `Q${i+1}: ${it.querySelector('.q-text').value}`).join('\n\n');
+            const qList = formData.questions.map((q, i) => `Q${i+1} (${q.type}): ${q.q}\nOptions: ${q.options ? q.options.join(', ') : 'N/A'}`).join('\n\n');
             const btn = event.target.closest('button');
             const oldText = btn.innerHTML;
             
@@ -2746,23 +2746,40 @@
                 Output as a clear summary in Thai. Use bullet points. Keep it professional.
                 Include the suggested titles at the top under "### 🎯 Suggested Titles".`;
                 
-                const { text: analysis, tokens: aiTokens, model: aiModel } = await callUniversalAI('gemini-pro-latest', prompt);
-                
+                const { text: analysis, tokens: aiTokens, model: aiModel } = await callUniversalAI('gemini-1.5-pro', prompt);
+                const qDataJson = JSON.stringify(formData.questions);
+
                 // Show in a styled popup
                 const resultDiv = document.createElement('div');
-                resultDiv.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:85%; max-width:800px; max-height:80vh; background:white; padding:30px; border-radius:20px; box-shadow:0 10px 40px rgba(0,0,0,0.2); z-index:10001; overflow-y:auto; font-family:sans-serif;";
+                resultDiv.id = "ai-analysis-popup";
+                resultDiv.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:85%; max-width:800px; max-height:85vh; background:white; padding:30px; border-radius:30px; box-shadow:0 20px 60px rgba(0,0,0,0.3); z-index:10001; overflow-y:auto; font-family:'Inter', sans-serif; border: 1px solid #eee;";
                 resultDiv.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:15px; margin-bottom:15px;">
-                        <h2 style="margin:0; color:var(--primary);"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Quiz Analysis</h2>
-                        <button onclick="this.parentElement.parentElement.remove()" style="border:none; background:none; font-size:1.5em; cursor:pointer;">✕</button>
+                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f8f9fa; padding-bottom:15px; margin-bottom:15px;">
+                        <h2 style="margin:0; color:var(--primary); font-size:1.5em;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Quiz Analysis</h2>
+                        <button onclick="this.parentElement.parentElement.remove()" style="border:none; background:#f8f9fa; color:#666; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">✕</button>
                     </div>
-                    <div style="white-space:pre-wrap; line-height:1.6; color:#444;">${analysis}</div>
-                    <div style="margin-top:25px; text-align:center;">
-                        <button class="btn-primary" onclick="this.parentElement.parentElement.remove()" style="padding:10px 30px; border-radius:12px;">Understood</button>
+                    <div style="white-space:pre-wrap; line-height:1.8; color:#333; font-size:1em; margin-bottom:20px;">${analysis}</div>
+                    
+                    <div style="background:#f0f7ff; padding:20px; border-radius:20px; border:1px solid #cce3ff; margin-bottom:25px;">
+                        <h4 style="margin:0 0 10px 0; color:#0056b3; display:flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-lightbulb"></i> Auto-Improvement (Experimental)
+                        </h4>
+                        <p style="font-size:0.85em; color:#555; margin-bottom:15px;">The AI can magically rewrite and improve these questions based on the analysis above. <b>Note:</b> This will replace all current questions.</p>
+                        <div style="display:flex; gap:10px; justify-content:flex-start;">
+                            <button id="btn-apply-ai-improve" class="btn-primary" style="padding:10px 25px; border-radius:12px; font-weight:700; background:#0056b3;" 
+                                onclick="applyQuizImprovements(\`${analysis.replace(/`/g, '\\`').replace(/\$\{/g, '\\${')}\`, \`${qDataJson.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$\{/g, '\\${')}\`)">
+                                <i class="fa-solid fa-magic"></i> Apply Suggestions to Quiz
+                            </button>
+                        </div>
                     </div>
-                    <div style="margin-top:15px; padding-top:10px; border-top:1px solid #eee; font-size:0.75em; color:#999; display:flex; justify-content:space-between; align-items:center;">
-                        <span><i class="fa-solid fa-microchip"></i> Model: <b>${aiModel}</b></span>
-                        <span><i class="fa-solid fa-coins"></i> Tokens: <b>${aiTokens.toLocaleString()}</b></span>
+
+                    <div style="text-align:right;">
+                        <button class="btn-sm btn-dark" onclick="this.parentElement.parentElement.remove()" style="padding:8px 25px; border-radius:10px;">Close</button>
+                    </div>
+                    
+                    <div style="margin-top:20px; padding-top:15px; border-top:1px solid #eee; font-size:0.7em; color:#999; display:flex; justify-content:space-between;">
+                        <span>🚀 Model: <b>${aiModel}</b> | 💡 Tokens: <b>${aiTokens.toLocaleString()}</b></span>
+                        <span style="opacity:0.6">V86.97 Smart Analysis</span>
                     </div>
                 `;
                 document.body.appendChild(resultDiv);
@@ -2771,6 +2788,76 @@
                 alert("Analysis error: " + e.message);
             } finally {
                 btn.innerHTML = oldText;
+                btn.disabled = false;
+            }
+        };
+
+        window.applyQuizImprovements = async function(analysis, originalQsJson) {
+            const btn = document.getElementById('btn-apply-ai-improve');
+            if (!btn) return;
+            const originalText = btn.innerHTML;
+            
+            if (!confirm("AI will now regenerate your quiz based on the analysis. Current questions will be replaced. Continue?")) return;
+
+            try {
+                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Regenerating Quiz...`;
+                btn.disabled = true;
+
+                const originalQs = JSON.parse(originalQsJson);
+                const prompt = `You are a curriculum expert. Improve the following quiz based on this AI Analysis:
+                
+                --- ANALYSIS ---
+                ${analysis}
+                
+                --- ORIGINAL QUESTIONS ---
+                ${JSON.stringify(originalQs, null, 2)}
+                
+                --- REQUIREMENTS ---
+                1. Follow ALL suggestions (clinical integration, variety, merging redundancy).
+                2. Maintain the same question schema as the input.
+                3. Output ONLY a valid JSON array of question objects. 
+                4. Do NOT wrap in markdown code blocks.
+                5. Output in Thai (or keeping original language mix).
+                
+                JSON QUESTION SCHEMA EXAMPLE:
+                [
+                  {
+                    "q": "Improved question text...",
+                    "type": "choice",
+                    "options": ["Opt 1", "Opt 2", "Opt 3", "Opt 4"],
+                    "correct": [0],
+                    "timer": 60
+                  }
+                ]`;
+
+                const { text: resultJson } = await callUniversalAI('gemini-1.5-pro', prompt, true);
+                
+                // Parse and strip possible markdown markers
+                const cleanJson = resultJson.replace(/```json/g, "").replace(/```/g, "").trim();
+                const newQuestions = JSON.parse(cleanJson);
+
+                if (newQuestions && Array.isArray(newQuestions)) {
+                    // Update UI
+                    const container = document.getElementById('quiz-questions-container');
+                    container.innerHTML = "";
+                    newQuestions.forEach(q => addQuestionUI(q));
+                    
+                    quizQPageIndex = 0;
+                    updateQuizPagination();
+                    
+                    const popup = document.getElementById('ai-analysis-popup');
+                    if (popup) popup.remove();
+                    showToast("✨ Quiz Improved Successfully!");
+                    triggerAutoSave();
+                } else {
+                    throw new Error("Invalid output format from AI.");
+                }
+
+            } catch (e) {
+                console.error("Improvement Error:", e);
+                alert("Improvement error: " + e.message + "\n\nTry manual adjustment or analyze again.");
+            } finally {
+                btn.innerHTML = originalText;
                 btn.disabled = false;
             }
         };
