@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V86.60) Overview
+# MLP Internship Portfolio (V87.27) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -71,11 +71,22 @@
     - **🔀 Smart Shuffle (Option 1+2):** 
         - เพิ่ม Option ให้แอดมินเลือกเปิด/ปิดการสุ่มตัวเลือก (Shuffle Choices) ราย Quiz ได้
         - หากเปิดการสุ่ม ระบบจะสุ่มเฉพาะข้อแรกๆ และล็อคข้อสุดท้าย (Anchor) ไว้เสมอ เพื่อรองรับโจทย์ประเภท "ถูกทุกข้อ" หรือ "ไม่มีข้อใดถูก" ไม่ให้สับสน
-- **🎓 Premium Electronic Certificate (V78.6):** 
+- **✨ Premium Electronic Certificate (V78.6):** 
     - ปรับปรุงดีไซน์ใบรับรองใหม่แบบ **บิณฑบาต (Bilingual)** ภาษาไทย-อังกฤษคู่ขนาน
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-03-25] Session Updates (V87.16 → V87.27)
+
+### 1. Quiz Timer UI Fix (V87.27)
+- **Overflow Prevention:** Widened the timer input fields and removed browser spin buttons to prevent the "60s" value from being cut off (เวลายังตกขอบ).
+- **Logical Re-positioning:** Moved the per-question timer from the far-right side to the left side, immediately following the **Question Type** toggle, to utilize available space and improve the content-editing workflow.
+
+### 2. AI Design Lab Strict Framework (V87.27)
+- **Structural Prompting:** Implemented a mandatory 5-component framework for Infographic generation: **Task, Context, Core Instruction, Constraint, and Output**.
+- **AI-Powered Suggester:** The AI enhancer now automatically suggests and fills in missing components based on the user's rough idea, ensuring professional and actionable image generation prompts.
+- **Improved UI Hints:** Added dynamic placeholder text in the Design Lab to guide users through the new structured prompting workflow.
 ## [2026-03-25] Session Updates (V87.15 → V87.16)
 
 ### 1. Logical UI Reorganization (V87.16)
@@ -490,4 +501,4 @@ service cloud.firestore {
     - **Date & Time Formatting:** ปรับการแสดงผลวันที่และเวลาให้ใช้รูปแบบ `en-US` (เช่น Mar 23, 2026) ทั่วทั้งระบบเพื่อความสม่ำเสมอ
 
 ---
-*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V86.16) โดย Antigravity AI*
+*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V87.27) โดย Antigravity AI*

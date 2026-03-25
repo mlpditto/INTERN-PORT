@@ -14,7 +14,7 @@ const AUTH_SECRET = "mlp-secret-8888"; // Basic shared secret between admin.html
  * 🤖 AI Proxy Function (V86.85)
  * Handles: Gemini, OpenAI, and Vertex AI (Imagen 3)
  */
-exports.callAIProxy = onRequest({ cors: true, secrets: ["OPENAI_API_KEY", "GEMINI_API_KEY"] }, async (req, res) => {
+exports.callAIProxy = onRequest({ cors: true }, async (req, res) => {
     try {
         // 1. Basic Auth Check (Custom Header)
         const authHeader = req.headers["x-mlp-secret"];
@@ -22,7 +22,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["OPENAI_API_KEY", "GEMIN
             return res.status(401).json({ error: "Unauthorized access to AI Proxy" });
         }
 
-        const { provider, model, prompt, isJson } = req.body;
+        const { provider, model, prompt, isJson, visionData } = req.body;
         if (!provider || !prompt) {
             return res.status(400).json({ error: "Missing provider or prompt" });
         }
@@ -84,29 +84,65 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["OPENAI_API_KEY", "GEMIN
             }
         }
 
-        // --- 🟣 Gemini (AI Studio / Vertex) ---
+        // --- 🟣 Google Vertex AI (Gemini Multimodal / Vision) ---
         if (provider === "gemini") {
-            const apiKey = process.env.GEMINI_API_KEY;
-            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-            
+            const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
+            const client = await auth.getClient();
+            const token = await client.getAccessToken();
+
+            const actualModelName = model.includes('pro') ? "gemini-1.5-pro-002" : "gemini-1.5-flash-002";
+            const endpoint = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/publishers/google/models/${actualModelName}:predict`;
+
             const parts = [{ text: prompt }];
-            if (req.body.visionData) {
+            if (visionData) {
                 parts.push({
                     inlineData: {
-                        mimeType: req.body.visionData.image_mimetype || "image/png",
-                        data: req.body.visionData.image_base64
+                        mimeType: visionData.image_mimetype || "image/png",
+                        data: visionData.image_base64
                     }
                 });
             }
 
             const response = await axios.post(endpoint, {
-                contents: [{ parts: parts }],
-                generationConfig: isJson ? { responseMimeType: "application/json" } : {}
+                instances: [{ contents: [{ role: "user", parts: parts }] }],
+                parameters: {
+                    temperature: 0.2,
+                    maxOutputTokens: 2048,
+                    ...(isJson ? { responseMimeType: "application/json" } : {})
+                }
+            }, {
+                headers: { "Authorization": `Bearer ${token.token}`, "Content-Type": "application/json" }
             });
 
-            const text = response.data.candidates[0].content.parts[0].text;
-            const tokens = response.data.usageMetadata ? response.data.usageMetadata.totalTokenCount : 0;
-            return res.json({ text: text, tokens: tokens });
+            const text = response.data.predictions[0].candidates[0].content.parts[0].text;
+            const tokens = response.data.metadata?.tokenMetadata?.totalTokenCount || 0;
+            return res.json({ text: text, tokens: tokens, model: actualModelName });
+        }
+
+        // --- 🔵 Typhoon Vision Support (V87.24.1) ---
+        if (provider === "typhoon") {
+            const apiKey = process.env.TYPHOON_API_KEY;
+            const body = {
+                model: model.includes('vision') ? model : "typhoon-v2.5-vision-instruct",
+                messages: [{
+                    role: "user",
+                    content: [
+                        { type: "text", text: prompt },
+                        ...(visionData ? [{ 
+                            type: "image_url", 
+                            image_url: { url: `data:${visionData.image_mimetype};base64,${visionData.image_base64}` } 
+                        }] : [])
+                    ]
+                }],
+                response_format: isJson ? { type: "json_object" } : undefined,
+                temperature: 0.2
+            };
+
+            const response = await axios.post('https://api.opentyphoon.ai/v1/chat/completions', body, {
+                headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" }
+            });
+
+            return res.json({ text: response.data.choices[0].message.content, tokens: response.data.usage.total_tokens });
         }
 
         return res.status(400).json({ error: "Unsupported provider" });

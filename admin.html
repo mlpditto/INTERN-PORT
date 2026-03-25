@@ -4,10 +4,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V87.22)</title>
-    <!-- V87.16: Quiz Editor UI (Blended Toolkit) -->
+    <title>Internship Portfolio (V87.27)</title>
+    <!-- V87.27: Quiz Editor & AI Infographic Framework -->
+
+    <style>
+        /* Hide Spinners/Controllers for q-timer */
+        .q-timer::-webkit-outer-spin-button,
+        .q-timer::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .q-timer { -moz-appearance: textfield; appearance: none; }
+
+    </style>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <link
         href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Montserrat:wght@400;700&display=swap"
         rel="stylesheet">
@@ -1098,7 +1107,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.22</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.24</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -2233,7 +2242,7 @@
                 <hr>
                 <div style="background:var(--bg-card); border:1.5px solid var(--border-color); border-radius:20px; padding:12px 20px; margin-top:20px; margin-bottom:20px; box-shadow:0 10px 40px rgba(0,0,0,0.03); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:20px;">
                     
-                    <!-- Group 1: Quiz Config & Navigation (V87.22) -->
+                    <!-- Group 1: Quiz Config & Navigation (V87.24) -->
                     <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
                         <!-- Quiz Mode -->
                         <div style="display:flex; align-items:center; gap:10px; background:#f0f7ff; padding:5px 12px; border-radius:15px; border:1px solid #cce5ff;">
@@ -2257,11 +2266,11 @@
                                 <option value="total_time">🏁 Total</option>
                             </select>
                             <div id="timer-perq-area" style="display:flex; align-items:center; gap:5px;">
-                                <input type="number" id="quiz-set-all-timer" value="60" style="width:40px; padding:3px; border-radius:8px; border:1px solid #ddd; font-weight:bold; text-align:center; margin:0; font-size:0.85em;">
+                                <input type="number" id="quiz-set-all-timer" value="60" style="width:55px; padding:3px; border-radius:8px; border:1px solid #ddd; font-weight:bold; text-align:center; margin:0; font-size:0.85em;">
                                 <button class="btn-sm" onclick="setAllQuestionTimers()" style="background:#f39c12; color:white; border:none; padding:4px 10px; border-radius:10px; font-weight:bold; font-size:0.7em; box-shadow:0 4px 6px rgba(243,156,18,0.2);">Apply</button>
                             </div>
                             <div id="timer-total-area" style="display:none; align-items:center; gap:5px;">
-                                <input type="number" id="quiz-total-timer" value="300" style="width:60px; padding:3px; border-radius:8px; border:1px solid #ddd; font-weight:bold; text-align:center; margin:0; font-size:0.85em;">
+                                <input type="number" id="quiz-total-timer" value="300" style="width:70px; padding:3px; border-radius:8px; border:1px solid #ddd; font-weight:bold; text-align:center; margin:0; font-size:0.85em;">
                             </div>
                         </div>
 
@@ -3257,7 +3266,16 @@
         window.selectDesignStyle = function(el) {
             document.querySelectorAll('.style-option').forEach(opt => opt.classList.remove('active'));
             el.classList.add('active');
-            document.getElementById('selected-design-style').value = el.dataset.style;
+            const style = el.dataset.style;
+            document.getElementById('selected-design-style').value = style;
+            
+            // 🔥 V87.18: Infographic Requirement
+            const promptInput = document.getElementById('design-prompt');
+            if (style.toLowerCase().includes('infographic')) {
+                promptInput.placeholder = "💡 [Infographic Mode] Enter: Task, Context, Core Instruction, Constraint, Output (or describe your idea and AI will structure it!)";
+            } else {
+                promptInput.placeholder = "Describe the image you want to create...";
+            }
         };
 
         window.generateAIDesign = async function() {
@@ -3275,12 +3293,33 @@
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Refining...';
                 
                 // Step 1: AI Translation & Enhancement (Refinement)
-                const enhancerPrompt = `You are an expert AI Prompt Engineer.
+                let enhancerPrompt = `You are an expert AI Prompt Engineer.
                 Translate the following user prompt (e.g. from Thai) into professional English and enhance it with artistic details (lighting, composition, mood) suitable for ${engine}.
                 Style: ${style}
                 User Prompt: "${promptInput.value}"
                 
                 OUTPUT ONLY THE ENHANCED ENGLISH PROMPT STRING. NO EXPLANATIONS.`;
+
+                // 🔥 V87.18: Infographic Strict Structure
+                if (style.toLowerCase().includes('infographic')) {
+                    enhancerPrompt = `You are an expert AI Prompt Engineer specializing in Infographic Design and Data Visualization.
+                    The user wants to create an Infographic. The final prompt MUST strictly follow this structured framework:
+                    
+                    👉 [TASK]: [The core goal/message the infographic must convey]
+                    👉 [CONTEXT]: [The setting, target audience, or background story]
+                    👉 [CORE INSTRUCTION]: [The primary directive or step-by-step logic for the infographic's flow]
+                    👉 [CONSTRAINT]: [Color palette, typography, layout style, elements to include/exclude, technical details]
+                    👉 [OUTPUT]: [Visual characteristics: lighting, resolution, medium, overall artistic mood]
+
+                    User Input Draft: "${promptInput.value}"
+                    
+                    Instructions:
+                    1. Rephrase the user input into professional graphic design terminology in English.
+                    2. If any of the 5 components (Task, Context, Core Instruction, Constraint, Output) are missing or weak, use your creative expertise to fill them in logically to create a high-quality visualization.
+                    3. ALWAYS include all 5 headings in your output.
+                    
+                    OUTPUT ONLY THE STRUCTURED ENGLISH PROMPT. NO EXPLANATIONS.`;
+                }
                 
                 const { text: enhancedPrompt } = await callUniversalAI('gemini-2.0-flash', enhancerPrompt);
                 
@@ -4240,14 +4279,16 @@
             const correct = Array.isArray(rawCorrect) ? rawCorrect.map(v => parseInt(v)) : [parseInt(rawCorrect)];
 
             div.innerHTML = `
-                <!-- Reorganized Question Card Header (V87.16) -->
+                <!-- Reorganized Question Card Header (V87.25) -->
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; background:#f8faff; border:1px solid #e1e7f0; border-radius:18px; padding:10px 15px; flex-wrap:wrap; gap:12px; box-shadow:0 4px 6px rgba(0,0,0,0.02);">
                     
-                    <!-- Group A: Core Tools (V87.22) -->
-                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                        <span style="background:var(--primary); color:white; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.85em; box-shadow:0 2px 4px rgba(67,97,238,0.3);" class="q-index-badge">?</span>
+                    <!-- Unified Question Header (V87.25) -->
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; flex:1;">
+
+                        <span style="background:var(--primary); color:white; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.85em; box-shadow:0 2px 4px rgba(67,97,238,0.3); flex-shrink:0;" class="q-index-badge">?</span>
                         
-                        <div style="display:flex; align-items:center; background: rgba(0,0,0,0.03); padding:4px 8px; border-radius:14px; border:1px solid rgba(0,0,0,0.05); gap:10px;">
+                        <div style="display:flex; align-items:center; background: rgba(255,255,255,0.8); padding:4px 12px; border-radius:16px; border:1px solid rgba(0,0,0,0.06); gap:12px; flex-wrap:wrap; box-shadow:0 2px 5px rgba(0,0,0,0.02);">
+                            <!-- interaction Type -->
                             <div class="glass-toggle-container q-type-toggle" style="background: transparent; transform: scale(0.85); transform-origin: left center; flex-shrink:0; margin:0;" title="Select the interaction type for this question">
                                 <div class="glass-toggle-item ${qType === 'choice' ? 'active' : ''}" data-value="choice" onclick="selectQTypeToggle(this, 'choice')">Choice</div>
                                 <div class="glass-toggle-item ${qType === 'short_answer' ? 'active' : ''}" data-value="short_answer" onclick="selectQTypeToggle(this, 'short_answer')">Short</div>
@@ -4256,61 +4297,59 @@
                             </div>
                             <input type="hidden" class="q-type" value="${qType}">
 
-                            <div style="width:1.5px; height:18px; background:rgba(0,0,0,0.08);"></div>
-
-                            <div style="display:flex; align-items:center; gap:6px; padding:2px 0;" title="Individual Timer for this question (seconds)">
+                            <div style="width:1px; height:20px; background:rgba(0,0,0,0.08);"></div>
+                            <!-- Timer -->
+                            <div style="display:flex; align-items:center; gap:5px;" title="Individual Timer (seconds)">
                                 <label style="font-size:0.75em; color:#adb5bd; font-weight:800; cursor:default;"><i class="fa-solid fa-clock"></i></label>
-                                <input type="number" class="q-timer" value="${data ? (data.timer || 60) : (document.getElementById('quiz-set-all-timer') ? document.getElementById('quiz-set-all-timer').value : 60)}" style="width:40px; margin:0; padding:0; border:none; background:transparent; font-weight:800; text-align:center; font-size:0.95em; color:var(--primary); outline:none;">
+                                <input type="number" class="q-timer" value="${data ? (data.timer || 60) : (document.getElementById('quiz-set-all-timer') ? document.getElementById('quiz-set-all-timer').value : 60)}" style="width:55px; margin:0; padding:0; border:none; background:transparent; font-weight:800; text-align:center; font-size:0.9em; color:var(--primary); outline:none; appearance: textfield;">
                             </div>
-                        </div>
-                    </div>
+                            <div style="width:1px; height:20px; background:rgba(0,0,0,0.08);"></div>
+                            <!-- AI Input Tools -->
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <button type="button" class="btn-sm" onclick="triggerSmartPaste(this)" title="Smart Paste Text" style="background:none; border:none; color:var(--primary); font-size:0.85em; padding:4px; display:flex; align-items:center; gap:4px; font-weight:700;">
+                                   <i class="fa-solid fa-paste"></i> <span style="font-size:0.8em;">Paste</span>
+                                </button>
+                                <button type="button" class="btn-sm" onclick="triggerAiVisionScan(this)" title="AI Vision Scan (Upload Image)" style="background:none; border:none; color:#e91e63; font-size:0.85em; padding:4px; display:flex; align-items:center; gap:4px; font-weight:700;">
+                                    <i class="fa-solid fa-camera"></i> <span style="font-size:0.8em;">Scan</span>
+                                </button>
+                            </div>
 
-                    <!-- Group B: AI Toolkit & Actions -->
-                    <div style="display:flex; align-items:center; gap:12px; flex-wrap:nowrap; justify-content:flex-end;">
-                        <!-- AI Tools (Grouped) -->
-                        <div style="display:flex; align-items:center; gap:8px; background:rgba(67,97,238,0.03); padding:4px 10px; border-radius:15px; border:1px solid rgba(67,97,238,0.1);">
-                            <button type="button" class="btn-sm" onclick="triggerSmartPaste(this)" title="Smart Paste" style="background:#fff; color:var(--primary); font-size:0.7em; padding:6px 12px; border:1px solid #d0d7de; border-radius:10px; font-weight:700; white-space:nowrap; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
-                               <i class="fa-solid fa-paste"></i> <span>Paste</span>
-                            </button>
+                            <div style="width:1px; height:20px; background:rgba(0,0,0,0.08);"></div>
 
-                            <button type="button" class="btn-sm" onclick="triggerAiVisionScan(this)" title="AI Vision Scan (Upload Image)" style="background:#fff; color:#e91e63; font-size:0.7em; padding:6px 12px; border:1px solid #fce4ec; border-radius:10px; font-weight:700; white-space:nowrap; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
-                                <i class="fa-solid fa-camera"></i> <span>Scan</span>
-                            </button>
-
-                            <div style="display:flex; align-items:center; gap:6px;" title="AI Model selection">
-                                <div class="glass-toggle-container ai-model-toggle" style="background:transparent; transform:scale(0.8); transform-origin:left center; padding:0; gap:2px;">
+                            <!-- AI Settings -->
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <div class="glass-toggle-container ai-model-toggle" style="background:rgba(0,0,0,0.03); transform:scale(0.8); transform-origin:left center; padding:2px; gap:2px; border-radius:10px;">
                                     <div class="glass-toggle-item active" data-value="gemini-flash-latest" onclick="selectAiToggle(this, 'gemini-flash-latest')" title="Flash">⚡</div>
                                     <div class="glass-toggle-item" data-value="gpt-4o-mini" onclick="selectAiToggle(this, 'gpt-4o-mini')" title="Smart">🟢</div>
                                     <div class="glass-toggle-item" data-value="typhoon-v2.5-30b-a3b-instruct" onclick="selectAiToggle(this, 'typhoon-v2.5-30b-a3b-instruct')" title="Regional">🌀</div>
                                 </div>
                                 <input type="hidden" class="ai-model-quiz" value="gemini-flash-latest">
-                            </div>
 
-                            <div style="display:flex; align-items:center; gap:6px;" title="Language selection">
-                                <div class="glass-toggle-container ai-lang-toggle" style="background:transparent; transform:scale(0.8); transform-origin:left center; padding:0; gap:2px;">
+                                <div class="glass-toggle-container ai-lang-toggle" style="background:rgba(0,0,0,0.03); transform:scale(0.8); transform-origin:left center; padding:2px; gap:2px; border-radius:10px;">
                                     <div class="glass-toggle-item active" data-value="Thai" onclick="selectAiToggle(this, 'Thai')" title="Thai">🇹🇭</div>
                                     <div class="glass-toggle-item" data-value="English" onclick="selectAiToggle(this, 'English')" title="English">🇺🇸</div>
                                 </div>
                                 <input type="hidden" class="ai-lang-quiz" value="Thai">
                             </div>
 
-                            <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Enhance" style="background:linear-gradient(135deg, var(--primary), #6366f1); color:white; padding:8px 14px; border:none; border-radius:12px; font-weight:bold; font-size:0.7em; display:flex; align-items:center; gap:5px; box-shadow:0 4px 10px rgba(67,97,238,0.25); transition:transform 0.2s;">
-                                <i class="fa-solid fa-robot"></i> <span class="btn-text">Enhance</span>
+                            <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Enhance Content" style="background:linear-gradient(135deg, var(--primary), #6366f1); color:white; padding:6px 12px; border:none; border-radius:10px; font-weight:bold; font-size:0.7em; display:flex; align-items:center; gap:5px; box-shadow:0 3px 8px rgba(67,97,238,0.2); transition:transform 0.2s;">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> <span class="btn-text">Enhance</span>
                             </button>
-                        </div>
-
-                        <!-- Actions -->
-                        <div style="display:flex; align-items:center; gap:6px;">
-                            <button type="button" class="btn-sm" onclick="copyQuestionToClipboard(this)" title="Copy Content" style="width:32px; height:32px; border-radius:10px; background:#fff; border:1px solid #d0d7de; color:#6366f1; padding:0; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
-                                <i class="fa-solid fa-copy" style="font-size:0.85em;"></i>
-                            </button>
-                            <button type="button" class="btn-sm" onclick="duplicateQuestion(this)" title="Clone Question" style="width:32px; height:32px; border-radius:10px; background:#fff; border:1px solid #d0d7de; color:#2ecc71; padding:0; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
-                                <i class="fa-solid fa-clone" style="font-size:0.85em;"></i>
-                            </button>
-                            <button class="btn-sm btn-danger" onclick="if(confirm('Delete this question?')){this.closest('.quiz-q-item').remove(); updateQuizPagination();}" style="width:32px; height:32px; padding:0; border-radius:10px; flex-shrink:0; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(239,35,60,0.15);" title="Remove Question"><i class="fa-solid fa-trash-can" style="font-size:0.85em;"></i></button>
                         </div>
                     </div>
+
+                    <!-- Actions (Far Right) -->
+                    <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                        <button type="button" class="btn-sm" onclick="copyQuestionToClipboard(this)" title="Copy Content" style="width:30px; height:30px; border-radius:10px; background:#fff; border:1px solid #d0d7de; color:#6366f1; padding:0; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
+                            <i class="fa-solid fa-copy" style="font-size:0.8em;"></i>
+                        </button>
+                        <button type="button" class="btn-sm" onclick="duplicateQuestion(this)" title="Clone Question" style="width:30px; height:30px; border-radius:10px; background:#fff; border:1px solid #d0d7de; color:#2ecc71; padding:0; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
+                            <i class="fa-solid fa-clone" style="font-size:0.8em;"></i>
+                        </button>
+                        <button class="btn-sm btn-danger" onclick="if(confirm('Delete this question?')){this.closest('.quiz-q-item').remove(); updateQuizPagination();}" style="width:30px; height:30px; padding:0; border-radius:10px; flex-shrink:0; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(239,35,60,0.15);" title="Remove Question"><i class="fa-solid fa-trash-can" style="font-size:0.8em;"></i></button>
+                    </div>
                 </div>
+
 
                 <!-- Input Area (V87.0 Consolidated Title) -->
                 <div style="margin-bottom:15px; position:relative;">
@@ -4560,7 +4599,7 @@
         }
 
         function handleQuestionPaste(e, textarea) {
-            // Check for image in clipboard (V87.22)
+            // Check for image in clipboard (V87.24)
             const items = (e.clipboardData || e.originalEvent.clipboardData).items;
             for (let i = 0; i < items.length; i++) {
                 if (items[i].type.indexOf("image") !== -1) {
