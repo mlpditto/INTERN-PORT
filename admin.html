@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V87.16)</title>
+    <title>Internship Portfolio (V87.17)</title>
     <!-- V87.16: Quiz Editor UI (Blended Toolkit) -->
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -69,6 +69,25 @@
             </div>
             <div id="lb-popup-stats"
                 style="display:flex; justify-content:space-around; align-items:center; font-size:1em; color:#444; padding:15px; background:#f8f9fa; border-radius:10px;">
+            </div>
+        </div>
+    </div>
+    
+    <!-- AI Design Prompt Editor Modal (V87.17) -->
+    <div id="aiDesignPromptModal" class="modal" style="display:none; z-index:9999; backdrop-filter: blur(10px); background: rgba(0,0,0,0.4); align-items:center; justify-content:center;">
+        <div class="modal-content" style="max-width:700px; border-radius:24px; padding:30px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); animation: modalPop 0.3s ease-out; border:none;">
+            <h3 style="margin-top:0; color:var(--primary); display:flex; align-items:center; gap:10px; font-size:1.3em;">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> AI Refined Prompt
+            </h3>
+            <p style="font-size:0.85em; color:#666; margin-bottom:15px; line-height:1.5;">AI has enhanced your request for better artistic results. Feel free to tweak the English description below before proceeding.</p>
+            
+            <textarea id="ai-design-refined-text" style="width:100%; height:220px; border-radius:15px; border:1.5px solid #e1e7f0; padding:15px; font-size:0.95em; line-height:1.6; margin-bottom:20px; outline:none; background:#fcfdff; font-family:inherit;"></textarea>
+            
+            <div style="display:flex; justify-content:flex-end; gap:12px;">
+                <button class="btn-sm" onclick="closeAiDesignPromptModal()" style="background:#f1f5f9; color:#666; border:none; padding:10px 22px; border-radius:12px; font-weight:bold; font-size:0.9em;">Cancel</button>
+                <button id="btn-design-proceed" class="btn-sm" style="background:linear-gradient(135deg, var(--primary), #6366f1); color:white; border:none; padding:10px 28px; border-radius:12px; font-weight:bold; font-size:0.9em; box-shadow:0 4px 12px rgba(67,97,238,0.3); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                    Create Masterpiece
+                </button>
             </div>
         </div>
     </div>
@@ -785,6 +804,11 @@
             margin-top: 15px;
         }
 
+        @keyframes modalPop {
+            0% { transform: scale(0.95); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
         .btn-del-hist {
             padding: 2px 6px;
             font-size: 0.7em;
@@ -1074,7 +1098,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.16</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.17</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -3233,9 +3257,28 @@
                 
                 const { text: enhancedPrompt } = await callUniversalAI('gemini-2.0-flash', enhancerPrompt);
                 
-                // Step 2: Show Confirmation Modal
-                const userConfirmed = confirm("✨ AI has refined your request for better results:\n\n\"" + enhancedPrompt + "\"\n\nGenerate masterpiece image now?");
-                if (!userConfirmed) {
+                // Step 2: Show Prompt Editor Modal (V87.17)
+                const finalPrompt = await new Promise((resolve) => {
+                    const modal = document.getElementById('aiDesignPromptModal');
+                    const textArea = document.getElementById('ai-design-refined-text');
+                    const proceedBtn = document.getElementById('btn-design-proceed');
+                    
+                    textArea.value = enhancedPrompt;
+                    modal.style.display = 'flex';
+                    
+                    proceedBtn.onclick = () => {
+                        const val = textArea.value.trim();
+                        modal.style.display = 'none';
+                        resolve(val);
+                    };
+                    
+                    window.closeAiDesignPromptModal = () => {
+                        modal.style.display = 'none';
+                        resolve(null);
+                    };
+                });
+
+                if (!finalPrompt) {
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Create Masterpiece';
                     return;
@@ -3245,12 +3288,12 @@
                 previewContainer.innerHTML = `
                     <div class="loader-container" style="text-align:center;">
                         <i class="fa-solid fa-wand-sparkles fa-beat" style="font-size:4em; color:#e67e22; margin-bottom:20px;"></i>
-                        <h3>Brewing your vision...</h3>
-                        <p style="color:#888;">AI is interpreting your prompt.</p>
+                        <h3>Manifesting your masterpiece...</h3>
+                        <p style="color:#888;">AI is interpreting your refined vision.</p>
                     </div>
                 `;
 
-                const { text: imageUrl } = await callUniversalAI(engine, enhancedPrompt);
+                const { text: imageUrl } = await callUniversalAI(engine, finalPrompt);
 
                 previewContainer.innerHTML = `<img src="${imageUrl}" id="generated-image" style="max-width:100%; max-height:100%; border-radius:15px; box-shadow:0 10px 40px rgba(0,0,0,0.15);">`;
                 actions.style.display = "flex";
