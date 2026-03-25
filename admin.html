@@ -4272,6 +4272,10 @@
                                <i class="fa-solid fa-paste"></i> <span>Paste</span>
                             </button>
 
+                            <button type="button" class="btn-sm" onclick="triggerAiVisionScan(this)" title="AI Vision Scan (Upload Image)" style="background:#fff; color:#e91e63; font-size:0.7em; padding:6px 12px; border:1px solid #fce4ec; border-radius:10px; font-weight:700; white-space:nowrap; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
+                                <i class="fa-solid fa-camera"></i> <span>Scan</span>
+                            </button>
+
                             <div style="display:flex; align-items:center; gap:6px;" title="AI Model selection">
                                 <div class="glass-toggle-container ai-model-toggle" style="background:transparent; transform:scale(0.8); transform-origin:left center; padding:0; gap:2px;">
                                     <div class="glass-toggle-item active" data-value="gemini-flash-latest" onclick="selectAiToggle(this, 'gemini-flash-latest')" title="Flash">⚡</div>
@@ -4459,7 +4463,114 @@
             }
         }
 
+        async function triggerAiVisionScan(btn) {
+            const item = btn.closest('.quiz-q-item');
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*';
+            fileInput.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (file) processQuizVision(file, item, btn);
+            };
+            fileInput.click();
+        }
+
+        async function processQuizVision(imageBlob, item, btn = null) {
+            const oldHtml = btn ? btn.innerHTML : null;
+            if (btn) {
+                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Scanning...</span>`;
+                btn.disabled = true;
+            }
+
+            try {
+                // Read as base64
+                const reader = new FileReader();
+                reader.onload = async () => {
+                    const base64 = reader.result.split(',')[1];
+                    const aiModel = item.querySelector('.ai-model-quiz').value;
+                    const aiLang = item.querySelector('.ai-lang-quiz').value;
+
+                    const prompt = `Task: Extract quiz question and options from this image.
+                    Requirements:
+                    1. Detect if it's a Multiple Choice, True/False, or Short Answer.
+                    2. If choices are A, B, C, D... extract them as an array of strings.
+                    3. If a correct answer is clearly highlighted, circled, or marked, specify the index.
+                    4. Output strictly JSON.
+                    JSON Format: {
+                      "q": "The question text...",
+                      "options": ["Opt 1", "Opt 2", ...],
+                      "correct": [index],
+                      "type": "choice" | "short_answer"
+                    }
+                    Language for output: ${aiLang}`;
+
+                    const res = await callUniversalAI(prompt, aiModel, 0.2, {
+                        image_base64: base64,
+                        image_mimetype: imageBlob.type || 'image/png'
+                    });
+
+                    // Parse JSON from markdown block
+                    const jsonMatch = res.match(/\{[\s\S]*\}/);
+                    if (!jsonMatch) throw new Error("Could not parse AI vision response.");
+                    const data = JSON.parse(jsonMatch[0]);
+
+                    // Update UI
+                    item.querySelector('.q-text').value = data.q;
+                    if (data.type) {
+                       const typeToggle = item.querySelector(`.glass-toggle-item[data-value="${data.type}"]`);
+                       if (typeToggle) selectQTypeToggle(typeToggle, data.type);
+                    }
+                    
+                    if (data.options && data.options.length > 0) {
+                        const optContainer = item.querySelector('.options-container');
+                        optContainer.innerHTML = "";
+                        const qId = item.dataset.qId;
+                        data.options.forEach((opt, idx) => {
+                            const isCorrect = data.correct && data.correct.includes(idx);
+                            const optHtml = `
+                            <div class="q-opt-row ${isCorrect ? 'is-correct' : ''}" style="display:flex; align-items:center; gap:10px; background:${isCorrect ? '#f0fdf4' : '#fff'}; border:1.5px solid ${isCorrect ? '#bbf7d0' : '#f1f5f9'}; border-radius:14px; padding:8px 12px;">
+                                <label class="correct-circle-label" style="width:32px; height:32px; flex-shrink:0; cursor:pointer;">
+                                    <input type="checkbox" name="q-correct-${qId}" value="${idx}" class="q-correct-check" ${isCorrect ? 'checked' : ''} onchange="toggleOptionCorrect(this)">
+                                    <span class="circle-content">${idx+1}</span>
+                                </label>
+                                <textarea class="q-opt" style="flex:1; margin:0; padding:8px; border:none; background:transparent;">${opt}</textarea>
+                                <button type="button" onclick="removeOption(this)" style="background:none; border:none; color:#ddd;">✕</button>
+                            </div>`;
+                            optContainer.insertAdjacentHTML('beforeend', optHtml);
+                        });
+                        item.querySelector('.options-container').style.display = 'flex';
+                        item.querySelector('.options-actions').style.display = 'block';
+                    }
+
+                    showToast("AI Vision Scan Complete!");
+                    triggerAutoSave();
+                };
+                reader.readAsDataURL(imageBlob);
+            } catch (e) {
+                alert("Vision error: " + e.message);
+                console.error(e);
+            } finally {
+                if (btn) {
+                    btn.innerHTML = oldHtml;
+                    btn.disabled = false;
+                }
+            }
+        }
+
         function handleQuestionPaste(e, textarea) {
+            // Check for image in clipboard (V87.21)
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf("image") !== -1) {
+                    const blob = items[i].getAsFile();
+                    const item = textarea.closest('.quiz-q-item');
+                    if (confirm("Image detected in clipboard. Use AI Vision to scan and import this question?")) {
+                        processQuizVision(blob, item);
+                    }
+                    return; // Stop processing text if it was an image
+                }
+            }
+
             const text = (e.clipboardData || window.clipboardData).getData('text');
             if (!text) return;
             const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
