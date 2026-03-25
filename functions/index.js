@@ -14,7 +14,7 @@ const AUTH_SECRET = "mlp-secret-8888"; // Basic shared secret between admin.html
  * 🤖 AI Proxy Function (V86.85)
  * Handles: Gemini, OpenAI, and Vertex AI (Imagen 3)
  */
-exports.callAIProxy = onRequest({ cors: true, secrets: ["OPENAI_API_KEY"] }, async (req, res) => {
+exports.callAIProxy = onRequest({ cors: true, secrets: ["OPENAI_API_KEY", "GEMINI_API_KEY"] }, async (req, res) => {
     try {
         // 1. Basic Auth Check (Custom Header)
         const authHeader = req.headers["x-mlp-secret"];
@@ -67,7 +67,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["OPENAI_API_KEY"] }, asy
                 n: 1,
                 size: "1024x1024"
             } : {
-                model: model.includes('4') ? 'gpt-4o' : 'gpt-3.5-turbo',
+                model: model.includes('gpt-4') ? model : (model.includes('gpt-3.5') ? model : 'gpt-4o-mini'),
                 messages: [{ role: "user", content: prompt }],
                 response_format: isJson ? { type: "json_object" } : undefined,
                 temperature: 0.7
@@ -90,7 +90,8 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["OPENAI_API_KEY"] }, asy
             const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
             
             const response = await axios.post(endpoint, {
-                contents: [{ parts: [{ text: prompt }] }]
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: isJson ? { responseMimeType: "application/json" } : {}
             });
 
             const text = response.data.candidates[0].content.parts[0].text;
