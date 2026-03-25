@@ -76,6 +76,14 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+## [2026-03-25] Session Updates (V87.11 → V87.12)
+
+### 1. Blended Quiz Toolkit UI (V87.12)
+- **Seamless Toolbar:** Fully blended the Quiz Editor tools into a single, cohesive row-based toolbar.
+- **Eliminated Separators:** Removed the internal divider line and separate row structure to create a more integrated, tool-focused experience.
+- **Dynamic Layout:** Uses a continuous flex-flow to group the Question Counter, Timer settings, AI Analysis, and Navigation tools without visual breaks.
+- **Enhanced Spacing:** Refined gaps and padding to maintain clarity while consolidating elements vertically.
+
 ## [2026-03-25] Session Updates (V87.10 → V87.11)
 
 ### 1. Unified Quiz Toolkit UI (V87.11)
