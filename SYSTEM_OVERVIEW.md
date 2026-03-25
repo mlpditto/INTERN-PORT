@@ -76,6 +76,14 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+## [2026-03-25] Session Updates (V87.10 → V87.11)
+
+### 1. Unified Quiz Toolkit UI (V87.11)
+- **Consolidated Toolbar:** Merged the Timer/AI configuration bar and the Question navigation bar into a single, unified premium card.
+- **Header Integration:** Moved the "Questions (count)" label into the unified toolbar header, eliminating the separate `<h3>` element to reduce vertical clutter.
+- **Navigation Flow:** Reorganized the tool layout to ensure functional buttons (+, Import, Arrows) are grouped together, while the question pagination numbers are placed at the end to prevent them from separating the action tools.
+- **Premium Aesthetics:** Added glassmorphism effects, improved shadows, and consistent padding to match the high-end portal design.
+
 ## [2026-03-23] Session Updates (V86.14 → V86.16)
 
 ### 1. Reflective Log Detail View (Admin)
