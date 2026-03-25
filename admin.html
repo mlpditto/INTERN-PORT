@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V87.27)</title>
-    <!-- V87.27: Quiz Editor & AI Infographic Framework -->
+    <title>Internship Portfolio (V87.28)</title>
+    <!-- V87.28: AI Vision Scan FIX (Multimodal Argument Routing) -->
 
     <style>
         /* Hide Spinners/Controllers for q-timer */
@@ -3077,10 +3077,28 @@
                     else if (modelName.includes('flash')) actualModelName = "gemini-flash-latest";
                     else actualModelName = "gemini-flash-latest";
 
-                    let model = genAI.getGenerativeModel({ model: actualModelName });
+                    // V87.28: Add JSON mode support for Gemini
+                    let modelConfig = { model: actualModelName };
+                    if (isJson) {
+                        modelConfig.generationConfig = { responseMimeType: "application/json" };
+                    }
+                    let model = genAI.getGenerativeModel(modelConfig);
                     let result;
                     try {
-                        result = await model.generateContent(prompt);
+                        let parts = prompt;
+                        // V87.28 Handle Vision Data for local Gemini call
+                        if (visionData && visionData.image_base64) {
+                            parts = [
+                                { text: prompt },
+                                { 
+                                    inlineData: { 
+                                        data: visionData.image_base64.includes('base64,') ? visionData.image_base64.split('base64,')[1] : visionData.image_base64, 
+                                        mimeType: visionData.image_mimetype || "image/png" 
+                                    } 
+                                }
+                            ];
+                        }
+                        result = await model.generateContent(parts);
                     } catch (e) {
                         console.warn("AI Generation failed, trying fallback to gemini-flash-latest", e);
                         actualModelName = "gemini-flash-latest";
@@ -3093,15 +3111,15 @@
                     text = response.text();
                     if (!text) throw new Error("Empty response from Gemini AI");
                 } else if (modelName.includes('multimodal')) {
+                    // Legacy multimodal block (Deprioritized in V87.28)
                     if (GEMINI_API_KEY.includes('__')) throw new Error("Proxy failed and no local Gemini Key set for vision.");
                     
                     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
                     const parts = [
-                        { text: prompt.text },
-                        { inlineData: { data: prompt.imageBase64.split(',')[1], mimeType: "image/jpeg" } }
+                        { text: typeof prompt === 'object' ? prompt.text : prompt },
+                        { inlineData: { data: (typeof prompt === 'object' && prompt.imageBase64) ? prompt.imageBase64.split(',')[1] : (visionData ? visionData.image_base64 : ''), mimeType: "image/jpeg" } }
                     ];
 
-                    // Simplified fallback for multimodal as per new instruction
                     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
                     const result = await model.generateContent(parts);
                     const response = await result.response;
@@ -3143,7 +3161,17 @@
                 } else if (modelName.includes('gpt')) {
                     if (OPENAI_API_KEY.includes('__')) throw new Error("Proxy failed and no local OpenAI API Key set.");
                     let messages = [];
-                    if (typeof prompt === 'object' && prompt.imageBase64) {
+                    // V87.28: Support both implicit (prompt object) and explicit (visionData) multimodal calls
+                    if (visionData && visionData.image_base64) {
+                        const imgUrl = visionData.image_base64.startsWith('data:') ? visionData.image_base64 : `data:${visionData.image_mimetype || 'image/png'};base64,${visionData.image_base64.includes('base64,') ? visionData.image_base64.split('base64,')[1] : visionData.image_base64}`;
+                        messages = [{
+                            role: "user",
+                            content: [
+                                { type: "text", text: prompt },
+                                { type: "image_url", image_url: { url: imgUrl } }
+                            ]
+                        }];
+                    } else if (typeof prompt === 'object' && prompt.imageBase64) {
                         messages = [{
                             role: "user",
                             content: [
@@ -4544,7 +4572,7 @@
                     }
                     Language for output: ${aiLang}`;
 
-                    const res = await callUniversalAI(prompt, aiModel, 0.2, {
+                    const res = await callUniversalAI(aiModel, prompt, true, {
                         image_base64: base64,
                         image_mimetype: imageBlob.type || 'image/png'
                     });

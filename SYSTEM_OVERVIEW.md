@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V87.27) Overview
+# MLP Internship Portfolio (V87.28) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -76,6 +76,14 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-03-25] Session Updates (V87.27 → V87.28)
+
+### 1. AI Vision Scan Fix (V87.28)
+- **Multimodal Routing:** Fixed a critical bug in `processQuizVision` where incorrect argument ordering prevented the AI from receiving the image data.
+- **Local Key Support:** Improved `callUniversalAI` to correctly handle `visionData` (multimodal) when falling back to local Gemini and GPT API keys.
+- **Gemini JSON Mode:** Enabled JSON response support for Gemini models to ensure structured extraction from images.
+- **Homogenized API:** Standardized how vision data is passed across different providers (Proxy, Gemini, GPT) to ensure stability.
 
 ## [2026-03-25] Session Updates (V87.16 → V87.27)
 
@@ -501,4 +509,4 @@ service cloud.firestore {
     - **Date & Time Formatting:** ปรับการแสดงผลวันที่และเวลาให้ใช้รูปแบบ `en-US` (เช่น Mar 23, 2026) ทั่วทั้งระบบเพื่อความสม่ำเสมอ
 
 ---
-*บันทึกภาพรวมระบบฉบับสมบูรณ์ (V87.27) โดย Antigravity AI*
+*บันทึกภาพรวมระบบสะท้อนความจริง (V87.28) โดย Antigravity AI*
