@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V86.97)</title>
+    <title>Internship Portfolio (V86.98)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -1066,7 +1066,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.97</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V86.98</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -2231,9 +2231,18 @@
                         <input type="number" id="quiz-total-timer" value="300" style="width:80px; padding:4px 8px; border-radius:10px; border:1px solid #ddd; font-weight:bold; text-align:center;">
                     </div>
 
-                    <button class="btn-sm" onclick="analyzeQuizAI()" style="background:#8e44ad; color:white; border:none; padding:6px 15px; border-radius:12px; font-weight:bold; font-size:0.8em; display:flex; align-items:center; gap:6px; box-shadow:0 4px 10px rgba(142,68,173,0.2);">
-                        <i class="fa-solid fa-microchip"></i> AI Analyze Quiz
-                    </button>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <div class="glass-toggle-container ai-analyzer-model" style="background:rgba(142,68,173,0.1); transform:scale(0.85); transform-origin:right center; flex-shrink:0;">
+                            <div class="glass-toggle-item active" data-value="gemini-1.5-pro" onclick="selectAiToggle(this, 'gemini-1.5-pro')" title="Gemini 1.5 Pro (Brain)">🧠 Pro</div>
+                            <div class="glass-toggle-item" data-value="gemini-flash-latest" onclick="selectAiToggle(this, 'gemini-flash-latest')" title="Gemini 1.5 Flash (Fast)">⚡ Flash</div>
+                            <div class="glass-toggle-item" data-value="gpt-4o" onclick="selectAiToggle(this, 'gpt-4o')" title="GPT-4o (Smart)">🟢 4o</div>
+                            <div class="glass-toggle-item" data-value="typhoon-v1.5x-70b-instruct" onclick="selectAiToggle(this, 'typhoon-v1.5x-70b-instruct')" title="Typhoon 70B">🌀 T</div>
+                        </div>
+                        <input type="hidden" id="ai-analyzer-model-val" value="gemini-1.5-pro">
+                        <button class="btn-sm" onclick="analyzeQuizAI()" style="background:#8e44ad; color:white; border:none; padding:6px 15px; border-radius:12px; font-weight:bold; font-size:0.8em; display:flex; align-items:center; gap:6px; box-shadow:0 4px 10px rgba(142,68,173,0.2);">
+                            <i class="fa-solid fa-microchip"></i> AI Analyze Quiz
+                        </button>
+                    </div>
                 </div>
                 <div
                     style="display:flex; align-items:center; gap:6px; margin-bottom:10px; background:var(--col-bg); padding:8px 10px; border-radius:8px;">
@@ -2746,7 +2755,9 @@
                 Output as a clear summary in Thai. Use bullet points. Keep it professional.
                 Include the suggested titles at the top under "### 🎯 Suggested Titles".`;
                 
-                const { text: analysis, tokens: aiTokens, model: aiModel } = await callUniversalAI('gemini-1.5-pro', prompt);
+                const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-1.5-pro';
+                
+                const { text: analysis, tokens: aiTokens, model: aiModel } = await callUniversalAI(selectedModel, prompt);
                 const qDataJson = JSON.stringify(formData.questions);
 
                 // Show in a styled popup
@@ -2779,7 +2790,7 @@
                     
                     <div style="margin-top:20px; padding-top:15px; border-top:1px solid #eee; font-size:0.7em; color:#999; display:flex; justify-content:space-between;">
                         <span>🚀 Model: <b>${aiModel}</b> | 💡 Tokens: <b>${aiTokens.toLocaleString()}</b></span>
-                        <span style="opacity:0.6">V86.97 Smart Analysis</span>
+                        <span style="opacity:0.6">V86.98 Smart Analysis</span>
                     </div>
                 `;
                 document.body.appendChild(resultDiv);
@@ -2830,7 +2841,8 @@
                   }
                 ]`;
 
-                const { text: resultJson } = await callUniversalAI('gemini-1.5-pro', prompt, true);
+                const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-1.5-pro';
+                const { text: resultJson } = await callUniversalAI(selectedModel, prompt, true);
                 
                 // Parse and strip possible markdown markers
                 const cleanJson = resultJson.replace(/```json/g, "").replace(/```/g, "").trim();
@@ -3043,7 +3055,10 @@
                         });
                         
                         const data = await response.json();
-                        if (!response.ok) throw new Error(data.error?.message || `Vertex AI Error ${response.status}`);
+                        if (!response.ok) {
+                            if (response.status === 401) throw new Error("🔑 Vertex AI Token expired or invalid. Please update your Access Token in AI Settings.");
+                            throw new Error(data.error?.message || `Vertex AI Error ${response.status}`);
+                        }
                         
                         // Vertex AI returns base64
                         const b64 = data.predictions[0].bytesBase64Encoded;
