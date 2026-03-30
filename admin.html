@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V87.28)</title>
+    <title>Internship Portfolio (V87.41)</title>
     <!-- V87.28: AI Vision Scan FIX (Multimodal Argument Routing) -->
 
     <style>
@@ -1107,7 +1107,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.40</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.41</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -5009,6 +5009,18 @@
             const localISOTime = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
 
             document.getElementById('quiz-start-time').value = localISOTime;
+
+            // V87.41: If current deadline is in the past, offer to clear it
+            const deadVal = document.getElementById('quiz-deadline').value;
+            if (deadVal) {
+                const d = new Date(deadVal);
+                if (now > d) {
+                    if (confirm(`⚠️ Current deadline (${d.toLocaleString()}) is in the past.\nWould you like to RESET the deadline to allow immediate entry?`)) {
+                        document.getElementById('quiz-deadline').value = "";
+                    }
+                }
+            }
+
             if (!confirm("🚀 Launch Quiz Immediately? (Status will be set to ACTIVE)")) return;
 
             // Force Active
@@ -5128,8 +5140,8 @@
                 if (att.userId) {
                     const u = usersData.find(x => x.id === att.userId);
                     if (u) {
-                        if (!uImg) uImg = u.pictureUrl;
-                        if (!uName || uName === 'Unknown') uName = u.displayName;
+                        if (!uImg) uImg = u.pictureUrl || '';
+                        if (!uName || uName === 'Unknown') uName = u.displayName || 'Unknown';
                     }
                 }
 
@@ -6364,7 +6376,7 @@
                         <td style="min-width:180px;">
                             <div style="display:flex; flex-wrap:wrap; gap:3px; align-items:center; max-width:220px;">
                                 <button class="btn-sm btn-primary" onclick="openQuizModal('${q.id}')" style="padding:2px 8px;">Edit</button>
-                                <button class="btn-sm btn-dark" onclick="toggleQuizStatus('${q.id}', ${q.isActive})" style="padding:2px 6px; font-size:0.75em;">${q.isActive ? 'End' : 'On'}</button>
+                                <button class="btn-sm btn-dark" onclick="toggleQuizStatus('${q.id}', ${q.isActive})" style="padding:2px 6px; font-size:0.75em;">${q.isActive ? 'End' : 'Live 🚀'}</button>
                                 ${timerMenu}
                                 <button class="btn-sm btn-info" style="background:#4361ee; min-width:36px; padding:2px 6px; justify-content:center;" onclick="showQuizParticipants('${q.id}')" title="Participants"><i class="fa-solid fa-users"></i> <span style="font-size:0.8em; font-weight:bold;">${(window.quizCounts && window.quizCounts[q.id]) || 0}</span></button>
                             </div>
@@ -6713,8 +6725,6 @@
                 renderKanban();
                 renderTable('works');
                 // Pending quizzes update automatically via listener, but we can force check if needed
-            } else if (id === 'tab-laughtale') {
-                renderLaughTale();
             } else if (id === 'tab-research') {
                 loadKnowledgeBase();
             }
@@ -6742,6 +6752,7 @@
                 renderLeaderboard(); 
                 updateAssigneeList(); 
                 renderCertTable(); 
+                drawKanban(); // Update board cards (e.g. if filtering by group)
             });
             db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban);
             db.collection("quests").onSnapshot(s => { questsCache = s.docs.map(d => ({ id: d.id, ...d.data() })); loadActiveQuests(); loadQuestHistory(); loadReflectiveLogsAdmin(); });
@@ -8026,103 +8037,207 @@
             };
             
             // Safety Check
-            if (!cols.Backlog) return;
+            if (!cols.Backlog || !cols.Review) return;
 
-            Object.values(cols).forEach(e => e.innerHTML = "");
+            Object.values(cols).forEach(e => { if (e) e.innerHTML = ""; });
             const cnt = { "Backlog": 0, "Doing": 0, "Review": 0, "Done": 0 };
-            const filter = document.getElementById('board-search').value.toLowerCase();
+            const filterEl = document.getElementById('board-search');
+            const filter = filterEl ? filterEl.value.toLowerCase() : "";
 
             // 1. Render Side Quests
-            Object.keys(sideQuestsCache).forEach(id => {
-                const q = sideQuestsCache[id];
-                if (q.status === 'Archived') return;
+            try {
+                Object.keys(sideQuestsCache).forEach(id => {
+                    const q = sideQuestsCache[id];
+                    if (!q || q.status === 'Archived') return;
 
-                let match = q.title.toLowerCase().includes(filter);
-                if (q.assignees) q.assignees.forEach(u => { if (u.name.toLowerCase().includes(filter)) match = true; });
-                if (!match) return;
+                    let match = (q.title || "").toLowerCase().includes(filter);
+                    if (q.assignees) q.assignees.forEach(u => { if ((u.name || "").toLowerCase().includes(filter)) match = true; });
+                    if (!match) return;
 
-                // Group filtering for Side Quests (If any assignee belongs to the group)
-                if (activeBoardGroup !== 'All') {
-                    let groupMatch = false;
-                    if (q.assigneeIds) {
-                        q.assigneeIds.forEach(uid => {
-                            const u = usersData.find(x => x.id === uid);
-                            if ((u?.group || 'Public') === activeBoardGroup) groupMatch = true;
-                        });
-                    }
-                    if (!groupMatch) return;
-                }
-
-                if (cols[q.status]) {
-                    cnt[q.status]++;
-                    const isProj = q.isProject === true;
-                    const d = document.createElement('div');
-                    d.className = `kanban-card card-${q.status} ${q.isScored ? 'scored' : ''} ${isProj ? 'project' : ''}`;
-                    d.dataset.id = id;
-
-                    let imgs = '<div class="assignee-stack">';
-                    if (q.assignees) q.assignees.forEach(u => imgs += `<img src="${u.pic}" class="assignee-img" title="${u.name}">`);
-                    imgs += '</div>';
-
-                    let timersHtml = "";
-                    if (q.deadline) {
-                        const dl = q.deadline.toMillis ? q.deadline.toMillis() : new Date(q.deadline).getTime();
-                        if (q.status !== 'Done') timersHtml += `<span class="timer-global" data-dead="${dl}">⏳ Exp: ...</span>`;
-                    }
-
-                    let act = "";
-                    if (q.status === 'Done' && q.doneAt) act = `<button class="btn-sm btn-dark" style="width:100%;margin-top:5px;" onclick="archiveSQ('${id}')">📥 archive</button>`;
-                    else if (!q.isScored && q.status !== 'Backlog' && q.status !== 'Done') {
-                        if (q.linkedQuizId) {
-                            act = `<div style="width:100%;margin-top:5px;padding:6px;background:linear-gradient(135deg,#e8f5e9,#e3f2fd);border-radius:8px;text-align:center;font-size:0.78em;color:#555;"><i class="fa-solid fa-link" style="color:#4361ee;"></i> Automated Quiz Score</div>`;
-                        } else {
-                            act = `<button class="btn-sm btn-success" style="width:100%;margin-top:5px;" onclick="giveScore('${id}')">💰 Give Score</button>`;
+                    // Group filtering for Side Quests
+                    if (activeBoardGroup !== 'All') {
+                        let groupMatch = false;
+                        if (q.assigneeIds) {
+                            q.assigneeIds.forEach(uid => {
+                                const u = usersData.find(x => x.id === uid);
+                                if ((u?.group || 'Public') === activeBoardGroup) groupMatch = true;
+                            });
                         }
+                        if (!groupMatch) return;
                     }
 
-                    let arrows = `<div class="arrow-controls">`;
-                    if (q.status !== 'Backlog') arrows += `<button class="btn-arrow" onclick="moveCard('${id}','prev')"><i class="fa-solid fa-chevron-left"></i></button>`;
-                    if (q.status !== 'Done') arrows += `<button class="btn-arrow" onclick="moveCard('${id}','next')"><i class="fa-solid fa-chevron-right"></i></button>`;
-                    arrows += `</div>`;
+                    if (cols[q.status]) {
+                        cnt[q.status]++;
+                        const isProj = q.isProject === true;
+                        const d = document.createElement('div');
+                        d.className = `kanban-card card-${q.status} ${q.isScored ? 'scored' : ''} ${isProj ? 'project' : ''}`;
+                        d.dataset.id = id;
 
-                    const pColor = q.priority === 'High' ? '#ef233c' : (q.priority === 'Medium' ? '#ff9f1c' : '#17a2b8');
-                    const descId = 'admin-sq-desc-' + id;
-                    const descHtml = q.description ? `
-                        <div onclick="toggleSqDesc('${descId}')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:#f1f3f5; padding:4px 8px; border-radius:6px; margin-top:5px; font-size:0.75em; color:#555;">
-                            <span><i class="fa-solid fa-align-left"></i> Description</span>
-                            <i id="icon-${descId}" class="fa-solid fa-chevron-down"></i>
-                        </div>
-                        <div id="${descId}" style="display:none; font-size:0.8em; color:#666; margin-bottom:5px; white-space:pre-wrap; background:#fafafa; padding:8px; border-radius:6px; border:1px solid #eee;">${q.description}</div>
-                    ` : "";
+                        let imgs = '<div class="assignee-stack">';
+                        if (q.assignees) q.assignees.forEach(u => imgs += `<img src="${u.pic || ''}" class="assignee-img" title="${u.name || ''}">`);
+                        imgs += '</div>';
 
-                    d.innerHTML = `
-                        <div class="card-header-row">
-                            <span class="badge" style="background:${pColor}">${q.priority}</span>
-                            <div class="card-header-right">${imgs} ${arrows}</div>
-                        </div>
-                        <div style="font-weight:bold;">${isProj ? '<span class="badge" style="background:#e83e8c;font-size:0.6em;">PROJ</span>' : ''} ${q.title}</div>
-                        <div class="card-timers">${timersHtml}</div>
-                        ${descHtml}
-                        <div class="card-tool-row">
-                            <button class="btn-sm btn-warning" onclick="openTaskModal('${id}')"><i class="fa-solid fa-pen"></i></button>
-                            <button class="btn-sm btn-danger" onclick="startDeleteCard('${id}')"><i class="fa-solid fa-trash"></i></button>
-                        </div>
-                        ${act}`;
-                    cols[q.status].appendChild(d);
-                }
-            });
+                        let timersHtml = "";
+                        if (q.deadline) {
+                            const dl = q.deadline.toMillis ? q.deadline.toMillis() : new Date(q.deadline).getTime();
+                            if (q.status !== 'Done') timersHtml += `<span class="timer-global" data-dead="${dl}">⏳ Exp: ...</span>`;
+                        }
+
+                        let act = "";
+                        if (q.status === 'Done' && q.doneAt) act = `<button class="btn-sm btn-dark" style="width:100%;margin-top:5px;" onclick="archiveSQ('${id}')">📥 archive</button>`;
+                        else if (!q.isScored && q.status !== 'Backlog' && q.status !== 'Done') {
+                            if (q.linkedQuizId) {
+                                act = `<div style="width:100%;margin-top:5px;padding:6px;background:linear-gradient(135deg,#e8f5e9,#e3f2fd);border-radius:8px;text-align:center;font-size:0.78em;color:#555;"><i class="fa-solid fa-link" style="color:#4361ee;"></i> Automated Quiz Score</div>`;
+                            } else {
+                                act = `<button class="btn-sm btn-success" style="width:100%;margin-top:5px;" onclick="giveScore('${id}')">💰 Give Score</button>`;
+                            }
+                        }
+
+                        let arrows = `<div class="arrow-controls">`;
+                        if (q.status !== 'Backlog') arrows += `<button class="btn-arrow" onclick="moveCard('${id}','prev')"><i class="fa-solid fa-chevron-left"></i></button>`;
+                        if (q.status !== 'Done') arrows += `<button class="btn-arrow" onclick="moveCard('${id}','next')"><i class="fa-solid fa-chevron-right"></i></button>`;
+                        arrows += `</div>`;
+
+                        const pColor = q.priority === 'High' ? '#ef233c' : (q.priority === 'Medium' ? '#ff9f1c' : '#17a2b8');
+                        const descId = 'admin-sq-desc-' + id;
+                        const descHtml = q.description ? `
+                            <div onclick="toggleSqDesc('${descId}')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:#f1f3f5; padding:4px 8px; border-radius:6px; margin-top:5px; font-size:0.75em; color:#555;">
+                                <span><i class="fa-solid fa-align-left"></i> Description</span>
+                                <i id="icon-${descId}" class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div id="${descId}" style="display:none; font-size:0.8em; color:#666; margin-bottom:5px; white-space:pre-wrap; background:#fafafa; padding:8px; border-radius:6px; border:1px solid #eee;">${q.description}</div>
+                        ` : "";
+
+                        d.innerHTML = `
+                            <div class="card-header-row">
+                                <span class="badge" style="background:${pColor}">${q.priority || 'Medium'}</span>
+                                <div class="card-header-right">${imgs} ${arrows}</div>
+                            </div>
+                            <div style="font-weight:bold;">${isProj ? '<span class="badge" style="background:#e83e8c;font-size:0.6em;">PROJ</span>' : ''} ${q.title}</div>
+                            <div class="card-timers">${timersHtml}</div>
+                            ${descHtml}
+                            <div class="card-tool-row">
+                                <button class="btn-sm btn-warning" onclick="openTaskModal('${id}')"><i class="fa-solid fa-pen"></i></button>
+                                <button class="btn-sm btn-danger" onclick="startDeleteCard('${id}')"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                            ${act}`;
+                        cols[q.status].appendChild(d);
+                    }
+                });
+            } catch (e) { console.error("Kanban Section 1 Error:", e); }
 
             // 2. Render Pending Reflective Logs in "Review"
-            reflectiveLogsCache.forEach(log => {
-                const isPending = !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null);
-                if (log.isArchived) return; // Never show archived in Kanban
-                if (isPending) {
-                    const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
-                    const time = log.timestamp?.toDate() || new Date();
-                    
-                    if (filter && !log.content.toLowerCase().includes(filter) && !(log.userName || '').toLowerCase().includes(filter)) return;
+            try {
+                reflectiveLogsCache.forEach(log => {
+                    const isPending = !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null);
+                    if (log.isArchived) return;
+                    if (isPending) {
+                        if (filter && !(log.content || "").toLowerCase().includes(filter) && !(log.userName || '').toLowerCase().includes(filter)) return;
 
-                    // Group filtering for Reflective Logs
+                        if (activeBoardGroup !== 'All') {
+                            const user = usersData.find(u => u.id === log.userId);
+                            if ((user?.group || 'Public') !== activeBoardGroup) return;
+                        }
+
+                        cnt["Review"]++;
+                        const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
+                        const d = document.createElement('div');
+                        d.className = 'kanban-card card-Review reflective-card';
+                        d.style.borderLeft = "4px solid #d35400";
+                        d.style.background = "#fffcf5";
+                        
+                        d.innerHTML = `
+                            <div class="card-header-row">
+                                <span class="badge" style="background:#d35400;">Reflective</span>
+                                <div class="card-header-right"><img src="${log.pictureUrl || ''}" class="assignee-img" title="${log.userName || ''}"></div>
+                            </div>
+                            <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${log.userName || 'Unknown'}</div>
+                            <div style="font-size:0.85em; color:#444; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${moodEmoji} ${log.content || ''}</div>
+                            <div style="margin-top:8px;">
+                                <button class="btn-sm" style="width:100%; background:#d35400; color:white; border:none;" onclick="reviewReflective('${log.id}', '${(log.userName || '').replace(/'/g, "")}', '${log.userId}')">
+                                    <i class="fa-solid fa-comment-dots"></i> Review & Score
+                                </button>
+                            </div>
+                        `;
+                        cols["Review"].appendChild(d);
+                    }
+                });
+            } catch (e) { console.error("Kanban Section 2 Error:", e); }
+
+            // 3. Render Pending General Works in "Review"
+            try {
+                worksData.forEach(work => {
+                    const isPending = work.status !== 'ตรวจแล้ว';
+                    if (isPending && !work.isQuiz && !work.isPollResponse) {
+                        if (filter && !(work.title || "").toLowerCase().includes(filter) && !(work.displayName || '').toLowerCase().includes(filter)) return;
+
+                        if (activeBoardGroup !== 'All') {
+                            const user = usersData.find(u => u.id === work.userId);
+                            if ((user?.group || 'Public') !== activeBoardGroup) return;
+                        }
+
+                        cnt["Review"]++;
+                        const d = document.createElement('div');
+                        d.className = 'kanban-card card-Review work-card';
+                        d.style.borderLeft = "4px solid var(--success)";
+                        
+                        let linkHtml = "";
+                        if (work.link) {
+                            const href = work.link.startsWith('http') ? work.link : 'https://' + work.link;
+                            linkHtml = `<button class="btn-sm btn-dark" style="flex:1;" onclick="window.open('${href}', '_blank')"><i class="fa-solid fa-link"></i> Link</button>`;
+                        }
+
+                        d.innerHTML = `
+                            <div class="card-header-row">
+                                <span class="badge" style="background:var(--success);">Work</span>
+                                <div class="card-header-right"><img src="${work.pictureUrl || ''}" class="assignee-img" title="${work.displayName || ''}"></div>
+                            </div>
+                            <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${work.displayName || 'Unknown'}</div>
+                            <div style="font-size:0.85em; color:#444; font-weight:500;">📁 ${work.title || 'Work'}</div>
+                            <div style="margin-top:8px; display:flex; gap:5px;">
+                                ${linkHtml}
+                                <button class="btn-sm btn-primary" style="flex:1;" onclick="svSc('${work.id}', '${work.userId}')">
+                                    <i class="fa-solid fa-check"></i> Score
+                                </button>
+                            </div>
+                        `;
+                        cols["Review"].appendChild(d);
+                    }
+                });
+            } catch (e) { console.error("Kanban Section 3 Error:", e); }
+
+            // 4. Render Access Requests in "Review"
+            try {
+                accessRequestsCache.forEach(req => {
+                    if (filter && !(req.displayName || '').toLowerCase().includes(filter)) return;
+                    if (activeBoardGroup !== 'All' && (req.group || 'Public') !== activeBoardGroup) return;
+
+                    cnt["Review"]++;
+                    const d = document.createElement('div');
+                    d.className = 'kanban-card card-Review access-card';
+                    d.style.borderLeft = "4px solid #6f42c1";
+                    d.innerHTML = `
+                        <div class="card-header-row">
+                            <span class="badge" style="background:#6f42c1;">New Access</span>
+                            <div class="card-header-right"><img src="${req.pictureUrl || ''}" class="assignee-img" title="${req.displayName || ''}"></div>
+                        </div>
+                        <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${req.displayName || 'Unknown'}</div>
+                        <div style="font-size:0.8em; color:#666;">AKA: ${req.nickName || '-'} • Grp: ${req.group || 'Public'}</div>
+                        <div style="margin-top:8px; display:flex; gap:5px;">
+                            <button class="btn-sm btn-success" style="flex:1;" onclick="approveAccessRequest('${req.id}')">Approve</button>
+                            <button class="btn-sm btn-danger" style="flex:1;" onclick="rejectAccessRequest('${req.id}')">Reject</button>
+                        </div>
+                    `;
+                    cols["Review"].appendChild(d);
+                });
+            } catch (e) { console.error("Kanban Section 4 Error:", e); }
+
+            // 5. Render Points Claimed in "Review"
+            try {
+                pointsClaimedCache.forEach(log => {
+                    const uName = log.displayName || log.userName || 'Unknown';
+                    if (filter && !uName.toLowerCase().includes(filter)) return;
+                    
                     if (activeBoardGroup !== 'All') {
                         const user = usersData.find(u => u.id === log.userId);
                         if ((user?.group || 'Public') !== activeBoardGroup) return;
@@ -8130,168 +8245,72 @@
 
                     cnt["Review"]++;
                     const d = document.createElement('div');
-                    d.className = 'kanban-card card-Review reflective-card';
-                    d.style.borderLeft = "4px solid #d35400";
-                    d.style.background = "#fffcf5";
-                    
+                    d.className = 'kanban-card card-Review claimed-card';
+                    d.style.borderLeft = "4px solid #00b894";
+                    d.style.background = "#f0fdf9";
                     d.innerHTML = `
                         <div class="card-header-row">
-                            <span class="badge" style="background:#d35400;">Reflective</span>
-                            <div class="card-header-right"><img src="${log.pictureUrl || ''}" class="assignee-img" title="${log.userName}"></div>
+                            <span class="badge" style="background:#00b894;">Points Claimed</span>
+                            <div class="card-header-right"><img src="${log.pictureUrl || ''}" class="assignee-img" title="${uName}"></div>
                         </div>
-                        <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${log.userName}</div>
-                        <div style="font-size:0.85em; color:#444; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${moodEmoji} ${log.content}</div>
+                        <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${uName}</div>
+                        <div style="font-size:0.85em; color:#444;">🎉 Bonus already claimed: <span style="font-weight:bold; color:#00b894;">+${log.adminBonus || 0} pts</span></div>
                         <div style="margin-top:8px;">
-                            <button class="btn-sm" style="width:100%; background:#d35400; color:white; border:none;" onclick="reviewReflective('${log.id}', '${log.userName.replace(/'/g, "")}', '${log.userId}')">
-                                <i class="fa-solid fa-comment-dots"></i> Review & Score
+                            <button class="btn-sm btn-success" style="width:100%; background:#00b894; border:none;" onclick="acknowledgeClaimedPoints('${log.id}')">
+                                <i class="fa-solid fa-check"></i> Acknowledge
                             </button>
                         </div>
                     `;
                     cols["Review"].appendChild(d);
-                }
-            });
+                });
+            } catch (e) { console.error("Kanban Section 5 Error:", e); }
 
-            // 3. Render Pending General Works in "Review"
-            worksData.forEach(work => {
-                const isPending = work.status !== 'ตรวจแล้ว';
-                if (isPending && !work.isQuiz && !work.isPollResponse) {
-                    if (filter && !work.title.toLowerCase().includes(filter) && !(work.displayName || '').toLowerCase().includes(filter)) return;
+            // 6. Render Pending Quiz Reviews in "Review"
+            try {
+                pendingQuizzesCache.forEach(att => {
+                    const q = quizzesData.find(x => x.id === att.quizId) || {};
+                    const qTitle = q.shortTitle || q.title || "Unknown Quiz";
+                    const uImg = att.pictureUrl || '';
+                    const uName = att.displayName || 'Unknown';
+                    const isRequest = att.status === 'requesting';
 
-                    // Group filtering for Works
+                    if (filter && !qTitle.toLowerCase().includes(filter) && !uName.toLowerCase().includes(filter)) return;
+                    
+                    // Group filtering
                     if (activeBoardGroup !== 'All') {
-                        const user = usersData.find(u => u.id === work.userId);
+                        const user = usersData.find(u => u.id === att.userId);
                         if ((user?.group || 'Public') !== activeBoardGroup) return;
                     }
 
                     cnt["Review"]++;
                     const d = document.createElement('div');
-                    d.className = 'kanban-card card-Review work-card';
-                    d.style.borderLeft = "4px solid var(--success)";
+                    d.className = 'kanban-card card-Review quiz-card';
+                    d.style.borderLeft = "4px solid var(--primary)";
                     
-                    let linkHtml = "";
-                    if (work.link) {
-                        const href = work.link.startsWith('http') ? work.link : 'https://' + work.link;
-                        linkHtml = `<button class="btn-sm btn-dark" style="flex:1;" onclick="window.open('${href}', '_blank')"><i class="fa-solid fa-link"></i> Link</button>`;
+                    let actionBtn = `<button class="btn-sm btn-info" style="width:100%;" onclick="reviewQuiz('${att.id}')"><i class="fa-solid fa-magnifying-glass"></i> Review Answers</button>`;
+                    if (isRequest) {
+                        actionBtn = `
+                            <div style="display:flex; gap:5px;">
+                                <button class="btn-sm btn-success" style="flex:1;" onclick="allowLateQuiz('${att.id}')">Allow</button>
+                                <button class="btn-sm btn-danger" style="flex:1;" onclick="rejectQuiz('${att.id}')">Deny</button>
+                            </div>
+                        `;
                     }
 
                     d.innerHTML = `
                         <div class="card-header-row">
-                            <span class="badge" style="background:var(--success);">Work</span>
-                            <div class="card-header-right"><img src="${work.pictureUrl || ''}" class="assignee-img" title="${work.displayName}"></div>
+                            <span class="badge" style="background:var(--primary);">${isRequest ? 'Late Quiz' : 'Quiz Review'}</span>
+                            <div class="card-header-right"><img src="${uImg}" class="assignee-img" title="${uName}"></div>
                         </div>
-                        <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${work.displayName}</div>
-                        <div style="font-size:0.85em; color:#444; font-weight:500;">📁 ${work.title}</div>
-                        <div style="margin-top:8px; display:flex; gap:5px;">
-                            ${linkHtml}
-                            <button class="btn-sm btn-primary" style="flex:1;" onclick="svSc('${work.id}', '${work.userId}')">
-                                <i class="fa-solid fa-check"></i> Score
-                            </button>
+                        <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${uName}</div>
+                        <div style="font-size:0.85em; color:#444; font-weight:500;">📖 ${qTitle}</div>
+                        <div style="margin-top:8px;">
+                            ${actionBtn}
                         </div>
                     `;
                     cols["Review"].appendChild(d);
-                }
-            });
-
-            // 4. Render Access Requests in "Review" (V86.14)
-            accessRequestsCache.forEach(req => {
-                if (filter && !(req.displayName || '').toLowerCase().includes(filter)) return;
-                if (activeBoardGroup !== 'All' && (req.group || 'Public') !== activeBoardGroup) return;
-
-                cnt["Review"]++;
-                const d = document.createElement('div');
-                d.className = 'kanban-card card-Review access-card';
-                d.style.borderLeft = "4px solid #6f42c1";
-                d.innerHTML = `
-                    <div class="card-header-row">
-                        <span class="badge" style="background:#6f42c1;">New Access</span>
-                        <div class="card-header-right"><img src="${req.pictureUrl || ''}" class="assignee-img" title="${req.displayName}"></div>
-                    </div>
-                    <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${req.displayName}</div>
-                    <div style="font-size:0.8em; color:#666;">AKA: ${req.nickName || '-'} • Grp: ${req.group}</div>
-                    <div style="margin-top:8px; display:flex; gap:5px;">
-                        <button class="btn-sm btn-success" style="flex:1;" onclick="approveAccessRequest('${req.id}')">Approve</button>
-                        <button class="btn-sm btn-danger" style="flex:1;" onclick="rejectAccessRequest('${req.id}')">Reject</button>
-                    </div>
-                `;
-                cols["Review"].appendChild(d);
-            });
-
-            // 5. Render Points Claimed in "Review" (V86.14)
-            pointsClaimedCache.forEach(log => {
-                const uName = log.displayName || log.userName || 'Unknown';
-                if (filter && !uName.toLowerCase().includes(filter)) return;
-                
-                // Group filtering for Claimed Points
-                if (activeBoardGroup !== 'All') {
-                    const user = usersData.find(u => u.id === log.userId);
-                    if ((user?.group || 'Public') !== activeBoardGroup) return;
-                }
-
-                cnt["Review"]++;
-                const d = document.createElement('div');
-                d.className = 'kanban-card card-Review claimed-card';
-                d.style.borderLeft = "4px solid #00b894";
-                d.style.background = "#f0fdf9";
-                d.innerHTML = `
-                    <div class="card-header-row">
-                        <span class="badge" style="background:#00b894;">Points Claimed</span>
-                        <div class="card-header-right"><img src="${log.pictureUrl || ''}" class="assignee-img" title="${uName}"></div>
-                    </div>
-                    <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${uName}</div>
-                    <div style="font-size:0.85em; color:#444;">🎉 Bonus already claimed: <span style="font-weight:bold; color:#00b894;">+${log.adminBonus || 0} pts</span></div>
-                    <div style="margin-top:8px;">
-                        <button class="btn-sm btn-success" style="width:100%; background:#00b894; border:none;" onclick="acknowledgeClaimedPoints('${log.id}')">
-                            <i class="fa-solid fa-check"></i> Acknowledge
-                        </button>
-                    </div>
-                `;
-                cols["Review"].appendChild(d);
-            });
-
-            // 6. Render Pending Quiz Reviews in "Review" (V86.14)
-            pendingQuizzesCache.forEach(att => {
-                const q = quizzesData.find(x => x.id === att.quizId) || {};
-                const qTitle = q.shortTitle || q.title || "Unknown Quiz";
-                const uImg = att.pictureUrl || '';
-                const uName = att.displayName || 'Unknown';
-                const isRequest = att.status === 'requesting';
-
-                if (filter && !qTitle.toLowerCase().includes(filter) && !uName.toLowerCase().includes(filter)) return;
-                
-                // Group filtering
-                if (activeBoardGroup !== 'All') {
-                    const user = usersData.find(u => u.id === att.userId);
-                    if ((user?.group || 'Public') !== activeBoardGroup) return;
-                }
-
-                cnt["Review"]++;
-                const d = document.createElement('div');
-                d.className = 'kanban-card card-Review quiz-card';
-                d.style.borderLeft = "4px solid var(--primary)";
-                
-                let actionBtn = `<button class="btn-sm btn-info" style="width:100%;" onclick="reviewQuiz('${att.id}')"><i class="fa-solid fa-magnifying-glass"></i> Review Answers</button>`;
-                if (isRequest) {
-                    actionBtn = `
-                        <div style="display:flex; gap:5px;">
-                            <button class="btn-sm btn-success" style="flex:1;" onclick="allowLateQuiz('${att.id}')">Allow</button>
-                            <button class="btn-sm btn-danger" style="flex:1;" onclick="rejectQuiz('${att.id}')">Deny</button>
-                        </div>
-                    `;
-                }
-
-                d.innerHTML = `
-                    <div class="card-header-row">
-                        <span class="badge" style="background:var(--primary);">${isRequest ? 'Late Quiz' : 'Quiz Review'}</span>
-                        <div class="card-header-right"><img src="${uImg}" class="assignee-img" title="${uName}"></div>
-                    </div>
-                    <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${uName}</div>
-                    <div style="font-size:0.85em; color:#444; font-weight:500;">📖 ${qTitle}</div>
-                    <div style="margin-top:8px;">
-                        ${actionBtn}
-                    </div>
-                `;
-                cols["Review"].appendChild(d);
-            });
+                });
+            } catch (e) { console.error("Kanban Section 6 Error:", e); }
 
             Object.keys(cnt).forEach(k => {
                 const badge = document.getElementById(`cnt-${k}`);

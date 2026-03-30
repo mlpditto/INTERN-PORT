@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V87.28) Overview
+# MLP Internship Portfolio (V87.41) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -76,6 +76,14 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-03-30] Session Updates (V87.40 → V87.41)
+
+### 1. Reflective Logs & Works History Fix (V87.41)
+- **Data Fetching:** Removed `.orderBy("timestamp", "desc")` from `loadReflectiveLogs`, `loadMyReflectiveLogs`, and `loadMyWorks` in `index.html`.
+- **Root Cause Resolution:** This prevents silent Firestore query failures caused by missing composite indexes when querying `.where()` and `.orderBy()` on different fields simultaneously.
+- **Client-Side Sorting:** The UI now correctly relies on `Array.sort()` internally in `renderHistory()` and `renderReflectiveLogs()` to maintain chronological order without database constraints.
+- **Feedback Loop Restored:** Administrators' feedback on daily reflective logs is now successfully fetched and displayed, allowing users to claim their bonus points automatically.
 
 ## [2026-03-25] Session Updates (V87.27 → V87.28)
 
