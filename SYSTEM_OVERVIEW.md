@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V87.44) Overview
+# MLP Internship Portfolio (V87.45) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -76,6 +76,12 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-03-30] Session Updates (V87.44 → V87.45)
+
+### 1. Laugh Tale — Full Width Grid Layout (V87.45)
+- **Widescreen Optimization:** Increased the maximum width of the Laugh Tale container from `1000px` to `1400px` to better utilize horizontal screen real estate on desktop monitors.
+- **Card Sizing:** Adjusted the grid's auto-fill constraints from `minmax(300px)` to `minmax(340px)` with a slightly larger gap (`25px`). This prevents cards from looking too narrow while allowing 4 columns cleanly on fullscreen 1080p displays.
 
 ## [2026-03-30] Session Updates (V87.43 → V87.44)
 
