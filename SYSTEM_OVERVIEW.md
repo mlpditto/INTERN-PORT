@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V87.49) Overview
+# MLP Internship Portfolio (V87.50) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -76,6 +76,12 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-03-30] Session Updates (V87.49 → V87.50)
+
+### 1. UI Improvement — Thumbnails Size Increase (V87.50)
+- Increased the height of the Visual Style Collection thumbnail images in the Design Lab sidebar from 55px to 85px to make all new One Piece imagery much clearer.
+- Added subtle box-shadows and borders to each image container to improve UI card contrast.
 
 ## [2026-03-30] Session Updates (V87.48 → V87.49)
 
