@@ -9190,10 +9190,10 @@
         // --- 🔥 V84.8: Reflective Log System (Admin) ---
         function loadReflectiveLogsAdmin() {
             db.collection("reflective_logs")
-                .orderBy("timestamp", "desc")
-                .limit(200) 
                 .onSnapshot(snapshot => {
                     reflectiveLogsCache = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                    // Client-side sort to replace missing composite index constraint
+                    reflectiveLogsCache.sort((a,b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
                     
                     const searchBox = document.getElementById('reflective-search');
                     const search = searchBox ? searchBox.value.toLowerCase() : "";
@@ -9259,6 +9259,9 @@
                     
                     if (document.getElementById('tab-laughtale')?.classList.contains('active')) renderLaughTale();
                     drawKanban(); // Sync with Kanban
+                }, error => {
+                    console.error("🔥 Error loading admin reflective logs:", error);
+                    showToast("Error loading logs: " + error.message);
                 });
         }
 
