@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V87.46) Overview
+# MLP Internship Portfolio (V87.47) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -76,6 +76,18 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-03-30] Session Updates (V87.46 → V87.47)
+
+### 1. AI Design Lab — One Piece Custom Thumbnails (V87.47)
+- **Custom AI Preview Images:** Replaced Unsplash placeholder images with natively generated custom AI images directly created for the One Piece themes:
+  - `op_crew.png` for Pirate Crew Life
+  - `op_jolly.png` for Jolly Roger Vector
+  - `op_fruit.png` for 3D Devil Fruit
+  - `op_map.png` for Grand Line Map
+  - `op_manga.png` for Oda Manga Style (re-instated working image)
+  - `op_wano.png` for Wano Arc Anime
+- Fixed missing OdA Manga Style picture by using a guaranteed local asset.
 
 ## [2026-03-30] Session Updates (V87.45 → V87.46)
 
