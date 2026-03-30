@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V87.50)</title>
+    <title>Internship Portfolio (V87.51)</title>
     <!-- V87.28: AI Vision Scan FIX (Multimodal Argument Routing) -->
 
     <style>
@@ -2390,9 +2390,14 @@
                             <div class="glass-toggle-item" data-value="typhoon-v1.5x-70b-instruct" onclick="selectAiToggle(this, 'typhoon-v1.5x-70b-instruct')" title="Typhoon 70B">🌀 T</div>
                         </div>
                         <input type="hidden" id="ai-analyzer-model-val" value="gemini-1.5-pro">
-                        <button class="btn-sm" onclick="analyzeQuizAI(this)" style="background:#8e44ad; color:white; border:none; padding:8px 18px; border-radius:12px; font-weight:bold; font-size:0.85em; display:flex; align-items:center; gap:8px; box-shadow:0 6px 15px rgba(142,68,173,0.25); transition:transform 0.2s;">
-                            <i class="fa-solid fa-brain"></i> <span class="btn-text">AI Analyze Quiz</span>
-                        </button>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn-sm" onclick="analyzeQuizAI(this)" style="background:#8e44ad; color:white; border:none; padding:8px 18px; border-radius:12px; font-weight:bold; font-size:0.85em; display:flex; align-items:center; gap:8px; box-shadow:0 6px 15px rgba(142,68,173,0.25); transition:transform 0.2s;">
+                                <i class="fa-solid fa-brain"></i> <span class="btn-text">Analyze</span>
+                            </button>
+                            <button class="btn-sm" onclick="openPdfToQuizModal()" style="background:#2ec4b6; color:white; border:none; padding:8px 18px; border-radius:12px; font-weight:bold; font-size:0.85em; display:flex; align-items:center; gap:8px; box-shadow:0 6px 15px rgba(46, 196, 182, 0.25);">
+                                <i class="fa-solid fa-file-pdf"></i> <span class="btn-text">Generate from PDF</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div id="quiz-questions-container"
@@ -5772,6 +5777,108 @@
                 await db.collection("knowledge_base").doc(id).delete();
                 showToast("Deleted");
             } catch (err) { alert(err.message); }
+        }
+
+        // --- 🔥 V87.51: PDF-to-Quiz Generator (NotebookLM-like) ---
+        function openPdfToQuizModal() {
+            renderPdfToQuizList();
+            document.getElementById('pdfToQuizModal').style.display = 'block';
+        }
+
+        function renderPdfToQuizList() {
+            const container = document.getElementById('p2q-list');
+            if (knowledgeBaseCache.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">No documents in Knowledge Base.</div>';
+                return;
+            }
+
+            container.innerHTML = knowledgeBaseCache.map(doc => `
+                <div style="background:#fff; border:1.5px solid #eee; border-radius:15px; padding:12px 15px; display:flex; align-items:center; gap:12px; cursor:pointer; transition:0.2s;" 
+                     onclick="generateFromDoc('${doc.id}')"
+                     onmouseover="this.style.borderColor='#00796b'; this.style.background='#f0fdfa';" 
+                     onmouseout="this.style.borderColor='#eee'; this.style.background='#fff';">
+                    <div style="width:40px; height:40px; background:#e0f2f1; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#00796b; flex-shrink:0;">
+                        <i class="fa-solid ${doc.type === 'pdf' ? 'fa-file-pdf' : 'fa-file-lines'}"></i>
+                    </div>
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-weight:bold; font-size:0.9em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${doc.name}</div>
+                        <div style="font-size:0.75em; color:#666;">${doc.type.toUpperCase()} • ${doc.charCount || 0} chars</div>
+                    </div>
+                    <button class="btn-sm" style="background:#00796b; color:white; border:none; padding:5px 12px; border-radius:10px; font-weight:bold; font-size:0.8em;">Generate</button>
+                </div>
+            `).join('');
+        }
+
+        async function generateFromDoc(docId) {
+            const doc = knowledgeBaseCache.find(d => d.id === docId);
+            if (!doc) return alert("Document not found.");
+
+            const qCount = document.getElementById('p2q-count').value;
+            const model = document.getElementById('ai-analyzer-model-val').value;
+
+            if (!confirm(`Generate ${qCount} questions from "${doc.name}"? This will append to your current quiz.`)) return;
+
+            document.getElementById('pdfToQuizModal').style.display = 'none';
+            showToast(`🤖 AI is analyzing "${doc.name}"...`, "info");
+
+            try {
+                // Determine if content is likely binary/junk and needs warning
+                if (doc.type === 'pdf' && doc.content.startsWith('%PDF') && doc.content.length < 50000) {
+                   showToast("⚠️ Note: This PDF might contain raw binary data. Generation might be inaccurate if not OCR'd.", "warning");
+                }
+
+                const systemPrompt = `You are an expert Educational Content Designer. 
+                Task: Generate a high-quality quiz based on the provided content.
+                
+                CONTENT SOURCE: "${doc.name}"
+                CONTENT:
+                ${doc.content.substring(0, 12000)} 
+                
+                INSTRUCTIONS:
+                1. Create exactly ${qCount} questions based on the key concepts in the content.
+                2. Use a mix of Multiple Choice (4 options) and Short Answer questions.
+                3. Ensure options for Multiple Choice are plausible but clearly distinct.
+                4. Output strictly valid JSON array of objects. No additional talk or formatting.
+                
+                SCHEMA:
+                [{
+                  "q": "The question text...",
+                  "type": "choice" | "short_answer",
+                  "options": ["A", "B", "C", "D"],
+                  "correct": [index],
+                  "timer": 60
+                }]
+                
+                LANGUAGE: Match the primary language of the content.`;
+
+                const res = await callUniversalAI(model, systemPrompt, true);
+                let quizJson = [];
+                
+                try {
+                    const match = res.text.match(/\[[\s\S]*\]/);
+                    if (match) {
+                        quizJson = JSON.parse(match[0]);
+                    } else {
+                        throw new Error("Invalid AI format");
+                    }
+                } catch (e) {
+                    throw new Error("AI failed to return structured quiz data. Please try again or use a different document.");
+                }
+
+                if (quizJson.length > 0) {
+                    quizJson.forEach(q => addQuestionUI(q));
+                    showToast(`✅ Generated ${quizJson.length} questions!`);
+                    triggerAutoSave();
+                    
+                    const items = document.querySelectorAll('.quiz-q-item');
+                    quizQPageIndex = items.length - quizJson.length;
+                    updateQuizPagination();
+                }
+
+            } catch (err) {
+                console.error("P2Q Error:", err);
+                alert("Generation Error: " + err.message);
+            }
         }
 
         function clearResearchChat() {
@@ -9769,6 +9876,39 @@
 
             <div style="margin-top:25px; border-top:1px solid #eee; padding-top:15px; text-align:right;">
                 <button class="btn-dark" onclick="document.getElementById('knowledgeBaseModal').style.display='none'" style="padding:10px 30px; border-radius:30px;">Done</button>
+            </div>
+        </div>
+    <!-- PDF-to-Quiz Document Selector Modal (V87.51) -->
+    <div id="pdfToQuizModal" class="modal" style="z-index:5200;">
+        <div class="modal-content" style="max-width:600px; padding:30px; border-radius:25px;">
+            <span class="close-modal" onclick="document.getElementById('pdfToQuizModal').style.display='none'">&times;</span>
+            <div style="display:flex; align-items:center; gap:15px; margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:15px;">
+                <div style="width:50px; height:50px; background:#e0f2f1; border-radius:15px; display:flex; align-items:center; justify-content:center; color:#00796b;">
+                    <i class="fa-solid fa-file-pdf" style="font-size:1.5em;"></i>
+                </div>
+                <div>
+                    <h3 style="margin:0;">Select Content Source</h3>
+                    <p style="margin:2px 0 0 0; font-size:0.85em; color:#666;">Choose a document to generate quiz questions from.</p>
+                </div>
+            </div>
+
+            <div style="margin-bottom:20px;">
+                <label style="display:block; font-size:0.8em; font-weight:bold; color:#666; margin-bottom:8px;">Desired Question Count:</label>
+                <select id="p2q-count" style="width:100%; border-radius:10px; padding:8px 12px; border:1px solid #ddd; font-weight:bold;">
+                    <option value="5">5 Questions</option>
+                    <option value="10" selected>10 Questions</option>
+                    <option value="15">15 Questions</option>
+                    <option value="20">20 Questions</option>
+                </select>
+            </div>
+
+            <div id="p2q-list" style="max-height:400px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:5px;">
+                <!-- KB documents will be listed here -->
+            </div>
+
+            <div style="margin-top:25px; border-top:1px solid #eee; padding-top:15px; text-align:right; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.75em; color:#999; font-style:italic;">* AI will attempt to generate structured data.</span>
+                <button class="btn-dark" onclick="document.getElementById('pdfToQuizModal').style.display='none'" style="padding:10px 30px; border-radius:30px; font-weight:bold;">Cancel</button>
             </div>
         </div>
     </div>
