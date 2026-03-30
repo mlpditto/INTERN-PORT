@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V87.43) Overview
+# MLP Internship Portfolio (V87.44) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -76,6 +76,15 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-03-30] Session Updates (V87.43 → V87.44)
+
+### 1. Laugh Tale — Button UI & Avatar Blindness Update (V87.44)
+- **Compact UI:** Removed text labels from "Copy" & "Blind" buttons on the Laugh Tale cards, replacing them with circular icon-only buttons (`fa-copy`, `fa-eye-slash`) to save space and match the style of the "Visualize" and "Edit" buttons.
+- **Deep Blind Integration:** 
+   - Toggling the *Blind* name also replaces the user's profile picture with a generic anonymous avatar (`ui-avatars.com`).
+   - The original image src is safely stored and restored when un-blinding.
+- **Dynamic Clipboard:** The *Copy* function now dynamically reads from the DOM instead of raw stored variables. If the *Blind* toggle is active, copying the block will correctly copy "👤 Anonymous" instead of the real name, ensuring safe and anonymous sharing limits.
 
 ## [2026-03-30] Session Updates (V87.42 → V87.43)
 
