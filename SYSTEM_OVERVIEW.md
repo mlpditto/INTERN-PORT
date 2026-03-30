@@ -77,6 +77,14 @@
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
 
+## [2026-03-30] Session Updates (V87.41 → V87.42)
+
+### 1. Laugh Tale Empty Grid Fix (V87.42)
+- **Root Cause:** `renderLaughTale()` was never called when the admin clicked the **Laugh Tale** tab — it only triggered via Firestore `onSnapshot`. If data had already loaded before tab switch, the grid would remain blank.
+- **Fix:** Added `renderLaughTale()` call inside `switchTab('tab-laughtale')` so the grid always renders from the cached data whenever the tab is activated.
+- **Admin Feedback Index Fix:** Removed `.orderBy("timestamp", "desc")` from `loadReflectiveLogsAdmin()` to prevent silent Firestore composite index failures. Client-side sort is now used instead.
+- **Edit Feedback Button:** Added a 🖊️ edit button to each Laugh Tale card. Clicking it opens the review modal with the **existing comment and bonus pre-filled**, allowing admins to update/refine with AI multilingual suggestions (🇹🇭 TH, 🇺🇸 EN, 🇨🇳 CN, 🇰🇷 KO, 🇯🇵 JP).
+
 ## [2026-03-30] Session Updates (V87.40 → V87.41)
 
 ### 1. Reflective Logs & Works History Fix (V87.41)
