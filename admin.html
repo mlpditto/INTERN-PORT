@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V87.42)</title>
+    <title>Internship Portfolio (V87.41)</title>
     <!-- V87.28: AI Vision Scan FIX (Multimodal Argument Routing) -->
 
     <style>
@@ -1107,7 +1107,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.42</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.41</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -9295,14 +9295,18 @@
                 const dateObj = log.timestamp?.toDate() || new Date();
                 const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
                 const groupColor = getGroupColor(usersData.find(u => u.id === log.userId)?.group || 'Public');
+                const cardId = 'ltcard-' + log.id;
+                const dn = (log.displayName || log.userName || 'Unknown').split("'").join("\\'");
+                const sc = (log.content || '').split("'").join("\\'");
+                const sf = (log.adminComment || '-').split("'").join("\\'");
 
                 return `
-                    <div class="laugh-card" style="background:#fff; border-radius:20px; box-shadow:0 10px 25px rgba(0,0,0,0.05); padding:20px; position:relative; overflow:hidden; border:1px solid #eee; transition:all 0.3s ease;">
+                    <div id="${cardId}" class="laugh-card" style="background:#fff; border-radius:20px; box-shadow:0 10px 25px rgba(0,0,0,0.05); padding:20px; position:relative; overflow:hidden; border:1px solid #eee; transition:all 0.3s ease;">
                         <div style="position:absolute; top:0; left:0; width:100%; height:8px; background:${groupColor};"></div>
                         <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px;">
                             <img src="${log.pictureUrl || ''}" style="width:45px; height:45px; border-radius:50%; border:3px solid #fff; box-shadow:0 0 10px rgba(0,0,0,0.1);">
                             <div style="flex:1;">
-                                <div style="font-weight:bold; font-size:1em;">${log.displayName || log.userName || 'Unknown'}</div>
+                                <div class="lt-name" style="font-weight:bold; font-size:1em;">${log.displayName || log.userName || 'Unknown'}</div>
                                 <div style="font-size:0.75em; color:#999; text-transform:uppercase;">${dateObj.toLocaleDateString('en-US')} • ${moodEmoji}</div>
                             </div>
                             <div style="font-size:1.2em;">✨</div>
@@ -9319,14 +9323,49 @@
                             </div>
                             ${log.adminBonus ? `<div style="margin-top:10px; text-align:right;"><span style="background:#e6fffa; color:#00b894; padding:2px 10px; border-radius:20px; font-weight:bold; font-size:0.8em;">+${log.adminBonus} PTS</span></div>` : ''}
                         </div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; position:absolute; top:12px; right:12px; gap:8px;">
-                             <button onclick="visualizeStory('${(log.content || "").replace(/'/g, "\\'")}')" style="background:rgba(230,126,34,0.1); border:1px solid #ffe8d1; color:#e67e22; border-radius:15px; padding:3px 10px; font-size:0.7em; cursor:pointer;" title="Visualize this with AI"><i class="fa-solid fa-palette"></i> Visualize</button>
-                             <button onclick="reviewReflective('${log.id}', '${(log.displayName || log.userName || 'Unknown').replace(/'/g, "\\'")}', '${log.userId}')" style="background:none; border:none; color:#ddd; cursor:pointer;" title="Edit Feedback"><i class="fa-solid fa-pen"></i></button>
+                        <div style="position:absolute; top:12px; right:12px; display:flex; align-items:center; gap:5px;">
+                             <button onclick="copyLaughCard('${cardId}','${dn}','${sc}','${sf}')" style="background:rgba(0,184,148,0.12); border:1px solid #b2f5ea; color:#00b894; border-radius:15px; padding:3px 9px; font-size:0.68em; cursor:pointer;" title="Copy text"><i class="fa-solid fa-copy"></i> Copy</button>
+                             <button onclick="blindLaughCard('${cardId}','${dn}')" style="background:rgba(52,73,94,0.1); border:1px solid #ccc; color:#555; border-radius:15px; padding:3px 9px; font-size:0.68em; cursor:pointer;" title="Blind name"><i class="fa-solid fa-eye-slash"></i> Blind</button>
+                             <button onclick="visualizeStory('${sc}')" style="background:rgba(230,126,34,0.1); border:1px solid #ffe8d1; color:#e67e22; border-radius:15px; padding:3px 9px; font-size:0.68em; cursor:pointer;" title="Visualize with AI"><i class="fa-solid fa-palette"></i></button>
+                             <button onclick="reviewReflective('${log.id}','${dn}','${log.userId}')" style="background:none; border:none; color:#ddd; cursor:pointer;" title="Edit Feedback"><i class="fa-solid fa-pen"></i></button>
                              <button onclick="unarchiveReflective('${log.id}')" style="background:none; border:none; color:#ddd; cursor:pointer;" title="Unarchive"><i class="fa-solid fa-rotate-left"></i></button>
                         </div>
                     </div>
                 `;
             }).join('');
+        }
+
+        function blindLaughCard(cardId, realName) {
+            const card = document.getElementById(cardId);
+            if (!card) return;
+            const el = card.querySelector('.lt-name');
+            if (!el) return;
+            if (el.dataset.blind === 'true') {
+                el.textContent = realName;
+                el.dataset.blind = 'false';
+                const ic = card.querySelector('[title="Blind name"] i');
+                if (ic) ic.className = 'fa-solid fa-eye-slash';
+            } else {
+                el.textContent = '🙈 Anonymous';
+                el.dataset.blind = 'true';
+                const ic = card.querySelector('[title="Blind name"] i');
+                if (ic) ic.className = 'fa-solid fa-eye';
+            }
+        }
+
+        function copyLaughCard(cardId, name, content, feedback) {
+            const text = '📝 Reflective Log\n👤 ' + name + '\n\n"' + content + '"\n\n💬 Admin Feedback:\n' + feedback;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('📋 Copied to clipboard!');
+            }).catch(() => {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showToast('📋 Copied!');
+            });
         }
 
         async function archiveReflective(id) {
