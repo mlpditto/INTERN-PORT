@@ -3128,8 +3128,14 @@
                         updateAIUsage(proxyProvider, proxyData.tokens || 0);
                         return { text: proxyData.text, tokens: proxyData.tokens || 0, model: proxyData.model || modelName };
                     } else {
-                        const errorData = await proxyResponse.json();
-                        console.warn("⚠️ Proxy failed, falling back to local keys...", errorData.error);
+                        let errorText = "";
+                        try {
+                            const errorData = await proxyResponse.json();
+                            errorText = errorData.error || JSON.stringify(errorData);
+                        } catch(e) {
+                            errorText = await proxyResponse.text();
+                        }
+                        console.warn("⚠️ Proxy failed, falling back to local keys...", errorText);
                     }
                 }
             } catch (proxyErr) {
@@ -3299,7 +3305,13 @@
                             })
                         });
 
-                        const data = await response.json();
+                        let data;
+                        try {
+                            data = await response.json();
+                        } catch(e) {
+                            const errHtml = await response.text();
+                            throw new Error(`Firebase AI Proxy Error (HTTP ${response.status}). The endpoint returned HTML/Text instead of JSON. Ensure Firebase Functions are deployed.`);
+                        }
                         if (!response.ok) throw new Error(data.error || `Proxy Error ${response.status}`);
 
                         text = data.text;
