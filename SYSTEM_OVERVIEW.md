@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V87.41) Overview
+# MLP Internship Portfolio (V87.43) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -76,6 +76,13 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-03-30] Session Updates (V87.42 → V87.43)
+
+### 1. Laugh Tale — Blind Name & Copy Text Buttons (V87.43)
+- **📋 Copy Button:** Each Laugh Tale card now has a Copy button that assembles `📝 Reflective Log / 👤 Name / "content" / 💬 Admin Feedback` into a clean text block and copies it to Clipboard via `navigator.clipboard.writeText()` with an `execCommand` fallback.
+- **🙈 Blind Button:** Clicking Blind toggles the user's display name on the card to "🙈 Anonymous" (only visually — no DB write). Clicking again restores the real name. Icon toggles between `fa-eye-slash` and `fa-eye`.
+- **Card ID:** Each card now has a unique `id="ltcard-{log.id}"` and the name element uses `class="lt-name"` for targeted DOM manipulation.
 
 ## [2026-03-30] Session Updates (V87.41 → V87.42)
 
