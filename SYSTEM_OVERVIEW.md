@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V87.47) Overview
+# MLP Internship Portfolio (V87.48) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
@@ -76,6 +76,14 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-03-30] Session Updates (V87.47 → V87.48)
+
+### 1. AI Design Lab — Inline Engine Selector (V87.48)
+- Moved the Image AI Model selector (Imagen 3, DALL-E) to an inline dropdown element placed directly beside the "Create Masterpiece" button inside the text area container.
+- Ensures absolute clarity on which model is selected before generation starts.
+- Linked the two selectors bidirectionally (sidebar and inline) to prevent state desync.
+- Resolved misleading JSON parse error UI trace.
 
 ## [2026-03-30] Session Updates (V87.46 → V87.47)
 
