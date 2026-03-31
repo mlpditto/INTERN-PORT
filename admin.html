@@ -1107,7 +1107,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.59</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.60</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -5974,7 +5974,15 @@
                 aiResponse = responseObj.text;
                 
                 typingEl.style.display = 'none';
-                appendResearchMessage('ai', aiResponse, hasContext ? "Knowledge Base Source Used" : null, question);
+                
+                // 🤖 V87.60: Intelligent Intent Check
+                const lowerQ = question.toLowerCase();
+                const isQuizIntent = lowerQ.includes('quiz') || lowerQ.includes('exam') || lowerQ.includes('ข้อสอบ') || lowerQ.includes('แบบทดสอบ');
+                
+                appendResearchMessage('ai', aiResponse, hasContext ? "Knowledge Base Source Used" : null, question, false, isQuizIntent);
+                
+                // 💾 Auto-Save
+                saveResearchToHistory(question, aiResponse, selectedModel);
                 
                 // 💾 V87.58: Auto-Save Research to History (Firestore)
                 saveResearchToHistory(question, aiResponse, selectedModel);
@@ -6019,7 +6027,7 @@
             }
         }
 
-        function appendResearchMessage(role, text, sourceLabel, originalQuestion, skipSync = false) {
+        function appendResearchMessage(role, text, sourceLabel, originalQuestion, skipSync = false, isQuizIntent = false) {
             const historyEl = document.getElementById('research-chat-history');
             const msgDiv = document.createElement('div');
             
@@ -6083,21 +6091,33 @@
                 html = html.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
                 msgDiv.innerHTML = `${sourceBadge}<div style="line-height:1.6;">${html}</div>`;
                 
-                // --- 🛠️ V87.58: AI Action Bar (Copy, Export, Quiz) ---
+                // --- 🛠️ V87.60: AI Action Bar (Enhanced) ---
                 const actionBar = document.createElement('div');
-                actionBar.style = "display:flex; gap:10px; margin-top:10px; padding-top:10px; border-top:1px dashed #eee;";
-                const btnStyle = "font-size:0.75em; padding:4px 10px; border-radius:8px; display:flex; align-items:center; gap:5px; transition:0.2s; cursor:pointer; border:1px solid #eef0f5; background:white; color:#555;";
+                actionBar.style = "display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; padding-top:10px; border-top:1px dashed #eee;";
+                const btnStyle = "font-size:0.75em; padding:6px 12px; border-radius:10px; display:flex; align-items:center; gap:5px; transition:0.2s; cursor:pointer; border:1px solid #eef0f5; background:white; color:#555;";
+
+                // If Quiz Intent detected, add a MEGA button
+                let quizBtn = "";
+                if (isQuizIntent) {
+                    quizBtn = `
+                        <div class="ai-act-btn pulse-blue" style="${btnStyle}; background:#4361ee; color:white; border:none; font-weight:bold; box-shadow:0 4px 15px rgba(67, 97, 238, 0.3);" onclick="sendResearchToQuiz(\`${text.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Create Quiz in Assignments
+                        </div>
+                    `;
+                }
 
                 actionBar.innerHTML = `
+                    ${quizBtn}
                     <div class="ai-act-btn" style="${btnStyle}" onclick="copyToClipboard(\`${text.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`, 'Research copied!')">
                         <i class="fa-solid fa-copy"></i> Copy
                     </div>
                     <div class="ai-act-btn" style="${btnStyle}" onclick="exportResearchChat(\`${text.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">
-                        <i class="fa-solid fa-file-export"></i> Export
+                        <i class="fa-solid fa-file-export"></i> Export .txt
                     </div>
+                    ${!isQuizIntent ? `
                     <div class="ai-act-btn" style="${btnStyle}; background:#fff5f5; color:#e74c3c; border-color:#fadbd8;" onclick="sendResearchToQuiz(\`${text.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">
                         <i class="fa-solid fa-bolt"></i> Send to Quiz
-                    </div>
+                    </div>` : ''}
                 `;
                 msgDiv.appendChild(actionBar);
             }
