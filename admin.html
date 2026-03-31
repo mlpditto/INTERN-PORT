@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V87.66)</title>
-    <!-- V87.66: KB Folder Management Fix - Native Dialog Fallback -->
+    <title>Internship Portfolio (V87.67)</title>
+    <!-- V87.67: Google Drive Integration for Knowledge Base (no size limit) -->
 
     <style>
         /* Hide Spinners/Controllers for q-timer */
@@ -28,6 +28,9 @@
     <!-- SweetAlert2 for premium modals (V87.66) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Google Drive Picker & GSI (V87.67) -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
     <!-- LIFF Preview Modal (V86.14 Consolidated) -->
     <div id="liffPreviewModal" class="modal" style="display:none; z-index:9999; backdrop-filter: blur(8px); background: rgba(0,0,0,0.85);">
         <div class="modal-content" style="max-width:1100px; padding:0; background:#000; border-radius:30px; border:8px solid #333; height:95vh; overflow:hidden; position:relative; display:flex; flex-direction:column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
@@ -5848,6 +5851,149 @@
             renderKnowledgeBase();
         }
 
+        // ============================================================
+        // 🔵 Google Drive Integration (V87.67)
+        // Steps to configure:
+        //   1. Go to console.cloud.google.com → APIs → Enable Drive API + Picker API
+        //   2. Create OAuth2 Client ID (Web App) → add https://mlp-int.work to origins
+        //   3. Create API Key → restrict to Picker API
+        //   4. Fill in the 3 constants below
+        // ============================================================
+        const GDRIVE_CLIENT_ID  = 'YOUR_OAUTH2_CLIENT_ID.apps.googleusercontent.com'; // ← replace
+        const GDRIVE_API_KEY    = 'YOUR_API_KEY';                                       // ← replace
+        const GDRIVE_APP_ID     = 'intern-port-edfa7';                                  // Firebase Project ID
+
+        let gdriveTokenClient = null;
+        let gdriveAccessToken = null;
+        let gdrivePickerReady = false;
+
+        function initGdriveTokenClient() {
+            if (!window.google?.accounts?.oauth2) return;
+            gdriveTokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: GDRIVE_CLIENT_ID,
+                scope: 'https://www.googleapis.com/auth/drive.readonly',
+                callback: (tokenResponse) => {
+                    if (tokenResponse.error) {
+                        alert('Google Drive auth failed: ' + tokenResponse.error);
+                        return;
+                    }
+                    gdriveAccessToken = tokenResponse.access_token;
+                    _openPickerNow();
+                }
+            });
+        }
+
+        function loadPickerApi() {
+            return new Promise((resolve) => {
+                if (gdrivePickerReady) return resolve();
+                gapi.load('picker', () => { gdrivePickerReady = true; resolve(); });
+            });
+        }
+
+        async function openGoogleDrivePicker() {
+            if (GDRIVE_CLIENT_ID.startsWith('YOUR_')) {
+                return alert('⚙️ Google Drive not configured yet.\n\nPlease set GDRIVE_CLIENT_ID and GDRIVE_API_KEY in admin.html.\n\nSee the setup guide in the Knowledge Base section.');
+            }
+            if (!window.gapi) {
+                return alert('⚠️ Google API not loaded yet. Please wait a moment and try again.');
+            }
+            await loadPickerApi();
+            if (!gdriveTokenClient) initGdriveTokenClient();
+
+            if (gdriveAccessToken) {
+                _openPickerNow();
+            } else {
+                gdriveTokenClient.requestAccessToken({ prompt: 'consent' });
+            }
+        }
+
+        function _openPickerNow() {
+            const folderName = document.getElementById('kb-folder-name').value.trim() || 'General';
+
+            const docsView = new google.picker.DocsView()
+                .setIncludeFolders(false)
+                .setMimeTypes([
+                    'application/pdf',
+                    'text/plain',
+                    'application/vnd.google-apps.document',
+                    'application/vnd.google-apps.presentation',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                ].join(','));
+
+            const picker = new google.picker.PickerBuilder()
+                .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
+                .setAppId(GDRIVE_APP_ID)
+                .setOAuthToken(gdriveAccessToken)
+                .setDeveloperKey(GDRIVE_API_KEY)
+                .addView(docsView)
+                .addView(new google.picker.DocsUploadView())
+                .setCallback((data) => _handlePickerCallback(data, folderName))
+                .build();
+
+            picker.setVisible(true);
+        }
+
+        async function _handlePickerCallback(data, folderName) {
+            if (data.action !== google.picker.Action.PICKED) return;
+
+            const files = data.docs;
+            showToast(`📥 Importing ${files.length} file(s) from Google Drive...`, 'info');
+
+            for (const file of files) {
+                await _importDriveFile(file, folderName);
+            }
+            showToast('✅ Google Drive import complete!');
+            renderKnowledgeBase();
+        }
+
+        async function _importDriveFile(file, folderName) {
+            const { id: fileId, name: fileName, mimeType } = file;
+            showToast(`⏳ Reading: ${fileName}`);
+
+            try {
+                let content = '';
+                // For Google Docs/Slides → export as plain text
+                // For PDF/Word → export as plain text via Drive export API
+                const isGoogleDoc = mimeType.startsWith('application/vnd.google-apps.');
+                const exportMime  = 'text/plain';
+                const url = isGoogleDoc
+                    ? `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=${encodeURIComponent(exportMime)}`
+                    : `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+
+                const res = await fetch(url, {
+                    headers: { Authorization: `Bearer ${gdriveAccessToken}` }
+                });
+
+                if (!res.ok) throw new Error(`Drive API error: ${res.status} ${res.statusText}`);
+                content = await res.text();
+
+                // Truncate to Firestore safe limit
+                const MAX_CHARS = 900000;
+                const wasTruncated = content.length > MAX_CHARS;
+                if (wasTruncated) content = content.substring(0, MAX_CHARS) + '\n\n[...truncated]';
+
+                await db.collection('knowledge_base').add({
+                    name: fileName,
+                    folder: folderName,
+                    type: mimeType.includes('pdf') ? 'pdf' : 'gdoc',
+                    content: content,
+                    driveFileId: fileId,
+                    driveMimeType: mimeType,
+                    isGoogleDrive: true,
+                    isTruncated: wasTruncated,
+                    charCount: content.length,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                showToast(`✅ Indexed: ${fileName}${wasTruncated ? ' (truncated)' : ''}`);
+            } catch (err) {
+                console.error('Drive import error:', err);
+                showToast(`❌ Failed: ${fileName} — ${err.message}`, 'error');
+            }
+        }
+        // ============================================================
+
+
         async function createNewKbProject() {
             const folderName = prompt('📁 Create New Project Folder\n\nEnter folder/project name (e.g. Med Project A):');
             if (!folderName || folderName.trim() === '' || folderName.toLowerCase() === 'all') {
@@ -10302,7 +10448,16 @@
                 <div style="font-size:0.8em; color:#7f8c8d; margin-bottom:15px;">Drag & Drop or Select Files Below</div>
                 <input type="file" id="kb-file-input" style="display:none;" multiple onchange="handleKbFileUpload(event)">
                 <button class="magic-btn" onclick="document.getElementById('kb-file-input').click()" style="padding:10px 25px; border-radius:30px; font-weight:bold;">
-                    <i class="fa-solid fa-plus"></i> Select Files
+                    <i class="fa-solid fa-plus"></i> Select Local Files
+                </button>
+                <div style="margin-top:12px; display:flex; align-items:center; gap:10px; justify-content:center;">
+                    <div style="flex:1; height:1px; background:#ddd;"></div>
+                    <span style="font-size:0.75em; color:#999; white-space:nowrap;">or import from</span>
+                    <div style="flex:1; height:1px; background:#ddd;"></div>
+                </div>
+                <button onclick="openGoogleDrivePicker()" style="margin-top:10px; padding:10px 25px; border-radius:30px; font-weight:bold; border:2px solid #4285f4; background:white; color:#4285f4; cursor:pointer; display:flex; align-items:center; gap:10px; margin:10px auto 0;">
+                    <svg width="18" height="18" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>
+                    Add from Google Drive
                 </button>
             </div>
 
