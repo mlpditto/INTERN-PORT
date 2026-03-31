@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V87.65)</title>
-    <!-- V87.65: Gemini 3.1 Pro/Flash Upgrade & Dynamic AI Proxy Routing (2026 Stable) -->
+    <title>Internship Portfolio (V87.66)</title>
+    <!-- V87.66: KB Folder Management Fix - Native Dialog Fallback -->
 
     <style>
         /* Hide Spinners/Controllers for q-timer */
@@ -25,6 +25,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <!-- SweetAlert2 for premium modals (V87.66) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <!-- LIFF Preview Modal (V86.14 Consolidated) -->
     <div id="liffPreviewModal" class="modal" style="display:none; z-index:9999; backdrop-filter: blur(8px); background: rgba(0,0,0,0.85);">
         <div class="modal-content" style="max-width:1100px; padding:0; background:#000; border-radius:30px; border:8px solid #333; height:95vh; overflow:hidden; position:relative; display:flex; flex-direction:column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
@@ -5846,45 +5849,33 @@
         }
 
         async function createNewKbProject() {
-            const { value: folderName } = await Swal.fire({
-                title: 'Create New Project Folder',
-                html: 'Organize your knowledge into separate topics.',
-                input: 'text',
-                inputPlaceholder: 'Enter folder name (e.g. My Project A)...',
-                showCancelButton: true,
-                confirmButtonText: '<i class="fa-solid fa-plus"></i> Create Folder',
-                confirmButtonColor: '#2ecc71',
-                inputValidator: (value) => {
-                    if (!value || value.trim() === "") return 'You need to write something!';
-                    if (value.toLowerCase() === 'all') return 'Invalid folder name';
+            const folderName = prompt('📁 Create New Project Folder\n\nEnter folder/project name (e.g. Med Project A):');
+            if (!folderName || folderName.trim() === '' || folderName.toLowerCase() === 'all') {
+                if (folderName !== null) showToast('⚠️ Invalid folder name. Please try again.');
+                return;
+            }
+            const name = folderName.trim();
+            try {
+                showToast(`Creating folder "${name}"...`, 'info');
+                await db.collection('knowledge_base').add({
+                    name: `_FolderMeta_${name}`,
+                    folder: name,
+                    type: 'meta',
+                    content: 'System Folder Metadata',
+                    isSystem: true,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                showToast(`✅ Folder "${name}" created!`);
+                const folderInput = document.getElementById('kb-folder-name');
+                if (folderInput) folderInput.value = name;
+                const modalFilter = document.getElementById('kb-filter-modal');
+                if (modalFilter) { 
+                    // renderKnowledgeBase will repopulate; set after slight delay
+                    setTimeout(() => { modalFilter.value = name; }, 300);
                 }
-            });
-
-            if (folderName) {
-                try {
-                    showToast(`Creating folder "${folderName}"...`, "info");
-                    // Create a system placeholder to make the folder exist even without data
-                    await db.collection("knowledge_base").add({
-                        name: `_FolderMeta_${folderName}`,
-                        folder: folderName,
-                        type: 'meta',
-                        content: 'System Folder Metadata',
-                        isSystem: true,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    showToast(`✅ Folder "${folderName}" created!`);
-                    
-                    // Set current upload folder and filter to this new folder
-                    const folderInput = document.getElementById('kb-folder-name');
-                    if (folderInput) folderInput.value = folderName;
-                    
-                    const modalFilter = document.getElementById('kb-filter-modal');
-                    if (modalFilter) modalFilter.value = folderName;
-
-                    renderKnowledgeBase();
-                } catch (err) {
-                    Swal.fire('Error', err.message, 'error');
-                }
+                renderKnowledgeBase();
+            } catch (err) {
+                alert('Error creating folder: ' + err.message);
             }
         }
 
@@ -5922,22 +5913,37 @@
                             }
 
                             const folderName = document.getElementById('kb-folder-name').value.trim() || 'General';
+
+                            // 🔥 V87.66: Firestore has a ~1MB doc limit. Truncate if needed.
+                            const MAX_CONTENT_CHARS = 900000; // ~900KB safe limit
+                            let finalContent = content;
+                            let wasTruncated = false;
+                            if (typeof content === 'string' && content.length > MAX_CONTENT_CHARS) {
+                                finalContent = content.substring(0, MAX_CONTENT_CHARS) + '\n\n[...Content truncated to fit storage limits. Upload a smaller file for full indexing.]';
+                                wasTruncated = true;
+                            }
                             
                             await db.collection("knowledge_base").add({
                                 name: fileName,
                                 folder: folderName,
                                 type: fileType,
-                                content: content,
+                                content: finalContent,
                                 isImage: isImage,
-                                charCount: content.length,
+                                charCount: finalContent.length,
+                                isTruncated: wasTruncated,
                                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
                             });
-                            showToast(`✅ Indexed: ${fileName}`);
+                            if (wasTruncated) {
+                                showToast(`⚠️ "${fileName}" saved (truncated — file too large for full storage)`, 'warning');
+                            } else {
+                                showToast(`✅ Indexed: ${fileName}`);
+                            }
                         } catch (err) {
                             console.error("Upload Error for " + fileName, err);
                             const errMsg = err.message || "Unknown error";
-                            showToast(`❌ Error [${fileName}]: ${errMsg.substring(0, 30)}...`);
-                            alert(`File: ${fileName}\nError: ${errMsg}\n\nMake sure your AI Keys are valid and active.`);
+                            const isFirestoreLimit = errMsg.includes('longer than') || errMsg.includes('maximum allowed size');
+                            showToast(`❌ Error [${fileName}]: ${errMsg.substring(0, 40)}...`);
+                            alert(`File: ${fileName}\nError: ${errMsg}${isFirestoreLimit ? '\n\n💡 Tip: This file is too large for Firestore storage (max ~1MB). Try splitting it into smaller parts.' : ''}`);
                         }
                         resolve();
                     };
@@ -5965,86 +5971,43 @@
         async function moveKbDoc(id) {
             const doc = knowledgeBaseCache.find(d => d.id === id);
             if (!doc) return;
-
             const folders = [...new Set(knowledgeBaseCache.map(d => d.folder || 'General'))].sort();
-            
-            const { value: targetFolder } = await Swal.fire({
-                title: 'Move Document',
-                html: `Move <b>${doc.name}</b> to:`,
-                input: 'select',
-                inputOptions: Object.fromEntries(folders.map(f => [f, f])),
-                showCancelButton: true,
-                confirmButtonText: 'Move Now',
-                confirmButtonColor: '#4361ee',
-                inputPlaceholder: 'Select a project/folder...'
-            });
-
-            if (targetFolder) {
-                try {
-                    await db.collection("knowledge_base").doc(id).update({ folder: targetFolder });
-                    showToast(`📦 Moved to ${targetFolder}`);
-                    renderKnowledgeBase();
-                } catch (err) {
-                    Swal.fire('Error', err.message, 'error');
-                }
+            const folderList = folders.join('\n');
+            const targetFolder = prompt(`📦 Move "${doc.name}" to which folder?\n\nAvailable folders:\n${folderList}\n\nType the folder name exactly:`, doc.folder || 'General');
+            if (!targetFolder || targetFolder.trim() === '') return;
+            const target = targetFolder.trim();
+            try {
+                await db.collection('knowledge_base').doc(id).update({ folder: target });
+                showToast(`📦 Moved to "${target}"`);
+                renderKnowledgeBase();
+            } catch (err) {
+                alert('Error: ' + err.message);
             }
         }
         async function renameKbFolder() {
             const modalFilter = document.getElementById('kb-filter-modal');
             const oldName = modalFilter ? modalFilter.value : 'all';
-            
             if (oldName === 'all') {
-                return Swal.fire({
-                    icon: 'warning',
-                    title: 'Select a Project',
-                    text: 'Please select a specific project/folder to rename from the filter dropdown.'
-                });
+                return alert('⚠️ Please select a specific project/folder to rename from the filter dropdown.');
             }
-
-            const { value: newName } = await Swal.fire({
-                title: 'Rename Project',
-                input: 'text',
-                inputLabel: `New name for "${oldName}"`,
-                inputValue: oldName,
-                showCancelButton: true,
-                inputValidator: (value) => {
-                    if (!value || value.trim() === "") return 'You need to write something!';
-                    if (value === oldName) return 'Name must be different';
-                }
-            });
-
-            if (newName && newName !== oldName) {
-                const confirmed = await Swal.fire({
-                    title: 'Confirm Rename',
-                    text: `Are you sure you want to rename "${oldName}" to "${newName}"? This will update ${knowledgeBaseCache.filter(d => (d.folder || 'General') === oldName).length} documents.`,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#4361ee',
-                    cancelButtonColor: '#999',
-                    confirmButtonText: 'Yes, Rename All'
-                });
-
-                if (confirmed.isConfirmed) {
-                    try {
-                        showToast(`🚀 Renaming Project...`, "info");
-                        const batch = db.batch();
-                        const docsToUpdate = knowledgeBaseCache.filter(d => (d.folder || 'General') === oldName);
-                        
-                        docsToUpdate.forEach(doc => {
-                            batch.update(db.collection("knowledge_base").doc(doc.id), { folder: newName });
-                        });
-
-                        await batch.commit();
-                        showToast(`✅ Project renamed to "${newName}"`);
-                        
-                        // Sync UI: wait for Firestore listener to trigger update, or manually force
-                        if (modalFilter) modalFilter.value = newName;
-                        renderKnowledgeBase();
-                    } catch (err) {
-                        console.error("Rename Error:", err);
-                        Swal.fire('Error', 'Failed to rename documents: ' + err.message, 'error');
-                    }
-                }
+            const newName = prompt(`✏️ Rename Project\n\nCurrent name: "${oldName}"\nEnter new name:`, oldName);
+            if (!newName || newName.trim() === '' || newName === oldName) return;
+            const trimmed = newName.trim();
+            const count = knowledgeBaseCache.filter(d => (d.folder || 'General') === oldName).length;
+            if (!confirm(`Rename "${oldName}" → "${trimmed}"?\nThis will update ${count} document(s).`)) return;
+            try {
+                showToast(`🚀 Renaming...`, 'info');
+                const batch = db.batch();
+                knowledgeBaseCache
+                    .filter(d => (d.folder || 'General') === oldName)
+                    .forEach(doc => batch.update(db.collection('knowledge_base').doc(doc.id), { folder: trimmed }));
+                await batch.commit();
+                showToast(`✅ Project renamed to "${trimmed}"`);
+                if (modalFilter) setTimeout(() => { modalFilter.value = trimmed; }, 300);
+                renderKnowledgeBase();
+            } catch (err) {
+                console.error('Rename Error:', err);
+                alert('Failed to rename: ' + err.message);
             }
         }
 
