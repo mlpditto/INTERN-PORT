@@ -1107,7 +1107,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.58</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.59</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -5948,7 +5948,8 @@
                 3. NEVER output internal thoughts or JSON actions.
                 
                 VISUAL PRESENTATION (MERMAID.JS) RULES:
-                - Use Mermaid circles or charts ONLY as a summary for the text above. 
+                - Use 'mindmap' for centralized "One Page" summaries (root in center, nodes spreading out).
+                - For processes or structures, use 'graph TD' or 'graph LR'.
                 - ALWAYS wrap node labels in double quotes. CORRECT: A["Medication"]
                 - Use 'Premium Infographic' style.
                 
@@ -6047,7 +6048,8 @@
                                        .replace(/(\w+)(\([^"]*[\[\]\(\)][^"]*\))/g, '$1("$2")');
                         }).join('\n');
                     }
-                    if (!mermaidCode.match(/^(graph|flowchart|sequenceDiagram|gantt|classDiagram|stateDiagram|pie|erDiagram|journey|gitGraph)/i)) {
+                    // --- 🛠️ V87.59: Mermaid Autocorrect & Mindmap Support ---
+                    if (!mermaidCode.match(/^(graph|flowchart|sequenceDiagram|gantt|classDiagram|stateDiagram|pie|erDiagram|journey|gitGraph|mindmap)/i)) {
                         mermaidCode = "graph TD\n" + mermaidCode;
                     }
                     const cleanCode = sanitizeMermaid(mermaidCode);
@@ -6055,7 +6057,7 @@
                     const replacement = `
                         <div class="mermaid-block" style="margin:15px 0; background:#fdfdfd; padding:15px; border-radius:15px; border:1px solid #eee; position:relative;">
                             <div style="position:absolute; top:10px; right:10px; z-index:10; display:flex; gap:5px;">
-                                <button onclick="downloadMermaidSvg('${chartId}')" style="background:white; border:1px solid #ddd; width:28px; height:28px; border-radius:6px; cursor:pointer; color:#666;" title="Download"><i class="fa-solid fa-download"></i></button>
+                                <button onclick="openExportMenu('${chartId}')" style="background:white; border:1px solid #ddd; width:28px; height:28px; border-radius:6px; cursor:pointer; color:#666;" title="Export Multi-Format"><i class="fa-solid fa-cloud-arrow-down"></i></button>
                                 <button onclick="zoomMermaid('${chartId}')" style="background:white; border:1px solid #ddd; width:28px; height:28px; border-radius:6px; cursor:pointer; color:#666;" title="Zoom"><i class="fa-solid fa-maximize"></i></button>
                             </div>
                             <div id="${chartId}" style="cursor:zoom-in; overflow:hidden;" onclick="zoomMermaid('${chartId}')">
@@ -6150,6 +6152,57 @@
             a.download = `MedLifePlus_Research_${new Date().toISOString().slice(0,10)}.txt`;
             a.click();
             showToast("Research exported as text file.");
+        };
+
+        // --- 📥 V87.59: Advanced Export Logic (PNG/JPG/PDF) ---
+        window.openExportMenu = function(chartId) {
+            Swal.fire({
+                title: 'Export Visual Summary',
+                text: 'Select your preferred format for the infographic:',
+                icon: 'info',
+                showCancelButton: true,
+                showDenyButton: true,
+                confirmButtonText: '<i class="fa-solid fa-file-image"></i> PNG',
+                denyButtonText: '<i class="fa-solid fa-file-pdf"></i> JPG',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#4361ee',
+                denyButtonColor: '#f72585'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    exportMermaidAsImage(chartId, 'png');
+                } else if (result.isDenied) {
+                    exportMermaidAsImage(chartId, 'jpeg');
+                }
+            });
+        };
+
+        window.exportMermaidAsImage = function(chartId, format) {
+            const svgEl = document.querySelector(`#${chartId} svg`);
+            if (!svgEl) return showToast("Rendering not finished yet.");
+            
+            const svgData = new XMLSerializer().serializeToString(svgEl);
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            const img = new Image();
+            
+            const svgSize = svgEl.getBoundingClientRect();
+            canvas.width = svgSize.width * 2; // High Resolution
+            canvas.height = svgSize.height * 2;
+            
+            img.onload = function() {
+                if (format === 'jpeg') {
+                    ctx.fillStyle = "white";
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const url = canvas.toDataURL(`image/${format}`, 1.0);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `Summary_${Date.now()}.${format === 'jpeg' ? 'jpg' : 'png'}`;
+                a.click();
+                showToast(`Exported as ${format.toUpperCase()}`);
+            };
+            img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
         };
 
         window.pendingAttachedImage = null;
