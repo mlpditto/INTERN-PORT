@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V87.51)</title>
-    <!-- V87.28: AI Vision Scan FIX (Multimodal Argument Routing) -->
+    <title>Internship Portfolio (V87.53)</title>
+    <!-- V87.53: FIX - "body stream already read" in AI Proxy handling & Improved Robustness -->
 
     <style>
         /* Hide Spinners/Controllers for q-timer */
@@ -1107,7 +1107,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.50</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.52</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -3145,11 +3145,13 @@
                         return { text: proxyData.text, tokens: proxyData.tokens || 0, model: proxyData.model || modelName };
                     } else {
                         let errorText = "";
+                        // Read as text first to avoid "stream already read" if we try json() later
+                        errorText = await proxyResponse.text();
                         try {
-                            const errorData = await proxyResponse.json();
-                            errorText = errorData.error || JSON.stringify(errorData);
+                            const errorData = JSON.parse(errorText);
+                            errorText = errorData.error || errorText;
                         } catch(e) {
-                            errorText = await proxyResponse.text();
+                            // Already have text
                         }
                         console.warn("⚠️ Proxy failed, falling back to local keys...", errorText);
                     }
@@ -5783,7 +5785,7 @@
             } catch (err) { alert(err.message); }
         }
 
-        // --- 🔥 V87.51: PDF-to-Quiz Generator (NotebookLM-like) ---
+        // --- 🔥 V87.52: PDF-to-Quiz Generator (NotebookLM-like) ---
         function openPdfToQuizModal() {
             renderPdfToQuizList();
             document.getElementById('pdfToQuizModal').style.display = 'block';
@@ -5945,21 +5947,23 @@
                 
                 RESOURCES: ${sourceText}`;
 
-                let aiResponse = "";
-                
+                let responseObj = null;
                 if (window.pendingAttachedImage) {
                     const visionPrompt = {
                         text: systemPrompt + "\n\nUser Question: " + question,
                         imageBase64: window.pendingAttachedImage
                     };
-                    const responseObj = await callUniversalAI('multimodal', visionPrompt);
-                    aiResponse = responseObj.text;
+                    responseObj = await callUniversalAI('multimodal', visionPrompt);
                     window.clearAttachedImage(); // Reset
                 } else {
                     const fullPrompt = systemPrompt + "\n\nUser: " + question;
-                    const responseObj = await window.callUniversalAI(selectedModel, fullPrompt); 
-                    aiResponse = responseObj.text;
+                    responseObj = await window.callUniversalAI(selectedModel, fullPrompt); 
                 }
+                
+                if (!responseObj || !responseObj.text) {
+                    throw new Error("AI failed to provide a valid response.");
+                }
+                aiResponse = responseObj.text;
                 
                 typingEl.style.display = 'none';
                 appendResearchMessage('ai', aiResponse, hasContext ? "Knowledge Base Source Used" : null, question);
@@ -9882,7 +9886,7 @@
                 <button class="btn-dark" onclick="document.getElementById('knowledgeBaseModal').style.display='none'" style="padding:10px 30px; border-radius:30px;">Done</button>
             </div>
         </div>
-    <!-- PDF-to-Quiz Document Selector Modal (V87.51) -->
+    <!-- PDF-to-Quiz Document Selector Modal (V87.52) -->
     <div id="pdfToQuizModal" class="modal" style="z-index:5200;">
         <div class="modal-content" style="max-width:600px; padding:30px; border-radius:25px;">
             <span class="close-modal" onclick="document.getElementById('pdfToQuizModal').style.display='none'">&times;</span>

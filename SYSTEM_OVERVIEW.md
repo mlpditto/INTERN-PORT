@@ -77,6 +77,22 @@
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
 
+## [2026-03-31] Session Updates (V87.52 → V87.53)
+
+### 1. AI Digital Hub — Improved Robustness (V87.53)
+- **Error Handling Fix:** Resolved a critical `TypeError: Failed to execute 'text' on 'Response': body stream already read` bug in the AI communication logic. 
+- **Graceful Fallback:** Improved the proxy failure logic to correctly fallback to local API keys without hanging the UI.
+- **Typing Indicator Reset:** Ensured the "Processing Knowledge Base" indicator is always cleared, even if an error occurs.
+- **Deployment Script Update:** Updated `deploy.ps1` to include `functions` deployment, ensuring the AI Proxy endpoint (`/api/ai`) is properly active.
+
+## [2026-03-30] Session Updates (V87.51 → V87.52)
+
+### 1. Research Assistant — Input Reliability (V87.52)
+- Fixed an issue where the "Query the Brain" input could sometimes fail to trigger the submission logic on mobile devices.
+- Refined the Enter key handling and the send button click listeners.
+
+## [2026-03-30] Session Updates (V87.50 → V87.51)
+
 ## [2026-03-30] Session Updates (V87.49 → V87.50)
 
 ### 1. UI Improvement — Thumbnails Size Increase (V87.50)
