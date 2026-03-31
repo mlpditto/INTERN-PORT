@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V87.72)</title>
-    <!-- V87.72: Drive Link Import + Swal2 z-index Fix -->
+    <title>Internship Portfolio (V87.73)</title>
+    <!-- V87.73: GDrive Config Resilience + LocalStorage Fallback -->
 
     <style>
         /* Hide Spinners/Controllers for q-timer */
@@ -1115,7 +1115,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.72</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.73</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -5876,9 +5876,21 @@
         //   3. Create API Key → restrict to Picker API
         //   4. Fill in the 3 constants below
         // ============================================================
-        const GDRIVE_CLIENT_ID  = window.GDRIVE_CLIENT_ID || '';
-        const GDRIVE_API_KEY    = window.GDRIVE_API_KEY   || '';
-        const GDRIVE_APP_ID     = window.GDRIVE_APP_ID    || 'intern-port-edfa7';
+        // Load from LocalStorage fallback if config files failed (404)
+        function getStoredConfig(key, defaultVal = '') {
+            const stored = localStorage.getItem('MLP_DRIVE_CONFIG');
+            if (stored) {
+                try {
+                    const cfg = JSON.parse(stored);
+                    return cfg[key] || window[key] || defaultVal;
+                } catch(e) { }
+            }
+            return window[key] || defaultVal;
+        }
+
+        const GDRIVE_CLIENT_ID  = getStoredConfig('GDRIVE_CLIENT_ID');
+        const GDRIVE_API_KEY    = getStoredConfig('GDRIVE_API_KEY');
+        const GDRIVE_APP_ID     = getStoredConfig('GDRIVE_APP_ID', 'intern-port-edfa7');
 
         let gdriveTokenClient = null;
         let gdriveAccessToken = null;
@@ -5908,8 +5920,38 @@
         }
 
         async function openGoogleDrivePicker() {
-            if (GDRIVE_CLIENT_ID.startsWith('YOUR_')) {
-                return alert('⚙️ Google Drive not configured yet.\n\nPlease set GDRIVE_CLIENT_ID and GDRIVE_API_KEY in admin.html.\n\nSee the setup guide in the Knowledge Base section.');
+            if (!GDRIVE_CLIENT_ID || GDRIVE_CLIENT_ID.startsWith('YOUR_')) {
+                const setup = await Swal.fire({
+                    title: '⚙️ Drive Config Needed',
+                    html: `
+                        <div style="text-align:left; font-size:0.85em; color:#666;">
+                            <p>เนื่องจากไฟล์ <b>gdrive-config.js</b> ตรวจไม่พบบน server (อาจเนื่องจาก CI/CD) กรุณาระบุรหัส API เพื่อใช้งาน:</p>
+                            <label>Client ID:</label>
+                            <input id="swal-client-id" class="swal2-input" placeholder="...apps.googleusercontent.com" value="${GDRIVE_CLIENT_ID}">
+                            <label>API Key:</label>
+                            <input id="swal-api-key" class="swal2-input" placeholder="Google API Key" value="${GDRIVE_API_KEY}">
+                        </div>
+                    `,
+                    showCancelButton: true,
+                    confirmButtonText: '💾 Save Locally & Close',
+                    preConfirm: () => {
+                        return {
+                            cid: document.getElementById('swal-client-id').value,
+                            key: document.getElementById('swal-api-key').value
+                        }
+                    }
+                });
+
+                if (setup.isConfirmed && setup.value.cid && setup.value.key) {
+                    localStorage.setItem('MLP_DRIVE_CONFIG', JSON.stringify({
+                        GDRIVE_CLIENT_ID: setup.value.cid,
+                        GDRIVE_API_KEY: setup.value.key,
+                        GDRIVE_APP_ID: 'intern-port-edfa7'
+                    }));
+                    Swal.fire('Saved!', 'Reloding page to apply changes...', 'success');
+                    setTimeout(() => location.reload(), 1000);
+                }
+                return;
             }
             if (!window.gapi) {
                 return alert('⚠️ Google API not loaded yet. Please wait a moment and try again.');
