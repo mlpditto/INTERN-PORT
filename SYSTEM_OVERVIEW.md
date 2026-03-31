@@ -77,6 +77,13 @@
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
 
+## [2026-03-31] Session Updates (V87.53 → V87.54)
+
+### 1. Claude 3.5 Sonnet Integration (V87.54)
+- **Anthropic Provider Added:** Implemented a new backend provider for Anthropic API in the AI Proxy.
+- **Improved Model Selection:** Added "Claude 3.5 Sonnet" as a selectable engine in the AI Digital Hub (Research Assistant).
+- **Pro-Level Logic:** Integrated Claude's superior reasoning capabilities to complement Gemini and GPT-4o options.
+
 ## [2026-03-31] Session Updates (V87.52 → V87.53)
 
 ### 1. AI Digital Hub — Improved Robustness (V87.53)

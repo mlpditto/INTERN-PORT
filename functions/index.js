@@ -145,6 +145,36 @@ exports.callAIProxy = onRequest({ cors: true }, async (req, res) => {
             return res.json({ text: response.data.choices[0].message.content, tokens: response.data.usage.total_tokens });
         }
 
+        // --- 🔴 Anthropic (Claude 3.5 Sonnet / Haiku) (V87.54) ---
+        if (provider === "anthropic") {
+            const apiKey = process.env.ANTHROPIC_API_KEY;
+            if (!apiKey) return res.status(500).json({ error: "Anthropic API Key not configured on server." });
+
+            const actualModel = model.includes('sonnet') ? "claude-3-5-sonnet-20240620" : "claude-3-haiku-20240307";
+            
+            // Claude uses a separate 'system' parameter for the system prompt
+            const response = await axios.post('https://api.anthropic.com/v1/messages', {
+                model: actualModel,
+                max_tokens: 4096,
+                messages: [{ role: "user", content: prompt }],
+                // In this architecture, systemPrompt is often prepended to prompt or handled via a specific var
+                // For simplicity here, we assume prompt contains the full tailored context from admin.html
+                temperature: 0.7
+            }, {
+                headers: { 
+                    "x-api-key": apiKey, 
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json" 
+                }
+            });
+
+            return res.json({ 
+                text: response.data.content[0].text, 
+                tokens: (response.data.usage.input_tokens + response.data.usage.output_tokens) || 0,
+                model: actualModel
+            });
+        }
+
         return res.status(400).json({ error: "Unsupported provider" });
 
     } catch (err) {
