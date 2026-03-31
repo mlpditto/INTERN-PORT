@@ -1107,7 +1107,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.63</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.65</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -1702,6 +1702,12 @@
                             <h4 style="margin:0 0 15px 0; color:#34495e; font-size:0.95em; display:flex; align-items:center; gap:8px;">
                                 <i class="fa-solid fa-book-open-reader" style="color:var(--primary);"></i> Knowledge Sources
                             </h4>
+                            <div style="margin-bottom:15px;">
+                                <select id="kb-filter-sidebar" onchange="renderKnowledgeBase()" style="width:100%; padding:8px; border-radius:10px; border:1px solid #d0e3ff; background:#f0f7ff; color:var(--primary); font-weight:bold; font-size:0.85em; cursor:pointer;">
+                                    <option value="all">📁 All Projects</option>
+                                    <option value="General">📂 General</option>
+                                </select>
+                            </div>
                             <div id="research-document-list" style="display:flex; flex-direction:column; gap:10px; max-height:350px; overflow-y:auto; margin-bottom:20px; padding:5px;">
                                 <div style="text-align:center; padding:30px 10px; color:#bdc3c7; border:2px dashed #ecf0f1; border-radius:18px; background:#fafafa;">
                                     <i class="fa-solid fa-folder-open" style="font-size:1.5em; margin-bottom:10px;"></i>
@@ -1880,7 +1886,12 @@
             <div style="max-width:1400px; margin:0 auto; width:100%; padding: 0 20px;">
                 <div style="text-align:center; margin-bottom:40px;">
                     <h1 style="font-family:'Cormorant Garamond', serif; font-size:3em; color:#0a192f; margin-bottom:5px;">LAUGH TALE</h1>
-                    <div style="font-size:1.2em; color:#d35400; font-weight:bold; letter-spacing:3px;">웃음 이야기 : THE TREASURE BOX</div>
+                    <div style="font-size:1.2em; color:#d35400; font-weight:bold; letter-spacing:3px; display:flex; align-items:center; justify-content:center; gap:15px;">
+                        웃음 이야기 : THE TREASURE BOX
+                        <button onclick="toggleGlobalBlind()" id="btn-global-blind" title="Straw Hat Mode: Hide/Show All Identities" style="background:white; border:2px solid #f1c40f; color:#f39c12; width:45px; height:45px; border-radius:50%; cursor:pointer; font-size:1.4em; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 10px rgba(241,196,15,0.2); transition:0.3s;" onmouseover="this.style.transform='scale(1.1) rotate(15deg)'" onmouseout="this.style.transform='scale(1) rotate(0)'">
+                            👒
+                        </button>
+                    </div>
                     <p style="color:#666; font-style:italic; margin-top:10px;">"The collection of greatest stories, reflections, and hearts."</p>
                 </div>
                 <div id="laughtale-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap:25px;">
@@ -5754,22 +5765,39 @@
             const sidebarList = document.getElementById('research-document-list');
             const modalList = document.getElementById('kb-document-list');
             const countEl = document.getElementById('kb-doc-count');
+            const sidebarFilter = document.getElementById('kb-filter-sidebar');
+            const modalFilter = document.getElementById('kb-filter-modal');
             
-            if (countEl) countEl.innerText = `${knowledgeBaseCache.length} Docs`;
+            // Get unique folders for filters
+            const folders = ['General', ...new Set(knowledgeBaseCache.map(d => d.folder || 'General'))];
+            [sidebarFilter, modalFilter].forEach(f => {
+                if (!f) return;
+                const current = f.value;
+                f.innerHTML = `<option value="all">📁 All Projects</option>` + 
+                    folders.map(fol => `<option value="${fol}">📂 ${fol}</option>`).join('');
+                if ([...f.options].some(o => o.value === current)) f.value = current;
+            });
 
-            if (knowledgeBaseCache.length === 0) {
+            const activeFilter = (sidebarFilter && sidebarFilter.value !== 'all') ? sidebarFilter.value : 
+                                 (modalFilter && modalFilter.value !== 'all' ? modalFilter.value : 'all');
+
+            const filteredDocs = activeFilter === 'all' ? knowledgeBaseCache : knowledgeBaseCache.filter(d => (d.folder || 'General') === activeFilter);
+
+            if (countEl) countEl.innerText = `${filteredDocs.length} Docs`;
+
+            if (filteredDocs.length === 0) {
                 const emptyHtml = `<div style="text-align:center; padding:30px 10px; color:#bdc3c7; border:2px dashed #ecf0f1; border-radius:15px;">
                     <i class="fa-solid fa-folder-open" style="font-size:1.5em; margin-bottom:10px;"></i>
-                    <p style="font-size:0.8em; margin:0;">No documents in Knowledge Base.<br><a href="#" onclick="openKnowledgeBaseManager()" style="color:var(--primary); font-weight:bold;">Upload now</a></p>
+                    <p style="font-size:0.8em; margin:0;">No documents in this folder.<br><a href="#" onclick="openKnowledgeBaseManager()" style="color:var(--primary); font-weight:bold;">Check Manager</a></p>
                 </div>`;
                 if (sidebarList) sidebarList.innerHTML = emptyHtml;
-                if (modalList) modalList.innerHTML = `<div style="text-align:center; padding:40px; color:#999; font-style:italic;">No documents uploaded yet.</div>`;
+                if (modalList) modalList.innerHTML = `<div style="text-align:center; padding:40px; color:#999; font-style:italic;">No documents in this folder.</div>`;
                 return;
             }
 
-            // Render Sidebar (Simple List)
+            // Render Sidebar
             if (sidebarList) {
-                sidebarList.innerHTML = knowledgeBaseCache.map(doc => `
+                sidebarList.innerHTML = filteredDocs.map(doc => `
                     <div style="background:#fff; border:1px solid #eee; padding:10px 12px; border-radius:12px; display:flex; align-items:center; gap:10px; font-size:0.85em; transition:0.2s; cursor:default;" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='#eee'">
                         <i class="fa-solid ${doc.type === 'pdf' ? 'fa-file-pdf' : 'fa-file-lines'}" style="color:${doc.type === 'pdf' ? '#e74c3c' : '#3498db'};"></i>
                         <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500;">${doc.name}</div>
@@ -5777,16 +5805,16 @@
                 `).join('');
             }
 
-            // Render Modal (Detailed with Delete)
+            // Render Modal
             if (modalList) {
-                modalList.innerHTML = knowledgeBaseCache.map(doc => `
+                modalList.innerHTML = filteredDocs.map(doc => `
                     <div style="background:white; border:1px solid #efefef; border-radius:15px; padding:12px 15px; display:flex; align-items:center; gap:15px; box-shadow:0 2px 5px rgba(0,0,0,0.02);">
                         <div style="width:40px; height:40px; background:#f8f9fa; border-radius:10px; display:flex; align-items:center; justify-content:center;">
                             <i class="fa-solid ${doc.type === 'pdf' ? 'fa-file-pdf' : 'fa-file-lines'}" style="color:${doc.type === 'pdf' ? '#e74c3c' : '#3498db'};"></i>
                         </div>
                         <div style="flex:1; min-width:0;">
                             <div style="font-weight:bold; font-size:0.9em; margin-bottom:2px;">${doc.name}</div>
-                            <div style="font-size:0.75em; color:#999;">${doc.type.toUpperCase()} | ${doc.charCount || 0} chars | ${doc.createdAt ? doc.createdAt.toDate().toLocaleDateString() : 'Just now'}</div>
+                            <div style="font-size:0.75em; color:#999;">[${doc.folder || 'General'}] | ${doc.type.toUpperCase()} | ${doc.charCount || 0} chars</div>
                         </div>
                         <button class="btn-sm" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:1.1em;" onclick="deleteKbDoc('${doc.id}')" title="Delete">
                             <i class="fa-solid fa-trash-can"></i>
@@ -5834,8 +5862,11 @@
                                 content = transcription; 
                             }
 
+                            const folderName = document.getElementById('kb-folder-name').value.trim() || 'General';
+                            
                             await db.collection("knowledge_base").add({
                                 name: fileName,
+                                folder: folderName,
                                 type: fileType,
                                 content: content,
                                 isImage: isImage,
@@ -6071,19 +6102,26 @@
         }
 
         function queryKnowledgeBaseLocal(query) {
+            const filterEl = document.getElementById('kb-filter-sidebar');
+            const activeFolder = filterEl ? filterEl.value : 'all';
+            
+            let pool = knowledgeBaseCache;
+            if (activeFolder !== 'all') {
+                pool = knowledgeBaseCache.filter(d => (d.folder || 'General') === activeFolder);
+            }
+
             // Simple RAG: Find docs that contain keywords from query
             const keywords = query.toLowerCase().split(/\s+/).filter(k => k.length > 2);
-            let relevantDocs = knowledgeBaseCache.filter(doc => {
+            let relevantDocs = pool.filter(doc => {
                 const content = (doc.content || "").toLowerCase();
                 return keywords.some(k => content.includes(k));
             });
 
             if (relevantDocs.length === 0) {
-                // Fallback: take most recent 3 docs
-                relevantDocs = knowledgeBaseCache.slice(0, 3);
+                relevantDocs = pool.slice(0, 3);
             }
 
-            return relevantDocs.map(d => `SOURCE: ${d.name}\nCONTENT: ${d.content.substring(0, 2000)}`).join('\n\n---\n\n');
+            return relevantDocs.map(d => `SOURCE: [${d.folder || 'General'}] ${d.name}\nCONTENT: ${d.content.substring(0, 2000)}`).join('\n\n---\n\n');
         }
 
         // 💾 V87.61: Firestore History Management (Firebase v8 Compatible)
@@ -9733,6 +9771,28 @@
             }).join('');
         }
 
+        function toggleGlobalBlind() {
+            const allCards = document.querySelectorAll('.laugh-card');
+            const btn = document.getElementById('btn-global-blind');
+            const isHiding = btn.dataset.hiding === 'true';
+            
+            allCards.forEach(card => {
+                const cardId = card.id;
+                const nameEl = card.querySelector('.lt-name');
+                const isCardBlind = nameEl && nameEl.dataset.blind === 'true';
+                
+                // If we want to hide all, but card is showing -> toggle it
+                // If we want to show all, but card is hiding -> toggle it
+                if (isHiding && isCardBlind) blindLaughCard(cardId);
+                else if (!isHiding && !isCardBlind) blindLaughCard(cardId);
+            });
+            
+            btn.dataset.hiding = isHiding ? 'false' : 'true';
+            btn.style.background = isHiding ? 'white' : '#f1c40f';
+            btn.style.color = isHiding ? '#f39c12' : 'white';
+            showToast(isHiding ? "Revealed all identities" : "👒 Straw Hat Mode! All identities hidden.");
+        }
+
         function blindLaughCard(cardId) {
             const card = document.getElementById(cardId);
             if (!card) return;
@@ -10126,18 +10186,27 @@
                 </div>
             </div>
 
-            <div style="background:#f8f9fa; border:2px dashed #ddd; border-radius:15px; padding:30px; text-align:center; margin-bottom:25px; transition:0.3s;" id="kb-drop-zone">
-                <i class="fa-solid fa-cloud-arrow-up" style="font-size:2.5em; color:#bdc3c7; margin-bottom:15px;"></i>
-                <div style="font-weight:bold; color:#2c3e50; margin-bottom:5px;">Drag & Drop documents here</div>
-                <div style="font-size:0.8em; color:#7f8c8d; margin-bottom:15px;">Supports PDF (Metadata) and Plain Text. Max 5MB.</div>
+            <div style="background:#f8f9fa; border:2px dashed #ddd; border-radius:15px; padding:20px; text-align:center; margin-bottom:25px; transition:0.3s;" id="kb-drop-zone">
+                <i class="fa-solid fa-cloud-arrow-up" style="font-size:2em; color:#bdc3c7; margin-bottom:10px;"></i>
+                <div style="font-weight:bold; color:#2c3e50; margin-bottom:10px;">Group documents into Project/Folder:</div>
+                <input type="text" id="kb-folder-name" placeholder="Project name (e.g. Med Project A)" style="width:280px; padding:8px 15px; border-radius:10px; border:1px solid #ddd; margin-bottom:15px; font-weight:bold; text-align:center;">
+                
+                <div style="font-size:0.8em; color:#7f8c8d; margin-bottom:15px;">Drag & Drop or Select Files Below</div>
                 <input type="file" id="kb-file-input" style="display:none;" multiple onchange="handleKbFileUpload(event)">
-                <button class="btn-primary" onclick="document.getElementById('kb-file-input').click()" style="padding:10px 25px; border-radius:30px; font-weight:bold;">
+                <button class="magic-btn" onclick="document.getElementById('kb-file-input').click()" style="padding:10px 25px; border-radius:30px; font-weight:bold;">
                     <i class="fa-solid fa-plus"></i> Select Files
                 </button>
             </div>
 
+            <div style="margin-bottom:20px; display:flex; gap:10px; align-items:center;">
+                <label style="font-size:0.85em; font-weight:bold; color:#555;">📁 Filter Project:</label>
+                <select id="kb-filter-modal" onchange="renderKnowledgeBase()" style="flex:1; padding:8px; border-radius:10px; border:1px solid #ddd; background:#fff; font-weight:bold;">
+                    <option value="all">📁 All Projects</option>
+                </select>
+            </div>
+
             <h4 style="margin:0 0 15px 0; display:flex; justify-content:space-between; align-items:center;">
-                Uploaded Documents
+                Project Documents
                 <span id="kb-doc-count" style="font-size:0.7em; background:#eee; padding:2px 10px; border-radius:10px; color:#666;">0 Docs</span>
             </h4>
             
