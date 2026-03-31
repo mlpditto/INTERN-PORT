@@ -1107,7 +1107,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.57</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.58</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -5975,6 +5975,9 @@
                 typingEl.style.display = 'none';
                 appendResearchMessage('ai', aiResponse, hasContext ? "Knowledge Base Source Used" : null, question);
                 
+                // 💾 V87.58: Auto-Save Research to History (Firestore)
+                saveResearchToHistory(question, aiResponse, selectedModel);
+                
             } catch (err) {
                 typingEl.style.display = 'none';
                 console.error("Research Error:", err);
@@ -5996,6 +5999,23 @@
             }
 
             return relevantDocs.map(d => `SOURCE: ${d.name}\nCONTENT: ${d.content.substring(0, 2000)}`).join('\n\n---\n\n');
+        }
+
+        // 💾 V87.58: Firestore History Management
+        async function saveResearchToHistory(q, a, model) {
+            try {
+                if (!window.db) return;
+                await addDoc(collection(db, "research_history"), {
+                    userId: window.currentAdminEmail || "admin",
+                    question: q,
+                    answer: a,
+                    model: model,
+                    timestamp: serverTimestamp()
+                });
+                console.log("Research session saved to cloud.");
+            } catch (e) {
+                console.warn("Firestore save failed:", e);
+            }
         }
 
         function appendResearchMessage(role, text, sourceLabel, originalQuestion, skipSync = false) {
@@ -6061,38 +6081,76 @@
                 html = html.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
                 msgDiv.innerHTML = `${sourceBadge}<div style="line-height:1.6;">${html}</div>`;
                 
-                // --- 🎨 Artistic Mode Button (V86.49: Perfect Logic) ---
-                if (html.length > 200 && !html.includes('dall-e-image')) {
-                    const creativeBtn = document.createElement('button');
-                    creativeBtn.className = 'btn-sm';
-                    creativeBtn.style = "margin-top:10px; background:#f72585; color:white; border:none; border-radius:20px; font-size:0.7em; padding:5px 15px; cursor:pointer;";
-                    creativeBtn.innerHTML = `<i class="fa-solid fa-palette"></i> Generate Artistic Infographic (DALL-E 3)`;
-                    creativeBtn.onclick = async () => {
-                        creativeBtn.disabled = true;
-                        creativeBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Designing...`;
-                        try {
-                            const qTextForDalle = originalQuestion || "Medical Research Summary";
-                            const dallePrompt = `Professional medical infographic about: ${qTextForDalle}. High-quality 3D render style, clean, stunning aesthetic, 4k resolution. Infographic elements. No errors.`;
-                            const imgUrl = await window.callUniversalAI('dalle', dallePrompt);
-                            const imgContainer = document.createElement('div');
-                            imgContainer.style = "margin-top:15px; text-align:center;";
-                            imgContainer.innerHTML = `<img src="${imgUrl}" style="width:100%; border-radius:15px; box-shadow:0 10px 30px rgba(0,0,0,0.1); cursor:zoom-in;" onclick="window.open('${imgUrl}', '_blank')">`;
-                            msgDiv.appendChild(imgContainer);
-                            creativeBtn.remove();
-                        } catch (err) { showToast(err.message); creativeBtn.disabled = false; creativeBtn.innerHTML = "Retry Creative"; }
-                    };
-                    msgDiv.appendChild(creativeBtn);
-                }
+                // --- 🛠️ V87.58: AI Action Bar (Copy, Export, Quiz) ---
+                const actionBar = document.createElement('div');
+                actionBar.style = "display:flex; gap:10px; margin-top:10px; padding-top:10px; border-top:1px dashed #eee;";
+                const btnStyle = "font-size:0.75em; padding:4px 10px; border-radius:8px; display:flex; align-items:center; gap:5px; transition:0.2s; cursor:pointer; border:1px solid #eef0f5; background:white; color:#555;";
+
+                actionBar.innerHTML = `
+                    <div class="ai-act-btn" style="${btnStyle}" onclick="copyToClipboard(\`${text.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`, 'Research copied!')">
+                        <i class="fa-solid fa-copy"></i> Copy
+                    </div>
+                    <div class="ai-act-btn" style="${btnStyle}" onclick="exportResearchChat(\`${text.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">
+                        <i class="fa-solid fa-file-export"></i> Export
+                    </div>
+                    <div class="ai-act-btn" style="${btnStyle}; background:#fff5f5; color:#e74c3c; border-color:#fadbd8;" onclick="sendResearchToQuiz(\`${text.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">
+                        <i class="fa-solid fa-bolt"></i> Send to Quiz
+                    </div>
+                `;
+                msgDiv.appendChild(actionBar);
             }
             historyEl.appendChild(msgDiv);
             historyEl.scrollTop = historyEl.scrollHeight;
-            if (!skipSync) {
-                db.collection("research_chat").add({
-                    role, text, question: originalQuestion || null, sourceLabel: sourceLabel || null, createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+            
+            if (!skipSync && window.db) {
+                // 💾 V87.58: Fixed Firebase v9 Modular Logging
+                addDoc(collection(db, "research_history"), {
+                    role, text, 
+                    question: originalQuestion || null, 
+                    sourceLabel: sourceLabel || null, 
+                    userId: window.currentAdminEmail || "admin",
+                    timestamp: serverTimestamp()
+                }).catch(err => console.error("History log failed:", err));
             }
             researchChatHistory.push({ role, text });
         }
+
+        // --- 🎯 V87.58: Cross-Module Logic (Research to Quiz) ---
+        window.sendResearchToQuiz = function(content) {
+            Swal.fire({
+                title: 'Send to Quiz Creator?',
+                text: "This will transfer the content to the AI Quiz Generation tool.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#4361ee',
+                confirmButtonText: 'Yes, Send Now'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    switchTab('assignments');
+                    setTimeout(() => {
+                        const aiInput = document.getElementById('ai-quiz-prompt');
+                        if (aiInput) {
+                            aiInput.value = "Create a professional quiz based on these research findings:\n\n" + content;
+                            aiInput.focus();
+                            aiInput.style.border = "3px solid #2ecc71";
+                            showToast("Content imported to Quiz Designer!", "success");
+                        } else {
+                            showToast("Could not find Quiz AI input. Please open the Generator manually.", "error");
+                        }
+                    }, 500);
+                }
+            });
+        };
+
+        window.exportResearchChat = function(content) {
+            const blob = new Blob([content], { type: "text/plain" });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `MedLifePlus_Research_${new Date().toISOString().slice(0,10)}.txt`;
+            a.click();
+            showToast("Research exported as text file.");
+        };
 
         window.pendingAttachedImage = null;
         function handleResearchImageAttach(event) {
