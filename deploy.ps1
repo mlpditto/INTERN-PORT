@@ -10,6 +10,6 @@ git push origin production
 
 # 2. Deploy to Firebase
 Write-Host "Deploying to Firebase (Hosting & Functions)..."
-firebase deploy --only hosting,functions
+firebase deploy --only "hosting,functions"
 
 Write-Host "Done! URL: https://mlp-int.work/admin.html"
