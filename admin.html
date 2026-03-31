@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V87.71)</title>
-    <!-- V87.71: Premium Hub UI Overhaul + Layout Fixes -->
+    <title>Internship Portfolio (V87.72)</title>
+    <!-- V87.72: Drive Link Import + Swal2 z-index Fix -->
 
     <style>
         /* Hide Spinners/Controllers for q-timer */
@@ -1115,7 +1115,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.71</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.72</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -6106,6 +6106,61 @@
             }, 150);
         }
 
+        async function importDriveFileByLink() {
+            const linkInput = document.getElementById('kb-drive-link');
+            const link = linkInput.value.trim();
+            if (!link) return showToast('⚠️ Please paste a Google Drive link first.', 'warning');
+            
+            // Extract File ID from link
+            let fileId = '';
+            const idMatch = link.match(/\/d\/([a-zA-Z0-9_-]+)/) || link.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+            if (idMatch) fileId = idMatch[1];
+            
+            if (!fileId) return Swal.fire('Invalid Link', 'Could not extract Google Drive File ID from that link.', 'error');
+            
+            const folderName = document.getElementById('kb-folder-name').value.trim() || 'General';
+            
+            try {
+                showToast(`📥 Importing from link...`, 'info');
+                
+                if (!window.gapi) throw new Error('Google API not loaded.');
+                
+                // If we don't have a token, we might need to trigger auth via the picker flow first
+                if (!gdriveAccessToken) {
+                    const authResult = await Swal.fire({
+                        title: 'Authentication Required',
+                        text: 'To import via link, we need your permission to access Google Drive.',
+                        icon: 'info',
+                        showCancelButton: true,
+                        confirmButtonText: 'Authorize'
+                    });
+                    if (authResult.isConfirmed) {
+                        await openGoogleDrivePicker();
+                        // openGoogleDrivePicker will handle token request. 
+                        // The user will have to click "Import" again or we can try to re-run.
+                        return; 
+                    }
+                    return;
+                }
+                
+                // Fetch basic metadata to get file name
+                const metaRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,mimeType`, {
+                    headers: { Authorization: `Bearer ${gdriveAccessToken}` }
+                });
+                
+                if (!metaRes.ok) throw new Error('Drive API Access Error: ' + metaRes.statusText);
+                const fileMeta = await metaRes.json();
+                
+                await _importDriveFile(fileMeta, folderName);
+                linkInput.value = '';
+                showToast('✅ Imported successfully!');
+                renderKnowledgeBase();
+            } catch (err) {
+                console.error('Import Link Error:', err);
+                Swal.fire('Import Failed', err.message, 'error');
+            }
+        }
+
         async function handleKbFileUpload(event) {
             const files = event.target.files;
             if (!files || files.length === 0) return;
@@ -10534,7 +10589,7 @@
     </div>
 
     <!-- Knowledge Base Management Modal (V86.35) -->
-    <div id="knowledgeBaseModal" class="modal" style="z-index:5100;">
+    <div id="knowledgeBaseModal" class="modal" style="z-index:1040;">
         <div class="modal-content" style="max-width:800px; text-align: left; padding:30px; border-radius:25px;">
             <span class="close-modal" onclick="document.getElementById('knowledgeBaseModal').style.display='none'">&times;</span>
             <div style="display:flex; align-items:center; gap:15px; margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:15px;">
@@ -10557,15 +10612,22 @@
                 <button class="magic-btn" onclick="document.getElementById('kb-file-input').click()" style="padding:10px 25px; border-radius:30px; font-weight:bold;">
                     <i class="fa-solid fa-plus"></i> Select Local Files
                 </button>
-                <div style="margin-top:12px; display:flex; align-items:center; gap:10px; justify-content:center;">
-                    <div style="flex:1; height:1px; background:#ddd;"></div>
-                    <span style="font-size:0.75em; color:#999; white-space:nowrap;">or import from</span>
-                    <div style="flex:1; height:1px; background:#ddd;"></div>
+                <div style="margin-top:15px; display:flex; flex-direction:column; align-items:center; gap:12px; justify-content:center;">
+                    <div style="width:100%; height:1px; background:#eee; position:relative; margin:10px 0;">
+                        <span style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:#f8f9fa; padding:0 10px; font-size:0.7em; color:#aaa; font-weight:bold; text-transform:uppercase; letter-spacing:1px;">or import from cloud</span>
+                    </div>
+                    
+                    <button class="btn-sm" onclick="openGoogleDrivePicker()" style="width:300px; padding:12px; border-radius:30px; background:white; color:#4285f4; border:1.5px solid #4285f4; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; transition:0.2s;" onmouseover="this.style.background='#f0f7ff'" onmouseout="this.style.background='white'">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg" style="width:20px;"> Add from Google Drive Picker
+                    </button>
+
+                    <div style="width:300px; display:flex; gap:8px;">
+                        <input type="text" id="kb-drive-link" placeholder="Paste Google Drive link here..." style="flex:1; padding:12px 15px; border-radius:12px; border:1.5px solid #e0e6ed; font-size:0.85em; outline:none; transition:0.3s; background:white;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='#e0e6ed'">
+                        <button onclick="importDriveFileByLink()" style="padding:10px 18px; border-radius:12px; background:var(--primary); color:white; border:none; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 10px rgba(67,97,238,0.25);" title="Import from Link">
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
                 </div>
-                <button onclick="openGoogleDrivePicker()" style="margin-top:10px; padding:10px 25px; border-radius:30px; font-weight:bold; border:2px solid #4285f4; background:white; color:#4285f4; cursor:pointer; display:flex; align-items:center; gap:10px; margin:10px auto 0;">
-                    <svg width="18" height="18" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>
-                    Add from Google Drive
-                </button>
             </div>
 
             <div style="margin-bottom:20px; display:flex; gap:10px; align-items:center; background:#f0f7ff; padding:12px; border-radius:15px; border:1px solid #d0e3ff;">
