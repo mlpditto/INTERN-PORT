@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V87.58)</title>
-    <!-- V87.58: GPT-5.4 Series Integration (Standard, Mini, Nano) & UI Consolidation (Pastel Theme) -->
+    <title>Internship Portfolio (V87.63)</title>
+    <!-- V87.63: Knowledge Base Project Management & Folder Renaming Fix -->
 
     <style>
         /* Hide Spinners/Controllers for q-timer */
@@ -5766,21 +5766,29 @@
             const sidebarList = document.getElementById('research-document-list');
             const modalList = document.getElementById('kb-document-list');
             const countEl = document.getElementById('kb-doc-count');
-            const sidebarFilter = document.getElementById('kb-filter-sidebar');
-            const modalFilter = document.getElementById('kb-filter-modal');
-            
+            // Sync filters if one was changed (optional: keep in sync for better UX)
+            if (sidebarFilter && modalFilter) {
+                // If this was called from a filter change, we might want to sync. 
+                // But specifically for now, we just ensure they both react.
+            }
+
             // Get unique folders for filters
-            const folders = ['General', ...new Set(knowledgeBaseCache.map(d => d.folder || 'General'))];
+            const folders = [...new Set(knowledgeBaseCache.map(d => d.folder || 'General'))].sort();
             [sidebarFilter, modalFilter].forEach(f => {
                 if (!f) return;
                 const current = f.value;
                 f.innerHTML = `<option value="all">📁 All Projects</option>` + 
                     folders.map(fol => `<option value="${fol}">📂 ${fol}</option>`).join('');
                 if ([...f.options].some(o => o.value === current)) f.value = current;
+                else if (current !== 'all' && folders.length > 0) {
+                   // If current was a folder that was just renamed, we'll need to handle it or it resets to 'all'
+                }
             });
 
-            const activeFilter = (sidebarFilter && sidebarFilter.value !== 'all') ? sidebarFilter.value : 
-                                 (modalFilter && modalFilter.value !== 'all' ? modalFilter.value : 'all');
+            // Determine active filter based on which one actually was interacted with or keep it simple
+            // For now, let's just use the one from modal if it's open, else sidebar
+            const isModalOpen = document.getElementById('knowledgeBaseModal').style.display === 'block';
+            const activeFilter = isModalOpen ? (modalFilter ? modalFilter.value : 'all') : (sidebarFilter ? sidebarFilter.value : 'all');
 
             const filteredDocs = activeFilter === 'all' ? knowledgeBaseCache : knowledgeBaseCache.filter(d => (d.folder || 'General') === activeFilter);
 
@@ -5801,7 +5809,7 @@
                 sidebarList.innerHTML = filteredDocs.map(doc => `
                     <div style="background:#fff; border:1px solid #eee; padding:10px 12px; border-radius:12px; display:flex; align-items:center; gap:10px; font-size:0.85em; transition:0.2s; cursor:default;" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='#eee'">
                         <i class="fa-solid ${doc.type === 'pdf' ? 'fa-file-pdf' : 'fa-file-lines'}" style="color:${doc.type === 'pdf' ? '#e74c3c' : '#3498db'};"></i>
-                        <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500;">${doc.name}</div>
+                        <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500;" title="${doc.name}">${doc.name}</div>
                     </div>
                 `).join('');
             }
@@ -5814,12 +5822,17 @@
                             <i class="fa-solid ${doc.type === 'pdf' ? 'fa-file-pdf' : 'fa-file-lines'}" style="color:${doc.type === 'pdf' ? '#e74c3c' : '#3498db'};"></i>
                         </div>
                         <div style="flex:1; min-width:0;">
-                            <div style="font-weight:bold; font-size:0.9em; margin-bottom:2px;">${doc.name}</div>
-                            <div style="font-size:0.75em; color:#999;">[${doc.folder || 'General'}] | ${doc.type.toUpperCase()} | ${doc.charCount || 0} chars</div>
+                            <div style="font-weight:bold; font-size:0.9em; margin-bottom:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${doc.name}</div>
+                            <div style="font-size:0.75em; color:#999;"><span style="color:var(--primary); font-weight:bold;">${doc.folder || 'General'}</span> | ${doc.type.toUpperCase()} | ${doc.charCount || 0} chars</div>
                         </div>
-                        <button class="btn-sm" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:1.1em;" onclick="deleteKbDoc('${doc.id}')" title="Delete">
-                            <i class="fa-solid fa-trash-can"></i>
-                        </button>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn-sm" style="background:none; border:none; color:var(--primary); cursor:pointer; font-size:1.1em;" onclick="moveKbDoc('${doc.id}')" title="Move to another Project">
+                                <i class="fa-solid fa-folder-tree"></i>
+                            </button>
+                            <button class="btn-sm" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:1.1em;" onclick="deleteKbDoc('${doc.id}')" title="Delete">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
                     </div>
                 `).join('');
             }
@@ -5902,6 +5915,92 @@
                 await db.collection("knowledge_base").doc(id).delete();
                 showToast("Deleted");
             } catch (err) { alert(err.message); }
+        }
+
+        async function moveKbDoc(id) {
+            const doc = knowledgeBaseCache.find(d => d.id === id);
+            if (!doc) return;
+
+            const folders = [...new Set(knowledgeBaseCache.map(d => d.folder || 'General'))].sort();
+            
+            const { value: targetFolder } = await Swal.fire({
+                title: 'Move Document',
+                html: `Move <b>${doc.name}</b> to:`,
+                input: 'select',
+                inputOptions: Object.fromEntries(folders.map(f => [f, f])),
+                showCancelButton: true,
+                confirmButtonText: 'Move Now',
+                confirmButtonColor: '#4361ee',
+                inputPlaceholder: 'Select a project/folder...'
+            });
+
+            if (targetFolder) {
+                try {
+                    await db.collection("knowledge_base").doc(id).update({ folder: targetFolder });
+                    showToast(`📦 Moved to ${targetFolder}`);
+                    renderKnowledgeBase();
+                } catch (err) {
+                    Swal.fire('Error', err.message, 'error');
+                }
+            }
+        }
+        async function renameKbFolder() {
+            const modalFilter = document.getElementById('kb-filter-modal');
+            const oldName = modalFilter ? modalFilter.value : 'all';
+            
+            if (oldName === 'all') {
+                return Swal.fire({
+                    icon: 'warning',
+                    title: 'Select a Project',
+                    text: 'Please select a specific project/folder to rename from the filter dropdown.'
+                });
+            }
+
+            const { value: newName } = await Swal.fire({
+                title: 'Rename Project',
+                input: 'text',
+                inputLabel: `New name for "${oldName}"`,
+                inputValue: oldName,
+                showCancelButton: true,
+                inputValidator: (value) => {
+                    if (!value || value.trim() === "") return 'You need to write something!';
+                    if (value === oldName) return 'Name must be different';
+                }
+            });
+
+            if (newName && newName !== oldName) {
+                const confirmed = await Swal.fire({
+                    title: 'Confirm Rename',
+                    text: `Are you sure you want to rename "${oldName}" to "${newName}"? This will update ${knowledgeBaseCache.filter(d => (d.folder || 'General') === oldName).length} documents.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#4361ee',
+                    cancelButtonColor: '#999',
+                    confirmButtonText: 'Yes, Rename All'
+                });
+
+                if (confirmed.isConfirmed) {
+                    try {
+                        showToast(`🚀 Renaming Project...`, "info");
+                        const batch = db.batch();
+                        const docsToUpdate = knowledgeBaseCache.filter(d => (d.folder || 'General') === oldName);
+                        
+                        docsToUpdate.forEach(doc => {
+                            batch.update(db.collection("knowledge_base").doc(doc.id), { folder: newName });
+                        });
+
+                        await batch.commit();
+                        showToast(`✅ Project renamed to "${newName}"`);
+                        
+                        // Sync UI: wait for Firestore listener to trigger update, or manually force
+                        if (modalFilter) modalFilter.value = newName;
+                        renderKnowledgeBase();
+                    } catch (err) {
+                        console.error("Rename Error:", err);
+                        Swal.fire('Error', 'Failed to rename documents: ' + err.message, 'error');
+                    }
+                }
+            }
         }
 
         // --- 🔥 V87.52: PDF-to-Quiz Generator (NotebookLM-like) ---
@@ -10199,11 +10298,14 @@
                 </button>
             </div>
 
-            <div style="margin-bottom:20px; display:flex; gap:10px; align-items:center;">
-                <label style="font-size:0.85em; font-weight:bold; color:#555;">📁 Filter Project:</label>
-                <select id="kb-filter-modal" onchange="renderKnowledgeBase()" style="flex:1; padding:8px; border-radius:10px; border:1px solid #ddd; background:#fff; font-weight:bold;">
+            <div style="margin-bottom:20px; display:flex; gap:10px; align-items:center; background:#f0f7ff; padding:12px; border-radius:15px; border:1px solid #d0e3ff;">
+                <label style="font-size:0.85em; font-weight:bold; color:var(--primary); white-space:nowrap;">📁 Project Filter:</label>
+                <select id="kb-filter-modal" onchange="renderKnowledgeBase()" style="flex:1; padding:8px; border-radius:10px; border:1px solid #d0e3ff; background:#fff; font-weight:bold; color:var(--primary); outline:none; cursor:pointer;">
                     <option value="all">📁 All Projects</option>
                 </select>
+                <button class="btn-sm" onclick="renameKbFolder()" style="background:var(--primary); color:white; border:none; border-radius:10px; padding:8px 12px; cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; transition:0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'" title="Rename selected project">
+                    <i class="fa-solid fa-pen-to-square"></i> Rename
+                </button>
             </div>
 
             <h4 style="margin:0 0 15px 0; display:flex; justify-content:space-between; align-items:center;">
