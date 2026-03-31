@@ -67,7 +67,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"] }, 
                 n: 1,
                 size: "1024x1024"
             } : {
-                model: model.includes('gpt-4') ? model : (model.includes('gpt-3.5') ? model : 'gpt-4o-mini'),
+                model: model.includes('gpt-5.4') ? model : (model.includes('gpt-4') ? model : (model.includes('gpt-3.5') ? model : 'gpt-4o-mini')),
                 messages: [{ role: "user", content: prompt }],
                 response_format: isJson ? { type: "json_object" } : undefined,
                 temperature: 0.7
