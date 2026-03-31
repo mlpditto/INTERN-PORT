@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Portfolio (V87.63)</title>
-    <!-- V87.63: Knowledge Base Project Management & Folder Renaming Fix -->
+    <title>Internship Portfolio (V87.64)</title>
+    <!-- V87.64: Explicit Knowledge Base Folder Creation & Project Management -->
 
     <style>
         /* Hide Spinners/Controllers for q-timer */
@@ -5790,7 +5790,8 @@
             const isModalOpen = document.getElementById('knowledgeBaseModal').style.display === 'block';
             const activeFilter = isModalOpen ? (modalFilter ? modalFilter.value : 'all') : (sidebarFilter ? sidebarFilter.value : 'all');
 
-            const filteredDocs = activeFilter === 'all' ? knowledgeBaseCache : knowledgeBaseCache.filter(d => (d.folder || 'General') === activeFilter);
+            const filteredDocs = (activeFilter === 'all' ? knowledgeBaseCache : knowledgeBaseCache.filter(d => (d.folder || 'General') === activeFilter))
+                                 .filter(d => d.type !== 'meta'); // 🔥 V87.64: Hide system metadata docs from lists
 
             if (countEl) countEl.innerText = `${filteredDocs.length} Docs`;
 
@@ -5841,6 +5842,49 @@
         function openKnowledgeBaseManager() {
             document.getElementById('knowledgeBaseModal').style.display = 'block';
             renderKnowledgeBase();
+        }
+
+        async function createNewKbProject() {
+            const { value: folderName } = await Swal.fire({
+                title: 'Create New Project Folder',
+                html: 'Organize your knowledge into separate topics.',
+                input: 'text',
+                inputPlaceholder: 'Enter folder name (e.g. My Project A)...',
+                showCancelButton: true,
+                confirmButtonText: '<i class="fa-solid fa-plus"></i> Create Folder',
+                confirmButtonColor: '#2ecc71',
+                inputValidator: (value) => {
+                    if (!value || value.trim() === "") return 'You need to write something!';
+                    if (value.toLowerCase() === 'all') return 'Invalid folder name';
+                }
+            });
+
+            if (folderName) {
+                try {
+                    showToast(`Creating folder "${folderName}"...`, "info");
+                    // Create a system placeholder to make the folder exist even without data
+                    await db.collection("knowledge_base").add({
+                        name: `_FolderMeta_${folderName}`,
+                        folder: folderName,
+                        type: 'meta',
+                        content: 'System Folder Metadata',
+                        isSystem: true,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    showToast(`✅ Folder "${folderName}" created!`);
+                    
+                    // Set current upload folder and filter to this new folder
+                    const folderInput = document.getElementById('kb-folder-name');
+                    if (folderInput) folderInput.value = folderName;
+                    
+                    const modalFilter = document.getElementById('kb-filter-modal');
+                    if (modalFilter) modalFilter.value = folderName;
+
+                    renderKnowledgeBase();
+                } catch (err) {
+                    Swal.fire('Error', err.message, 'error');
+                }
+            }
         }
 
         async function handleKbFileUpload(event) {
@@ -10299,13 +10343,18 @@
             </div>
 
             <div style="margin-bottom:20px; display:flex; gap:10px; align-items:center; background:#f0f7ff; padding:12px; border-radius:15px; border:1px solid #d0e3ff;">
-                <label style="font-size:0.85em; font-weight:bold; color:var(--primary); white-space:nowrap;">📁 Project Filter:</label>
+                <label style="font-size:0.85em; font-weight:bold; color:var(--primary); white-space:nowrap;">📁 Filter:</label>
                 <select id="kb-filter-modal" onchange="renderKnowledgeBase()" style="flex:1; padding:8px; border-radius:10px; border:1px solid #d0e3ff; background:#fff; font-weight:bold; color:var(--primary); outline:none; cursor:pointer;">
                     <option value="all">📁 All Projects</option>
                 </select>
-                <button class="btn-sm" onclick="renameKbFolder()" style="background:var(--primary); color:white; border:none; border-radius:10px; padding:8px 12px; cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; transition:0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'" title="Rename selected project">
-                    <i class="fa-solid fa-pen-to-square"></i> Rename
-                </button>
+                <div style="display:flex; gap:5px;">
+                    <button class="btn-sm" onclick="renameKbFolder()" style="background:var(--primary); color:white; border:none; border-radius:10px; padding:8px 12px; cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; transition:0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'" title="Rename selected project">
+                        <i class="fa-solid fa-pen-to-square"></i> Edit
+                    </button>
+                    <button class="btn-sm" onclick="createNewKbProject()" style="background:#2ecc71; color:white; border:none; border-radius:10px; padding:8px 12px; cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; transition:0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'" title="Create new project folder">
+                        <i class="fa-solid fa-folder-plus"></i> New Folder
+                    </button>
+                </div>
             </div>
 
             <h4 style="margin:0 0 15px 0; display:flex; justify-content:space-between; align-items:center;">
