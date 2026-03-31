@@ -90,7 +90,11 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"] }, 
             const client = await auth.getClient();
             const token = await client.getAccessToken();
 
-            const actualModelName = model.includes('pro') ? "gemini-1.5-pro-002" : "gemini-1.5-flash-002";
+            let actualModelName = model;
+            if (model === 'gemini-pro') actualModelName = "gemini-1.5-pro-002";
+            else if (model === 'gemini-flash') actualModelName = "gemini-1.5-flash-002";
+            else if (!model || !model.startsWith('gemini-')) actualModelName = "gemini-3.1-flash"; 
+
             const endpoint = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/publishers/google/models/${actualModelName}:predict`;
 
             const parts = [{ text: prompt }];
