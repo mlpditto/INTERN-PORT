@@ -13,6 +13,7 @@ const firebaseConfig = {
 let GEMINI_API_KEY = "__GEMINI_API_KEY__";
 let TYPHOON_API_KEY = "__TYPHOON_API_KEY__";
 let OPENAI_API_KEY = "__OPENAI_API_KEY__";
+let ANTHROPIC_API_KEY = "__ANTHROPIC_API_KEY__";
 
 // เริ่มต้นการทำงาน Firebase
 firebase.initializeApp(firebaseConfig);
