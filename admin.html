@@ -1107,7 +1107,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.60</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V87.61</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -1600,19 +1600,19 @@
                     </div>
 
                     <div style="display:flex; align-items:center; gap:20px;">
-                        <div class="ai-stat-card">
-                            <i class="fa-solid fa-bolt" style="color:#f1c40f; font-size:1.2em;"></i>
+                        <div class="ai-stat-card" style="background:#fffdf2; border:1.5px solid #fae588; box-shadow:0 4px 12px rgba(241,196,15,0.05);">
+                            <i class="fa-solid fa-bolt" style="color:#d4ac0d; font-size:1.2em;"></i>
                             <div style="font-size:0.8em;">
-                                <div style="color:#95a5a6; font-weight:bold; font-size:0.7em; text-transform:uppercase; letter-spacing:0.5px;">API Usage Meter</div>
-                                <div id="ai-token-usage-badge" style="color:#2c3e50; font-weight:800; display:flex; align-items:center; gap:5px;">
+                                <div style="color:#a08620; font-weight:bold; font-size:0.7em; text-transform:uppercase; letter-spacing:0.5px;">API Usage Meter</div>
+                                <div id="ai-token-usage-badge" style="color:#7a6207; font-weight:800; display:flex; align-items:center; gap:5px; margin-top:2px;">
                                     <span id="ai-usage-breakdown">Tokens: 0</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div id="ai-status-badge" onclick="openAIKeysModal()" style="display:flex; align-items:center; gap:10px; background:white; padding:10px 18px; border-radius:14px; border:1.5px solid var(--primary); box-shadow:0 4px 10px rgba(0,0,0,0.03); cursor:pointer; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-                            <i class="fa-solid fa-key" style="color:var(--primary);"></i>
-                            <span style="font-size:0.9em; font-weight:bold; color:var(--primary);">AI API Settings</span>
+                        <div id="ai-status-badge" onclick="openAIKeysModal()" style="display:flex; align-items:center; gap:10px; background:#f0efff; padding:10px 18px; border-radius:14px; border:1.5px solid #dcd4ff; box-shadow:0 4px 12px rgba(108,92,231,0.05); cursor:pointer; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                            <i class="fa-solid fa-key" style="color:#6b5cea;"></i>
+                            <span style="font-size:0.9em; font-weight:bold; color:#6b5cea;">AI API Settings</span>
                         </div>
                     </div>
                 </div>
@@ -1830,6 +1830,9 @@
                 document.getElementById('hub-view-design').style.display = mode === 'design' ? 'flex' : 'none';
                 document.getElementById('hub-view-research').style.display = mode === 'research' ? 'flex' : 'none';
                 
+                if (mode === 'research') {
+                    loadResearchHistory();
+                }
                 showToast("Switched to " + (mode === 'design' ? 'Design Lab' : 'Research Assistant'));
             }
         </script>
@@ -3115,6 +3118,7 @@
 
             // 🤖 Step 1: Try AI Proxy (Keyless Mode)
             try {
+                let proxyProvider = "";
                 // Hardcoded detection for Anthropic/Claude (V87.57)
                 if (modelName.toLowerCase().indexOf('claude') !== -1) {
                     proxyProvider = "anthropic";
@@ -3395,6 +3399,8 @@
                     text = data.data[0].url;
                     updateAIUsage('OpenAI', 1);
                     actualModelName = 'dall-e-3';
+                } else if (modelName.toLowerCase().includes('claude')) {
+                    throw new Error("Claude requires the AI Proxy. Ensure function endpoint is deployed and responsive.");
                 } else {
                     throw new Error("Unknown AI Model Provider selected.");
                 }
@@ -5984,9 +5990,6 @@
                 // 💾 Auto-Save
                 saveResearchToHistory(question, aiResponse, selectedModel);
                 
-                // 💾 V87.58: Auto-Save Research to History (Firestore)
-                saveResearchToHistory(question, aiResponse, selectedModel);
-                
             } catch (err) {
                 typingEl.style.display = 'none';
                 console.error("Research Error:", err);
@@ -6010,20 +6013,47 @@
             return relevantDocs.map(d => `SOURCE: ${d.name}\nCONTENT: ${d.content.substring(0, 2000)}`).join('\n\n---\n\n');
         }
 
-        // 💾 V87.58: Firestore History Management
+        // 💾 V87.61: Firestore History Management (Firebase v8 Compatible)
         async function saveResearchToHistory(q, a, model) {
             try {
                 if (!window.db) return;
-                await addDoc(collection(db, "research_history"), {
+                await db.collection("research_history").add({
                     userId: window.currentAdminEmail || "admin",
                     question: q,
                     answer: a,
                     model: model,
-                    timestamp: serverTimestamp()
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 console.log("Research session saved to cloud.");
             } catch (e) {
                 console.warn("Firestore save failed:", e);
+            }
+        }
+
+        async function loadResearchHistory() {
+            try {
+                if (!window.db) return;
+                const historyEl = document.getElementById('research-chat-history');
+                if (historyEl.children.length > 2) return; // Already loaded to prevent duplicates
+                
+                const snapshot = await db.collection("research_history")
+                    .where("userId", "==", window.currentAdminEmail || "admin")
+                    .orderBy("timestamp", "asc")
+                    .limit(50)
+                    .get();
+                    
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.question) {
+                        appendResearchMessage('user', data.question, null, null, true);
+                    }
+                    if (data.answer) {
+                        const isQuizIntent = data.question ? (data.question.toLowerCase().includes('quiz') || data.question.toLowerCase().includes('exam') || data.question.toLowerCase().includes('ข้อสอบ') || data.question.toLowerCase().includes('แบบทดสอบ')) : false;
+                        appendResearchMessage('ai', data.answer, data.sourceLabel || null, data.question, true, isQuizIntent);
+                    }
+                });
+            } catch (e) {
+                console.warn("Firestore load history failed:", e);
             }
         }
 
