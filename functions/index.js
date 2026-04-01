@@ -14,7 +14,7 @@ const AUTH_SECRET = "mlp-secret-8888"; // Basic shared secret between admin.html
  * 🤖 AI Proxy Function (V86.85)
  * Handles: Gemini, OpenAI, and Vertex AI (Imagen 3)
  */
-exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"] }, async (req, res) => {
+exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"], timeoutSeconds: 120, memory: "512MiB" }, async (req, res) => {
     try {
         // 1. Basic Auth Check (Custom Header)
         const authHeader = req.headers["x-mlp-secret"];
@@ -61,16 +61,20 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"] }, 
             const apiKey = process.env.OPENAI_API_KEY;
             const endpoint = model === 'dalle' ? "https://api.openai.com/v1/images/generations" : "https://api.openai.com/v1/chat/completions";
             
+            const isReasoner = model.includes('gpt-5.4') || model.includes('o1');
+            const actualModel = model === 'gpt-5.4' ? 'gpt-4o' : (model === 'gpt-5.4-mini' ? 'gpt-4o-mini' : (isReasoner ? model : (model.includes('gpt-4') ? model : (model.includes('gpt-3.5') ? model : 'gpt-4o-mini'))));
+            
             const body = model === 'dalle' ? {
                 model: "dall-e-3",
                 prompt: prompt,
                 n: 1,
                 size: "1024x1024"
             } : {
-                model: model.includes('gpt-5.4') ? model : (model.includes('gpt-4') ? model : (model.includes('gpt-3.5') ? model : 'gpt-4o-mini')),
+                model: actualModel,
                 messages: [{ role: "user", content: prompt }],
-                response_format: isJson ? { type: "json_object" } : undefined,
-                temperature: 0.7
+                response_format: (isJson && !actualModel.includes('o1')) ? { type: "json_object" } : undefined,
+                temperature: (actualModel.includes('o1') || actualModel.includes('gpt-5.4')) ? undefined : 0.7,
+                [actualModel.includes('o1') ? 'max_completion_tokens' : 'max_tokens']: isJson ? 4096 : 4096
             };
 
             const response = await axios.post(endpoint, body, {
@@ -109,10 +113,11 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"] }, 
 
             const parts = [{ text: prompt }];
             if (visionData) {
+                const b64 = visionData.image_base64.includes('base64,') ? visionData.image_base64.split('base64,')[1] : visionData.image_base64;
                 parts.push({
                     inlineData: {
                         mimeType: visionData.image_mimetype || "image/png",
-                        data: visionData.image_base64
+                        data: b64
                     }
                 });
             }
