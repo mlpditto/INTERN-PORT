@@ -3273,9 +3273,9 @@
                     if (GEMINI_API_KEY.includes('__')) throw new Error("Proxy failed and no local Gemini Key set.");
                     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
                     
-                    if (modelName.includes('pro')) actualModelName = "gemini-1.5-pro-002";
-                    else if (modelName.includes('flash') || modelName.includes('2.0') || modelName.includes('gemini')) actualModelName = "gemini-1.5-flash-002";
-                    else actualModelName = "gemini-1.5-flash-002";
+                    if (modelName.includes('pro')) actualModelName = "gemini-1.5-pro";
+                    else if (modelName.includes('flash') || modelName.includes('2.0') || modelName.includes('gemini')) actualModelName = "gemini-1.5-flash";
+                    else actualModelName = "gemini-1.5-flash";
 
                     // V87.28: Add JSON mode support for Gemini
                     let modelConfig = { model: actualModelName };
@@ -6781,7 +6781,10 @@
                 html = html.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
                 msgDiv.innerHTML = `${sourceBadge}<div style="line-height:1.6;">${html}</div>`;
                 
-                // --- 🛠️ V87.60: AI Action Bar (Enhanced) ---
+                // --- 🛠️ V87.78: AI Action Bar (Refactored for Stability) ---
+                const msgId = researchMessageStore.length;
+                researchMessageStore.push(text);
+
                 const actionBar = document.createElement('div');
                 actionBar.style = "display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; padding-top:10px; border-top:1px dashed #eee;";
                 const btnStyle = "font-size:0.75em; padding:6px 12px; border-radius:10px; display:flex; align-items:center; gap:5px; transition:0.2s; cursor:pointer; border:1px solid #eef0f5; background:white; color:#555;";
@@ -6790,7 +6793,7 @@
                 let quizBtn = "";
                 if (isQuizIntent) {
                     quizBtn = `
-                        <div class="ai-act-btn pulse-blue" style="${btnStyle}; background:#4361ee; color:white; border:none; font-weight:bold; box-shadow:0 4px 15px rgba(67, 97, 238, 0.3);" onclick="sendResearchToQuiz(\`${text.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">
+                        <div class="ai-act-btn pulse-blue" style="${btnStyle}; background:#4361ee; color:white; border:none; font-weight:bold; box-shadow:0 4px 15px rgba(67, 97, 238, 0.3);" onclick="sendResearchToQuizById(${msgId})">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Create Quiz in Assignments
                         </div>
                     `;
@@ -6798,14 +6801,14 @@
 
                 actionBar.innerHTML = `
                     ${quizBtn}
-                    <div class="ai-act-btn" style="${btnStyle}" onclick="copyToClipboard(\`${text.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`, 'Research copied!')">
+                    <div class="ai-act-btn" style="${btnStyle}" onclick="copyMessageFromStore(${msgId})">
                         <i class="fa-solid fa-copy"></i> Copy
                     </div>
-                    <div class="ai-act-btn" style="${btnStyle}" onclick="exportResearchChat(\`${text.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">
+                    <div class="ai-act-btn" style="${btnStyle}" onclick="exportMessageFromStore(${msgId})">
                         <i class="fa-solid fa-file-export"></i> Export .txt
                     </div>
                     ${!isQuizIntent ? `
-                    <div class="ai-act-btn" style="${btnStyle}; background:#fff5f5; color:#e74c3c; border-color:#fadbd8;" onclick="sendResearchToQuiz(\`${text.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">
+                    <div class="ai-act-btn" style="${btnStyle}; background:#fff5f5; color:#e74c3c; border-color:#fadbd8;" onclick="sendResearchToQuizById(${msgId})">
                         <i class="fa-solid fa-bolt"></i> Send to Quiz
                     </div>` : ''}
                 `;
@@ -6827,7 +6830,21 @@
             researchChatHistory.push({ role, text });
         }
 
-        // --- 🎯 V87.58: Cross-Module Logic (Research to Quiz) ---
+        // --- 🎯 V87.78: Cross-Module Logic (Research to Quiz) ---
+        window.researchMessageStore = [];
+        window.copyMessageFromStore = function(id) {
+            const content = researchMessageStore[id];
+            if (content) copyToClipboard(content, 'Research copied!');
+        };
+        window.exportMessageFromStore = function(id) {
+            const content = researchMessageStore[id];
+            if (content) exportResearchChat(content);
+        };
+        window.sendResearchToQuizById = function(id) {
+            const content = researchMessageStore[id];
+            if (content) sendResearchToQuiz(content);
+        };
+
         window.sendResearchToQuiz = function(content) {
             Swal.fire({
                 title: 'Send to Quiz Creator?',
