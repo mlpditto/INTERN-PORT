@@ -90,10 +90,20 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"] }, 
             const client = await auth.getClient();
             const token = await client.getAccessToken();
 
-            let actualModelName = model;
-            if (model === 'gemini-pro') actualModelName = "gemini-1.5-pro-002";
-            else if (model === 'gemini-flash') actualModelName = "gemini-1.5-flash-002";
-            else if (!model || !model.startsWith('gemini-')) actualModelName = "gemini-3.1-flash"; 
+            let actualModelName = model || "gemini-1.5-flash-002";
+            
+            // Standardize model name for Vertex AI targeting
+            if (model?.startsWith('gemini-') || !model) {
+                if (model?.includes('pro')) {
+                    actualModelName = "gemini-1.5-pro-002";
+                } else if (model?.includes('flash') || model?.includes('2.0') || model?.includes('3.1')) {
+                    // All variants of flash (including 2.0 exp or 3.1 placeholders) map to 1.5-flash stability
+                    actualModelName = "gemini-1.5-flash-002";
+                } else {
+                    // Fallback for generic 'gemini-' or empty model
+                    actualModelName = "gemini-1.5-flash-002";
+                }
+            }
 
             const endpoint = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/publishers/google/models/${actualModelName}:predict`;
 

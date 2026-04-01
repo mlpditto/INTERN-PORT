@@ -1666,13 +1666,13 @@
                                 </div>
                                 <select id="research-model-select" style="width:100%; padding:12px; border:1.5px solid #eee; border-radius:14px; font-size:0.95em; color:var(--primary); font-weight:bold; cursor:pointer; outline:none; background:#f9fbff;" onchange="updateModelDescription(this); showToast('Architecture: ' + this.value)">
                                     <optgroup label="Google Vertex AI">
-                                        <option value="gemini-3.1-flash" selected>Gemini 3.1 Flash (Fast & Efficient)</option>
-                                        <option value="gemini-3.1-pro">Gemini 3.1 Pro (Deep Research)</option>
-                                        <option value="gemini-3.1-deepthink">Gemini 3.1 Deep Think (Complex Logic)</option>
+                                        <option value="gemini-1.5-flash" selected>Gemini 1.5 Flash (Fast & Efficient)</option>
+                                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (Deep Research)</option>
+                                        <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Next-Gen Exp)</option>
                                     </optgroup>
                                     <optgroup label="External Frontier">
-                                        <option value="claude-3.5-sonnet">Claude 3.5 Sonnet (Pro Writing/Code)</option>
-                                        <option value="gpt-5.4">GPT-5.4 Pro (High Quality)</option>
+                                        <option value="claude-3.5-sonnet-latest">Claude 3.5 Sonnet (Pro Writing/Code)</option>
+                                        <option value="gpt-4o">GPT-4o (High Quality)</option>
                                         <option value="typhoon-v1.5x-70b-instruct">Typhoon 1.5x (Thai Language Spec)</option>
                                     </optgroup>
                                 </select>
@@ -1853,14 +1853,20 @@
                 let desc = "";
                 switch(model) {
                     case 'gemini-1.5-flash':
+                    case 'gemini-flash':
                         desc = "⚡ <b>Gemini Flash:</b> รวดเร็วและประหยัด เหมาะกับงานทั่วไปและสรุปข้อมูลเบื้องต้นอย่างฉับไว";
                         break;
                     case 'gemini-1.5-pro':
+                    case 'gemini-pro':
                         desc = "🧠 <b>Gemini Pro:</b> ความแม่นยำสูง เหมาะสำหรับวิเคราะห์ข้อมูลเชิงลึก เหตุและผล และเนื้อหาแพทยศาสตร์";
+                        break;
+                    case 'gemini-2.0-flash-exp':
+                        desc = "🚀 <b>Gemini 2.0 Flash:</b> เทคโนโลยีล่าสุดที่รองรับหลายรูปแบบ (Multimodal) และรวดเร็วอย่างยิ่ง";
                         break;
                     case 'gpt-4o':
                         desc = "👑 <b>GPT-4o:</b> ตรรกะยอดเยี่ยม เหมาะกับงานสร้างสรรค์ วางโครงสร้าง และวิเคราะห์วิจารณ์ได้เนียบเนียน";
                         break;
+                    case 'claude-3.5-sonnet-latest':
                     case 'claude-3.5-sonnet':
                         desc = "🎭 <b>Claude Sonnet:</b> ภาษาที่สละสลวยเสมือนมนุษย์ โดดเด่นเรื่องงานเขียนระดับโปร การจัดรูปแบบ และวิเคราะห์ละเอียด";
                         break;
@@ -3267,11 +3273,11 @@
                     if (GEMINI_API_KEY.includes('__')) throw new Error("Proxy failed and no local Gemini Key set.");
                     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
                     
-                    if (modelName.includes('pro')) actualModelName = "gemini-pro-latest";
-                    else if (modelName.includes('2.5')) actualModelName = "gemini-2.5-flash"; 
-                    else if (modelName.includes('2.0')) actualModelName = "gemini-2.0-flash";
-                    else if (modelName.includes('flash')) actualModelName = "gemini-flash-latest";
-                    else actualModelName = "gemini-flash-latest";
+                    if (modelName.includes('pro')) actualModelName = "gemini-1.5-pro";
+                    else if (modelName.includes('2.0')) actualModelName = "gemini-2.0-flash-exp";
+                    else if (modelName.includes('flash')) actualModelName = "gemini-1.5-flash";
+                    else if (modelName.includes('gemini')) actualModelName = "gemini-1.5-flash"; // Catch-all for other gemini variants
+                    else actualModelName = "gemini-1.5-flash";
 
                     // V87.28: Add JSON mode support for Gemini
                     let modelConfig = { model: actualModelName };
@@ -3296,8 +3302,8 @@
                         }
                         result = await model.generateContent(parts);
                     } catch (e) {
-                        console.warn("AI Generation failed, trying fallback to gemini-flash-latest", e);
-                        actualModelName = "gemini-flash-latest";
+                        console.warn("AI Generation failed, trying fallback to gemini-1.5-flash", e);
+                        actualModelName = "gemini-1.5-flash";
                         model = genAI.getGenerativeModel({ model: actualModelName });
                         result = await model.generateContent(prompt);
                     }
@@ -3316,13 +3322,13 @@
                         { inlineData: { data: (typeof prompt === 'object' && prompt.imageBase64) ? prompt.imageBase64.split(',')[1] : (visionData ? visionData.image_base64 : ''), mimeType: "image/jpeg" } }
                     ];
 
-                    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+                    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
                     const result = await model.generateContent(parts);
                     const response = await result.response;
                     text = response.text();
                     tokens = response.usageMetadata ? response.usageMetadata.totalTokenCount : 0;
                     updateAIUsage('Gemini', tokens);
-                    actualModelName = "gemini-1.5-flash-latest";
+                    actualModelName = "gemini-1.5-flash";
                 } else if (modelName.includes('typhoon')) {
                     if (TYPHOON_API_KEY.includes('__')) throw new Error("Proxy failed and no local Typhoon API Key set.");
                     
@@ -3576,7 +3582,7 @@
                     OUTPUT ONLY THE STRUCTURED ENGLISH PROMPT. NO EXPLANATIONS.`;
                 }
                 
-                const { text: enhancedPrompt } = await callUniversalAI('gemini-2.0-flash', enhancerPrompt);
+                const { text: enhancedPrompt } = await callUniversalAI('gemini-1.5-flash', enhancerPrompt);
                 
                 // Step 2: Show Prompt Editor Modal (V87.17)
                 const finalPrompt = await new Promise((resolve) => {
@@ -3673,7 +3679,7 @@
             const textarea = document.getElementById('reflective-review-comment');
             const modelSelect = document.getElementById('ai-model-review');
             const langSelect = document.getElementById('ai-lang-review');
-            const selectedModelName = modelSelect ? modelSelect.value : "gemini-2.5-flash";
+            const selectedModelName = modelSelect ? modelSelect.value : "gemini-1.5-flash";
             const targetLang = langSelect ? langSelect.value : "Thai";
             
             if (!logContent || logContent.length < 5) return alert("No reflective log content found to analyze");
@@ -4576,12 +4582,12 @@
                             <!-- AI Settings -->
                             <div style="display:flex; align-items:center; gap:8px;">
                                 <div class="glass-toggle-container ai-model-toggle" style="background:rgba(0,0,0,0.03); transform:scale(0.8); transform-origin:left center; padding:2px; gap:2px; border-radius:10px;">
-                                    <div class="glass-toggle-item active" data-value="gemini-flash-latest" onclick="selectAiToggle(this, 'gemini-flash-latest')" title="Flash">⚡</div>
+                                    <div class="glass-toggle-item active" data-value="gemini-1.5-flash" onclick="selectAiToggle(this, 'gemini-1.5-flash')" title="Flash">⚡</div>
                                     <div class="glass-toggle-item" data-value="gpt-4o-mini" onclick="selectAiToggle(this, 'gpt-4o-mini')" title="Smart">🟢</div>
                                     <div class="glass-toggle-item" data-value="claude-3-5-sonnet-latest" onclick="selectAiToggle(this, 'claude-3-5-sonnet-latest')" title="Claude 3.5">🎭</div>
                                     <div class="glass-toggle-item" data-value="typhoon-v2.5-30b-a3b-instruct" onclick="selectAiToggle(this, 'typhoon-v2.5-30b-a3b-instruct')" title="Regional">🌀</div>
                                 </div>
-                                <input type="hidden" class="ai-model-quiz" value="gemini-flash-latest">
+                                <input type="hidden" class="ai-model-quiz" value="gemini-1.5-flash">
 
                                 <div class="glass-toggle-container ai-lang-toggle" style="background:rgba(0,0,0,0.03); transform:scale(0.8); transform-origin:left center; padding:2px; gap:2px; border-radius:10px;">
                                     <div class="glass-toggle-item active" data-value="Thai" onclick="selectAiToggle(this, 'Thai')" title="Thai">🇹🇭</div>
@@ -6256,12 +6262,13 @@
 
                             const folderName = document.getElementById('kb-folder-name').value.trim() || 'General';
 
-                            // 🔥 V87.66: Firestore has a ~1MB doc limit. Truncate if needed.
-                            const MAX_CONTENT_CHARS = 900000; // ~900KB safe limit
+                            // 🔥 V87.67: Firestore has a 1MiB (1,048,576 bytes) doc limit. 
+                            // Thai characters are 3 bytes in UTF-8, so 300,000 chars is safer (max 900k bytes).
+                            const MAX_CONTENT_CHARS = 300000; 
                             let finalContent = content;
                             let wasTruncated = false;
                             if (typeof content === 'string' && content.length > MAX_CONTENT_CHARS) {
-                                finalContent = content.substring(0, MAX_CONTENT_CHARS) + '\n\n[...Content truncated to fit storage limits. Upload a smaller file for full indexing.]';
+                                finalContent = content.substring(0, MAX_CONTENT_CHARS) + '\n\n[...Content truncated to fit storage limits. Upload a smaller file or split it for full indexing.]';
                                 wasTruncated = true;
                             }
                             
