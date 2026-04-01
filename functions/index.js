@@ -96,7 +96,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"] }, 
             if (model?.startsWith('gemini-') || !model) {
                 if (model?.includes('pro')) {
                     actualModelName = "gemini-1.5-pro-002";
-                } else if (model?.includes('flash') || model?.includes('2.0') || model?.includes('3.1')) {
+                } else if (model?.includes('flash') || model?.includes('2.0') || model?.includes('3.1') || !model) {
                     // All variants of flash (including 2.0 exp or 3.1 placeholders) map to 1.5-flash stability
                     actualModelName = "gemini-1.5-flash-002";
                 } else {

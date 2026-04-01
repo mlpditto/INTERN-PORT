@@ -1666,8 +1666,8 @@
                                 </div>
                                 <select id="research-model-select" style="width:100%; padding:12px; border:1.5px solid #eee; border-radius:14px; font-size:0.95em; color:var(--primary); font-weight:bold; cursor:pointer; outline:none; background:#f9fbff;" onchange="updateModelDescription(this); showToast('Architecture: ' + this.value)">
                                     <optgroup label="Google Vertex AI">
-                                        <option value="gemini-1.5-flash" selected>Gemini 1.5 Flash (Fast & Efficient)</option>
-                                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (Deep Research)</option>
+                                        <option value="gemini-1.5-flash-002-002" selected>Gemini 1.5 Flash (Fast & Efficient)</option>
+                                        <option value="gemini-1.5-pro-002-002">Gemini 1.5 Pro (Deep Research)</option>
                                         <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Next-Gen Exp)</option>
                                     </optgroup>
                                     <optgroup label="External Frontier">
@@ -1852,11 +1852,11 @@
                 const model = selectEl.value;
                 let desc = "";
                 switch(model) {
-                    case 'gemini-1.5-flash':
+                    case 'gemini-1.5-flash-002':
                     case 'gemini-flash':
                         desc = "⚡ <b>Gemini Flash:</b> รวดเร็วและประหยัด เหมาะกับงานทั่วไปและสรุปข้อมูลเบื้องต้นอย่างฉับไว";
                         break;
-                    case 'gemini-1.5-pro':
+                    case 'gemini-1.5-pro-002':
                     case 'gemini-pro':
                         desc = "🧠 <b>Gemini Pro:</b> ความแม่นยำสูง เหมาะสำหรับวิเคราะห์ข้อมูลเชิงลึก เหตุและผล และเนื้อหาแพทยศาสตร์";
                         break;
@@ -2545,7 +2545,7 @@
                             <option value="gpt-5.4-mini" selected>🫧 GPT-5.4 mini</option>
                             <option value="gpt-5.4">🧠 GPT-5.4</option>
                             <option value="gpt-5.4-nano">✨ GPT-5.4 nano</option>
-                            <option value="gemini-1.5-flash">⚡ Gemini Flash</option>
+                            <option value="gemini-1.5-flash-002">⚡ Gemini Flash</option>
                             <option value="claude-3-5-sonnet-latest">🎭 Claude 3.5</option>
                         </select>
                         <select id="ai-lang-review" style="padding:2px 5px; font-size:0.7em; border-radius:10px; border:1px solid #ccc; background:#fff; font-weight:bold; cursor:pointer;" title="Target Language">
@@ -3016,7 +3016,7 @@
                 
                 const prompt = `Analyze these quiz questions for similarity, redundancy, variety, and quality.\nIdentify specific questions that need improvement (wording, clarity, or removing duplicates).\n\nQuestions list:\n${qList}\n\nOUTPUT FORMAT (MANDATORY JSON):\n{\n  "suggestedTitles": { "full": "...", "short": "..." },\n  "analysisText": "Professional detailed summary in Thai (markdown enabled)...",\n  "items": [\n    {\n      "index": 0,\n      "issue": "Explanation of issue for Q1 (e.g. too simple, redundant with Q2)",\n      "suggestion": "How to improve it",\n      "improvedQuestion": {\n        "q": "Improved question text...",\n        "type": "choice",\n        "options": ["A", "B", "C", "D"],\n        "correct": [0],\n        "timer": 60\n      }\n    }\n  ]\n}\n\nImportant: If a question is perfect, omit it from the "items" array. Always use Thai for analysis and improved text.\nInclude suggested titles at the top of analysisText as well.`;
                 
-                const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-1.5-pro';
+                const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-1.5-pro-002';
                 
                 const { text: resultRaw, tokens: aiTokens, model: aiModel } = await callUniversalAI(selectedModel, prompt, true);
                 
@@ -3167,7 +3167,7 @@
                   }
                 ]`;
 
-                const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-1.5-pro';
+                const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-1.5-pro-002';
                 const { text: resultJson } = await callUniversalAI(selectedModel, prompt, true);
                 
                 // Parse and strip possible markdown markers
@@ -3273,11 +3273,9 @@
                     if (GEMINI_API_KEY.includes('__')) throw new Error("Proxy failed and no local Gemini Key set.");
                     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
                     
-                    if (modelName.includes('pro')) actualModelName = "gemini-1.5-pro";
-                    else if (modelName.includes('2.0')) actualModelName = "gemini-2.0-flash-exp";
-                    else if (modelName.includes('flash')) actualModelName = "gemini-1.5-flash";
-                    else if (modelName.includes('gemini')) actualModelName = "gemini-1.5-flash"; // Catch-all for other gemini variants
-                    else actualModelName = "gemini-1.5-flash";
+                    if (modelName.includes('pro')) actualModelName = "gemini-1.5-pro-002-002";
+                    else if (modelName.includes('flash') || modelName.includes('2.0') || modelName.includes('gemini')) actualModelName = "gemini-1.5-flash-002-002";
+                    else actualModelName = "gemini-1.5-flash-002-002";
 
                     // V87.28: Add JSON mode support for Gemini
                     let modelConfig = { model: actualModelName };
@@ -3302,8 +3300,8 @@
                         }
                         result = await model.generateContent(parts);
                     } catch (e) {
-                        console.warn("AI Generation failed, trying fallback to gemini-1.5-flash", e);
-                        actualModelName = "gemini-1.5-flash";
+                        console.warn("AI Generation failed, trying fallback to gemini-1.5-flash-002-002", e);
+                        actualModelName = "gemini-1.5-flash-002-002";
                         model = genAI.getGenerativeModel({ model: actualModelName });
                         result = await model.generateContent(prompt);
                     }
@@ -3322,13 +3320,13 @@
                         { inlineData: { data: (typeof prompt === 'object' && prompt.imageBase64) ? prompt.imageBase64.split(',')[1] : (visionData ? visionData.image_base64 : ''), mimeType: "image/jpeg" } }
                     ];
 
-                    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-002" });
                     const result = await model.generateContent(parts);
                     const response = await result.response;
                     text = response.text();
                     tokens = response.usageMetadata ? response.usageMetadata.totalTokenCount : 0;
                     updateAIUsage('Gemini', tokens);
-                    actualModelName = "gemini-1.5-flash";
+                    actualModelName = "gemini-1.5-flash-002";
                 } else if (modelName.includes('typhoon')) {
                     if (TYPHOON_API_KEY.includes('__')) throw new Error("Proxy failed and no local Typhoon API Key set.");
                     
@@ -3582,7 +3580,7 @@
                     OUTPUT ONLY THE STRUCTURED ENGLISH PROMPT. NO EXPLANATIONS.`;
                 }
                 
-                const { text: enhancedPrompt } = await callUniversalAI('gemini-1.5-flash', enhancerPrompt);
+                const { text: enhancedPrompt } = await callUniversalAI('gemini-1.5-flash-002-002', enhancerPrompt);
                 
                 // Step 2: Show Prompt Editor Modal (V87.17)
                 const finalPrompt = await new Promise((resolve) => {
@@ -3679,7 +3677,7 @@
             const textarea = document.getElementById('reflective-review-comment');
             const modelSelect = document.getElementById('ai-model-review');
             const langSelect = document.getElementById('ai-lang-review');
-            const selectedModelName = modelSelect ? modelSelect.value : "gemini-1.5-flash";
+            const selectedModelName = modelSelect ? modelSelect.value : "gemini-1.5-flash-002-002";
             const targetLang = langSelect ? langSelect.value : "Thai";
             
             if (!logContent || logContent.length < 5) return alert("No reflective log content found to analyze");
@@ -3760,7 +3758,7 @@
             const correctChecks = item.querySelectorAll('.q-correct-check');
             const modelSelect = item.querySelector('.ai-model-quiz');
             const langSelect = item.querySelector('.ai-lang-quiz');
-            const selectedModelName = modelSelect ? modelSelect.value : "gemini-1.5-flash";
+            const selectedModelName = modelSelect ? modelSelect.value : "gemini-1.5-flash-002-002";
             const targetLang = langSelect ? langSelect.value : "English";
             
             const questionText = questionTextarea.value.trim();
@@ -4582,12 +4580,12 @@
                             <!-- AI Settings -->
                             <div style="display:flex; align-items:center; gap:8px;">
                                 <div class="glass-toggle-container ai-model-toggle" style="background:rgba(0,0,0,0.03); transform:scale(0.8); transform-origin:left center; padding:2px; gap:2px; border-radius:10px;">
-                                    <div class="glass-toggle-item active" data-value="gemini-1.5-flash" onclick="selectAiToggle(this, 'gemini-1.5-flash')" title="Flash">⚡</div>
+                                    <div class="glass-toggle-item active" data-value="gemini-1.5-flash-002" onclick="selectAiToggle(this, 'gemini-1.5-flash-002')" title="Flash">⚡</div>
                                     <div class="glass-toggle-item" data-value="gpt-4o-mini" onclick="selectAiToggle(this, 'gpt-4o-mini')" title="Smart">🟢</div>
                                     <div class="glass-toggle-item" data-value="claude-3-5-sonnet-latest" onclick="selectAiToggle(this, 'claude-3-5-sonnet-latest')" title="Claude 3.5">🎭</div>
                                     <div class="glass-toggle-item" data-value="typhoon-v2.5-30b-a3b-instruct" onclick="selectAiToggle(this, 'typhoon-v2.5-30b-a3b-instruct')" title="Regional">🌀</div>
                                 </div>
-                                <input type="hidden" class="ai-model-quiz" value="gemini-1.5-flash">
+                                <input type="hidden" class="ai-model-quiz" value="gemini-1.5-flash-002">
 
                                 <div class="glass-toggle-container ai-lang-toggle" style="background:rgba(0,0,0,0.03); transform:scale(0.8); transform-origin:left center; padding:2px; gap:2px; border-radius:10px;">
                                     <div class="glass-toggle-item active" data-value="Thai" onclick="selectAiToggle(this, 'Thai')" title="Thai">🇹🇭</div>
