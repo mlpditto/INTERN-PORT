@@ -5128,19 +5128,45 @@
             };
 
             try {
+                console.log("🔍 Saving quiz data:", data);
+                console.log("🔍 Firebase auth state:", auth.currentUser);
+                
                 if (id) {
+                    console.log("🔍 Updating existing quiz:", id);
                     await db.collection("quizzes").doc(id).update(data);
+                    showToast("Quiz Updated!");
                 } else {
+                    console.log("🔍 Creating new quiz");
                     data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                     data.isActive = true;
-                    await db.collection("quizzes").add(data);
+                    const docRef = await db.collection("quizzes").add(data);
+                    console.log("🔍 Quiz created with ID:", docRef.id);
+                    showToast("Quiz Saved!");
                 }
+                
                 localStorage.removeItem('quiz_draft'); // Clear draft on success
-                document.getElementById('quizManageModal').style.display = 'none';
-                showToast("Quiz Saved!");
+                
+                // Close modal with delay
+                const modal = document.getElementById('quizManageModal');
+                if (modal) {
+                    console.log("🔍 Closing modal");
+                    modal.style.display = 'none';
+                } else {
+                    console.error("🔍 Modal not found!");
+                }
+                
             } catch (e) {
-                console.error("Save Quiz Error:", e);
-                alert(`Error: ${e.message}`);
+                console.error("🔍 Save Quiz Error:", e);
+                console.error("🔍 Error details:", e.code, e.message);
+                
+                // More specific error messages
+                if (e.code === 'permission-denied') {
+                    alert("❌ Permission denied: You don't have rights to create quizzes. Please check your admin role.");
+                } else if (e.code === 'unavailable') {
+                    alert("❌ Firebase is unavailable. Please check your internet connection.");
+                } else {
+                    alert(`❌ Error saving quiz: ${e.message}`);
+                }
             }
         }
 
