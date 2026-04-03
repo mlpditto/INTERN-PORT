@@ -6892,22 +6892,73 @@
 
         window.sendResearchToQuiz = function(content) {
             Swal.fire({
-                title: 'Send to Quiz Creator?',
-                text: "This will transfer the content to the AI Quiz Generation tool.",
+                title: 'Create Quiz from Research',
+                html: `
+                    <div style="text-align: left; margin: 20px 0;">
+                        <p style="margin-bottom: 15px;">This will transfer the research content to the Quiz Generator. Choose the quiz type:</p>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">📚 Quiz Type:</label>
+                            <select id="quiz-type-select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                <option value="standard">📝 Standard Quiz (Multiple Choice)</option>
+                                <option value="homework">📚 Homework Assignment</option>
+                                <option value="poll">📊 Quick Poll</option>
+                                <option value="reflection">💭 Reflection Questions</option>
+                                <option value="knowledge">🧠 Knowledge Check</option>
+                            </select>
+                        </div>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">🎯 Difficulty Level:</label>
+                            <select id="quiz-difficulty-select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                <option value="easy">😊 Easy (Beginner)</option>
+                                <option value="medium" selected>🎯 Medium (Intermediate)</option>
+                                <option value="hard">🔥 Hard (Advanced)</option>
+                            </select>
+                        </div>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">📊 Number of Questions:</label>
+                            <input type="number" id="quiz-questions-count" value="5" min="1" max="20" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                        </div>
+                    </div>
+                `,
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonColor: '#4361ee',
-                confirmButtonText: 'Yes, Send Now'
+                confirmButtonText: 'Create Quiz',
+                cancelButtonText: 'Cancel',
+                preConfirm: () => {
+                    const quizType = document.getElementById('quiz-type-select').value;
+                    const difficulty = document.getElementById('quiz-difficulty-select').value;
+                    const questionCount = document.getElementById('quiz-questions-count').value;
+                    
+                    if (!quizType || !difficulty || !questionCount) {
+                        Swal.showValidationMessage('Please fill in all fields');
+                        return false;
+                    }
+                    
+                    return { quizType, difficulty, questionCount };
+                }
             }).then((result) => {
                 if (result.isConfirmed) {
+                    const { quizType, difficulty, questionCount } = result.value;
+                    
+                    // Build enhanced prompt based on selections
+                    let enhancedPrompt = `Create a ${quizType} quiz based on these research findings:\n\n${content}\n\n`;
+                    enhancedPrompt += `Requirements:\n`;
+                    enhancedPrompt += `- Difficulty: ${difficulty}\n`;
+                    enhancedPrompt += `- Number of questions: ${questionCount}\n`;
+                    enhancedPrompt += `- Provide clear instructions and answer keys\n`;
+                    
                     switchTab('assignments');
                     setTimeout(() => {
                         const aiInput = document.getElementById('ai-quiz-prompt');
                         if (aiInput) {
-                            aiInput.value = "Create a professional quiz based on these research findings:\n\n" + content;
+                            aiInput.value = enhancedPrompt;
                             aiInput.focus();
                             aiInput.style.border = "3px solid #2ecc71";
-                            showToast("Content imported to Quiz Designer!", "success");
+                            showToast(`${quizType.charAt(0).toUpperCase() + quizType.slice(1)} quiz imported to Generator!`, "success");
                         } else {
                             showToast("Could not find Quiz AI input. Please open the Generator manually.", "error");
                         }
