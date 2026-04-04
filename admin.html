@@ -3627,7 +3627,7 @@
             }
         };
 
-        window.callUniversalAI = async function(modelName, prompt, isJson = false, visionData = null) {
+        window.callUniversalAI = async function(modelName, prompt, isJson = false, visionData = null, quickApiKey = '') {
             const PROXY_SECRET = "mlp-secret-8888";
             const PROXY_URL = "/api/ai"; 
 
@@ -3788,7 +3788,9 @@
                     updateAIUsage('Typhoon', tokens);
                     text = data.choices[0].message.content.trim();
                 } else if (modelName.includes('gpt')) {
-                    if (OPENAI_API_KEY.includes('__')) throw new Error("Proxy failed and no local OpenAI API Key set.");
+                    // Use quick API key if provided, otherwise use stored key
+                    const apiKey = quickApiKey || OPENAI_API_KEY;
+                    if (apiKey.includes('__')) throw new Error("Proxy failed and no local OpenAI API Key set.");
                     let messages = [];
                     // V87.28: Support both implicit (prompt object) and explicit (visionData) multimodal calls
                     if (visionData && visionData.image_base64) {
@@ -3815,7 +3817,7 @@
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
-                            "Authorization": `Bearer ${OPENAI_API_KEY}`
+                            "Authorization": `Bearer ${apiKey}`
                         },
                         body: JSON.stringify({
                             model: modelName.startsWith('gpt-5.4') ? modelName : (modelName === 'gpt-4o' ? 'gpt-4o' : (modelName.includes('4') ? 'gpt-4' : 'gpt-3.5-turbo')),
@@ -4228,8 +4230,10 @@
             const correctChecks = item.querySelectorAll('.q-correct-check');
             const modelSelect = item.querySelector('.ai-model-quiz');
             const langSelect = item.querySelector('.ai-lang-quiz');
+            const quickApiKeyInput = item.querySelector('.quick-api-key');
             const selectedModelName = modelSelect ? modelSelect.value : "gemini-1.5-flash";
             const targetLang = langSelect ? langSelect.value : "English";
+            const quickApiKey = quickApiKeyInput ? quickApiKeyInput.value.trim() : '';
             
             const questionText = questionTextarea.value.trim();
             const options = Array.from(optionTextareas).map(ta => ta.value.trim());
@@ -4261,7 +4265,8 @@
                 }
                 If the order of options changes, make sure "correctIndices" points at the ${targetLang} translated version of the original correct answers.`;
                 
-                const { text: aiResponse } = await window.callUniversalAI(selectedModelName, prompt, true);
+                // Use quick API key if provided, otherwise use stored keys
+                const { text: aiResponse } = await window.callUniversalAI(selectedModelName, prompt, true, quickApiKey);
                 
                 // Robust parsing for JSON
                 let cleanJson = aiResponse.trim();
@@ -5062,11 +5067,14 @@
                                     <div class="glass-toggle-item" data-value="English" onclick="selectAiToggle(this, 'English')" title="English">🇺🇸</div>
                                 </div>
                                 <input type="hidden" class="ai-lang-quiz" value="Thai">
-                            </div>
+                                
+                                <!-- Quick API Key Input -->
+                                <input type="password" class="quick-api-key" placeholder="API Key (optional)" style="width:120px; padding:4px 8px; border:1px solid #ddd; border-radius:6px; font-size:0.7em; background:#f8f9fa;" title="Enter API key for this operation only">
 
-                            <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Enhance Content" style="background:linear-gradient(135deg, var(--primary), #6366f1); color:white; padding:6px 12px; border:none; border-radius:10px; font-weight:bold; font-size:0.7em; display:flex; align-items:center; gap:5px; box-shadow:0 3px 8px rgba(67,97,238,0.2); transition:transform 0.2s;">
-                                <i class="fa-solid fa-wand-magic-sparkles"></i> <span class="btn-text">Enhance</span>
-                            </button>
+                                <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Enhance Content" style="background:linear-gradient(135deg, var(--primary), #6366f1); color:white; padding:6px 12px; border:none; border-radius:10px; font-weight:bold; font-size:0.7em; display:flex; align-items:center; gap:5px; box-shadow:0 3px 8px rgba(67,97,238,0.2); transition:transform 0.2s;">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> <span class="btn-text">Enhance</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
