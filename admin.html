@@ -2000,9 +2000,43 @@
                         </button>
                     </div>
                     <p style="color:#666; font-style:italic; margin-top:10px;">"The collection of greatest stories, reflections, and hearts."</p>
+                    
+                    <!-- 🎭 AI Storyteller Controls -->
+                    <div style="margin-top:30px; display:flex; justify-content:center; gap:15px; flex-wrap:wrap;">
+                        <button onclick="analyzeLaughTaleReflections()" class="btn-sm" style="background:linear-gradient(45deg, #667eea, #764ba2); color:white; border:none; padding:12px 25px; border-radius:25px; font-weight:bold; box-shadow:0 4px 15px rgba(102, 126, 234, 0.3);">
+                            <i class="fa-solid fa-book-open"></i> 📖 Story Analysis
+                        </button>
+                        <button onclick="findLaughTalePatterns()" class="btn-sm" style="background:linear-gradient(45deg, #f093fb, #f5576c); color:white; border:none; padding:12px 25px; border-radius:25px; font-weight:bold; box-shadow:0 4px 15px rgba(240, 147, 251, 0.3);">
+                            <i class="fa-solid fa-sparkles"></i> ✨ Pattern Discovery
+                        </button>
+                        <button onclick="toggleAIComments()" class="btn-sm" style="background:linear-gradient(45deg, #4facfe, #00f2fe); color:white; border:none; padding:12px 25px; border-radius:25px; font-weight:bold; box-shadow:0 4px 15px rgba(79, 172, 254, 0.3);">
+                            <i class="fa-solid fa-feather"></i> 📝 AI Comments
+                        </button>
+                    </div>
                 </div>
                 <div id="laughtale-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap:25px;">
                     <!-- Archived Reflective Logs injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 🎭 AI Storyteller Modal -->
+        <div id="aiStorytellerModal" class="modal" style="z-index:6000;">
+            <div class="modal-content" style="max-width:900px; width:95%; text-align:left; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; border-radius:25px; border:none; box-shadow:0 25px 50px rgba(0,0,0,0.3);">
+                <span class="close-modal" onclick="document.getElementById('aiStorytellerModal').style.display='none'" style="color:white; font-size:1.5em;">&times;</span>
+                <h3 style="margin-top:0; font-family:'Cormorant Garamond', serif; font-size:2em; text-shadow:2px 2px 4px rgba(0,0,0,0.3);">
+                    <i class="fa-solid fa-hat-wizard"></i> 🎭 AI Storyteller's Insights
+                </h3>
+                <div id="ai-storyteller-content" style="background:rgba(255,255,255,0.1); backdrop-filter:blur(10px); padding:25px; border-radius:20px; margin-top:20px; min-height:300px; max-height:500px; overflow-y:auto;">
+                    <div style="text-align:center; padding:50px;">
+                        <i class="fa-solid fa-sparkles fa-spin" style="font-size:3em; margin-bottom:20px;"></i>
+                        <p style="font-style:italic; opacity:0.9;">เรื่องราวกำลังถูกเปิดเผย...</p>
+                    </div>
+                </div>
+                <div style="margin-top:20px; display:flex; gap:10px; justify-content:flex-end;">
+                    <button onclick="saveAIStorytellerInsights()" class="btn-sm" style="background:white; color:#667eea; border:none; padding:10px 20px; border-radius:15px; font-weight:bold;">
+                        <i class="fa-solid fa-save"></i> Save Insights
+                    </button>
                 </div>
             </div>
         </div>
@@ -10510,6 +10544,203 @@
                 `;
             }).join('');
         }
+
+        // 🎭 AI Storyteller Functions for LAUGH TALE
+        window.analyzeLaughTaleReflections = async function() {
+            const archived = reflectiveLogsCache.filter(l => {
+                const isReviewed = l.adminComment || (l.adminBonus !== undefined && l.adminBonus !== null);
+                if (l.isArchived === false) return false; 
+                return isReviewed || l.isArchived === true;
+            });
+
+            if (archived.length === 0) {
+                showToast("No stories to analyze yet. Add some reflections first!", "warning");
+                return;
+            }
+
+            document.getElementById('aiStorytellerModal').style.display = 'block';
+            document.getElementById('ai-storyteller-content').innerHTML = `
+                <div style="text-align:center; padding:50px;">
+                    <i class="fa-solid fa-book-open fa-spin" style="font-size:3em; margin-bottom:20px;"></i>
+                    <p style="font-style:italic; opacity:0.9;">นักเล่าเรื่องกำลังอ่านบันทึกการเดินทาง...</p>
+                </div>
+            `;
+
+            const stories = archived.map(log => ({
+                content: log.content || '',
+                mood: log.mood || 'normal',
+                feedback: log.adminComment || '',
+                date: log.timestamp?.toDate() || new Date(),
+                author: log.displayName || log.userName || 'Unknown'
+            })).slice(0, 20); // Limit to last 20 for analysis
+
+            const prompt = `เป็นนักเล่าเรื่องที่มองโลกแบบวรรณกรรม วิเคราะห์บันทึกการเดินทางเหล่านี้ดั่งดวงดาวที่ส่องแสง:
+
+📖 **บันทึกที่รวบรวม:**
+${stories.map((s, i) => `
+${i+1}. **${s.author}** (${s.date.toLocaleDateString('th-TH')})
+   อารมณ์: ${s.mood} | เนื้อหา: "${s.content.slice(0, 150)}..."
+   คำตอบ: "${s.feedback.slice(0, 100)}..."
+`).join('\n')}
+
+🎭 **วิเคราะห์เชิงลึก:**
+1. **สายแห่งความรู้สึก** - อารมณ์ที่เปลี่ยนแปลงตามเวลา
+2. **ธีมแฝง** - แนวคิดที่ซ่อนอยู่ในเรื่องราว
+3. **บทเรียนที่เรียนรู้** - สิ่งที่พวกเขาได้เรียนรู้
+4. **เส้นทางการเติบโต** - วิวัฒนาการของแต่ละคน
+5. **เรื่องราวที่โดดเด่น** - บันทึกที่น่าจดจำ
+
+✨ **เขียนแบบนักวรรณกรรม:** ใช้ภาษาสร้างสรรค์ อุปมาอุปไมย์ และมองโลกในมุมมองที่ลึกซึ้ง`;
+
+            try {
+                const response = await callUniversalAI(prompt, 'gemini-1.5-pro', 'laughtale-analysis');
+                document.getElementById('ai-storyteller-content').innerHTML = `
+                    <div style="white-space: pre-line; line-height:1.8; font-size:1.05em;">
+                        ${response}
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('ai-storyteller-content').innerHTML = `
+                    <div style="text-align:center; padding:30px; color:#ff6b6b;">
+                        <i class="fa-solid fa-exclamation-triangle" style="font-size:2em; margin-bottom:15px;"></i>
+                        <p>เรื่องราวยังไม่พร้อมเปิดเผย... ลองใหม่อีกครั้ง</p>
+                    </div>
+                `;
+            }
+        };
+
+        window.findLaughTalePatterns = async function() {
+            const archived = reflectiveLogsCache.filter(l => {
+                const isReviewed = l.adminComment || (l.adminBonus !== undefined && l.adminBonus !== null);
+                if (l.isArchived === false) return false; 
+                return isReviewed || l.isArchived === true;
+            });
+
+            if (archived.length < 3) {
+                showToast("Need at least 3 stories to find patterns!", "warning");
+                return;
+            }
+
+            document.getElementById('aiStorytellerModal').style.display = 'block';
+            document.getElementById('ai-storyteller-content').innerHTML = `
+                <div style="text-align:center; padding:50px;">
+                    <i class="fa-solid fa-sparkles fa-spin" style="font-size:3em; margin-bottom:20px;"></i>
+                    <p style="font-style:italic; opacity:0.9;">กำลังค้นหาเส้นใยที่เชื่อมโยง...</p>
+                </div>
+            `;
+
+            const stories = archived.map(log => log.content || '').slice(0, 15);
+
+            const prompt = `เป็นนักหาแพทเทิร์นที่มองโลกแบบโหราศาสตร์ ค้นหาเส้นใยแห่งกรรมที่เชื่อมโยงบันทึกเหล่านี้:
+
+🌟 **บันทึกที่วิเคราะห์:**
+${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
+
+🔍 **ค้นหาแพทเทิร์น:**
+1. **รูปแบบคำ** - คำที่ซ้ำกันบ่อยๆ
+2. **ธีมซ้ำ** - แนวคิดที่ปรากฏหลายครั้ง
+3. **วัฏจักรอารมณ์** - การเปลี่ยนแปลงความรู้สึก
+4. **เวลาแห่งการเรียนรู้** - ช่วงเวลาที่เติบโต
+5. **ดวงดาวนำโชค** - สิ่งที่นำพาความสำเร็จ
+
+✨ **วิเคราะห์แบบโหราศาสตร์:** ใช้ภาษาลึกลับ มองหาความเชื่อมโยงที่มองไม่เห็น`;
+
+            try {
+                const response = await callUniversalAI(prompt, 'gemini-1.5-pro', 'laughtale-patterns');
+                document.getElementById('ai-storyteller-content').innerHTML = `
+                    <div style="white-space: pre-line; line-height:1.8; font-size:1.05em;">
+                        ${response}
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('ai-storyteller-content').innerHTML = `
+                    <div style="text-align:center; padding:30px; color:#ff6b6b;">
+                        <i class="fa-solid fa-exclamation-triangle" style="font-size:2em; margin-bottom:15px;"></i>
+                        <p>ดวงดาวยังไม่ตรง... ลองใหม่อีกครั้ง</p>
+                    </div>
+                `;
+            }
+        };
+
+        window.toggleAIComments = function() {
+            const cards = document.querySelectorAll('.laugh-card');
+            const hasComments = document.querySelectorAll('.ai-comment-section').length > 0;
+            
+            if (hasComments) {
+                // Remove AI comments
+                cards.forEach(card => {
+                    const commentSection = card.querySelector('.ai-comment-section');
+                    if (commentSection) commentSection.remove();
+                });
+                showToast("AI comments hidden", "info");
+            } else {
+                // Add AI comments to each card
+                cards.forEach(card => {
+                    const contentEl = card.querySelector('.lt-user-content');
+                    if (!contentEl) return;
+                    
+                    const content = contentEl.textContent.replace(/"/g, '');
+                    const commentSection = document.createElement('div');
+                    commentSection.className = 'ai-comment-section';
+                    commentSection.style.cssText = 'margin-top:15px; padding:15px; background:linear-gradient(135deg, #667eea15, #764ba215); border-radius:15px; border:1px solid #667eea30;';
+                    commentSection.innerHTML = `
+                        <div style="font-size:0.75em; font-weight:bold; color:#667eea; text-transform:uppercase; margin-bottom:8px;">
+                            <i class="fa-solid fa-feather"></i> AI Storyteller's Whisper
+                        </div>
+                        <div style="font-size:0.85em; color:#555; font-style:italic; line-height:1.5;">
+                            <i class="fa-solid fa-spinner fa-spin"></i> กำลังฟังเสียงจากดวงดาว...
+                        </div>
+                    `;
+                    
+                    contentEl.parentNode.insertBefore(commentSection, contentEl.nextSibling);
+                    
+                    // Generate AI comment for this specific reflection
+                    generateAIComment(content, commentSection);
+                });
+                showToast("AI comments added to all stories", "success");
+            }
+        };
+
+        async function generateAIComment(content, commentSection) {
+            const prompt = `เป็นนักกวีที่มองโลกแบบเชิงลึก ให้ความเห็นเพียง 1-2 ประโยคเกี่ยวกับบันทึกนี้:
+
+"${content}"
+
+✨ **เขียนแบบนักกวี:** ใช้ภาษาสวยงาม อุปมาอุปไมย์ มองโลกในมุมที่ลึกซึ้ง ไม่เกิน 50 ตัวอักษร`;
+
+            try {
+                const response = await callUniversalAI(prompt, 'gemini-1.5-flash', 'laughtale-comment');
+                commentSection.innerHTML = `
+                    <div style="font-size:0.75em; font-weight:bold; color:#667eea; text-transform:uppercase; margin-bottom:8px;">
+                        <i class="fa-solid fa-feather"></i> AI Storyteller's Whisper
+                    </div>
+                    <div style="font-size:0.85em; color:#555; font-style:italic; line-height:1.5;">
+                        ${response}
+                    </div>
+                `;
+            } catch (error) {
+                commentSection.innerHTML = `
+                    <div style="font-size:0.75em; font-weight:bold; color:#667eea; text-transform:uppercase; margin-bottom:8px;">
+                        <i class="fa-solid fa-feather"></i> AI Storyteller's Whisper
+                    </div>
+                    <div style="font-size:0.85em; color:#999; font-style:italic; line-height:1.5;">
+                        ดวงดาวเงียบ... ไม่สามารถตีความได้ในขณะนี้
+                    </div>
+                `;
+            }
+        }
+
+        window.saveAIStorytellerInsights = function() {
+            const content = document.getElementById('ai-storyteller-content').textContent;
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `laugh-tale-insights-${new Date().toISOString().split('T')[0]}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast("Insights saved to file!", "success");
+        };
 
         function toggleGlobalBlind() {
             const allCards = document.querySelectorAll('.laugh-card');
