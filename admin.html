@@ -1160,7 +1160,7 @@
                 <button class="btn-sm btn-primary" onclick="openShareModal()" title="Share">
                     <i class="fa-solid fa-share-nodes"></i> <span class="hide-mobile">Share</span>
                 </button>
-                <button class="btn-sm btn-info" onclick="console.log('AI button clicked'); openAIKeysModal();" title="AI Settings" style="background:#8e44ad;">
+                <button class="btn-sm btn-info" onclick="console.log('AI button clicked'); if (document.getElementById('aiKeysModal')) { openAIKeysModal(); } else { alert('AI Settings Modal not loaded yet. Please refresh the page.'); }" title="AI Settings" style="background:#8e44ad;">
                     <i class="fa-solid fa-robot"></i> AI
                 </button>
                 <button class="btn-sm btn-dark" onclick="toggleTheme()" title="Theme">
@@ -3158,6 +3158,26 @@
         window.openAIKeysModal = function() {
             console.log("Opening AI Keys Modal...");
             try {
+                // Check if modal exists first
+                const modal = document.getElementById('aiKeysModal');
+                if (!modal) {
+                    console.error("AI Keys Modal not found!");
+                    alert("Error: AI Settings Modal not found. Please refresh the page.");
+                    return;
+                }
+                
+                // Check if all input fields exist
+                const fields = ['local-gemini-key', 'local-openai-key', 'local-typhoon-key', 'local-anthropic-key', 'local-llama-key'];
+                for (const fieldId of fields) {
+                    const field = document.getElementById(fieldId);
+                    if (!field) {
+                        console.error(`Field ${fieldId} not found!`);
+                        alert(`Error: Input field ${fieldId} not found. Please refresh the page.`);
+                        return;
+                    }
+                }
+                
+                // Now safely set values
                 document.getElementById('local-gemini-key').value = GEMINI_API_KEY.includes('__') ? "" : GEMINI_API_KEY;
                 document.getElementById('local-openai-key').value = OPENAI_API_KEY.includes('__') ? "" : OPENAI_API_KEY;
                 document.getElementById('local-typhoon-key').value = TYPHOON_API_KEY.includes('__') ? "" : TYPHOON_API_KEY;
@@ -3179,7 +3199,7 @@
                 }
                 toggleVertexManualFields();
                 
-                document.getElementById('aiKeysModal').style.display = 'block';
+                modal.style.display = 'block';
                 console.log("AI Keys Modal opened successfully");
             } catch (error) {
                 console.error("Error opening AI Keys Modal:", error);
