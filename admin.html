@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V88.41)</title>
-    <!-- V88.41: Global Scope Fix for Quiz Actions & Participants View -->
-    <!-- Release: 2026-04-04 19:25 UTC+7 -->
+    <title>Intern Admin Portal (V88.42)</title>
+    <!-- V88.42: Final Global/Local Scope Fix & Cache Bust -->
+    <!-- Release: 2026-04-04 19:30 UTC+7 -->
 
     <style>
         /* Hide Spinners/Controllers for q-timer */
@@ -1154,7 +1154,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.3em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V88.41</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V88.42</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -5024,7 +5024,7 @@
         let quizzesData = [];
         let autoSaveTimer;
 
-        window.openQuizModal = function(id = null) {
+        window.openQuizModal = function openQuizModal(id = null) {
             document.getElementById('quizManageModal').style.display = 'block';
             const container = document.getElementById('quiz-questions-container');
             container.innerHTML = "";
@@ -6322,7 +6322,7 @@
             });
         }
 
-        window.showPollResults = async function(quizId) {
+        window.showPollResults = async function showPollResults(quizId) {
             window.currentPollQuizId = quizId; // Store for refresh logic
             const quiz = quizzesData.find(x => x.id === quizId);
             if (!quiz) return;
@@ -6524,7 +6524,7 @@
             if (lastQuizIdForParticipants) showQuizParticipants(lastQuizIdForParticipants);
         }
 
-        window.showQuizParticipants = async function(quizId) {
+        window.showQuizParticipants = async function showQuizParticipants(quizId) {
             const quiz = quizzesData.find(x => x.id === quizId);
             if (!quiz) return;
 
@@ -8114,7 +8114,7 @@
             }
         }
 
-        window.showQuizDiscussions = async function(quizId) {
+        window.showQuizDiscussions = async function showQuizDiscussions(quizId) {
             const quiz = quizzesData.find(x => x.id === quizId);
             if (!quiz) return;
 
@@ -8486,7 +8486,7 @@
             renderQuizzes();
         }
 
-        window.repostQuiz = async function(id) {
+        window.repostQuiz = async function repostQuiz(id) {
             if (!confirm("Repost this quiz? (Previous timers will be cleared)")) return;
             await db.collection("quizzes").doc(id).update({
                 startTime: null,
@@ -8497,7 +8497,7 @@
             showToast("Reposted!");
         }
 
-        window.setQuizDuration = async function(id, hours) {
+        window.setQuizDuration = async function setQuizDuration(id, hours) {
             if (!hours) return;
             if (!confirm(`Set countdown timer for ${hours} hours?`)) return;
             const now = new Date();
@@ -8512,7 +8512,7 @@
             } catch (e) { alert(e.message); }
         }
 
-        window.adjustQuizPoints = async function(id, delta) {
+        window.adjustQuizPoints = async function adjustQuizPoints(id, delta) {
             const q = quizzesData.find(x => x.id === id);
             if (!q) return;
             const newPoints = Math.round(((parseFloat(q.totalPoints) || 1.0) + delta) * 10) / 10;
@@ -8526,7 +8526,7 @@
             } catch (e) { alert(e.message); }
         }
 
-        window.duplicateQuiz = async function(id) {
+        window.duplicateQuiz = async function duplicateQuiz(id) {
             const q = quizzesData.find(x => x.id === id);
             if (!q) return;
             if (!confirm(`Duplicate "${q.title}"?`)) return;
@@ -8547,7 +8547,7 @@
             } catch (e) { alert("Duplicate Error: " + e.message); }
         }
 
-        window.toggleQuizStatus = async function(id, current) {
+        window.toggleQuizStatus = async function toggleQuizStatus(id, current) {
             const updates = { isActive: !current };
             
             // V86.14: If turning ON an expired quiz, suggest resetting deadline
@@ -8572,13 +8572,13 @@
             await db.collection("quizzes").doc(id).update(updates);
             showToast(updates.isActive ? "Quiz Started!" : "Quiz Ended!");
         }
-        window.deleteQuiz = async function(id) { if (confirm("Delete this quiz?")) await db.collection("quizzes").doc(id).delete(); }
+        window.deleteQuiz = async function deleteQuiz(id) { if (confirm("Delete this quiz?")) await db.collection("quizzes").doc(id).delete(); }
 
         // 🔥 V78.2: Quick Homework Assignment Modal
         let hwModalQuizId = null;
         let hwModalSelectedUsers = new Set();
 
-        window.openHomeworkAssignModal = function(quizId) {
+        window.openHomeworkAssignModal = function openHomeworkAssignModal(quizId) {
             hwModalQuizId = quizId;
             const q = quizzesData.find(x => x.id === quizId);
             if (!q) return;
