@@ -4808,10 +4808,19 @@
             document.getElementById('quiz-deadline').value = fmt(q.deadline);
 
             document.getElementById('quiz-questions-container').innerHTML = "";
-            if (q.questions) {
-                q.questions.forEach(item => addQuestionUI(item));
+            console.log("🔍 Loading quiz questions:", q.questions);
+            if (q.questions && Array.isArray(q.questions)) {
+                console.log("🔍 Questions count:", q.questions.length);
+                q.questions.forEach((item, idx) => {
+                    console.log(`🔍 Adding question ${idx}:`, item);
+                    addQuestionUI(item);
+                });
+            } else {
+                console.warn("🔍 No questions found in quiz data");
             }
             quizQPageIndex = 0;
+            updateQuizPagination();
+            console.log("🔍 Final question count in DOM:", document.querySelectorAll('.quiz-q-item').length);
         }
 
         function resetQuizForm() {
@@ -5084,7 +5093,9 @@
             if (quizQPageIndex < 0) quizQPageIndex = 0;
 
             items.forEach((item, i) => {
-                item.style.display = (i === quizQPageIndex) ? 'block' : 'none';
+                // Always show all questions instead of hiding them
+                item.style.display = 'block';
+                item.style.marginBottom = '15px';
 
                 // 🔥 V80: Read-only Mode Logic
                 const quizType = document.getElementById('quiz-type').value;
