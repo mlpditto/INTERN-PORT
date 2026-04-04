@@ -1160,7 +1160,7 @@
                 <button class="btn-sm btn-primary" onclick="openShareModal()" title="Share">
                     <i class="fa-solid fa-share-nodes"></i> <span class="hide-mobile">Share</span>
                 </button>
-                <button class="btn-sm btn-info" onclick="console.log('AI button clicked'); if (document.getElementById('aiKeysModal')) { openAIKeysModal(); } else { alert('AI Settings Modal not loaded yet. Please refresh the page.'); }" title="AI Settings" style="background:#8e44ad;">
+                <button class="btn-sm btn-info" onclick="console.log('AI button clicked'); setTimeout(() => { if (document.getElementById('aiKeysModal')) { openAIKeysModal(); } else { alert('AI Settings Modal not loaded yet. Please refresh the page.'); } }, 100);" title="AI Settings" style="background:#8e44ad;">
                     <i class="fa-solid fa-robot"></i> AI
                 </button>
                 <button class="btn-sm btn-dark" onclick="toggleTheme()" title="Theme">
@@ -3162,20 +3162,27 @@
                 const modal = document.getElementById('aiKeysModal');
                 if (!modal) {
                     console.error("AI Keys Modal not found!");
-                    alert("Error: AI Settings Modal not found. Please refresh the page.");
+                    alert("Error: AI Settings Modal not found. Please refresh the page and try again.");
                     return;
                 }
                 
-                // Check if all input fields exist
-                const fields = ['local-gemini-key', 'local-openai-key', 'local-typhoon-key', 'local-anthropic-key', 'local-llama-key'];
-                for (const fieldId of fields) {
+                // Check if ALL input fields exist before setting values
+                const allFields = [
+                    'local-gemini-key', 'local-openai-key', 'local-typhoon-key', 
+                    'local-anthropic-key', 'local-llama-key', 'local-gcp-mode',
+                    'local-gcp-project', 'local-gcp-location', 'local-gcp-token'
+                ];
+                
+                for (const fieldId of allFields) {
                     const field = document.getElementById(fieldId);
                     if (!field) {
-                        console.error(`Field ${fieldId} not found!`);
+                        console.error(`Field ${fieldId} not found in modal!`);
                         alert(`Error: Input field ${fieldId} not found. Please refresh the page.`);
                         return;
                     }
                 }
+                
+                console.log("All fields found, setting values...");
                 
                 // Now safely set values
                 document.getElementById('local-gemini-key').value = GEMINI_API_KEY.includes('__') ? "" : GEMINI_API_KEY;
@@ -3189,6 +3196,8 @@
                 document.getElementById('local-gcp-location').value = window.GCP_LOCATION || "us-central1";
                 document.getElementById('local-gcp-token').value = window.GCP_ACCESS_TOKEN || "";
 
+                console.log("Values set successfully");
+
                 // Sync Toggles
                 const gcpToggle = document.querySelector('#aiKeysModal .glass-toggle-container input[id="local-gcp-mode"]')?.parentElement;
                 if (gcpToggle) {
@@ -3197,13 +3206,17 @@
                         it.classList.toggle('active', it.dataset.value === (window.GCP_MODE || "auto"));
                     });
                 }
-                toggleVertexManualFields();
+                
+                // Check if toggleVertexManualFields exists
+                if (typeof toggleVertexManualFields === 'function') {
+                    toggleVertexManualFields();
+                }
                 
                 modal.style.display = 'block';
                 console.log("AI Keys Modal opened successfully");
             } catch (error) {
                 console.error("Error opening AI Keys Modal:", error);
-                alert("Error opening AI Settings: " + error.message);
+                alert("Error opening AI Settings: " + error.message + "\n\nPlease refresh the page and try again.");
             }
         };
 
