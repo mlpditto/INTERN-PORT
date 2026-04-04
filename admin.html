@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V88.47)</title>
-    <!-- V88.47: Robust Scope Resolution & Cache Force -->
+    <title>Intern Admin Portal (V88.48)</title>
+    <!-- V88.48: Robust Scope Resolution & Cache Force -->
     <!-- Release: 2026-04-04 19:50 UTC+7 -->
 
     <style>
@@ -1154,7 +1154,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.3em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V88.47</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V88.48</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -2020,7 +2020,18 @@
                     <p style="color:#666; font-style:italic; margin-top:10px;">"The collection of greatest stories, reflections, and hearts."</p>
                     
                     <!-- 🎭 AI Storyteller Controls -->
-                    <div style="margin-top:30px; display:flex; justify-content:center; gap:15px; flex-wrap:wrap;">
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:15px; margin-top:25px;">
+                        <div class="glass-toggle-container" id="laughtale-ai-model-toggle" style="background:rgba(255,255,255,0.7); box-shadow:0 4px 15px rgba(0,0,0,0.05); padding:4px; gap:4px; max-width:600px; transform:scale(0.9);">
+                            <div class="glass-toggle-item active" data-value="gemini-1.5-flash-latest" onclick="selectLaughTaleAi(this, 'gemini-1.5-flash-latest')">⚡ Flash</div>
+                            <div class="glass-toggle-item" data-value="gemini-1.5-pro" onclick="selectLaughTaleAi(this, 'gemini-1.5-pro')">💎 Pro</div>
+                            <div class="glass-toggle-item" data-value="gpt-4o-mini" onclick="selectLaughTaleAi(this, 'gpt-4o-mini')">🟢 GPT</div>
+                            <div class="glass-toggle-item" data-value="claude-3-5-sonnet-latest" onclick="selectLaughTaleAi(this, 'claude-3-5-sonnet-latest')">🎭 Claude</div>
+                            <div class="glass-toggle-item" data-value="meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo" onclick="selectLaughTaleAi(this, 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo')">🌀 Llama</div>
+                        </div>
+                        <input type="hidden" id="laughtale-ai-model" value="gemini-1.5-flash-latest">
+                    </div>
+
+                    <div style="margin-top:15px; display:flex; justify-content:center; gap:15px; flex-wrap:wrap;">
                         <button onclick="analyzeLaughTaleReflections()" class="btn-sm" style="background:linear-gradient(45deg, #667eea, #764ba2); color:white; border:none; padding:12px 25px; border-radius:25px; font-weight:bold; box-shadow:0 4px 15px rgba(102, 126, 234, 0.3);">
                             <i class="fa-solid fa-book-open"></i> 📖 Story Analysis
                         </button>
@@ -8577,7 +8588,7 @@
         }
         async function deleteQuiz(id) { if (confirm("Delete this quiz?")) await db.collection("quizzes").doc(id).delete(); }
 
-        // Export to Global window for HTML onclick (V88.47)
+        // Export to Global window for HTML onclick (V88.48)
         window.openQuizModal = openQuizModal;
         window.showPollResults = showPollResults;
         window.showQuizParticipants = showQuizParticipants;
@@ -11434,6 +11445,13 @@
         }
 
         // 🎭 AI Storyteller Functions for LAUGH TALE
+        window.selectLaughTaleAi = function(el, val) {
+            const parent = el.parentNode;
+            parent.querySelectorAll('.glass-toggle-item').forEach(i => i.classList.remove('active'));
+            el.classList.add('active');
+            document.getElementById('laughtale-ai-model').value = val;
+        };
+
         window.analyzeLaughTaleReflections = async function() {
             const archived = reflectiveLogsCache.filter(l => {
                 const isReviewed = l.adminComment || (l.adminBonus !== undefined && l.adminBonus !== null);
@@ -11446,11 +11464,14 @@
                 return;
             }
 
+            const activeModel = document.getElementById('laughtale-ai-model').value;
+            console.log("LaughTale Analysis using model:", activeModel);
+
             document.getElementById('aiStorytellerModal').style.display = 'block';
             document.getElementById('ai-storyteller-content').innerHTML = `
                 <div style="text-align:center; padding:50px;">
                     <i class="fa-solid fa-book-open fa-spin" style="font-size:3em; margin-bottom:20px;"></i>
-                    <p style="font-style:italic; opacity:0.9;">นักเล่าเรื่องกำลังอ่านบันทึกการเดินทาง...</p>
+                    <p style="font-style:italic; opacity:0.9;">นักเล่าเรื่องกำลังอ่านบันทึกการเดินทางด้วย ${activeModel}...</p>
                 </div>
             `;
 
@@ -11481,7 +11502,7 @@ ${i+1}. **${s.author}** (${s.date.toLocaleDateString('th-TH')})
 ✨ **เขียนแบบนักวรรณกรรม:** ใช้ภาษาสร้างสรรค์ อุปมาอุปไมย์ และมองโลกในมุมมองที่ลึกซึ้ง`;
 
             try {
-                const response = await callUniversalAI(prompt, 'gemini-1.5-pro', 'laughtale-analysis');
+                const response = await callUniversalAI(prompt, activeModel, 'laughtale-analysis');
                 document.getElementById('ai-storyteller-content').innerHTML = `
                     <div style="white-space: pre-line; line-height:1.8; font-size:1.05em;">
                         ${response}
@@ -11491,7 +11512,7 @@ ${i+1}. **${s.author}** (${s.date.toLocaleDateString('th-TH')})
                 document.getElementById('ai-storyteller-content').innerHTML = `
                     <div style="text-align:center; padding:30px; color:#ff6b6b;">
                         <i class="fa-solid fa-exclamation-triangle" style="font-size:2em; margin-bottom:15px;"></i>
-                        <p>เรื่องราวยังไม่พร้อมเปิดเผย... ลองใหม่อีกครั้ง</p>
+                        <p>เรื่องราวยังไม่พร้อมเปิดเผยด้วย ${activeModel}... ลองใช้อีกตัวดูนะครับ</p>
                     </div>
                 `;
             }
@@ -11509,11 +11530,13 @@ ${i+1}. **${s.author}** (${s.date.toLocaleDateString('th-TH')})
                 return;
             }
 
+            const activeModel = document.getElementById('laughtale-ai-model').value;
+
             document.getElementById('aiStorytellerModal').style.display = 'block';
             document.getElementById('ai-storyteller-content').innerHTML = `
                 <div style="text-align:center; padding:50px;">
                     <i class="fa-solid fa-sparkles fa-spin" style="font-size:3em; margin-bottom:20px;"></i>
-                    <p style="font-style:italic; opacity:0.9;">กำลังค้นหาเส้นใยที่เชื่อมโยง...</p>
+                    <p style="font-style:italic; opacity:0.9;">กำลังค้นหาเส้นใยที่เชื่อมโยงด้วย ${activeModel}...</p>
                 </div>
             `;
 
@@ -11534,7 +11557,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 ✨ **วิเคราะห์แบบโหราศาสตร์:** ใช้ภาษาลึกลับ มองหาความเชื่อมโยงที่มองไม่เห็น`;
 
             try {
-                const response = await callUniversalAI(prompt, 'gemini-1.5-pro', 'laughtale-patterns');
+                const response = await callUniversalAI(prompt, activeModel, 'laughtale-patterns');
                 document.getElementById('ai-storyteller-content').innerHTML = `
                     <div style="white-space: pre-line; line-height:1.8; font-size:1.05em;">
                         ${response}
@@ -11544,7 +11567,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 document.getElementById('ai-storyteller-content').innerHTML = `
                     <div style="text-align:center; padding:30px; color:#ff6b6b;">
                         <i class="fa-solid fa-exclamation-triangle" style="font-size:2em; margin-bottom:15px;"></i>
-                        <p>ดวงดาวยังไม่ตรง... ลองใหม่อีกครั้ง</p>
+                        <p>ดวงดาวยังไม่ตรงด้วย ${activeModel}... ลองเช็ค API หรือเปลี่ยนรุ่นดูนะครับ</p>
                     </div>
                 `;
             }
@@ -11616,8 +11639,8 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 ✨ **เขียนแบบนักกวี:** ใช้ภาษาสวยงาม อุปมาอุปไมย์ มองโลกในมุมที่ลึกซึ้ง ไม่เกิน 50 ตัวอักษร`;
 
             try {
-                // ลองใช้ Gemini ก่อน (เร็วที่สุด)
-                const response = await callUniversalAI(prompt, 'gemini-1.5-flash-latest', 'laughtale-comment');
+                const activeModel = document.getElementById('laughtale-ai-model').value;
+                const response = await callUniversalAI(prompt, activeModel, 'laughtale-comment');
                 commentSection.innerHTML = `
                     <div style="font-size:0.75em; font-weight:bold; color:#667eea; text-transform:uppercase; margin-bottom:8px;">
                         <i class="fa-solid fa-feather"></i> AI Storyteller's Whisper
@@ -12223,5 +12246,6 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 </body>
 
 </html>
+
 
 
