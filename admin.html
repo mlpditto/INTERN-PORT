@@ -10702,6 +10702,25 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         };
 
         async function generateAIComment(content, commentSection) {
+            // ตรวจสอบว่ามี API key หรือไม่
+            const locG = localStorage.getItem('ai_gemini_key');
+            const locO = localStorage.getItem('ai_openai_key');
+            const locT = localStorage.getItem('ai_typhoon_key');
+            const locA = localStorage.getItem('ai_anthropic_key');
+            const locL = localStorage.getItem('ai_llama_key');
+            
+            if ((!locG || locG === "__") && (!locO || locO === "__") && (!locT || locT === "__") && (!locA || locA === "__") && (!locL || locL === "__")) {
+                commentSection.innerHTML = `
+                    <div style="font-size:0.75em; font-weight:bold; color:#e74c3c; text-transform:uppercase; margin-bottom:8px;">
+                        <i class="fa-solid fa-exclamation-triangle"></i> No API Keys
+                    </div>
+                    <div style="font-size:0.85em; color:#e74c3c; font-style:italic; line-height:1.5;">
+                        กรุณาใส่ API Keys ก่อนใช้ AI Storyteller 🤖
+                    </div>
+                `;
+                return;
+            }
+
             const prompt = `เป็นนักกวีที่มองโลกแบบเชิงลึก ให้ความเห็นเพียง 1-2 ประโยคเกี่ยวกับบันทึกนี้:
 
 "${content}"
@@ -10709,6 +10728,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 ✨ **เขียนแบบนักกวี:** ใช้ภาษาสวยงาม อุปมาอุปไมย์ มองโลกในมุมที่ลึกซึ้ง ไม่เกิน 50 ตัวอักษร`;
 
             try {
+                // ลองใช้ Gemini ก่อน (เร็วที่สุด)
                 const response = await callUniversalAI(prompt, 'gemini-1.5-flash', 'laughtale-comment');
                 commentSection.innerHTML = `
                     <div style="font-size:0.75em; font-weight:bold; color:#667eea; text-transform:uppercase; margin-bottom:8px;">
@@ -10719,12 +10739,13 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     </div>
                 `;
             } catch (error) {
+                console.error("AI Comment Error:", error);
                 commentSection.innerHTML = `
-                    <div style="font-size:0.75em; font-weight:bold; color:#667eea; text-transform:uppercase; margin-bottom:8px;">
-                        <i class="fa-solid fa-feather"></i> AI Storyteller's Whisper
+                    <div style="font-size:0.75em; font-weight:bold; color:#f39c12; text-transform:uppercase; margin-bottom:8px;">
+                        <i class="fa-solid fa-exclamation-triangle"></i> AI พักผ่อน
                     </div>
-                    <div style="font-size:0.85em; color:#999; font-style:italic; line-height:1.5;">
-                        ดวงดาวเงียบ... ไม่สามารถตีความได้ในขณะนี้
+                    <div style="font-size:0.85em; color:#f39c12; font-style:italic; line-height:1.5;">
+                        ดวงดาวกำลังพัก... ลองใหม่อีกสักครู่ ⭐
                     </div>
                 `;
             }
