@@ -3125,7 +3125,7 @@
         // --- AI Diagnostic Tool (V86.14) ---
         window.checkGeminiModels = async function() {
             try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${window.GEMINI_API_KEY}`);
                 const data = await response.json();
                 if (data.models) {
                     const validModels = data.models
@@ -3197,16 +3197,17 @@
             const locT = localStorage.getItem('ai_typhoon_key');
             const locA = localStorage.getItem('ai_anthropic_key');
             const locL = localStorage.getItem('ai_llama_key');
-            let GEMINI_API_KEY = "__";
-            let OPENAI_API_KEY = "__";
-            let TYPHOON_API_KEY = "__";
-            let ANTHROPIC_API_KEY = "__";
-            let LLAMA_API_KEY = "__";
-            if (locG && locG !== "") GEMINI_API_KEY = locG;
-            if (locO && locO !== "") OPENAI_API_KEY = locO;
-            if (locT && locT !== "") TYPHOON_API_KEY = locT;
-            if (locA && locA !== "") ANTHROPIC_API_KEY = locA;
-            if (locL && locL !== "") LLAMA_API_KEY = locL;
+            // Fix: Use window.GLOBAL to properly update global variables
+            window.GEMINI_API_KEY = "__";
+            window.OPENAI_API_KEY = "__";
+            window.TYPHOON_API_KEY = "__";
+            window.ANTHROPIC_API_KEY = "__";
+            window.LLAMA_API_KEY = "__";
+            if (locG && locG !== "") window.GEMINI_API_KEY = locG;
+            if (locO && locO !== "") window.OPENAI_API_KEY = locO;
+            if (locT && locT !== "") window.TYPHOON_API_KEY = locT;
+            if (locA && locA !== "") window.ANTHROPIC_API_KEY = locA;
+            if (locL && locL !== "") window.LLAMA_API_KEY = locL;
 
             // GCP / Vertex AI (Aggressive Defaulting)
             window.GCP_MODE = localStorage.getItem('gcp_mode') || 'auto';
@@ -3222,7 +3223,7 @@
             
             const badge = document.getElementById('ai-status-badge');
             if(badge) {
-                const hasAny = (GEMINI_API_KEY.startsWith('AIza') || GEMINI_API_KEY.length > 20 || OPENAI_API_KEY.startsWith('sk-'));
+                const hasAny = (window.GEMINI_API_KEY.startsWith('AIza') || window.GEMINI_API_KEY.length > 20 || window.OPENAI_API_KEY.startsWith('sk-'));
                 const count = initAIUsageDisplay();
                 badge.style.background = hasAny ? "#8e44ad" : "#fefce8";
                 badge.style.color = "#white";
@@ -3867,8 +3868,8 @@
                 let text = "";
 
                 if (modelName.includes('gemini')) {
-                    if (GEMINI_API_KEY.includes('__')) throw new Error("Proxy failed and no local Gemini Key set.");
-                    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+                    if (window.GEMINI_API_KEY.includes('__')) throw new Error("Proxy failed and no local Gemini Key set.");
+                    const genAI = new GoogleGenerativeAI(window.GEMINI_API_KEY);
                     
                     // Map model names to correct Gemini API format (Latest versions)
                     if (modelName.includes('pro')) actualModelName = "gemini-1.5-pro";
@@ -3911,9 +3912,9 @@
                     if (!text) throw new Error("Empty response from Gemini AI");
                 } else if (modelName.includes('multimodal')) {
                     // Legacy multimodal block (Deprioritized in V87.28)
-                    if (GEMINI_API_KEY.includes('__')) throw new Error("Proxy failed and no local Gemini Key set for vision.");
+                    if (window.GEMINI_API_KEY.includes('__')) throw new Error("Proxy failed and no local Gemini Key set for vision.");
                     
-                    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+                    const genAI = new GoogleGenerativeAI(window.GEMINI_API_KEY);
                     const parts = [
                         { text: typeof prompt === 'object' ? prompt.text : prompt },
                         { inlineData: { data: (typeof prompt === 'object' && prompt.imageBase64) ? prompt.imageBase64.split(',')[1] : (visionData ? visionData.image_base64 : ''), mimeType: "image/jpeg" } }
@@ -3927,12 +3928,12 @@
                     updateAIUsage('Gemini', tokens);
                     actualModelName = "gemini-1.5-flash";
                 } else if (modelName.includes('typhoon')) {
-                    if (TYPHOON_API_KEY.includes('__')) throw new Error("Proxy failed and no local Typhoon API Key set.");
+                    if (window.TYPHOON_API_KEY.includes('__')) throw new Error("Proxy failed and no local Typhoon API Key set.");
                     
                     const callTyphoon = async (mName) => {
                         const response = await fetch('https://api.opentyphoon.ai/v1/chat/completions', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${TYPHOON_API_KEY}` },
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.TYPHOON_API_KEY}` },
                             body: JSON.stringify({
                                 model: mName,
                                 messages: [{ role: 'user', content: prompt }],
@@ -3959,7 +3960,7 @@
                     text = data.choices[0].message.content.trim();
                 } else if (modelName.includes('gpt')) {
                     // Use quick API key if provided, otherwise use stored key
-                    const apiKey = quickApiKey || OPENAI_API_KEY;
+                    const apiKey = quickApiKey || window.OPENAI_API_KEY;
                     if (apiKey.includes('__')) throw new Error("Proxy failed and no local OpenAI API Key set.");
                     let messages = [];
                     // V87.28: Support both implicit (prompt object) and explicit (visionData) multimodal calls
@@ -4067,12 +4068,12 @@
                         actualModelName = 'imagen-3.0';
                     }
                 } else if (modelName === 'dalle' || modelName === 'dall-e-3') {
-                    if (OPENAI_API_KEY.includes('__')) throw new Error("Proxy failed and no local OpenAI API Key set for DALL-E.");
+                    if (window.OPENAI_API_KEY.includes('__')) throw new Error("Proxy failed and no local OpenAI API Key set for DALL-E.");
                     const response = await fetch('https://api.openai.com/v1/images/generations', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${OPENAI_API_KEY}`
+                            'Authorization': `Bearer ${window.OPENAI_API_KEY}`
                         },
                         body: JSON.stringify({
                             model: "dall-e-3",
@@ -4087,7 +4088,7 @@
                     updateAIUsage('OpenAI', 1);
                     actualModelName = 'dall-e-3';
                 } else if (modelName.toLowerCase().includes('claude')) {
-                    if (typeof ANTHROPIC_API_KEY === 'undefined' || ANTHROPIC_API_KEY.includes('__')) throw new Error("Proxy failed and no local Anthropic API Key set for Claude fallback. Go to AI API Settings and add it.");
+                    if (typeof window.ANTHROPIC_API_KEY === 'undefined' || window.ANTHROPIC_API_KEY.includes('__')) throw new Error("Proxy failed and no local Anthropic API Key set for Claude fallback. Go to AI API Settings and add it.");
                     
                     console.log("🚀 [Direct] Calling Claude via corsproxy...");
                     
@@ -4109,7 +4110,7 @@
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
-                            "x-api-key": ANTHROPIC_API_KEY,
+                            "x-api-key": window.ANTHROPIC_API_KEY,
                             "anthropic-version": "2023-06-01",
                             "anthropic-dangerous-direct-browser-access": "true"
                         },
@@ -4127,14 +4128,14 @@
                     text = data.content?.[0]?.text || "No response";
                     actualModelName = actualModelName;
                 } else if (modelName.includes('llama')) {
-                    if (LLAMA_API_KEY.includes('__')) throw new Error("Proxy failed and no local Llama API Key set.");
+                    if (window.LLAMA_API_KEY.includes('__')) throw new Error("Proxy failed and no local Llama API Key set.");
                     
                     const callLlama = async (mName) => {
                         const response = await fetch('https://api.together.xyz/v1/chat/completions', {
                             method: 'POST',
                             headers: { 
                                 'Content-Type': 'application/json', 
-                                'Authorization': `Bearer ${LLAMA_API_KEY}` 
+                                'Authorization': `Bearer ${window.LLAMA_API_KEY}` 
                             },
                             body: JSON.stringify({
                                 model: mName,
