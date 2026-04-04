@@ -169,15 +169,22 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"], ti
             const apiKey = process.env.ANTHROPIC_API_KEY;
             if (!apiKey) return res.status(500).json({ error: "Anthropic API Key not configured on server." });
 
-            const actualModel = model.includes('sonnet') ? "claude-3-5-sonnet-20240620" : "claude-3-haiku-20240307";
-            
-            // Claude uses a separate 'system' parameter for the system prompt
+            // Robust model mapping (V88.40)
+            let actualModel = "claude-3-5-sonnet-20241022"; 
+            if (model.includes('haiku')) actualModel = "claude-3-5-haiku-20241022";
+            else if (model.includes('opus')) actualModel = "claude-3-opus-20240229";
+
+            // If isJson is true, we must NOT use response_format for Claude. 
+            // Instead, we ensure the prompt includes JSON instructions.
+            let tailoredPrompt = prompt;
+            if (isJson && !prompt.toLowerCase().includes("json")) {
+                tailoredPrompt += "\n\nIMPORTANT: Respond strictly in valid JSON format.";
+            }
+
             const response = await axios.post('https://api.anthropic.com/v1/messages', {
                 model: actualModel,
                 max_tokens: 4096,
-                messages: [{ role: "user", content: prompt }],
-                // In this architecture, systemPrompt is often prepended to prompt or handled via a specific var
-                // For simplicity here, we assume prompt contains the full tailored context from admin.html
+                messages: [{ role: "user", content: tailoredPrompt }],
                 temperature: 0.7
             }, {
                 headers: { 

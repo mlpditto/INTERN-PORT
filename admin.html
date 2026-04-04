@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V88.39)</title>
-    <!-- V88.39: Widen Quiz Editor & Clean Question Header UI -->
-    <!-- Release: 2026-04-04 18:40 UTC+7 -->
+    <title>Intern Admin Portal (V88.40)</title>
+    <!-- V88.40: AI Stability Patch - Fix Claude response_format and Gemini Key check -->
+    <!-- Release: 2026-04-04 18:55 UTC+7 -->
 
     <style>
         /* Hide Spinners/Controllers for q-timer */
@@ -1154,7 +1154,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.3em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V88.39</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V88.40</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -4304,6 +4304,12 @@
                     
                     console.log(`🔧 Claude model mapping: ${modelName} → ${actualModelName}`);
                     
+                    const body = {
+                        model: actualModelName,
+                        max_tokens: 4096,
+                        messages: [{ role: "user", content: prompt }]
+                    };
+
                     const response = await fetch("https://corsproxy.io/?https://api.anthropic.com/v1/messages", {
                         method: "POST",
                         headers: {
@@ -4312,11 +4318,7 @@
                             "anthropic-version": "2023-06-01",
                             "anthropic-dangerous-direct-browser-access": "true"
                         },
-                        body: JSON.stringify({
-                            model: actualModelName,
-                            max_tokens: 2048,
-                            messages: [{ role: "user", content: prompt }]
-                        })
+                        body: JSON.stringify(body)
                     });
                     const data = await response.json();
                     if (!response.ok) throw new Error(data.error?.message || `Anthropic Error ${response.status}`);
