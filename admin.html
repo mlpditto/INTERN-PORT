@@ -2895,10 +2895,20 @@
             
             <label style="font-size:0.85em; font-weight:bold; color:#555;">OpenAI Key (sk-...)</label>
             <input type="password" id="local-openai-key" placeholder="Enter OpenAI Key" style="width:100%; margin-bottom:15px; padding:10px; border:1px solid #ddd; border-radius:8px;">
-
+            
             <label style="font-size:0.85em; font-weight:bold; color:#555;">Claude / Anthropic Key (sk-ant-...)</label>
             <input type="password" id="local-anthropic-key" placeholder="Enter Anthropic Key (for Claude 3.5)" style="width:100%; margin-bottom:15px; padding:10px; border:1px solid #ddd; border-radius:8px;">
             
+            <div style="margin-bottom:20px; padding:15px; background:#f8f9fa; border-radius:10px; border:1px solid #dee2e6;">
+                <h4 style="margin:0 0 10px 0; color:#495057; font-size:0.9em;">
+                    <i class="fa-solid fa-paste"></i> Quick Paste All Keys
+                </h4>
+                <textarea id="bulk-paste-keys" placeholder="Paste all API keys here (one per line):&#10;Gemini: AIza...&#10;OpenAI: sk-...&#10;Typhoon: ...&#10;Anthropic: sk-ant-...&#10;Llama: xxx..." style="width:100%; height:120px; padding:10px; border:1px solid #ced4da; border-radius:6px; font-family:monospace; font-size:0.85em; resize:vertical;"></textarea>
+                <button onclick="parseAndFillKeys()" class="btn-sm btn-primary" style="margin-top:10px; width:100%; background:#28a745;">
+                    <i class="fa-solid fa-magic"></i> Auto-Fill All Keys
+                </button>
+            </div>
+
             <label style="font-size:0.85em; font-weight:bold; color:#555;">Typhoon Key</label>
             <input type="password" id="local-typhoon-key" placeholder="Enter Typhoon Key" style="width:100%; margin-bottom:15px; padding:10px; border:1px solid #ddd; border-radius:8px;">
             
@@ -3103,6 +3113,59 @@
             document.getElementById('vertex-manual-fields').style.display = mode === 'manual' ? 'block' : 'none';
             document.getElementById('vertex-auto-status').style.display = mode === 'auto' ? 'flex' : 'none';
         }
+
+        window.parseAndFillKeys = function() {
+            const bulkText = document.getElementById('bulk-paste-keys').value;
+            if (!bulkText.trim()) {
+                showToast("Please paste your API keys first", "warning");
+                return;
+            }
+            
+            const lines = bulkText.split('\n');
+            let filledCount = 0;
+            
+            lines.forEach(line => {
+                const trimmedLine = line.trim();
+                if (!trimmedLine) return;
+                
+                // Parse different formats
+                let key = '';
+                let targetField = null;
+                
+                if (trimmedLine.toLowerCase().includes('gemini') || trimmedLine.startsWith('AIza')) {
+                    key = trimmedLine.includes(':') ? trimmedLine.split(':')[1].trim() : trimmedLine;
+                    targetField = 'local-gemini-key';
+                } else if (trimmedLine.toLowerCase().includes('openai') || trimmedLine.startsWith('sk-')) {
+                    key = trimmedLine.includes(':') ? trimmedLine.split(':')[1].trim() : trimmedLine;
+                    targetField = 'local-openai-key';
+                } else if (trimmedLine.toLowerCase().includes('typhoon')) {
+                    key = trimmedLine.includes(':') ? trimmedLine.split(':')[1].trim() : trimmedLine;
+                    targetField = 'local-typhoon-key';
+                } else if (trimmedLine.toLowerCase().includes('anthropic') || trimmedLine.startsWith('sk-ant-')) {
+                    key = trimmedLine.includes(':') ? trimmedLine.split(':')[1].trim() : trimmedLine;
+                    targetField = 'local-anthropic-key';
+                } else if (trimmedLine.toLowerCase().includes('llama') || trimmedLine.includes('xxxx')) {
+                    key = trimmedLine.includes(':') ? trimmedLine.split(':')[1].trim() : trimmedLine;
+                    targetField = 'local-llama-key';
+                }
+                
+                if (targetField && key) {
+                    const field = document.getElementById(targetField);
+                    if (field) {
+                        field.value = key;
+                        filledCount++;
+                    }
+                }
+            });
+            
+            if (filledCount > 0) {
+                showToast(`✅ Auto-filled ${filledCount} API keys!`, "success");
+                // Clear the textarea
+                document.getElementById('bulk-paste-keys').value = '';
+            } else {
+                showToast("No valid API keys found in the text", "warning");
+            }
+        };
 
         window.saveAIKeys = function() {
             const g = document.getElementById('local-gemini-key').value.trim();
