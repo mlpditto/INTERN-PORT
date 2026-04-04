@@ -3654,6 +3654,32 @@
                     updateAIUsage('OpenAI', tokens); // Log Claude Tokens into OpenAI bin for local tracking temporarily
                     text = data.content?.[0]?.text || "No response";
                     actualModelName = actualModelName;
+                } else if (modelName.includes('llama')) {
+                    if (LLAMA_API_KEY.includes('__')) throw new Error("Proxy failed and no local Llama API Key set.");
+                    
+                    const callLlama = async (mName) => {
+                        const response = await fetch('https://api.together.xyz/v1/chat/completions', {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json', 
+                                'Authorization': `Bearer ${LLAMA_API_KEY}` 
+                            },
+                            body: JSON.stringify({
+                                model: mName,
+                                messages: [{ role: 'user', content: prompt }],
+                                temperature: 0.7,
+                                max_tokens: 2000
+                            })
+                        });
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(data.error?.message || `Llama Error ${response.status}`);
+                        return data;
+                    };
+                    
+                    const data = await callLlama(modelName);
+                    tokens = data.usage ? data.usage.total_tokens : 0;
+                    updateAIUsage('Llama', tokens);
+                    text = data.choices[0].message.content.trim();
                 } else {
                     throw new Error("Unknown AI Model Provider selected.");
                 }
