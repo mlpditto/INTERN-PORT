@@ -1695,6 +1695,8 @@
                                         <option value="claude-3.5-sonnet-latest">Claude 3.5 Sonnet (Pro Writing/Code)</option>
                                         <option value="gpt-4o">GPT-4o (High Quality)</option>
                                         <option value="typhoon-v1.5x-70b-instruct">Typhoon 1.5x (Thai Language Spec)</option>
+                                        <option value="llama-3.1-70b-instruct">Llama 3.1 70B (Open Source)</option>
+                                        <option value="llama-3.2-3b-instruct">Llama 3.2 3B (Fast & Efficient)</option>
                                     </optgroup>
                                 </select>
                                 <div id="model-desc-box" style="margin-top:12px; background:#eff6ff; border-left:4px solid var(--primary); padding:10px 14px; border-radius:4px 10px 10px 4px; font-size:0.8em; color:#1e40af; line-height:1.5; min-height:60px;">
@@ -1922,11 +1924,16 @@
                     case 'typhoon-v1.5x-70b-instruct':
                         desc = "🐘 <b>Typhoon:</b> เก่งภาษาไทยเป็นพิเศษ เข้าใจบริบทศัพท์เฉพาะทาง รวมถึงบริบทวัฒนธรรมไทยได้ดีเยี่ยม";
                         break;
+                    case 'llama-3.1-70b-instruct':
+                        desc = "🦙 <b>Llama 3.1 70B:</b> Open Source ขนาดใหญ่ คุณภาพสูง เหมาะกับงานวิเคราะห์และสร้างเนื้อหาซับซ้อน";
+                        break;
+                    case 'llama-3.2-3b-instruct':
+                        desc = "🦙 <b>Llama 3.2 3B:</b> Open Source ขนาดเล็ก เร็วและประหยัด เหมาะกับงานทั่วไปและตอบคำถามเร็ว";
+                        break;
                     default:
                         desc = "🤖 <b>AI Architecture:</b> ผู้ช่วยอัจฉริยะสำหรับคุณ";
                 }
                 
-                // Fade effect
                 descBox.style.opacity = '0';
                 setTimeout(() => {
                     descBox.innerHTML = desc;
@@ -2858,6 +2865,9 @@
             <label style="font-size:0.85em; font-weight:bold; color:#555;">Typhoon Key</label>
             <input type="password" id="local-typhoon-key" placeholder="Enter Typhoon Key" style="width:100%; margin-bottom:15px; padding:10px; border:1px solid #ddd; border-radius:8px;">
             
+            <label style="font-size:0.85em; font-weight:bold; color:#555;">Llama Key (Together.ai)</label>
+            <input type="password" id="local-llama-key" placeholder="Enter Together.ai API Key" style="width:100%; margin-bottom:15px; padding:10px; border:1px solid #ddd; border-radius:8px;">
+            
             <hr style="border:0; border-top:1px dashed #eee; margin-bottom:15px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                 <label style="font-size:0.85em; font-weight:bold; color:var(--primary);"><i class="fa-solid fa-cloud"></i> Google Vertex AI (Imagen)</label>
@@ -2991,10 +3001,17 @@
             const locO = localStorage.getItem('ai_openai_key');
             const locT = localStorage.getItem('ai_typhoon_key');
             const locA = localStorage.getItem('ai_anthropic_key');
+            const locL = localStorage.getItem('ai_llama_key');
+            let GEMINI_API_KEY = "__";
+            let OPENAI_API_KEY = "__";
+            let TYPHOON_API_KEY = "__";
+            let ANTHROPIC_API_KEY = "__";
+            let LLAMA_API_KEY = "__";
             if (locG && locG !== "") GEMINI_API_KEY = locG;
             if (locO && locO !== "") OPENAI_API_KEY = locO;
             if (locT && locT !== "") TYPHOON_API_KEY = locT;
             if (locA && locA !== "") ANTHROPIC_API_KEY = locA;
+            if (locL && locL !== "") LLAMA_API_KEY = locL;
 
             // GCP / Vertex AI (Aggressive Defaulting)
             window.GCP_MODE = localStorage.getItem('gcp_mode') || 'auto';
@@ -3024,6 +3041,7 @@
             document.getElementById('local-openai-key').value = OPENAI_API_KEY.includes('__') ? "" : OPENAI_API_KEY;
             document.getElementById('local-typhoon-key').value = TYPHOON_API_KEY.includes('__') ? "" : TYPHOON_API_KEY;
             document.getElementById('local-anthropic-key').value = (typeof ANTHROPIC_API_KEY !== 'undefined' && ANTHROPIC_API_KEY.includes('__')) ? "" : (typeof ANTHROPIC_API_KEY !== 'undefined' ? ANTHROPIC_API_KEY : "");
+            document.getElementById('local-llama-key').value = (typeof LLAMA_API_KEY !== 'undefined' && LLAMA_API_KEY.includes('__')) ? "" : (typeof LLAMA_API_KEY !== 'undefined' ? LLAMA_API_KEY : "");
             
             document.getElementById('local-gcp-mode').value = window.GCP_MODE || "auto";
             document.getElementById('local-gcp-project').value = window.GCP_PROJECT_ID || "intern-port-edfa7";
@@ -3054,11 +3072,13 @@
             const o = document.getElementById('local-openai-key').value.trim();
             const t = document.getElementById('local-typhoon-key').value.trim();
             const a = document.getElementById('local-anthropic-key').value.trim();
+            const l = document.getElementById('local-llama-key').value.trim();
             if(g) localStorage.setItem('ai_gemini_key', g);
             if(o) localStorage.setItem('ai_openai_key', o);
             if(t) localStorage.setItem('ai_typhoon_key', t);
             if(a) localStorage.setItem('ai_anthropic_key', a);
-            else localStorage.removeItem('ai_anthropic_key');
+            if(l) localStorage.setItem('ai_llama_key', l);
+            else localStorage.removeItem('ai_llama_key');
             
             localStorage.setItem('gcp_mode', document.getElementById('local-gcp-mode').value);
             localStorage.setItem('gcp_project_id', document.getElementById('local-gcp-project').value.trim());
@@ -3409,7 +3429,7 @@
                             body: JSON.stringify({
                                 model: mName,
                                 messages: [{ role: 'user', content: prompt }],
-                                temperature: 0.6,
+                                temperature: 0.7,
                                 max_tokens: 2000
                             })
                         });
