@@ -4022,19 +4022,30 @@
                     } else {
                         messages = [{ role: "user", content: prompt }];
                     }
+                    // Build payload conditionally to avoid null max_tokens
+                    const payload = {
+                        model: modelName.startsWith('gpt-5.4') ? modelName : (modelName === 'gpt-4o' ? 'gpt-4o' : (modelName.includes('4') ? 'gpt-4' : 'gpt-3.5-turbo')),
+                        messages: messages,
+                        temperature: 0.7
+                    };
+                    
+                    // Only add response_format for JSON mode
+                    if (isJson) {
+                        payload.response_format = { type: "json_object" };
+                    }
+                    
+                    // Only add max_tokens when NOT in JSON mode (OpenAI doesn't accept null)
+                    if (!isJson) {
+                        payload.max_tokens = modelName.includes('gpt-5.4') || modelName === 'gpt-4o' ? 4096 : 1000;
+                    }
+                    
                     const response = await fetch("https://api.openai.com/v1/chat/completions", {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
                             "Authorization": `Bearer ${apiKey}`
                         },
-                        body: JSON.stringify({
-                            model: modelName.startsWith('gpt-5.4') ? modelName : (modelName === 'gpt-4o' ? 'gpt-4o' : (modelName.includes('4') ? 'gpt-4' : 'gpt-3.5-turbo')),
-                            messages: messages,
-                            response_format: isJson ? { type: "json_object" } : undefined,
-                            temperature: 0.7,
-                            max_tokens: isJson ? null : (modelName.includes('gpt-5.4') || modelName === 'gpt-4o' ? 4096 : 1000)
-                        })
+                        body: JSON.stringify(payload)
                     });
                     const data = await response.json();
                     if (!response.ok) throw new Error(data.error?.message || `OpenAI Error ${response.status}`);
