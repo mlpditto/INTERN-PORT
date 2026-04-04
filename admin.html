@@ -2909,6 +2909,24 @@
                 </button>
             </div>
 
+            <div style="margin-bottom:20px; padding:15px; background:#e3f2fd; border-radius:10px; border:1px solid #bbdefb;">
+                <h4 style="margin:0 0 10px 0; color:#1565c0; font-size:0.9em;">
+                    <i class="fa-solid fa-download"></i> Backup & Restore
+                </h4>
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <button onclick="exportAIKeys()" class="btn-sm" style="flex:1; background:#1976d2; color:white;">
+                        <i class="fa-solid fa-download"></i> Export Keys
+                    </button>
+                    <button onclick="document.getElementById('import-file-input').click()" class="btn-sm" style="flex:1; background:#388e3c; color:white;">
+                        <i class="fa-solid fa-upload"></i> Import Keys
+                    </button>
+                    <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="importAIKeys(event)">
+                </div>
+                <div style="font-size:0.75em; color:#666; font-style:italic;">
+                    💾 Export saves keys to file for backup. Import restores from backup file.
+                </div>
+            </div>
+
             <label style="font-size:0.85em; font-weight:bold; color:#555;">Typhoon Key</label>
             <input type="password" id="local-typhoon-key" placeholder="Enter Typhoon Key" style="width:100%; margin-bottom:15px; padding:10px; border:1px solid #ddd; border-radius:8px;">
             
@@ -3165,6 +3183,84 @@
             } else {
                 showToast("No valid API keys found in the text", "warning");
             }
+        };
+
+        // 📤 Export AI Keys Function
+        window.exportAIKeys = function() {
+            const keys = {
+                gemini: localStorage.getItem('ai_gemini_key') || '',
+                openai: localStorage.getItem('ai_openai_key') || '',
+                typhoon: localStorage.getItem('ai_typhoon_key') || '',
+                anthropic: localStorage.getItem('ai_anthropic_key') || '',
+                llama: localStorage.getItem('ai_llama_key') || '',
+                gcp_mode: localStorage.getItem('gcp_mode') || 'auto',
+                gcp_project_id: localStorage.getItem('gcp_project_id') || '',
+                gcp_location: localStorage.getItem('gcp_location') || '',
+                gcp_access_token: localStorage.getItem('gcp_access_token') || '',
+                export_date: new Date().toISOString(),
+                version: 'V87.98'
+            };
+            
+            // สร้าง JSON และ download
+            const dataStr = JSON.stringify(keys, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ai-keys-backup-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showToast("✅ AI Keys exported successfully!", "success");
+        };
+
+        // 📥 Import AI Keys Function
+        window.importAIKeys = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const keys = JSON.parse(e.target.result);
+                    
+                    // ตรวจสอบว่าเป็น backup file ที่ถูกต้อง
+                    if (!keys.version || !keys.gemini) {
+                        showToast("❌ Invalid backup file format", "error");
+                        return;
+                    }
+                    
+                    // นำเข้า keys
+                    if (keys.gemini) localStorage.setItem('ai_gemini_key', keys.gemini);
+                    if (keys.openai) localStorage.setItem('ai_openai_key', keys.openai);
+                    if (keys.typhoon) localStorage.setItem('ai_typhoon_key', keys.typhoon);
+                    if (keys.anthropic) localStorage.setItem('ai_anthropic_key', keys.anthropic);
+                    if (keys.llama) localStorage.setItem('ai_llama_key', keys.llama);
+                    
+                    // นำเข้า GCP settings
+                    if (keys.gcp_mode) localStorage.setItem('gcp_mode', keys.gcp_mode);
+                    if (keys.gcp_project_id) localStorage.setItem('gcp_project_id', keys.gcp_project_id);
+                    if (keys.gcp_location) localStorage.setItem('gcp_location', keys.gcp_location);
+                    if (keys.gcp_access_token) localStorage.setItem('gcp_access_token', keys.gcp_access_token);
+                    
+                    // Reload และปิด modal
+                    loadAIKeys();
+                    openAIKeysModal(); // เพื่อแสดง keys ที่นำเข้ามา
+                    showToast(`✅ Keys imported from backup (${keys.export_date?.split('T')[0] || 'unknown date'})`, "success");
+                    
+                } catch (error) {
+                    showToast("❌ Failed to import backup file", "error");
+                    console.error("Import error:", error);
+                }
+            };
+            
+            reader.readAsText(file);
+            
+            // Clear file input
+            event.target.value = '';
         };
 
         window.saveAIKeys = function() {
