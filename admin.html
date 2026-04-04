@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V88.35)</title>
-    <!-- V88.35: Fix ID mismatch - quiz-description vs quiz-desc causing null error -->
+    <title>Intern Admin Portal (V88.36)</title>
+    <!-- V88.36: Fix AI API Key global variable scope - use window.GLOBAL for all key references -->
     <!-- Release: 2026-04-04 14:58 UTC+7 -->
 
     <style>
@@ -1139,7 +1139,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.3em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V88.35</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V88.36</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -3111,6 +3111,44 @@
         </div>
     </div>
 
+    <!-- Quick API Key Selection Popup (V88.36) -->
+    <div id="quickApiKeyPopup" class="modal" style="z-index:6000;">
+        <div class="modal-content" style="max-width:400px; padding:20px; text-align:left;">
+            <span class="close-modal" onclick="closeQuickApiKeyPopup()">&times;</span>
+            <h3 style="margin-top:0; font-size:1.1em;"><i class="fa-solid fa-key" style="color:#f59e0b;"></i> Select API Key</h3>
+            <p style="font-size:0.8em; color:#666; margin-bottom:15px;">
+                Choose a saved key or enter a new one for this question.
+            </p>
+            
+            <!-- Saved Keys Section -->
+            <div id="saved-api-keys-section" style="margin-bottom:15px;">
+                <h4 style="font-size:0.85em; color:#667eea; margin:0 0 8px 0;"><i class="fa-solid fa-database"></i> Saved Keys (from AI Settings)</h4>
+                <div id="saved-keys-list" style="display:flex; flex-direction:column; gap:6px;">
+                    <!-- Keys will be populated dynamically -->
+                </div>
+            </div>
+            
+            <!-- Divider -->
+            <div style="border-top:1px solid #eee; margin:12px 0;"></div>
+            
+            <!-- Manual Entry -->
+            <div>
+                <h4 style="font-size:0.85em; color:#666; margin:0 0 8px 0;"><i class="fa-solid fa-pen"></i> Custom Key</h4>
+                <input type="password" id="quick-api-key-input" placeholder="Enter API Key manually" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; font-size:0.85em; margin-bottom:10px;">
+            </div>
+            
+            <!-- Buttons -->
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button onclick="applyQuickApiKey()" class="btn-primary" style="flex:1; font-weight:700; padding:10px; border-radius:8px; background:linear-gradient(135deg, #f59e0b, #d97706); border:none; color:white;">
+                    <i class="fa-solid fa-check"></i> Apply
+                </button>
+                <button onclick="clearQuickApiKey()" class="btn-secondary" style="width:35%; font-weight:700; padding:10px; border-radius:8px; background:#e74c3c; border:none; color:white;">
+                    <i class="fa-solid fa-trash"></i> Clear
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="firebase-config.js"></script>
     <script type="importmap">
       {
@@ -3421,7 +3459,7 @@
                 gcp_location: localStorage.getItem('gcp_location') || '',
                 gcp_access_token: localStorage.getItem('gcp_access_token') || '',
                 export_date: new Date().toISOString(),
-                version: 'V88.35'
+                version: 'V88.36'
             };
             
             // สร้าง JSON และ download
@@ -4394,6 +4432,114 @@
             showToast("Question Duplicated!");
         };
 
+        // --- Quick API Key Popup Functions (V88.36) ---
+        let currentQuickApiKeyTarget = null;
+
+        window.openQuickApiKeyPopup = function(btn) {
+            currentQuickApiKeyTarget = btn.closest('.quiz-q-item');
+            const popup = document.getElementById('quickApiKeyPopup');
+            const savedKeysList = document.getElementById('saved-keys-list');
+            const keyInput = document.getElementById('quick-api-key-input');
+            
+            // Get current value
+            const hiddenInput = currentQuickApiKeyTarget.querySelector('.quick-api-key');
+            keyInput.value = hiddenInput ? hiddenInput.value : '';
+            
+            // Load saved keys from AI Settings
+            const geminiKey = localStorage.getItem('ai_gemini_key') || '';
+            const openaiKey = localStorage.getItem('ai_openai_key') || '';
+            const typhoonKey = localStorage.getItem('ai_typhoon_key') || '';
+            const anthropicKey = localStorage.getItem('ai_anthropic_key') || '';
+            const llamaKey = localStorage.getItem('ai_llama_key') || '';
+            
+            let keysHtml = '';
+            
+            if (geminiKey && geminiKey.length > 10) {
+                keysHtml += `<button onclick="selectSavedKey('${geminiKey.replace(/'/g, "\\'")}', 'Gemini')" class="saved-key-btn" style="display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #e0e0e0; border-radius:6px; background:#f8f9fa; cursor:pointer; font-size:0.8em; text-align:left;">
+                    <i class="fa-solid fa-bolt" style="color:#4285f4;"></i> <span>Gemini Key</span> <span style="margin-left:auto; font-size:0.75em; color:#999;">(${geminiKey.substring(0,8)}...)</span>
+                </button>`;
+            }
+            if (openaiKey && openaiKey.length > 10) {
+                keysHtml += `<button onclick="selectSavedKey('${openaiKey.replace(/'/g, "\\'")}', 'OpenAI')" class="saved-key-btn" style="display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #e0e0e0; border-radius:6px; background:#f8f9fa; cursor:pointer; font-size:0.8em; text-align:left;">
+                    <i class="fa-solid fa-circle" style="color:#10a37f;"></i> <span>OpenAI Key</span> <span style="margin-left:auto; font-size:0.75em; color:#999;">(${openaiKey.substring(0,8)}...)</span>
+                </button>`;
+            }
+            if (typhoonKey && typhoonKey.length > 10) {
+                keysHtml += `<button onclick="selectSavedKey('${typhoonKey.replace(/'/g, "\\'")}', 'Typhoon')" class="saved-key-btn" style="display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #e0e0e0; border-radius:6px; background:#f8f9fa; cursor:pointer; font-size:0.8em; text-align:left;">
+                    <i class="fa-solid fa-hurricane" style="color:#00bcd4;"></i> <span>Typhoon Key</span> <span style="margin-left:auto; font-size:0.75em; color:#999;">(${typhoonKey.substring(0,8)}...)</span>
+                </button>`;
+            }
+            if (anthropicKey && anthropicKey.length > 10) {
+                keysHtml += `<button onclick="selectSavedKey('${anthropicKey.replace(/'/g, "\\'")}', 'Claude')" class="saved-key-btn" style="display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #e0e0e0; border-radius:6px; background:#f8f9fa; cursor:pointer; font-size:0.8em; text-align:left;">
+                    <i class="fa-solid fa-mask" style="color:#d4a574;"></i> <span>Claude Key</span> <span style="margin-left:auto; font-size:0.75em; color:#999;">(${anthropicKey.substring(0,8)}...)</span>
+                </button>`;
+            }
+            if (llamaKey && llamaKey.length > 10) {
+                keysHtml += `<button onclick="selectSavedKey('${llamaKey.replace(/'/g, "\\'")}', 'Llama')" class="saved-key-btn" style="display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #e0e0e0; border-radius:6px; background:#f8f9fa; cursor:pointer; font-size:0.8em; text-align:left;">
+                    <i class="fa-solid fa-horse" style="color:#8b5a2b;"></i> <span>Llama Key</span> <span style="margin-left:auto; font-size:0.75em; color:#999;">(${llamaKey.substring(0,8)}...)</span>
+                </button>`;
+            }
+            
+            if (keysHtml === '') {
+                keysHtml = `<div style="font-size:0.8em; color:#999; padding:10px; background:#f5f5f5; border-radius:6px; text-align:center;">
+                    <i class="fa-solid fa-info-circle"></i> No saved keys found. Go to <b>AI API Settings</b> to add keys.
+                </div>`;
+            }
+            
+            savedKeysList.innerHTML = keysHtml;
+            popup.style.display = 'block';
+        };
+
+        window.selectSavedKey = function(key, provider) {
+            document.getElementById('quick-api-key-input').value = key;
+            showToast(`✓ Selected ${provider} key`);
+        };
+
+        window.closeQuickApiKeyPopup = function() {
+            document.getElementById('quickApiKeyPopup').style.display = 'none';
+            currentQuickApiKeyTarget = null;
+        };
+
+        window.applyQuickApiKey = function() {
+            if (!currentQuickApiKeyTarget) return;
+            
+            const keyInput = document.getElementById('quick-api-key-input');
+            const hiddenInput = currentQuickApiKeyTarget.querySelector('.quick-api-key');
+            const keyBtn = currentQuickApiKeyTarget.querySelector('.quick-api-key-btn');
+            const keyStatus = keyBtn.querySelector('.key-status');
+            
+            if (hiddenInput) {
+                hiddenInput.value = keyInput.value;
+                
+                // Update button appearance
+                if (keyInput.value) {
+                    keyBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+                    keyStatus.textContent = 'Set';
+                    showToast('✓ API Key applied');
+                } else {
+                    keyBtn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+                    keyStatus.textContent = 'Key';
+                }
+            }
+            
+            closeQuickApiKeyPopup();
+        };
+
+        window.clearQuickApiKey = function() {
+            document.getElementById('quick-api-key-input').value = '';
+            if (currentQuickApiKeyTarget) {
+                const hiddenInput = currentQuickApiKeyTarget.querySelector('.quick-api-key');
+                const keyBtn = currentQuickApiKeyTarget.querySelector('.quick-api-key-btn');
+                const keyStatus = keyBtn.querySelector('.key-status');
+                
+                if (hiddenInput) hiddenInput.value = '';
+                keyBtn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+                keyStatus.textContent = 'Key';
+            }
+            showToast('✓ API Key cleared');
+            closeQuickApiKeyPopup();
+        };
+
         window.aiEnhanceQuestion = async function(btn) {
             const item = btn.closest('.quiz-q-item');
             const questionTextarea = item.querySelector('.q-text');
@@ -5256,8 +5402,11 @@
                                 </div>
                                 <input type="hidden" class="ai-lang-quiz" value="Thai">
                                 
-                                <!-- Quick API Key Input -->
-                                <input type="password" class="quick-api-key" placeholder="API Key (optional)" style="width:120px; padding:4px 8px; border:1px solid #ddd; border-radius:6px; font-size:0.7em; background:#f8f9fa;" title="Enter API key for this operation only">
+                                <!-- Quick API Key Button -->
+                                <button type="button" class="btn-sm quick-api-key-btn" onclick="openQuickApiKeyPopup(this)" title="Set API Key for this question" style="background:linear-gradient(135deg, #f59e0b, #d97706); color:white; padding:4px 10px; border:none; border-radius:8px; font-weight:bold; font-size:0.7em; display:flex; align-items:center; gap:4px;">
+                                    <i class="fa-solid fa-key"></i> <span class="key-status">Key</span>
+                                </button>
+                                <input type="hidden" class="quick-api-key" value="">
 
                                 <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Enhance Content" style="background:linear-gradient(135deg, var(--primary), #6366f1); color:white; padding:6px 12px; border:none; border-radius:10px; font-weight:bold; font-size:0.7em; display:flex; align-items:center; gap:5px; box-shadow:0 3px 8px rgba(67,97,238,0.2); transition:transform 0.2s;">
                                     <i class="fa-solid fa-wand-magic-sparkles"></i> <span class="btn-text">Enhance</span>
