@@ -7790,8 +7790,15 @@
         }
 
         function renderQuizzes() {
+            console.log("🔍 renderQuizzes() called, quizzesData length:", quizzesData.length);
             const tbodyActive = document.querySelector("#quizzesTableActive tbody");
             const tbodyInactive = document.querySelector("#quizzesTableInactive tbody");
+            
+            if (!tbodyActive || !tbodyInactive) {
+                console.error("🔍 Quiz tables not found!");
+                return;
+            }
+            
             tbodyActive.innerHTML = "";
             tbodyInactive.innerHTML = "";
             const now = new Date();
@@ -8285,6 +8292,7 @@
             if (id === 'tab-assignments') {
                 loadActiveQuests();
                 renderQuizzes();
+                renderPendingQuizzes(); // Ensure pending quizzes are loaded
             } else if (id === 'tab-sidequest') {
                 renderKanban();
                 renderTable('works');
@@ -8326,7 +8334,11 @@
                 knowledgeBaseCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderKnowledgeBase();
             });
-            db.collection("quizzes").onSnapshot(s => { quizzesData = s.docs.map(d => ({ id: d.id, ...d.data() })); renderQuizzes(); });
+            db.collection("quizzes").onSnapshot(s => { 
+                quizzesData = s.docs.map(d => ({ id: d.id, ...d.data() })); 
+                console.log("🔍 Firebase quizzes updated, count:", quizzesData.length);
+                renderQuizzes(); 
+            });
             // 🔥 Refined V77.6: Listen only for actionable items (Pending Review or New Request)
             db.collection("quiz_attempts").where("status", "in", ["pending", "requesting"]).onSnapshot(s => {
                 renderPendingQuizzes(s.docs.map(d => ({ id: d.id, ...d.data() })));
