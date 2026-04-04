@@ -1581,6 +1581,9 @@
                     document.getElementById('u-group-badge').innerHTML = `<i class="fa-solid ${getGroupIcon(myGroup)}"></i> ${myGroup}`;
                     document.getElementById('u-group-badge').style.background = getGroupColor(myGroup);
                     document.getElementById('u-group-badge').style.display = myGroup !== 'Public' ? 'inline-block' : 'none';
+                    
+                    // Check graduation eligibility when score updates
+                    checkGraduation(da);
 
                     if (da.startDate) {
                         document.getElementById('u-start-date').value = da.startDate;
@@ -1858,11 +1861,14 @@
             if (!data.startDate || !data.endDate) return;
             const e = new Date(data.endDate), now = new Date();
             const btn = document.getElementById('grad-action');
+            const score = parseInt(document.getElementById('u-score').innerText) || 0;
 
-            // Logic: now >= end_date (Inclusive)
-            if (now >= e) {
+            // Logic: now >= end_date AND score >= 30 (Inclusive)
+            if (now >= e && score >= 30) {
                 if (data.certRequested) btn.innerHTML = `<span style="color:#28a745;">✅ ส่งคำร้องขอใบรับรองแล้ว</span>`;
                 else btn.innerHTML = `<button onclick="requestCert()" class="btn-warning" style="width:100%"><i class="fa-solid fa-certificate"></i> ขอใบรับรองจบ (Request Cert)</button>`;
+            } else if (now >= e && score < 30) {
+                btn.innerHTML = `<span style="color:#dc3545; display:inline-block; background:#f8d7da; padding:3px 8px; border-radius:6px; font-weight:600;"><i class="fa-solid fa-exclamation-triangle"></i> ต้องได้คะแนน >= 30 แต้ม (ปัจจุบัน: ${score} แต้ม)</span>`;
             } else {
                 const left = Math.ceil((e - now) / 86400000);
                 btn.innerHTML = `<span style="color:#17a2b8; display:inline-block; background:#e0f7fa; padding:3px 8px; border-radius:6px; font-weight:600;"><i class="fa-solid fa-hourglass-half"></i> เหลือเวลาฝึกงานอีก ${left} วัน</span>`;
