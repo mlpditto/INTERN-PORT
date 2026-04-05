@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -3844,10 +3844,16 @@
                                         <div style="background:#fcfdff; border:1.5px solid #edf2f7; border-radius:15px; padding:15px; border-left:5px solid #4361ee;">
                                             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
                                                 <b style="color:#2d3748;">Q${qIdx + 1} Issue</b>
-                                                <button class="btn-sm" style="background:#4361ee; color:white; border:none; padding:4px 12px; border-radius:8px; font-weight:bold; font-size:0.75em;"
-                                                    onclick="applySingleAiFix(${qIdx}, '${improvedJson}')">
-                                                    <i class="fa-solid fa-check-double"></i> Fix Q${qIdx + 1}
-                                                </button>
+                                                <div style="display:flex; gap:6px;">
+                                                    <button class="btn-sm" style="background:#6366f1; color:white; border:none; padding:4px 12px; border-radius:8px; font-weight:bold; font-size:0.75em;"
+                                                        onclick="previewAiFix(${qIdx}, '${improvedJson}')">
+                                                        <i class="fa-solid fa-code-compare"></i> Compare
+                                                    </button>
+                                                    <button class="btn-sm" style="background:#22c55e; color:white; border:none; padding:4px 12px; border-radius:8px; font-weight:bold; font-size:0.75em;"
+                                                        onclick="applySingleAiFix(${qIdx}, '${improvedJson}')">
+                                                        <i class="fa-solid fa-check-double"></i> Fix
+                                                    </button>
+                                                </div>
                                             </div>
                                             <div style="font-size:0.9em; color:#4a5568; margin-bottom:8px;">⚠️ <b>Issue:</b> ${item.issue}</div>
                                             <div style="font-size:0.9em; color:#4361ee;">✨ <b>Suggestion:</b> ${item.suggestion}</div>
@@ -12266,6 +12272,82 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             }
         });
         
+
+        window.previewAiFix = function(index, improvedQJson) {
+            try {
+                const improvedQ = JSON.parse(improvedQJson.replace(/&quot;/g, '"'));
+                const currentQs = getQuizFormData().questions;
+                if (index >= currentQs.length) return alert("Question index out of sync.");
+                const currentQ = currentQs[index];
+
+                const renderQ = (q, label, color) => {
+                    const optionsHtml = q.options ? q.options.map((opt, i) => {
+                        const isCorrect = q.correct && q.correct.includes(i);
+                        return `<div style="padding:6px 10px; margin:3px 0; border-radius:8px; font-size:0.88em; background:${isCorrect ? '#dcfce7' : '#f8fafc'}; border:1px solid ${isCorrect ? '#86efac' : '#e2e8f0'}; display:flex; align-items:center; gap:6px;">
+                            ${isCorrect ? '<i class="fa-solid fa-circle-check" style="color:#16a34a;"></i>' : '<i class="fa-regular fa-circle" style="color:#94a3b8;"></i>'}
+                            ${opt}
+                        </div>`;
+                    }).join('') : '<div style="color:#94a3b8; font-size:0.85em;">No options</div>';
+
+                    return `<div style="flex:1; min-width:280px;">
+                        <div style="background:${color}; color:white; padding:8px 14px; border-radius:12px 12px 0 0; font-weight:800; font-size:0.82em; display:flex; align-items:center; gap:6px;">
+                            <i class="fa-solid fa-${label === 'Current' ? 'file-lines' : 'wand-magic-sparkles'}"></i> ${label} Q${index + 1}
+                            <span style="margin-left:auto; background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:6px; font-size:0.85em;">${q.type || 'choice'}</span>
+                        </div>
+                        <div style="background:#fff; border:1.5px solid #e2e8f0; border-top:none; border-radius:0 0 12px 12px; padding:14px;">
+                            <div style="font-weight:700; color:#1e293b; margin-bottom:10px; font-size:0.95em; line-height:1.5;">${q.q || '(empty)'}</div>
+                            <div style="margin-bottom:8px;">${optionsHtml}</div>
+                            <div style="font-size:0.75em; color:#94a3b8; display:flex; gap:12px;">
+                                <span><i class="fa-solid fa-stopwatch"></i> ${q.timer || 60}s</span>
+                                <span><i class="fa-solid fa-list"></i> ${q.options ? q.options.length : 0} options</span>
+                            </div>
+                        </div>
+                    </div>`;
+                };
+
+                // Find differences
+                const diffs = [];
+                if (currentQ.q !== improvedQ.q) diffs.push('Question text changed');
+                if (JSON.stringify(currentQ.options) !== JSON.stringify(improvedQ.options)) diffs.push('Options changed');
+                if (JSON.stringify(currentQ.correct) !== JSON.stringify(improvedQ.correct)) diffs.push('Correct answer changed');
+                if (currentQ.type !== improvedQ.type) diffs.push('Question type changed');
+
+                const diffBadges = diffs.map(d => `<span style="background:#fef3c7; color:#92400e; padding:3px 10px; border-radius:20px; font-size:0.75em; font-weight:600;">${d}</span>`).join(' ');
+
+                const modal = document.createElement('div');
+                modal.id = 'ai-compare-modal';
+                modal.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:30000; display:flex; align-items:center; justify-content:center; padding:20px;';
+                modal.innerHTML = `
+                    <div style="background:#f8fafc; border-radius:20px; max-width:900px; width:100%; max-height:85vh; overflow-y:auto; box-shadow:0 25px 60px rgba(0,0,0,0.3); position:relative;">
+                        <div style="background:linear-gradient(135deg, #4f46e5, #7c3aed); padding:18px 24px; border-radius:20px 20px 0 0; display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <h3 style="margin:0; color:white; font-size:1.1em;"><i class="fa-solid fa-code-compare"></i> Compare Q${index + 1}</h3>
+                                <div style="color:rgba(255,255,255,0.8); font-size:0.78em; margin-top:4px;">Review changes before applying</div>
+                            </div>
+                            <button onclick="document.getElementById('ai-compare-modal').remove()" style="background:rgba(255,255,255,0.2); border:none; color:white; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">&times;</button>
+                        </div>
+                        <div style="padding:20px 24px;">
+                            ${diffs.length > 0 ? `<div style="margin-bottom:16px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;"><span style="font-size:0.78em; font-weight:700; color:#64748b;">Changes:</span> ${diffBadges}</div>` : ''}
+                            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                                ${renderQ(currentQ, 'Current', '#64748b')}
+                                ${renderQ(improvedQ, 'AI Suggested', '#7c3aed')}
+                            </div>
+                            <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px; padding-top:16px; border-top:1px solid #e2e8f0;">
+                                <button class="btn-sm" onclick="document.getElementById('ai-compare-modal').remove()" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; padding:8px 20px; border-radius:10px; font-weight:700; font-size:0.85em; cursor:pointer;">Cancel</button>
+                                <button class="btn-sm" onclick="document.getElementById('ai-compare-modal').remove(); applySingleAiFix(${index}, '${improvedQJson.replace(/'/g, "\\'")}')" style="background:linear-gradient(135deg, #22c55e, #16a34a); color:white; border:none; padding:8px 20px; border-radius:10px; font-weight:700; font-size:0.85em; cursor:pointer; box-shadow:0 4px 12px rgba(34,197,94,0.3);"><i class="fa-solid fa-check-double"></i> Apply AI Fix</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                // Remove existing if any
+                const existing = document.getElementById('ai-compare-modal');
+                if (existing) existing.remove();
+                document.body.appendChild(modal);
+            } catch(e) {
+                console.error("Preview error:", e);
+                alert("Error previewing: " + e.message);
+            }
+        };
         window.applySingleAiFix = function(index, improvedQJson) {
             try {
                 // Decode &quot; back to "
