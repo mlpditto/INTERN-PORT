@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V88.49)</title>
-    <!-- V88.49: Robust Scope Resolution & Cache Force -->
-    <!-- Release: 2026-04-04 19:50 UTC+7 -->
+    <title>Intern Admin Portal (V88.50)</title>
+    <!-- V88.50: Quiz Participant Visibility Fix & Global Cache -->
+    <!-- Release: 2026-04-05 10:05 UTC+7 -->
 
     <style>
         /* Hide Spinners/Controllers for q-timer */
@@ -1154,7 +1154,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.3em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V88.49</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V88.53</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -2844,7 +2844,7 @@
             </div>
         </div>
 
-        <div id="quizParticipantsModal" class="modal">
+        <div id="quizParticipantsModal" class="modal" style="z-index:7000;">
             <div class="modal-content" style="max-width: 1000px;">
                 <span class="close-modal"
                     onclick="document.getElementById('quizParticipantsModal').style.display='none'">&times;</span>
@@ -3198,17 +3198,24 @@
     <script type="module">
         import { GoogleGenerativeAI } from "@google/generative-ai";
         
-        // --- AI Diagnostic Tool (V86.14) ---
+        // --- AI Diagnostic Tool (V88.55 Handle 403) ---
         window.checkGeminiModels = async function() {
             try {
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${window.GEMINI_API_KEY}`);
                 const data = await response.json();
+                
                 if (data.models) {
                     const validModels = data.models
                         .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"))
                         .map(m => m.name.replace("models/", ""));
                     alert("✅ Available AI Models for this Key:\n\n" + validModels.join("\n") + "\n\n(Please capture this or use these names as default)");
                     console.log("✅ Available Models:", validModels);
+                } else if (data.error && data.error.code === 403) {
+                    alert("⚠️ Gemini Diagnostic: Permission Denied (403)\n\n" + 
+                          "The 'ListModels' method is blocked for this API key. This usually means your key has API restrictions enabled.\n\n" +
+                          "Action: Please visit Google Cloud Console and ensure your API key has permission for 'Generative Language API' or remove restrictions for the ListModels method.\n\n" +
+                          "Note: Your key might still work for generating content despite this diagnostic failure.");
+                    console.warn("Gemini 403:", data.error.message);
                 } else {
                     alert("❌ AI Model data not found: " + JSON.stringify(data));
                 }
@@ -3274,12 +3281,21 @@
             // We can only check if key is valid
             try {
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${window.GEMINI_API_KEY}`);
-                if (response.ok) {
+                const data = await response.json().catch(() => ({}));
+                
+                if (response.ok && data.models) {
                     return { 
                         provider: 'Gemini', 
-                        status: 'Free: 60 req/min limit (no API to check remaining)', 
+                        status: 'Free Tier (60 req/min limit (no API to check balance))', 
                         percent: 0, 
                         color: '#4285f4' 
+                    };
+                } else if (data.error && data.error.code === 403) {
+                     return { 
+                        provider: 'Gemini', 
+                        status: '⚠️ API Restriction (ListModels blocked, but key might work)', 
+                        percent: 0, 
+                        color: '#f59e0b' 
                     };
                 } else {
                     return { provider: 'Gemini', status: '❌ Invalid key or rate limited', percent: 100, color: '#e74c3c' };
@@ -3999,6 +4015,9 @@
         window.callUniversalAI = async function(modelName, prompt, isJson = false, visionData = null, quickApiKey = '') {
             const PROXY_SECRET = "mlp-secret-8888";
             const PROXY_URL = "/api/ai"; 
+
+            // 🔥 V88.50: Ensure local keys are loaded BEFORE any call, especially on GitHub Pages
+            if (window.loadAIKeys) window.loadAIKeys();
 
             // 🤖 Step 1: Try AI Proxy (Keyless Mode)
             try {
@@ -4827,11 +4846,12 @@
 
         const auth = firebase.auth();
 
-        let usersData = [], worksData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {};
-        let reflectiveLogsCache = []; // Shared cache for Kanban and Table
-        let accessRequestsCache = []; // New V86.14
-        let pendingQuizzesCache = [];  // New V86.14
-        let pointsClaimedCache = [];   // New V86.14
+        var usersData = [], worksData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {};
+        var reflectiveLogsCache = []; 
+        var accessRequestsCache = []; 
+        var pendingQuizzesCache = [];  
+        var pointsClaimedCache = [];   
+        var quizAttemptsAllCache = []; // 🔥 V88.50: Global Cache for all attempts to fix visibility bug
         let hideCompletedWorks = true;
         let historyCache = []; let historyPage = 1; const HISTORY_PER_PAGE = 10;
         let archiveCache = []; let archivePage = 1; const ARCHIVE_PER_PAGE = 10;
@@ -5032,7 +5052,7 @@
             }
         }
 
-        let quizzesData = [];
+        var quizzesData = []; // V88.50: Changed to var for better global reliability across script tags
         let autoSaveTimer;
 
         async function openQuizModal(id = null) {
@@ -5538,17 +5558,15 @@
                             <i class="fa-solid fa-clock" style="color:#adb5bd; font-size:0.85em;"></i>
                             <input type="number" class="q-timer" value="${data ? (data.timer || 60) : (document.getElementById('quiz-set-all-timer') ? document.getElementById('quiz-set-all-timer').value : 60)}" style="width:40px; border:none; background:transparent; font-weight:800; text-align:center; font-size:0.9em; color:var(--primary); outline:none;">
                         </div>
-                    </div>
 
-                    <!-- Middle Section: AI & Input Tools (Balanced) -->
-                    <div style="display:flex; align-items:center; gap:8px; flex:1; justify-content:center; flex-wrap:wrap;">
-                            <!-- AI Model & Lang Group -->
+                        <!-- V88.52: Restored AI Toggles and Balanced Layout -->
+                        <div style="display:flex; align-items:center; gap:8px; flex:1; justify-content:center; flex-wrap:wrap;">
                             <div style="display:flex; align-items:center; gap:6px;">
                                 <div class="glass-toggle-container ai-model-toggle" style="background:rgba(0,0,0,0.02); padding:2px; gap:1px; border-radius:10px; border:none; box-shadow:none; transform:scale(0.85); transform-origin:left center;">
                                     <div class="glass-toggle-item active" data-value="gemini-1.5-flash-latest" onclick="selectAiToggle(this, 'gemini-1.5-flash-latest')" title="Gemini Flash">⚡ Gemini</div>
                                     <div class="glass-toggle-item" data-value="gpt-4o-mini" onclick="selectAiToggle(this, 'gpt-4o-mini')" title="GPT Smart">🟢 GPT</div>
                                     <div class="glass-toggle-item" data-value="claude-3-5-sonnet-latest" onclick="selectAiToggle(this, 'claude-3-5-sonnet-latest')" title="Claude">🎭 Claude</div>
-                                    <div class="glass-toggle-item" data-value="meta-llama/Meta-meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo-Turbo" onclick="selectAiToggle(this, 'meta-llama/Meta-meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo-Turbo')" title="Llama 3.1 70B">🌀 Llama</div>
+                                    <div class="glass-toggle-item" data-value="meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo" onclick="selectAiToggle(this, 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo')" title="Llama 3.1 70B">🌀 Llama</div>
                                 </div>
                                 <input type="hidden" class="ai-model-quiz" value="gemini-1.5-flash-latest">
 
@@ -5561,16 +5579,13 @@
 
                             <div style="width:1px; height:18px; background:#eee;"></div>
 
-                            <!-- AI Enhance with Vertical Key -->
-                            <div style="display:grid; grid-template-rows: auto auto; gap:4px; align-items:center;">
+                            <div style="display:flex; flex-direction:column; gap:4px; align-items:center;">
                                 <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Enhance" style="background:linear-gradient(135deg, var(--primary), #6366f1); color:white; padding:4px 14px; border:none; border-radius:12px; font-weight:bold; font-size:0.7em; display:flex; align-items:center; gap:6px; box-shadow:0 3px 10px rgba(67,97,238,0.25); height: 26px;">
                                     <i class="fa-solid fa-wand-magic-sparkles"></i> <span class="btn-text">Enhance</span>
                                 </button>
-                                <div style="display:flex; justify-content:center;">
-                                    <button type="button" class="btn-sm quick-api-key-btn" onclick="openQuickApiKeyPopup(this)" title="API Key" style="background:rgba(245,158,11,0.05); color:#d97706; padding:0 8px; border:none; font-weight:900; font-size:0.55em; display:flex; align-items:center; gap:2px; height:14px; opacity:0.8;">
-                                        <i class="fa-solid fa-key" style="font-size:0.8em;"></i> <span class="key-status">Key Management</span>
-                                    </button>
-                                </div>
+                                <button type="button" class="btn-sm quick-api-key-btn" onclick="openQuickApiKeyPopup(this)" title="API Key" style="background:none; color:#d97706; border:none; font-weight:bold; font-size:0.55em; display:flex; align-items:center; gap:3px; height:12px; opacity:0.7; cursor:pointer;">
+                                    <i class="fa-solid fa-key" style="font-size:0.8em;"></i> <span class="key-status">Key Management</span>
+                                </button>
                                 <input type="hidden" class="quick-api-key" value="">
                             </div>
                         </div>
@@ -5578,18 +5593,19 @@
 
                     <!-- Right Section: Instance Actions -->
                     <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
-                        <!-- Move Paste/Scan Here -->
-                        <div style="display:flex; align-items:center; gap:2px; background:rgba(255,255,255,0.7); padding:3px; border-radius:14px; border:1px solid #edf2f7; margin-right:4px;">
-                            <button type="button" onclick="triggerSmartPaste(this)" title="Smart Paste" style="width:28px; height:28px; border:none; background:transparent; color:var(--primary); cursor:pointer; font-size:1em; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-paste"></i></button>
-                            <button type="button" onclick="triggerAiVisionScan(this)" title="Scan Image" style="width:28px; height:28px; border:none; background:transparent; color:#e91e63; cursor:pointer; font-size:1em; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-camera"></i></button>
-                        </div>
-
                         <button type="button" class="btn-sm" onclick="copyQuestionToClipboard(this)" title="Copy Content" style="width:34px; height:34px; border-radius:12px; background:#fff; border:1.5px solid #edf2f7; color:#6366f1; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.02); transition:0.2s;" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='#edf2f7'">
                             <i class="fa-solid fa-copy" style="font-size:0.9em;"></i>
                         </button>
                         <button type="button" class="btn-sm" onclick="duplicateQuestion(this)" title="Clone Question" style="width:34px; height:34px; border-radius:12px; background:#fff; border:1.5px solid #edf2f7; color:#2ecc71; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.02); transition:0.2s;" onmouseover="this.style.borderColor='#2ecc71'" onmouseout="this.style.borderColor='#edf2f7'">
                             <i class="fa-solid fa-clone" style="font-size:0.9em;"></i>
                         </button>
+                        
+                        <!-- 🔥 V88.52: Paste/Scan Beside Delete -->
+                        <div style="display:flex; align-items:center; gap:1px; background:rgba(255,255,255,0.8); border:1px solid #edf2f7; padding:2px; border-radius:12px;">
+                            <button type="button" onclick="triggerSmartPaste(this)" title="Smart Paste" style="width:28px; height:28px; border:none; background:transparent; color:var(--primary); cursor:pointer;"><i class="fa-solid fa-paste"></i></button>
+                            <button type="button" onclick="triggerAiVisionScan(this)" title="Scan Image" style="width:28px; height:28px; border:none; background:transparent; color:#e91e63; cursor:pointer;"><i class="fa-solid fa-camera"></i></button>
+                        </div>
+
                         <button class="btn-sm btn-danger" onclick="if(confirm('Delete this question?')){this.closest('.quiz-q-item').remove(); updateQuizPagination();}" style="width:34px; height:34px; border-radius:12px; flex-shrink:0; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(239,35,60,0.15);" title="Remove Question"><i class="fa-solid fa-trash-can" style="font-size:0.9em;"></i></button>
                     </div>
                 </div>
@@ -6527,7 +6543,19 @@
 
         async function showQuizParticipants(quizId) {
             console.log("DEBUG: showQuizParticipants called with quizId:", quizId);
-            let quiz = quizzesData.find(x => x.id === quizId);
+            lastQuizIdForParticipants = quizId;
+            
+            // 🔥 V88.50: Open modal IMMEDIATELY to provide visual feedback, even if loading fails later
+            document.getElementById('quizParticipantsModal').style.display = 'block';
+            
+            const container = document.getElementById('quiz-participants-container');
+            const info = document.getElementById('quiz-participants-info');
+            const avgBadge = document.getElementById('quiz-avg-score-badge');
+            
+            container.innerHTML = "<div style='text-align:center; padding:20px;'><i class='fa-solid fa-circle-notch fa-spin'></i> Loading participants...</div>";
+            info.innerText = `Quiz ID: ${quizId}`; // Temporary fallback
+
+            let quiz = (typeof quizzesData !== 'undefined' && Array.isArray(quizzesData)) ? quizzesData.find(x => x.id === quizId) : null;
 
             if (!quiz) {
                 console.warn("Quiz not found in cache. Attempting direct fetch.");
@@ -6538,25 +6566,32 @@
             }
 
             if (!quiz) {
-                alert("Quiz data could not be loaded. Please refresh.");
+                container.innerHTML = `<div style="text-align:center; padding:50px; color:#ef233c;">
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size:2em; margin-bottom:15px;"></i>
+                    <p>Quiz data could not be loaded. Please refresh.</p>
+                    <button class="btn-sm" onclick="showQuizParticipants('${quizId}')">Retry</button>
+                </div>`;
                 return;
             }
 
-            document.getElementById('quizParticipantsModal').style.display = 'block';
-            const container = document.getElementById('quiz-participants-container');
-            const info = document.getElementById('quiz-participants-info');
-            const avgBadge = document.getElementById('quiz-avg-score-badge');
-            container.innerHTML = "<p>Loading participants...</p>";
             info.innerText = `Quiz: ${quiz.title}`;
 
-            lastQuizIdForParticipants = quizId;
-            document.getElementById('hideScoresToggle').checked = hideQuizScores;
-
             try {
-                // Fetch attempts for this quiz
-                const snap = await db.collection("quiz_attempts").where("quizId", "==", quizId).get();
-                const attempts = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-                    .sort((a, b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
+                // 🔥 V88.50: Try fetching from local cache FIRST for immediate display
+                let attempts = [];
+                if (typeof quizAttemptsAllCache !== 'undefined' && quizAttemptsAllCache.length > 0) {
+                    attempts = quizAttemptsAllCache.filter(a => a.quizId === quizId)
+                        .sort((a, b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
+                    console.log(`DEBUG: Found ${attempts.length} attempts in local cache.`);
+                }
+
+                if (attempts.length === 0) {
+                    console.log("DEBUG: Cache empty/no match, fetching from Firestore...");
+                    // Fetch attempts for this quiz directly if cache missed
+                    const snap = await db.collection("quiz_attempts").where("quizId", "==", quizId).get();
+                    attempts = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                        .sort((a, b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
+                }
 
                 if (attempts.length === 0) {
                     container.innerHTML = "<p style='text-align:center; padding:20px; color:#999;'>No one has taken this quiz yet.</p>";
@@ -8891,6 +8926,7 @@
                     if (qId) counts[qId] = (counts[qId] || 0) + 1;
                 });
                 window.quizCounts = counts;
+                quizAttemptsAllCache = allAttempts; // 🔥 V88.50: Sync with Global Cache for immediate Participant Modal loading
 
                 // 3. Refresh UI
                 renderQuizzes();
@@ -11382,11 +11418,8 @@
             const container = document.getElementById('laughtale-grid');
             if (!container) return;
             
-            // 🔥 V86.17: Automatic Laugh Tale - Show all logs with admin feedback, 
-            // but allow manual unarchiving (isArchived === false)
             const archived = reflectiveLogsCache.filter(l => {
                 const isReviewed = l.adminComment || (l.adminBonus !== undefined && l.adminBonus !== null);
-                // If it was manually hidden from Laugh Tale (isArchived === false), don't show it if it is not explicitly marked as Archived
                 if (l.isArchived === false) return false; 
                 return isReviewed || l.isArchived === true;
             }).sort((a,b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
@@ -11502,10 +11535,10 @@ ${i+1}. **${s.author}** (${s.date.toLocaleDateString('th-TH')})
 ✨ **เขียนแบบนักวรรณกรรม:** ใช้ภาษาสร้างสรรค์ อุปมาอุปไมย์ และมองโลกในมุมมองที่ลึกซึ้ง`;
 
             try {
-                const response = await callUniversalAI(prompt, activeModel, 'laughtale-analysis');
+                const response = await callUniversalAI(activeModel, prompt);
                 document.getElementById('ai-storyteller-content').innerHTML = `
                     <div style="white-space: pre-line; line-height:1.8; font-size:1.05em;">
-                        ${response}
+                        ${response.text}
                     </div>
                 `;
             } catch (error) {
@@ -11560,10 +11593,10 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 ✨ **วิเคราะห์แบบโหราศาสตร์:** ใช้ภาษาลึกลับ มองหาความเชื่อมโยงที่มองไม่เห็น`;
 
             try {
-                const response = await callUniversalAI(prompt, activeModel, 'laughtale-patterns');
+                const response = await callUniversalAI(activeModel, prompt);
                 document.getElementById('ai-storyteller-content').innerHTML = `
                     <div style="white-space: pre-line; line-height:1.8; font-size:1.05em;">
-                        ${response}
+                        ${response.text}
                     </div>
                 `;
             } catch (error) {
@@ -11646,13 +11679,13 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
             try {
                 const activeModel = document.getElementById('laughtale-ai-model').value;
-                const response = await callUniversalAI(prompt, activeModel, 'laughtale-comment');
+                const response = await callUniversalAI(activeModel, prompt);
                 commentSection.innerHTML = `
                     <div style="font-size:0.75em; font-weight:bold; color:#667eea; text-transform:uppercase; margin-bottom:8px;">
                         <i class="fa-solid fa-feather"></i> AI Storyteller's Whisper
                     </div>
                     <div style="font-size:0.85em; color:#555; font-style:italic; line-height:1.5;">
-                        ${response}
+                        ${response.text}
                     </div>
                 `;
             } catch (error) {
