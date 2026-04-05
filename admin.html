@@ -4806,25 +4806,30 @@
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>' + (btn.offsetWidth > 60 ? ' Processing...' : '');
                 
+                let taskPrompt = `Translate the following multiple-choice question and its options from Thai to professional, high-quality ${targetLang}.`;
+                if (targetLang === 'Typhoon') {
+                    taskPrompt = `As a Thai language and curriculum expert (Typhoon AI), enhance and polish the following Thai multiple-choice question. Refine the wording to be more professional, medical/technical as appropriate, and ensure cultural accuracy.`;
+                }
+
                 const prompt = `You are an expert educator. Your task is to:
-                1. Translate the following multiple-choice question and its options from Thai to professional, high-quality ${targetLang}.
+                1. ${taskPrompt}
                 2. Enhance the options to make them more challenging and professional (avoid obvious distractors).
                 3. Maintain the logical meaning of the original question and the correct answers.
                 
-                Original Thai Question: "${questionText}"
+                Original Question: "${questionText}"
                 Original Options: ${JSON.stringify(options)}
                 The current correct option index is: ${JSON.stringify(correctIndices)} (0-indexed)
                 
                 IMPORTANT: YOUR OUTPUT MUST BE ONLY A RAW JSON STRING WITHOUT ANY MARKDOWN CODE BLOCKS OR OTHER EXPLANATIONS.
                 {
-                  "question": "${targetLang} version of the question",
-                  "options": ["Enhanced ${targetLang} Opt 1", "Enhanced ${targetLang} Opt 2", ...],
+                  "question": "Enhanced version of the question",
+                  "options": ["Enhanced Opt 1", "Enhanced Opt 2", ...],
                   "correctIndices": [indices of correct answers in the new list]
                 }
-                If the order of options changes, make sure "correctIndices" points at the ${targetLang} translated version of the original correct answers.`;
+                If the order of options changes, make sure "correctIndices" points at the corresponding version of the original correct answers.`;
                 
                 // Use quick API key if provided, otherwise use stored keys
-                const { text: aiResponse } = await window.callUniversalAI(selectedModelName, prompt, true, quickApiKey);
+                const { text: aiResponse } = await window.callUniversalAI(selectedModelName, prompt, true, null, quickApiKey);
                 
                 // Robust parsing for JSON
                 let cleanJson = aiResponse.trim();
