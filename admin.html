@@ -4004,32 +4004,29 @@
                     }
                 }
             } catch (e) {
-                document.getElementById('login-error').innerText = "LINE Error: " + e.message;
             }
         }
 
-        // 🔥 Magic Link Logic (Replaces Google Sign-In)
-        function sendMagicLink() {
+        // Magic Link Logic (Replaces Google Sign-In)
+        window.sendMagicLink = function() {
             const email = document.getElementById('email-input').value;
             if (email !== ALLOWED_EMAIL) {
-                alert("❌ Access Denied: Email not authorized.");
+                alert(" Access Denied: Email not authorized.");
                 return;
             }
-
-            const actionCodeSettings = {
-                url: MY_URL,
+            auth.sendSignInLinkToEmail(email, {
+                url: window.location.href,
                 handleCodeInApp: true
-            };
-
-            auth.sendSignInLinkToEmail(email, actionCodeSettings)
-                .then(() => {
-                    window.localStorage.setItem('emailForSignIn', email);
-                    alert("✅ Link Sent! Check your email to login.");
-                })
-                .catch((error) => {
-                    document.getElementById('login-error').innerText = "Error: " + error.message;
-                });
-        }
+            })
+            .then(() => {
+                localStorage.setItem('emailForSignIn', email);
+                alert(' Magic link sent! Check your email.');
+            })
+            .catch((error) => {
+                console.error("Magic Link Error:", error);
+                alert("Error sending magic link: " + error.message);
+            });
+        };
 
         // Check for Magic Link on Load
         if (auth.isSignInWithEmailLink(window.location.href)) {
