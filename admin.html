@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V88.82)</title>
-    <!-- V88.82: Added visual highlight for current question being edited -->
-    <!-- Release: 2026-04-05 21:05 UTC+7 -->
+    <title>Intern Admin Portal (V88.83)</title>
+    <!-- V88.83: Added AI language detection and custom regeneration options -->
+    <!-- Release: 2026-04-05 21:10 UTC+7 -->
 
     <style>
         /* Hide Spinners/Controllers for q-timer */
@@ -4101,6 +4101,16 @@
             const existingQs = formData.questions.map((q, i) => `Q${i+1}: ${q.q}`).join('\n');
             const quizTitle = document.getElementById('quiz-title').value;
             
+            // Detect language from existing questions
+            const detectLanguage = (text) => {
+                const thaiRegex = /[\u0E00-\u0E7F]/;
+                return thaiRegex.test(text) ? 'Thai' : 'English';
+            };
+            
+            const primaryLanguage = formData.questions.length > 0 
+                ? detectLanguage(formData.questions[0].q)
+                : 'Thai';
+            
             try {
                 btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Brainstorming...`;
                 btn.disabled = true;
@@ -4113,7 +4123,7 @@
                 --- QUALITY REQUIREMENTS ---
                 - Difficulty: ${diff.toUpperCase()} - Make questions genuinely challenging, not just harder vocabulary
                 - Focus: ${focus.replace('_', ' ').toUpperCase()} - Create deeper learning opportunities
-                - Language: Thai (Mandatory)
+                - Language: ${primaryLanguage} (Mandatory - match existing questions)
                 - CRITICAL: Questions must test UNDERSTANDING, not just memorization
                 - Include real-world scenarios, critical thinking, and application
                 - Distractors must be conceptually plausible but clearly incorrect
@@ -4157,6 +4167,88 @@
             }
         };
 
+        window.regenerateSuggestions = async function(focusType) {
+            const formData = getQuizFormData();
+            const existingQs = formData.questions.map((q, i) => `Q${i+1}: ${q.q}`).join('\n');
+            const quizTitle = document.getElementById('quiz-title').value;
+            const n = 3; // Keep same number
+            
+            // Detect language from existing questions
+            const detectLanguage = (text) => {
+                const thaiRegex = /[\u0E00-\u0E7F]/;
+                return thaiRegex.test(text) ? 'Thai' : 'English';
+            };
+            
+            const primaryLanguage = formData.questions.length > 0 
+                ? detectLanguage(formData.questions[0].q)
+                : 'Thai';
+            
+            // Build custom prompt based on focus type
+            let customPrompt = '';
+            switch(focusType) {
+                case 'harder':
+                    customPrompt = 'Make questions SIGNIFICANTLY harder - add complex scenarios, multi-step reasoning, and advanced concepts. Remove any simple recall questions.';
+                    break;
+                case 'analytical':
+                    customPrompt = 'Focus on CRITICAL THINKING and ANALYSIS - create questions requiring data interpretation, logical reasoning, evidence evaluation, and problem-solving skills.';
+                    break;
+                case 'practical':
+                    customPrompt = 'Emphasize REAL-WORLD APPLICATION - include clinical scenarios, practical examples, case studies, and hands-on problem-solving contexts.';
+                    break;
+                case 'creative':
+                    customPrompt = 'Generate INNOVATIVE and CREATIVE questions - use hypothetical scenarios, "what if" situations, and novel approaches to test deeper understanding.';
+                    break;
+                case 'custom':
+                    customPrompt = document.getElementById('custom-prompt-input').value || 'Create high-quality questions';
+                    break;
+            }
+            
+            const prompt = `You are an expert educational assessment designer. Create exactly ${n} HIGH-QUALITY questions for "${quizTitle}".
+            
+            --- EXISTING QUESTIONS ---
+            ${existingQs}
+            
+            --- SPECIAL FOCUS ---
+            ${customPrompt}
+            
+            --- QUALITY REQUIREMENTS ---
+            - Language: ${primaryLanguage} (Mandatory - match existing questions)
+            - Questions must test UNDERSTANDING, not just memorization
+            - Include real-world scenarios and critical thinking
+            - Distractors must be conceptually plausible but clearly incorrect
+            - Each question should have educational value beyond the existing ones
+            
+            JSON SCHEMA:
+            [
+              {
+                "q": "Challenging question text...",
+                "type": "choice",
+                "options": ["Option A", "Option B", "Option C", "Option D"],
+                "correct": [0],
+                "timer": 60,
+                "explanation": "Detailed explanation..."
+              }
+            ]`;
+
+            try {
+                showToast(" Regenerating with custom focus...");
+                const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-2.5-pro-preview-05-06';
+                const { text: resultRaw } = await callUniversalAI(selectedModel, prompt, true);
+                const cleanJson = resultRaw.replace(/```json/g, "").replace(/```/g, "").trim();
+                const suggestions = JSON.parse(cleanJson);
+                
+                // Close current popup and show new suggestions
+                const popup = document.getElementById('ai-suggestions-popup');
+                if (popup) popup.remove();
+                
+                showAiSuggestionsPopup(suggestions);
+                
+            } catch(e) {
+                console.error(e);
+                alert("Regeneration error: " + e.message);
+            }
+        };
+
         window.showAiSuggestionsPopup = function(suggestions) {
             const resultDiv = document.createElement('div');
             resultDiv.id = "ai-suggestions-popup";
@@ -4181,32 +4273,6 @@
                                 </div>
                             `).join('')}
                         </div>
-                        ${q.explanation ? `<div style="margin-top:15px; font-size:0.8em; color:#64748b; background:#f1f5f9; padding:10px; border-radius:10px; border-left:4px solid #8e44ad;">💡 <b>Explanation:</b> ${q.explanation}</div>` : ''}
-                    </div>
-                `;
-            }).join('');
-
-            resultDiv.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
-                    <div>
-                        <h2 style="margin:0; color:#1e293b; font-size:1.8em; font-weight:900;"><i class="fa-solid fa-sparkles" style="color:#f59e0b;"></i> AI Suggested Questions</h2>
-                        <p style="margin:5px 0 0 0; color:#64748b; font-size:0.9em; font-weight:500;">Review and add any of these to your quiz collection.</p>
-                    </div>
-                    <button onclick="this.parentElement.parentElement.remove()" style="border:none; background:#f1f5f9; color:#64748b; width:40px; height:40px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center; transition:all 0.2s;" onmouseover="this.style.background='#e2e8f0'">✕</button>
-                </div>
-                
-                <div style="margin-bottom:20px;">
-                    ${itemsHtml}
-                </div>
-
-                <div style="text-align:center; padding-top:10px;">
-                    <button class="btn-sm btn-dark" onclick="this.parentElement.parentElement.remove()" style="padding:12px 40px; border-radius:16px; font-weight:800; font-size:1em; box-shadow:0 10px 20px rgba(0,0,0,0.1);">Close Suggestions</button>
-                </div>
-            `;
-
-            document.body.appendChild(resultDiv);
-        };
-
         window.callUniversalAI = async function(modelName, prompt, isJson = false, visionData = null, quickApiKey = '') {
             const PROXY_SECRET = "mlp-secret-8888";
             const PROXY_URL = "https://mlp-int.work/api/ai"; 
@@ -10634,32 +10700,39 @@
 
                         let arrows = `<div class="arrow-controls">`;
                         if (q.status !== 'Backlog') arrows += `<button class="btn-arrow" onclick="moveCard('${id}','prev')"><i class="fa-solid fa-chevron-left"></i></button>`;
-                        if (q.status !== 'Done') arrows += `<button class="btn-arrow" onclick="moveCard('${id}','next')"><i class="fa-solid fa-chevron-right"></i></button>`;
-                        arrows += `</div>`;
 
-                        const pColor = q.priority === 'High' ? '#ef233c' : (q.priority === 'Medium' ? '#ff9f1c' : '#17a2b8');
-                        const descId = 'admin-sq-desc-' + id;
-                        const descHtml = q.description ? `
-                            <div onclick="toggleSqDesc('${descId}')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:#f1f3f5; padding:4px 8px; border-radius:6px; margin-top:5px; font-size:0.75em; color:#555;">
-                                <span><i class="fa-solid fa-align-left"></i> Description</span>
-                                <i id="icon-${descId}" class="fa-solid fa-chevron-down"></i>
-                            </div>
-                            <div id="${descId}" style="display:none; font-size:0.8em; color:#666; margin-bottom:5px; white-space:pre-wrap; background:#fafafa; padding:8px; border-radius:6px; border:1px solid #eee;">${q.description}</div>
-                        ` : "";
+                cnt["Review"]++;
+                const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
+                const d = document.createElement('div');
+                d.className = 'kanban-card card-Review reflective-card';
+                d.style.borderLeft = "4px solid #d35400";
+                d.style.background = "#fffcf5";
+                
+                const uName = (log.userName || log.displayName || 'Unknown').replace(/'/g, "");
+                d.innerHTML = `
+                    <div class="card-header-row">
+                        <span class="badge" style="background:#d35400;">Reflective</span>
+                        <div class="card-header-right"><img src="${log.pictureUrl || ''}" class="assignee-img" title="${log.userName || ''}"></div>
+                    </div>
+                    <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${log.userName || log.displayName || 'Unknown'}</div>
+                    <div style="font-size:0.85em; color:#444; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${moodEmoji} ${log.content || ''}</div>
+                    <div style="margin-top:8px;">
+                        <button class="btn-sm" style="width:100%; background:#d35400; color:white; border:none;" onclick="event.stopPropagation(); reviewReflective('${log.id}')">
+                            <i class="fa-solid fa-comment-dots"></i> Review & Score
+                        </button>
+                    </div>
+                `;
+                cols["Review"].appendChild(d);
+            }
+        });
+    } catch (e) { console.error("Kanban Section 2 Error:", e); }
 
-                        d.innerHTML = `
-                            <div class="card-header-row">
-                                <span class="badge" style="background:${pColor}">${q.priority || 'Medium'}</span>
-                                <div class="card-header-right">${imgs} ${arrows}</div>
-                            </div>
-                            <div style="font-weight:bold;">${isProj ? '<span class="badge" style="background:#e83e8c;font-size:0.6em;">PROJ</span>' : ''} ${q.title}</div>
-                            <div class="card-timers">${timersHtml}</div>
-                            ${descHtml}
-                            <div class="card-tool-row">
-                                <button class="btn-sm btn-warning" onclick="openTaskModal('${id}')"><i class="fa-solid fa-pen"></i></button>
-                                <button class="btn-sm btn-danger" onclick="startDeleteCard('${id}')"><i class="fa-solid fa-trash"></i></button>
-                            </div>
-                            ${act}`;
+    // 3. Render Pending General Works in "Review"
+    try {
+        worksData.forEach(work => {
+            const isPending = work.status !== 'ตรวจแล้ว';
+            if (isPending && !work.isQuiz && !work.isPollResponse) {
+                if (filter && !(work.title || "").toLowerCase().includes(filter) && !(work.displayName || '').toLowerCase().includes(filter)) return;
                         cols[q.status].appendChild(d);
                     }
                 });
