@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V88.83)</title>
-    <!-- V88.83: Added AI language detection and custom regeneration options -->
-    <!-- Release: 2026-04-05 21:10 UTC+7 -->
+    <title>Intern Admin Portal (V88.84)</title>
+    <!-- V88.84: Added timeout handling for Claude AI analyze requests -->
+    <!-- Release: 2026-04-05 21:15 UTC+7 -->
 
     <style>
         /* Hide Spinners/Controllers for q-timer */
@@ -3825,7 +3825,18 @@
                 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-2.5-pro-preview-05-06';
                 
-                const { text: resultRaw, tokens: aiTokens, model: aiModel } = await callUniversalAI(selectedModel, prompt, true);
+                let resultRaw, aiTokens, aiModel;
+                try {
+                    const result = await callUniversalAI(selectedModel, prompt, true);
+                    resultRaw = result.text;
+                    aiTokens = result.tokens;
+                    aiModel = result.model;
+                } catch (timeoutError) {
+                    if (timeoutError.name === 'AbortError' || timeoutError.message.includes('timeout')) {
+                        throw new Error('Analysis timeout - please try again with a shorter quiz or different AI model');
+                    }
+                    throw timeoutError;
+                }
                 
                 let result;
                 try {
@@ -4296,31 +4307,37 @@
                     proxyProvider = "openai";
                 } else if (modelName.includes('typhoon')) {
                     proxyProvider = "typhoon";
-                } else if (modelName.includes('llama')) {
-                    proxyProvider = "together";
-                }
 
-                if (proxyProvider !== "") {
-                    console.log(`🚀 [Proxy] AI Request [${modelName}]: ${typeof prompt === 'string' ? prompt.substring(0, 50) : "[Object]"}...`);
-                    const proxyResponse = await fetch(PROXY_URL, {
-                        method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'x-mlp-secret': PROXY_SECRET
-                        },
-                        body: JSON.stringify({
-                            provider: proxyProvider,
-                            model: modelName,
-                            prompt: prompt,
-                            isJson: isJson,
-                            visionData: visionData
-                        })
-                    });
+window.showAiSuggestionsPopup = function(suggestions) {
+    const resultDiv = document.createElement('div');
+    resultDiv.id = "ai-suggestions-popup";
+    resultDiv.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:800px; max-height:85vh; background:#f8fafc; padding:30px; border-radius:32px; box-shadow:0 30px 80px rgba(0,0,0,0.3); z-index:10002; overflow-y:auto; font-family:'Inter', sans-serif; border: 1px solid #fff;";
+    
+    let itemsHtml = suggestions.map((q, i) => {
+        const qJson = JSON.stringify(q).replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        return `
+            <div style="background:white; border:1px solid #e2e8f0; border-radius:20px; padding:20px; margin-bottom:15px; box-shadow:0 4px 6px rgba(0,0,0,0.02); transition:transform 0.2s;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+                    <span style="background:#8e44ad; color:white; padding:4px 10px; border-radius:8px; font-size:0.75em; font-weight:800;">Suggested Q${i+1}</span>
+                    <button class="btn-sm" style="background:#22c55e; color:white; border:none; padding:8px 16px; border-radius:12px; font-weight:800; font-size:0.85em; cursor:pointer; box-shadow:0 4px 12px rgba(34,197,94,0.3);" 
+                        onclick="addQuestionUI(${qJson}); this.disabled=true; this.style.background='#94a3b8'; this.innerHTML='<i class=&quot;fa-solid fa-check&quot;></i> Added'; showToast('Question added!');">
+                        <i class="fa-solid fa-plus"></i> Add to Quiz
+                    </button>
+                </div>
+                <div style="font-weight:800; color:#1e293b; font-size:1.05em; margin-bottom:15px; line-height:1.4;">${q.q}</div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    ${q.options.map((opt, optIdx) => `
+                        <div style="font-size:0.85em; padding:8px 12px; border-radius:10px; background:${q.correct.includes(optIdx) ? '#ecfdf5' : '#f8fafc'}; color:${q.correct.includes(optIdx) ? '#059669' : '#64748b'}; border:1px solid ${q.correct.includes(optIdx) ? '#10b981' : '#e2e8f0'}; font-weight:${q.correct.includes(optIdx) ? '700' : '500'};">
+                            ${String.fromCharCode(65 + optIdx)}. ${opt}
+                        </div>
+                    `).join('')}
+                </div>
+window.callUniversalAI = async function(modelName, prompt, isJson = false, visionData = null, quickApiKey = '') {
+    const PROXY_SECRET = "mlp-secret-8888";
+    const PROXY_URL = "https://mlp-int.work/api/ai"; 
 
-                    if (proxyResponse.ok) {
-                        const proxyData = await proxyResponse.json();
-                        updateAIUsage(proxyProvider, proxyData.tokens || 0);
-                        return { text: proxyData.text, tokens: proxyData.tokens || 0, model: proxyData.model || modelName };
+    // Ensure local keys are loaded BEFORE any call, especially on GitHub Pages
+    if (window.loadAIKeys) window.loadAIKeys();
                     } else {
                         let errorText = "";
                         // Read as text first to avoid "stream already read" if we try json() later
