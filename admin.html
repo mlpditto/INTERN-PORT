@@ -5909,7 +5909,10 @@
 
                 <div class="options-actions" style="display:${qType === 'choice' ? 'block' : 'none'}; margin-bottom:15px;">
                     <div style="display:flex; align-items:center; gap:12px; justify-content:space-between;">
-                        <button type="button" class="btn-sm" onclick="addOption(this)" style="padding:6px 20px; background:#fff; color:var(--primary); border:1.5px solid var(--primary); border-radius:12px; font-weight:900; font-size:0.8em; transition:all 0.2s; box-shadow:0 4px 10px rgba(99,102,241,0.05);" onmouseover="this.style.background='var(--primary)'; this.style.color='white';"><i class="fa-solid fa-plus"></i> Add Option</button>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <button type="button" class="btn-sm" onclick="addOption(this)" style="padding:6px 20px; background:#fff; color:var(--primary); border:1.5px solid var(--primary); border-radius:12px; font-weight:900; font-size:0.8em; transition:all 0.2s; box-shadow:0 4px 10px rgba(99,102,241,0.05);" onmouseover="this.style.background='var(--primary)'; this.style.color='white';"><i class="fa-solid fa-plus"></i> Add Option</button>
+                            <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Magic - enhance this question" style="padding:6px 16px; background:linear-gradient(135deg, #8b5cf6, #7c3aed); color:white; border:none; border-radius:12px; font-weight:900; font-size:0.75em; transition:all 0.2s; box-shadow:0 4px 10px rgba(139,92,246,0.25);" onmouseover="this.style.background='linear-gradient(135deg, #7c3aed, #6d28d9)';" onmouseout="this.style.background='linear-gradient(135deg, #8b5cf6, #7c3aed)';"><i class="fa-solid fa-wand-magic-sparkles"></i> Magic</button>
+                        </div>
                         <div style="display:flex; align-items:center; gap:8px;">
                             <div style="display:flex; align-items:center; gap:3px; background:#f8fafc; padding:2px 8px; border-radius:8px; border:1px solid #edf2f7;" title="Seconds per Q">
                                 <i class="fa-solid fa-stopwatch" style="color:#6366f1; font-size:0.7em;"></i>
@@ -5992,7 +5995,7 @@
             }
 
             optCont.style.display = (type === 'choice' || type === 'ordering' || type === 'flashcard') ? 'flex' : 'none';
-            optAct.style.display = (type === 'choice' || type === 'ordering') ? 'block' : 'none';
+            optAct.style.display = (type === 'choice' || type === 'ordering' || type === 'flashcard' || type === 'short_answer') ? 'block' : 'none';
 
             // Flashcard: Only 2 options (True/False)
             if (type === 'flashcard') {
@@ -6001,12 +6004,20 @@
                 addOption(el, "❌ False / Incorrect");
                 // Set default timer for flashcard
                 item.querySelector('.q-timer').value = 5;
+                // Add AI button to flashcard
+                item.querySelector('.options-actions').innerHTML = `
+                    <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Magic - enhance this question" style="padding:6px 16px; background:linear-gradient(135deg, #8b5cf6, #7c3aed); color:white; border:none; border-radius:12px; font-weight:900; font-size:0.75em; transition:all 0.2s; box-shadow:0 4px 10px rgba(139,92,246,0.25);" onmouseover="this.style.background='linear-gradient(135deg, #7c3aed, #6d28d9)';" onmouseout="this.style.background='linear-gradient(135deg, #8b5cf6, #7c3aed)';"><i class="fa-solid fa-wand-magic-sparkles"></i> Magic</button>
+                    <small style="margin-left:10px; color:#666; font-size:0.8em;">Flashcard: True/False</small>
+                `;
             }
 
             if (type === 'ordering') {
                 item.querySelector('.options-actions').innerHTML = `
-                    <button type="button" class="btn-sm" onclick="addOption(this)" style="width:auto; padding:5px 15px; background:#e9f5ff; color:#007bff; border:1px solid #b8daff;"><i class="fa-solid fa-plus"></i> Add Step</button>
-                    <small style="margin-left:10px; color:#2e7d32; font-weight:bold;">💡 Correct Order is Top to Bottom</small>
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <button type="button" class="btn-sm" onclick="addOption(this)" style="width:auto; padding:5px 15px; background:#e9f5ff; color:#007bff; border:1px solid #b8daff;"><i class="fa-solid fa-plus"></i> Add Step</button>
+                        <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Magic - enhance this question" style="padding:5px 15px; background:linear-gradient(135deg, #8b5cf6, #7c3aed); color:white; border:none; border-radius:10px; font-weight:900; font-size:0.75em; transition:all 0.2s; box-shadow:0 4px 10px rgba(139,92,246,0.25);" onmouseover="this.style.background='linear-gradient(135deg, #7c3aed, #6d28d9)';" onmouseout="this.style.background='linear-gradient(135deg, #8b5cf6, #7c3aed)';"><i class="fa-solid fa-wand-magic-sparkles"></i> Magic</button>
+                        <small style="color:#2e7d32; font-weight:bold;">💡 Correct Order is Top to Bottom</small>
+                    </div>
                 `;
             } else if (type !== 'flashcard' && type !== 'short_answer') {
                 item.querySelector('.options-actions').innerHTML = `
@@ -6014,7 +6025,9 @@
                     <small style="margin-left:10px; color:#666; font-size:0.8em;">(Tick the circle to set as correct answer)</small>
                 `;
             } else if (type === 'short_answer') {
-                item.querySelector('.options-actions').innerHTML = "";
+                item.querySelector('.options-actions').innerHTML = `
+                    <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Magic - enhance this question" style="padding:6px 16px; background:linear-gradient(135deg, #8b5cf6, #7c3aed); color:white; border:none; border-radius:12px; font-weight:900; font-size:0.75em; transition:all 0.2s; box-shadow:0 4px 10px rgba(139,92,246,0.25);" onmouseover="this.style.background='linear-gradient(135deg, #7c3aed, #6d28d9)';" onmouseout="this.style.background='linear-gradient(135deg, #8b5cf6, #7c3aed)';"><i class="fa-solid fa-wand-magic-sparkles"></i> Magic</button>
+                `;
             }
 
             updatePollUI();
