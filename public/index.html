@@ -796,6 +796,22 @@
                 </div>
             </div>
 
+            <!-- Quiz Feedback Section -->
+            <div id="section-quiz-feedback" style="margin-bottom: 20px;">
+                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #28a745;">
+                    <div onclick="toggleQuizFeedback()"
+                        style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #f0fff4;">
+                        <h4 style="margin: 0; font-size: 1.1em; color: #28a745;"><i class="fa-solid fa-chart-line"></i> Quiz Feedback ผลการเรียนรู้</h4>
+                        <i id="quiz-feedback-icon" class="fa-solid fa-chevron-down" style="color: #28a745; transition: 0.3s; font-size: 0.9em;"></i>
+                    </div>
+                    <div id="quiz-feedback-content" style="display: none; padding: 15px; border-top: 1px solid #f0f0f0; background: #fff;">
+                        <div id="quiz-feedback-container">
+                            <!-- Quiz feedback will be injected here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="section-kanban" style="margin-bottom: 20px;">
                 <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #333;">
                     <div onclick="toggleKanban()"
@@ -3962,6 +3978,188 @@
             } else {
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function toggleQuizFeedback() {
+            const content = document.getElementById('quiz-feedback-content');
+            const icon = document.getElementById('quiz-feedback-icon');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.style.transform = 'rotate(180deg)';
+                loadQuizFeedback();
+            } else {
+                content.style.display = 'none';
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        async function loadQuizFeedback() {
+            const container = document.getElementById('quiz-feedback-container');
+            container.innerHTML = '<div style="text-align:center; padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading feedback...</div>';
+            
+            try {
+                // Get user's quiz attempts
+                const attemptsSnapshot = await db.collection("quiz_attempts")
+                    .where("userId", "==", userId)
+                    .where("status", "in", ["completed", "graded"])
+                    .orderBy("submittedAt", "desc")
+                    .limit(10)
+                    .get();
+                
+                if (attemptsSnapshot.empty) {
+                    container.innerHTML = `
+                        <div style="text-align:center; padding:30px; color:#999;">
+                            <i class="fa-solid fa-chart-line" style="font-size:3em; margin-bottom:10px; opacity:0.3;"></i>
+                            <div style="font-weight:bold; margin-bottom:5px;">ยังไม่มีผลการเรียนรู้</div>
+                            <div style="font-size:0.9em;">ทำข้อสอบเพื่อดู feedback และวิเคราะห์การเรียนรู้ของคุณ</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let feedbackHTML = '';
+                const attempts = attemptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // Generate feedback for each attempt
+                for (const attempt of attempts) {
+                    const quiz = quizzesCache.find(q => q.id === attempt.quizId);
+                    if (!quiz) continue;
+                    
+                    const score = attempt.score || 0;
+                    const totalScore = attempt.totalScore || quiz.totalScore || 100;
+                    const percentage = Math.round((score / totalScore) * 100);
+                    const submittedAt = attempt.submittedAt ? attempt.submittedAt.toDate().toLocaleString('th-TH', { 
+                        day: 'numeric', 
+                        month: 'short', 
+                        year: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    }) : '-';
+                    
+                    const scoreColor = percentage >= 80 ? '#28a745' : percentage >= 60 ? '#ffc107' : '#dc3545';
+                    const scoreIcon = percentage >= 80 ? 'fa-trophy' : percentage >= 60 ? 'fa-star' : 'fa-redo';
+                    
+                    feedbackHTML += `
+                        <div style="background:#f8f9fa; border-radius:12px; padding:15px; margin-bottom:15px; border-left:4px solid ${scoreColor};">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <div style="font-weight:bold; color:#333; font-size:1em;">${quiz.shortTitle || quiz.title || 'Quiz'}</div>
+                                <div style="color:#999; font-size:0.8em;">${submittedAt}</div>
+                            </div>
+                            
+                            <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                                <div style="background:${scoreColor}; color:white; padding:5px 12px; border-radius:20px; font-weight:bold; font-size:0.9em;">
+                                    <i class="fa-solid ${scoreIcon}"></i> ${score}/${totalScore} (${percentage}%)
+                                </div>
+                                <div style="font-size:0.8em; color:#666;">
+                                    ${attempt.isPractice ? '<span style="background:#e3f2fd; color:#1976d2; padding:2px 8px; border-radius:10px;">Practice</span>' : '<span style="background:#fff3e0; color:#f57c00; padding:2px 8px; border-radius:10px;">Official</span>'}
+                                </div>
+                            </div>
+                            
+                            <div style="margin-bottom:10px;">
+                                <div style="font-size:0.85em; font-weight:bold; color:#555; margin-bottom:5px;">💡 คำแนะนำการพัฒนา:</div>
+                                <div id="feedback-${attempt.id}" style="font-size:0.9em; color:#666; line-height:1.4; padding:10px; background:#fff; border-radius:8px;">
+                                    <i class="fa-solid fa-spinner fa-spin"></i> กำลังวิเคราะห์ผลการเรียนรู้...
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                container.innerHTML = feedbackHTML;
+                
+                // Generate AI feedback for each attempt
+                for (const attempt of attempts) {
+                    const quiz = quizzesCache.find(q => q.id === attempt.quizId);
+                    if (!quiz) continue;
+                    
+                    setTimeout(() => {
+                        generateQuizFeedback(attempt, quiz);
+                    }, 500);
+                }
+                
+            } catch (error) {
+                console.error("Error loading quiz feedback:", error);
+                container.innerHTML = `
+                    <div style="text-align:center; padding:20px; color:#dc3545;">
+                        <i class="fa-solid fa-exclamation-triangle"></i>
+                        <div>ไม่สามารถโหลด feedback ได้</div>
+                    </div>
+                `;
+            }
+        }
+
+        async function generateQuizFeedback(attempt, quiz) {
+            const feedbackEl = document.getElementById(`feedback-${attempt.id}`);
+            if (!feedbackEl) return;
+            
+            try {
+                // Analyze performance
+                const score = attempt.score || 0;
+                const totalScore = attempt.totalScore || quiz.totalScore || 100;
+                const percentage = Math.round((score / totalScore) * 100);
+                
+                // Get quiz questions for analysis
+                const questions = quiz.questions || [];
+                const userAnswers = attempt.answers || {};
+                
+                // Analyze correct/incorrect answers
+                let correctCount = 0;
+                let incorrectQuestions = [];
+                
+                questions.forEach((q, index) => {
+                    const userAnswer = userAnswers[index];
+                    const correctAnswers = Array.isArray(q.correct) ? q.correct : [q.correct];
+                    
+                    if (correctAnswers.includes(userAnswer)) {
+                        correctCount++;
+                    } else {
+                        incorrectQuestions.push({
+                            index: index + 1,
+                            question: q.question,
+                            userAnswer: userAnswer,
+                            correctAnswer: correctAnswers,
+                            explanation: q.explanation
+                        });
+                    }
+                });
+                
+                // Generate AI feedback
+                const feedbackPrompt = `จากผลการทำข้อสอดความ "${quiz.shortTitle || quiz.title}" คะแนน ${score}/${totalScore} (${percentage}%) ถูก ${correctCount}/${questions.length} ข้อ
+
+${incorrectQuestions.length > 0 ? `ข้อที่ตอบผิด:
+${incorrectQuestions.slice(0, 3).map(q => `- ข้อ ${q.index}: ${q.question.substring(0, 50)}...`).join('\n')}` : 'ทำข้อสอบได้คะแนนสูง!'}
+
+กรุณาวิเคราะห์และให้คำแนะนำ:
+1. จุดเด่นและสิ่งที่ทำได้ดี
+2. ปรับปรุงในส่วนที่ต้องการพัฒนา
+3. แนวทางการเรียนรู้ต่อ
+4. คำปรึกษาเป็นกำลังใจ
+
+ตอบเป็นภาษาไทย ไม่เกิน 200 ตัวอักษร กระชับและมีประโยชน์`;
+
+                const response = await callUniversalAI('gemini-3-flash-preview', feedbackPrompt);
+                
+                feedbackEl.innerHTML = `
+                    <div style="color:#28a745; font-weight:600; margin-bottom:8px;">
+                        <i class="fa-solid fa-lightbulb"></i> ${response.text}
+                    </div>
+                    ${incorrectQuestions.length > 0 ? `
+                        <div style="margin-top:8px; padding-top:8px; border-top:1px solid #e9ecef;">
+                            <div style="font-size:0.8em; color:#666;">
+                                <i class="fa-solid fa-redo"></i> แนะนำ: ทบทวน ${incorrectQuestions.length} ข้อที่ตอบผิดเพื่อพัฒนาการเรียนรู้
+                            </div>
+                        </div>
+                    ` : ''}
+                `;
+                
+            } catch (error) {
+                console.error("Error generating feedback:", error);
+                feedbackEl.innerHTML = `
+                    <div style="color:#666;">
+                        <i class="fa-solid fa-info-circle"></i> ทำข้อสอบได้ดี! ลองทบทวนคำตอบเพื่อพัฒนาความเข้าใจ
+                    </div>
+                `;
             }
         }
 
