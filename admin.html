@@ -12646,8 +12646,15 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             const id = document.getElementById('reflective-review-id').value;
             const uid = document.getElementById('reflective-review-uid').value;
             const name = document.getElementById('reflective-review-uname').value;
-            const bonus = parseFloat(document.getElementById('reflective-review-bonus').value) || 0;
+            let bonus = parseFloat(document.getElementById('reflective-review-bonus').value) || 0;
             const comment = document.getElementById('reflective-review-comment').value.trim();
+
+            // 🔥 Ensure bonus is reasonable (0.1 to 2.0) and default to 0.5 if invalid
+            if (bonus <= 0 || bonus > 2.0) {
+                bonus = 0.5;
+                document.getElementById('reflective-review-bonus').value = "0.5";
+                showToast("⚠️ Bonus points reset to 0.5 (valid range: 0.1-2.0)");
+            }
 
             if (!comment) return alert("Please provide a short comment/feedback for the student.");
 
@@ -12662,7 +12669,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 };
 
                 await logRef.update(upData);
-                showToast("Reviewed! Waiting for user to claim points ✨");
+                showToast(`Reviewed! User can claim +${bonus} points ✨`);
                 document.getElementById('reflectiveReviewModal').style.display = 'none';
             } catch (e) {
                 alert("Error: " + e.message);
