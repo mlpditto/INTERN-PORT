@@ -10854,6 +10854,99 @@
                     ${buildBreakdown(maxDate, '↑ Max Day', '#28a745')}
                 </div>
             `;
+
+            // Add Request Certificate button
+            let certBtnEl = document.getElementById('lb-popup-cert-request');
+            if (!certBtnEl) {
+                certBtnEl = document.createElement('div');
+                certBtnEl.id = 'lb-popup-cert-request';
+                certBtnEl.style.cssText = 'margin-top:15px; text-align:center;';
+                breakdownEl.parentNode.appendChild(certBtnEl);
+            }
+            
+            // Check if user already has certificate data
+            const hasCert = u.startDate && u.endDate && (u.score || 0) > 0;
+            const certRequested = u.certRequested || false;
+            const certApproved = u.certApproved || false;
+            
+            if (certApproved) {
+                certBtnEl.innerHTML = `<button class="btn-sm btn-success" disabled style="width:100%;"><i class="fa-solid fa-certificate"></i> Certificate Approved</button>`;
+            } else if (certRequested) {
+                certBtnEl.innerHTML = `<button class="btn-sm btn-warning" disabled style="width:100%;"><i class="fa-solid fa-clock"></i> Request Pending</button>`;
+            } else if (hasCert) {
+                certBtnEl.innerHTML = `<button class="btn-sm btn-primary" onclick="requestCertificate('${u.id}')" style="width:100%; background:linear-gradient(135deg, #667eea, #764ba2); border:none;"><i class="fa-solid fa-certificate"></i> Request Certificate</button>`;
+            } else {
+                certBtnEl.innerHTML = `<button class="btn-sm" disabled style="width:100%;" title="Complete more tasks to unlock certificate"><i class="fa-solid fa-lock"></i> Request Certificate (Score: ${(u.score || 0).toFixed(2)})</button>`;
+            }
+        }
+
+        // Request Certificate function
+        async function requestCertificate(userId) {
+            try {
+                // Mark user as requested certificate
+                await db.collection("users").doc(userId).update({
+                    certRequested: true,
+                    certRequestedAt: new Date()
+                });
+                
+                // Get user info for notification
+                const user = usersData.find(u => u.id === userId);
+                if (!user) return;
+                
+                // Send notification to admin
+                await sendCertificateRequestNotification(user);
+                
+                // Update UI
+                showToast("🎓 Certificate request sent! Admin will review your request.");
+                
+                // Refresh popup to show pending status
+                openLbPopup(userId);
+                
+            } catch (error) {
+                console.error("Error requesting certificate:", error);
+                showToast("❌ Failed to request certificate. Please try again.");
+            }
+        }
+
+        // Send notification to admin about certificate request
+        async function sendCertificateRequestNotification(user) {
+            try {
+                // Create notification in admin notifications collection
+                const notification = {
+                    type: 'certificate_request',
+                    userId: user.id,
+                    userName: user.displayName,
+                    userPicture: user.pictureUrl,
+                    userScore: (user.score || 0).toFixed(2),
+                    userGroup: user.group || 'Public',
+                    message: `${user.displayName} requested a certificate`,
+                    timestamp: new Date(),
+                    read: false,
+                    actionUrl: `#certificate-${user.id}`
+                };
+                
+                await db.collection("admin_notifications").add(notification);
+                
+                // Also create a task in kanban for admin to review
+                const taskData = {
+                    title: `Certificate Request - ${user.displayName}`,
+                    description: `User: ${user.displayName}\nScore: ${(user.score || 0).toFixed(2)}\nGroup: ${user.group || 'Public'}\nReview and approve certificate request.`,
+                    assigneeIds: [], // Admin will assign
+                    status: 'Backlog',
+                    priority: 'Medium',
+                    isCertificateRequest: true,
+                    requestedBy: user.id,
+                    requestedAt: new Date(),
+                    createdAt: new Date()
+                };
+                
+                await db.collection("side_quests").add(taskData);
+                
+                console.log("Certificate request notification sent to admin");
+                
+            } catch (error) {
+                console.error("Error sending certificate request notification:", error);
+            }
         }
 
         function initKanban() {
