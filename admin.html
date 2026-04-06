@@ -4403,6 +4403,8 @@
                 let tokens = 0;
                 let text = "";
 
+                console.log(`🔍 [Debug] Processing model: "${modelName}"`);
+
                 if (modelName.includes('gemini')) {
                     if (window.GEMINI_API_KEY.includes('__')) throw new Error("Proxy failed and no local Gemini Key set.");
                     const genAI = new GoogleGenerativeAI(window.GEMINI_API_KEY);
@@ -4692,13 +4694,13 @@
                         if (!response.ok) throw new Error(data.error?.message || `Llama Error ${response.status}`);
                         return data;
                     };
-                    
                     const data = await callLlama(modelName);
                     tokens = data.usage ? data.usage.total_tokens : 0;
                     updateAIUsage('Llama', tokens);
                     text = data.choices[0].message.content.trim();
                 } else {
-                    throw new Error("Unknown AI Model Provider selected.");
+                    console.error(`❌ [Debug] Unknown model "${modelName}". Checked for: gemini, gpt, typhoon, llama, claude, imagen, dalle`);
+                    throw new Error(`Unknown AI Model Provider selected: "${modelName}". Available: Gemini, GPT, Typhoon, Llama, Claude, Imagen, DALL-E`);
                 }
                 
                 return { text: text.trim(), tokens, model: actualModelName };
