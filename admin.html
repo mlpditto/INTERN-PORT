@@ -7505,140 +7505,141 @@
         }
 
         async function reviewQuiz(attemptId) {
-            const attemptDoc = await db.collection("quiz_attempts").doc(attemptId).get();
-            if (!attemptDoc.exists) return alert("Data not found");
-            const att = attemptDoc.data();
-            const quiz = quizzesData.find(x => x.id === att.quizId);
-
-            if (!quiz) return alert("Quiz Reference missing");
-
-            document.getElementById('review-attempt-id').value = attemptId;
-            const container = document.getElementById('review-quiz-container');
-            container.innerHTML = "";
-
-            // 🔥 V80: Read-only Review Display
-            if (quiz.quizType === 'read_only') {
-                const rawFeedback = (att.answers || [])[att.answers.length - 1] || 'No feedback provided.';
-                const feedbackText = Array.isArray(rawFeedback) ? rawFeedback.join("\n---\n") : rawFeedback;
-                container.innerHTML = `
-                    <div style="background:#f0f7ff; border:1px solid #4361ee; padding:20px; border-radius:15px; border-left:8px solid #4361ee; margin-bottom:20px;">
-                        <b style="font-size:1.1em; color:#0d47a1; display:flex; align-items:center; gap:8px;">
-                            <i class="fa-solid fa-book-open"></i> Read-only Feedback / Reflection
-                        </b>
-                        <div style="margin-top:15px; background:#fff; padding:15px; border-radius:10px; border:1px solid #eee; white-space:pre-wrap; font-size:1.05em; color:#333; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02); min-height:80px;">${feedbackText}</div>
-                        <div style="margin-top:15px; color:#666; font-size:0.85em; font-style:italic;">
-                            * The text above is what you learned/summarized after reading. (System will approve full points upon approval).
-                        </div>
-                    </div>
-                `;
-                document.getElementById('quizReviewModal').style.display = 'block';
-            }
-
-            quiz.questions.forEach((q, i) => {
-                const studentAns = (att.answers || att.practiceAnswers || [])[i];
-                const isChoice = (q.type || 'choice') === 'choice';
-
-                let isCorrect = false;
-                if (isChoice) {
-                    const target = q.correct;
-                    const sAns = Array.isArray(studentAns) ? studentAns : (studentAns !== undefined && studentAns !== null ? [studentAns] : []);
-                    const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
-
-                    if (tAns.length === 0) {
-                        isCorrect = false;
-                    } else if (tAns.length === 1 && sAns.length === 1) {
-                        isCorrect = (String(sAns[0]).trim() === String(tAns[0]).trim());
-                    } else {
-                        isCorrect = (sAns.length === tAns.length && tAns.every(v => sAns.map(String).includes(String(v))));
-                    }
-                } else {
-                    isCorrect = (att.gradedAnswers && att.gradedAnswers[i]);
-                }
-
-                let studentAnsText = "";
-                let correctAnsText = "";
-
-                if (isChoice) {
-                    const sIdx = parseInt(studentAns);
-                    const cIdx = parseInt(q.correct);
-                    studentAnsText = `<b>${q.options[sIdx] || '-'}</b> (Choice ${isNaN(sIdx) ? '-' : sIdx + 1})`;
-                    correctAnsText = `<span style="color:green;">${q.options[cIdx]}</span> (Choice ${isNaN(cIdx) ? '-' : cIdx + 1})`;
-                } else {
-                    // Handle Tweetstorm (Array) or Flattened string
-                    let ansArray = [];
-                    if (Array.isArray(studentAns)) {
-                        ansArray = studentAns;
-                    } else if (typeof studentAns === 'string' && studentAns.includes("\n---\n")) {
-                        ansArray = studentAns.split("\n---\n");
-                    }
-
-                    if (ansArray.length > 0) {
-                        studentAnsText = `<div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
-                            ${ansArray.map((tweet, tidx) => `
-                                <div style="background:#fff; border:1px solid #1da1f2; padding:10px; border-radius:12px; font-size:0.95em; position:relative;">
-                                    <span style="position:absolute; top:5px; right:10px; color:#1da1f2; font-size:0.7em; font-weight:bold;">#${tidx + 1}</span>
-                                    <div style="white-space:pre-wrap; color:#333;">${tweet || '-'}</div>
-                                    <div style="font-size:0.7em; color:#999; text-align:right; margin-top:4px;">${tweet.length || 0} letters</div>
-                                </div>
-                            `).join('')}
-                        </div>`;
-                    } else {
-                        studentAnsText = `<div style="background:#fff; padding:10px; border-radius:5px; border:1px solid #ccc; margin-top:5px; white-space:pre-wrap;">${studentAns || '-'}</div>`;
-                    }
-                    correctAnsText = `<span style="color:#666;">(Subjective Answer - No fixed correct answer)</span>`;
-                }
-
-                const cardBg = isCorrect ? '#d4edda' : '#f8d7da';
-                const cardBorder = isCorrect ? '#28a745' : '#dc3545';
-                const cardIcon = isCorrect ? '✅' : '❌';
-
-                const studentDuration = (att.durations || [])[i];
-                const durationHtml = studentDuration !== undefined ? `<span style="font-size:0.7em; background:#e9ecef; color:#495057; padding:2px 8px; border-radius:10px; margin-left:8px; display:inline-flex; align-items:center; gap:4px;"><i class="fa-regular fa-clock"></i> ${studentDuration}s</span>` : '';
-
-                container.innerHTML += `
-                    <div style="border:2px solid ${cardBorder}; padding:15px; margin-bottom:15px; border-radius:12px; background:${cardBg}; border-left:8px solid ${cardBorder}; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
-                            <b style="font-size:1.1em; flex:1;">${cardIcon} Q${i + 1}: ${q.q} ${durationHtml}</b>
-                            <span class="badge" style="background:#6c757d; font-size:0.7em; padding:2px 8px; margin-left:8px;">${isChoice ? 'Choice' : 'Short Answer'}</span>
-                        </div>
-                        
-                        <div style="display:flex; flex-direction:column; gap:8px;">
-                             <div style="padding:10px; border-radius:8px; background:rgba(255,255,255,0.6); border:1px solid rgba(0,0,0,0.05); font-size:0.95em;">
-                                <span style="color:#666; font-weight:bold; display:inline-block; width:65px;">Student:</span> 
-                                <span style="color:#333;">${studentAnsText}</span>
-                             </div>
-                             
-                             <div style="padding:10px; border-radius:8px; background:#d1e7dd; border:1px solid #badbcc; color:#0f5132; font-size:0.95em;">
-                                <span style="color:#157347; font-weight:bold; display:inline-block; width:65px;">Correct:</span> 
-                                <span style="font-weight:500;">${correctAnsText}</span>
-                             </div>
-                        </div>
-
-                        <div style="margin-top:12px; padding-top:10px; border-top:1px solid rgba(0,0,0,0.05);">
-                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.9em; color:#444;">
-                                <input type="checkbox" style="width:18px; height:18px; margin:0;" onchange="manualCorrectAns('${attemptId}', ${i}, this.checked)" ${isCorrect ? 'checked disabled' : ''}> 
-                                <span>Mark as Correct / Graded</span>
-                            </label>
-                        </div>
-                    </div>
-                 `;
-            });
-
-            document.getElementById('quizReviewModal').style.display = 'block';
-        }
-
-        // --- 🔥 V86.48: Research Assistant & Knowledge Base (RAG) ---
-        let knowledgeBaseCache = [];
-        let researchChatHistory = [];
-
-        async function initResearchTab() {
-            loadKbDocs();
-            await loadResearchHistory(); // V86.47
-        }
-
-        async function loadResearchHistory() {
             try {
-                const historyEl = document.getElementById('research-chat-history');
+                console.log("Reviewing quiz attempt:", attemptId);
+                const attemptDoc = await db.collection("quiz_attempts").doc(attemptId).get();
+                if (!attemptDoc.exists) {
+                    console.error("Attempt not found:", attemptId);
+                    return alert("Data not found");
+                }
+                const att = attemptDoc.data();
+                const quiz = quizzesData.find(x => x.id === att.quizId);
+
+                if (!quiz) {
+                    console.error("Quiz not found for ID:", att.quizId);
+                    return alert("Quiz Reference missing");
+                }
+
+                console.log("Quiz found:", quiz.title);
+                document.getElementById('review-attempt-id').value = attemptId;
+                const container = document.getElementById('review-quiz-container');
+                container.innerHTML = "";
+
+                // Read-only Review Display
+                if (quiz.quizType === 'read_only') {
+                    const rawFeedback = (att.answers || [])[att.answers.length - 1] || 'No feedback provided.';
+                    const feedbackText = Array.isArray(rawFeedback) ? rawFeedback.join("\n---\n") : rawFeedback;
+                    container.innerHTML = `
+                        <div style="background:#f0f7ff; border:1px solid #4361ee; padding:20px; border-radius:15px; border-left:8px solid #4361ee; margin-bottom:20px;">
+                            <b style="font-size:1.1em; color:#0d47a1; display:flex; align-items:center; gap:8px;">
+                                <i class="fa-solid fa-book-open"></i> Read-only Feedback / Reflection
+                            </b>
+                            <div style="margin-top:15px; background:#fff; padding:15px; border-radius:10px; border:1px solid #eee; white-space:pre-wrap; font-size:1.05em; color:#333; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02); min-height:80px;">${feedbackText}</div>
+                            <div style="margin-top:15px; color:#666; font-size:0.85em; font-style:italic;">
+                                * The text above is what you learned/summarized after reading. (System will approve full points upon approval).
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('quizReviewModal').style.display = 'block';
+                    return;
+                }
+
+                quiz.questions.forEach((q, i) => {
+                    const studentAns = (att.answers || att.practiceAnswers || [])[i];
+                    const isChoice = (q.type || 'choice') === 'choice';
+
+                    let isCorrect = false;
+                    if (isChoice) {
+                        const target = q.correct;
+                        const sAns = Array.isArray(studentAns) ? studentAns : (studentAns !== undefined && studentAns !== null ? [studentAns] : []);
+                        const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
+
+                        if (tAns.length === 0) {
+                            isCorrect = false;
+                        } else if (tAns.length === 1 && sAns.length === 1) {
+                            isCorrect = (String(sAns[0]).trim() === String(tAns[0]).trim());
+                        } else {
+                            isCorrect = (sAns.length === tAns.length && tAns.every(v => sAns.map(String).includes(String(v))));
+                        }
+                    } else {
+                        isCorrect = (att.gradedAnswers && att.gradedAnswers[i]);
+                    }
+
+                    let studentAnsText = "";
+                    let correctAnsText = "";
+
+                    if (isChoice) {
+                        const sIdx = parseInt(studentAns);
+                        const cIdx = parseInt(q.correct);
+                        studentAnsText = `<b>${q.options[sIdx] || '-'}</b> (Choice ${isNaN(sIdx) ? '-' : sIdx + 1})`;
+                        correctAnsText = `<span style="color:green;">${q.options[cIdx]}</span> (Choice ${isNaN(cIdx) ? '-' : cIdx + 1})`;
+                    } else {
+                        // Handle Tweetstorm (Array) or Flattened string
+                        let ansArray = [];
+                        if (Array.isArray(studentAns)) {
+                            ansArray = studentAns;
+                        } else if (typeof studentAns === 'string' && studentAns.includes("\n---\n")) {
+                            ansArray = studentAns.split("\n---\n");
+                        }
+
+                        if (ansArray.length > 0) {
+                            studentAnsText = `<div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+                                ${ansArray.map((tweet, tidx) => `
+                                    <div style="background:#fff; border:1px solid #1da1f2; padding:10px; border-radius:12px; font-size:0.95em; position:relative;">
+                                        <span style="position:absolute; top:5px; right:10px; color:#1da1f2; font-size:0.7em; font-weight:bold;">#${tidx + 1}</span>
+                                        <div style="white-space:pre-wrap; color:#333;">${tweet || '-'}</div>
+                                        <div style="font-size:0.7em; color:#999; text-align:right; margin-top:4px;">${tweet.length || 0} letters</div>
+                                    </div>
+                                `).join('')}
+                            </div>`;
+                        } else {
+                            studentAnsText = `<div style="background:#fff; padding:10px; border-radius:5px; border:1px solid #ccc; margin-top:5px; white-space:pre-wrap;">${studentAns || '-'}</div>`;
+                        }
+                        correctAnsText = `<span style="color:#666;">(Subjective Answer - No fixed correct answer)</span>`;
+                    }
+
+                    const cardBg = isCorrect ? '#d4edda' : '#f8d7da';
+                    const cardBorder = isCorrect ? '#28a745' : '#dc3545';
+                    const cardIcon = isCorrect ? '&#10004;' : '&#10006;';
+
+                    const studentDuration = (att.durations || [])[i];
+                    const durationHtml = studentDuration !== undefined ? `<span style="font-size:0.7em; background:#e9ecef; color:#495057; padding:2px 8px; border-radius:10px; margin-left:8px; display:inline-flex; align-items:center; gap:4px;"><i class="fa-regular fa-clock"></i> ${studentDuration}s</span>` : '';
+
+                    container.innerHTML += `
+                        <div style="border:2px solid ${cardBorder}; padding:15px; margin-bottom:15px; border-radius:12px; background:${cardBg}; border-left:8px solid ${cardBorder}; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                                <b style="font-size:1.1em; flex:1;">${cardIcon} Q${i + 1}: ${q.q} ${durationHtml}</b>
+                                <span class="badge" style="background:#6c757d; font-size:0.7em; padding:2px 8px; margin-left:8px;">${isChoice ? 'Choice' : 'Short Answer'}</span>
+                            </div>
+                            
+                            <div style="display:flex; flex-direction:column; gap:8px;">
+                                 <div style="padding:10px; border-radius:8px; background:rgba(255,255,255,0.6); border:1px solid rgba(0,0,0,0.05); font-size:0.95em;">
+                                    <span style="color:#666; font-weight:bold; display:inline-block; width:65px;">Student:</span> 
+                                    <span style="color:#333;">${studentAnsText}</span>
+                                 </div>
+                                 
+                                 <div style="padding:10px; border-radius:8px; background:#d1e7dd; border:1px solid #badbcc; color:#0f5132; font-size:0.95em;">
+                                    <span style="color:#157347; font-weight:bold; display:inline-block; width:65px;">Correct:</span> 
+                                    <span style="font-weight:500;">${correctAnsText}</span>
+                                 </div>
+                            </div>
+
+                            <div style="margin-top:12px; padding-top:10px; border-top:1px solid rgba(0,0,0,0.05);">
+                                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.9em; color:#444;">
+                                    <input type="checkbox" style="width:18px; height:18px; margin:0;" onchange="manualCorrectAns('${attemptId}', ${i}, this.checked)" ${isCorrect ? 'checked disabled' : ''}> 
+                                    <span>Mark as Correct / Graded</span>
+                                </label>
+                                </div>
+                             `;
+                        });
+
+                        document.getElementById('quizReviewModal').style.display = 'block';
+                    } catch (e) {
+                        console.error("Error reviewing quiz attempt:", e);
+                        alert("Error reviewing quiz attempt: " + e.message);
+                    } finally {
+                        // Added closing bracket here
+                    }
                 const snapshot = await db.collection("research_chat")
                                          .orderBy("createdAt", "desc")
                                          .limit(20)
