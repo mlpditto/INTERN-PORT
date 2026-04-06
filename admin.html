@@ -5968,12 +5968,89 @@
         function updateQuizPagination() {
             updatePollUI();
             const items = document.querySelectorAll('.quiz-q-item');
+            const total = items.length;
+            if (quizQPageIndex >= total && total > 0) quizQPageIndex = total - 1;
+            if (quizQPageIndex < 0) quizQPageIndex = 0;
 
-let quizQPageIndex = 0;
+            items.forEach((item, i) => {
+                // Show only current question (1 per page) with modern liquid glass highlight
+                if (i === quizQPageIndex) {
+                    item.style.display = 'block';
+                    item.style.marginBottom = '20px';
+                    // Add modern liquid glass highlight class
+                    item.classList.add('current-question-highlight');
+                    // Apply modern glassmorphism styles
+                    item.style.cssText = `
+                        display: block !important;
+                        margin-bottom: 20px !important;
+                        border: 2px solid rgba(99, 102, 241, 0.3) !important;
+                        border-radius: 20px !important;
+                        background: linear-gradient(135deg, 
+                            rgba(255, 255, 255, 0.95), 
+                            rgba(248, 250, 255, 0.9), 
+                            rgba(99, 102, 241, 0.05)) !important;
+                        backdrop-filter: blur(20px) !important;
+                        -webkit-backdrop-filter: blur(20px) !important;
+                        padding: 25px !important;
+                        box-shadow: 
+                            0 20px 40px rgba(99, 102, 241, 0.15),
+                            0 8px 32px rgba(0, 0, 0, 0.08),
+                            inset 0 1px 0 rgba(255, 255, 255, 0.6),
+                            inset 0 -1px 0 rgba(0, 0, 0, 0.1) !important;
+                        position: relative !important;
+                        z-index: 10 !important;
+                        transform: translateY(-2px) !important;
+                        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                    `;
+                    
+                    // Add modern glass indicator
+                    if (!item.querySelector('.current-question-indicator')) {
+                        const indicator = document.createElement('div');
+                        indicator.className = 'current-question-indicator';
+                        indicator.style.cssText = `
+                            position: absolute;
+                            top: -15px;
+                            left: 25px;
+                            background: linear-gradient(135deg, var(--primary), #6366f1);
+                            color: white;
+                            padding: 6px 16px;
+                            border-radius: 25px;
+                            font-size: 0.75em;
+                            font-weight: 800;
+                            z-index: 11;
+                            box-shadow: 
+                                0 8px 25px rgba(99, 102, 241, 0.4),
+                                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+                            backdrop-filter: blur(10px);
+                            -webkit-backdrop-filter: blur(10px);
+                            border: 1px solid rgba(255, 255, 255, 0.2);
+                            letter-spacing: 0.5px;
+                            text-transform: uppercase;
+                            animation: pulse-glow 2s infinite;
+                        `;
+                        indicator.innerHTML = `<i class="fa-solid fa-pen-nib" style="margin-right: 6px;"></i> EDITING Q${i + 1}`;
+                        item.appendChild(indicator);
+                    }
+                } else {
+                    item.style.display = 'none';
+                    // Remove highlight class and reset styles
+                    item.classList.remove('current-question-highlight');
+                    item.style.cssText = `
+                        display: none !important;
+                        border: 1px solid #eee;
+                        border-radius: 8px;
+                        padding: 15px;
+                        background: #ffffff;
+                    `;
+                    
+                    // Remove indicator
+                    const indicator = item.querySelector('.current-question-indicator');
+                    if (indicator) indicator.remove();
+                }
 
-function moveQuizQ(direction) {
-const items = document.querySelectorAll('.quiz-q-item');
-const total = items.length;
+                // 🔥 V80: Read-only Mode Logic
+                const quizType = document.getElementById('quiz-type').value;
+                const contentArea = item.querySelector('.q-page-content-area');
                 const optionsArea = item.querySelector('.options-container');
                 const optionsActions = item.querySelector('.options-actions');
                 const qTypeSelect = item.querySelector('.q-type');
