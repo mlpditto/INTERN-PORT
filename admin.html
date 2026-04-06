@@ -2935,6 +2935,45 @@
             </div>
         </div>
 
+        <!-- 🔥 Score Adjustment Modal -->
+        <div id="scoreAdjustmentModal" class="modal" style="z-index: 2503;">
+            <div class="modal-content" style="max-width: 450px; border-top: 5px solid #f39c12; border-radius: 12px;">
+                <span class="close-modal" onclick="closeScoreAdjustmentModal()">&times;</span>
+                <h3 style="color:#f39c12; margin-bottom:15px;"><i class="fa-solid fa-edit"></i> ปรับคะแนน Reflective Log</h3>
+                
+                <div style="background:#fff3cd; padding:12px; border-radius:10px; margin-bottom:15px; border:1px solid #ffeaa7;">
+                    <div style="font-weight:bold; color:#856404; margin-bottom:5px;">📊 ข้อมูลปัจจุบัน:</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="color:#666;">คะแนนปัจจุบัน:</span>
+                        <span id="current-score-display" style="font-weight:bold; color:#f39c12; font-size:1.2em;">0</span>
+                    </div>
+                </div>
+
+                <input type="hidden" id="score-adjustment-log-id">
+
+                <div style="margin-bottom:15px;">
+                    <label style="display:block; font-size:0.85em; font-weight:bold; color:#555; margin-bottom:5px;">🎯 คะแนนใหม่:</label>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <input type="number" id="score-adjustment-input" value="0.5" step="0.1" min="0" max="2.0" 
+                            style="flex:1; padding:10px; border:1.5px solid #f39c12; border-radius:8px; font-weight:bold; font-size:1.1em; color:#f39c12;">
+                        <span style="color:#999; font-size:0.9em;">Pts</span>
+                    </div>
+                    <div style="font-size:0.75em; color:#999; margin-top:3px;">* ช่วงคะแนน: 0.0 - 2.0</div>
+                </div>
+
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; font-size:0.85em; font-weight:bold; color:#555; margin-bottom:5px;">📝 เหตุผลการปรับคะแนน:</label>
+                    <textarea id="score-adjustment-reason" rows="3" placeholder="ระบุเหตุผลที่ต้องการปรับคะแนน..." 
+                        style="width:100%; padding:10px; border:1.5px solid #eee; border-radius:8px; resize:none; font-size:0.9em;"></textarea>
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <button class="magic-btn" style="flex:2; background:#f39c12;" onclick="saveScoreAdjustment()">💾 บันทึกการปรับ</button>
+                    <button class="btn-sm btn-dark" style="flex:1; border-radius:8px;" onclick="closeScoreAdjustmentModal()">ยกเลิก</button>
+                </div>
+            </div>
+        </div>
+
         <!-- 🔥 Reflective Detail Modal (V86.96) -->
         <div id="reflectiveDetailModal" class="modal" style="z-index: 2502;">
             <div class="modal-content" style="max-width: 500px; border-top: 5px solid var(--primary); border-radius: 12px;">
@@ -12721,7 +12760,14 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                                         </div>
                                     </div>
                                 </td>
-                                <td><span style="font-weight:bold; color:#00b894; font-size:1.1em;">+${log.adminBonus || 0}</span></td>
+                                <td>
+                                    <div style="display:flex; align-items:center; gap:5px;">
+                                        <span id="score-display-${doc.id}" style="font-weight:bold; color:#00b894; font-size:1.1em;">+${log.adminBonus || 0}</span>
+                                        <button class="btn-sm" onclick="editScoreAdjustment('${doc.id}', ${log.adminBonus || 0})" style="background:#f39c12; color:white; border:none; border-radius:50%; width:24px; height:24px; padding:0; display:flex; align-items:center; justify-content:center;" title="ปรับคะแนน">
+                                            <i class="fa-solid fa-edit" style="font-size:0.7em;"></i>
+                                        </button>
+                                    </div>
+                                </td>
                                 <td style="display:flex; gap:5px;">
                                     <button class="btn-sm btn-success" onclick="acknowledgeClaimedPoints('${doc.id}')" style="background:#00b894; border:none; flex:1;">
                                         <i class="fa-solid fa-check"></i> Got it
@@ -12744,6 +12790,87 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 });
                 showToast("Acknowledged ✅");
             } catch (e) { alert(e.message); }
+        }
+
+        function editScoreAdjustment(id, currentScore) {
+            const modal = document.getElementById('scoreAdjustmentModal');
+            const scoreInput = document.getElementById('score-adjustment-input');
+            const logId = document.getElementById('score-adjustment-log-id');
+            const currentScoreDisplay = document.getElementById('current-score-display');
+            
+            logId.value = id;
+            scoreInput.value = currentScore;
+            currentScoreDisplay.textContent = currentScore;
+            
+            modal.style.display = 'block';
+            
+            // Focus on input
+            setTimeout(() => {
+                scoreInput.focus();
+                scoreInput.select();
+            }, 100);
+        }
+
+        async function saveScoreAdjustment() {
+            const id = document.getElementById('score-adjustment-log-id').value;
+            const newScore = parseFloat(document.getElementById('score-adjustment-input').value) || 0;
+            const currentScore = parseFloat(document.getElementById('current-score-display').textContent) || 0;
+            const reason = document.getElementById('score-adjustment-reason').value.trim();
+            
+            // Validate score
+            if (newScore < 0 || newScore > 2.0) {
+                showToast("⚠️ คะแนนต้องอยู่ระหว่าง 0 ถึง 2.0", "error");
+                return;
+            }
+            
+            if (!reason) {
+                showToast("⚠️ กรุณาระบุเหตุผลการปรับคะแนน", "error");
+                return;
+            }
+            
+            try {
+                // Update the score in reflective_logs
+                await db.collection("reflective_logs").doc(id).update({
+                    adminBonus: newScore,
+                    scoreAdjustmentReason: reason,
+                    scoreAdjustedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    scoreAdjustedBy: 'admin'
+                });
+                
+                // Update user's total score
+                const log = pointsClaimedCache.find(l => l.id === id);
+                if (log && log.userId) {
+                    const scoreDiff = newScore - currentScore;
+                    await db.collection("users").doc(log.userId).update({
+                        score: firebase.firestore.FieldValue.increment(scoreDiff)
+                    });
+                }
+                
+                // Update display
+                const scoreDisplay = document.getElementById(`score-display-${id}`);
+                if (scoreDisplay) {
+                    scoreDisplay.textContent = `+${newScore}`;
+                    scoreDisplay.style.color = newScore > currentScore ? '#e74c3c' : newScore < currentScore ? '#3498db' : '#00b894';
+                    scoreDisplay.style.fontWeight = 'bold';
+                }
+                
+                // Close modal
+                document.getElementById('scoreAdjustmentModal').style.display = 'none';
+                
+                // Clear form
+                document.getElementById('score-adjustment-reason').value = '';
+                
+                showToast(`✅ ปรับคะแนนเป็น +${newScore} เรียบร้อย`, "success");
+                
+            } catch (error) {
+                console.error("Error adjusting score:", error);
+                showToast("❌ ไม่สามารถปรับคะแนนได้ กรุณาลองใหม่", "error");
+            }
+        }
+
+        function closeScoreAdjustmentModal() {
+            document.getElementById('scoreAdjustmentModal').style.display = 'none';
+            document.getElementById('score-adjustment-reason').value = '';
         }
 
         async function deleteReflective(id) {
