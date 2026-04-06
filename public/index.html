@@ -812,6 +812,22 @@
                 </div>
             </div>
 
+            <!-- API Key Request Section -->
+            <div id="section-api-request" style="margin-bottom: 20px;">
+                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #17a2b8;">
+                    <div onclick="toggleAPIRequest()"
+                        style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #e0f7fa;">
+                        <h4 style="margin: 0; font-size: 1.1em; color: #17a2b8;"><i class="fa-solid fa-key"></i> AI API Key Request</h4>
+                        <i id="api-request-icon" class="fa-solid fa-chevron-down" style="color: #17a2b8; transition: 0.3s; font-size: 0.9em;"></i>
+                    </div>
+                    <div id="api-request-content" style="display: none; padding: 15px; border-top: 1px solid #f0f0f0; background: #fff;">
+                        <div id="api-request-container">
+                            <!-- API key request form will be injected here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="section-kanban" style="margin-bottom: 20px;">
                 <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #333;">
                     <div onclick="toggleKanban()"
@@ -3992,6 +4008,160 @@
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
             }
+        }
+
+        function toggleAPIRequest() {
+            const content = document.getElementById('api-request-content');
+            const icon = document.getElementById('api-request-icon');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.style.transform = 'rotate(180deg)';
+                loadAPIRequestForm();
+            } else {
+                content.style.display = 'none';
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function loadAPIRequestForm() {
+            const container = document.getElementById('api-request-container');
+            container.innerHTML = `
+                <div style="text-align:center; padding:20px;">
+                    <div style="color:#17a2b8; font-weight:bold; margin-bottom:15px;">
+                        <i class="fa-solid fa-key"></i> ขอ AI API Key เพื่อใช้งาน
+                    </div>
+                    <div style="font-size:0.9em; color:#666; margin-bottom:20px;">
+                        เพื่อให้คำแนะนำการเรียนรู้ที่ลึกขึ้น คุณสามารถขอ AI API Key ได้ที่นี่
+                    </div>
+                    
+                    <div style="background:#f8f9fa; padding:15px; border-radius:10px; margin-bottom:20px; text-align:left;">
+                        <div style="font-weight:bold; margin-bottom:10px; color:#333;">🔑 ทำไมต้องมี API Key?</div>
+                        <ul style="margin:0; padding-left:20px; font-size:0.85em; color:#666;">
+                            <li>วิเคราะห์การเรียนรู้ที่ลึกขึ้นด้วย AI</li>
+                            <li>คำแนะนำส่วนตัวจาก GPT-4o และ Claude-3.5</li>
+                            <li>ระบุจุดอ่อนและแนวทางการพัฒนา</li>
+                            <li>ไม่มีค่าใช้จ่ายสำหรับผู้เรียน</li>
+                        </ul>
+                    </div>
+                    
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; font-size:0.9em; font-weight:bold; margin-bottom:5px;">เลือก AI Service ที่ต้องการ:</label>
+                        <select id="api-service-select" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:5px;">
+                            <option value="">-- เลือก --</option>
+                            <option value="openai">OpenAI (GPT-4o)</option>
+                            <option value="anthropic">Anthropic (Claude-3.5)</option>
+                            <option value="google">Google (Gemini)</option>
+                            <option value="all">ทั้งหมด (Full Features)</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; font-size:0.9em; font-weight:bold; margin-bottom:5px;">เหตุผลที่ต้องการ API Key:</label>
+                        <textarea id="api-reason-text" rows="3" placeholder="เช่น ต้องการวิเคราะห์ผลการเรียนรู้ให้ลึกขึ้น..." 
+                            style="width:100%; padding:8px; border:1px solid #ddd; border-radius:5px; resize:none;"></textarea>
+                    </div>
+                    
+                    <button onclick="requestAPIKey()" class="btn-sm btn-primary" style="width:100%; background:#17a2b8; border:none; padding:10px; border-radius:5px; font-weight:bold;">
+                        <i class="fa-solid fa-paper-plane"></i> ส่งคำขอ
+                    </button>
+                    
+                    <div id="api-request-status" style="margin-top:15px;"></div>
+                </div>
+            `;
+        }
+
+        async function requestAPIKey() {
+            const service = document.getElementById('api-service-select').value;
+            const reason = document.getElementById('api-reason-text').value.trim();
+            const statusEl = document.getElementById('api-request-status');
+            
+            if (!service) {
+                statusEl.innerHTML = '<div style="color:#dc3545;"><i class="fa-solid fa-exclamation-triangle"></i> กรุณาเลือก AI Service</div>';
+                return;
+            }
+            
+            if (!reason) {
+                statusEl.innerHTML = '<div style="color:#dc3545;"><i class="fa-solid fa-exclamation-triangle"></i> กรุณาระบุเหตุผลที่ต้องการ</div>';
+                return;
+            }
+            
+            try {
+                // Disable button
+                const button = event.target;
+                button.disabled = true;
+                button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่ง...';
+                
+                // Create notification for admin
+                const notification = {
+                    type: 'api_key_request',
+                    userId: userId,
+                    userName: userProfile.displayName,
+                    userPicture: userProfile.pictureUrl || "",
+                    apiService: service,
+                    reason: reason,
+                    message: `${userProfile.displayName} ขอ API Key สำหรับ ${getServiceName(service)}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    read: false,
+                    actionUrl: `#api-key-${userId}`
+                };
+                
+                await db.collection("admin_notifications").add(notification);
+                
+                // Create task in kanban for admin to review
+                const taskData = {
+                    title: `API Key Request - ${userProfile.displayName}`,
+                    description: `User: ${userProfile.displayName}\nService: ${getServiceName(service)}\nReason: ${reason}\n\nReview and provide API key access if appropriate.`,
+                    assigneeIds: [],
+                    status: 'Backlog',
+                    priority: 'Medium',
+                    isAPIKeyRequest: true,
+                    requestedBy: userId,
+                    apiService: service,
+                    reason: reason,
+                    requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                await db.collection("side_quests").add(taskData);
+                
+                // Update UI
+                statusEl.innerHTML = `
+                    <div style="color:#28a745;">
+                        <i class="fa-solid fa-check-circle"></i> ส่งคำขอสำเร็จ!
+                    </div>
+                    <div style="font-size:0.8em; color:#666; margin-top:5px;">
+                        Admin จะตรวจสอบและตอบกลับโดยเร็ว
+                    </div>
+                `;
+                
+                // Reset form
+                document.getElementById('api-service-select').value = '';
+                document.getElementById('api-reason-text').value = '';
+                
+                // Show success in main UI
+                showToast("🔑 คำขอ API Key ส่งให้ Admin แล้ว");
+                
+            } catch (error) {
+                console.error("Error requesting API key:", error);
+                statusEl.innerHTML = '<div style="color:#dc3545;"><i class="fa-solid fa-exclamation-triangle"></i> ไม่สามารถส่งคำขอได้ กรุณาลองใหม่</div>';
+            } finally {
+                // Re-enable button
+                const button = document.querySelector('button[onclick="requestAPIKey()"]');
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ส่งคำขอ';
+                }
+            }
+        }
+
+        function getServiceName(service) {
+            const names = {
+                'openai': 'OpenAI (GPT-4o)',
+                'anthropic': 'Anthropic (Claude-3.5)',
+                'google': 'Google (Gemini)',
+                'all': 'ทั้งหมด (Full Features)'
+            };
+            return names[service] || service;
         }
 
         async function loadQuizFeedback() {
