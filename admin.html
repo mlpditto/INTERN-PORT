@@ -4625,18 +4625,23 @@
                         // 🔥 Try different model names for Typhoon
                         let actualModelName = mName;
                         if (mName.includes('v1.5x') || mName.includes('70b')) {
-                            actualModelName = 'typhoon-v1.5-instruct';
+                            actualModelName = 'typhoon-v2.1-12b-instruct';
                         } else if (mName.includes('v1.5')) {
-                            actualModelName = 'typhoon-v1.5-instruct';
+                            actualModelName = 'typhoon-v2.1-12b-instruct';
                         } else if (!mName.includes('typhoon')) {
-                            actualModelName = 'typhoon-v1.5-instruct';
+                            actualModelName = 'typhoon-v2.1-12b-instruct';
+                        } else if (mName.includes('v2') || mName.includes('2.')) {
+                            actualModelName = 'typhoon-v2.1-12b-instruct';
                         }
 
                         const payload = {
                             model: actualModelName,
                             messages: [{ role: 'user', content: prompt }],
-                            temperature: 0.7,
-                            max_tokens: 2000
+                            temperature: 0.6,
+                            max_tokens: 512,
+                            top_p: 0.95,
+                            repetition_penalty: 1.05,
+                            stream: false
                         };
                         
                         // 🔥 V88.78: Add JSON mode for Typhoon - modify prompt instead of response_format
@@ -4646,57 +4651,44 @@
 
                         console.log('🔥 Typhoon API Request:', { model: actualModelName, payload: payload });
                         
-                        // 🔥 Try multiple endpoints
-                        const endpoints = [
-                            'https://api.opentyphoon.ai/v1/chat/completions',
-                            'https://api.typhoon.ai/v1/chat/completions',
-                            'https://typhoon-api.ai/v1/chat/completions'
-                        ];
+                        // 🔥 Try only the official endpoint
+                        const endpoint = 'https://api.opentyphoon.ai/v1/chat/completions';
                         
-                        let lastError = null;
-                        for (const endpoint of endpoints) {
+                        try {
+                            console.log(`🔥 Trying Typhoon endpoint: ${endpoint}`);
+                            const response = await fetch(endpoint, {
+                                method: 'POST',
+                                headers: { 
+                                    'Content-Type': 'application/json', 
+                                    'Authorization': `Bearer ${window.TYPHOON_API_KEY}`,
+                                    'User-Agent': 'Intern-Port/1.0'
+                                },
+                                body: JSON.stringify(payload)
+                            });
+                            
+                            const responseText = await response.text();
+                            console.log(`🔥 Typhoon Response from ${endpoint}:`, response.status, responseText);
+                            
+                            let data;
                             try {
-                                console.log(`🔥 Trying Typhoon endpoint: ${endpoint}`);
-                                const response = await fetch(endpoint, {
-                                    method: 'POST',
-                                    headers: { 
-                                        'Content-Type': 'application/json', 
-                                        'Authorization': `Bearer ${window.TYPHOON_API_KEY}`,
-                                        'User-Agent': 'Intern-Port/1.0'
-                                    },
-                                    body: JSON.stringify(payload)
-                                });
-                                
-                                const responseText = await response.text();
-                                console.log(`🔥 Typhoon Response from ${endpoint}:`, response.status, responseText);
-                                
-                                let data;
-                                try {
-                                    data = JSON.parse(responseText);
-                                } catch (e) {
-                                    console.log(`🔥 Typhoon Raw Response from ${endpoint}:`, responseText);
-                                    lastError = `Invalid JSON from ${endpoint}: ${responseText.substring(0, 100)}`;
-                                    continue; // Try next endpoint
-                                }
-                                
-                                if (response.ok) {
-                                    console.log(`✅ Typhoon Success from ${endpoint}:`, data);
-                                    return data;
-                                } else {
-                                    const errorMsg = data.error?.message || data.error || `Typhoon Error ${response.status}`;
-                                    console.log(`❌ Typhoon Error from ${endpoint}:`, errorMsg);
-                                    lastError = `${endpoint}: ${errorMsg}`;
-                                    continue; // Try next endpoint
-                                }
+                                data = JSON.parse(responseText);
                             } catch (e) {
-                                console.log(`❌ Typhoon Network Error from ${endpoint}:`, e);
-                                lastError = `${endpoint}: ${e.message}`;
-                                continue; // Try next endpoint
+                                console.log(`🔥 Typhoon Raw Response from ${endpoint}:`, responseText);
+                                throw new Error(`Invalid JSON from ${endpoint}: ${responseText.substring(0, 100)}`);
                             }
+                            
+                            if (response.ok) {
+                                console.log(`✅ Typhoon Success from ${endpoint}:`, data);
+                                return data;
+                            } else {
+                                const errorMsg = data.error?.message || data.error || `Typhoon Error ${response.status}`;
+                                console.log(`❌ Typhoon Error from ${endpoint}:`, errorMsg);
+                                throw new Error(`${endpoint}: ${errorMsg}`);
+                            }
+                        } catch (e) {
+                            console.log(`❌ Typhoon Network Error from ${endpoint}:`, e);
+                            throw new Error(`Typhoon API failed: ${e.message}`);
                         }
-                        
-                        // All endpoints failed
-                        throw new Error(`All Typhoon endpoints failed. Last error: ${lastError}`);
                     };
 
                     let data;
