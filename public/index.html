@@ -4062,6 +4062,30 @@
                                     <i class="fa-solid fa-spinner fa-spin"></i> กำลังวิเคราะห์ผลการเรียนรู้...
                                 </div>
                             </div>
+                            
+                            <div id="weakness-${attempt.id}" style="margin-bottom:10px; display:none;">
+                                <div style="font-size:0.85em; font-weight:bold; color:#dc3545; margin-bottom:5px;">
+                                    <i class="fa-solid fa-exclamation-triangle"></i> จุดที่ต้องพัฒนา:
+                                </div>
+                                <div style="font-size:0.9em; color:#666; line-height:1.4; padding:10px; background:#fff5f5; border-radius:8px; border-left:3px solid #dc3545;">
+                                    <i class="fa-solid fa-spinner fa-spin"></i> กำลังวิเคราะห์จุดอ่อน...
+                                </div>
+                            </div>
+                            
+                            <div id="learning-${attempt.id}" style="display:none;">
+                                <div style="font-size:0.85em; font-weight:bold; color:#007bff; margin-bottom:5px;">
+                                    <i class="fa-solid fa-graduation-cap"></i> แนวทางการเรียนรู้:
+                                </div>
+                                <div style="font-size:0.9em; color:#666; line-height:1.4; padding:10px; background:#f0f8ff; border-radius:8px; border-left:3px solid #007bff;">
+                                    <i class="fa-solid fa-spinner fa-spin"></i> กำลังวางแผนการเรียน...
+                                </div>
+                            </div>
+                            
+                            <div style="margin-top:10px; text-align:right;">
+                                <button onclick="toggleDetailedFeedback('${attempt.id}')" class="btn-sm" style="background:#6c757d; color:white; border:none; border-radius:15px; padding:5px 12px; font-size:0.8em;">
+                                    <i class="fa-solid fa-chevron-down"></i> ดูเพิ่มเติม
+                                </button>
+                            </div>
                         </div>
                     `;
                 }
@@ -4078,6 +4102,9 @@
                     }, 500);
                 }
                 
+                // Store attempts data for detailed feedback
+                window.attemptsData = attempts;
+                
             } catch (error) {
                 console.error("Error loading quiz feedback:", error);
                 container.innerHTML = `
@@ -4086,6 +4113,31 @@
                         <div>ไม่สามารถโหลด feedback ได้</div>
                     </div>
                 `;
+            }
+        }
+
+        function toggleDetailedFeedback(attemptId) {
+            const weaknessEl = document.getElementById(`weakness-${attemptId}`);
+            const learningEl = document.getElementById(`learning-${attemptId}`);
+            const button = event.target;
+            
+            if (weaknessEl.style.display === 'none') {
+                weaknessEl.style.display = 'block';
+                learningEl.style.display = 'block';
+                button.innerHTML = '<i class="fa-solid fa-chevron-up"></i> ซ่อนรายละเอียด';
+                
+                // Generate detailed feedback if not already generated
+                if (weaknessEl.querySelector('.fa-spinner')) {
+                    const attempt = attemptsData.find(a => a.id === attemptId);
+                    const quiz = quizzesCache.find(q => q.id === attempt.quizId);
+                    if (attempt && quiz) {
+                        generateDetailedFeedback(attempt, quiz);
+                    }
+                }
+            } else {
+                weaknessEl.style.display = 'none';
+                learningEl.style.display = 'none';
+                button.innerHTML = '<i class="fa-solid fa-chevron-down"></i> ดูเพิ่มเติม';
             }
         }
 
@@ -4158,6 +4210,103 @@ ${incorrectQuestions.slice(0, 3).map(q => `- ข้อ ${q.index}: ${q.question.
                 feedbackEl.innerHTML = `
                     <div style="color:#666;">
                         <i class="fa-solid fa-info-circle"></i> ทำข้อสอบได้ดี! ลองทบทวนคำตอบเพื่อพัฒนาความเข้าใจ
+                    </div>
+                `;
+            }
+        }
+
+        async function generateDetailedFeedback(attempt, quiz) {
+            const weaknessEl = document.getElementById(`weakness-${attempt.id}`);
+            const learningEl = document.getElementById(`learning-${attempt.id}`);
+            
+            if (!weaknessEl || !learningEl) return;
+            
+            try {
+                // Get quiz questions for analysis
+                const questions = quiz.questions || [];
+                const userAnswers = attempt.answers || {};
+                
+                // Analyze incorrect answers by topic/concept
+                const incorrectQuestions = [];
+                const topicAnalysis = {};
+                
+                questions.forEach((q, index) => {
+                    const userAnswer = userAnswers[index];
+                    const correctAnswers = Array.isArray(q.correct) ? q.correct : [q.correct];
+                    
+                    if (!correctAnswers.includes(userAnswer)) {
+                        incorrectQuestions.push({
+                            index: index + 1,
+                            question: q.question,
+                            userAnswer: userAnswer,
+                            correctAnswer: correctAnswers,
+                            explanation: q.explanation,
+                            topic: q.topic || q.category || 'General',
+                            difficulty: q.difficulty || 'medium'
+                        });
+                        
+                        // Group by topic
+                        const topic = q.topic || q.category || 'General';
+                        if (!topicAnalysis[topic]) {
+                            topicAnalysis[topic] = { incorrect: 0, total: 0 };
+                        }
+                        topicAnalysis[topic].incorrect++;
+                        topicAnalysis[topic].total++;
+                    }
+                });
+                
+                // Generate Weakness Areas analysis
+                const weaknessPrompt = `จากการทำข้อสอดความ "${quiz.shortTitle || quiz.title}" พบว่าตอบผิด ${incorrectQuestions.length} ข้อ
+
+${incorrectQuestions.length > 0 ? `ข้อที่ตอบผิดตามหัวข้อ:
+${Object.entries(topicAnalysis).map(([topic, data]) => `- ${topic}: ${data.incorrect}/${data.total} ข้อผิด`).join('\n')}` : ''}
+
+กรุณาวิเคราะห์และระบุ:
+1. จุดอ่อนที่พบบ่อยที่สุด (2-3 อันดับแรก)
+2. สาเหตุที่อาจทำให้ตอบผิด
+3. แนวทางการแก้ไขเฉพาะจุดนั้นๆ
+
+ตอบเป็นภาษาไทย กระชับ ใช้ bullet point ไม่เกิน 150 ตัวอักษร`;
+
+                const weaknessResponse = await callUniversalAI('gemini-3-flash-preview', weaknessPrompt);
+                
+                weaknessEl.innerHTML = `
+                    <div style="color:#dc3545; font-weight:600;">
+                        <i class="fa-solid fa-exclamation-triangle"></i> ${weaknessResponse.text}
+                    </div>
+                `;
+                
+                // Generate Learning Path recommendations
+                const learningPrompt = `จากผลการทำข้อสอดความ "${quiz.shortTitle || quiz.title}" คะแนน ${attempt.score || 0}/${attempt.totalScore || 100}
+
+${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข้อ: ${Object.keys(topicAnalysis).join(', ')}` : ''}
+
+กรุณาแนะนำแนวทางการเรียนรู้:
+1. แหล่งเรียนรู้ที่เหมาะสม (YouTube, Article, Practice)
+2. วิธีการฝึกฝนเฉพาะหัวข้อที่อ่อน
+3. กลยุทธ์การทำข้อสอบให้ดีขึ้น
+4. ระยะเวลาที่ควรใช้ในการฝึก
+
+ตอบเป็นภาษาไทย กระชับ ใช้ bullet point ไม่เกิน 200 ตัวอักษร`;
+
+                const learningResponse = await callUniversalAI('gemini-3-flash-preview', learningPrompt);
+                
+                learningEl.innerHTML = `
+                    <div style="color:#007bff; font-weight:600;">
+                        <i class="fa-solid fa-graduation-cap"></i> ${learningResponse.text}
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error("Error generating detailed feedback:", error);
+                weaknessEl.innerHTML = `
+                    <div style="color:#666;">
+                        <i class="fa-solid fa-info-circle"></i> วิเคราะห์จุดที่ต้องพัฒนาเพื่อปรับปรุงการเรียนรู้
+                    </div>
+                `;
+                learningEl.innerHTML = `
+                    <div style="color:#666;">
+                        <i class="fa-solid fa-info-circle"></i> ฝึกปฏิบัติเพิ่มเติมเพื่อเสริมสร้างความเข้าใจ
                     </div>
                 `;
             }
