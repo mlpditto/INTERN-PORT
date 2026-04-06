@@ -2997,6 +2997,53 @@
             </div>
         </div>
 
+        <!-- 📅 Period Adjustment Modal (V88.86) -->
+        <div id="periodAdjustmentModal" class="modal" style="z-index: 2503;">
+            <div class="modal-content" style="max-width: 500px; border-top: 5px solid #6c757d; border-radius: 12px;">
+                <span class="close-modal" onclick="document.getElementById('periodAdjustmentModal').style.display='none'">&times;</span>
+                <h3 style="color:#6c757d; margin-bottom:15px;">
+                    <i class="fa-solid fa-calendar-days"></i> 📅 ปรับ Period ของ User
+                </h3>
+                
+                <div style="background:#f8f9fa; padding:15px; border-radius:10px; margin-bottom:20px;">
+                    <div style="font-weight:bold; color:#333; margin-bottom:5px;">User:</div>
+                    <div id="period-user-name" style="color:#6c757d; font-size:1.1em; margin-bottom:10px;">-</div>
+                </div>
+
+                <div style="margin-bottom:15px;">
+                    <label style="display:block; font-size:0.85em; font-weight:bold; color:#555; margin-bottom:5px;">
+                        <input type="checkbox" id="period-enabled-checkbox" onchange="togglePeriodFields()"> เปิดใช้งาน Period
+                    </label>
+                    <div style="font-size:0.75em; color:#999; margin-top:3px;">* ปิด checkbox = ไม่มี Period (ไม่แสดงวันที่)</div>
+                </div>
+
+                <div id="period-fields-container" style="display:none;">
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; font-size:0.85em; font-weight:bold; color:#555; margin-bottom:5px;">📅 วันเริ่มต้น:</label>
+                        <input type="date" id="period-start-date" 
+                            style="width:100%; padding:10px; border:1.5px solid #6c757d; border-radius:8px; font-weight:bold;">
+                    </div>
+
+                    <div style="margin-bottom:20px;">
+                        <label style="display:block; font-size:0.85em; font-weight:bold; color:#555; margin-bottom:5px;">📅 วันสิ้นสุด:</label>
+                        <input type="date" id="period-end-date" 
+                            style="width:100%; padding:10px; border:1.5px solid #6c757d; border-radius:8px; font-weight:bold;">
+                    </div>
+                </div>
+
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; font-size:0.85em; font-weight:bold; color:#555; margin-bottom:5px;">📝 เหตุผลการปรับ Period:</label>
+                    <textarea id="period-adjustment-reason" rows="3" placeholder="ระบุเหตุผลที่ต้องการปรับ Period..." 
+                        style="width:100%; padding:10px; border:1.5px solid #eee; border-radius:8px; resize:none; font-size:0.9em;"></textarea>
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <button class="magic-btn" style="flex:2; background:#6c757d;" onclick="savePeriodAdjustment()">💾 บันทึกการปรับ</button>
+                    <button class="btn-sm btn-dark" style="flex:1; border-radius:8px;" onclick="closePeriodAdjustmentModal()">ยกเลิก</button>
+                </div>
+            </div>
+        </div>
+
         <!-- 🔥 Reflective Detail Modal (V86.96) -->
         <div id="reflectiveDetailModal" class="modal" style="z-index: 2502;">
             <div class="modal-content" style="max-width: 500px; border-top: 5px solid var(--primary); border-radius: 12px;">
@@ -10267,7 +10314,13 @@
                                 ${d.periodScore !== undefined ? `<span style="font-weight:bold;color:var(--primary);">${d.periodScore.toFixed(2)}</span> <span style="font-size:0.75em; color:#999;">(+${parseFloat((d.score || 0).toFixed(2))})</span>` : `<span style="font-weight:bold;color:var(--primary);">${parseFloat((d.score || 0).toFixed(2))}</span>`}
                             </td>
                             <td><div style="display:flex;"><input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:70px;margin:0;" onkeypress="if(event.key==='Enter')adjDec('${d.id}')"><button class="btn-sm btn-success" onclick="adjDec('${d.id}')">Adj</button></div></td>
-                            <td style="font-size:0.78em; white-space:nowrap;">${dateStr} ${certStatus}</td>
+                            <td style="font-size:0.78em; white-space:nowrap;">
+                                <div style="display:flex; align-items:center; gap:5px;">
+                                    <span>${dateStr}</span>
+                                    ${certStatus}
+                                    <button class="btn-sm" onclick="openPeriodModal('${d.id}', '${d.displayName}', '${d.startDate || ''}', '${d.endDate || ''}')" style="font-size:0.7em; padding:2px 6px; background:#6c757d; color:white; border:none; border-radius:4px;" title="Adjust Period">📅</button>
+                                </div>
+                            </td>
                             <td>${actionsGroup}</td>
                         </tr>`;
                 }
@@ -12896,11 +12949,117 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             document.getElementById('score-adjustment-reason').value = '';
         }
 
-        async function deleteReflective(id) {
-            if (confirm("Delete this log?")) {
-                await db.collection("reflective_logs").doc(id).delete();
-                showToast("Deleted");
+        // Period Adjustment Functions (V88.86)
+        let currentPeriodUserId = '';
+
+        function openPeriodModal(userId, userName, startDate, endDate) {
+            currentPeriodUserId = userId;
+            const modal = document.getElementById('periodAdjustmentModal');
+            const userNameDisplay = document.getElementById('period-user-name');
+            const enabledCheckbox = document.getElementById('period-enabled-checkbox');
+            const startDateInput = document.getElementById('period-start-date');
+            const endDateInput = document.getElementById('period-end-date');
+            
+            userNameDisplay.textContent = userName;
+            
+            // Check if user currently has period dates
+            const hasPeriod = startDate && endDate && startDate !== '' && endDate !== '';
+            enabledCheckbox.checked = hasPeriod;
+            
+            if (hasPeriod) {
+                startDateInput.value = startDate;
+                endDateInput.value = endDate;
+            } else {
+                // Set default dates if no period exists
+                const today = new Date();
+                const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+                startDateInput.value = today.toISOString().split('T')[0];
+                endDateInput.value = nextMonth.toISOString().split('T')[0];
             }
+            
+            togglePeriodFields();
+            modal.style.display = 'block';
+        }
+
+        function togglePeriodFields() {
+            const enabled = document.getElementById('period-enabled-checkbox').checked;
+            const fieldsContainer = document.getElementById('period-fields-container');
+            fieldsContainer.style.display = enabled ? 'block' : 'none';
+        }
+
+        async function savePeriodAdjustment() {
+            try {
+                const userId = currentPeriodUserId;
+                const enabled = document.getElementById('period-enabled-checkbox').checked;
+                const reason = document.getElementById('period-adjustment-reason').value.trim();
+                
+                if (!userId) {
+                    showToast("❌ ไม่พบข้อมูล User", "error");
+                    return;
+                }
+                
+                let updateData = {};
+                
+                if (enabled) {
+                    const startDate = document.getElementById('period-start-date').value;
+                    const endDate = document.getElementById('period-end-date').value;
+                    
+                    if (!startDate || !endDate) {
+                        showToast("❌ กรุณาระบุวันเริ่มต้นและวันสิ้นสุด", "error");
+                        return;
+                    }
+                    
+                    if (new Date(startDate) > new Date(endDate)) {
+                        showToast("❌ วันเริ่มต้นต้องไม่เกินวันสิ้นสุด", "error");
+                        return;
+                    }
+                    
+                    updateData = {
+                        startDate: startDate,
+                        endDate: endDate
+                    };
+                } else {
+                    // Clear period dates
+                    updateData = {
+                        startDate: firebase.firestore.FieldValue.delete(),
+                        endDate: firebase.firestore.FieldValue.delete()
+                    };
+                }
+                
+                // Update user document
+                await db.collection("users").doc(userId).update(updateData);
+                
+                // Log the adjustment if reason provided
+                if (reason) {
+                    await db.collection("admin_logs").add({
+                        userId: userId,
+                        action: enabled ? 'period_enabled' : 'period_disabled',
+                        details: enabled ? {
+                            startDate: updateData.startDate,
+                            endDate: updateData.endDate
+                        } : 'period_removed',
+                        reason: reason,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        adminId: 'current_admin' // You might want to track which admin made the change
+                    });
+                }
+                
+                // Close modal and refresh table
+                closePeriodAdjustmentModal();
+                renderTable('users');
+                
+                showToast(`✅ ${enabled ? 'ตั้งค่า Period' : 'ลบ Period'} เรียบร้อย`, "success");
+                
+            } catch (error) {
+                console.error("Error adjusting period:", error);
+                showToast("❌ ไม่สามารถปรับ Period ได้ กรุณาลองใหม่", "error");
+            }
+        }
+
+        function closePeriodAdjustmentModal() {
+            document.getElementById('periodAdjustmentModal').style.display = 'none';
+            document.getElementById('period-adjustment-reason').value = '';
+            currentPeriodUserId = '';
         }
 
         // V86.14: Quick Review Modal Logic
