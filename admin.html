@@ -4622,36 +4622,31 @@
                     if (window.TYPHOON_API_KEY.includes('__')) throw new Error("Proxy failed and no local Typhoon API Key set.");
                     
                     const callTyphoon = async (mName) => {
-                        // 🔥 Try different model names for Typhoon
-                        let actualModelName = mName;
-                        if (mName.includes('v1.5x') || mName.includes('70b')) {
-                            actualModelName = 'typhoon-v2.1-12b-instruct';
-                        } else if (mName.includes('v1.5')) {
-                            actualModelName = 'typhoon-v2.1-12b-instruct';
-                        } else if (!mName.includes('typhoon')) {
-                            actualModelName = 'typhoon-v2.1-12b-instruct';
-                        } else if (mName.includes('v2') || mName.includes('2.')) {
-                            actualModelName = 'typhoon-v2.1-12b-instruct';
-                        }
+                        // 🔥 Use the correct model name from official docs
+                        let actualModelName = 'typhoon-v2.5-30b-a3b-instruct';
+                        
+                        // 🔥 Add system message for better translation
+                        const messages = [
+                            { 
+                                role: 'system', 
+                                content: 'You are a helpful assistant that translates text accurately. Respond only with the translation.' 
+                            },
+                            { 
+                                role: 'user', 
+                                content: prompt 
+                            }
+                        ];
 
                         const payload = {
                             model: actualModelName,
-                            messages: [{ role: 'user', content: prompt }],
-                            temperature: 0.6,
-                            max_tokens: 512,
-                            top_p: 0.95,
-                            repetition_penalty: 1.05,
-                            stream: false
+                            messages: messages,
+                            temperature: 0.7,
+                            max_tokens: 256
                         };
                         
-                        // 🔥 V88.78: Add JSON mode for Typhoon - modify prompt instead of response_format
-                        if (isJson) {
-                            payload.messages[0].content = prompt + "\n\nIMPORTANT: Respond with valid JSON only. No other text.";
-                        }
-
                         console.log('🔥 Typhoon API Request:', { model: actualModelName, payload: payload });
                         
-                        // 🔥 Try only the official endpoint
+                        // 🔥 Use the official endpoint
                         const endpoint = 'https://api.opentyphoon.ai/v1/chat/completions';
                         
                         try {
@@ -4660,8 +4655,7 @@
                                 method: 'POST',
                                 headers: { 
                                     'Content-Type': 'application/json', 
-                                    'Authorization': `Bearer ${window.TYPHOON_API_KEY}`,
-                                    'User-Agent': 'Intern-Port/1.0'
+                                    'Authorization': `Bearer ${window.TYPHOON_API_KEY}`
                                 },
                                 body: JSON.stringify(payload)
                             });
