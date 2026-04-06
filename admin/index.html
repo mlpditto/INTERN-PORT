@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Portal - INTERN-PORT</title>
+    
+    <!-- External Libraries -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    
+    <!-- Internal CSS -->
+    <link rel="stylesheet" href="css/admin.css">
+    
+    <style>
+        /* Additional inline styles for critical components */
+        .prompt-suggestion-btn {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 15px 20px;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .prompt-suggestion-btn:hover {
+            background: #e9ecef;
+            border-color: #dee2e6;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen">
+        <div style="text-align: center; padding: 40px;">
+            <h1 style="color: var(--primary); margin-bottom: 30px;">🔐 Admin Portal</h1>
+            
+            <div id="login-error" style="color: var(--danger); margin-bottom: 20px;"></div>
+            
+            <button class="btn-google magic-btn" onclick="loginWithGoogle()"
+                style="width:100%; background:white; color:#444; border:1px solid #ddd; margin-bottom:15px;">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"
+                    style="width:18px; vertical-align:middle; margin-right:8px;">
+                Sign in with Google
+            </button>
+            
+            <button class="magic-btn" onclick="loginWithLINE()"
+                style="width:100%; background:#00C300; color:white; margin-bottom:15px;">
+                <i class="fa-brands fa-line"></i> Sign in with LINE
+            </button>
+            
+            <div style="margin: 20px 0; text-align: center; color: #666;">
+                <small>--- OR ---</small>
+            </div>
+            
+            <input type="email" id="email-input" placeholder="Enter your email" 
+                style="width:100%; margin-bottom:10px;">
+            <button class="magic-btn" onclick="sendMagicLink()"
+                style="width:100%;">
+                <i class="fa-solid fa-paper-plane"></i> Send Magic Link
+            </button>
+        </div>
+    </div>
+
+    <!-- Dashboard Container -->
+    <div id="dashboard-container">
+        <!-- Header -->
+        <header style="display: flex; justify-content: space-between; align-items: center; padding: 20px; background: white; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <h1 style="color: var(--primary); margin: 0;">
+                <i class="fa-solid fa-gear"></i> Admin Portal
+            </h1>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <span id="admin-email" style="color: var(--text-sub);"></span>
+                <button onclick="logout()" class="btn-sm btn-danger">
+                    <i class="fa-solid fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </header>
+
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="switchTab('dashboard')">
+                <i class="fa-solid fa-chart-line"></i> Dashboard
+            </button>
+            <button class="tab-btn" onclick="switchTab('users')">
+                <i class="fa-solid fa-users"></i> Users
+            </button>
+            <button class="tab-btn" onclick="switchTab('quizzes')">
+                <i class="fa-solid fa-brain"></i> Quizzes
+            </button>
+            <button class="tab-btn" onclick="switchTab('settings')">
+                <i class="fa-solid fa-cog"></i> Settings
+            </button>
+        </div>
+
+        <!-- Tab Contents -->
+        <div id="tab-dashboard" class="tab-content active">
+            <h2>Kanban Board</h2>
+            <div class="kanban-board">
+                <div class="kanban-col">
+                    <h3>Backlog</h3>
+                    <div id="Backlog"></div>
+                </div>
+                <div class="kanban-col">
+                    <h3>Doing</h3>
+                    <div id="Doing"></div>
+                </div>
+                <div class="kanban-col">
+                    <h3>Review</h3>
+                    <div id="Review"></div>
+                </div>
+                <div class="kanban-col">
+                    <h3>Done</h3>
+                    <div id="Done"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-users" class="tab-content">
+            <h2>User Management</h2>
+            <p>User management features coming soon...</p>
+        </div>
+
+        <div id="tab-quizzes" class="tab-content">
+            <h2>Quiz Management</h2>
+            <p>Quiz management features coming soon...</p>
+        </div>
+
+        <div id="tab-settings" class="tab-content">
+            <h2>Settings</h2>
+            <p>Settings features coming soon...</p>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast"></div>
+
+    <!-- Scripts -->
+    <script src="js/auth.js"></script>
+    <script src="js/kanban.js"></script>
+    <script>
+        // Global functions
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById('tab-' + tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Initialize system
+        let isInit = false;
+        function initSystem() {
+            if (isInit) return;
+            isInit = true;
+            
+            console.log('Admin System Initialized');
+            showToast('Welcome to Admin Portal!');
+            
+            // Initialize Kanban
+            if (typeof initKanban === 'function') {
+                initKanban();
+            }
+        }
+
+        // Theme toggle
+        function toggleTheme() {
+            document.body.classList.toggle('dark-mode');
+        }
+    </script>
+</body>
+</html>
