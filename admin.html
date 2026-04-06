@@ -1121,6 +1121,35 @@
             font-weight: 900;
             pointer-events: none;
         }
+
+        /* Modern Liquid Glass Highlight for Current Question */
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 
+                    0 8px 25px rgba(99, 102, 241, 0.4),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            }
+            50% {
+                box-shadow: 
+                    0 12px 35px rgba(99, 102, 241, 0.6),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+            }
+        }
+
+        .current-question-highlight {
+            animation: slideInGlow 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes slideInGlow {
+            from {
+                opacity: 0;
+                transform: translateY(10px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script>mermaid.initialize({ startOnLoad: false, theme: 'neutral' });</script>
@@ -5939,66 +5968,12 @@
         function updateQuizPagination() {
             updatePollUI();
             const items = document.querySelectorAll('.quiz-q-item');
-            const total = items.length;
-            if (quizQPageIndex >= total && total > 0) quizQPageIndex = total - 1;
-            if (quizQPageIndex < 0) quizQPageIndex = 0;
 
-            items.forEach((item, i) => {
-                // Show only current question (1 per page) with highlight
-                if (i === quizQPageIndex) {
-                    item.style.display = 'block';
-                    item.style.marginBottom = '15px';
-                    // Add highlight class for current question
-                    item.classList.add('current-question-highlight');
-                    // Apply inline styles as backup
-                    item.style.border = '3px solid var(--primary) !important';
-                    item.style.borderRadius = '16px !important';
-                    item.style.background = 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(99,102,241,0.03)) !important';
-                    item.style.padding = '20px !important';
-                    item.style.boxShadow = '0 8px 25px rgba(99,102,241,0.2) !important';
-                    item.style.position = 'relative';
-                    item.style.zIndex = '10';
-                    
-                    // Add visual indicator
-                    if (!item.querySelector('.current-question-indicator')) {
-                        const indicator = document.createElement('div');
-                        indicator.className = 'current-question-indicator';
-                        indicator.style.cssText = `
-                            position: absolute;
-                            top: -12px;
-                            left: 20px;
-                            background: var(--primary);
-                            color: white;
-                            padding: 4px 12px;
-                            border-radius: 20px;
-                            font-size: 0.7em;
-                            font-weight: 800;
-                            z-index: 11;
-                            box-shadow: 0 4px 8px rgba(99,102,241,0.3);
-                        `;
-                        indicator.innerHTML = `<i class="fa-solid fa-edit"></i> EDITING Q${i + 1}`;
-                        item.appendChild(indicator);
-                    }
-                } else {
-                    item.style.display = 'none';
-                    // Remove highlight class and reset styles
-                    item.classList.remove('current-question-highlight');
-                    item.style.border = '';
-                    item.style.borderRadius = '';
-                    item.style.background = '';
-                    item.style.padding = '';
-                    item.style.boxShadow = '';
-                    item.style.position = '';
-                    item.style.zIndex = '';
-                    
-                    // Remove indicator
-                    const indicator = item.querySelector('.current-question-indicator');
-                    if (indicator) indicator.remove();
-                }
+let quizQPageIndex = 0;
 
-                // 🔥 V80: Read-only Mode Logic
-                const quizType = document.getElementById('quiz-type').value;
-                const contentArea = item.querySelector('.q-page-content-area');
+function moveQuizQ(direction) {
+const items = document.querySelectorAll('.quiz-q-item');
+const total = items.length;
                 const optionsArea = item.querySelector('.options-container');
                 const optionsActions = item.querySelector('.options-actions');
                 const qTypeSelect = item.querySelector('.q-type');
