@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V88.98)</title>
-    <!-- V88.98: forceShowModal defined in <head> for global scope -->
-    <!-- Release: 2026-04-06 19:30 UTC+7 -->
+    <title>Intern Admin Portal (V88.99)</title>
+    <!-- V88.99: Fix NULL bytes, Negative Wording Detection, Thai→AI Suggest -->
+    <!-- Release: 2026-04-07 08:40 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -1359,7 +1359,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.3em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,219,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V88.98</span>
+                        <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,219,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V88.99</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -2978,13 +2978,13 @@
                             <i class="fa-solid fa-key"></i> <span class="btn-text">Settings</span>
                         </button>
                     </div>
-                    <textarea id="reflective-review-comment" placeholder="Send advice to others... (e.g. Keep it up!, Well done!)" 
+                    <textarea id="reflective-review-comment" placeholder="พิมพ์ภาษาไทยแล้วกด AI Suggest → แปลเป็นภาษาที่เลือก ✨ หรือเว้นว่างให้ AI สร้างให้อัตโนมัติ" 
                         style="width:100%; height:100px; padding:12px; border:1.5px solid #eee; border-radius:8px; font-size:0.95em;"></textarea>
                 </div>
 
                 <div style="display:flex; gap:10px;">
                     <button class="magic-btn" style="flex:2; background:#d35400;" onclick="saveReflectiveReview()">💾 Save & Score</button>
-                    <button class="btn-sm btn-dark" style="flex:1; border-radius:8px;" onclick="document.getElementById('reflectiveReviewModal').style.display='none'">Cancel</button>
+                    <button class="btn-sm btn-dark" style="flex:1; border-radius:8px;" onclick="forceHideModal('reflectiveReviewModal')">Cancel</button>
                 </div>
             </div>
         </div>
@@ -5203,23 +5203,44 @@
             
             if (!logContent || logContent.length < 5) return alert("No reflective log content found to analyze");
             
+            const existingDraft = textarea.value.trim();
+            
             try {
                 btn.disabled = true;
                 const originalHtml = btn.innerHTML;
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>' + (btn.offsetWidth > 60 ? ' Analyzing...' : '');
                 
-                const prompt = `You are a kind and expert Mentor. 
-                Here is a Reflective Log from an intern:
-                "${logContent}"
-                
-                Please write a short praise and feedback (max 2-3 sentences) showing empathy and encouragement. 
-                Keep it friendly but professional. Response must be in "${targetLang}" only. 
-                Do not include any explanation other than the feedback body.`;
+                let prompt;
+                if (existingDraft && existingDraft.length >= 3) {
+                    // V88.99: Thai draft → AI refine & output in target language
+                    prompt = `You are a kind and expert Mentor.
+Here is a Reflective Log from an intern:
+"${logContent}"
+
+The admin has written a draft feedback/prompt in Thai:
+"${existingDraft}"
+
+Your task:
+1. Understand the admin's intent from the Thai draft above.
+2. Refine, polish, and expand it into a warm, professional feedback message.
+3. The final output MUST be in "${targetLang}" only.
+4. Keep it 2-3 sentences max. Show empathy and encouragement.
+5. Do not include any explanation — output ONLY the refined feedback text.`;
+                } else {
+                    // Original: Generate from scratch
+                    prompt = `You are a kind and expert Mentor. 
+Here is a Reflective Log from an intern:
+"${logContent}"
+
+Please write a short praise and feedback (max 2-3 sentences) showing empathy and encouragement. 
+Keep it friendly but professional. Response must be in "${targetLang}" only. 
+Do not include any explanation other than the feedback body.`;
+                }
                 
                 const { text } = await window.callUniversalAI(selectedModelName, prompt);
                 
                 textarea.value = text;
-                showToast("✨ AI suggested feedback!");
+                showToast(existingDraft ? "✨ AI refined your Thai draft → " + targetLang : "✨ AI suggested feedback!");
                 
             } catch (error) {
                 console.error("AI Error:", error);
@@ -5643,11 +5664,33 @@
 
         function toggleTheme() { document.body.classList.toggle('dark-mode'); }
 
+        // V88.99: Negative Wording Detection for Reflective Review
+        function detectNegativeWording(text) {
+            if (!text) return { found: false, words: [] };
+            const lower = text.toLowerCase();
+            const negTH = ['เบื่อ','เหนื่อย','ท้อ','ท้อแท้','หมดแรง','หมดกำลังใจ','เครียด','กดดัน','ผิดหวัง','เศร้า','เสียใจ','โกรธ','หงุดหงิด','รำคาญ','กลัว','วิตกกังวล','กังวล','ไม่ไหว','ไม่อยากทำ','ไม่มีแรง','อยากลาออก','ไม่ชอบ','ไม่มีความสุข','น่าเบื่อ','แย่','ห่วย','ไม่ดี','ล้มเหลว','พลาด','ผิด','โดนด่า','ถูกตำหนิ','ไม่ยุติธรรม','ไม่เป็นธรรม','ลำบาก','ยากลำบาก','ทุกข์','ทรมาน','เจ็บปวด','สิ้นหวัง','หดหู่','ซึมเศร้า','ร้องไห้','อ่อนแอ','ไม่พอใจ','โมโห'];
+            const negEN = ['hate','angry','sad','depressed','hopeless','tired','exhausted','stressed','frustrated','disappointed','annoyed','anxious','worried','scared','bored','terrible','awful','horrible','miserable','quit','give up','fail','failed','useless','worthless','helpless','lonely','cry','painful','suffering','unfair','burnout','overwhelmed'];
+            const found = [];
+            negTH.forEach(w => { if (lower.includes(w)) found.push(w); });
+            negEN.forEach(w => { if (lower.includes(w)) found.push(w); });
+            return { found: found.length > 0, words: found, severity: found.length >= 3 ? 'high' : found.length >= 1 ? 'medium' : 'none' };
+        }
+
+        function getNegativeBadgeHtml(text) {
+            const result = detectNegativeWording(text);
+            if (!result.found) return '';
+            const color = result.severity === 'high' ? '#dc3545' : '#f39c12';
+            const icon = result.severity === 'high' ? 'fa-triangle-exclamation' : 'fa-circle-exclamation';
+            const label = result.severity === 'high' ? 'Negative' : 'Caution';
+            return `<div style="margin-top:5px; display:inline-flex; align-items:center; gap:4px; background:${color}15; border:1px solid ${color}40; color:${color}; padding:2px 8px; border-radius:12px; font-size:0.72em; font-weight:bold;" title="Detected: ${result.words.join(', ')}"><i class="fa-solid ${icon}"></i> ${label} (${result.words.length})</div>`;
+        }
+
         const groupColorMap = {
             'Public': '#4361ee',
             'IT': '#20c997',
             'Marketing': '#ff9f1c',
             'MLP': '#ef233c',
+            // ... (rest of the code remains the same)
             'Pharmacists': '#8338ec',
             'Dev': '#34495e',
             'Design': '#e83e8c',
@@ -12340,6 +12383,7 @@
                                     <td style="font-size:1.5em; text-align:center;">${moodEmoji}</td>
                                     <td style="font-size:0.85em; color:#444;">
                                         <div style="font-weight:500;">${log.content}</div>
+                                        ${getNegativeBadgeHtml(log.content)}
                                         ${log.adminComment ? `<div style="font-size:0.9em; color:#d35400; border-top:1px dashed #eee; margin-top:5px; padding-top:3px;">💬 ${log.adminComment}</div>` : ''}
                                     </td>
                                     <td>
@@ -12780,11 +12824,24 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     </div>
                 </div>
                 <div style="font-size:1.05em; color:#333; line-height:1.4;">${moodEmoji} ${log.content}</div>
+                ${(() => {
+                    const neg = detectNegativeWording(log.content);
+                    if (!neg.found) return '';
+                    const c = neg.severity === 'high' ? '#dc3545' : '#f39c12';
+                    return `<div style="margin-top:10px; padding:10px 14px; border-radius:12px; background:${c}10; border:1px solid ${c}30;">
+                        <div style="font-size:0.8em; font-weight:bold; color:${c}; margin-bottom:4px;">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Negative Wording Detected (${neg.words.length})
+                        </div>
+                        <div style="display:flex; flex-wrap:wrap; gap:4px;">
+                            ${neg.words.map(w => '<span style="background:' + c + '20; color:' + c + '; padding:2px 8px; border-radius:8px; font-size:0.78em; font-weight:600;">' + w + '</span>').join('')}
+                        </div>
+                    </div>`;
+                })()}
             `;
 
             document.getElementById('reflective-review-bonus').value = log.adminBonus !== undefined ? log.adminBonus : "0.5";
             document.getElementById('reflective-review-comment').value = log.adminComment || "";
-            document.getElementById('reflectiveReviewModal').style.display = 'block';
+            forceShowModal('reflectiveReviewModal');
         }
 
         async function saveReflectiveReview() {
@@ -12815,7 +12872,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
                 await logRef.update(upData);
                 showToast(`Reviewed! User can claim +${bonus} points ✨`);
-                document.getElementById('reflectiveReviewModal').style.display = 'none';
+                forceHideModal('reflectiveReviewModal');
             } catch (e) {
                 alert("Error: " + e.message);
             }
@@ -13339,8 +13396,8 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         };
 
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V88.98 loaded OK ', 'background:#4361ee;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
-        console.log('setUserGroup:', typeof setUserGroup, '| openPeriodModal:', typeof openPeriodModal, '| reviewQuiz:', typeof reviewQuiz);
+        console.log('%c V88.99 loaded OK ', 'background:#4361ee;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('setUserGroup:', typeof setUserGroup, '| openPeriodModal:', typeof openPeriodModal, '| reviewQuiz:', typeof reviewQuiz, '| detectNegativeWording:', typeof detectNegativeWording);
     </script>
 
     <!-- Quick Review Modal -->
@@ -13512,10 +13569,3 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 </body>
 
 </html>
-
-
-
-
-< ! - -   C a c h e   b u s t :   0 4 / 0 5 / 2 0 2 6   2 0 : 3 6 : 0 9   - - > 
- 
- 
