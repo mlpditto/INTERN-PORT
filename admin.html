@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V89.01)</title>
+    <title>Intern Admin Portal (V89.02)</title>
     <!-- V89.01: Fix Quiz Participants modal close buttons and event binding -->
     <!-- Release: 2026-04-07 11:05 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -12,155 +12,43 @@
     <meta http-equiv="Expires" content="0">
 
     <script>
-        // V89.00: Enhanced modal helpers with debugging and double modal prevention
+        // V89.02: Reconstructed helper with nested modal support
         function forceShowModal(id, displayType) {
-            var m = document.getElementById(id);
+            const m = document.getElementById(id);
             if (!m) { console.error('forceShowModal: not found:', id); return; }
             displayType = displayType || 'block';
+
+            // Special handling for nested modals (Participants/Review on top of Manager)
+            const isNested = (id === 'quizParticipantsModal' || id === 'reflectiveReviewModal' || id === 'quizReviewModal');
             
-            console.log('forceShowModal: Advanced DOM manipulation for:', id);
-            
-            // IMPORTANT: Close ALL other modals first to prevent double display
+            // Hide other modals unless they are safe parents
             document.querySelectorAll('.modal').forEach(modal => {
                 if (modal.id !== id) {
-                    modal.classList.remove('force-show');
-                    modal.style.display = 'none';
-                    modal.setAttribute('style', 'display:none;');
-                }
-            });
-            
-            // V89.00: Double check after a delay to ensure all modals are hidden
-            setTimeout(() => {
-                document.querySelectorAll('.modal').forEach(modal => {
-                    if (modal.id !== id && (modal.style.display !== 'none' || modal.classList.contains('force-show'))) {
-                        console.warn('forceShowModal: Found still-visible modal:', modal.id, '- force hiding again');
+                    const isSafeParent = (modal.id === 'quizManageModal' || modal.id === 'archiveModal' || modal.id === 'assignmentsManageModal');
+                    if (!isNested || !isSafeParent) {
                         modal.classList.remove('force-show');
                         modal.style.display = 'none';
                         modal.setAttribute('style', 'display:none;');
-                        modal.style.setProperty('display', 'none', 'important');
                     }
-                });
-            }, 50);
-            
-            // Remove any nuclear overlays
-            document.querySelectorAll('[id^="nuclear-overlay-"]').forEach(overlay => {
-                overlay.remove();
-            });
-            
-            // V89.00: Special handling for nested modals - check if current modal is inside another modal
-            var currentParent = m.parentElement;
-            var foundModalParent = null;
-            while (currentParent && currentParent !== document.body) {
-                if (currentParent.classList.contains('modal') && currentParent.id !== id) {
-                    foundModalParent = currentParent;
-                    console.warn('forceShowModal: Found modal parent:', foundModalParent.id, '- this will cause double display');
-                    break;
                 }
-                currentParent = currentParent.parentElement;
-            }
-            
-            // If we found a modal parent, ensure it's properly hidden
-            if (foundModalParent) {
-                console.log('forceShowModal: Force hiding modal parent:', foundModalParent.id);
-                foundModalParent.classList.remove('force-show');
-                foundModalParent.style.display = 'none';
-                foundModalParent.setAttribute('style', 'display:none;');
-            }
-            
-            // Check parent elements for display issues
-            var parent = m.parentElement;
-            while (parent && parent !== document.body) {
-                var parentStyle = window.getComputedStyle(parent);
-                console.log('forceShowModal: Parent', parent.tagName, 'style:', parentStyle.display, parentStyle.visibility, parentStyle.opacity);
-                if (parentStyle.display === 'none' || parentStyle.visibility === 'hidden' || parentStyle.opacity === '0') {
-                    console.warn('forceShowModal: Found hidden parent:', parent);
-                    parent.style.setProperty('display', 'block', 'important');
-                    parent.style.setProperty('visibility', 'visible', 'important');
-                    parent.style.setProperty('opacity', '1', 'important');
-                }
-                parent = parent.parentElement;
-            }
-            
-            // Remove any existing force-show classes from other modals
-            document.querySelectorAll('.modal.force-show').forEach(modal => {
-                modal.classList.remove('force-show');
             });
-            
-            // V89.00: Move modal to body ONLY for reflectiveReviewModal to fix double modal issue
-            var wasMoved = false;
-            if (m.parentElement !== document.body && id === 'reflectiveReviewModal') {
-                console.log('forceShowModal: Moving reflectiveReviewModal to body (problematic modal only)');
-                document.body.appendChild(m);
-                wasMoved = true;
-            } else if (m.parentElement !== document.body) {
-                console.log('forceShowModal: Keeping modal', id, 'in original position to preserve UI');
-            }
-            
-            // Remove all inline styles and classes
+
+            // Ensure current modal is visible and positioned correctly
             m.removeAttribute('style');
             m.className = 'modal force-show';
+            m.style.display = displayType;
+            m.style.setProperty('display', displayType, 'important');
             
-            // V89.00: Rebind event listeners if modal was moved
-            if (wasMoved) {
-                console.log('forceShowModal: Rebinding event listeners for moved modal');
-                // Rebind close buttons
-                m.querySelectorAll('.close-modal').forEach(closeBtn => {
-                    const modalId = m.id;
-                    closeBtn.onclick = function() {
-                        console.log('forceShowModal: Close button clicked for', modalId);
-                        forceHideModal(modalId);
-                    };
-                });
-                
-                // Rebind Cancel buttons specifically for reflectiveReviewModal and quizParticipantsModal
-                if (id === 'reflectiveReviewModal' || id === 'quizParticipantsModal') {
-                    m.querySelectorAll('button').forEach(btn => {
-                        const btnText = btn.textContent.trim().toLowerCase();
-                        if (btnText === 'cancel' || btnText === 'close') {
-                            btn.onclick = function() {
-                                console.log('forceShowModal: Close button clicked for', id);
-                                forceHideModal(id);
-                            };
-                        }
-                    });
-                }
-            }
-            
-            // Force multiple reflows
+            // Force reflow
             m.offsetHeight;
             document.body.offsetHeight;
-            
+
             setTimeout(() => {
-                var rect = m.getBoundingClientRect();
-                console.log('forceShowModal:', id, 'modal rect after DOM manipulation:', rect);
-                
+                const rect = m.getBoundingClientRect();
                 if (rect.width === 0 || rect.height === 0) {
-                    console.error('forceShowModal: All approaches failed, trying nuclear option');
-                    // Nuclear option: create new overlay
-                    var overlay = document.createElement('div');
-                    overlay.id = 'nuclear-overlay-' + id;
-                    overlay.style.cssText = 'position:fixed !important;top:0 !important;left:0 !important;width:100vw !important;height:100vh !important;z-index:999999 !important;background:rgba(0,0,0,0.5) !important;display:flex !important;align-items:center !important;justify-content:center !important;';
-                    
-                    // Clone modal content
-                    var content = m.querySelector('.modal-content');
-                    if (content) {
-                        var clonedContent = content.cloneNode(true);
-                        clonedContent.style.cssText = 'position:relative !important;z-index:1000000 !important;background:white !important;display:block !important;max-width:90vw !important;max-height:90vh !important;overflow:auto !important;';
-                        overlay.appendChild(clonedContent);
-                        
-                        // Add close functionality
-                        var closeBtn = clonedContent.querySelector('.close-modal');
-                        if (closeBtn) {
-                            closeBtn.onclick = function() {
-                                overlay.remove();
-                            };
-                        }
-                        
-                        document.body.appendChild(overlay);
-                        console.log('forceShowModal: Nuclear overlay created');
-                    }
+                    console.error('forceShowModal: failed for', id);
                 }
-            }, 10);
+            }, 50);
         }
         function forceHideModal(id) {
             var m = document.getElementById(id);
@@ -2881,8 +2769,9 @@
                         <div style="display:flex; gap:6px; align-items:flex-end;">
                             <div style="flex:1;">
                                 <label style="font-size:0.7em; color:#64748b; font-weight:600; display:block; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.5px;">Deadline</label>
+                                <input type="datetime-local" id="quiz-deadline" lang="en-GB" style="width:100%; padding:8px 12px; border:1px solid #e2e8f0; border-radius:10px; font-size:0.9em; background:#fff; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);">
                             </div>
-                            <button class="btn-sm" onclick="endQuizNow()" style="padding:5px 12px; background:linear-gradient(135deg, #fecaca, #fca5a5); color:#991b1b; border:none; border-radius:8px; font-weight:700; font-size:0.75em; white-space:nowrap; height:32px; cursor:pointer; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">End Now</button>
+                            <button class="btn-sm" onclick="endQuizNow()" style="padding:5px 12px; background:linear-gradient(135deg, #fecaca, #fca5a5); color:#991b1b; border:none; border-radius:8px; font-weight:700; font-size:0.75em; white-space:nowrap; height:38px; cursor:pointer; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">End Now</button>
                         </div>
                     </div>
 
