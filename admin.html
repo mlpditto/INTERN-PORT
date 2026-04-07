@@ -87,14 +87,42 @@
             });
             
             // Move modal to body to avoid container issues
+            var wasMoved = false;
             if (m.parentElement !== document.body) {
                 console.log('forceShowModal: Moving modal to body');
                 document.body.appendChild(m);
+                wasMoved = true;
             }
             
             // Remove all inline styles and classes
             m.removeAttribute('style');
             m.className = 'modal force-show';
+            
+            // V89.00: Rebind event listeners if modal was moved
+            if (wasMoved) {
+                console.log('forceShowModal: Rebinding event listeners for moved modal');
+                // Rebind close buttons
+                m.querySelectorAll('.close-modal').forEach(closeBtn => {
+                    const modalId = m.id;
+                    closeBtn.onclick = function() {
+                        console.log('forceShowModal: Close button clicked for', modalId);
+                        forceHideModal(modalId);
+                    };
+                });
+                
+                // Rebind Cancel buttons specifically for reflectiveReviewModal
+                if (id === 'reflectiveReviewModal') {
+                    m.querySelectorAll('button').forEach(btn => {
+                        const btnText = btn.textContent.trim().toLowerCase();
+                        if (btnText === 'cancel' || btnText === 'close') {
+                            btn.onclick = function() {
+                                console.log('forceShowModal: Cancel button clicked for reflectiveReviewModal');
+                                forceHideModal('reflectiveReviewModal');
+                            };
+                        }
+                    });
+                }
+            }
             
             // Force multiple reflows
             m.offsetHeight;
