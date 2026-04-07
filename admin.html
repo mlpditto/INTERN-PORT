@@ -4,15 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V88.99)</title>
-    <!-- V88.99: Fix NULL bytes, Negative Wording Detection, Thai→AI Suggest -->
+    <title>Intern Admin Portal (V89.00)</title>
+    <!-- V89.00: Fix NULL bytes, Negative Wording Detection, Thai→AI Suggest, Double Modal -->
     <!-- Release: 2026-04-07 08:40 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
     <script>
-        // V88.99: Enhanced modal helpers with debugging and content visibility
+        // V89.00: Enhanced modal helpers with debugging and double modal prevention
         function forceShowModal(id, displayType) {
             var m = document.getElementById(id);
             if (!m) { console.error('forceShowModal: not found:', id); return; }
@@ -20,11 +20,12 @@
             
             console.log('forceShowModal: Advanced DOM manipulation for:', id);
             
-            // IMPORTANT: Close all other modals first to prevent double display
+            // IMPORTANT: Close ALL other modals first to prevent double display
             document.querySelectorAll('.modal').forEach(modal => {
                 if (modal.id !== id) {
                     modal.classList.remove('force-show');
                     modal.style.display = 'none';
+                    modal.setAttribute('style', 'display:none;');
                 }
             });
             
@@ -32,6 +33,26 @@
             document.querySelectorAll('[id^="nuclear-overlay-"]').forEach(overlay => {
                 overlay.remove();
             });
+            
+            // V89.00: Special handling for nested modals - check if current modal is inside another modal
+            var currentParent = m.parentElement;
+            var foundModalParent = null;
+            while (currentParent && currentParent !== document.body) {
+                if (currentParent.classList.contains('modal') && currentParent.id !== id) {
+                    foundModalParent = currentParent;
+                    console.warn('forceShowModal: Found modal parent:', foundModalParent.id, '- this will cause double display');
+                    break;
+                }
+                currentParent = currentParent.parentElement;
+            }
+            
+            // If we found a modal parent, ensure it's properly hidden
+            if (foundModalParent) {
+                console.log('forceShowModal: Force hiding modal parent:', foundModalParent.id);
+                foundModalParent.classList.remove('force-show');
+                foundModalParent.style.display = 'none';
+                foundModalParent.setAttribute('style', 'display:none;');
+            }
             
             // Check parent elements for display issues
             var parent = m.parentElement;
