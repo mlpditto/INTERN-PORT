@@ -1,7 +1,10 @@
 # MLP Internship Portfolio (V89.05) Overview
 
 > [!IMPORTANT]
-> **📢 กฎการพัฒนา (Development Rule):** ทุกครั้งที่มีการปรับปรุงฟีเจอร์หรือแก้ไขบั๊ก (Code Improvement) **"ต้องอัพเดทเวอร์ชัน (Version)"** ในไฟล์ `admin.html`, `index.html` และเอกสารประกอบเสมอ เพื่อการติดตามที่ถูกต้อง (Version Consistency)
+> **📢 กฎการพัฒนา (Development Rule):** 
+> 1. แก้ไขโค้ดที่ `production` เสมอ ห้ามแก้ที่ `main`
+> 2. ทุกครั้งที่ Commit ต้องอัปเดตเวอร์ชัน (Vxx.xx) ใน `admin.html` (Title & Badge)
+> 3. ใช้ **"Turbo Mode"** (Merge `production` -> `main`) ทุกครั้งเมื่อต้องการ Deploy (ตามกฎใน `VERSION_SYNC_POLICY.md`)
 
 ระบบเว็บแอปพลิเคชันสำหรับจัดการการฝึกงานและระบบ Gamification (สะสมคะแนน) เพื่อจูงใจและติดตามความก้าวหน้าของนักศึกษาฝึกงาน
 
