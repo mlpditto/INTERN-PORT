@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V89.03)</title>
-    <!-- V89.03: Fix missing closed div in quizManageModal causing overlapping displays -->
-    <!-- Release: 2026-04-07 20:35 UTC+7 -->
+    <title>Intern Admin Portal (V89.04)</title>
+    <!-- V89.04: Fix AI Quiz Analyzer index mismatch and add related questions preview -->
+    <!-- Release: 2026-04-07 21:05 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -4177,7 +4177,7 @@
                     btn.disabled = true;
                 }
                 
-                const prompt = `Analyze these quiz questions for similarity, redundancy, variety, and quality.\nIdentify specific questions that need improvement (wording, clarity, or removing duplicates).\n\nQuestions list:\n${qList}\n\nOUTPUT FORMAT (MANDATORY JSON):\n{\n  "suggestedTitles": { "full": "...", "short": "..." },\n  "analysisText": "Professional detailed summary in Thai (markdown enabled)...",\n  "items": [\n    {\n      "index": 0,\n      "issue": "Explanation of issue for Q1 (e.g. too simple, redundant with Q2)",\n      "suggestion": "How to improve it",\n      "improvedQuestion": {\n        "q": "Improved question text...",\n        "type": "choice",\n        "options": ["A", "B", "C", "D"],\n        "correct": [0],\n        "timer": 60\n      }\n    }\n  ]\n}\n\nImportant: If a question is perfect, omit it from the "items" array. Always use Thai for analysis and improved text.\nInclude suggested titles at the top of analysisText as well.`;
+                const prompt = `Analyze these quiz questions for similarity, redundancy, variety, and quality.\nIdentify specific questions that need improvement.\n\nQuestions list:\n${qList}\n\nOUTPUT FORMAT (MANDATORY JSON):\n{\n  "suggestedTitles": { "full": "...", "short": "..." },\n  "analysisText": "Professional summary in Thai. If questions are duplicated, mention all Q numbers.",\n  "items": [\n    {\n      "qNumber": 1,\n      "relatedQNumbers": [2],\n      "issue": "Explanation of issue for Q1 (e.g. redundant with Q2)",\n      "suggestion": "How to improve it",\n      "improvedQuestion": {\n        "q": "Improved question text...",\n        "type": "choice",\n        "options": ["A", "B", "C", "D"],\n        "correct": [0],\n        "timer": 60\n      }\n    }\n  ]\n}\n\nImportant: Omit perfect questions. ALWAYS use Thai. ALWAYS use 1-based qNumber matching the Q list EXACTLY.`;
                 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-2.5-pro-preview-05-06';
                 
@@ -4212,7 +4212,8 @@
                             <h4 style="color:var(--primary); margin-bottom:15px;"><i class="fa-solid fa-list-check"></i> Individual Improvements (${result.items.length})</h4>
                             <div style="display:flex; flex-direction:column; gap:12px;">
                                 ${result.items.map((item, arrIdx) => {
-                                    const qIdx = item.index;
+                                    let qIdx = (item.qNumber !== undefined) ? item.qNumber - 1 : (item.index !== undefined ? item.index : 0);
+                                    qIdx = Math.max(0, Math.min(qIdx, formData.questions.length - 1));
                                     return `
                                         <div style="background:#fcfdff; border:1.5px solid #edf2f7; border-radius:15px; padding:15px; border-left:5px solid #4361ee;">
                                             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
@@ -13397,7 +13398,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 if (index >= currentQs.length) return alert("Question index out of sync.");
                 const currentQ = currentQs[index];
 
-                const renderQ = (q, label, color) => {
+                const renderQ = (q, label, color, qIdxNum) => {
                     const optionsHtml = q.options ? q.options.map((opt, i) => {
                         const isCorrect = q.correct && q.correct.includes(i);
                         return `<div style="padding:6px 10px; margin:3px 0; border-radius:8px; font-size:0.88em; background:${isCorrect ? '#dcfce7' : '#f8fafc'}; border:1px solid ${isCorrect ? '#86efac' : '#e2e8f0'}; display:flex; align-items:center; gap:6px;">
@@ -13406,9 +13407,11 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                         </div>`;
                     }).join('') : '<div style="color:#94a3b8; font-size:0.85em;">No options</div>';
 
+                    let iconCls = label === 'Current' ? 'file-lines' : (label === 'Reference' ? 'bookmark' : 'wand-magic-sparkles');
+
                     return `<div style="flex:1; min-width:280px;">
                         <div style="background:${color}; color:white; padding:8px 14px; border-radius:12px 12px 0 0; font-weight:800; font-size:0.82em; display:flex; align-items:center; gap:6px;">
-                            <i class="fa-solid fa-${label === 'Current' ? 'file-lines' : 'wand-magic-sparkles'}"></i> ${label} Q${index + 1}
+                            <i class="fa-solid fa-${iconCls}"></i> ${label} Q${qIdxNum + 1}
                             <span style="margin-left:auto; background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:6px; font-size:0.85em;">${q.type || 'choice'}</span>
                         </div>
                         <div style="background:#fff; border:1.5px solid #e2e8f0; border-top:none; border-radius:0 0 12px 12px; padding:14px;">
@@ -13431,6 +13434,28 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
                 const diffBadges = diffs.map(d => `<span style="background:#fef3c7; color:#92400e; padding:3px 10px; border-radius:20px; font-size:0.75em; font-weight:600;">${d}</span>`).join(' ');
 
+                // Find related questions from AI analysis or regex
+                let relatedIndices = (item.relatedQNumbers || []).map(n => n - 1);
+                if (relatedIndices.length === 0 && item.issue) {
+                    const matches = item.issue.match(/Q(\d+)/gi);
+                    if (matches) {
+                        matches.forEach(m => {
+                            const n = parseInt(m.substring(1));
+                            if (!isNaN(n)) relatedIndices.push(n - 1);
+                        });
+                    }
+                }
+                relatedIndices = [...new Set(relatedIndices)].filter(i => i >= 0 && i < currentQs.length && i !== index);
+                
+                let relatedHtml = "";
+                if (relatedIndices.length > 0) {
+                    relatedHtml = `<div style="width:100%; height:1px; background:#e2e8f0; margin:15px 0;"></div>
+                    <div style="width:100%; font-size:0.85em; font-weight:bold; color:#64748b; margin-bottom:10px;"><i class="fa-solid fa-link"></i> Related Questions Mentioned</div>
+                    <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                        ${relatedIndices.map(rIdx => renderQ(currentQs[rIdx], 'Reference', '#94a3b8', rIdx)).join('')}
+                    </div>`;
+                }
+
                 const modal = document.createElement('div');
                 modal.id = 'ai-compare-modal';
                 modal.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:30000; display:flex; align-items:center; justify-content:center; padding:20px;';
@@ -13446,9 +13471,10 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                         <div style="padding:20px 24px;">
                             ${diffs.length > 0 ? `<div style="margin-bottom:16px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;"><span style="font-size:0.78em; font-weight:700; color:#64748b;">Changes:</span> ${diffBadges}</div>` : ''}
                             <div style="display:flex; gap:16px; flex-wrap:wrap;">
-                                ${renderQ(currentQ, 'Current', '#64748b')}
-                                ${renderQ(improvedQ, 'AI Suggested', '#7c3aed')}
+                                ${renderQ(currentQ, 'Current', '#64748b', index)}
+                                ${renderQ(improvedQ, 'AI Suggested', '#7c3aed', index)}
                             </div>
+                            ${relatedHtml}
                             <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px; padding-top:16px; border-top:1px solid #e2e8f0;">
                                 <button class="btn-sm" onclick="document.getElementById('ai-compare-modal').remove()" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; padding:8px 20px; border-radius:10px; font-weight:700; font-size:0.85em; cursor:pointer;">Cancel</button>
                                 <button class="btn-sm" onclick="document.getElementById('ai-compare-modal').remove(); applySingleAiFix(${index}, ${arrIdx})" style="background:linear-gradient(135deg, #22c55e, #16a34a); color:white; border:none; padding:8px 20px; border-radius:10px; font-weight:700; font-size:0.85em; cursor:pointer; box-shadow:0 4px 12px rgba(34,197,94,0.3);"><i class="fa-solid fa-check-double"></i> Apply AI Fix</button>
