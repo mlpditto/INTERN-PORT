@@ -18,35 +18,70 @@
             if (!m) { console.error('forceShowModal: not found:', id); return; }
             displayType = displayType || 'block';
             
-            console.log('forceShowModal: Using CSS class approach for:', id);
+            console.log('forceShowModal: Advanced DOM manipulation for:', id);
+            
+            // Check parent elements for display issues
+            var parent = m.parentElement;
+            while (parent && parent !== document.body) {
+                var parentStyle = window.getComputedStyle(parent);
+                console.log('forceShowModal: Parent', parent.tagName, 'style:', parentStyle.display, parentStyle.visibility, parentStyle.opacity);
+                if (parentStyle.display === 'none' || parentStyle.visibility === 'hidden' || parentStyle.opacity === '0') {
+                    console.warn('forceShowModal: Found hidden parent:', parent);
+                    parent.style.setProperty('display', 'block', 'important');
+                    parent.style.setProperty('visibility', 'visible', 'important');
+                    parent.style.setProperty('opacity', '1', 'important');
+                }
+                parent = parent.parentElement;
+            }
             
             // Remove any existing force-show classes from other modals
             document.querySelectorAll('.modal.force-show').forEach(modal => {
                 modal.classList.remove('force-show');
             });
             
-            // Remove all inline styles
+            // Move modal to body to avoid container issues
+            if (m.parentElement !== document.body) {
+                console.log('forceShowModal: Moving modal to body');
+                document.body.appendChild(m);
+            }
+            
+            // Remove all inline styles and classes
             m.removeAttribute('style');
+            m.className = 'modal force-show';
             
-            // Add the force-show class
-            m.classList.add('force-show');
-            
-            // Force reflow
+            // Force multiple reflows
             m.offsetHeight;
+            document.body.offsetHeight;
             
             setTimeout(() => {
                 var rect = m.getBoundingClientRect();
-                console.log('forceShowModal:', id, 'modal rect after class:', rect);
+                console.log('forceShowModal:', id, 'modal rect after DOM manipulation:', rect);
                 
                 if (rect.width === 0 || rect.height === 0) {
-                    console.error('forceShowModal: Class approach failed, trying inline fallback');
-                    // Last resort: inline styles
-                    m.setAttribute('style', 'position:fixed !important;top:0 !important;left:0 !important;width:100vw !important;height:100vh !important;z-index:99999 !important;display:' + displayType + ' !important;visibility:visible !important;opacity:1 !important;background:rgba(0,0,0,0.5) !important;overflow:auto !important;margin:0 !important;padding:0 !important;border:none !important;box-sizing:border-box !important;');
+                    console.error('forceShowModal: All approaches failed, trying nuclear option');
+                    // Nuclear option: create new overlay
+                    var overlay = document.createElement('div');
+                    overlay.id = 'nuclear-overlay-' + id;
+                    overlay.style.cssText = 'position:fixed !important;top:0 !important;left:0 !important;width:100vw !important;height:100vh !important;z-index:999999 !important;background:rgba(0,0,0,0.5) !important;display:flex !important;align-items:center !important;justify-content:center !important;';
                     
-                    setTimeout(() => {
-                        var finalRect = m.getBoundingClientRect();
-                        console.log('forceShowModal:', id, 'final rect after inline fallback:', finalRect);
-                    }, 10);
+                    // Clone modal content
+                    var content = m.querySelector('.modal-content');
+                    if (content) {
+                        var clonedContent = content.cloneNode(true);
+                        clonedContent.style.cssText = 'position:relative !important;z-index:1000000 !important;background:white !important;display:block !important;max-width:90vw !important;max-height:90vh !important;overflow:auto !important;';
+                        overlay.appendChild(clonedContent);
+                        
+                        // Add close functionality
+                        var closeBtn = clonedContent.querySelector('.close-modal');
+                        if (closeBtn) {
+                            closeBtn.onclick = function() {
+                                overlay.remove();
+                            };
+                        }
+                        
+                        document.body.appendChild(overlay);
+                        console.log('forceShowModal: Nuclear overlay created');
+                    }
                 }
             }, 10);
         }
