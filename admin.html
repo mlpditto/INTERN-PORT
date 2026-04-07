@@ -12,7 +12,7 @@
     <meta http-equiv="Expires" content="0">
 
     <script>
-        // V89.02: Reconstructed helper with nested modal support
+        // V89.02: Reconstructed helper with nested modal and parent visibility support
         function forceShowModal(id, displayType) {
             const m = document.getElementById(id);
             if (!m) { console.error('forceShowModal: not found:', id); return; }
@@ -36,9 +36,18 @@
             // Ensure current modal is visible and positioned correctly
             m.removeAttribute('style');
             m.className = 'modal force-show';
-            m.style.display = displayType;
             m.style.setProperty('display', displayType, 'important');
             
+            // NEW: Ensure all parents are visible
+            let p = m.parentElement;
+            while (p && p !== document.body) {
+                if (window.getComputedStyle(p).display === 'none') {
+                    console.warn('forceShowModal: Un-hiding parent:', p.id || p.tagName);
+                    p.style.setProperty('display', 'block', 'important');
+                }
+                p = p.parentElement;
+            }
+
             // Force reflow
             m.offsetHeight;
             document.body.offsetHeight;
@@ -46,9 +55,9 @@
             setTimeout(() => {
                 const rect = m.getBoundingClientRect();
                 if (rect.width === 0 || rect.height === 0) {
-                    console.error('forceShowModal: failed for', id);
+                    console.error('forceShowModal: CRITICAL failure for', id, '- Modal is still zero-size. Possible absolute centering issue or hidden ancestor.');
                 }
-            }, 50);
+            }, 100);
         }
         function forceHideModal(id) {
             var m = document.getElementById(id);
@@ -4962,12 +4971,12 @@
                             })
                         });
 
-                        let data;
+                        let data = {};
+                        const responseText = await response.text();
                         try {
-                            data = await response.json();
+                            data = JSON.parse(responseText);
                         } catch(e) {
-                            const errHtml = await response.text();
-                            throw new Error(`Firebase AI Proxy Error (HTTP ${response.status}). The endpoint returned HTML/Text instead of JSON. Ensure Firebase Functions are deployed.`);
+                            throw new Error(`Firebase AI Proxy Error (HTTP ${response.status}). The endpoint returned HTML/Text instead of JSON. Details: ${responseText.substring(0,100)}`);
                         }
                         if (!response.ok) throw new Error(data.error || `Proxy Error ${response.status}`);
 
