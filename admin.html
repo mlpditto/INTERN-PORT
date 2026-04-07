@@ -9763,6 +9763,10 @@ Do not include any explanation other than the feedback body.`;
             } else if (id === 'tab-research') {
                 loadKnowledgeBase();
             } else if (id === 'tab-laughtale') {
+                // Ensure reflective logs are loaded before rendering
+                if (reflectiveLogsCache.length === 0) {
+                    loadReflectiveLogsAdmin();
+                }
                 renderLaughTale();
             }
         }
@@ -12422,6 +12426,22 @@ Do not include any explanation other than the feedback body.`;
             const container = document.getElementById('laughtale-grid');
             if (!container) return;
             
+            console.log("DEBUG: renderLaughTale called, cache length:", reflectiveLogsCache.length);
+            
+            // If cache is empty, try to load it
+            if (reflectiveLogsCache.length === 0) {
+                console.log("DEBUG: Cache empty, loading reflective logs");
+                loadReflectiveLogsAdmin();
+                container.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align:center; padding:100px 20px; background:rgba(255,255,255,0.5); border:2px dashed #ccc; border-radius:20px;">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size:3em; color:#ccc; margin-bottom:20px;"></i>
+                        <h3 style="color:#999;">Loading treasures...</h3>
+                        <p style="color:#aaa;">Please wait while we gather the stories.</p>
+                    </div>
+                `;
+                return;
+            }
+            
             const archived = reflectiveLogsCache.filter(l => {
                 const isReviewed = l.adminComment || (l.adminBonus !== undefined && l.adminBonus !== null);
                 if (l.isArchived === false) return false; 
@@ -12804,7 +12824,8 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             } catch (e) { alert(e.message); }
         }
         async function reviewReflective(id) {
-            console.log("reviewReflective triggered for:", id);
+            console.log("DEBUG: reviewReflective triggered for:", id);
+            console.log("DEBUG: reflectiveLogsCache length:", reflectiveLogsCache ? reflectiveLogsCache.length : 'undefined');
             let log = reflectiveLogsCache.find(l => l.id === id);
             
             if (!log) {
@@ -12854,7 +12875,11 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
             document.getElementById('reflective-review-bonus').value = log.adminBonus !== undefined ? log.adminBonus : "0.5";
             document.getElementById('reflective-review-comment').value = log.adminComment || "";
+            console.log("DEBUG: About to call forceShowModal for reflectiveReviewModal");
+            const modal = document.getElementById('reflectiveReviewModal');
+            console.log("DEBUG: reflectiveReviewModal element:", modal);
             forceShowModal('reflectiveReviewModal');
+            console.log("DEBUG: forceShowModal called for reflectiveReviewModal");
         }
 
         async function saveReflectiveReview() {
