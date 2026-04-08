@@ -6437,6 +6437,42 @@ Do not include any explanation other than the feedback body.`;
             div.className = 'quiz-q-item';
             div.innerHTML = `
                 <input type="hidden" class="q-type" value="${qType}">
+                <input type="hidden" class="ai-model-quiz" value="gemini-1.5-flash-latest">
+                <input type="hidden" class="ai-lang-quiz" value="Thai">
+                <div class="glass-toggle-container q-type-toggle" style="display:none;">
+                    <div class="glass-toggle-item ${qType === 'choice' ? 'active' : ''}" data-value="choice"></div>
+                    <div class="glass-toggle-item ${qType === 'short_answer' ? 'active' : ''}" data-value="short_answer"></div>
+                    <div class="glass-toggle-item ${qType === 'ordering' ? 'active' : ''}" data-value="ordering"></div>
+                    <div class="glass-toggle-item ${qType === 'flashcard' ? 'active' : ''}" data-value="flashcard"></div>
+                </div>
+                <div style="background:#1e293b; border:1px solid #334155; border-radius:24px; padding:20px; box-shadow:0 8px 30px rgba(0,0,0,0.2);">
+                    <!-- Main Text Area -->
+                    <div style="margin-bottom:15px; position:relative;">
+                        <textarea class="q-text" onpaste="handleQuestionPaste(event, this)" placeholder="Type question or paste formatted content..." style="width:100%; height:100px; font-size:1.05em; border-radius:16px; border:1.5px solid #334155; padding:15px; background:#0f172a; color:#f1f5f9; box-shadow:inset 0 2px 4px rgba(0,0,0,0.2); line-height:1.6;"></textarea>
+                    </div>
+                
+                <div class="q-page-content-area" style="display:none; margin-bottom:15px; position:relative;">
+                    <label style="position:absolute; top:-10px; left:20px; background:#1e293b; padding:0 10px; font-size:0.75em; font-weight:900; color:#818cf8; z-index:1; border-radius:4px; text-transform:uppercase; letter-spacing:0.5px;">📖 Page Details</label>
+                    <textarea class="q-page-content" placeholder="Enter content for this page... (HTML supported)" style="width:100%; height:140px; font-size:0.95em; border:1.5px solid #334155; border-radius:15px; padding:15px; background:#0f172a; color:#f1f5f9;">${data ? (data.content || '') : ''}</textarea>
+                </div>
+
+                <!-- Options / Answers Section -->
+                <div class="options-container" style="display:${qType === 'choice' ? 'flex' : 'none'}; flex-direction:column; gap:10px; margin-bottom:15px;">
+                    ${options.map((opt, i) => {
+                        const isSelected = correct.includes(i);
+                        return `
+                        <div class="q-opt-row ${isSelected ? 'is-correct' : ''}" style="display:flex; align-items:center; gap:10px; background:${isSelected ? 'rgba(34, 197, 94, 0.15)' : '#0f172a'}; border:1.5px solid ${isSelected ? 'rgba(34, 197, 94, 0.3)' : '#334155'}; border-radius:14px; padding:8px 15px; transition:all 0.2s;">
+                            <label class="correct-circle-label" style="width:32px; height:32px; flex-shrink:0; cursor:pointer;" title="Correct answer">
+                                <input type="checkbox" name="q-correct-${qId}" value="${i}" id="corr-${qId}-${i}" class="q-correct-check" ${isSelected ? 'checked' : ''} onchange="toggleOptionCorrect(this)">
+                                <span class="circle-content" style="font-size:0.9em; border-width:2px; font-weight:900;">${i+1}</span>
+                            </label>
+                            <textarea class="q-opt" placeholder="Option ${i + 1}" style="flex:1; margin:0; font-size:0.95em; padding:8px; border-radius:10px; border:none; background:transparent; min-height:40px; outline:none; font-weight:600; color:#f1f5f9;">${opt}</textarea>
+                            ${options.length > 2 ? \`<button type="button" onclick="removeOption(this)" style="width:28px; height:28px; padding:0; background:none; color:#475569; border:none; cursor:pointer; font-size:0.8em; transition:all 0.2s;" onmouseover="this.style.color='#ef4444'; this.style.transform='scale(1.1)'" onmouseout="this.style.color='#475569'; this.style.transform='scale(1)'">✕</button>\` : ''}
+                        </div>
+                        `;
+                    }).join('')}
+                </div>
+                </div>
 
                 <div class="options-actions" style="display:${qType === 'choice' ? 'block' : 'none'}; margin-bottom:15px;">
                     <div style="display:flex; align-items:center; gap:12px; justify-content:space-between;">
@@ -6802,14 +6838,14 @@ Do not include any explanation other than the feedback body.`;
             // Add Option Row
             const row = document.createElement('div');
             row.className = 'q-opt-row';
-            row.style.cssText = 'display:flex; align-items:center; gap:10px; background:#fff; border:1.5px solid #f1f5f9; border-radius:14px; padding:8px 12px; transition:all 0.2s;';
+            row.style.cssText = 'display:flex; align-items:center; gap:10px; background:#0f172a; border:1.5px solid #334155; border-radius:14px; padding:8px 15px; transition:all 0.2s;';
             row.innerHTML = `
                     <label class="correct-circle-label" style="width:32px; height:32px; flex-shrink:0; cursor:pointer;" title="Click to mark this option as a correct answer">
                         <input type="checkbox" name="q-correct-${qId}" value="${count}" id="corr-${qId}-${count}" class="q-correct-check" onchange="toggleOptionCorrect(this)">
-                        <span class="circle-content" style="font-size:0.9em; border-width:2px;">${count + 1}</span>
+                        <span class="circle-content" style="font-size:0.9em; border-width:2px; font-weight:900;">${count + 1}</span>
                     </label>
-                    <textarea class="q-opt" placeholder="Option ${count + 1}" style="flex:1; margin:0; font-size:0.95em; padding:8px 12px; border-radius:10px; border:none; background:transparent; min-height:40px; outline:none;">${val}</textarea>
-                    <button type="button" onclick="removeOption(this)" style="width:28px; height:28px; padding:0; background:none; color:#cbd5e1; border:none; cursor:pointer; font-size:0.8em; transition:color 0.2s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#cbd5e1'" title="Delete Option">✕</button>
+                    <textarea class="q-opt" placeholder="Option ${count + 1}" style="flex:1; margin:0; font-size:0.95em; padding:8px; border-radius:10px; border:none; background:transparent; min-height:40px; outline:none; font-weight:600; color:#f1f5f9;">${val}</textarea>
+                    <button type="button" onclick="removeOption(this)" style="width:28px; height:28px; padding:0; background:none; color:#475569; border:none; cursor:pointer; font-size:0.8em; transition:all 0.2s;" onmouseover="this.style.color='#ef4444'; this.style.transform='scale(1.1)'" onmouseout="this.style.color='#475569'; this.style.transform='scale(1)'" title="Delete Option">✕</button>
                 `;
             container.appendChild(row);
             updateOptionNumbers(item);
