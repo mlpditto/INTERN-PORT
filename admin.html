@@ -2768,6 +2768,17 @@
                         <label style="font-size:0.7em; color:#818cf8; font-weight:600; display:block; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.5px;"><i class="fa-solid fa-align-left"></i> Description</label>
                         <textarea id="quiz-description" placeholder="Describe your quiz..." style="width:100%; padding:6px 10px; border:1px solid #334155; border-radius:8px; font-size:0.85em; background:#0f172a; color:#f1f5f9; min-height:45px; max-height:80px; resize:vertical;"></textarea>
                     </div>
+                    
+                    <!-- V89.10: ICD-11 Tags Section -->
+                    <div style="margin-bottom:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+                            <label style="font-size:0.75em; color:#4ade80; font-weight:700; text-transform:uppercase; letter-spacing:0.8px;"><i class="fa-solid fa-tags"></i> ICD-11 Categorization (Auto-Tagging)</label>
+                            <button class="btn-sm" onclick="autoTagQuizAI(this)" style="background:rgba(22,163,74,0.1); border:1px solid rgba(22,163,74,0.2); color:#4ade80; padding:2px 8px; border-radius:6px; font-size:0.65em; font-weight:800; display:flex; align-items:center; gap:3px; cursor:pointer;" onmouseover="this.style.background='rgba(22,163,74,0.2)'" onmouseout="this.style.background='rgba(22,163,74,0.1)'">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggest Tags
+                            </button>
+                        </div>
+                        <input type="text" id="quiz-tags" placeholder="e.g. 05 Endocrine, Type 2 Diabetes, hypertension..." style="width:100%; padding:6px 12px; border:1px solid #334155; border-radius:10px; font-size:0.85em; background:#0f172a; color:#f1f5f9; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);">
+                    </div>
 
                     <!-- Row 4: Quiz Options (inline) -->
                     <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px; flex-wrap:wrap;">
@@ -2907,7 +2918,7 @@
                             <div class="glass-toggle-container" id="ai-translate-lang-toggle" style="margin:0; background:rgba(0,0,0,0.2); border:1px solid rgba(22,163,74,0.15); padding:2px; height:28px; border-radius:8px; gap:1px;">
                                 <div class="glass-toggle-item active" data-value="Thai" onclick="selectAiToolbarToggle(this,'toolbar-ai-lang')" style="font-size:0.8em; font-weight:800; padding:3px 7px; border-radius:6px; color:#4ade80;">🇹🇭</div>
                                 <div class="glass-toggle-item" data-value="English" onclick="selectAiToolbarToggle(this,'toolbar-ai-lang')" style="font-size:0.8em; font-weight:800; padding:3px 7px; border-radius:6px; color:#94a3b8;">🇬🇧</div>
-                                <div class="glass-toggle-item" data-value="Typhoon" onclick="selectAiToolbarToggle(this,'toolbar-ai-lang')" style="font-size:0.65em; font-weight:800; padding:3px 7px; border-radius:6px; color:#94a3b8;">Magic</div>
+                                <div class="glass-toggle-item" data-value="Typhoon" onclick="selectAiToolbarToggle(this,'toolbar-ai-lang')" title="Typhoon: ปรับปรุงและเกลาภาษาไทยให้เป็นมืออาชีพ (Thai Specialist AI)" style="font-size:0.8em; font-weight:800; padding:3px 7px; border-radius:6px; color:#94a3b8;">✨</div>
                             </div>
                             <input type="hidden" id="toolbar-ai-lang" value="Thai">
                             <button class="btn-sm" onclick="aiEnhanceCurrentQuestion(this)" title="Enhance" style="background:linear-gradient(135deg,#16a34a,#22c55e); color:white; border:none; padding:4px 10px; border-radius:8px; font-weight:700; font-size:0.7em; height:28px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
@@ -2944,13 +2955,7 @@
                 <div id="quiz-questions-container" style="min-height: 350px; text-align: left; padding: 12px; border: 1px solid #334155; border-radius: 12px; margin-bottom: 8px; background:#0f172a;">
                 </div>
                 
-                <!-- Quiz Modal Footer with Save Button -->
-                <div style="display:flex; gap:12px; justify-content:flex-end; padding:15px; margin:0 15px 15px 15px; border-top:1px solid #334155;">
-                    <button class="btn-sm" onclick="forceHideModal('quizManageModal')" style="padding:6px 16px; background:#334155; color:#f1f5f9; border:none; border-radius:10px; font-weight:700; cursor:pointer;">Cancel</button>
-                    <button class="btn-sm" onclick="saveQuiz()" style="padding:6px 20px; background:linear-gradient(135deg, #6366f1, #a855f7); color:white; border:none; border-radius:10px; font-weight:800; cursor:pointer; box-shadow:0 4px 12px rgba(99,102,241,0.3);">
-                        <i class="fa-solid fa-save"></i> Save Quiz
-                    </button>
-                </div>
+
             </div>
         </div>
         </div> <!-- V89.03: Close quizManageModal -->
@@ -4358,6 +4363,61 @@
             } finally {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
+            }
+        };
+
+        // V89.10: Auto-Tagging Categorization (ICD-11)
+        window.autoTagQuizAI = async function(btn) {
+            const formData = getQuizFormData();
+            if (!formData.title && formData.questions.length === 0) {
+                return alert("Please enter a title or add questions first so AI can analyze the content.");
+            }
+
+            const oldText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Tagging...';
+
+            try {
+                // Prepare content for analysis
+                const qTextContent = formData.questions.map((q, i) => `Q${i+1}: ${q.q}`).join('\n');
+                const contentToAnalyze = `Title: ${formData.title}\nDescription: ${formData.description}\nQuestions:\n${qTextContent}`;
+
+                const prompt = `Identify the most relevant ICD-11 (International Classification of Diseases, 11th Revision) categories and codes for this medical quiz content.
+Identify the primary disease group and specific condition if possible.
+
+Content to analyze:
+${contentToAnalyze}
+
+INSTRUCTIONS:
+1. Provide a list of 2-5 highly relevant ICD-11 tags or categories.
+2. Use precise terminology (e.g., '05 Endocrine, nutritional or metabolic diseases', 'Type 2 diabetes mellitus').
+3. Respond in a comma-separated format that is easy to read.
+4. If multiple systems are involved, list the most prominent ones first.
+5. If the content is in Thai, provide the most relevant tags in Thai and English (e.g. 'เบาหวานชนิดที่ 2 (Type 2 Diabetes)').
+
+OUTPUT FORMAT: Just the comma-separated tags, nothing else.`;
+
+                const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-3.0-flash';
+                const { text: suggestedTags } = await callUniversalAI(selectedModel, prompt, true);
+
+                if (suggestedTags) {
+                    const cleanTags = suggestedTags.replace(/```/g, "").replace(/tags:/gi, "").trim();
+                    const existingTags = document.getElementById('quiz-tags').value;
+                    if (existingTags && existingTags.trim() !== "") {
+                        if (confirm("Replace existing tags with AI suggestions?\n\nNew Suggestion:\n" + cleanTags)) {
+                            document.getElementById('quiz-tags').value = cleanTags;
+                        }
+                    } else {
+                        document.getElementById('quiz-tags').value = cleanTags;
+                    }
+                    showToast("✅ AI suggestion applied!");
+                }
+            } catch (e) {
+                console.error("Auto-Tagging Error:", e);
+                alert("AI Tagging Error: " + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = oldText;
             }
         };
 
@@ -6039,6 +6099,7 @@ Do not include any explanation other than the feedback body.`;
             document.getElementById('quiz-target-group').value = q.targetGroup || "Public";
             document.getElementById('quiz-total-points').value = q.totalPoints || 1.0;
             document.getElementById('quiz-description').value = q.description || "";
+            document.getElementById('quiz-tags').value = q.tags || "";
             document.getElementById('quiz-is-poll').checked = q.isPoll || false;
             document.getElementById('quiz-one-time').checked = q.oneTimeMode || false;
             document.getElementById('quiz-is-homework').checked = q.isHomework || false;
@@ -6104,6 +6165,7 @@ Do not include any explanation other than the feedback body.`;
             document.getElementById('quiz-target-group').value = "Public";
             document.getElementById('quiz-total-points').value = 1.0;
             document.getElementById('quiz-description').value = "";
+            document.getElementById('quiz-tags').value = "";
             document.getElementById('quiz-is-poll').checked = false;
             document.getElementById('quiz-one-time').checked = false;
             document.getElementById('quiz-is-homework').checked = false;
@@ -6331,6 +6393,7 @@ Do not include any explanation other than the feedback body.`;
             const quizType = document.getElementById('quiz-type').value;
             const feedbackLimit = parseInt(document.getElementById('quiz-feedback-limit').value) || 280;
             const caseContent = document.getElementById('quiz-case-content').value;
+            const tags = document.getElementById('quiz-tags').value.trim();
 
             const qItems = document.querySelectorAll('.quiz-q-item');
             const questions = [];
@@ -6352,7 +6415,7 @@ Do not include any explanation other than the feedback body.`;
             });
 
             return {
-                title, shortTitle, targetGroup, description, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, quizType, feedbackLimit, caseContent, questions,
+                title, shortTitle, targetGroup, description, tags, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, quizType, feedbackLimit, caseContent, questions,
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
             };
@@ -6501,19 +6564,22 @@ Do not include any explanation other than the feedback body.`;
                 </div>
                 </div>
 
-                <div class="options-actions" style="display:${qType === 'choice' ? 'block' : 'none'}; margin-bottom:15px;">
+                <div class="options-actions" style="margin-top:15px; margin-bottom:10px;">
                     <div style="display:flex; align-items:center; gap:12px; justify-content:space-between;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <button type="button" class="btn-sm" onclick="addOption(this)" style="padding:6px 20px; background:#fff; color:var(--primary); border:1.5px solid var(--primary); border-radius:12px; font-weight:900; font-size:0.8em; transition:all 0.2s; box-shadow:0 4px 10px rgba(99,102,241,0.05);" onmouseover="this.style.background='var(--primary)'; this.style.color='white';"><i class="fa-solid fa-plus"></i> Add Option</button>
-                            <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Magic - enhance this question" style="padding:6px 16px; background:linear-gradient(135deg, #8b5cf6, #7c3aed); color:white; border:none; border-radius:12px; font-weight:900; font-size:0.75em; transition:all 0.2s; box-shadow:0 4px 10px rgba(139,92,246,0.25);" onmouseover="this.style.background='linear-gradient(135deg, #7c3aed, #6d28d9)';" onmouseout="this.style.background='linear-gradient(135deg, #8b5cf6, #7c3aed)';"><i class="fa-solid fa-wand-magic-sparkles"></i> Magic</button>
+                        <div class="q-type-actions" style="display:flex; align-items:center; gap:8px;">
+                            ${qType === 'choice' ? `
+                                <button type="button" class="btn-sm" onclick="addOption(this)" style="padding:6px 20px; background:#fff; color:var(--primary); border:1.5px solid var(--primary); border-radius:12px; font-weight:900; font-size:0.8em; transition:all 0.2s; box-shadow:0 4px 10px rgba(99,102,241,0.05);" onmouseover="this.style.background='var(--primary)'; this.style.color='white';"><i class="fa-solid fa-plus"></i> Add Option</button>
+                                <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Magic - enhance this question" style="padding:4px 12px; background:linear-gradient(135deg, #8b5cf6, #7c3aed); color:white; border:none; border-radius:12px; font-weight:900; font-size:0.75em; transition:all 0.2s;"><i class="fa-solid fa-wand-magic-sparkles"></i> Magic</button>
+                            ` : ''}
                         </div>
                         <div style="display:flex; align-items:center; gap:8px;">
-                            <div style="display:flex; align-items:center; gap:3px; background:#f8fafc; padding:2px 8px; border-radius:8px; border:1px solid #edf2f7;" title="Seconds per Q">
-                                <i class="fa-solid fa-stopwatch" style="color:#6366f1; font-size:0.7em;"></i>
-                                <input type="number" class="q-timer" value="${data ? (data.timer || 60) : (document.getElementById('quiz-set-all-timer') ? document.getElementById('quiz-set-all-timer').value : 60)}" style="width:70px; border:none; background:transparent; font-weight:800; color:#1e293b; font-size:0.85em; outline:none; padding:0; text-align:center;">
-                                <span style="font-size:0.6em; color:#94a3b8;">s</span>
+                            <button type="button" class="btn-sm" onclick="forceHideModal('quizManageModal')" style="padding:6px 16px; background:#334155; color:#f1f5f9; border:none; border-radius:10px; font-weight:700; font-size:0.75em; height:32px;">Cancel</button>
+                            <button type="button" class="btn-sm" onclick="saveQuiz()" style="padding:6px 20px; background:linear-gradient(135deg, #6366f1, #a855f7); color:white; border:none; border-radius:10px; font-weight:800; font-size:0.75em; height:32px; box-shadow:0 4px 12px rgba(99,102,241,0.3);"><i class="fa-solid fa-save"></i> Save Quiz</button>
+                            <div style="display:flex; align-items:center; gap:3px; background:#f8fafc; padding:2px 10px; border-radius:10px; border:1px solid #edf2f7; height:32px;" title="Seconds per Q">
+                                <i class="fa-solid fa-stopwatch" style="color:#6366f1; font-size:0.75em;"></i>
+                                <input type="number" class="q-timer" value="${data ? (data.timer || 60) : (document.getElementById('quiz-set-all-timer') ? document.getElementById('quiz-set-all-timer').value : 60)}" style="width:50px; border:none; background:transparent; font-weight:800; color:#1e293b; font-size:0.85em; outline:none; padding:0; text-align:center;">
+                                <span style="font-size:0.65em; color:#94a3b8; font-weight:800;">s</span>
                             </div>
-
                         </div>
                     </div>
                 </div>
@@ -6577,8 +6643,7 @@ Do not include any explanation other than the feedback body.`;
             const item = el.closest('.quiz-q-item');
             const type = el.value;
             const optCont = item.querySelector('.options-container');
-            const optAct = item.querySelector('.options-actions');
-            const isRead = document.getElementById('quiz-type').value === 'read_only';
+            const typeActions = item.querySelector('.q-type-actions');
             const label = item.querySelector('.q-label-text');
             if (label) {
                 let explain = "(Select correct answers)";
@@ -6589,7 +6654,6 @@ Do not include any explanation other than the feedback body.`;
             }
 
             optCont.style.display = (type === 'choice' || type === 'ordering' || type === 'flashcard') ? 'flex' : 'none';
-            optAct.style.display = (type === 'choice' || type === 'ordering' || type === 'flashcard' || type === 'short_answer') ? 'block' : 'none';
 
             // Flashcard: Only 2 options (True/False)
             if (type === 'flashcard') {
@@ -6599,29 +6663,35 @@ Do not include any explanation other than the feedback body.`;
                 // Set default timer for flashcard
                 item.querySelector('.q-timer').value = 5;
                 // Add AI button to flashcard
-                item.querySelector('.options-actions').innerHTML = `
-                    <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Magic - enhance this question" style="padding:6px 12px; background:linear-gradient(135deg, #8b5cf6, #7c3aed); color:white; border:none; border-radius:12px; font-weight:900; font-size:0.75em; transition:all 0.2s; box-shadow:0 4px 10px rgba(139,92,246,0.25);" onmouseover="this.style.background='linear-gradient(135deg, #7c3aed, #6d28d9)';" onmouseout="this.style.background='linear-gradient(135deg, #8b5cf6, #7c3aed)';"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
-                    <small style="margin-left:10px; color:#666; font-size:0.8em;">Flashcard: True/False</small>
-                `;
-            }
-
-            if (type === 'ordering') {
-                item.querySelector('.options-actions').innerHTML = `
-                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                        <button type="button" class="btn-sm" onclick="addOption(this)" style="width:auto; padding:5px 15px; background:#e9f5ff; color:#007bff; border:1px solid #b8daff;"><i class="fa-solid fa-plus"></i> Add Step</button>
-                        <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Magic - enhance this question" style="padding:5px 12px; background:linear-gradient(135deg, #8b5cf6, #7c3aed); color:white; border:none; border-radius:10px; font-weight:900; font-size:0.75em; transition:all 0.2s; box-shadow:0 4px 10px rgba(139,92,246,0.25);" onmouseover="this.style.background='linear-gradient(135deg, #7c3aed, #6d28d9)';" onmouseout="this.style.background='linear-gradient(135deg, #8b5cf6, #7c3aed)';"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
-                        <small style="color:#2e7d32; font-weight:bold;">💡 Correct Order is Top to Bottom</small>
-                    </div>
-                `;
-            } else if (type !== 'flashcard' && type !== 'short_answer') {
-                item.querySelector('.options-actions').innerHTML = `
-                    <button type="button" class="btn-sm" onclick="addOption(this)" style="padding:6px 20px; background:#fff; color:var(--primary); border:1.5px solid var(--primary); border-radius:12px; font-weight:900; font-size:0.8em; transition:all 0.2s; box-shadow:0 4px 10px rgba(99,102,241,0.05);" onmouseover="this.style.background='var(--primary)'; this.style.color='white';"><i class="fa-solid fa-plus"></i> Add Option</button>
-                    <small style="margin-left:10px; color:#666; font-size:0.8em;">(Tick the circle to set as correct answer)</small>
-                `;
+                if (typeActions) {
+                    typeActions.innerHTML = `
+                        <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Magic - enhance this question" style="padding:6px 12px; background:linear-gradient(135deg, #8b5cf6, #7c3aed); color:white; border:none; border-radius:12px; font-weight:900; font-size:0.75em; transition:all 0.2s; box-shadow:0 4px 10px rgba(139,92,246,0.25);" onmouseover="this.style.background='linear-gradient(135deg, #7c3aed, #6d28d9)';" onmouseout="this.style.background='linear-gradient(135deg, #8b5cf6, #7c3aed)';"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                        <small style="margin-left:10px; color:#666; font-size:0.8em;">Flashcard: True/False</small>
+                    `;
+                }
+            } else if (type === 'ordering') {
+                if (typeActions) {
+                    typeActions.innerHTML = `
+                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                            <button type="button" class="btn-sm" onclick="addOption(this)" style="width:auto; padding:5px 15px; background:#e9f5ff; color:#007bff; border:1px solid #b8daff; border-radius:10px;"><i class="fa-solid fa-plus"></i> Add Step</button>
+                            <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Magic - enhance this question" style="padding:5px 12px; background:linear-gradient(135deg, #8b5cf6, #7c3aed); color:white; border:none; border-radius:10px; font-weight:900; font-size:0.75em; transition:all 0.2s; box-shadow:0 4px 10px rgba(139,92,246,0.25);" onmouseover="this.style.background='linear-gradient(135deg, #7c3aed, #6d28d9)';" onmouseout="this.style.background='linear-gradient(135deg, #8b5cf6, #7c3aed)';"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                            <small style="color:#2e7d32; font-weight:bold;">💡 Correct Order is Top to Bottom</small>
+                        </div>
+                    `;
+                }
             } else if (type === 'short_answer') {
-                item.querySelector('.options-actions').innerHTML = `
-                    <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Magic - enhance this question" style="padding:6px 12px; background:linear-gradient(135deg, #8b5cf6, #7c3aed); color:white; border:none; border-radius:12px; font-weight:900; font-size:0.75em; transition:all 0.2s; box-shadow:0 4px 10px rgba(139,92,246,0.25);" onmouseover="this.style.background='linear-gradient(135deg, #7c3aed, #6d28d9)';" onmouseout="this.style.background='linear-gradient(135deg, #8b5cf6, #7c3aed)';"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
-                `;
+                if (typeActions) {
+                    typeActions.innerHTML = `
+                        <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Magic - enhance this question" style="padding:6px 12px; background:linear-gradient(135deg, #8b5cf6, #7c3aed); color:white; border:none; border-radius:12px; font-weight:900; font-size:0.75em; transition:all 0.2s; box-shadow:0 4px 10px rgba(139,92,246,0.25);" onmouseover="this.style.background='linear-gradient(135deg, #7c3aed, #6d28d9)';" onmouseout="this.style.background='linear-gradient(135deg, #8b5cf6, #7c3aed)';"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                    `;
+                }
+            } else {
+                if (typeActions) {
+                    typeActions.innerHTML = `
+                        <button type="button" class="btn-sm" onclick="addOption(this)" style="padding:6px 20px; background:#fff; color:var(--primary); border:1.5px solid var(--primary); border-radius:12px; font-weight:900; font-size:0.8em; transition:all 0.2s; box-shadow:0 4px 10px rgba(99,102,241,0.05);" onmouseover="this.style.background='var(--primary)'; this.style.color='white';"><i class="fa-solid fa-plus"></i> Add Option</button>
+                        <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Magic - enhance this question" style="padding:6px 16px; background:linear-gradient(135deg, #8b5cf6, #7c3aed); color:white; border:none; border-radius:12px; font-weight:900; font-size:0.75em; transition:all 0.2s; box-shadow:0 4px 10px rgba(139,92,246,0.25);" onmouseover="this.style.background='linear-gradient(135deg, #7c3aed, #6d28d9)';" onmouseout="this.style.background='linear-gradient(135deg, #8b5cf6, #7c3aed)';"><i class="fa-solid fa-wand-magic-sparkles"></i> Magic</button>
+                    `;
+                }
             }
 
             updatePollUI();
@@ -7089,6 +7159,7 @@ async function saveQuiz() {
                 shortTitle: formData.shortTitle,
                 targetGroup: formData.targetGroup, // Add targetGroup
                 description: formData.description,
+                tags: formData.tags || "",
                 totalPoints: formData.totalPoints,
                 isPoll: formData.isPoll,
                 oneTimeMode: formData.oneTimeMode || false,
@@ -13719,7 +13790,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         };
 
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V89.14 loaded OK ', 'background:#4361ee;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V89.15 loaded OK ', 'background:#4361ee;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
         console.log('setUserGroup:', typeof setUserGroup, '| openPeriodModal:', typeof openPeriodModal, '| reviewQuiz:', typeof reviewQuiz, '| detectNegativeWording:', typeof detectNegativeWording);
     </script>
 
