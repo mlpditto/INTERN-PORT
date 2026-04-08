@@ -11,7 +11,7 @@ const REGION = "us-central1"; // Primary for Imagen
 const AUTH_SECRET = "mlp-secret-8888"; // Basic shared secret between admin.html and proxy
 
 /**
- * 🤖 AI Proxy Function (V89.12)
+ * 🤖 AI Proxy Function (V89.13)
  * Handles: Gemini, OpenAI, and Vertex AI (Imagen 3)
  */
 exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"], timeoutSeconds: 300, memory: "512MiB" }, async (req, res) => {

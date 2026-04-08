@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V89.12)</title>
-    <!-- V89.12: Add Approve All button to Review Quiz Attempt popup -->
-    <!-- Release: 2026-04-08 12:00 UTC+7 -->
+    <title>Intern Admin Portal (V89.13)</title>
+    <!-- V89.13: Add selected questions counter to Bulk Extract modal and fix null ID reference -->
+    <!-- Release: 2026-04-08 13:25 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -1408,7 +1408,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.3em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,219,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.12</span>
+                        <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,219,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.13</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -6390,7 +6390,7 @@ Do not include any explanation other than the feedback body.`;
                     item.style.display = 'block';
                     item.style.marginBottom = '20px';
                     item.classList.add('current-question-highlight');
-                    // Fully Dark Mode Styles [V89.12]
+                    // Fully Dark Mode Styles [V89.13]
                     item.style.cssText = `
                         display: block !important;
                         margin-bottom: 20px !important;
@@ -6947,7 +6947,7 @@ Do not include any explanation other than the feedback body.`;
             
             const listHtml = questions.map((q, i) => `
                 <div style="display:flex; align-items:center; gap:10px; padding:10px; border-bottom:1px solid #334155; color:white; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
-                    <input type="checkbox" class="bulk-q-check" value="${i}" id="bulk-q-${i}" style="width:20px; height:20px; cursor:pointer; accent-color:#4338ca;">
+                    <input type="checkbox" class="bulk-q-check" value="${i}" id="bulk-q-${i}" onchange="updateBulkSelectCounter()" style="width:20px; height:20px; cursor:pointer; accent-color:#4338ca;">
                     <label for="bulk-q-${i}" style="font-size:0.88em; flex:1; cursor:pointer;">
                         <span style="color:#94a3b8; font-weight:800; margin-right:8px;">Q${i+1}</span> 
                         ${q.q.substring(0, 100)}${q.q.length > 100 ? '...' : ''}
@@ -6967,9 +6967,10 @@ Do not include any explanation other than the feedback body.`;
                         </div>
                         <button onclick="document.getElementById('bulk-export-modal').remove()" style="background:#334155; border:none; color:white; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">&times;</button>
                     </div>
-                    <div style="padding:15px 24px; border-bottom:1px solid #334155; display:flex; gap:10px; background:rgba(0,0,0,0.1);">
-                        <button class="btn-sm" onclick="document.querySelectorAll('.bulk-q-check').forEach(c=>c.checked=true)" style="background:#334155; color:white; border:none; padding:6px 14px; border-radius:8px; font-size:0.75em; font-weight:700; cursor:pointer;">Select All</button>
-                        <button class="btn-sm" onclick="document.querySelectorAll('.bulk-q-check').forEach(c=>c.checked=false)" style="background:#334155; color:white; border:none; padding:6px 14px; border-radius:8px; font-size:0.75em; font-weight:700; cursor:pointer;">Clear All</button>
+                    <div style="padding:15px 24px; border-bottom:1px solid #334155; display:flex; align-items:center; gap:10px; background:rgba(0,0,0,0.1);">
+                        <button class="btn-sm" onclick="document.querySelectorAll('.bulk-q-check').forEach(c=>c.checked=true); updateBulkSelectCounter();" style="background:#334155; color:white; border:none; padding:6px 14px; border-radius:8px; font-size:0.75em; font-weight:700; cursor:pointer;">Select All</button>
+                        <button class="btn-sm" onclick="document.querySelectorAll('.bulk-q-check').forEach(c=>c.checked=false); updateBulkSelectCounter();" style="background:#334155; color:white; border:none; padding:6px 14px; border-radius:8px; font-size:0.75em; font-weight:700; cursor:pointer;">Clear All</button>
+                        <span id="bulk-selection-count" style="margin-left:auto; font-size:0.85em; color:#6366f1; font-weight:800; background:rgba(99,102,241,0.1); padding:4px 12px; border-radius:20px; border:1px solid rgba(99,102,241,0.2);">Selected: 0 / ${questions.length}</span>
                     </div>
                     <div style="padding:10px 14px; overflow-y:auto; flex:1; background:#0f172a;">
                         ${listHtml}
@@ -6987,6 +6988,18 @@ Do not include any explanation other than the feedback body.`;
                 </div>
             `;
             document.body.appendChild(modal);
+            updateBulkSelectCounter();
+        };
+
+        window.updateBulkSelectCounter = function() {
+            const checked = document.querySelectorAll('.bulk-q-check:checked').length;
+            const total = document.querySelectorAll('.bulk-q-check').length;
+            const counter = document.getElementById('bulk-selection-count');
+            if (counter) {
+                counter.innerText = `Selected: ${checked} / ${total}`;
+                // Optional: visual feedback if selection is non-zero
+                counter.style.background = checked > 0 ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.1)';
+            }
         };
 
         window.executeBulkExport = async function(btn) {
@@ -7024,7 +7037,7 @@ Do not include any explanation other than the feedback body.`;
                 if (isCut) {
                     const remainingQuestions = formData.questions.filter((_, idx) => !checked.includes(idx));
                     
-                    const currentQuizId = document.getElementById('quiz-id-hidden').value;
+                    const currentQuizId = document.getElementById('edit-quiz-id').value;
                     if (currentQuizId) {
                         await db.collection("quizzes").doc(currentQuizId).update({
                             questions: remainingQuestions,
@@ -13679,7 +13692,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         };
 
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V89.12 loaded OK ', 'background:#4361ee;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V89.13 loaded OK ', 'background:#4361ee;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
         console.log('setUserGroup:', typeof setUserGroup, '| openPeriodModal:', typeof openPeriodModal, '| reviewQuiz:', typeof reviewQuiz, '| detectNegativeWording:', typeof detectNegativeWording);
     </script>
 
