@@ -9049,18 +9049,42 @@ Do not include any explanation other than the feedback body.`;
                     gradedAnswers[i] = true;
                 });
                 
-                await docRef.update({
+                const pointsToAdd = parseFloat(quiz.totalPoints || 1.0);
+                const b = db.batch();
+                
+                b.update(docRef, {
                     gradedAnswers: gradedAnswers,
                     correctCount: quiz.questions.length,
                     score: 1.0,
                     isApproved: true,
+                    status: 'approved',
                     approvedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 
-                showToast("✅ Attempt Approved!");
+                if (att.userId && pointsToAdd > 0) {
+                    b.update(db.collection("users").doc(att.userId), { score: firebase.firestore.FieldValue.increment(pointsToAdd) });
+                    b.set(db.collection("checkin_logs").doc(), {
+                        userId: att.userId,
+                        type: 'quiz',
+                        amount: pointsToAdd,
+                        note: `Quiz Approved (All Correct): ${quiz.id}`,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+                
+                await b.commit();
+                
+                // Immediately remove from pending cache to clear UI without a heavy database refetch
+                if (typeof pendingQuizzesCache !== 'undefined') {
+                    const cacheIndex = pendingQuizzesCache.findIndex(x => x.id === attemptId);
+                    if (cacheIndex !== -1) pendingQuizzesCache.splice(cacheIndex, 1);
+                }
+                
+                showToast("✅ Attempt Approved & Points Added!");
                 closeReviewOverlay();
-                // Optionally reload pending view if available
-                if (window.renderPendingQuizzes) window.renderPendingQuizzes();
+                
+                if (typeof renderPendingQuizzes !== 'undefined') renderPendingQuizzes();
+                if (typeof drawKanban !== 'undefined') drawKanban();
             } catch (e) {
                 console.error("Approve error:", e);
                 alert("Failed to approve: " + e.message);
