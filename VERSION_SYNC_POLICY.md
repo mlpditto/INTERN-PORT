@@ -1,4 +1,4 @@
-# Intern Admin Portal - Version & Git Development Rules (V89.13)
+# Intern Admin Portal - Version & Git Development Rules (V89.14)
 
 ## 🎯 Golden Rule: Absolute Version Sync
 
@@ -58,4 +58,4 @@ git checkout production
 **หากพบว่าเลขเวอร์ชันไม่ตรงกัน ให้ใช้ "Turbo Mode" ซ้ำอีกครั้งเพื่อยืนยันการ Sync ข้อมูล**
 
 ---
-*อัปเดตกฎล่าสุดเมื่อ: V89.13 - 2026-04-08*
+*อัปเดตกฎล่าสุดเมื่อ: V89.14 - 2026-04-08*
