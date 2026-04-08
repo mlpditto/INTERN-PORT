@@ -4721,33 +4721,48 @@
                     else if (modelName.includes('2.0') || modelName.includes('exp')) actualModelName = "gemini-3.0-flash-latest";
                     else actualModelName = "gemini-3.0-flash";
 
-                    // V87.28: Add JSON mode support for Gemini
+                                        // V87.28: Add JSON mode support for Gemini (with 2026 Fallback Chain)
                     let modelConfig = { model: actualModelName };
                     if (isJson) {
-                        modelConfig.generationConfig = { responseMimeType: "application/json" };
+                        modelConfig.generationConfig = { responseMimeType: 'application/json' };
                     }
-                    let model = genAI.getGenerativeModel(modelConfig);
-                    let result;
-                    try {
+                    
+                    const tryGemini = async (mName) => {
                         let parts = prompt;
-                        // V87.28 Handle Vision Data for local Gemini call
                         if (visionData && visionData.image_base64) {
                             parts = [
                                 { text: prompt },
-                                { 
-                                    inlineData: { 
-                                        data: visionData.image_base64.includes('base64,') ? visionData.image_base64.split('base64,')[1] : visionData.image_base64, 
-                                        mimeType: visionData.image_mimetype || "image/png" 
-                                    } 
+                                {
+                                    inlineData: {
+                                        data: visionData.image_base64.includes('base64,') ? visionData.image_base64.split('base64,')[1] : visionData.image_base64,
+                                        mimeType: visionData.image_mimetype || 'image/png'
+                                    }
                                 }
                             ];
                         }
-                        result = await model.generateContent(parts);
+                        const config = { ...modelConfig, model: mName };
+                        const m = genAI.getGenerativeModel(config);
+                        return await m.generateContent(parts);
+                    };
+
+                    try {
+                        result = await tryGemini(actualModelName);
                     } catch (e) {
-                        console.warn("AI Generation failed, trying fallback to gemini-3.0-flash", e);
-                        actualModelName = "gemini-3.0-flash";
-                        model = genAI.getGenerativeModel({ model: actualModelName });
-                        result = await model.generateContent(prompt);
+                        console.warn('Gemini ' + actualModelName + ' failed, trying fallback chain...', e);
+                        const fallbacks = ['gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-pro'];
+                        let success = false;
+                        for (const fb of fallbacks) {
+                            if (fb === actualModelName) continue;
+                            try {
+                                result = await tryGemini(fb);
+                                console.log('Successfully used fallback: ' + fb);
+                                success = true;
+                                break;
+                            } catch (e2) {
+                                console.warn('Fallback ' + fb + ' failed:', e2.message);
+                            }
+                        }
+                        if (!success) throw e;
                     }
                     const response = await result.response;
                     tokens = response.usageMetadata ? response.usageMetadata.totalTokenCount : 0;
