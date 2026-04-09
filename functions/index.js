@@ -11,7 +11,7 @@ const REGION = "us-central1"; // Primary for Imagen
 const AUTH_SECRET = "mlp-secret-8888"; // Basic shared secret between admin.html and proxy
 
 /**
- * 🤖 AI Proxy Function (V89.14)
+ * 🤖 AI Proxy Function (V89.19)
  * Handles: Gemini, OpenAI, and Vertex AI (Imagen 3)
  */
 exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"], timeoutSeconds: 300, memory: "512MiB" }, async (req, res) => {
@@ -64,6 +64,12 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"], ti
             const isReasoner = model.includes('gpt-5.4') || model.includes('o1');
             const actualModel = model === 'gpt-5.4' ? 'gpt-4o' : (model === 'gpt-5.4-mini' ? 'gpt-4o-mini' : (isReasoner ? model : (model.includes('gpt-4') ? model : (model.includes('gpt-3.5') ? model : 'gpt-4o-mini'))));
             
+            // Ensure 'json' is in prompt for OpenAI if isJson is true (V89.15)
+            let tailoredPrompt = prompt;
+            if (isJson && !prompt.toLowerCase().includes("json") && !actualModel.includes('o1')) {
+                tailoredPrompt += "\n\n(Respond in strictly valid JSON format)";
+            }
+
             const body = model === 'dalle' ? {
                 model: "dall-e-3",
                 prompt: prompt,
@@ -71,7 +77,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"], ti
                 size: "1024x1024"
             } : {
                 model: actualModel,
-                messages: [{ role: "user", content: prompt }],
+                messages: [{ role: "user", content: tailoredPrompt }],
                 response_format: (isJson && !actualModel.includes('o1')) ? { type: "json_object" } : undefined,
                 temperature: (actualModel.includes('o1') || actualModel.includes('gpt-5.4')) ? undefined : 0.7,
                 [actualModel.includes('o1') ? 'max_completion_tokens' : 'max_tokens']: isJson ? 4096 : 4096
@@ -141,12 +147,18 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"], ti
         // --- 🔵 Typhoon Vision Support (V87.24.1) ---
         if (provider === "typhoon") {
             const apiKey = process.env.TYPHOON_API_KEY;
+            // Ensure 'json' is in prompt for Typhoon if isJson is true (V89.15)
+            let tailoredPromptT = prompt;
+            if (isJson && !prompt.toLowerCase().includes("json")) {
+                tailoredPromptT += "\n\n(Respond in strictly valid JSON format)";
+            }
+
             const body = {
                 model: model.includes('vision') ? model : "typhoon-v2.5-vision-instruct",
                 messages: [{
                     role: "user",
                     content: [
-                        { type: "text", text: prompt },
+                        { type: "text", text: tailoredPromptT },
                         ...(visionData ? [{ 
                             type: "image_url", 
                             image_url: { url: `data:${visionData.image_mimetype};base64,${visionData.image_base64}` } 
