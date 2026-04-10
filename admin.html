@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V89.22)</title>
-    <!-- V89.22: Fixed Toolbar Copy/Clone functionality in Quiz Editor -->
+    <title>Intern Admin Portal (V89.26)</title>
+    <!-- V89.26: Enhanced Active Status visibility (Sharp Theme) -->
     <!-- Release: 2026-04-09 20:38 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1408,7 +1408,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.3em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,219,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.22</span>
+                        <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,219,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.26</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -7967,7 +7967,8 @@ async function saveQuiz() {
                         <div style="padding:15px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;background:#f8f9fa;">
                             <h3 style="margin:0;color:#4361ee;font-size:1.1em;"><i class="fa-solid fa-magnifying-glass"></i> Review Quiz Attempt</h3>
                             <div style="display:flex; gap:8px;">
-                                <button onclick="approveQuizAttempt('${attemptId}')" style="background:#2ecc71;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;"><i class="fa-solid fa-check-double"></i> Approve All</button>
+                                <button onclick="approveQuizAttempt('${attemptId}')" style="background:#2ecc71;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;">🍎 Manten Manten no Mi (100%)</button>
+                                <button onclick="approveQuizAttemptActual('${attemptId}')" style="background:#3498db;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;">🍇 Shōjiki Shōjiki no Mi (Actual)</button>
                                 <button onclick="closeReviewOverlay()" style="background:#ef233c;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;">Close</button>
                             </div>
                         </div>
@@ -9377,6 +9378,61 @@ async function saveQuiz() {
             }
         }
 
+        async function approveQuizAttemptActual(attemptId) {
+            const confirmed = confirm("Approve this attempt using the ACTUAL current score? Points for the user will be calculated based on the current correct count.");
+            if (!confirmed) return;
+            try {
+                const docRef = db.collection("quiz_attempts").doc(attemptId);
+                const docSnap = await docRef.get();
+                if (!docSnap.exists) return alert("Attempt data not found");
+                const att = docSnap.data();
+                const quiz = quizzesData.find(x => x.id === att.quizId);
+                if (!quiz) return alert("Quiz data not found");
+                
+                // Use current correctCount. 
+                const curCorrect = att.correctCount || 0;
+                const totalQ = (quiz.questions || []).length;
+                const scoreRatio = totalQ > 0 ? curCorrect / totalQ : 0;
+                const totalPoints = parseFloat(quiz.totalPoints || 1.0);
+                const pointsToAdd = parseFloat((scoreRatio * totalPoints).toFixed(2));
+                
+                const b = db.batch();
+                b.update(docRef, {
+                    score: parseFloat(scoreRatio.toFixed(4)),
+                    isApproved: true,
+                    status: 'approved',
+                    approvedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                if (att.userId && pointsToAdd > 0) {
+                    b.update(db.collection("users").doc(att.userId), { score: firebase.firestore.FieldValue.increment(pointsToAdd) });
+                    b.set(db.collection("checkin_logs").doc(), {
+                        userId: att.userId,
+                        type: 'quiz',
+                        amount: pointsToAdd,
+                        note: `Quiz Approved (Actual): ${curCorrect}/${totalQ} - ${quiz.id}`,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+                
+                await b.commit();
+                
+                if (typeof pendingQuizzesCache !== 'undefined') {
+                    const cacheIndex = pendingQuizzesCache.findIndex(x => x.id === attemptId);
+                    if (cacheIndex !== -1) pendingQuizzesCache.splice(cacheIndex, 1);
+                }
+                
+                showToast(`✅ Approved with score: ${curCorrect}/${totalQ} (${pointsToAdd} pts)`);
+                closeReviewOverlay();
+                
+                if (typeof renderPendingQuizzes !== 'undefined') renderPendingQuizzes();
+                if (typeof drawKanban !== 'undefined') drawKanban();
+            } catch (e) {
+                console.error("Approve Actual error:", e);
+                alert("Failed to approve: " + e.message);
+            }
+        }
+
         async function showQuizDiscussions(quizId) {
             const quiz = quizzesData.find(x => x.id === quizId);
             if (!quiz) return;
@@ -9635,7 +9691,7 @@ async function saveQuiz() {
 
                 const oneTimeLabel = q.oneTimeMode ? '<span class="badge" style="background:#f57f17; color:white;">🔄 ONE-TIME</span>' : '';
                 const homeworkLabel = q.isHomework ? `<span class="badge" style="background:#2e7d32; color:white;">📚 HW${q.assignedUsers && q.assignedUsers.length ? ' (' + q.assignedUsers.length + ')' : ''}</span>` : '';
-                const templateLabel = (q.isTemplate || !isActiveSection) ? '<div style="margin-top:4px;"><span class="badge" style="background:orange; color:white; font-size:0.75em;">TEMPLATE</span></div>' : '';
+                const templateLabel = q.isTemplate ? '<div style="margin-top:4px;"><span class="badge" style="background:orange; color:white; font-size:0.75em;">TEMPLATE</span></div>' : '';
                 const targetGroupLabel = q.targetGroup && q.targetGroup !== "Public" ? `<span class="badge" style="background:#007bff; margin-left:5px;">${q.targetGroup}</span>` : '';
 
 
@@ -9723,6 +9779,7 @@ async function saveQuiz() {
                                 <button class="btn-sm" style="background:#2e7d32; color:white; padding:2px 6px;" onclick="openHomeworkAssignModal('${q.id}')" title="Homework"><i class="fa-solid fa-book"></i></button>
                                 ${(q.isPoll || hasWriting) ? `<button class="btn-sm" style="background:#8e44ad; color:white; padding:2px 6px;" onclick="showPollResults('${q.id}')" title="Result">📊</button>` : ''}
                                 <button class="btn-sm" style="background:#8e44ad; color:white; padding:2px 6px;" onclick="showQuizDiscussions('${q.id}')" title="Discussion">💬</button>
+                                <button class="btn-sm" style="background:${q.isTemplate ? '#fbbf24' : '#94a3b8'}; color:white; padding:2px 6px;" onclick="toggleTemplateStatus('${q.id}', ${q.isTemplate || false})" title="Toggle Template Status"><i class="fa-solid fa-star"></i></button>
                                 ${(!isActiveSection) ? `<button class="btn-sm btn-warning" style="padding:2px 6px; font-size:0.75em;" onclick="repostQuiz('${q.id}')">♻️</button>` : ''}
                                 <button class="btn-sm btn-danger" style="padding:2px 6px;" onclick="deleteQuiz('${q.id}')">Del</button>
                             </div>
@@ -9873,6 +9930,14 @@ async function saveQuiz() {
             showToast(updates.isActive ? "Quiz Started!" : "Quiz Ended!");
         }
         async function deleteQuiz(id) { if (confirm("Delete this quiz?")) await db.collection("quizzes").doc(id).delete(); }
+        async function toggleTemplateStatus(id, current) {
+            try {
+                await db.collection("quizzes").doc(id).update({ isTemplate: !current });
+                showToast(`Template Status: ${!current ? 'ON' : 'OFF'}`);
+            } catch (e) {
+                alert("Error: " + e.message);
+            }
+        }
 
         // Export to Global window for HTML onclick (V88.49)
         window.openQuizModal = openQuizModal;
@@ -9884,6 +9949,7 @@ async function saveQuiz() {
         window.adjustQuizPoints = adjustQuizPoints;
         window.duplicateQuiz = duplicateQuiz;
         window.toggleQuizStatus = toggleQuizStatus;
+        window.toggleTemplateStatus = toggleTemplateStatus;
         window.deleteQuiz = deleteQuiz;
         window.openHomeworkAssignModal = openHomeworkAssignModal;
 
@@ -10711,7 +10777,7 @@ async function saveQuiz() {
                             <td style="text-align:center;">-</td>
                             <td><img src="${d.pictureUrl}" class="user-pic"> <span style="font-weight:bold; color:#777;">⏳ ${d.displayName}</span><div style="font-size:0.75em; color:var(--primary); margin-top:3px; padding-left:40px;">Code: <b style="background:#f3f0ff; padding:2px 8px; border-radius:10px; border:1px dashed var(--primary); font-family:monospace;">${d.code}</b></div></td>
                             <td><span class="badge" style="background:${getGroupColor(d.group)}; color:white; font-size:0.8em;"><i class="fa-solid ${getGroupIcon(d.group)}"></i> ${d.group}</span></td>
-                            <td><span class="badge" style="background:#ffc107; color:black;"><i class="fa-solid fa-hourglass-half"></i> Pending Reg.</span></td>
+                            <td><span class="badge" style="background:#ffc107; color:black;"><i class="fa-solid fa-hourglass-half"></i> Pending Req.</span></td>
                             <td>-</td>
                             <td>-</td>
                             <td style="font-size:0.78em; white-space:nowrap;">${dateStr}</td>
@@ -10753,7 +10819,7 @@ async function saveQuiz() {
                                 ${certNameDisplay}
                             </td>
                             <td><button class="btn-sm" style="font-size:0.75em; padding:2px 8px; background:${getGroupColor(group)}; color:white; border:none; display:flex; align-items:center; gap:5px;" onclick="setUserGroup('${d.id}', '${group}')"><i class="fa-solid ${getGroupIcon(group)}"></i> ${group}</button></td>
-                            <td><button class="btn-sm" onclick="toggleIgnoreUser('${d.id}',${ignored})">${ignored ? '🚫 ignored' : '👁️ active'}</button></td>
+                            <td><button class="btn-sm" onclick="toggleIgnoreUser('${d.id}',${ignored})" style="border:none; border-radius:15px; padding:3px 12px; font-weight:800; font-size:0.75em; cursor:pointer; background:${ignored ? '#f1f3f5' : '#10b981'}; color:${ignored ? '#adb5bd' : 'white'}; box-shadow:${ignored ? 'none' : '0 2px 5px rgba(16,185,129,0.3)'};">${ignored ? '<i class="fa-solid fa-eye-slash"></i> ignored' : '<i class="fa-solid fa-check"></i> active'}</button></td>
                             <td>
                                 <span class="badge" style="background:#eee;color:#333;margin-right:5px;">Lv.${lv}</span>
                                 ${d.periodScore !== undefined ? `<span style="font-weight:bold;color:var(--primary);">${d.periodScore.toFixed(2)}</span> <span style="font-size:0.75em; color:#999;">(+${parseFloat((d.score || 0).toFixed(2))})</span>` : `<span style="font-weight:bold;color:var(--primary);">${parseFloat((d.score || 0).toFixed(2))}</span>`}
