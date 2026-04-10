@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V89.24)</title>
-    <!-- V89.24: Added Anime-themed naming (Manten/Shōjiki no Mi) for Quiz Review buttons -->
+    <title>Intern Admin Portal (V89.25)</title>
+    <!-- V89.25: Added Toggle Template Status functionality -->
     <!-- Release: 2026-04-09 20:38 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1408,7 +1408,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.3em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,219,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.24</span>
+                        <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,219,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.25</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -9691,7 +9691,7 @@ async function saveQuiz() {
 
                 const oneTimeLabel = q.oneTimeMode ? '<span class="badge" style="background:#f57f17; color:white;">🔄 ONE-TIME</span>' : '';
                 const homeworkLabel = q.isHomework ? `<span class="badge" style="background:#2e7d32; color:white;">📚 HW${q.assignedUsers && q.assignedUsers.length ? ' (' + q.assignedUsers.length + ')' : ''}</span>` : '';
-                const templateLabel = (q.isTemplate || !isActiveSection) ? '<div style="margin-top:4px;"><span class="badge" style="background:orange; color:white; font-size:0.75em;">TEMPLATE</span></div>' : '';
+                const templateLabel = q.isTemplate ? '<div style="margin-top:4px;"><span class="badge" style="background:orange; color:white; font-size:0.75em;">TEMPLATE</span></div>' : '';
                 const targetGroupLabel = q.targetGroup && q.targetGroup !== "Public" ? `<span class="badge" style="background:#007bff; margin-left:5px;">${q.targetGroup}</span>` : '';
 
 
@@ -9779,6 +9779,7 @@ async function saveQuiz() {
                                 <button class="btn-sm" style="background:#2e7d32; color:white; padding:2px 6px;" onclick="openHomeworkAssignModal('${q.id}')" title="Homework"><i class="fa-solid fa-book"></i></button>
                                 ${(q.isPoll || hasWriting) ? `<button class="btn-sm" style="background:#8e44ad; color:white; padding:2px 6px;" onclick="showPollResults('${q.id}')" title="Result">📊</button>` : ''}
                                 <button class="btn-sm" style="background:#8e44ad; color:white; padding:2px 6px;" onclick="showQuizDiscussions('${q.id}')" title="Discussion">💬</button>
+                                <button class="btn-sm" style="background:${q.isTemplate ? '#fbbf24' : '#94a3b8'}; color:white; padding:2px 6px;" onclick="toggleTemplateStatus('${q.id}', ${q.isTemplate || false})" title="Toggle Template Status"><i class="fa-solid fa-star"></i></button>
                                 ${(!isActiveSection) ? `<button class="btn-sm btn-warning" style="padding:2px 6px; font-size:0.75em;" onclick="repostQuiz('${q.id}')">♻️</button>` : ''}
                                 <button class="btn-sm btn-danger" style="padding:2px 6px;" onclick="deleteQuiz('${q.id}')">Del</button>
                             </div>
@@ -9929,6 +9930,14 @@ async function saveQuiz() {
             showToast(updates.isActive ? "Quiz Started!" : "Quiz Ended!");
         }
         async function deleteQuiz(id) { if (confirm("Delete this quiz?")) await db.collection("quizzes").doc(id).delete(); }
+        async function toggleTemplateStatus(id, current) {
+            try {
+                await db.collection("quizzes").doc(id).update({ isTemplate: !current });
+                showToast(`Template Status: ${!current ? 'ON' : 'OFF'}`);
+            } catch (e) {
+                alert("Error: " + e.message);
+            }
+        }
 
         // Export to Global window for HTML onclick (V88.49)
         window.openQuizModal = openQuizModal;
@@ -9940,6 +9949,7 @@ async function saveQuiz() {
         window.adjustQuizPoints = adjustQuizPoints;
         window.duplicateQuiz = duplicateQuiz;
         window.toggleQuizStatus = toggleQuizStatus;
+        window.toggleTemplateStatus = toggleTemplateStatus;
         window.deleteQuiz = deleteQuiz;
         window.openHomeworkAssignModal = openHomeworkAssignModal;
 
