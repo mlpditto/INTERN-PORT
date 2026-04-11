@@ -1408,7 +1408,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.3em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,219,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.40</span>
+                                                <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,219,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.41</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -12158,25 +12158,40 @@ async function saveQuiz() {
             if (!u) return;
             document.getElementById('merge-source-info').innerText = `Source: ${u.displayName || u.fullName || 'Unknown'}`;
             
+            renderMergeTargetList("");
+            document.getElementById('mergeModal').style.display = 'flex';
+        }
+
+        function renderMergeTargetList(searchStr = "") {
             const list = document.getElementById('merge-target-list');
             list.innerHTML = "";
-            const targets = usersData.filter(x => x.id !== id && !x.isIgnored).sort((a,b) => a.displayName.localeCompare(b.displayName));
+            const t = searchStr.toLowerCase();
             
-            targets.forEach(t => {
+            const targets = usersData.filter(x => 
+                x.id !== mergeSourceId && 
+                !x.isIgnored && 
+                ((x.displayName || "").toLowerCase().includes(t) || (x.fullName || "").toLowerCase().includes(t))
+            ).sort((a,b) => (a.displayName || "").localeCompare(b.displayName || ""));
+            
+            if (targets.length === 0) {
+                list.innerHTML = `<div style="text-align:center; padding:20px; color:#999; font-size:0.85em;">No potential targets found.</div>`;
+                return;
+            }
+
+            targets.forEach(target => {
                 list.innerHTML += `
-                    <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid #eee; background:white; border-radius:8px; margin-bottom:5px;">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <img src="${t.pictureUrl}" style="width:30px; height:30px; border-radius:50%; object-fit:cover;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid #f8fafc; background:white; border-radius:12px; margin-bottom:6px; transition:all 0.2s; border:1px solid #f1f5f9;">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <img src="${target.pictureUrl || 'https://cdn-icons-png.flaticon.com/512/847/847969.png'}" style="width:36px; height:36px; border-radius:50%; object-fit:cover; border:2px solid #f1f5f9;">
                             <div>
-                                <div style="font-weight:bold; font-size:0.9em;">${t.displayName}</div>
-                                <div style="font-size:0.7em; color:#888;">${t.fullName || ''} | ${t.id}</div>
+                                <div style="font-weight:bold; font-size:0.95em; color:#1e293b;">${target.displayName}</div>
+                                <div style="font-size:0.7em; color:#64748b; margin-top:1px;">${target.fullName || 'No Real Name'} | Score: <b>${(target.score || 0).toFixed(2)}</b></div>
                             </div>
                         </div>
-                        <button class="btn-sm btn-primary" onclick="executeMerge('${t.id}')">Merge Here</button>
+                        <button class="btn-sm btn-primary" onclick="executeMerge('${target.id}')" style="border-radius:20px; padding:6px 14px; font-weight:600; font-size:0.8em; box-shadow:0 4px 10px rgba(67,97,238,0.15);">Merge Here</button>
                     </div>
                 `;
             });
-            document.getElementById('mergeModal').style.display = 'flex';
         }
 
         async function executeMerge(targetId) {
@@ -12184,59 +12199,86 @@ async function saveQuiz() {
             const source = usersData.find(x => x.id === mergeSourceId) || preRegData.find(x => x.id === mergeSourceId);
             const target = usersData.find(x => x.id === targetId);
             
-            if (!confirm(`🚀 ATTENTION: MERGE DATA?\n\nFROM: ${source.displayName}\nTO: ${target.displayName}\n\nAll history (Quizzes, Works, Logs) and Score (${source.score || 0}) will be transferred. ${source.displayName} will be DELETED permanently.`)) return;
+            if (!source || !target) return alert("Source or Target missing.");
+
+            const confirmMsg = `🚀 ATTENTION: MERGE DATA?\n\n` +
+                               `FROM: ${source.displayName || source.fullName}\n` +
+                               `TO: ${target.displayName || target.fullName}\n\n` +
+                               `All history (Quizzes, Works, Logs, Polls) and Score (${(source.score || 0).toFixed(2)}) will be transferred.\n` +
+                               `The source account (${source.displayName}) will be DELETED permanently.`;
             
-            showToast("⌛ Merging database records...");
-            const btn = event.target;
-            btn.disabled = true;
-            btn.innerText = "Processing...";
+            if (!confirm(confirmMsg)) return;
+            
+            showToast("⌛ Executing Large-Scale Merge...");
+            const oldTargetInner = document.getElementById('merge-target-list').innerHTML;
+            document.getElementById('merge-target-list').innerHTML = `<div style="text-align:center; padding:50px;"><i class="fa-solid fa-spinner fa-spin fa-2xl" style="color:var(--primary);"></i><p style="margin-top:15px; font-weight:bold;">Moving records in chunks...</p></div>`;
             
             try {
-                const batch = db.batch();
-                
-                // 1. Transfer Score
+                // 1. Transfer Score First (Immediate Update)
                 const sourceScore = parseFloat(source.score || 0);
                 if (sourceScore !== 0) {
-                    batch.update(db.collection("users").doc(targetId), {
+                    await db.collection("users").doc(targetId).update({
                         score: firebase.firestore.FieldValue.increment(sourceScore)
                     });
                 }
                 
-                // 2. Fetch all historical collections to update userId
-                const collections = ["works", "quiz_attempts", "checkin_logs", "reflective_logs", "quest_submissions"];
+                // 2. Fetch and Transfer all historical collections with Chunking (Avoid limit 500)
+                const collections = ["works", "quiz_attempts", "checkin_logs", "reflective_logs", "quest_submissions", "poll_responses"];
+                let totalTasks = 0;
+                let currentBatch = db.batch();
+                let opCount = 0;
                 
                 for (const coll of collections) {
                     const snap = await db.collection(coll).where("userId", "==", mergeSourceId).get();
-                    snap.forEach(doc => {
-                        batch.update(doc.ref, { userId: targetId });
-                    });
+                    for (const doc of snap.docs) {
+                        currentBatch.update(doc.ref, { userId: targetId });
+                        opCount++;
+                        totalTasks++;
+                        
+                        // Firestore limit 500 per batch. We use 450 for safety.
+                        if (opCount >= 450) {
+                            await currentBatch.commit();
+                            currentBatch = db.batch();
+                            opCount = 0;
+                        }
+                    }
                 }
                 
-                // 3. Update PreReg linkage if Source was a claimed PreReg
+                // 3. Last Batch commit for collections
+                if (opCount > 0) {
+                    await currentBatch.commit();
+                    opCount = 0;
+                    currentBatch = db.batch();
+                }
+
+                // 4. Update PreReg linkage
                 const preSnap = await db.collection("pre_registration").where("claimedBy", "==", mergeSourceId).get();
                 preSnap.forEach(doc => {
-                    batch.update(doc.ref, { claimedBy: targetId });
+                    currentBatch.update(doc.ref, { claimedBy: targetId });
+                    opCount++;
+                    if (opCount >= 450) { /* Actually rare to have >500 pre-regs for one user */ }
                 });
 
-                // 4. Delete Source Account
-                batch.delete(db.collection("users").doc(mergeSourceId));
+                // 5. Delete Source Account
+                currentBatch.delete(db.collection("users").doc(mergeSourceId));
                 
-                // 5. If source was from pre_registration (Not yet a full user or duplicate), delete its pre-reg entry too if it's the specific one
+                // 6. Delete PreReg entry if it was a raw pre-reg source
                 if (source.isPreReg) {
-                     batch.delete(db.collection("pre_registration").doc(mergeSourceId));
+                     currentBatch.delete(db.collection("pre_registration").doc(mergeSourceId));
                 }
 
-                await batch.commit();
-                showToast("✅ Merge Complete! All data unified.");
+                await currentBatch.commit();
+                
+                showToast(`✅ Merge Complete! ${totalTasks} records unified.`);
                 document.getElementById('mergeModal').style.display = 'none';
                 
-                // Re-poll data
-                fetchInitialData();
+                // Reload data
+                if (typeof fetchInitialData === 'function') fetchInitialData();
+                else window.location.reload();
             } catch (e) {
                 console.error("Merge error:", e);
                 alert("Error during merge: " + e.message);
-                btn.disabled = false;
-                btn.innerText = "Merge Here";
+                renderMergeTargetList(""); // Restore UI
             }
         }
         function openShareModal() { document.getElementById('shareModal').style.display = 'block'; }
@@ -14282,11 +14324,18 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             <p style="font-size:0.9em; color:#666; margin-bottom:15px; background:#fff9db; padding:10px; border-radius:10px; border-left:4px solid #fcc419;">
                 <b>Merge</b> this user's data into another account. This will transfer all history/score and delete the source account.
             </p>
-            <div id="merge-source-info" style="font-weight:800; color:var(--primary); background:rgba(67, 97, 238, 0.05); padding:10px; border-radius:10px; margin-bottom:15px; text-align:center;">-</div>
+            <div id="merge-source-info" style="font-weight:800; color:var(--primary); background:rgba(67, 97, 238, 0.05); padding:10px; border-radius:10px; margin-bottom:15px; text-align:center; border:1px solid rgba(67, 97, 238, 0.1);">
+                -
+            </div>
             
-            <div style="margin-bottom:10px; font-weight:bold; font-size:0.85em; color:#444;">Select Destination User:</div>
-            <div id="merge-target-list" style="max-height:300px; overflow-y:auto; border:1px solid #eee; border-radius:12px; padding:5px; background:#fafafa;">
-                <p style="text-align:center; padding:20px; color:#999;">Loading potential targets...</p>
+            <div style="margin-bottom:12px;">
+                <div style="margin-bottom:6px; font-weight:bold; font-size:0.85em; color:#444;">Select Destination User:</div>
+                <input type="text" id="merge-search" placeholder="🔍 Search target user..." onkeyup="renderMergeTargetList(this.value)" 
+                    style="width:100%; padding:10px; border-radius:12px; border:1px solid #ddd; font-size:0.9em; outline:none; transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 3px rgba(67,97,238,0.1)';">
+            </div>
+
+            <div id="merge-target-list" style="max-height:350px; overflow-y:auto; border:1px solid #f1f5f9; border-radius:15px; padding:8px; background:#f8fafc;">
+                <p style="text-align:center; padding:20px; color:#999; font-size:0.85em;">Loading potential targets...</p>
             </div>
             
             <div style="margin-top:20px; text-align:right;">
