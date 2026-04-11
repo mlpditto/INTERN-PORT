@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard (V89.74 Global Fix)</title>
-    <!-- V89.72: AI Reliability fix for Unified Tags & Specialist Toolbar -->
-    <!-- Release: 2026-04-09 20:38 UTC+7 -->
+    <title>Admin Dashboard (V89.76 Global AI Unified)</title>
+    <!-- V89.76: AI Reliability fix - Unified module execution for Tagging & AI Utilities -->
+    <!-- Release: 2026-04-11 22:25 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -80,47 +80,7 @@
             }
         };
 
-        window.autoTagQuizAI = async function(btn) {
-            console.log("🚀 [AI Tagging] Starting sequence...");
-            if (typeof showToast === 'function') showToast("🔍 AI analyzing content...");
 
-            const formData = typeof getQuizFormData === 'function' ? getQuizFormData() : null;
-            if (!formData || (!formData.title && (!formData.questions || formData.questions.length === 0))) {
-                return alert("Please enter a title or add questions first.");
-            }
-
-            const oldHtml = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyzing...';
-
-            try {
-                const qTextContent = (formData.questions || []).slice(0, 50).map((q, i) => `Q${i+1}: ${q.q}`).join('\n');
-                const contentToAnalyze = `Title: ${formData.title}\nDescription: ${formData.description || ""}\nQuestions:\n${qTextContent}`;
-
-                const prompt = `Analyze this medical quiz content and provide 5-8 comma-separated medical tags.\nContent:\n${contentToAnalyze}\n\nOUTPUT FORMAT: Just comma-separated tags.`;
-
-                const modelVal = document.getElementById('ai-tagging-model-val')?.value || 'gemini-2.5-flash';
-                
-                const response = await window.callUniversalAI(modelVal, prompt, false);
-                const suggestedTags = response.text;
-
-                if (suggestedTags && suggestedTags.trim().length > 2) {
-                    const cleanTags = suggestedTags.replace(/```/g, "").replace(/tags:/gi, "").replace(/tag:/gi, "").trim();
-                    const tagInput = document.getElementById('quiz-tags');
-                    if (tagInput) {
-                        if (tagInput.value && !confirm("Replace existing tags?")) return;
-                        tagInput.value = cleanTags;
-                        if (typeof refreshTagChips === 'function') refreshTagChips();
-                    }
-                    if (typeof showToast === 'function') showToast("✅ AI suggestion applied!");
-                }
-            } catch (e) {
-                alert("AI Tagging Error: " + e.message);
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = oldHtml;
-            }
-        };
     </script>
 
     <style>
@@ -14461,8 +14421,57 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             refreshTagChips();
         };
 
+
+        // V89.76: autoTagQuizAI unified in module for dependency safety
+        window.autoTagQuizAI = async function(btn) {
+            console.log("🚀 [AI Tagging] Starting sequence...");
+            if (typeof showToast === 'function') showToast("🔍 AI analyzing content...");
+
+            const formData = typeof getQuizFormData === 'function' ? getQuizFormData() : null;
+            if (!formData || (!formData.title && (!formData.questions || formData.questions.length === 0))) {
+                return alert("Please enter a title or add questions first.");
+            }
+
+            const oldText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyzing...';
+
+            try {
+                const qTextContent = (formData.questions || []).slice(0, 50).map((q, i) => `Q${i+1}: ${q.q}`).join('\n');
+                const contentToAnalyze = `Title: ${formData.title}\nDescription: ${formData.description || ""}\nQuestions:\n${qTextContent}`;
+
+                const prompt = `Analyze this medical quiz content and provide 5-8 comma-separated medical tags.\nContent:\n${contentToAnalyze}\n\nOUTPUT FORMAT: Just comma-separated tags.`;
+
+                const modelVal = document.getElementById('ai-tagging-model-val')?.value || 'gemini-2.5-flash';
+                
+                // Safety check for deferred module execution
+                if (typeof window.callUniversalAI !== 'function') {
+                    throw new Error("AI engine still initializing. Please wait 1-2 seconds.");
+                }
+
+                const response = await window.callUniversalAI(modelVal, prompt, false);
+                const suggestedTags = response.text;
+
+                if (suggestedTags && suggestedTags.trim().length > 2) {
+                    const cleanTags = suggestedTags.replace(/```/g, "").replace(/tags:/gi, "").replace(/tag:/gi, "").trim();
+                    const tagInput = document.getElementById('quiz-tags');
+                    if (tagInput) {
+                        if (tagInput.value && !confirm("Replace existing tags?")) return;
+                        tagInput.value = cleanTags;
+                        if (typeof refreshTagChips === 'function') refreshTagChips();
+                    }
+                    if (typeof showToast === 'function') showToast("✅ AI suggestion applied!");
+                }
+            } catch (e) {
+                alert("AI Tagging Error: " + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = oldText;
+            }
+        };
+
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V89.74 loaded OK (Global Fix) ', 'background:#4361ee;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V89.76 loaded OK (Unified AI Fix) ', 'background:#4361ee;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
         console.log('setUserGroup:', typeof setUserGroup, '| openPeriodModal:', typeof openPeriodModal, '| reviewQuiz:', typeof reviewQuiz, '| detectNegativeWording:', typeof detectNegativeWording);
     </script>
 
