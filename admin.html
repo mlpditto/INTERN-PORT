@@ -3564,6 +3564,9 @@
     <script type="module">
         import { GoogleGenerativeAI } from "@google/generative-ai";
 
+        console.log("🚦 [Module] Starting Priority AI Core Load...");
+        window.AI_CORE_READY = false;
+
         // --- CORE AI ENGINE (V89.78 Priority Loaded) ---
         window.loadAIKeys = function() {
             const locG = localStorage.getItem('ai_gemini_key');
@@ -3641,7 +3644,8 @@
             }
         };
 
-        console.log("🤖 [AI Engine] Global Core V89.78 Initialized");
+        window.AI_CORE_READY = true;
+        console.log("🤖 [AI Engine] Global Core V89.78 Ready");
         
         // --- AI Diagnostic Tool (V88.55 Handle 403) ---
         window.checkGeminiModels = async function() {
@@ -13791,9 +13795,10 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
                 const modelVal = document.getElementById('ai-tagging-model-val')?.value || 'gemini-2.5-flash';
                 
-                // Safety check for deferred module execution
+                // V89.78: Resilience - allow function call directly if defined
                 if (typeof window.callUniversalAI !== 'function') {
-                    throw new Error("AI engine still initializing. Please wait 1-2 seconds.");
+                    console.error("❌ [AI Tagging] Engine Missing. Status:", window.AI_CORE_READY);
+                    throw new Error("AI engine is missing or still initializing. Status: " + window.AI_CORE_READY);
                 }
 
                 const response = await window.callUniversalAI(modelVal, prompt, false);
