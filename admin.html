@@ -13697,11 +13697,28 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
                 return `<span style="background:${bg}; color:${color}; border:1px solid ${border}; padding:5px 12px; border-radius:10px; font-size:0.78em; font-weight:800; display:flex; align-items:center; gap:8px; transition:0.2s;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 10px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none'">
                     <i class="fa-solid ${icon}" style="font-size:0.9em; opacity:0.8;"></i>
-                    ${t}
+                    <span style="cursor:pointer;" onclick="editTagChip(${idx})" title="Click to edit tag text">${t}</span>
                     <i class="fa-solid fa-circle-xmark" style="cursor:pointer; opacity:0.5; transition:0.2s;" onmouseover="this.style.opacity='1'; this.style.color='#f87171'" onmouseout="this.style.opacity='0.5'; this.style.color='inherit'" onclick="removeTagChip(${idx})"></i>
                 </span>`;
             }).join('');
         };
+
+        window.editTagChip = function(index) {
+            const hiddenInput = document.getElementById('quiz-tags');
+            if (!hiddenInput) return;
+            let tagStr = (hiddenInput.value || "").trim();
+            let tags = tagStr.split(',').map(t => t.trim()).filter(t => t !== "");
+            const oldVal = tags[index];
+            const newVal = prompt("Edit Tag Name:", oldVal);
+            
+            if (newVal !== null && newVal.trim() !== "" && newVal !== oldVal) {
+                tags[index] = newVal.trim();
+                hiddenInput.value = tags.join(', ');
+                if (typeof refreshTagChips === 'function') refreshTagChips();
+                if (typeof showToast === 'function') showToast("Tag updated!");
+            }
+        };
+
         window.autoTagQuizAI = async function(btn) {
             console.log("🚀 [AI Tagging] Starting sequence...");
             if (typeof showToast === 'function') showToast("🔍 AI analyzing content...");
