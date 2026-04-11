@@ -4225,7 +4225,38 @@
                     btn.disabled = true;
                 }
                 
-                const prompt = `Analyze these quiz questions for similarity, redundancy, variety, and quality.\nIdentify specific questions that need improvement.\n\nQuestions list:\n${qList}\n\nOUTPUT FORMAT (MANDATORY JSON):\n{\n  "suggestedTitles": { "full": "...", "short": "..." },\n  "analysisText": "Professional summary in Thai. If questions are duplicated, mention all Q numbers.",\n  "items": [\n    {\n      "qNumber": 1,\n      "relatedQNumbers": [2],\n      "issue": "Explanation of issue for Q1 (e.g. redundant with Q2)",\n      "suggestion": "How to improve it",\n      "improvedQuestion": {\n        "q": "Improved question text - MUST BE DIFFERENT if a fix is needed",\n        "type": "choice",\n        "options": ["A", "B", "C", "D"],\n        "correct": [0],\n        "timer": 60\n      }\n    }\n  ]\n}\n\nCRITICAL INSTRUCTION: The "improvedQuestion" MUST NOT be a copy of the original if you identified an issue. It MUST incorporate the suggested fix (e.g., rephrase, change options, or solve the specific issue mentioned). Omit perfect questions. ALWAYS use 1-based qNumber matching the Q list EXACTLY. LANGUAGE RULE: All "improvedQuestion" fields (q, options, etc.) MUST maintain the original language of the question being analyzed. Only "analysisText", "issue", and "suggestion" should be in Thai.`;
+                const prompt = `You are a high-level Assessment Specialist. Analyze these quiz questions for redundancy, logical variety, and cognitive depth (Bloom's Taxonomy).
+                
+                YOUR GOALS:
+                1. Identify simple "Recall" questions and suggest shifting them to "Application" or "Analysis" (Higher-Order Thinking).
+                2. Evaluate Distractor Quality: Mark questions where distractors are too easy or obviously wrong.
+                3. Suggest scenarios/clinical contexts to make the assessment more realistic and challenging.
+                
+                Questions list:
+                ${qList}
+                
+                OUTPUT FORMAT (MANDATORY JSON):
+                {
+                  "suggestedTitles": { "full": "...", "short": "..." },
+                  "analysisText": "Professional summary in Thai, evaluating the overall Challenge Level (Low/Med/High) and suggesting a better balance of question types.",
+                  "items": [
+                    {
+                      "qNumber": 1,
+                      "relatedQNumbers": [2],
+                      "issue": "Detailed issue description in Thai (e.g., 'เป็นเพียงความจำระดับพื้นฐาน และตัวเลือกไม่สมเหตุสมผล')",
+                      "suggestion": "Detailed Thai suggestion on how to make it more challenging (e.g. 'เปลี่ยนเป็นโจทย์สถานการณ์จำลอง เพื่อให้ผู้เรียนวิเคราะห์')",
+                      "improvedQuestion": {
+                        "q": "Enhanced question text using Application/Analysis approach",
+                        "type": "choice",
+                        "options": ["Plausible Distractor A", "Correct Answer B", "Plausible Distractor C", "Plausible Distractor D"],
+                        "correct": [1],
+                        "timer": 60
+                      }
+                    }
+                  ]
+                }
+                
+                CRITICAL INSTRUCTION: The "improvedQuestion" MUST incorporate 'Professional-Grade' distractors and higher-order challenge. Omit perfect questions. LANGUAGE RULE: All "improvedQuestion" content MUST be in the original language of the question list. Thai is used only for "analysisText", "issue", and "suggestion".`;
                 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-3.0-pro';
                 
@@ -5797,10 +5828,12 @@ Do not include any explanation other than the feedback body.`;
                     taskPrompt = `As a Thai language and curriculum expert (Typhoon AI), enhance and polish the following Thai multiple-choice question. Refine the wording to be more professional, medical/technical as appropriate, and ensure cultural accuracy.`;
                 }
 
-                const prompt = `You are an expert educator. Your task is to:
+                const prompt = `You are an expert educator and curriculum designer specializing in high-stakes professional assessments (e.g., Medical/Technical boards). Your task is to:
                 1. ${taskPrompt}
-                2. Enhance the options to make them more challenging and professional (avoid obvious distractors).
-                3. Maintain the logical meaning of the original question and the correct answers.
+                2. Apply Bloom's Taxonomy: Shift the question from simple recall to Higher-Order Thinking (Application, Analysis, or Evaluation) where possible. 
+                3. Create "Professional-Grade" Distractors: All options must be plausible and based on common misconceptions or logical alternatives. Avoid "obvious" wrong answers. 
+                4. Maintain technical accuracy: Ensure the core medical/technical concept and the original correct answer(s) are preserved but expressed more robustly.
+                5. Conciseness: Keep the question and options professional, avoiding unnecessary padding.`;
                 
                 Original Question: "${questionText}"
                 Original Options: ${JSON.stringify(options)}
