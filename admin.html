@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V89.43)</title>
-    <!-- V89.43: Merge Modal Fix + forceShowModal Integration complete -->
+    <title>Intern Admin Portal (V89.44)</title>
+    <!-- V89.44: Pre-Reg Merge Linking & KB Modal Fix -->
     <!-- Release: 2026-04-09 20:38 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1408,7 +1408,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.3em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                                                <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,219,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.43</span>
+                                                <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,219,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.44</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -10872,7 +10872,12 @@ async function saveQuiz() {
                             <td>-</td>
                             <td>-</td>
                             <td style="font-size:0.78em; white-space:nowrap;">${dateStr}</td>
-                            <td><button class="btn-sm btn-danger" onclick="deletePreReg('${d.id}')">Del</button></td>
+                            <td>
+                                <div style="display:flex; gap:5px;">
+                                    <button class="btn-sm" onclick="openMergeModal('${d.id}')" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:5px; padding:4px 8px;" title="Link Data"><i class="fa-solid fa-link"></i></button>
+                                    <button class="btn-sm btn-danger" onclick="deletePreReg('${d.id}')">Del</button>
+                                </div>
+                            </td>
                         </tr>`;
                         return;
                     }
@@ -12167,7 +12172,7 @@ async function saveQuiz() {
         function filterBoard() { drawKanban(); }
         function filterUsers() { renderTable('users'); }
 
-        // 🔥 User Merger Logic (V89.43)
+        // 🔥 User Merger Logic (V89.44)
         let mergeSourceId = null;
         function openMergeModal(id) {
             mergeSourceId = id;
@@ -12185,7 +12190,22 @@ async function saveQuiz() {
             list.innerHTML = "";
             const t = searchStr.toLowerCase();
             
-            const targets = usersData.filter(x => 
+            const sourceIsPreReg = !usersData.find(x => x.id === mergeSourceId);
+            
+            let allTargets = [...usersData];
+            if (!sourceIsPreReg) {
+                const unclaimedPreRegs = preRegData.filter(p => !p.claimed).map(p => ({
+                    id: p.id,
+                    isPreReg: true,
+                    displayName: `⏳ [Pre-Reg] ${p.fullName || p.nickName || 'No Name'}`,
+                    fullName: p.fullName,
+                    score: 0,
+                    pictureUrl: 'https://cdn-icons-png.flaticon.com/512/847/847969.png'
+                }));
+                allTargets = [...allTargets, ...unclaimedPreRegs];
+            }
+
+            const targets = allTargets.filter(x => 
                 x.id !== mergeSourceId && 
                 !x.isIgnored && 
                 ((x.displayName || "").toLowerCase().includes(t) || (x.fullName || "").toLowerCase().includes(t))
@@ -12214,10 +12234,65 @@ async function saveQuiz() {
 
         async function executeMerge(targetId) {
             if (!mergeSourceId || !targetId) return;
-            const source = usersData.find(x => x.id === mergeSourceId) || preRegData.find(x => x.id === mergeSourceId);
-            const target = usersData.find(x => x.id === targetId);
+            const sourceIsPreReg = !usersData.find(x => x.id === mergeSourceId);
+            let target = usersData.find(x => x.id === targetId);
+            let targetIsPreReg = false;
             
-            if (!source || !target) return alert("Source or Target missing.");
+            if (!target) {
+                target = preRegData.find(x => x.id === targetId);
+                targetIsPreReg = !!target;
+            }
+            
+            if (!source && !sourceIsPreReg) return alert("Source missing.");
+            if (!target) return alert("Target missing.");
+            
+            if (sourceIsPreReg && targetIsPreReg) return alert("Cannot link two pre-registrations.");
+
+            if (sourceIsPreReg || targetIsPreReg) {
+                const preRegId = sourceIsPreReg ? mergeSourceId : targetId;
+                const userId = sourceIsPreReg ? targetId : mergeSourceId;
+                const preRegDoc = sourceIsPreReg ? source : target;
+                const userDoc = sourceIsPreReg ? target : source;
+                
+                const confirmMsg = `🚀 ATTENTION: LINK PRE-REGISTRATION?\n\n` +
+                                   `USER: ${userDoc.displayName || userDoc.fullName || 'Unknown'}\n` +
+                                   `PRE-REG: ⏳ ${preRegDoc.fullName || preRegDoc.nickName || 'No Name'}\n\n` +
+                                   `This will manually claim the pre-registration for the user. Group '${preRegDoc.group}' and dates will be applied to the user.`;
+                
+                if (!confirm(confirmMsg)) return;
+                
+                showToast("⌛ Linking pre-registration...");
+                try {
+                    const batch = db.batch();
+                    // 1. Mark pre_registration as claimed
+                    batch.update(db.collection("pre_registration").doc(preRegId), {
+                        claimed: true,
+                        claimedBy: userId
+                    });
+                    
+                    // 2. Update user info
+                    const updateData = {
+                        fullName: preRegDoc.fullName,
+                        group: preRegDoc.group,
+                        startDate: preRegDoc.startDate,
+                        endDate: preRegDoc.endDate,
+                        isIntern: preRegDoc.group === 'INTERN',
+                        status: 'active'
+                    };
+                    if (preRegDoc.nickName) updateData.nickName = preRegDoc.nickName;
+                    
+                    batch.update(db.collection("users").doc(userId), updateData);
+                    await batch.commit();
+                    
+                    showToast(`✅ Link Complete!`);
+                    forceHideModal('mergeModal');
+                    if (typeof fetchInitialData === 'function') fetchInitialData();
+                    else window.location.reload();
+                } catch (e) {
+                    alert("Error linking pre-reg: " + e.message);
+                }
+                return;
+            }
 
             const confirmMsg = `🚀 ATTENTION: MERGE DATA?\n\n` +
                                `FROM: ${source.displayName || source.fullName}\n` +
@@ -14260,6 +14335,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 </button>
             </div>
         </div>
+    </div>
     <!-- PDF-to-Quiz Document Selector Modal (V87.52) -->
     <div id="pdfToQuizModal" class="modal" style="z-index:5200;">
         <div class="modal-content" style="max-width:600px; padding:30px; border-radius:25px;">
@@ -14332,7 +14408,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             <div id="prereg-list" style="max-height:400px; overflow-y:auto;"></div>
         </div>
     </div>
-    <!-- 🔥 User Merger Modal (V89.43) -->
+    <!-- 🔥 User Merger Modal (V89.44) -->
     <div id="mergeModal" class="modal" style="display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);">
         <div class="modal-content" style="max-width:500px; width:90%; border-radius:20px; border:none; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
