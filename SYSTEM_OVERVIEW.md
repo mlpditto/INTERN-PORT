@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V89.76) Overview
+# MLP Internship Portfolio (V89.78) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** 
@@ -79,6 +79,12 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-04-12] Session Updates (V89.76 → V89.78)
+### 1. Priority AI Core Loading (V89.78)
+- **Engine Relocation:** Moved `callUniversalAI` and its core dependencies to the very top of the module script block.
+- **Race Condition Fix:** Resolved the "AI engine still initializing" error by ensuring the AI core is defined before the UI components attempt to bind or trigger tagging logic.
+- **Global Deployment Synchronization:** Pushed V89.78 to both `production` and `main` branches for GitHub Pages and production stability.
 
 ## [2026-04-11] Session Updates (V89.72 → V89.76)
 ### 1. Unified AI Lifecycle (V89.76)
@@ -624,4 +630,4 @@ service cloud.firestore {
     - **Date & Time Formatting:** ปรับการแสดงผลวันที่และเวลาให้ใช้รูปแบบ `en-US` (เช่น Mar 23, 2026) ทั่วทั้งระบบเพื่อความสม่ำเสมอ
 
 ---
-*บันทึกภาพรวมระบบสะท้อนความจริง (V89.76) โดย Antigravity AI*
+*บันทึกภาพรวมระบบสะท้อนความจริง (V89.78) โดย Antigravity AI*
