@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V89.49) Overview
+# MLP Internship Portfolio (V89.50) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** 
@@ -289,6 +289,7 @@
     - ระบบจะแปลโจทย์และตัวเลือกจากไทยเป็นภาษาเป้าหมาย พร้อมปรับปรุงเนื้อหาให้มีความเป็นทางการและท้าทายมากขึ้น
     - ใช้ Gemini JSON Mode เพื่อรักษาโครงสร้างของชุดข้อสอบและลำดับเฉลยให้ถูกต้องแม่นยำ
 - **Unified Tags & Taxonomy Card (V89.49):** อัปเกรดส่วนการจัดหมวดหมู่เนื้อหาให้เป็นระบบ **Visual Tag Chips** ที่สวยงามและตอบโต้ได้ (Interactive) โดยมีการแบ่งสีตามประเภท (ICD-11, Topic, Difficulty) พร้อมระบบลบ/เพิ่ม Tag ที่สะดวกขึ้น
+- **Lean Quiz Header UI (V89.50):** ปรับปรุงหน้าตาของส่วนค้นหาข้อความใน "Inactive / Templates" ให้ดู Lean และสะอาดตาขึ้น โดยแยก Tag Filters ออกมาเป็นแถวเฉพาะ (Filter Row) เพื่อลดความแออัดข้างกล่อง Search
 - **Developer Security:** เก็บ API Key ไว้ใน `firebase-config.js` (Client-side) เพื่อการพัฒนาที่รวดเร็ว (สำหรับ Production แนะนำให้ย้ายไป Firebase Functions)
 
 ### 6. [AI] Research Assistant & Knowledge Base (V86.35 - Active)
@@ -617,4 +618,4 @@ service cloud.firestore {
     - **Date & Time Formatting:** ปรับการแสดงผลวันที่และเวลาให้ใช้รูปแบบ `en-US` (เช่น Mar 23, 2026) ทั่วทั้งระบบเพื่อความสม่ำเสมอ
 
 ---
-*บันทึกภาพรวมระบบสะท้อนความจริง (V89.49) โดย Antigravity AI*
+*บันทึกภาพรวมระบบสะท้อนความจริง (V89.50) โดย Antigravity AI*
