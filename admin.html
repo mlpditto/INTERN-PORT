@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V89.50)</title>
-    <!-- V89.50: Lean UI for Inactive Quizzes Header (Un-cluttering search area) -->
+    <title>Intern Admin Portal (V89.55)</title>
+    <!-- V89.55: Kanban Fix, Hide Period Toggle, and Score Dashboard -->
     <!-- Release: 2026-04-09 20:38 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1826,7 +1826,8 @@
                             <th>User (Cert Name)</th>
                             <th>Group</th>
                             <th>Status</th>
-                            <th>Score</th>
+                            <th style="width:100px;">Score</th>
+                            <th style="width:70px; text-align:center;">Logs</th>
                             <th>Adjust</th>
                             <th>Period</th>
                             <th>Actions</th>
@@ -2484,8 +2485,15 @@
                 <h2 id="history-title"></h2>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                     <h3 id="history-summary" style="margin:0;color:var(--primary);">Total: 0.00</h3>
-                    <button class="btn-sm btn-warning" onclick="recalculateUserScore(currentHistoryUserId)"><i
-                            class="fa-solid fa-rotate"></i> Recalculate Score</button>
+                    <button class="btn-sm btn-warning" onclick="recalculateUserScore(currentHistoryUserId)"><i class="fa-solid fa-rotate"></i> Recalculate Score</button>
+                </div>
+                <!-- 🔥 Score Dashboard Summary V89.50 -->
+                <div id="history-dashboard" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap:10px; margin-bottom:20px; background:#f8f9fa; padding:15px; border-radius:12px; border:1px solid #eee;">
+                    <div style="text-align:center;"><div style="font-size:0.7em;color:#999;text-transform:uppercase;font-weight:bold;">Quizzes</div><div id="dash-quizzes" style="font-size:1.2em;font-weight:bold;color:#4361ee;">0.00</div></div>
+                    <div style="text-align:center;"><div style="font-size:0.7em;color:#999;text-transform:uppercase;font-weight:bold;">Works</div><div id="dash-works" style="font-size:1.2em;font-weight:bold;color:#2ec4b6;">0.00</div></div>
+                    <div style="text-align:center;"><div style="font-size:0.7em;color:#999;text-transform:uppercase;font-weight:bold;">Logs</div><div id="dash-logs" style="font-size:1.2em;font-weight:bold;color:#f72585;">0.00</div></div>
+                    <div style="text-align:center;"><div style="font-size:0.7em;color:#999;text-transform:uppercase;font-weight:bold;">Bonus</div><div id="dash-bonus" style="font-size:1.2em;font-weight:bold;color:#ff9f1c;">0.00</div></div>
+                    <div style="text-align:center;"><div style="font-size:0.7em;color:#999;text-transform:uppercase;font-weight:bold;">Manual</div><div id="dash-manual" style="font-size:1.2em;font-weight:bold;color:#6f42c1;">0.00</div></div>
                 </div>
                 <ul id="history-list" style="list-style:none; padding:0;"></ul>
                 <div id="history-controls" class="history-controls"></div>
@@ -10937,12 +10945,18 @@ async function saveQuiz() {
                                 <span class="badge" style="background:#eee;color:#333;margin-right:5px;">Lv.${lv}</span>
                                 ${d.periodScore !== undefined ? `<span style="font-weight:bold;color:var(--primary);">${d.periodScore.toFixed(2)}</span> <span style="font-size:0.75em; color:#999;">(+${parseFloat((d.score || 0).toFixed(2))})</span>` : `<span style="font-weight:bold;color:var(--primary);">${parseFloat((d.score || 0).toFixed(2))}</span>`}
                             </td>
+                            <td style="text-align:center;">
+                                <span class="badge" style="background:rgba(230,126,34,0.1); color:#e67e22; border:1px solid rgba(230,126,34,0.2); font-weight:bold; cursor:pointer;" onclick="setReflectiveSearch('${(d.displayName || d.id).replace(/'/g, "\\'")}')" title="View Logs">
+                                    <i class="fa-solid fa-pen-fancy"></i> ${reflectiveLogsCache.filter(lg => lg.userId === d.id).length}
+                                </span>
+                            </td>
                             <td><div style="display:flex;"><input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:70px;margin:0;" onkeypress="if(event.key==='Enter')adjDec('${d.id}')"><button class="btn-sm btn-success" onclick="adjDec('${d.id}')">Adj</button></div></td>
                             <td style="font-size:0.78em; white-space:nowrap;">
                                 <div style="display:flex; align-items:center; gap:5px;">
-                                    <span>${dateStr}</span>
+                                    <span style="${d.hidePeriod ? 'text-decoration:line-through; color:#999;' : ''}">${dateStr}</span>
                                     ${certStatus}
                                     <button class="btn-sm" onclick="openPeriodModal('${d.id}', '${d.displayName}', '${d.startDate || ''}', '${d.endDate || ''}')" style="font-size:0.7em; padding:2px 6px; background:#6c757d; color:white; border:none; border-radius:4px;" title="Adjust Period">📅</button>
+                                    <button class="btn-sm" onclick="toggleHidePeriod('${d.id}', ${d.hidePeriod === true})" style="font-size:0.75em; padding:2px 6px; background:${d.hidePeriod ? '#ef233c' : '#20c997'}; color:white; border:none; border-radius:4px;" title="${d.hidePeriod ? 'Period is hidden in LIFF' : 'Period is visible in LIFF'}"><i class="fa-solid ${d.hidePeriod ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
                                 </div>
                             </td>
                             <td>${actionsGroup}</td>
@@ -11035,6 +11049,17 @@ async function saveQuiz() {
             document.getElementById("history-summary").innerText = `Total: ${total.toFixed(2)}`;
             document.getElementById("historyModal").style.display = "block";
             document.getElementById("history-list").innerHTML = "<p>Loading...</p>";
+
+            // Reset dashboard
+            const dash = { quizzes: 0, works: 0, logs: 0, bonus: 0, manual: 0 };
+            const updateDashUI = () => {
+                Object.keys(dash).forEach(k => {
+                    const el = document.getElementById(`dash-${k}`);
+                    if (el) el.innerText = dash[k].toFixed(2);
+                });
+            };
+            updateDashUI();
+
             try {
                 let all = [];
                 const [w, q, l, r] = await Promise.all([
@@ -11043,15 +11068,30 @@ async function saveQuiz() {
                     db.collection("checkin_logs").where("userId", "==", uid).get(),
                     db.collection("reflective_logs").where("userId", "==", uid).get()
                 ]);
-                w.forEach(d => { const x = d.data(); if (x.score > 0) all.push({ t: x.timestamp?.toDate(), type: 'work', text: `📁 ${x.title}`, score: x.score }); });
+
+                w.forEach(d => {
+                    const x = d.data();
+                    if (x.score > 0) {
+                        all.push({ t: x.timestamp?.toDate(), type: 'work', text: `📁 ${x.title}`, score: x.score });
+                        dash.works += x.score;
+                    }
+                });
+
                 q.forEach(d => {
                     const x = d.data();
                     const s = (x.earnedScore || 0) + (x.bonusGiven || 0);
                     const qObj = questsCache.find(q => q.id === x.questId);
                     const qName = qObj ? qObj.question : 'Quest';
                     const shortName = qName.length > 30 ? qName.substring(0, 30) + '...' : qName;
-                    if (x.status !== 'none') all.push({ t: x.receivedAt?.toDate(), type: 'bonus', text: `🚀 Receive: ${shortName}`, score: 0.1 });
-                    if (s > 0) all.push({ t: x.submittedAt?.toDate(), type: 'quest', text: `⚡ Submit: ${shortName}`, score: s });
+                    
+                    if (x.status !== 'none') {
+                        all.push({ t: x.receivedAt?.toDate(), type: 'bonus', text: `🚀 Receive: ${shortName}`, score: 0.1 });
+                        dash.bonus += 0.1;
+                    }
+                    if (s > 0) {
+                        all.push({ t: x.submittedAt?.toDate(), type: 'quest', text: `⚡ Submit: ${shortName}`, score: s });
+                        dash.quizzes += s;
+                    }
                 });
 
                 // 🔥 Add Quiz Attempts to History
@@ -11060,7 +11100,6 @@ async function saveQuiz() {
                     const att = d.data();
                     const qData = quizzesData.find(x => x.id === att.quizId) || {};
                     const qTitle = qData.shortTitle || qData.title || "Quiz";
-                    const points = att.gradedAnswers ? Object.keys(att.gradedAnswers).length : 0; 
                     const isPoll = qData.isPoll === true;
                     let finalScore = 0;
                     if (isPoll) finalScore = (qData.totalPoints || 1.0);
@@ -11072,39 +11111,52 @@ async function saveQuiz() {
                         text: `📝 ${isPoll ? 'Poll' : 'Quiz'}: ${qTitle}`,
                         score: finalScore
                     });
+                    dash.quizzes += finalScore;
                 });
 
-                // 🔥 Add Reflective Logs to History (V86.15)
+                // 🔥 Add Reflective Logs to History
                 r.forEach(d => {
                     const x = d.data();
                     const time = x.timestamp?.toDate();
                     const status = x.pointsClaimed ? 'Claimed' : (x.adminComment ? 'Reviewed' : 'Pending');
+                    const score = x.adminBonus || 0;
                     all.push({
                         t: time,
                         type: 'reflective_log',
                         text: `📔 Reflective Log (${status}): ${x.content?.substring(0, 50)}...`,
-                        score: x.adminBonus || 0,
+                        score: score,
                         isReflective: true,
                         docId: d.id,
                         fullContent: x.content,
                         adminComment: x.adminComment || "",
                         moodEmoji: { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[x.mood] || '📝'
                     });
+                    dash.logs += score;
                 });
 
                 l.forEach(d => {
                     const x = d.data();
-                    if (x.type === 'streak') all.push({ t: x.timestamp?.toDate(), type: 'bonus', text: `🔥 Streak`, score: x.amount, docId: d.id, source: 'checkin_logs' });
-                    if (x.type === 'manual_adjust' || x.type === 'manual') all.push({ t: x.timestamp?.toDate(), type: 'manual', text: `🛠️ ${x.note}`, score: x.amount, docId: d.id, source: 'checkin_logs' });
-                    if (x.type === 'reflective_log') all.push({ t: x.timestamp?.toDate(), type: 'bonus', text: `📝 ${x.note || 'Reflective Log'}`, score: x.amount, docId: d.id, source: 'checkin_logs' });
-                    // Skip redundant reflective_bonus if it's already in checkin_logs with amount
-                    if (x.type === 'reflective_bonus') all.push({ t: x.timestamp?.toDate(), type: 'bonus', text: `🎁 Reflective Bonus: ${x.note}`, score: x.amount, docId: d.id, source: 'checkin_logs' });
+                    const score = parseFloat(x.amount) || 0;
+                    if (x.type === 'streak') {
+                        all.push({ t: x.timestamp?.toDate(), type: 'bonus', text: `🔥 Streak`, score: score, docId: d.id, source: 'checkin_logs' });
+                        dash.bonus += score;
+                    } else if (x.type === 'manual_adjust' || x.type === 'manual') {
+                        all.push({ t: x.timestamp?.toDate(), type: 'manual', text: `🛠️ ${x.note}`, score: score, docId: d.id, source: 'checkin_logs' });
+                        dash.manual += score;
+                    } else if (x.type === 'reflective_log') {
+                        all.push({ t: x.timestamp?.toDate(), type: 'bonus', text: `📝 ${x.note || 'Reflective Log'}`, score: score, docId: d.id, source: 'checkin_logs' });
+                        dash.logs += score;
+                    } else if (x.type === 'reflective_bonus') {
+                        all.push({ t: x.timestamp?.toDate(), type: 'bonus', text: `🎁 Reflective Bonus: ${x.note}`, score: score, docId: d.id, source: 'checkin_logs' });
+                        dash.bonus += score;
+                    }
                 });
                 
                 all.sort((a, b) => (b.t || 0) - (a.t || 0));
                 historyCache = all;
                 historyPage = 1;
                 renderHistoryPage();
+                updateDashUI();
             } catch (e) { console.error(e); document.getElementById("history-list").innerHTML = "Error loading history"; }
         }
 
@@ -11573,7 +11625,7 @@ async function saveQuiz() {
             document.getElementById('lb-popup-stats').innerHTML = `
                 <div style="text-align:center;"><i class="fa-solid fa-arrow-down" style="color:#ef233c; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Min Daily</span><br><b style="font-size:1.3em;">${minS.toFixed(2)}</b><br><span style="font-size:0.7em; color:#aaa;">${minDateTh}</span></div>
                 <div style="text-align:center;"><i class="fa-solid fa-arrow-up" style="color:#28a745; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Max Daily</span><br><b style="font-size:1.3em;">${maxS.toFixed(2)}</b><br><span style="font-size:0.7em; color:#aaa;">${maxDateTh}</span></div>
-                <div style="text-align:center;"><i class="fa-solid fa-fire" style="color:#ff9f1c; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Longest Streak</span><br><b style="font-size:1.3em; color:#ff6b6b;">${longestStreak} Days</b><br><span style="font-size:0.7em; color:#aaa;">${streakRange}</span></div>
+<div style="text-align:center;"><i class="fa-solid fa-fire" style="color:#ff9f1c; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Longest Streak</span><br><b style="font-size:1.3em; color:#ff6b6b;">${longestStreak} Days</b><br><span style="font-size:0.7em; color:#aaa;">${streakRange}</span></div>
                 <div style="text-align:center;"><i class="fa-solid fa-calendar-check" style="color:#4361ee; font-size:1.2em;"></i><br><span style="font-size:0.8em; color:#999;">Active Days</span><br><b style="font-size:1.3em;">${activeDays}<span style="font-size:0.6em;color:#999;">/${elapsedDays}</span></b><br><div style="width:60px;height:6px;background:#eee;border-radius:3px;margin:4px auto 0;"><div style="width:${Math.min(activePct, 100)}%;height:100%;background:${pctColor};border-radius:3px;"></div></div><span style="font-size:0.75em;color:${pctColor};font-weight:bold;">${activePct}%</span></div>
             `;
 
@@ -11717,7 +11769,6 @@ async function saveQuiz() {
                 "Done": document.getElementById("Done") 
             };
             
-            // Safety Check
             if (!cols.Backlog || !cols.Review) return;
 
             Object.values(cols).forEach(e => { if (e) e.innerHTML = ""; });
@@ -11725,7 +11776,7 @@ async function saveQuiz() {
             const filterEl = document.getElementById('board-search');
             const filter = filterEl ? filterEl.value.toLowerCase() : "";
 
-            // 1. Render Side Quests
+            // 1. Render Side Quests from sideQuestsCache
             try {
                 Object.keys(sideQuestsCache).forEach(id => {
                     const q = sideQuestsCache[id];
@@ -11735,7 +11786,6 @@ async function saveQuiz() {
                     if (q.assignees) q.assignees.forEach(u => { if ((u.name || "").toLowerCase().includes(filter)) match = true; });
                     if (!match) return;
 
-                    // Group filtering for Side Quests
                     if (activeBoardGroup !== 'All') {
                         let groupMatch = false;
                         if (q.assigneeIds) {
@@ -11760,8 +11810,20 @@ async function saveQuiz() {
 
                         let timersHtml = "";
                         if (q.deadline) {
-                            const dl = q.deadline.toMillis ? q.deadline.toMillis() : new Date(q.deadline).getTime();
-                            if (q.status !== 'Done') timersHtml += `<span class="timer-global" data-dead="${dl}">⏳ Exp: ...</span>`;
+                            const dlVal = q.deadline.toMillis ? q.deadline.toMillis() : new Date(q.deadline).getTime();
+                            if (q.status !== 'Done') timersHtml += `<span class="timer-global" data-dead="${dlVal}">⏳ Exp: ...</span>`;
+                        }
+
+                        let ageHtml = "";
+                        if (q.createdAt) {
+                            const created = q.createdAt.toMillis ? q.createdAt.toMillis() : new Date(q.createdAt).getTime();
+                            const hrs = Math.floor((Date.now() - created) / 3600000);
+                            const days = Math.floor(hrs / 24);
+                            if (q.status === 'Backlog') {
+                                if (hrs < 1) ageHtml = `<span style="font-size:0.65em; background:#dcfce7; color:#166534; padding:2px 8px; border-radius:10px; font-weight:bold;">✨ NEW</span>`;
+                                else if (days > 0) ageHtml = `<span style="font-size:0.65em; color:#ef233c; font-weight:bold;"><i class="fa-solid fa-hourglass-start"></i> ปล่อยค้าง ${days} วัน</span>`;
+                                else ageHtml = `<span style="font-size:0.65em; color:#999;">🕙 มอบหมายแล้ว ${hrs} ชม.</span>`;
+                            }
                         }
 
                         let act = "";
@@ -11774,45 +11836,29 @@ async function saveQuiz() {
                             }
                         }
 
-                        let arrows = `<div class="arrow-controls">`;
-                        if (q.status !== 'Backlog') arrows += `<button class="btn-arrow" onclick="moveCard('${id}','prev')"><i class="fa-solid fa-chevron-left"></i></button>`;
-
-                cnt["Review"]++;
-                const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
-                const d2 = document.createElement('div');
-                d2.className = 'kanban-card card-Review reflective-card';
-                d2.style.borderLeft = "4px solid #d35400";
-                d2.style.background = "#fffcf5";
-                
-                const uName = (log.userName || log.displayName || 'Unknown').replace(/'/g, "");
-                d2.innerHTML = `
-                    <div class="card-header-row">
-                        <span class="badge" style="background:#d35400;">Reflective</span>
-                        <div class="card-header-right"><img src="${log.pictureUrl || ''}" class="assignee-img" title="${log.userName || ''}"></div>
-                    </div>
-                    <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${log.userName || log.displayName || 'Unknown'}</div>
-                    <div style="font-size:0.85em; color:#444; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${moodEmoji} ${log.content || ''}</div>
-                    <div style="margin-top:8px;">
-                        <button class="btn-sm" style="width:100%; background:#d35400; color:white; border:none;" onclick="event.stopPropagation(); reviewReflective('${log.id}')">
-                            <i class="fa-solid fa-comment-dots"></i> Review & Score
-                        </button>
-                    </div>
-                `;
-                cols["Review"].appendChild(d2);
-            }
-        });
-    } catch (e) { console.error("Kanban Section 2 Error:", e); }
-
-    // 3. Render Pending General Works in "Review"
-    try {
-        worksData.forEach(work => {
-            const isPending = work.status !== 'ตรวจแล้ว';
-            if (isPending && !work.isQuiz && !work.isPollResponse) {
-                if (filter && !(work.title || "").toLowerCase().includes(filter) && !(work.displayName || '').toLowerCase().includes(filter)) return;
+                        const escapedTitle = (q.title || "").replace(/'/g, "\\'");
+                        d.innerHTML = `
+                            <div class="card-header-row">
+                                <span class="badge ${isProj ? 'badge-project' : ''}" style="background:${isProj ? '#4361ee' : '#666'}">${isProj ? 'PROJECT' : 'TASK'}</span>
+                                ${ageHtml}
+                                <div class="card-header-right" onclick="event.stopPropagation(); openTaskModal('${id}')"><i class="fa-solid fa-pen-to-square"></i></div>
+                            </div>
+                            <div style="font-weight:bold; font-size:0.95em; margin-bottom:5px;">${q.title}</div>
+                            <div style="font-size:0.75em; color:#666; margin-bottom:10px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${q.description || ''}</div>
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                ${imgs}
+                                <div>${timersHtml}</div>
+                            </div>
+                            <div style="margin-top:10px; display:flex; gap:5px;">
+                                <button class="btn-sm btn-info" style="flex:1" onclick="event.stopPropagation(); openChat('${id}','${escapedTitle}')"><i class="fa-solid fa-comments"></i> Chat</button>
+                                <button class="btn-sm btn-danger" style="width:30px; padding:0; justify-content:center" onclick="event.stopPropagation(); startDeleteCard('${id}')"><i class="fa-solid fa-trash-can"></i></button>
+                            </div>
+                            ${act}
+                        `;
                         cols[q.status].appendChild(d);
                     }
                 });
-            } catch (e) { console.error("Kanban Section 1 Error:", e); }
+            } catch (e) { console.error("Kanban Section 1 (Side Quests) Error:", e); }
 
             // 2. Render Pending Reflective Logs in "Review"
             try {
@@ -11820,7 +11866,9 @@ async function saveQuiz() {
                     const isPending = !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null);
                     if (log.isArchived) return;
                     if (isPending) {
-                        if (filter && !(log.content || "").toLowerCase().includes(filter) && !(log.userName || '').toLowerCase().includes(filter)) return;
+                        const contentText = log.content || "";
+                        const userName = log.userName || log.displayName || 'Unknown';
+                        if (filter && !contentText.toLowerCase().includes(filter) && !userName.toLowerCase().includes(filter)) return;
 
                         if (activeBoardGroup !== 'All') {
                             const user = usersData.find(u => u.id === log.userId);
@@ -11834,14 +11882,13 @@ async function saveQuiz() {
                         d.style.borderLeft = "4px solid #d35400";
                         d.style.background = "#fffcf5";
                         
-                        const uName = (log.userName || log.displayName || 'Unknown').replace(/'/g, "");
                         d.innerHTML = `
                             <div class="card-header-row">
                                 <span class="badge" style="background:#d35400;">Reflective</span>
-                                <div class="card-header-right"><img src="${log.pictureUrl || ''}" class="assignee-img" title="${log.userName || ''}"></div>
+                                <div class="card-header-right"><img src="${log.pictureUrl || ''}" class="assignee-img" title="${userName}"></div>
                             </div>
-                            <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${log.userName || log.displayName || 'Unknown'}</div>
-                            <div style="font-size:0.85em; color:#444; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${moodEmoji} ${log.content || ''}</div>
+                            <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${userName}</div>
+                            <div style="font-size:0.85em; color:#444; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${moodEmoji} ${contentText}</div>
                             <div style="margin-top:8px;">
                                 <button class="btn-sm" style="width:100%; background:#d35400; color:white; border:none;" onclick="event.stopPropagation(); reviewReflective('${log.id}')">
                                     <i class="fa-solid fa-comment-dots"></i> Review & Score
@@ -11851,14 +11898,16 @@ async function saveQuiz() {
                         cols["Review"].appendChild(d);
                     }
                 });
-            } catch (e) { console.error("Kanban Section 2 Error:", e); }
+            } catch (e) { console.error("Kanban Section 2 (Reflective) Error:", e); }
 
             // 3. Render Pending General Works in "Review"
             try {
                 worksData.forEach(work => {
                     const isPending = work.status !== 'ตรวจแล้ว';
                     if (isPending && !work.isQuiz && !work.isPollResponse) {
-                        if (filter && !(work.title || "").toLowerCase().includes(filter) && !(work.displayName || '').toLowerCase().includes(filter)) return;
+                        const title = work.title || "Work";
+                        const dispName = work.displayName || 'Unknown';
+                        if (filter && !title.toLowerCase().includes(filter) && !dispName.toLowerCase().includes(filter)) return;
 
                         if (activeBoardGroup !== 'All') {
                             const user = usersData.find(u => u.id === work.userId);
@@ -11879,10 +11928,10 @@ async function saveQuiz() {
                         d.innerHTML = `
                             <div class="card-header-row">
                                 <span class="badge" style="background:var(--success);">Work</span>
-                                <div class="card-header-right"><img src="${work.pictureUrl || ''}" class="assignee-img" title="${work.displayName || ''}"></div>
+                                <div class="card-header-right"><img src="${work.pictureUrl || ''}" class="assignee-img" title="${dispName}"></div>
                             </div>
-                            <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${work.displayName || 'Unknown'}</div>
-                            <div style="font-size:0.85em; color:#444; font-weight:500;">📁 ${work.title || 'Work'}</div>
+                            <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${dispName}</div>
+                            <div style="font-size:0.85em; color:#444; font-weight:500;">📁 ${title}</div>
                             <div style="margin-top:8px; display:flex; gap:5px;">
                                 ${linkHtml}
                                 <button class="btn-sm btn-primary" style="flex:1;" onclick="svSc('${work.id}', '${work.userId}')">
@@ -11893,12 +11942,13 @@ async function saveQuiz() {
                         cols["Review"].appendChild(d);
                     }
                 });
-            } catch (e) { console.error("Kanban Section 3 Error:", e); }
+            } catch (e) { console.error("Kanban Section 3 (Works) Error:", e); }
 
             // 4. Render Access Requests in "Review"
             try {
                 accessRequestsCache.forEach(req => {
-                    if (filter && !(req.displayName || '').toLowerCase().includes(filter)) return;
+                    const dName = req.displayName || 'Unknown';
+                    if (filter && !dName.toLowerCase().includes(filter)) return;
                     if (activeBoardGroup !== 'All' && (req.group || 'Public') !== activeBoardGroup) return;
 
                     cnt["Review"]++;
@@ -11908,9 +11958,9 @@ async function saveQuiz() {
                     d.innerHTML = `
                         <div class="card-header-row">
                             <span class="badge" style="background:#6f42c1;">New Access</span>
-                            <div class="card-header-right"><img src="${req.pictureUrl || ''}" class="assignee-img" title="${req.displayName || ''}"></div>
+                            <div class="card-header-right"><img src="${req.pictureUrl || ''}" class="assignee-img" title="${dName}"></div>
                         </div>
-                        <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${req.displayName || 'Unknown'}</div>
+                        <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${dName}</div>
                         <div style="font-size:0.8em; color:#666;">AKA: ${req.nickName || '-'} • Grp: ${req.group || 'Public'}</div>
                         <div style="margin-top:8px; display:flex; gap:5px;">
                             <button class="btn-sm btn-success" style="flex:1;" onclick="approveAccessRequest('${req.id}')">Approve</button>
@@ -12184,6 +12234,7 @@ async function saveQuiz() {
         async function delUser(id) { if (confirm("Del?")) await db.collection("users").doc(id).delete(); }
         async function delWork(id) { if (confirm("Del?")) await db.collection("works").doc(id).delete(); }
         function toggleIgnoreUser(id, s) { db.collection("users").doc(id).update({ isIgnored: !s }); }
+        function toggleHidePeriod(id, s) { db.collection("users").doc(id).update({ hidePeriod: !s }); }
         function toggleForm() { const f = document.getElementById('sq-form'); f.style.display = f.style.display === 'none' ? 'block' : 'none'; }
         function filterBoard() { drawKanban(); }
         function filterUsers() { renderTable('users'); }
@@ -13096,6 +13147,9 @@ async function saveQuiz() {
                     // Client-side sort to replace missing composite index constraint
                     reflectiveLogsCache.sort((a,b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
                     
+                    // 🔥 Refresh User Table if open to update Log counts [V89.54]
+                    if (activeTab === 'Leaderboard') renderTable('users');
+                    
                     const searchBox = document.getElementById('reflective-search');
                     const search = searchBox ? searchBox.value.toLowerCase() : "";
                     const showReviewed = document.getElementById('show-reviewed-logs')?.checked || false;
@@ -13165,6 +13219,16 @@ async function saveQuiz() {
                     console.error("🔥 Error loading admin reflective logs:", error);
                     showToast("Error loading logs: " + error.message);
                 });
+        }
+
+        function setReflectiveSearch(name) {
+            switchTab('ReflectiveLogs');
+            const searchBox = document.getElementById('reflective-search');
+            if (searchBox) {
+                searchBox.value = name;
+                document.getElementById('show-reviewed-logs').checked = true; // Show all to find the specific user
+                loadReflectiveLogsAdmin(); // Trigger re-filter
+            }
         }
 
         function renderLaughTale() {
