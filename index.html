@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Intern Progress Online (V89.50)</title>
+    <title>Intern Progress Online (V89.60)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -731,7 +731,7 @@
                                 style="display:none; background:#343a40; color:white; font-size:0.65em; padding:2px 8px; border-radius:10px; font-weight:bold; opacity:0.8;">Division</span>
                         </div>
                         <!-- Compact Date & Graduation Info -->
-                        <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+                        <div id="u-period-box" style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
                             <div style="display: flex; flex-wrap: wrap; gap: 5px; font-size: 0.8em;">
                                 <div
                                     style="position: relative; display: inline-flex; align-items: center; gap: 4px; background: #f8f9fa; padding: 2px 8px; border-radius: 6px; border: 1px solid #e9ecef; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
@@ -796,6 +796,7 @@
                             <span id="rl-streak-badge" style="font-size:0.7em; background:#fef3cd; color:#856404; padding:2px 8px; border-radius:10px; margin-left:8px; display:none;">🔥 0 วัน</span>
                         </h4>
                         <div style="display:flex; align-items:center; gap:10px;">
+                            <span id="kanban-badge" style="font-size:0.75em; background:#ef233c; color:white; padding:1px 8px; border-radius:10px; display:none; font-weight:bold; box-shadow: 0 2px 4px rgba(239, 35, 60, 0.3);">0</span>
                             <span id="rl-today-status" style="font-size:0.8em; color:#999;"></span>
                             <span style="font-size:0.7em; color:#999; font-weight:bold; background:#eee; padding:2px 8px; border-radius:10px;">KANBAN</span>
                             <i id="kanban-icon" class="fa-solid fa-chevron-down" style="color: #666; transition: 0.3s; font-size: 0.9em;"></i>
@@ -812,6 +813,7 @@
                                 <h5 style="margin:0; color:#e67e22; display:flex; align-items:center; gap:8px;">
                                     <i class="fa-solid fa-pen-fancy"></i> บันทึกสะท้อนตัวเองวันนี้ 
                                     <small style="color:#999; font-weight:normal;">(+0.1 pts)</small>
+                                    <span id="rl-total-count" style="margin-left:auto; font-size:0.75em; background:rgba(230, 126, 34, 0.1); color:#e67e22; padding:2px 10px; border-radius:12px; font-weight:bold;">ส่งแล้ว 0 ครั้ง</span>
                                 </h5>
                             </div>
                             <!-- Form -->
@@ -969,7 +971,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V89.46 (Pre-Reg Merge Utility Fix)
+                V89.60 (Lean UI & AI Grading Update)
             </div>
         </div>
     </div>
@@ -1606,6 +1608,12 @@
                         document.getElementById('date-alert').style.display = 'block';
                     } else {
                         document.getElementById('date-alert').style.display = 'none';
+                    }
+
+                    // 🔥 Hide Period if requested by Admin (Tester mode)
+                    const periodBox = document.getElementById('u-period-box');
+                    if (periodBox) {
+                        periodBox.style.display = da.hidePeriod === true ? 'none' : 'flex';
                     }
 
                     // Render Special Awards (Support multiple V78.91)
@@ -2383,6 +2391,7 @@
                                 <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
                                     ${statusBadge}
                                     ${typeTags.join('')}
+                                    ${(q.tags || "").split(',').map(t => t.trim()).filter(t => t !== "").slice(0, 3).map(t => `<span class="assign-tag" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; font-size:0.75em;"><i class="fa-solid fa-tag" style="font-size:0.8em; opacity:0.7;"></i> ${t}</span>`).join('')}
                                 </div>
                             </div>
                             ${isCollapsed ? '<i class="fa-solid fa-chevron-down" style="color:#ccc; font-size:0.9em; margin-left:10px;"></i>' : ''}
@@ -3078,17 +3087,18 @@
                         </div>
                         <button class="btn-sm btn-danger" onclick="userAnswers[currentStep]=[]; renderQuizStep(true);" style="margin-top:10px; width:auto; background:#eee; color:#666;">ล้างลำดับ (Reset Order)</button>
                     `;
-                } else if (qType === 'flashcard') {
+                    `;
+                } else if (qType === 'short_answer') {
+                    if (typeof userAnswers[currentStep] !== 'string') userAnswers[currentStep] = '';
                     inputHtml = `
-                        <div class="flash-container">
-                            <button class="flash-btn flash-true" onclick="confirmFlashAnswer(0)">
-                                <i class="fa-solid fa-circle-check"></i>
-                                <span>ถูก (TRUE)</span>
-                            </button>
-                            <button class="flash-btn flash-false" onclick="confirmFlashAnswer(1)">
-                                <i class="fa-solid fa-circle-xmark"></i>
-                                <span>ผิด (FALSE)</span>
-                            </button>
+                        <div style="display:flex; flex-direction:column; gap:10px;">
+                            <textarea id="q-short-ans" 
+                                placeholder="Type your answer here..." 
+                                style="width:100%; height:120px; padding:15px; border:2px solid #ddd; border-radius:12px; font-size:1em; outline:none; transition:0.3s;"
+                                onfocus="this.style.borderColor='var(--primary)'"
+                                onblur="this.style.borderColor='#ddd'; userAnswers[${currentStep}] = this.value; triggerAutoSave();"
+                                oninput="userAnswers[${currentStep}] = this.value;"
+                            >${userAnswers[currentStep]}</textarea>
                         </div>
                     `;
                 } else {
@@ -3938,6 +3948,11 @@
             // Sorting by date descending for streak calculation
             const sortedLogs = [...reflectiveLogsCache].sort((a,b) => b.timestamp?.toDate() - a.timestamp?.toDate());
 
+            // 🔥 Update total count [V89.54]
+            const totalCount = reflectiveLogsCache.length;
+            const totalCountEl = document.getElementById('rl-total-count');
+            if (totalCountEl) totalCountEl.innerText = `ส่งแล้ว ${totalCount} ครั้ง`;
+
             sortedLogs.forEach((log, i) => {
                 if (!log.timestamp) return;
                 const d = log.timestamp.toDate();
@@ -4352,10 +4367,20 @@
                     }
                 });
 
-                // Update count badges
+                // Update Count Badges & Notification Badge (V89.51)
                 for (const [status, count] of Object.entries(counts)) {
                     const el = document.getElementById('cnt-' + status);
                     if (el) el.innerText = count;
+                }
+                const activeCount = counts['Backlog'] + counts['Doing'];
+                const kBadge = document.getElementById('kanban-badge');
+                if (kBadge) {
+                    if (activeCount > 0) {
+                        kBadge.innerText = activeCount;
+                        kBadge.style.display = 'inline-block';
+                    } else {
+                        kBadge.style.display = 'none';
+                    }
                 }
 
                 // If currently showing a tab with 0 items, and there's another with > 0, maybe auto-switch?
