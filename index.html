@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Intern Progress Online (V89.70)</title>
+    <title>Intern Progress Online (V89.71 Diagnostic)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -971,7 +971,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V89.70 (AI Intelligence Master Update)
+                V89.71 (Login Recovery Update)
             </div>
         </div>
     </div>
@@ -1350,9 +1350,15 @@
         // --- Initialization ---
         function updateStatus(msg) {
             const el = document.getElementById('loading-status');
-            if (el) el.innerText = msg;
-            console.log(msg);
+            if (el) el.innerHTML = msg; // Support HTML for color icons
+            console.log(`[Status] ${msg}`);
         }
+
+        // Global Error Tracking
+        window.onerror = function(msg, url, line) {
+            updateStatus(`<span style="color:#ff6b6b;">⚠ JS Error: ${msg}</span>`);
+            return false;
+        };
 
         const groupColorMap = {
             'Public': '#4361ee',
@@ -1397,6 +1403,8 @@
         }
 
         async function main() {
+            console.log("Main Execution Started (V89.70)");
+            updateStatus("System Starting (V89.70)...");
             try {
                 const urlParams = new URLSearchParams(window.location.search);
                 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -1408,7 +1416,7 @@
 
                     if (forcedUserId) {
                         userId = forcedUserId;
-                        updateStatus("Fetching Preview User Data...");
+                        updateStatus(`Fetching Preview User: ${userId}...`);
                         // Fetch user profile from Firestore if userId is provided
                         const userDoc = await db.collection("users").doc(userId).get();
                         if (userDoc.exists) {
@@ -1435,6 +1443,7 @@
                         userId = "preview-admin";
                     }
 
+                    updateStatus("Loading UI Assets...");
                     // Hide Loading
                     document.getElementById('loading-overlay').classList.add('hidden');
                     document.getElementById('main-app').classList.remove('hidden');
@@ -1449,6 +1458,7 @@
                     document.getElementById('u-img').src = userProfile.pictureUrl;
                     document.getElementById('u-name').innerText = userProfile.displayName;
 
+                    updateStatus("Syncing Firestore Data...");
                     // Load Data
                     checkUser();
                     loadAllQuests();
@@ -1462,48 +1472,51 @@
                     loadMyCases();
                     loadReflectiveLogs();
                     
+                    updateStatus("Starting Background Timers...");
                     // Exit main after loading data for preview
                     setInterval(checkExpiry, 1000);
                     return;
                 }
 
-                updateStatus("Checking LIFF SDK...");
+                updateStatus("Checking LIFF SDK (v2)...");
                 // Ensure liff is available
                 if (!window.liff) throw new Error("LIFF SDK not found on window");
 
-                updateStatus("Initializing LIFF...");
-                // Timeout for LIFF Init (10 seconds)
+                updateStatus("Connecting to LINE (Init)...");
+                // Timeout for LIFF Init (15 seconds)
                 const initPromise = liff.init({ liffId: USER_LIFF_ID });
                 const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error("LIFF Init Timeout")), 10000)
+                    setTimeout(() => reject(new Error("Connecting to LINE Timed Out. Please restart LINE App.")), 15000)
                 );
 
                 await Promise.race([initPromise, timeoutPromise]);
 
-                updateStatus("Checking Login Status...");
+                updateStatus("Verifying Identity...");
                 if (!liff.isLoggedIn()) {
-                    updateStatus("Not Logged In. Redirecting...");
+                    updateStatus("Redirecting to Login...");
                     document.getElementById('btn-manual-login').style.display = 'inline-block';
                     liff.login();
                     return;
                 }
 
-                updateStatus("Getting User Profile...");
+                updateStatus("Loading Profile Data...");
                 userProfile = await liff.getProfile();
                 userId = userProfile.userId;
 
-                updateStatus("Checking Admin Access...");
+                updateStatus("Checking Permissions...");
 
                 // 🔥 Admin Auto-Redirect logic
                 const idToken = liff.getDecodedIDToken();
                 if (idToken && idToken.email === "medlifeplus@gmail.com") {
                     isAdmin = true;
+                    updateStatus("Admin Detected. Redirecting...");
                     // Show a quick message before redirecting
                     document.getElementById('loading-overlay').innerHTML = "<h3 style='color:white;text-align:center;margin-top:200px;'>🔐 Redirecting to Admin Portal...</h3>";
                     window.location.replace("admin.html");
                     return;
                 }
 
+                updateStatus("Finalizing User Environment...");
                 document.getElementById('loading-overlay').classList.add('hidden');
                 document.getElementById('main-app').classList.remove('hidden');
 
@@ -1514,22 +1527,31 @@
                 document.getElementById('u-group-badge').innerText = myGroup;
 
                 // Load Data
+                updateStatus("Fetching System Quests...");
                 checkUser();
                 loadAllQuests();
+                updateStatus("Loading Assigned Quizzes...");
                 loadMySubmissions();
                 loadMyWorks();
+                updateStatus("Loading History...");
                 loadMyReflectiveLogs();
                 loadSideQuests();
                 loadQuizzes();
                 loadDivisionConfig();
                 loadGroupSettings();
-                loadMyCases(); // 🔥 Added V84.1
-                loadReflectiveLogs(); // 🔥 Added V84.8
+                loadMyCases();
+                loadReflectiveLogs();
 
+                updateStatus("Ready!");
                 // Start Timer Loop
                 setInterval(checkExpiry, 1000);
             } catch (e) {
-                alert("Init Error: " + e.message);
+                console.error("Init Error Details:", e);
+                updateStatus("❌ Error: " + e.message);
+                alert("Cannot start application: " + e.message);
+                document.getElementById('btn-manual-login').style.display = 'inline-block';
+                document.getElementById('btn-manual-login').innerText = "Retry / Refresh";
+                document.getElementById('btn-manual-login').onclick = () => window.location.reload(true);
             }
         }
         // Removed direct main() call to prevent double execution or execution before SDK load
