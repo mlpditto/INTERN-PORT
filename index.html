@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Intern Progress Online (V89.78)</title>
+    <title>Intern Progress Online (V89.81)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -971,7 +971,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V89.71 (Login Recovery Update)
+                V89.81 (Login Recovery Update)
             </div>
         </div>
     </div>
@@ -1403,8 +1403,8 @@
         }
 
         async function main() {
-            console.log("Main Execution Started (V89.70)");
-            updateStatus("System Starting (V89.70)...");
+            console.log("Main Execution Started (V89.81)");
+            updateStatus("System Starting (V89.81)...");
             try {
                 const urlParams = new URLSearchParams(window.location.search);
                 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -1548,12 +1548,26 @@
             } catch (e) {
                 console.error("Init Error Details:", e);
                 updateStatus("❌ Error: " + e.message);
-                alert("Cannot start application: " + e.message);
+                if (typeof showToast === 'function') showToast("Error: " + e.message);
                 document.getElementById('btn-manual-login').style.display = 'inline-block';
                 document.getElementById('btn-manual-login').innerText = "Retry / Refresh";
                 document.getElementById('btn-manual-login').onclick = () => window.location.reload(true);
             }
         }
+
+        // --- V89.81: Boot Watchdog ---
+        setTimeout(() => {
+            const status = document.getElementById('loading-status');
+            if (status && status.innerText.includes("Starting...")) {
+                console.warn("Boot Watchdog Triggered: main() hung or not called.");
+                updateStatus("<span style='color:#ffc107;'>⚠ Initializing taking longer than usual...</span>");
+                const manualBtn = document.getElementById('btn-manual-login');
+                if (manualBtn) {
+                    manualBtn.style.display = 'inline-block';
+                    manualBtn.innerText = "Force Start / Refresh";
+                }
+            }
+        }, 5000);
         // Removed direct main() call to prevent double execution or execution before SDK load
 
 
@@ -4892,16 +4906,24 @@
             `).join('');
         }
 
-        // Wait for window load to ensure SDK is ready
-        window.addEventListener('load', function () {
-            console.log("Window Loaded. Checking LIFF...");
+        // Wait for window load or interactive state to ensure SDK is ready
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            bootstrapMain();
+        } else {
+            window.addEventListener('load', bootstrapMain);
+        }
+
+        function bootstrapMain() {
+            console.log("Bootstrap Triggered. Checking LIFF...");
             if (window.liff) {
                 main();
             } else {
                 console.error("LIFF SDK not loaded from CDN");
-                alert("LIFF SDK Failed to Load. Please check your internet connection and refresh.");
+                updateStatus("<span style='color:#ef233c;'>❌ SDK Failed to Load</span>");
+                // Fallback attempt to reload if SDK missing
+                setTimeout(() => window.location.reload(true), 15000);
             }
-        });
+        }
         // --- V80: Discussion Logic ---
         let activeDiscussionId = "";
         let discussionUnsubscribe = null;
