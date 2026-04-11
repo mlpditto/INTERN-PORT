@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V89.70)</title>
-    <!-- V89.70: AI Assessment Specialist Update -->
+    <title>Admin Dashboard (V89.72 Intelligence Fix)</title>
+    <!-- V89.72: AI Reliability fix for Unified Tags & Specialist Toolbar -->
     <!-- Release: 2026-04-09 20:38 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1408,7 +1408,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.3em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                                                <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,219,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.70</span>
+                                                <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,2 pink,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.72</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -2953,7 +2953,7 @@
                             </div>
                             <input type="hidden" id="ai-analyzer-model-val" value="gemini-2.5-flash">
                             <div style="display:flex; gap:4px;">
-                                <button class="btn-sm" onclick="analyzeQuizAI(this)" title="Analyze Quiz" style="background:#7c3aed; color:white; border:none; padding:4px 10px; border-radius:8px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:28px;"><i class="fa-solid fa-microscope"></i> Analyze</button>
+                                <button class="btn-sm" onclick="analyzeQuizAI(this)" title="Analyze Quiz" style="background:#7c3aed; color:white; border:none; padding:4px 10px; border-radius:8px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:28px;"><i class="fa-solid fa-brain"></i> Specialist</button>
                                 <button class="btn-sm" onclick="openPdfToQuizModal()" title="Import PDF" style="background:#0ea5e9; color:white; border:none; padding:4px 10px; border-radius:8px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:28px;"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                                 <button class="btn-sm" onclick="openSuggestMoreModal()" title="Expand" style="background:#f59e0b; color:white; border:none; padding:4px 10px; border-radius:8px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:28px;"><i class="fa-solid fa-sparkles"></i> Expand</button>
                             </div>
@@ -4467,19 +4467,20 @@
 
         // V89.10: Auto-Tagging Categorization (ICD-11)
         window.autoTagQuizAI = async function(btn) {
+            console.log("🚀 [AI Tagging] Starting analysis...");
             const formData = getQuizFormData();
-            if (!formData.title && formData.questions.length === 0) {
+            if (!formData.title && (!formData.questions || formData.questions.length === 0)) {
                 return alert("Please enter a title or add questions first so AI can analyze the content.");
             }
 
-            const oldText = btn.innerHTML;
+            const oldHtml = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Tagging...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyzing Content...';
 
             try {
-                // Prepare content for analysis
-                const qTextContent = formData.questions.map((q, i) => `Q${i+1}: ${q.q}`).join('\n');
-                const contentToAnalyze = `Title: ${formData.title}\nDescription: ${formData.description}\nQuestions:\n${qTextContent}`;
+                // Prepare content for analysis (truncate if too long)
+                const qTextContent = (formData.questions || []).slice(0, 50).map((q, i) => `Q${i+1}: ${q.q}`).join('\n');
+                const contentToAnalyze = `Title: ${formData.title}\nDescription: ${formData.description || ""}\nQuestions:\n${qTextContent}`;
 
                 const prompt = `Analyze this medical quiz content and provide comprehensive categorization tags.
                 Content to analyze:
@@ -4492,18 +4493,24 @@
                 4. Identify the "Key Knowledge" targeted (e.g., 'Diagnostic Reasoning', 'Drug Dosage').
                 
                 RULES:
-                - Combine these into a single list of 4-8 comma-separated tags.
-                - Use precise medical terminology.
+                - Combine these into a single list of 5-8 comma-separated tags.
+                - Use precise high-level medical terminology.
                 - If the content is in Thai, provide the most relevant tags in Thai and English (e.g. 'เบาหวาน (Diabetes)').
                 
                 OUTPUT FORMAT: Just the comma-separated tags, nothing else.`;
 
-                const selectedModel = document.getElementById('ai-tagging-model-val')?.value || document.getElementById('ai-analyzer-model-val').value || 'gemini-2.5-flash';
-                const { text: suggestedTags } = await callUniversalAI(selectedModel, prompt, false);
+                const modelToggle = document.getElementById('ai-tagging-model-val');
+                const fallbackModel = document.getElementById('ai-analyzer-model-val');
+                const selectedModel = (modelToggle ? modelToggle.value : null) || (fallbackModel ? fallbackModel.value : 'gemini-2.5-flash');
+                
+                console.log(`🚀 [AI Tagging] Model: ${selectedModel}`);
+                const { text: suggestedTags } = await window.callUniversalAI(selectedModel, prompt, false);
+                console.log(`✅ [AI Tagging] Response: ${suggestedTags}`);
 
-                if (suggestedTags) {
-                    const cleanTags = suggestedTags.replace(/```/g, "").replace(/tags:/gi, "").trim();
+                if (suggestedTags && suggestedTags.trim().length > 2) {
+                    const cleanTags = suggestedTags.replace(/```/g, "").replace(/tags:/gi, "").replace(/tag:/gi, "").trim();
                     const existingTags = document.getElementById('quiz-tags').value;
+                    
                     if (existingTags && existingTags.trim() !== "") {
                         if (confirm("Replace existing tags with AI suggestions?\n\nNew Suggestion:\n" + cleanTags)) {
                             document.getElementById('quiz-tags').value = cleanTags;
@@ -4514,13 +4521,15 @@
                         refreshTagChips();
                     }
                     showToast("✅ AI suggestion applied!");
+                } else {
+                    throw new Error("AI returned empty tags. Please try again or add content.");
                 }
             } catch (e) {
                 console.error("Auto-Tagging Error:", e);
                 alert("AI Tagging Error: " + e.message);
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = oldText;
+                btn.innerHTML = oldHtml;
             }
         };
 
@@ -4801,7 +4810,8 @@
 
         window.callUniversalAI = async function(modelName, prompt, isJson = false, visionData = null, quickApiKey = '') {
             const PROXY_SECRET = "mlp-secret-8888";
-            const PROXY_URL = "https://mlp-int.work/api/ai"; 
+            // V89.72: Flexible Proxy URL based on origin
+            const PROXY_URL = (window.location.hostname === 'mlp-int.work') ? '/api/ai' : 'https://mlp-int.work/api/ai'; 
 
             // 🔥 V88.50: Ensure local keys are loaded BEFORE any call, especially on GitHub Pages
             if (window.loadAIKeys) window.loadAIKeys();
@@ -14230,7 +14240,12 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             }
         });
         
-
+        // V89.72: Scope Fix for sameWarning and overall AI utility resilience
+        window.getAiTaggingModel = function() {
+            const modelToggle = document.getElementById('ai-tagging-model-val');
+            const fallbackModel = document.getElementById('ai-analyzer-model-val');
+            return (modelToggle ? modelToggle.value : null) || (fallbackModel ? fallbackModel.value : 'gemini-2.5-flash');
+        };
         window.previewAiFix = function(index, arrIdx) {
             try {
                 const item = window._aiAnalysisItems[arrIdx]; if (!item || !item.improvedQuestion) return alert("No improvement data found."); const improvedQ = item.improvedQuestion;
@@ -14464,7 +14479,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         };
 
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V89.22 loaded OK ', 'background:#4361ee;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V89.72 loaded OK (AI Specialist Mode) ', 'background:#4361ee;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
         console.log('setUserGroup:', typeof setUserGroup, '| openPeriodModal:', typeof openPeriodModal, '| reviewQuiz:', typeof reviewQuiz, '| detectNegativeWording:', typeof detectNegativeWording);
     </script>
 
