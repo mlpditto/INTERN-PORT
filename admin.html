@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard (V89.76 Global AI Unified)</title>
-    <!-- V89.76: AI Reliability fix - Unified module execution for Tagging & AI Utilities -->
-    <!-- Release: 2026-04-11 22:25 UTC+7 -->
+    <title>Admin Dashboard (V89.78 Global AI Core)</title>
+    <!-- V89.78: AI Reliability fix - Core Engine Priority Loading -->
+    <!-- Release: 2026-04-12 00:08 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -3554,59 +3554,7 @@
                     <button onclick="checkAllQuota()" style="width:100%; margin-top:8px; background:linear-gradient(135deg, #667eea, #764ba2); color:white; border:none; font-size:0.9em; padding:6px; border-radius:6px; cursor:pointer;">
                         <i class="fa-solid fa-rotate"></i> Check Quota
                     </button>
-                </div>
-                
-                <button onclick="checkGeminiModels()" style="width:100%; margin-top:10px; background:none; color:#999; border:1px solid #ddd; font-size:0.9em; padding:5px; border-radius:6px; cursor:pointer;">
-                    <i class="fa-solid fa-stethoscope"></i> Diagnostic: Check Models
-                </button>
-            </div>
-
-            <p style="font-size:0.75em; color:#999; margin-top:10px; font-style:italic; text-align:center;">
-                * Settings kept only in this browser.
-            </p>
-        </div>
-    </div>
-
-    <!-- Quick API Key Selection Popup (V88.36) -->
-    <div id="quickApiKeyPopup" class="modal" style="z-index:6000;">
-        <div class="modal-content" style="max-width:400px; padding:20px; text-align:left;">
-            <span class="close-modal" onclick="closeQuickApiKeyPopup()">&times;</span>
-            <h3 style="margin-top:0; font-size:1.1em;"><i class="fa-solid fa-key" style="color:#f59e0b;"></i> Select API Key</h3>
-            <p style="font-size:0.8em; color:#666; margin-bottom:15px;">
-                Choose a saved key or enter a new one for this question.
-            </p>
-            
-            <!-- Saved Keys Section -->
-            <div id="saved-api-keys-section" style="margin-bottom:15px;">
-                <h4 style="font-size:0.85em; color:#667eea; margin:0 0 8px 0;"><i class="fa-solid fa-database"></i> Saved Keys (from AI Settings)</h4>
-                <div id="saved-keys-list" style="display:flex; flex-direction:column; gap:6px;">
-                    <!-- Keys will be populated dynamically -->
-                </div>
-            </div>
-            
-            <!-- Divider -->
-            <div style="border-top:1px solid #eee; margin:12px 0;"></div>
-            
-            <!-- Manual Entry -->
-            <div>
-                <h4 style="font-size:0.85em; color:#666; margin:0 0 8px 0;"><i class="fa-solid fa-pen"></i> Custom Key</h4>
-                <input type="password" id="quick-api-key-input" placeholder="Enter API Key manually" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; font-size:0.85em; margin-bottom:10px;">
-            </div>
-            
-            <!-- Buttons -->
-            <div style="display:flex; gap:10px; margin-top:15px;">
-                <button onclick="applyQuickApiKey()" class="btn-primary" style="flex:1; font-weight:700; padding:10px; border-radius:8px; background:linear-gradient(135deg, #f59e0b, #d97706); border:none; color:white;">
-                    <i class="fa-solid fa-check"></i> Apply
-                </button>
-                <button onclick="clearQuickApiKey()" class="btn-secondary" style="width:35%; font-weight:700; padding:10px; border-radius:8px; background:#e74c3c; border:none; color:white;">
-                    <i class="fa-solid fa-trash"></i> Clear
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Firebase config removed - API keys handled in admin.html -->
-    <script type="importmap">
+<script type="importmap">
       {
         "imports": {
           "@google/generative-ai": "https://esm.run/@google/generative-ai"
@@ -3615,6 +3563,85 @@
     </script>
     <script type="module">
         import { GoogleGenerativeAI } from "@google/generative-ai";
+
+        // --- CORE AI ENGINE (V89.78 Priority Loaded) ---
+        window.loadAIKeys = function() {
+            const locG = localStorage.getItem('ai_gemini_key');
+            const locO = localStorage.getItem('ai_openai_key');
+            const locT = localStorage.getItem('ai_typhoon_key');
+            const locA = localStorage.getItem('ai_anthropic_key');
+            const locL = localStorage.getItem('ai_llama_key');
+            window.GEMINI_API_KEY = locG || "__GEMINI_API_KEY__";
+            window.OPENAI_API_KEY = locO || "__OPENAI_API_KEY__";
+            window.TYPHOON_API_KEY = locT || "__TYPHOON_API_KEY__";
+            window.ANTHROPIC_API_KEY = locA || "__ANTHROPIC_API_KEY__";
+            window.LLAMA_API_KEY = locL || "__LLAMA_API_KEY__";
+
+            window.GCP_MODE = localStorage.getItem('gcp_mode') || 'auto';
+            window.GCP_PROJECT_ID = localStorage.getItem('gcp_project_id') || "intern-port-edfa7";
+            window.GCP_LOCATION = localStorage.getItem('gcp_location') || "us-central1";
+            window.GCP_ACCESS_TOKEN = localStorage.getItem('gcp_access_token') || "";
+        };
+        window.loadAIKeys();
+
+        window.updateAIUsage = function(provider, tokens = 0) {
+            if (!provider) return;
+            const today = new Date().toISOString().split('T')[0];
+            let usage = JSON.parse(localStorage.getItem('aiDetailedUsage') || '{}');
+            if (usage.date !== today) usage = { date: today, totals: {}, count: 0 };
+            usage.count = (usage.count || 0) + 1;
+            const key = provider.toLowerCase().includes('gemini') ? 'Gemini' : (provider.toLowerCase().includes('gpt') ? 'OpenAI' : 'Typhoon');
+            usage.totals[key] = (usage.totals[key] || 0) + tokens;
+            localStorage.setItem('aiDetailedUsage', JSON.stringify(usage));
+            if (typeof initAIUsageDisplay === 'function') initAIUsageDisplay();
+        };
+
+        window.callUniversalAI = async function(modelName, prompt, isJson = false, visionData = null, quickApiKey = '') {
+            const PROXY_SECRET = "mlp-secret-8888";
+            const PROXY_URL = (window.location.hostname === 'mlp-int.work') ? '/api/ai' : 'https://mlp-int.work/api/ai'; 
+            if (window.loadAIKeys) window.loadAIKeys();
+
+            try {
+                let proxyProvider = "";
+                if (modelName.toLowerCase().indexOf('claude') !== -1) proxyProvider = "anthropic";
+                else if (modelName === 'imagen' || modelName === 'imagen-nano') proxyProvider = "imagen";
+                else if (modelName === 'dalle') proxyProvider = "openai";
+                else if (modelName.includes('gemini')) proxyProvider = "gemini";
+                else if (modelName.includes('gpt')) proxyProvider = "openai";
+                else if (modelName.includes('typhoon')) proxyProvider = "typhoon";
+                else if (modelName.includes('llama')) proxyProvider = "together";
+
+                if (proxyProvider !== "") {
+                    const proxyResponse = await fetch(PROXY_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'x-mlp-secret': PROXY_SECRET },
+                        body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData })
+                    });
+                    if (proxyResponse.ok) {
+                        const proxyData = await proxyResponse.json();
+                        updateAIUsage(proxyProvider, proxyData.tokens || 0);
+                        return { text: proxyData.text, tokens: proxyData.tokens || 0, model: proxyData.model || modelName };
+                    }
+                }
+            } catch (e) {
+                console.warn("AI Proxy Link failed. Trying Local SDK...");
+            }
+
+            try {
+                if (modelName.includes('gemini')) {
+                    const genAI = new GoogleGenerativeAI(quickApiKey || window.GEMINI_API_KEY);
+                    const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: 'v1beta' });
+                    const result = await model.generateContent(prompt);
+                    const response = await result.response;
+                    return { text: response.text(), tokens: 0, model: modelName };
+                }
+                throw new Error("No provider active for " + modelName);
+            } catch (err) {
+                throw err;
+            }
+        };
+
+        console.log("🤖 [AI Engine] Global Core V89.78 Initialized");
         
         // --- AI Diagnostic Tool (V88.55 Handle 403) ---
         window.checkGeminiModels = async function() {
@@ -3649,19 +3676,10 @@
             
             const results = [];
             
-            // Check Gemini (Free tier: 60 req/min, can't query actual limit via API)
             results.push(checkGeminiQuota());
-            
-            // Check OpenAI (can query billing usage)
             results.push(checkOpenAIQuota());
-            
-            // Check Typhoon (no API, show note)
             results.push({ provider: 'Typhoon', status: 'ℹ️ Check dashboard', percent: null, color: '#999' });
-            
-            // Check Claude (no API, show note)
             results.push({ provider: 'Claude', status: 'ℹ️ Check console', percent: null, color: '#999' });
-            
-            // Check Llama/Together (no API, show note)
             results.push({ provider: 'Llama', status: 'ℹ️ Check dashboard', percent: null, color: '#999' });
             
             const resolved = await Promise.all(results);
@@ -3695,8 +3713,6 @@
         };
 
         async function checkGeminiQuota() {
-            // Gemini Free: 60 requests per minute, can't query actual remaining
-            // We can only check if key is valid
             try {
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${window.GEMINI_API_KEY}`);
                 const data = await response.json().catch(() => ({}));
@@ -3730,11 +3746,9 @@
             }
             
             try {
-                // Get today's date
                 const today = new Date().toISOString().split('T')[0];
                 const startOfMonth = today.substring(0, 8) + '01';
                 
-                // Try to fetch usage (requires Organization ID for full data)
                 const response = await fetch(`https://api.openai.com/v1/dashboard/billing/usage?start_date=${startOfMonth}&end_date=${today}`, {
                     headers: {
                         'Authorization': `Bearer ${apiKey}`
@@ -3743,8 +3757,7 @@
                 
                 if (response.ok) {
                     const data = await response.json();
-                    const usage = data.total_usage || 0; // in cents
-                    // Assuming $5 free tier = 500 cents
+                    const usage = data.total_usage || 0;
                     const limit = 500; 
                     const percent = Math.min((usage / limit) * 100, 100);
                     
@@ -3766,24 +3779,6 @@
             }
         }
         
-        // --- AI Quota Tracker (V86.14) ---
-        window.updateAIUsage = function(provider, tokens = 0) {
-            if (!provider) return; // Prevent "toLowerCase" of undefined
-            const today = new Date().toISOString().split('T')[0];
-            let usage = JSON.parse(localStorage.getItem('aiDetailedUsage') || '{}');
-            
-            if (usage.date !== today) {
-                usage = { date: today, totals: {}, count: 0 };
-            }
-            
-            usage.count = (usage.count || 0) + 1;
-            const key = provider.toLowerCase().includes('gemini') ? 'Gemini' : (provider.toLowerCase().includes('gpt') ? 'OpenAI' : 'Typhoon');
-            usage.totals[key] = (usage.totals[key] || 0) + tokens;
-            
-            localStorage.setItem('aiDetailedUsage', JSON.stringify(usage));
-            initAIUsageDisplay();
-        };
-
         window.initAIUsageDisplay = function() {
             const today = new Date().toISOString().split('T')[0];
             const usage = JSON.parse(localStorage.getItem('aiDetailedUsage') || '{}');
@@ -3799,11 +3794,10 @@
                 let listHtml = "";
                 let badgeStr = "";
                 
-                // Providers: Gemini, OpenAI, Typhoon
                 for (const [provider, total] of Object.entries(usage.totals)) {
                     listHtml += `<div style="display:flex; justify-content:space-between; margin-bottom:2px;"><span>${provider}:</span> <b>${total.toLocaleString()} tokens</b></div>`;
                     
-                    const shortName = provider.substring(0, 1).toUpperCase(); // G, O, T
+                    const shortName = provider.substring(0, 1).toUpperCase();
                     const kVal = total >= 1000 ? (total/1000).toFixed(1) + 'k' : total;
                     badgeStr += (badgeStr ? ' ' : '') + `${shortName}:${kVal}`;
                 }
@@ -3814,56 +3808,10 @@
             return count;
         };
 
-        // --- 🌐 Universal AI Provider Handler (V86.14) ---
-        // Local Storage Override Logic
-        window.loadAIKeys = function() {
-            const locG = localStorage.getItem('ai_gemini_key');
-            const locO = localStorage.getItem('ai_openai_key');
-            const locT = localStorage.getItem('ai_typhoon_key');
-            const locA = localStorage.getItem('ai_anthropic_key');
-            const locL = localStorage.getItem('ai_llama_key');
-            // Fix: Use window.GLOBAL to properly update global variables
-            window.GEMINI_API_KEY = "__";
-            window.OPENAI_API_KEY = "__";
-            window.TYPHOON_API_KEY = "__";
-            window.ANTHROPIC_API_KEY = "__";
-            window.LLAMA_API_KEY = "__";
-            if (locG && locG !== "") window.GEMINI_API_KEY = locG;
-            if (locO && locO !== "") window.OPENAI_API_KEY = locO;
-            if (locT && locT !== "") window.TYPHOON_API_KEY = locT;
-            if (locA && locA !== "") window.ANTHROPIC_API_KEY = locA;
-            if (locL && locL !== "") window.LLAMA_API_KEY = locL;
-
-            // GCP / Vertex AI (Aggressive Defaulting)
-            window.GCP_MODE = localStorage.getItem('gcp_mode') || 'auto';
-            let gcpId = localStorage.getItem('gcp_project_id');
-            if (!gcpId || gcpId === "undefined" || gcpId === "") gcpId = "intern-port-edfa7";
-            window.GCP_PROJECT_ID = gcpId;
-            
-            window.GCP_LOCATION = localStorage.getItem('gcp_location');
-            if (!window.GCP_LOCATION || window.GCP_LOCATION === "undefined") window.GCP_LOCATION = "us-central1";
-            
-            window.GCP_ACCESS_TOKEN = localStorage.getItem('gcp_access_token');
-            if (!window.GCP_ACCESS_TOKEN || window.GCP_ACCESS_TOKEN === "undefined") window.GCP_ACCESS_TOKEN = "";
-            
-            const badge = document.getElementById('ai-status-badge');
-            if(badge) {
-                const hasAny = (window.GEMINI_API_KEY.startsWith('AIza') || window.GEMINI_API_KEY.length > 20 || window.OPENAI_API_KEY.startsWith('sk-'));
-                const count = initAIUsageDisplay();
-                badge.style.background = hasAny ? "#8e44ad" : "#fefce8";
-                badge.style.color = "#white";
-                if (!hasAny) badge.style.color = "#a16207";
-                badge.innerHTML = `<i class="fa-solid fa-bolt"></i> AI: ${count} ${hasAny ? '(Ready)' : '(Setup)'}`;
-            }
-        };
-
         window.openAIKeysModal = function() {
             console.log("Opening AI Keys Modal...");
             try {
-                // First load keys from localStorage to memory
                 loadAIKeys();
-                
-                // Check if modal exists first
                 const modal = document.getElementById('aiKeysModal');
                 if (!modal) {
                     console.error("AI Keys Modal not found!");
@@ -3871,7 +3819,6 @@
                     return;
                 }
                 
-                // Check if ALL input fields exist before setting values
                 const allFields = [
                     'local-gemini-key', 'local-openai-key', 'local-typhoon-key', 
                     'local-anthropic-key', 'local-llama-key', 'local-gcp-mode',
@@ -3887,29 +3834,17 @@
                     }
                 }
                 
-                console.log("All fields found, setting values...");
-                
-                // Now safely set values - Fix for Llama key persistence
-                const geminiKey = localStorage.getItem('ai_gemini_key') || '';
-                const openaiKey = localStorage.getItem('ai_openai_key') || '';
-                const typhoonKey = localStorage.getItem('ai_typhoon_key') || '';
-                const anthropicKey = localStorage.getItem('ai_anthropic_key') || '';
-                const llamaKey = localStorage.getItem('ai_llama_key') || '';
-                
-                document.getElementById('local-gemini-key').value = geminiKey;
-                document.getElementById('local-openai-key').value = openaiKey;
-                document.getElementById('local-typhoon-key').value = typhoonKey;
-                document.getElementById('local-anthropic-key').value = anthropicKey;
-                document.getElementById('local-llama-key').value = llamaKey;
+                document.getElementById('local-gemini-key').value = localStorage.getItem('ai_gemini_key') || '';
+                document.getElementById('local-openai-key').value = localStorage.getItem('ai_openai_key') || '';
+                document.getElementById('local-typhoon-key').value = localStorage.getItem('ai_typhoon_key') || '';
+                document.getElementById('local-anthropic-key').value = localStorage.getItem('ai_anthropic_key') || '';
+                document.getElementById('local-llama-key').value = localStorage.getItem('ai_llama_key') || '';
                 
                 document.getElementById('local-gcp-mode').value = window.GCP_MODE || "auto";
                 document.getElementById('local-gcp-project').value = window.GCP_PROJECT_ID || "intern-port-edfa7";
                 document.getElementById('local-gcp-location').value = window.GCP_LOCATION || "us-central1";
                 document.getElementById('local-gcp-token').value = window.GCP_ACCESS_TOKEN || "";
 
-                console.log("Values set successfully");
-
-                // Sync Toggles
                 const gcpToggle = document.querySelector('#aiKeysModal .glass-toggle-container input[id="local-gcp-mode"]')?.parentElement;
                 if (gcpToggle) {
                     const items = gcpToggle.querySelectorAll('.glass-toggle-item');
@@ -3918,13 +3853,11 @@
                     });
                 }
                 
-                // Check if toggleVertexManualFields exists
                 if (typeof toggleVertexManualFields === 'function') {
                     toggleVertexManualFields();
                 }
                 
                 modal.style.display = 'block';
-                console.log("AI Keys Modal opened successfully");
             } catch (error) {
                 console.error("Error opening AI Keys Modal:", error);
                 alert("Error opening AI Settings: " + error.message + "\n\nPlease refresh the page and try again.");
@@ -3937,26 +3870,11 @@
                 const manualFields = document.getElementById('vertex-manual-fields');
                 const autoStatus = document.getElementById('vertex-auto-status');
                 
-                if (!mode) {
-                    console.error("GCP mode field not found!");
-                    return;
-                }
-                
-                if (!manualFields) {
-                    console.error("Vertex manual fields container not found!");
-                    return;
-                }
-                
-                if (!autoStatus) {
-                    console.error("Vertex auto status container not found!");
-                    return;
-                }
+                if (!mode || !manualFields || !autoStatus) return;
                 
                 const modeValue = mode.value;
                 manualFields.style.display = modeValue === 'manual' ? 'block' : 'none';
                 autoStatus.style.display = modeValue === 'auto' ? 'flex' : 'none';
-                
-                console.log(`Vertex fields toggled: mode=${modeValue}, manual=${manualFields.style.display}, auto=${autoStatus.style.display}`);
             } catch (error) {
                 console.error("Error in toggleVertexManualFields:", error);
             }
@@ -3976,7 +3894,6 @@
                 const trimmedLine = line.trim();
                 if (!trimmedLine) return;
                 
-                // Parse different formats
                 let key = '';
                 let targetField = null;
                 
@@ -4008,14 +3925,12 @@
             
             if (filledCount > 0) {
                 showToast(`✅ Auto-filled ${filledCount} API keys!`, "success");
-                // Clear the textarea
                 document.getElementById('bulk-paste-keys').value = '';
             } else {
                 showToast("No valid API keys found in the text", "warning");
             }
         };
 
-        // 👁️ Toggle Password Visibility Function
         window.togglePasswordVisibility = function(fieldId) {
             const field = document.getElementById(fieldId);
             const toggle = document.getElementById(fieldId + '-toggle');
@@ -4033,7 +3948,6 @@
             }
         };
 
-        // 📤 Export AI Keys Function
         window.exportAIKeys = function() {
             const keys = {
                 gemini: localStorage.getItem('ai_gemini_key') || '',
@@ -4049,7 +3963,6 @@
                 version: 'V88.96'
             };
             
-            // สร้าง JSON และ download
             const dataStr = JSON.stringify(keys, null, 2);
             const dataBlob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(dataBlob);
@@ -4065,7 +3978,6 @@
             showToast("✅ AI Keys exported successfully!", "success");
         };
 
-        // 📥 Import AI Keys Function
         window.importAIKeys = function(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -4074,83 +3986,41 @@
             reader.onload = function(e) {
                 try {
                     const keys = JSON.parse(e.target.result);
-                    
-                    // ตรวจสอบว่าเป็น backup file ที่ถูกต้อง
                     if (!keys.version || !keys.gemini) {
                         showToast("❌ Invalid backup file format", "error");
                         return;
                     }
                     
-                    // นำเข้า keys
                     if (keys.gemini) localStorage.setItem('ai_gemini_key', keys.gemini);
                     if (keys.openai) localStorage.setItem('ai_openai_key', keys.openai);
                     if (keys.typhoon) localStorage.setItem('ai_typhoon_key', keys.typhoon);
                     if (keys.anthropic) localStorage.setItem('ai_anthropic_key', keys.anthropic);
                     if (keys.llama) localStorage.setItem('ai_llama_key', keys.llama);
                     
-                    // นำเข้า GCP settings
                     if (keys.gcp_mode) localStorage.setItem('gcp_mode', keys.gcp_mode);
                     if (keys.gcp_project_id) localStorage.setItem('gcp_project_id', keys.gcp_project_id);
                     if (keys.gcp_location) localStorage.setItem('gcp_location', keys.gcp_location);
                     if (keys.gcp_access_token) localStorage.setItem('gcp_access_token', keys.gcp_access_token);
                     
-                    // Reload และอัปเดต UI
                     loadAIKeys();
                     
-                    // Debug: Log current localStorage values
-                    console.log("🔍 Import Debug - localStorage values:");
-                    console.log("Gemini:", localStorage.getItem('ai_gemini_key'));
-                    console.log("OpenAI:", localStorage.getItem('ai_openai_key'));
-                    console.log("Typhoon:", localStorage.getItem('ai_typhoon_key'));
-                    console.log("Anthropic:", localStorage.getItem('ai_anthropic_key'));
-                    console.log("Llama:", localStorage.getItem('ai_llama_key'));
-                    
-                    // กรอกค่าใน input fields ทันที
                     setTimeout(() => {
-                        console.log("🔍 Updating input fields after import...");
-                        const geminiField = document.getElementById('local-gemini-key');
-                        const openaiField = document.getElementById('local-openai-key');
-                        const typhoonField = document.getElementById('local-typhoon-key');
-                        const anthropicField = document.getElementById('local-anthropic-key');
-                        const llamaField = document.getElementById('local-llama-key');
-                        
-                        if (geminiField) {
-                            geminiField.value = localStorage.getItem('ai_gemini_key') || '';
-                            geminiField.type = 'text'; // Show value after import
-                            console.log("Gemini field updated to:", geminiField.value);
-                        }
-                        if (openaiField) {
-                            openaiField.value = localStorage.getItem('ai_openai_key') || '';
-                            openaiField.type = 'text'; // Show value after import
-                            console.log("OpenAI field updated to:", openaiField.value);
-                        }
-                        if (typhoonField) {
-                            typhoonField.value = localStorage.getItem('ai_typhoon_key') || '';
-                            typhoonField.type = 'text'; // Show value after import
-                            console.log("Typhoon field updated to:", typhoonField.value);
-                        }
-                        if (anthropicField) {
-                            anthropicField.value = localStorage.getItem('ai_anthropic_key') || '';
-                            anthropicField.type = 'text'; // Show value after import
-                            console.log("Anthropic field updated to:", anthropicField.value);
-                        }
-                        if (llamaField) {
-                            llamaField.value = localStorage.getItem('ai_llama_key') || '';
-                            llamaField.type = 'text'; // Show value after import
-                            console.log("Llama field updated to:", llamaField.value);
-                        }
+                        const fields = ['local-gemini-key', 'local-openai-key', 'local-typhoon-key', 'local-anthropic-key', 'local-llama-key'];
+                        fields.forEach(id => {
+                            const f = document.getElementById(id);
+                            if (f) {
+                                f.value = localStorage.getItem(id.replace('local-', 'ai_').replace('-key', '_key')) || '';
+                                f.type = 'text';
+                            }
+                        });
                     }, 100);
                     showToast(`✅ Keys imported from backup (${keys.export_date?.split('T')[0] || 'unknown date'})`, "success");
                     
                 } catch (error) {
                     showToast("❌ Failed to import backup file", "error");
-                    console.error("Import error:", error);
                 }
             };
-            
             reader.readAsText(file);
-            
-            // Clear file input
             event.target.value = '';
         };
 
@@ -4165,67 +4035,29 @@
             if(t) localStorage.setItem('ai_typhoon_key', t);
             if(a) localStorage.setItem('ai_anthropic_key', a);
             if(l) localStorage.setItem('ai_llama_key', l);
-            // Note: Don't remove keys if empty, just don't set them
             
             localStorage.setItem('gcp_mode', document.getElementById('local-gcp-mode').value);
             localStorage.setItem('gcp_project_id', document.getElementById('local-gcp-project').value.trim());
             localStorage.setItem('gcp_location', document.getElementById('local-gcp-location').value.trim());
             localStorage.setItem('gcp_access_token', document.getElementById('local-gcp-token').value.trim());
 
-            // Load keys to memory
             loadAIKeys();
-            
-            // Show success message but keep modal open
             showToast("✅ Keys saved locally!");
             
-            // Debug: Log current localStorage values
-            console.log("🔍 Save Debug - localStorage values:");
-            console.log("Gemini:", localStorage.getItem('ai_gemini_key'));
-            console.log("OpenAI:", localStorage.getItem('ai_openai_key'));
-            console.log("Typhoon:", localStorage.getItem('ai_typhoon_key'));
-            console.log("Anthropic:", localStorage.getItem('ai_anthropic_key'));
-            console.log("Llama:", localStorage.getItem('ai_llama_key'));
-            
-            // Update input fields directly without reopening modal
             setTimeout(() => {
-                console.log("🔍 Updating input fields...");
-                const geminiField = document.getElementById('local-gemini-key');
-                const openaiField = document.getElementById('local-openai-key');
-                const typhoonField = document.getElementById('local-typhoon-key');
-                const anthropicField = document.getElementById('local-anthropic-key');
-                const llamaField = document.getElementById('local-llama-key');
-                
-                if (geminiField) {
-                    geminiField.value = localStorage.getItem('ai_gemini_key') || '';
-                    geminiField.type = 'text'; // Show the value after save
-                    console.log("Gemini field updated to:", geminiField.value);
-                }
-                if (openaiField) {
-                    openaiField.value = localStorage.getItem('ai_openai_key') || '';
-                    openaiField.type = 'text'; // Show the value after save
-                    console.log("OpenAI field updated to:", openaiField.value);
-                }
-                if (typhoonField) {
-                    typhoonField.value = localStorage.getItem('ai_typhoon_key') || '';
-                    typhoonField.type = 'text'; // Show the value after save
-                    console.log("Typhoon field updated to:", typhoonField.value);
-                }
-                if (anthropicField) {
-                    anthropicField.value = localStorage.getItem('ai_anthropic_key') || '';
-                    anthropicField.type = 'text'; // Show the value after save
-                    console.log("Anthropic field updated to:", anthropicField.value);
-                }
-                if (llamaField) {
-                    llamaField.value = localStorage.getItem('ai_llama_key') || '';
-                    llamaField.type = 'text'; // Show the value after save
-                    console.log("Llama field updated to:", llamaField.value);
-                }
+                const fields = ['local-gemini-key', 'local-openai-key', 'local-typhoon-key', 'local-anthropic-key', 'local-llama-key'];
+                fields.forEach(id => {
+                    const f = document.getElementById(id);
+                    if (f) {
+                        f.value = localStorage.getItem(id.replace('local-', 'ai_').replace('-key', '_key')) || '';
+                        f.type = 'text';
+                    }
+                });
             }, 50);
         };
 
         window.analyzeQuizAI = async function(clickedBtn) {
             console.log("🚀 Starting AI Quiz Analysis...");
-            // V8.05: Remove existing analysis popup if any
             const oldPopup = document.getElementById('ai-analysis-popup');
             if (oldPopup) oldPopup.remove();
 
@@ -4236,7 +4068,6 @@
             const btn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
             const oldText = btn ? btn.innerHTML : "Analyze";
 
-            
             try {
                 if (btn) {
                     btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analyzing...`;
@@ -4292,12 +4123,10 @@
                 const analysis = result.analysisText || "Analysis complete.";
                 const qDataJson = JSON.stringify(formData.questions);
 
-                // Show in a styled popup
                 const resultDiv = document.createElement('div');
                 resultDiv.id = "ai-analysis-popup";
                 resultDiv.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:850px; max-height:85vh; background:white; padding:30px; border-radius:30px; box-shadow:0 20px 60px rgba(0,0,0,0.3); z-index:10001; overflow-y:auto; font-family:'Inter', sans-serif; border: 1px solid #eee;";
                 
-                // V88.72: Store AI results globally to avoid onclick escaping issues
                 window._aiAnalysisItems = result.items || [];
                 window._aiAnalysisText = analysis;
                 window._aiOriginalQsJson = qDataJson;
@@ -4451,12 +4280,10 @@
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-3.0-pro';
                 const { text: resultJson } = await callUniversalAI(selectedModel, prompt, true);
                 
-                // Parse and strip possible markdown markers
                 const cleanJson = resultJson.replace(/```json/g, "").replace(/```/g, "").trim();
                 const newQuestions = JSON.parse(cleanJson);
 
                 if (newQuestions && Array.isArray(newQuestions)) {
-                    // Update UI
                     const container = document.getElementById('quiz-questions-container');
                     container.innerHTML = "";
                     newQuestions.forEach(q => addQuestionUI(q));
@@ -4481,7 +4308,6 @@
             }
         };
 
-        // autoTagQuizAI moved to head for reliability
         window.openSuggestMoreModal = function() {
             const modal = document.createElement('div');
             modal.id = 'ai-suggest-config-modal';
@@ -4559,7 +4385,6 @@
             const existingQs = formData.questions.map((q, i) => `Q${i+1}: ${q.q}`).join('\n');
             const quizTitle = document.getElementById('quiz-title').value;
             
-            // Detect language from existing questions
             const detectLanguage = (text) => {
                 const thaiRegex = /[\u0E00-\u0E7F]/;
                 return thaiRegex.test(text) ? 'Thai' : 'English';
@@ -4629,9 +4454,8 @@
             const formData = getQuizFormData();
             const existingQs = formData.questions.map((q, i) => `Q${i+1}: ${q.q}`).join('\n');
             const quizTitle = document.getElementById('quiz-title').value;
-            const n = 3; // Keep same number
+            const n = 3;
             
-            // Detect language from existing questions
             const detectLanguage = (text) => {
                 const thaiRegex = /[\u0E00-\u0E7F]/;
                 return thaiRegex.test(text) ? 'Thai' : 'English';
@@ -4641,7 +4465,6 @@
                 ? detectLanguage(formData.questions[0].q)
                 : 'Thai';
             
-            // Build custom prompt based on focus type
             let customPrompt = '';
             switch(focusType) {
                 case 'harder':
@@ -4695,7 +4518,6 @@
                 const cleanJson = resultRaw.replace(/```json/g, "").replace(/```/g, "").trim();
                 const suggestions = JSON.parse(cleanJson);
                 
-                // Close current popup and show new suggestions
                 const popup = document.getElementById('ai-suggestions-popup');
                 if (popup) popup.remove();
                 
@@ -4756,13 +4578,6 @@
 
             document.body.appendChild(resultDiv);
         };
-
-        window.callUniversalAI = async function(modelName, prompt, isJson = false, visionData = null, quickApiKey = '') {
-            const PROXY_SECRET = "mlp-secret-8888";
-            // V89.72: Flexible Proxy URL based on origin
-            const PROXY_URL = (window.location.hostname === 'mlp-int.work') ? '/api/ai' : 'https://mlp-int.work/api/ai'; 
-
-            // 🔥 V88.50: Ensure local keys are loaded BEFORE any call, especially on GitHub Pages
             if (window.loadAIKeys) window.loadAIKeys();
 
             // 🤖 Step 1: Try AI Proxy (Keyless Mode)
@@ -14471,7 +14286,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         };
 
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V89.76 loaded OK (Unified AI Fix) ', 'background:#4361ee;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V89.78 loaded OK (Priority AI Core) ', 'background:#4361ee;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
         console.log('setUserGroup:', typeof setUserGroup, '| openPeriodModal:', typeof openPeriodModal, '| reviewQuiz:', typeof reviewQuiz, '| detectNegativeWording:', typeof detectNegativeWording);
     </script>
 
