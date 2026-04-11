@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V89.45)</title>
-    <!-- V89.45: Hotfix undefined source in Merger -->
+    <title>Intern Admin Portal (V89.46)</title>
+    <!-- V89.46: Fix pre_users collection name & claimed metadata -->
     <!-- Release: 2026-04-09 20:38 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1408,7 +1408,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.3em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                                                <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,219,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.45</span>
+                                                <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,219,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.46</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -12172,7 +12172,7 @@ async function saveQuiz() {
         function filterBoard() { drawKanban(); }
         function filterUsers() { renderTable('users'); }
 
-        // 🔥 User Merger Logic (V89.45)
+        // 🔥 User Merger Logic (V89.46)
         let mergeSourceId = null;
         function openMergeModal(id) {
             mergeSourceId = id;
@@ -12265,10 +12265,12 @@ async function saveQuiz() {
                 showToast("⌛ Linking pre-registration...");
                 try {
                     const batch = db.batch();
-                    // 1. Mark pre_registration as claimed
-                    batch.update(db.collection("pre_registration").doc(preRegId), {
+                    // 1. Mark pre_registration as claimed (using pre_users collection)
+                    batch.update(db.collection("pre_users").doc(preRegId), {
                         claimed: true,
-                        claimedBy: userId
+                        claimedBy: userId,
+                        claimedByName: userDoc.displayName || userDoc.fullName || 'Unknown',
+                        claimedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
                     
                     // 2. Update user info
@@ -12346,7 +12348,7 @@ async function saveQuiz() {
                 }
 
                 // 4. Update PreReg linkage
-                const preSnap = await db.collection("pre_registration").where("claimedBy", "==", mergeSourceId).get();
+                const preSnap = await db.collection("pre_users").where("claimedBy", "==", mergeSourceId).get();
                 preSnap.forEach(doc => {
                     currentBatch.update(doc.ref, { claimedBy: targetId });
                     opCount++;
@@ -12358,7 +12360,7 @@ async function saveQuiz() {
                 
                 // 6. Delete PreReg entry if it was a raw pre-reg source
                 if (source.isPreReg) {
-                     currentBatch.delete(db.collection("pre_registration").doc(mergeSourceId));
+                     currentBatch.delete(db.collection("pre_users").doc(mergeSourceId));
                 }
 
                 await currentBatch.commit();
@@ -14409,7 +14411,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             <div id="prereg-list" style="max-height:400px; overflow-y:auto;"></div>
         </div>
     </div>
-    <!-- 🔥 User Merger Modal (V89.45) -->
+    <!-- 🔥 User Merger Modal (V89.46) -->
     <div id="mergeModal" class="modal" style="display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);">
         <div class="modal-content" style="max-width:500px; width:90%; border-radius:20px; border:none; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
