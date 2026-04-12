@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V89.83) Overview
+# MLP Internship Portfolio (V89.84) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** 
@@ -79,6 +79,12 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-04-12] Session Updates (V89.83 → V89.84)
+### 1. UI Clarity & Title Resolution (V89.84)
+- **Quiz Title Resolver:** Implemented a regex-based title resolver in `buildBreakdown` to convert cryptic Document IDs into readable Quiz Titles for both existing and new logs.
+- **Improved Logging:** Updated all quiz approval functions (`approveQuiz`, `approveQuizAttempt`, etc.) to store the Quiz Title directly in the check-in log notes.
+- **Status Explanation:** Added helper text and tooltips for the "Request Pending" certificate status in the Member Dashboard to improve user/mentor understanding.
 
 ## [2026-04-12] Session Updates (V89.82 → V89.83)
 ### 1. Stats Upgrade — Quizzes Done (V89.83)
@@ -642,4 +648,4 @@ service cloud.firestore {
     - **Date & Time Formatting:** ปรับการแสดงผลวันที่และเวลาให้ใช้รูปแบบ `en-US` (เช่น Mar 23, 2026) ทั่วทั้งระบบเพื่อความสม่ำเสมอ
 
 ---
-*บันทึกภาพรวมระบบสะท้อนความจริง (V89.83) โดย Antigravity AI*
+*บันทึกภาพรวมระบบสะท้อนความจริง (V89.84) โดย Antigravity AI*
