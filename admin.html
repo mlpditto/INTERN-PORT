@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard (V89.83 Stats Upgrade)</title>
-    <!-- V89.83: Added Quizzes Done statistic to Member Dashboard -->
-    <!-- Release: 2026-04-12 23:46 UTC+7 -->
+    <title>Admin Dashboard (V89.84 Stats Clarity)</title>
+    <!-- V89.84: Quiz Title Resolution & Request Pending Clarity -->
+    <!-- Release: 2026-04-12 23:55 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -1436,7 +1436,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.3em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                                                <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,255,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.83</span>
+                                                <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,255,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.84</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -1655,7 +1655,7 @@
             <div class="kanban-board" style="min-height: 450px;">
                 <div class="kanban-col" id="col-Backlog">
                     <div style="font-weight:bold; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
-                        <span><span class="badge" style="background:#8e44ad; color:white;">V89.83 (New Stats)</span> Backlog</span>
+                        <span><span class="badge" style="background:#8e44ad; color:white;">V89.84 (UI Clarity)</span> Backlog</span>
                         <span class="badge" style="background:#e9ecef; color:#495057; border:1px solid #dee2e6;" id="cnt-Backlog">0</span>
                     </div>
                     <div id="Backlog"></div>
@@ -8847,7 +8847,7 @@ async function saveQuiz() {
                         userId: att.userId,
                         type: 'quiz',
                         amount: pointsToAdd,
-                        note: `Quiz Approved (All Correct): ${quiz.id}`,
+                        note: `Quiz Approved (All Correct): ${quiz.shortTitle || quiz.title || quiz.id}`,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 }
@@ -8903,7 +8903,7 @@ async function saveQuiz() {
                         userId: att.userId,
                         type: 'quiz',
                         amount: pointsToAdd,
-                        note: `Quiz Approved (Actual): ${curCorrect}/${totalQ} - ${quiz.id}`,
+                        note: `Quiz Approved (Actual): ${curCorrect}/${totalQ} - ${quiz.shortTitle || quiz.title || quiz.id}`,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 }
@@ -9014,11 +9014,15 @@ async function saveQuiz() {
                 const b = db.batch();
                 b.update(db.collection("quiz_attempts").doc(attemptId), { status: 'approved', approvedAt: firebase.firestore.FieldValue.serverTimestamp() });
                 b.update(db.collection("users").doc(uid), { score: firebase.firestore.FieldValue.increment(score) });
+                const quizId = attemptId.split('_')[0];
+                const quizObj = quizzesData.find(q => q.id === quizId);
+                const quizName = quizObj ? (quizObj.shortTitle || quizObj.title) : quizId;
+                
                 b.set(db.collection("checkin_logs").doc(), {
                     userId: uid,
                     type: 'quiz',
                     amount: score,
-                    note: `Quiz Approved: ${attemptId.split('_')[0]}`,
+                    note: `Quiz Approved: ${quizName}`,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 await b.commit();
@@ -11065,10 +11069,28 @@ async function saveQuiz() {
             const buildBreakdown = (dateStr, label, color) => {
                 const items = detailsMap[dateStr] || [];
                 if (items.length === 0) return `<div style="color:#aaa; font-size:0.8em;">No items found.</div>`;
+                
+                // V89.84: Note Resolver to handle Quiz IDs in existing logs
+                const resolveNodeTitle = (note) => {
+                    const patterns = [
+                        /Quiz Approved: ([a-zA-Z0-9_\-]+)/,
+                        /Quiz Approved \(All Correct\): ([a-zA-Z0-9_\-]+)/,
+                        /Quiz Approved \(Actual\): .*?- ([a-zA-Z0-9_\-]+)/
+                    ];
+                    for (const p of patterns) {
+                        const m = note.match(p);
+                        if (m && m[1]) {
+                            const q = quizzesData.find(x => x.id === m[1]);
+                            if (q) return note.replace(m[1], q.shortTitle || q.title);
+                        }
+                    }
+                    return note;
+                };
+
                 let html = `<div style="font-size:0.85em; font-weight:bold; color:${color}; margin-bottom:6px;">${label} — ${new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' })}</div>`;
                 items.forEach(item => {
                     html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 8px; margin:2px 0; background:rgba(0,0,0,0.03); border-radius:6px; font-size:0.82em;">
-                        <span>${typeIcon(item.type)} ${item.note.length > 40 ? item.note.substring(0, 40) + '…' : item.note}</span>
+                        <span>${typeIcon(item.type)} ${resolveNodeTitle(item.note)}</span>
                         <b style="color:${item.amount >= 0 ? '#28a745' : '#ef233c'}; white-space:nowrap; margin-left:8px;">${item.amount >= 0 ? '+' : ''}${item.amount.toFixed(2)}</b>
                     </div>`;
                 });
@@ -11117,9 +11139,15 @@ async function saveQuiz() {
             if (certApproved) {
                 certBtnEl.innerHTML = `<button class="btn-sm btn-success" disabled style="width:100%;"><i class="fa-solid fa-certificate"></i> Certificate Approved</button>`;
             } else if (certRequested) {
-                certBtnEl.innerHTML = `<button class="btn-sm btn-warning" disabled style="width:100%;"><i class="fa-solid fa-clock"></i> Request Pending</button>`;
+                certBtnEl.innerHTML = `
+                    <button class="btn-sm btn-warning" disabled style="width:100%; margin-bottom:5px;"><i class="fa-solid fa-clock"></i> Request Pending</button>
+                    <div style="font-size:0.75em; color:#e67e22; font-style:italic;"><i class="fa-solid fa-info-circle"></i> Waiting for Admin to issue the certificate.</div>
+                `;
             } else if (hasCert) {
-                certBtnEl.innerHTML = `<button class="btn-sm btn-primary" onclick="requestCertificate('${u.id}')" style="width:100%; background:linear-gradient(135deg, #667eea, #764ba2); border:none;"><i class="fa-solid fa-certificate"></i> Request Certificate</button>`;
+                certBtnEl.innerHTML = `
+                    <button class="btn-sm btn-primary" onclick="requestCertificate('${u.id}')" style="width:100%; background:linear-gradient(135deg, #667eea, #764ba2); border:none;"><i class="fa-solid fa-certificate"></i> Request Certificate</button>
+                    <div style="font-size:0.75em; color:#666; margin-top:5px;">Send a final request for certificate issuance.</div>
+                `;
             } else {
                 certBtnEl.innerHTML = `<button class="btn-sm" disabled style="width:100%;" title="Complete more tasks to unlock certificate"><i class="fa-solid fa-lock"></i> Request Certificate (Score: ${(u.score || 0).toFixed(2)})</button>`;
             }
