@@ -1,1338 +1,4 @@
-<!DOCTYPE html>
-<html lang="th">
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Intern Progress Online (V89.82)</title>
-
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-
-    <style>
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.02); }
-            100% { transform: scale(1); }
-        }
-        /* -----------------------
-           1. Global Styles
-           ----------------------- */
-        body {
-            font-family: 'Kanit', sans-serif;
-            background-color: #f4f6f9;
-            padding: 20px;
-            color: #333;
-            margin: 0;
-        }
-
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            position: relative;
-            padding-bottom: 80px;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        /* -----------------------
-           2. Components
-           ----------------------- */
-        .card {
-            background: white;
-            padding: 20px;
-            border-radius: 15px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-            border: 1px solid #f0f0f0;
-        }
-
-        .profile-img {
-            width: 90px;
-            height: 90px;
-            border-radius: 50%;
-            border: 4px solid #fff;
-            box-shadow: 0 5px 15px rgba(6, 199, 85, 0.2);
-            object-fit: cover;
-        }
-
-        .score-text {
-            color: #4361ee;
-            font-weight: 800;
-            font-size: 1.8em;
-        }
-
-        /* -----------------------
-           3. Kanban Board
-           ----------------------- */
-        .sq-container {
-            display: flex;
-            overflow-x: auto;
-            gap: 15px;
-            padding-bottom: 20px;
-            scroll-snap-type: x mandatory;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        .sq-col {
-            min-width: 85%;
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 15px;
-            scroll-snap-align: center;
-            border: 1px solid #eee;
-        }
-
-        .sq-card {
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            border-left: 5px solid #ccc;
-            margin-bottom: 10px;
-            position: relative;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
-        }
-
-        .sq-card.project {
-            background-color: #fff0f5;
-            border-left-color: #e83e8c;
-        }
-
-        .sq-card.scored {
-            background-color: #d1e7dd;
-            border-left-color: #198754;
-        }
-
-        .score-badge {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: #198754;
-            color: white;
-            font-size: 0.75em;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-weight: bold;
-        }
-
-        /* --- Kanban Compact Tabs (V81.5) --- */
-        .sq-tabs {
-            display: flex;
-            background: #eceff1;
-            border-radius: 14px;
-            padding: 5px;
-            margin-bottom: 12px;
-            gap: 5px;
-        }
-
-        .sq-tab-btn {
-            flex: 1;
-            padding: 8px 2px;
-            border-radius: 10px;
-            font-size: 0.72em;
-            font-weight: 600;
-            color: #78909c;
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            border: none;
-            background: transparent;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: auto;
-            line-height: 1.2;
-        }
-
-        .sq-tab-btn.active {
-            background: white;
-            color: #4361ee;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
-        }
-
-        .sq-tab-count {
-            font-size: 1.1em;
-            font-weight: 800;
-            display: block;
-        }
-
-        .sq-hint {
-            font-size: 0.72em;
-            color: #90a4ae;
-            text-align: center;
-            margin-bottom: 12px;
-            background: #fdfdfd;
-            padding: 6px;
-            border-radius: 10px;
-            border: 1px dashed #cfd8dc;
-        }
-
-        #sq-Backlog,
-        #sq-Doing,
-        #sq-Review,
-        #sq-Done {
-            transition: opacity 0.3s;
-        }
-
-        /* -----------------------
-           4. Modals & Popups
-           ----------------------- */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 9999;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(6px);
-            /* Center-align content properly */
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-content {
-            background: white;
-            padding: 20px;
-            /* 🔥 Fix for iPhone Safe Area & Button Visibility */
-            padding-bottom: calc(25px + env(safe-area-inset-bottom));
-            border-radius: 20px;
-            width: 90%;
-            max-width: 450px;
-            position: relative;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
-            text-align: center;
-            /* Ensure scrolling if content is tall */
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        /* Leaderboard Styles (V77.8) */
-        .lb-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 15px;
-            margin-bottom: 8px;
-            border-radius: 12px;
-            background: #fff;
-            transition: 0.2s;
-            border: 1px solid #f0f0f0;
-        }
-
-        /* -----------------------
-           5. Chat System
-           ----------------------- */
-        .chat-box {
-            height: 300px;
-            overflow-y: auto;
-            background: #f9f9f9;
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            border: 1px solid #eee;
-            text-align: left;
-        }
-
-        .chat-msg {
-            margin-bottom: 8px;
-            padding: 8px 12px;
-            border-radius: 12px;
-            font-size: 0.9em;
-            max-width: 80%;
-            line-height: 1.4;
-        }
-
-        .msg-admin {
-            background: #e9ecef;
-            margin-right: auto;
-            text-align: left;
-            color: #333;
-            border-bottom-left-radius: 2px;
-        }
-
-        .msg-user {
-            background: #4361ee;
-            color: white;
-            margin-left: auto;
-            text-align: right;
-            border-bottom-right-radius: 2px;
-        }
-
-        .msg-time {
-            font-size: 0.7em;
-            opacity: 0.7;
-            display: block;
-            margin-top: 3px;
-        }
-
-        /* -----------------------
-           6. Quest & Timers
-           ----------------------- */
-        .quest-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            text-align: center;
-            border: none;
-        }
-
-        .timer-display {
-            font-size: 1.8em;
-            font-weight: bold;
-            margin: 15px 0;
-            background: rgba(0, 0, 0, 0.2);
-            padding: 10px;
-            border-radius: 12px;
-            font-family: monospace;
-        }
-
-        .retry-wait {
-            color: #ef233c;
-            font-weight: bold;
-            background: #fff;
-            padding: 10px;
-            border-radius: 8px;
-            margin-top: 10px;
-        }
-
-        .global-expiry {
-            font-size: 0.9em;
-            color: #ffeb3b;
-            background: rgba(0, 0, 0, 0.2);
-            padding: 5px 10px;
-            border-radius: 15px;
-            display: inline-block;
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
-
-        /* -----------------------
-           7. Buttons & Inputs
-           ----------------------- */
-        button {
-            width: 100%;
-            padding: 12px;
-            border-radius: 10px;
-            border: none;
-            font-weight: 600;
-            cursor: pointer;
-            transition: 0.2s;
-            min-height: 48px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-        }
-
-        .btn-primary {
-            background-color: #4361ee;
-            color: white;
-        }
-
-        .btn-warning {
-            background-color: #ff9f1c;
-            color: black;
-        }
-
-        .btn-success {
-            background-color: #2ec4b6;
-            color: white;
-        }
-
-        .btn-danger {
-            background-color: #ef233c;
-            color: white;
-        }
-
-        .btn-sm {
-            width: auto;
-            min-height: 30px;
-            padding: 5px 10px;
-            font-size: 0.85em;
-        }
-
-        input,
-        textarea {
-            width: 100%;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-            box-sizing: border-box;
-            margin-bottom: 10px;
-        }
-
-        .date-input-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .date-input-group div {
-            flex: 1;
-        }
-
-        .grad-date-input {
-            padding: 8px !important;
-            font-size: 0.9em !important;
-        }
-
-        .date-input-group label {
-            font-size: 0.85em;
-            color: #666;
-            margin-bottom: 2px;
-            display: block;
-        }
-
-        .refresh-btn {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            width: auto;
-            min-height: auto;
-            background: white;
-            border: 1px solid #ddd;
-            padding: 5px 10px;
-            font-size: 0.8em;
-            z-index: 99;
-        }
-
-        .badge {
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 0.75em;
-            font-weight: bold;
-            color: white;
-            display: inline-block;
-        }
-
-        .p-Low {
-            background: #17a2b8;
-        }
-
-        .p-Medium {
-            background: #ff9f1c;
-        }
-
-        .p-High {
-            background: #ef233c;
-        }
-
-        /* 🔥 Added Styles for Loading Overlay */
-        .center-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            /* Flex is used inline, but good to have here too */
-            justify-content: center;
-            align-items: center;
-            background: rgba(0, 0, 0, 0.85);
-            /* Dark background */
-            backdrop-filter: blur(5px);
-            z-index: 9999;
-        }
-
-        .loader {
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #3498db;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-        }
-
-        /* -----------------------
-           8. New Assignment Cards (Modern UI)
-           ----------------------- */
-        .assignment-card {
-            background: white;
-            border-radius: 16px;
-            padding: 0;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-            border: 1px solid #f0f0f0;
-            overflow: hidden;
-            transition: transform 0.2s;
-        }
-
-        .assignment-card:active {
-            transform: scale(0.98);
-        }
-
-        .assign-header {
-            padding: 15px 20px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            border-bottom: 1px solid #f9f9f9;
-        }
-
-        .assign-icon {
-            width: 45px;
-            height: 45px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5em;
-            color: white;
-            flex-shrink: 0;
-        }
-
-        .icon-quest {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            box-shadow: 0 4px 10px rgba(118, 75, 162, 0.3);
-        }
-
-        .icon-quiz {
-            background: linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%);
-            box-shadow: 0 4px 10px rgba(67, 97, 238, 0.3);
-        }
-
-        .assign-info {
-            flex-grow: 1;
-            min-width: 0;
-            /* Flex truncation fix */
-        }
-
-        .assign-info h4 {
-            margin: 0;
-            font-size: 1.1em;
-            color: #333;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .assign-tag {
-            font-size: 0.75em;
-            padding: 2px 8px;
-            border-radius: 4px;
-            background: #f0f0f0;
-            color: #666;
-            margin-top: 4px;
-            display: inline-block;
-        }
-
-        .assign-body {
-            padding: 15px 20px;
-            font-size: 0.95em;
-            color: #555;
-            line-height: 1.5;
-        }
-
-        .assign-meta {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 10px;
-            font-size: 0.85em;
-            color: #888;
-        }
-
-        .meta-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .assign-footer {
-            padding: 15px 20px;
-            background: #fafafa;
-            border-top: 1px solid #f0f0f0;
-        }
-
-        /* Status colors */
-        .status-pending {
-            color: #ff9f1c;
-        }
-
-        .status-done {
-            color: #2ec4b6;
-        }
-
-        .status-expired {
-            color: #ef233c;
-        }
-
-
-
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .reveal-active {
-            animation: fadeInUp 0.8s ease-out forwards;
-        }
-
-        .poll-option-btn {
-            text-align: left;
-            padding: 12px 15px;
-            border-radius: 12px;
-            border: 2px solid #eee;
-            background: white;
-            color: #333;
-            font-size: 0.95em;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .poll-option-btn:hover:not(:disabled) {
-            border-color: var(--primary);
-            background: #f0f4ff;
-        }
-
-        .poll-option-btn.selected {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
-            box-shadow: 0 4px 12px rgba(67, 97, 238, 0.3);
-        }
-
-        /* --- Ordering & Flashcard UI (V89.34) --- */
-        .order-btn {
-            position: relative;
-            text-align: left;
-            padding-left: 50px !important;
-        }
-
-        .order-number {
-            position: absolute;
-            left: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 30px;
-            height: 30px;
-            background: #eee;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 800;
-            color: #666;
-            font-size: 0.9em;
-        }
-
-        .order-btn.active .order-number {
-            background: white;
-            color: var(--primary);
-        }
-
-        .flash-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        .flash-btn {
-            height: 150px;
-            font-size: 1.5em;
-            flex-direction: column;
-            border-radius: 20px;
-            border: 4px solid rgba(0, 0, 0, 0.05);
-        }
-
-        .flash-btn i {
-            font-size: 2em;
-            margin-bottom: 10px;
-        }
-
-        .flash-true {
-            background: #2ec4b6;
-            color: white;
-        }
-
-        .flash-false {
-            background: #ef233c;
-            color: white;
-        }
-    </style>
-</head>
-
-<body>
-    <div class="container">
-        <!-- Redundant top refresh buttons removed, moved to profile card -->
-        <!-- Removed duplicate loading div -->
-
-        <div id="main-app" class="hidden">
-            <div style="height:20px;"></div>
-
-            <!-- 🔥 Combined Profile & Status Section (V77.19) -->
-            <div id="section-profile-combined" class="card"
-                style="padding: 15px; position: relative; border-left: 5px solid #e67e22;">
-                <!-- Quick Actions (Top Right) -->
-                <div style="position: absolute; top: 12px; right: 12px; display: flex; gap: 8px; z-index: 10;">
-                    <button class="btn-sm" onclick="openLeaderboard()"
-                        style="width: 32px; height: 32px; border-radius: 50%; padding: 0; background: #eef2ff; color: #4361ee; border: 1px solid #dbeafe; display: flex; align-items: center; justify-content: center; min-height: auto;">
-                        <i class="fa-solid fa-ranking-star"></i>
-                    </button>
-                    <button class="btn-sm" onclick="openPersonalInfoModal()"
-                        style="width: 32px; height: 32px; border-radius: 50%; padding: 0; background: #fff7ed; color: #e67e22; border: 1px solid #ffedd5; display: flex; align-items: center; justify-content: center; min-height: auto;">
-                        <i class="fa-solid fa-user-pen"></i>
-                    </button>
-                    <button class="btn-sm" onclick="window.location.reload(true)"
-                        style="width: 32px; height: 32px; border-radius: 50%; padding: 0; background: #f8f9fa; color: #666; border: 1px solid #eee; display: flex; align-items: center; justify-content: center; min-height: auto;">
-                        <i class="fa-solid fa-arrows-rotate"></i>
-                    </button>
-                </div>
-
-                <!-- Profile Info Row -->
-                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-                    <div style="position: relative; flex-shrink: 0;">
-                        <img id="u-img" class="profile-img" src=""
-                            style="width: 65px; height: 65px; border-width: 3px;">
-                        <div id="u-award-badge"
-                            style="position: absolute; bottom: -5px; right: -5px; transform: scale(0.8);"></div>
-                    </div>
-                    <div style="flex-grow: 1; min-width: 0;">
-                        <h3
-                            style="margin: 0; font-size: 1.1em; display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
-                            <span id="u-name"
-                                style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;">User</span>
-                            <span id="u-group-badge"
-                                style="display:none; background:#4361ee; color:white; font-size:0.55em; padding:2px 8px; border-radius:10px; font-weight:bold;">Public</span>
-                        </h3>
-                        <div style="margin-top: 4px;">
-                            <span id="u-division-badge"
-                                style="display:none; background:#343a40; color:white; font-size:0.65em; padding:2px 8px; border-radius:10px; font-weight:bold; opacity:0.8;">Division</span>
-                        </div>
-                        <!-- Compact Date & Graduation Info -->
-                        <div id="u-period-box" style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
-                            <div style="display: flex; flex-wrap: wrap; gap: 5px; font-size: 0.8em;">
-                                <div
-                                    style="position: relative; display: inline-flex; align-items: center; gap: 4px; background: #f8f9fa; padding: 2px 8px; border-radius: 6px; border: 1px solid #e9ecef; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
-                                    <i class="fa-regular fa-calendar" style="color:#667eea; font-size:0.9em;"></i>
-                                    <span id="u-start-date-text"
-                                        style="color:#444; font-weight:500; min-width:65px; text-align:center;">Start
-                                        Date</span>
-                                    <input type="date" id="u-start-date" onchange="saveMyDates()"
-                                        style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
-                                </div>
-                                <span style="color:#adb5bd; font-weight:bold; line-height:22px;">-</span>
-                                <div
-                                    style="position: relative; display: inline-flex; align-items: center; gap: 4px; background: #f8f9fa; padding: 2px 8px; border-radius: 6px; border: 1px solid #e9ecef; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
-                                    <i class="fa-regular fa-calendar-check" style="color:#ef233c; font-size:0.9em;"></i>
-                                    <span id="u-end-date-text"
-                                        style="color:#444; font-weight:500; min-width:65px; text-align:center;">End
-                                        Date</span>
-                                    <input type="date" id="u-end-date" onchange="saveMyDates()"
-                                        style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
-                                </div>
-                            </div>
-                            <div id="date-alert"
-                                style="display:none; color:#e09f3e; font-size:0.75em; font-weight:bold;"><i
-                                    class="fa-solid fa-circle-exclamation"></i> กรุณาระบุวันฝึกงานให้ครบ</div>
-                            <div id="grad-action" style="font-size:0.8em;"></div>
-                        </div>
-                    </div>
-                    <div style="text-align: right; flex-shrink: 0; padding-right: 5px; margin-top: 35px;">
-                        <div id="u-score" class="score-text" style="font-size: 1.4em; line-height: 1;">0</div>
-                        <div
-                            style="font-size: 0.6em; color: #999; font-weight: bold; letter-spacing: 0.5px; margin-top: 2px;">
-                            POINTS</div>
-                    </div>
-                </div>
-
-                <!-- Internship Status Row is now integrated compactly into Profile Info Row -->
-                <div id="status-row" style="display: none;"></div>
-            </div>
-
-            <!-- Reflective Log moved into Side Quests section below -->
-
-            <div id="section-assignments" style="margin-bottom: 20px;">
-                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #8e44ad;">
-                    <div onclick="toggleAssignmentList()"
-                        style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fdf2ff;">
-                        <h4 style="margin: 0; font-size: 1.1em; color: #8e44ad;"><i class="fa-solid fa-clipboard-list"></i> Quiz 퀴즈</h4>
-                        <i id="assign-list-icon" class="fa-solid fa-chevron-down" style="color: #8e44ad; transition: 0.3s; font-size: 0.9em;"></i>
-                    </div>
-                    <div id="assignments-content" style="display: none; padding: 15px; border-top: 1px solid #f0f0f0; background: #fff;">
-                        <div id="assignments-container"></div>
-                        <div id="assign-pagination" style="margin-top:15px; display:flex; justify-content:center; gap:10px;"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="section-kanban" style="margin-bottom: 20px;">
-                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #333;">
-                    <div onclick="toggleKanban()"
-                        style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #f8f9fa;">
-                        <h4 style="margin: 0; font-size: 1.1em; color: #333;">
-                            <i class="fa-solid fa-scroll"></i> Mission 미션
-                            <span id="rl-streak-badge" style="font-size:0.7em; background:#fef3cd; color:#856404; padding:2px 8px; border-radius:10px; margin-left:8px; display:none;">🔥 0 วัน</span>
-                        </h4>
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <span id="kanban-badge" style="font-size:0.75em; background:#ef233c; color:white; padding:1px 8px; border-radius:10px; display:none; font-weight:bold; box-shadow: 0 2px 4px rgba(239, 35, 60, 0.3);">0</span>
-                            <span id="rl-today-status" style="font-size:0.8em; color:#999;"></span>
-                            <span style="font-size:0.7em; color:#999; font-weight:bold; background:#eee; padding:2px 8px; border-radius:10px;">KANBAN</span>
-                            <i id="kanban-icon" class="fa-solid fa-chevron-down" style="color: #666; transition: 0.3s; font-size: 0.9em;"></i>
-                        </div>
-                    </div>
-                    <div id="kanban-content" style="display: none; padding: 15px; border-top: 1px solid #f0f0f0; background: #fff;">
-                        <div class="sq-hint" style="margin:0 0 10px 0;">
-                            <i class="fa-solid fa-circle-info"></i> เลือกดูสถานะภารกิจ และกด "Start/Send" เพื่ออัปเดตงาน
-                        </div>
-
-                        <!-- 🔥 Integrated Reflective Log (Daily Mission) -->
-                        <div id="rl-integrated-area" style="background: #fffbf5; border: 1px solid #fdf2e9; border-radius: 12px; margin-bottom: 20px; overflow: hidden;">
-                            <div style="padding: 15px; border-bottom: 1px solid #fdf2e9; background: #fff8f0;">
-                                <h5 style="margin:0; color:#e67e22; display:flex; align-items:center; gap:8px;">
-                                    <i class="fa-solid fa-pen-fancy"></i> บันทึกสะท้อนตัวเองวันนี้ 
-                                    <small style="color:#999; font-weight:normal;">(+0.1 pts)</small>
-                                    <span id="rl-total-count" style="margin-left:auto; font-size:0.75em; background:rgba(230, 126, 34, 0.1); color:#e67e22; padding:2px 10px; border-radius:12px; font-weight:bold;">ส่งแล้ว 0 ครั้ง</span>
-                                </h5>
-                            </div>
-                            <!-- Form -->
-                            <div id="rl-form-area" style="padding: 15px; background: #fff;">
-                                <textarea id="rl-content" rows="3" placeholder="วันนี้ฉันได้เรียนรู้อะไร? เจอปัญหาอะไร? จะทำอะไรต่อ?" 
-                                    style="margin:0; border-radius:10px; resize:none; font-size:0.9em;"></textarea>
-                                <div style="display:flex; gap:10px; margin-top:10px; align-items:center;">
-                                    <select id="rl-mood" style="margin:0; width:auto; border-radius:20px; padding:5px 12px; font-size:0.85em; border:1px solid #eee;">
-                                        <option value="😊">😊 ดี</option>
-                                        <option value="😐">😐 เฉยๆ</option>
-                                        <option value="😓">😓 เหนื่อย</option>
-                                        <option value="🤔">🤔 สับสน</option>
-                                        <option value="💪">💪 มีกำลังใจ</option>
-                                        <option value="🎉">🎉 สำเร็จ!</option>
-                                    </select>
-                                    <div style="flex-grow:1;"></div>
-                                    <button id="rl-submit-btn" class="btn-primary" onclick="submitReflectiveLog()" 
-                                        style="height:35px; min-height:auto; border-radius:20px; padding:0 20px; font-size:0.85em; font-weight:bold; background:linear-gradient(135deg, #e67e22 0%, #f39c12 100%); border:none;">
-                                        <i class="fa-solid fa-paper-plane"></i> ส่งบันทึก
-                                    </button>
-                                </div>
-                            </div>
-                            <!-- Small History Toggle -->
-                            <div onclick="document.getElementById('rl-history-area').style.display = document.getElementById('rl-history-area').style.display==='none'?'block':'none'" 
-                                style="padding: 8px; text-align: center; font-size: 0.75em; color: #999; cursor: pointer; border-top: 1px solid #f9f9f9;">
-                                <i class="fa-solid fa-clock-rotate-left"></i> ดูบันทึกย้อนหลัง
-                            </div>
-                            <div id="rl-history-area" style="display:none; padding: 15px; background: #fffdf8; border-top: 1px solid #f9f9f9;">
-                                <div id="rl-history-list"></div>
-                            </div>
-                        </div>
-
-                        <div class="sq-tabs">
-                            <button class="sq-tab-btn active" id="tab-Backlog" onclick="switchSqTab('Backlog')">
-                                <span class="sq-tab-count" id="cnt-Backlog">0</span>
-                                <span>Backlog</span>
-                            </button>
-                            <button class="sq-tab-btn" id="tab-Doing" onclick="switchSqTab('Doing')">
-                                <span class="sq-tab-count" id="cnt-Doing">0</span>
-                                <span>Doing</span>
-                            </button>
-                            <button class="sq-tab-btn" id="tab-Review" onclick="switchSqTab('Review')">
-                                <span class="sq-tab-count" id="cnt-Review">0</span>
-                                <span>Review</span>
-                            </button>
-                            <button class="sq-tab-btn" id="tab-Done" onclick="switchSqTab('Done')">
-                                <span class="sq-tab-count" id="cnt-Done">0</span>
-                                <span>Done</span>
-                            </button>
-                        </div>
-
-                        <div class="sq-container" style="display:block; overflow:visible;">
-                            <div id="col-Backlog" class="sq-col"
-                                style="min-width:100%; display:block; padding:0; background:transparent; border:none;">
-                                <div id="sq-Backlog"></div>
-                            </div>
-                            <div id="col-Doing" class="sq-col"
-                                style="min-width:100%; display:none; padding:0; background:transparent; border:none;">
-                                <div id="sq-Doing"></div>
-                            </div>
-                            <div id="col-Review" class="sq-col"
-                                style="min-width:100%; display:none; padding:0; background:transparent; border:none;">
-                                <div id="sq-Review"></div>
-                            </div>
-                            <div id="col-Done" class="sq-col"
-                                style="min-width:100%; display:none; padding:0; background:transparent; border:none;">
-                                <div id="sq-Done"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="section-cases" style="margin-bottom: 25px;">
-                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #4361ee;">
-                    <div onclick="toggleCaseSection()"
-                        style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #f0f4ff;">
-                        <h4 style="margin: 0; font-size: 1.1em; color: #4361ee;"><i class="fa-solid fa-stethoscope"></i> Case 케이스</h4>
-                        <i id="case-section-icon" class="fa-solid fa-chevron-down" style="color: #4361ee; transition: 0.3s; font-size: 0.9em;"></i>
-                    </div>
-                    <div id="case-section-content" style="display: none; border-top: 1px solid #f0f0f0; background: #fff;">
-                        <!-- Form Part -->
-                        <div style="padding: 20px; border-bottom: 1px solid #f9f9f9;">
-                             <h5 style="margin-top:0; color:#4361ee;"><i class="fa-solid fa-plus-circle"></i> ส่งเคสใหม่ (New Case)</h5>
-                             <div style="margin-bottom:10px;">
-                                <label style="font-size:0.85em; font-weight:bold; color:#555; display:block; margin-bottom:3px;">เลขที่เคส (HN / Ref No.)*</label>
-                                <input type="text" id="c-id" placeholder="ระบุเลขที่เคส..." style="margin:0;">
-                            </div>
-                            
-                            <div style="margin-bottom:10px;">
-                                <label style="font-size:0.85em; font-weight:bold; color:#555; display:block; margin-bottom:3px;">ชื่อลูกค้า/ผู้ป่วย</label>
-                                <input type="text" id="c-customer" placeholder="ชื่อ-นามสกุล..." style="margin:0;">
-                            </div>
-
-                            <div style="margin-bottom:10px;">
-                                <label style="font-size:0.85em; font-weight:bold; color:#555; display:block; margin-bottom:3px;">ระบบโรค/กลุ่มอาการที่เกี่ยวข้อง</label>
-                                <input type="text" id="c-disease" placeholder="เช่น ระบบทางเดินหายใจ, เบาหวาน..." list="disease-systems" style="margin:0;">
-                                <datalist id="disease-systems">
-                                    <option value="ระบบทางเดินหายใจ (Respiratory)">
-                                    <option value="ระบบหัวใจและหลอดเลือด (Cardiovascular)">
-                                    <option value="ระบบทางเดินอาหาร (GI)">
-                                    <option value="ระบบประสาท (Neurological)">
-                                    <option value="ระบบกล้ามเนื้อและกระดูก (Musculoskeletal)">
-                                    <option value="โรคเรื้อรัง (NCDs)">
-                                    <option value="สุขภาพจิต (Mental Health)">
-                                    <option value="อื่นๆ (Others)">
-                                </datalist>
-                            </div>
-
-                            <div style="margin-bottom:15px;">
-                                <label style="font-size:0.85em; font-weight:bold; color:#555; display:block; margin-bottom:3px;">บันทึกเพิ่มเติม (Note)</label>
-                                <textarea id="c-note" rows="2" placeholder="รายละเอียดที่น่าสนใจ..." style="margin:0;"></textarea>
-                            </div>
-
-                            <button class="btn-primary" onclick="submitCase()" style="width:100%; font-weight:bold; border-radius:12px; height:45px;">
-                                🚀 ยืนยันส่งเคส
-                            </button>
-                        </div>
-                        <!-- History Part -->
-                        <div style="padding: 20px; background: #fbfbff;">
-                            <h5 style="margin-top:0; color:#4361ee;"><i class="fa-solid fa-chart-pie"></i> สรุปเคสแยกตามระบบ</h5>
-                            <div id="case-stats-summary" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:15px;"></div>
-                            <div id="case-list-grouped"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Moved: Reflective Log is now above Assignments -->
-
-            <div id="section-general-work">
-                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #28a745;">
-                    <div onclick="toggleWorkSection()"
-                        style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #f8fff9;">
-                        <h4 style="margin: 0; font-size: 1.1em; color: #28a745;"><i class="fa-solid fa-upload"></i> Work 워크</h4>
-                        <i id="work-section-icon" class="fa-solid fa-chevron-down" style="color: #28a745; transition: 0.3s; font-size: 0.9em;"></i>
-                    </div>
-                    <div id="work-section-content" style="display: none; border-top: 1px solid #f0f0f0; background: #fff;">
-                        <!-- Form -->
-                        <div style="padding: 20px; border-bottom: 1px solid #f9f9f9;">
-                            <h5 style="margin-top:0; color:#28a745;"><i class="fa-solid fa-plus-circle"></i> ส่งงานใหม่</h5>
-                            <input type="text" id="w-title" placeholder="หัวข้องาน...">
-                            <input type="url" id="w-link" placeholder="ลิงก์งาน (ถ้ามี)...">
-                            <button class="btn-success" onclick="submitWork()" style="width:100%; font-weight:bold; border-radius:12px; height:45px;">ยืนยันส่งงาน</button>
-                        </div>
-                        <!-- History -->
-                        <div style="padding: 20px; background: #f9fdf9;">
-                            <h5 style="margin-top:0; color:#333;"><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการส่งงาน</h5>
-                            <div id="work-list"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div style="height:50px;"></div>
-            <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
-                LINE LIFF Internship Management System<br>
-                V89.81 (Login Recovery Update)
-            </div>
-        </div>
-    </div>
-
-    <div id="loading-overlay" class="center-screen" style="flex-direction: column; gap: 20px;">
-        <div class="loader"></div>
-        <div style="text-align:center; color:white; max-width: 80%;">
-            <h3>🚀 กำลังเข้าสู่ระบบ...</h3>
-            <p style="font-size:0.9em; opacity:0.8;">หากค้างหน้านี้นานเกินไป ให้ลองกดปุ่มเมนูมุมขวาบน
-                <b>"เลือกเปิดด้วยเบราว์เซอร์"</b> (Open in Browser)
-            </p>
-            <p style="font-size:0.8em; margin-top:10px; color:#fff59d;">⚠️ ต้องอนุญาตการเข้าถึงข้อมูล (Allow Access)
-                เพื่อระบุตัวตน</p>
-            <p id="loading-status" style="font-size:0.7em; color:#ccc; margin-top:10px;">Starting...</p>
-            <button id="btn-manual-login" onclick="liff.login()"
-                style="margin-top:20px; padding:10px 20px; border-radius:30px; border:none; background:#06c755; color:white; font-weight:bold; display:none;">
-                <i class="fa-brands fa-line"></i> Login with LINE
-            </button>
-        </div>
-    </div>
-    <div id="chatModal" class="modal">
-        <div class="modal-content">
-            <span onclick="document.getElementById('chatModal').style.display='none'"
-                style="float:right;font-size:24px;cursor:pointer;">&times;</span>
-            <h3 id="chat-title" style="text-align:left;">💬 Chat</h3>
-            <input type="hidden" id="chat-card-id">
-            <div id="chat-box" class="chat-box"></div>
-            <div style="display:flex; gap:5px;">
-                <input type="text" id="chat-input" placeholder="พิมพ์ข้อความ..." style="margin:0;">
-                <button class="btn-primary" onclick="sendChat()" style="width:auto;"><i
-                        class="fa-solid fa-paper-plane"></i></button>
-            </div>
-        </div>
-    </div>
-
-    <div id="quizModal" class="modal">
-        <div class="modal-content" style="max-width: 500px; text-align: left;">
-            <span onclick="closeQuiz()" style="float:right;font-size:24px;cursor:pointer;">&times;</span>
-            <div id="quiz-q-timer"
-                style="float:right; font-weight:bold; color:#ef233c; margin-right:20px; font-size:1.2em;"></div>
-            <h3 id="quiz-run-title">Quiz</h3>
-            <!-- 🔥 Case Study Reader Section (V77.23) -->
-            <div id="quiz-case-passage-area" style="display:none; margin-bottom:15px;">
-                <button onclick="toggleCaseReader()"
-                    style="width:100%; justify-content:space-between; background:#e9f5ff; color:var(--primary); font-size:0.9em; padding:8px 15px; border:1px solid #b8daff; border-radius:10px; min-height:auto; font-weight:bold;">
-                    <span>📖 อ่านเนื้อหา (Read Case)</span>
-                    <i id="case-reader-icon" class="fa-solid fa-chevron-down"></i>
-                </button>
-                <div id="quiz-case-content-body"
-                    style="display:none; background:#fff; border:1px solid #eee; border-top:none; border-radius:0 0 10px 10px; padding:15px; font-size:0.95em; line-height:1.6; color:#444; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02); max-height:200px; overflow-y:auto; white-space:pre-wrap;">
-                </div>
-            </div>
-            <div id="quiz-run-container">
-                <!-- Quiz content dynamically injected -->
-            </div>
-            <div id="quiz-run-footer" style="margin-top:25px; display:flex; gap:12px;">
-                <button id="btn-quiz-prev" class="btn-sm btn-dark" onclick="prevQuizStep()"
-                    style="display:none; flex:1; height:45px; font-weight:bold;">Previous</button>
-                <button id="btn-quiz-next" class="btn-sm btn-primary" onclick="nextQuizStep()"
-                    style="flex:1; height:45px; font-weight:bold;">Next</button>
-                <button id="btn-quiz-submit" class="btn-sm btn-success" onclick="submitQuiz()"
-                    style="display:none; flex:1; height:45px; font-weight:bold;">Submit (ยืนยันส่ง)</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="quizResultModal" class="modal">
-        <div class="modal-content" style="max-width:600px;">
-            <span class="close-modal"
-                onclick="document.getElementById('quizResultModal').style.display='none'">&times;</span>
-            <h3>📊 ผลการสอบ (Quiz Results)</h3>
-            <div id="quiz-result-container" style="margin-top:20px;"></div>
-            <button class="btn-primary" onclick="document.getElementById('quizResultModal').style.display='none'"
-                style="width:100%; margin-top:20px;">Close</button>
-        </div>
-    </div>
-
-    <!-- 🔥 V80: Discussion Modal for Read-only Mode -->
-    <div id="discussion-modal" class="modal" style="z-index: 10001;">
-        <div class="modal-content"
-            style="max-width:450px; padding:0; overflow:hidden; display:flex; flex-direction:column; height:80vh; max-height:600px;">
-            <div
-                style="background:var(--primary); color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
-                <h4 id="discussion-modal-title" style="margin:0;"><i class="fa-regular fa-comments"></i> Discussion</h4>
-                <span onclick="document.getElementById('discussion-modal').style.display='none'"
-                    style="cursor:pointer; font-size:1.5em; line-height:1;">&times;</span>
-            </div>
-            <div id="discussion-comments-box"
-                style="flex:1; overflow-y:auto; padding:15px; display:flex; flex-direction:column; gap:12px; background:#f8f9fa;">
-                <!-- Comments injected here -->
-            </div>
-            <div style="padding:15px; background:white; border-top:1px solid #eee; display:flex; gap:8px;">
-                <input type="text" id="discussion-input" placeholder="แชร์ความคิดเห็นของคุณ..."
-                    style="flex:1; margin:0; border-radius:20px; padding:10px 15px; font-size:0.9em;">
-                <button onclick="sendDiscussionComment()"
-                    style="width:40px; height:40px; border-radius:50%; background:var(--primary); color:white; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer;">
-                    <i class="fa-solid fa-paper-plane"></i>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <div id="confirmModal" class="modal" style="z-index:10000;">
-        <div class="modal-content">
-            <h2 style="color:#ef233c;">⚠️ ยืนยันรับภารกิจ</h2>
-            <p>เวลานับถอยหลังจะเริ่มทันที</p>
-            <button id="btn-confirm-start" class="btn-danger" style="width:100%; font-size:1.2em;">ยืนยัน (5)</button>
-            <button class="btn-sm" style="width:100%; margin-top:8px; background:#f8f9fa; color:#666; border:1px solid #ddd;" onclick="document.getElementById('confirmModal').style.display='none'; if(confirmCountdown) clearInterval(confirmCountdown);">ยกเลิก (Cancel)</button>
-        </div>
-    </div>
-
-
-    <div id="quizFeedbackModal" class="modal">
-        <div class="modal-content" style="max-width:450px; text-align: left;">
-            <h3 style="color:var(--primary); margin-top:0;"><i class="fa-solid fa-comment-heart"></i> ส่งความเห็นหลังทำ (Feedback)</h3>
-            <div id="feedback-score-display" style="text-align:center; padding:15px; background:#f0f7ff; border-radius:12px; margin-bottom:15px;">
-                <div style="font-size:0.9em; color:#666;">คะแนนที่คุณได้รับ:</div>
-                <div id="feedback-score-val" style="font-size:2.5em; font-weight:800; color:var(--primary);">0.00</div>
-                <div id="feedback-time-val" style="font-size:0.9em; color:#e67e22; font-weight:bold; margin-top:5px;">🕒 เวลาที่ใช้: 00:00 นาที</div>
-            </div>
-            
-            <label style="font-weight:bold; display:block; margin-bottom:5px;">⭐ ให้คะแนนชุดข้อสอบนี้ (0-10 ดาว):</label>
-            <input type="range" id="fb-rating" min="0" max="10" step="1" value="0" 
-                   oninput="document.getElementById('fb-rating-num').innerText = this.value"
-                   style="width:100%; margin:10px 0; accent-color:var(--primary);">
-            <div style="text-align:center; font-weight:bold; color:var(--primary); margin-bottom:15px;">
-                <span id="fb-rating-num" style="font-size:1.5em;">0</span> / 10
-            </div>
-
-            <label style="font-weight:bold; display:block; margin-bottom:5px;">🎯 ชุดข้อสอบต่อไปที่อยากทำ?</label>
-            <input type="text" id="fb-next-topic" placeholder="เช่น ขั้นตอนการจ่ายยา, การดูแลเคส..." style="width:100%;">
-
-            <label style="font-weight:bold; display:block; margin-bottom:5px;">💬 ความเห็นอื่นๆ (Optional):</label>
-            <textarea id="fb-comment" rows="3" placeholder="ระบุความยาก-ง่าย หรือข้อเสนอแนะ..." style="width:100%; resize:none;"></textarea>
-
-            <button class="btn-primary" onclick="submitFeedback()" style="width:100%; margin-top:10px; font-weight:bold; height:50px; border-radius:15px; background:linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%);">
-                ส่งความเห็น (Submit Feedback)
-            </button>
-        </div>
-    </div>
-
-    <!-- 🔥 Reflective Feedback Modal (V86.33) -->
-    <div id="reflectiveFeedbackModal" class="modal" style="z-index: 10002;">
-        <div class="modal-content" style="max-width: 500px; border-radius: 20px; border-top: 10px solid #d35400; padding: 30px;">
-            <span class="close-modal" onclick="document.getElementById('reflectiveFeedbackModal').style.display='none'">&times;</span>
-            <div id="rf-mood-emoji" style="font-size: 3em; margin-bottom: 10px; text-align: center;">📝</div>
-            <h3 style="text-align:center; color:#d35400; margin-bottom:20px; font-weight:900;">บันทึกจากพี่เลี้ยง (Admin Feedback)</h3>
-            
-            <div style="background:#fff8e1; border:1px solid #ffe082; padding:20px; border-radius:15px; margin-bottom:20px; font-size:1.1em; line-height:1.6; color:#5d4037; position:relative;">
-                <i class="fa-solid fa-quote-left" style="position:absolute; top:10px; left:10px; opacity:0.1; font-size:2em;"></i>
-                <div id="rf-feedback-text" style="position:relative; z-index:1;"></div>
-            </div>
-
-            <div id="rf-claim-section" style="text-align:center;">
-                <!-- Injected via openReflectiveFeedback -->
-            </div>
-            
-            <div style="text-align:center; margin-top:20px;">
-                <button class="btn-sm" style="background:none; color:#999; border:none; text-decoration:underline; font-size:0.85em;" onclick="document.getElementById('reflectiveFeedbackModal').style.display='none'">ยังไม่ต้องรับตอนนี้ (Maybe later)</button>
-            </div>
-        </div>
-    </div>
-
-
-    <!-- 🔥 Leaderboard Modal (V77.8) -->
-    <div id="leaderboardModal" class="modal">
-        <div class="modal-content" style="max-width: 400px; padding: 0; overflow: hidden; border-radius: 20px;">
-            <div
-                style="background: linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%); padding: 30px 20px; color: white; text-align: center; position: relative;">
-                <span onclick="document.getElementById('leaderboardModal').style.display='none'"
-                    style="position:absolute; right:15px; top:10px; font-size:24px; cursor:pointer; opacity:0.8;">&times;</span>
-                <i class="fa-solid fa-crown"
-                    style="font-size: 3em; margin-bottom: 10px; filter: drop-shadow(0 4px 5px rgba(0,0,0,0.2));"></i>
-                <h2 style="margin: 0; font-size: 1.5em; letter-spacing: 1px;">Top Interns</h2>
-                <div id="lb-div-name" style="font-size: 0.9em; opacity: 0.9; margin-top: 5px; font-weight: 300;">Overall
-                    Division</div>
-            </div>
-            <div id="lb-list" style="padding: 10px; max-height: 550px; overflow-y: auto; background: #fff;">
-                <!-- Items injected by JS -->
-            </div>
-            <div style="padding: 15px; background: #f8f9fa; text-align: center; border-top: 1px solid #eee;">
-                <button class="btn-primary" onclick="document.getElementById('leaderboardModal').style.display='none'"
-                    style="width: 100%; border-radius: 12px; margin: 0;">Awesome!</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="personalInfoModal" class="modal">
-        <div class="modal-content" style="max-width: 400px; text-align: left;">
-            <span onclick="document.getElementById('personalInfoModal').style.display='none'"
-                style="float:right;font-size:24px;cursor:pointer;">&times;</span>
-            <h3 style="color:#e67e22;"><i class="fa-solid fa-user-pen"></i> ข้อมูลส่วนตัว</h3>
-            <p style="font-size:0.9em; color:#666;">กรุณากรอกข้อมูลจริงเพื่อใช้ในการติดต่อและออกใบรับรอง</p>
-
-            <div style="margin-top:15px;">
-                <label style="font-weight:bold; display:block; margin-bottom:5px;">ชื่อจริง (ภาษาไทย)</label>
-                <input type="text" id="pi-firstname" placeholder="เช่น Satoru"
-                    style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
-            </div>
-
-            <div style="margin-top:10px;">
-                <label style="font-weight:bold; display:block; margin-bottom:5px;">นามสกุล (ภาษาไทย)</label>
-                <input type="text" id="pi-lastname" placeholder="เช่น Gojo"
-                    style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
-            </div>
-
-            <div style="margin-top:10px; border-top: 1px solid #eee; padding-top: 10px;">
-                <label style="font-weight:bold; display:block; margin-bottom:5px; color: #4361ee;">FIRST NAME (English)</label>
-                <input type="text" id="pi-firstname-en" placeholder="e.g. Satoru"
-                    style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
-            </div>
-
-            <div style="margin-top:10px;">
-                <label style="font-weight:bold; display:block; margin-bottom:5px; color: #4361ee;">MIDDLE NAME (English - Optional)</label>
-                <input type="text" id="pi-middlename-en" placeholder="if any"
-                    style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
-            </div>
-
-            <div style="margin-top:10px;">
-                <label style="font-weight:bold; display:block; margin-bottom:5px; color: #4361ee;">LAST NAME (English)</label>
-                <input type="text" id="pi-lastname-en" placeholder="e.g. Gojo"
-                    style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
-            </div>
-
-            <div style="margin-top:10px;">
-                <label style="font-weight:bold; display:block; margin-bottom:5px;">ชื่อเล่น</label>
-                <input type="text" id="pi-nickname" placeholder="เช่น ก้อง"
-                    style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
-            </div>
-
-            <div style="margin-top:10px;">
-                <label style="font-weight:bold; display:block; margin-bottom:5px;">สถาบัน / ที่ทำงาน</label>
-                <input type="text" id="pi-institute" placeholder="เช่น มหาวิทยาลัยขอนแก่น"
-                    style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
-            </div>
-
-            <div style="margin-top:10px;">
-                <label style="font-weight:bold; display:block; margin-bottom:5px;">เบอร์โทรศัพท์</label>
-                <input type="tel" id="pi-phone" placeholder="08x-xxx-xxxx"
-                    style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
-            </div>
-
-            <button class="btn-primary" style="width:100%; margin-top:20px; background:#e67e22;"
-                onclick="savePersonalInfo()">บันทึกข้อมูล</button>
-        </div>
-    </div>
-
-    <!-- Enrollment Code Modal (V84.3 Upgrade) -->
-    <div id="enrollModal" class="modal" style="display:none; z-index:10000; background: rgba(0,0,0,0.95);">
-        <div class="modal-content" style="max-width:400px; text-align:center; padding: 25px;">
-            
-            <!-- View 1: Initial Entry (Code) -->
-            <div id="enroll-initial-view">
-                <h3 style="margin-bottom:8px; color:#6f42c1;"><i class="fa-solid fa-id-card"></i> ลงทะเบียนเข้าร่วม</h3>
-                <p style="font-size:0.87em; color:#666; margin-top:0; line-height:1.4;">ยินดีต้อนรับ! กรุณากรอกรหัสลงทะเบียนที่คุณได้รับจากผู้ดูแลระบบ</p>
-                
-                <div style="margin: 20px 0;">
-                    <input type="text" id="enroll-code-input" placeholder="รหัส 6 หลัก" maxlength="6"
-                        style="text-align:center; font-size:1.6em; font-family:'Courier New', monospace; font-weight:900; letter-spacing:6px; text-transform:uppercase; padding:15px; border:2px solid #6f42c1; border-radius:14px; width: 100%; box-shadow: 0 4px 12px rgba(111, 66, 193, 0.15);"
-                        onkeypress="if(event.key==='Enter')claimEnrollmentCode()">
-                </div>
-
-                <div id="enroll-status" style="font-size:0.85em; min-height:24px; margin-bottom:15px; font-weight:500;"></div>
-                
-                <button class="btn-primary" onclick="claimEnrollmentCode()"
-                    style="width:100%; background:linear-gradient(135deg, #6f42c1 0%, #4361ee 100%); padding:14px; font-size:1.1em; border-radius:12px; border:none; box-shadow: 0 4px 15px rgba(111, 66, 193, 0.3);">
-                    <i class="fa-solid fa-unlock-keyhole"></i> ตรวจสอบรหัส
-                </button>
-                
-                <div style="margin-top:25px; border-top:1px solid #eee; padding-top:20px;">
-                    <p style="font-size:0.82em; color:#999; margin-bottom:10px;">หากคุณยังไม่มีรหัสลงทะเบียน</p>
-                    <button class="btn-sm" onclick="showRequestView()" 
-                        style="background:white; color:#6f42c1; border:1px solid #6f42c1; width:100%; font-weight:600; padding:12px; border-radius:10px; cursor:pointer; transition: 0.2s;">
-                        <i class="fa-solid fa-paper-plane"></i> ขอรหัสเข้าใช้งาน (Request Access)
-                    </button>
-                </div>
-            </div>
-
-            <!-- View 2: Request Form -->
-            <div id="enroll-request-view" style="display:none;">
-                <h3 style="margin-bottom:5px; color:#e67e22;"><i class="fa-solid fa-user-plus"></i> ขอสิทธิ์เข้าใช้งาน</h3>
-                <p style="font-size:0.82em; color:#666; margin-bottom:15px;">กรุณากรอกข้อมูลเพื่อส่งให้ผู้ดูแลอนุมัติ</p>
-                
-                <div style="text-align:left; display:flex; flex-direction:column; gap:8px;">
-                    <div>
-                        <label style="font-size:0.75em; font-weight:800; color:#444; text-transform:uppercase;">ชื่อ-นามสกุล (ภาษาไทย)</label>
-                        <input type="text" id="req-name" placeholder="เช่น นายสมชาย ใจดี" style="margin:4px 0 0 0; padding:10px;">
-                    </div>
-                    
-                    <div>
-                        <label style="font-size:0.75em; font-weight:800; color:#444; text-transform:uppercase;">ชื่อเล่น</label>
-                        <input type="text" id="req-nickname" placeholder="เช่น ก้อง" style="margin:4px 0 0 0; padding:10px;">
-                    </div>
-                    
-                    <div>
-                        <label style="font-size:0.75em; font-weight:800; color:#444; text-transform:uppercase;">สถาบัน / ที่ทำงาน</label>
-                        <input type="text" id="req-institute" placeholder="เช่น มหาวิทยาลัยขอนแก่น" style="margin:4px 0 0 0; padding:10px;">
-                    </div>
-                    
-                    <div>
-                        <label style="font-size:0.75em; font-weight:800; color:#444; text-transform:uppercase;">กลุ่ม/สายงาน</label>
-                        <select id="req-group" style="width:100%; padding:10px; border-radius:8px; border:1px solid #ddd; margin-top:4px; font-family:'Kanit'; font-size:0.95em; background:white;">
-                            <option value="Intern">Intern (นศ.ฝึกงานทั่วไป)</option>
-                            <option value="Extern">Extern (นศภ. ผลัดปฏิบัติงาน)</option>
-                            <option value="Junior">Junior (น้องใหม่/ฝึกงานระยะสั้น)</option>
-                            <option value="Pharmacists">Pharmacists</option>
-                            <option value="IT">IT / Dev</option>
-                            <option value="Public">อื่นๆ (Public)</option>
-                        </select>
-                    </div>
-
-                    <div class="date-input-group" style="margin-top:5px;">
-                        <div>
-                            <label style="font-size:0.75em; font-weight:800; color:#444;">วันเริ่มฝึกงาน</label>
-                            <input type="date" id="req-start" class="grad-date-input" style="padding:10px; margin-top:4px;">
-                        </div>
-                        <div>
-                            <label style="font-size:0.75em; font-weight:800; color:#444;">วันสิ้นสุด</label>
-                            <input type="date" id="req-end" class="grad-date-input" style="padding:10px; margin-top:4px;">
-                        </div>
-                    </div>
-                </div>
-
-                <div id="req-status" style="font-size:0.82em; min-height:20px; margin-top:10px;"></div>
-                
-                <button class="btn-primary" onclick="submitAccessRequest()" 
-                    style="background:linear-gradient(135deg, #e67e22 0%, #d35400 100%); margin-top:10px; width:100%; font-size:1em; border:none; padding:12px; border-radius:10px;">
-                    ส่งคำขอ (Submit Request)
-                </button>
-                
-                <button class="btn-sm" onclick="showInitialView()" 
-                    style="background:none; color:#999; margin-top:10px; border:none; cursor:pointer;">
-                    <i class="fa-solid fa-arrow-left"></i> ย้อนกลับไปกรอกรหัส
-                </button>
-            </div>
-            
-            <!-- View 3: Pending Approval -->
-            <div id="enroll-pending-view" style="display:none; padding:20px 0;">
-                <div style="width:80px; height:80px; background:#fff3cd; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px;">
-                    <i class="fa-solid fa-hourglass-half" style="font-size:2.5em; color:#f39c12; animation: pulse 2s infinite;"></i>
-                </div>
-                <h3 style="color:#856404; margin-bottom:10px;">ส่งคำขอสำเร็จ</h3>
-                <p style="font-size:0.92em; color:#666; line-height:1.6;">
-                    กรุณารอผู้ดูแลระบบตรวจสอบและอนุมัติสิทธิ์ <br>
-                    เมื่ออนุมัติแล้วคุณจะสามารถเข้าใช้งานได้ทันทีครับ
-                </p>
-                <div style="background:#f8f9fa; padding:15px; border-radius:12px; margin-top:20px; text-align:left;">
-                    <div style="font-size:0.8em; color:#999; margin-bottom:5px;">UID: <code id="req-uid-display" style="color:#555;"></code></div>
-                    <div id="req-info-summary" style="font-size:0.85em; color:#444; font-weight:600;"></div>
-                </div>
-                <button class="btn-sm" onclick="location.reload()" 
-                    style="background:#4361ee; color:white; border:none; margin-top:20px; width:100%; padding:14px; border-radius:12px; font-weight:bold;">
-                    <i class="fa-solid fa-rotate"></i> ตรวจสอบสถานะการอนุมัติ
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <script src="firebase-config.js?v=65"></script>
-
-    <script>
         const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ✅ Updated ID
 
         let userId = "", userProfile = {}, userSubmissions = {};
@@ -1350,15 +16,9 @@
         // --- Initialization ---
         function updateStatus(msg) {
             const el = document.getElementById('loading-status');
-            if (el) el.innerHTML = msg; // Support HTML for color icons
-            console.log(`[Status] ${msg}`);
+            if (el) el.innerText = msg;
+            console.log(msg);
         }
-
-        // Global Error Tracking
-        window.onerror = function(msg, url, line) {
-            updateStatus(`<span style="color:#ff6b6b;">⚠ JS Error: ${msg}</span>`);
-            return false;
-        };
 
         const groupColorMap = {
             'Public': '#4361ee',
@@ -1403,8 +63,6 @@
         }
 
         async function main() {
-            console.log("Main Execution Started (V89.81)");
-            updateStatus("System Starting (V89.81)...");
             try {
                 const urlParams = new URLSearchParams(window.location.search);
                 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -1416,7 +74,7 @@
 
                     if (forcedUserId) {
                         userId = forcedUserId;
-                        updateStatus(`Fetching Preview User: ${userId}...`);
+                        updateStatus("Fetching Preview User Data...");
                         // Fetch user profile from Firestore if userId is provided
                         const userDoc = await db.collection("users").doc(userId).get();
                         if (userDoc.exists) {
@@ -1443,7 +101,6 @@
                         userId = "preview-admin";
                     }
 
-                    updateStatus("Loading UI Assets...");
                     // Hide Loading
                     document.getElementById('loading-overlay').classList.add('hidden');
                     document.getElementById('main-app').classList.remove('hidden');
@@ -1458,7 +115,6 @@
                     document.getElementById('u-img').src = userProfile.pictureUrl;
                     document.getElementById('u-name').innerText = userProfile.displayName;
 
-                    updateStatus("Syncing Firestore Data...");
                     // Load Data
                     checkUser();
                     loadAllQuests();
@@ -1472,51 +128,48 @@
                     loadMyCases();
                     loadReflectiveLogs();
                     
-                    updateStatus("Starting Background Timers...");
                     // Exit main after loading data for preview
                     setInterval(checkExpiry, 1000);
                     return;
                 }
 
-                updateStatus("Checking LIFF SDK (v2)...");
+                updateStatus("Checking LIFF SDK...");
                 // Ensure liff is available
                 if (!window.liff) throw new Error("LIFF SDK not found on window");
 
-                updateStatus("Connecting to LINE (Init)...");
-                // Timeout for LIFF Init (15 seconds)
+                updateStatus("Initializing LIFF...");
+                // Timeout for LIFF Init (10 seconds)
                 const initPromise = liff.init({ liffId: USER_LIFF_ID });
                 const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error("Connecting to LINE Timed Out. Please restart LINE App.")), 15000)
+                    setTimeout(() => reject(new Error("LIFF Init Timeout")), 10000)
                 );
 
                 await Promise.race([initPromise, timeoutPromise]);
 
-                updateStatus("Verifying Identity...");
+                updateStatus("Checking Login Status...");
                 if (!liff.isLoggedIn()) {
-                    updateStatus("Redirecting to Login...");
+                    updateStatus("Not Logged In. Redirecting...");
                     document.getElementById('btn-manual-login').style.display = 'inline-block';
                     liff.login();
                     return;
                 }
 
-                updateStatus("Loading Profile Data...");
+                updateStatus("Getting User Profile...");
                 userProfile = await liff.getProfile();
                 userId = userProfile.userId;
 
-                updateStatus("Checking Permissions...");
+                updateStatus("Checking Admin Access...");
 
                 // 🔥 Admin Auto-Redirect logic
                 const idToken = liff.getDecodedIDToken();
                 if (idToken && idToken.email === "medlifeplus@gmail.com") {
                     isAdmin = true;
-                    updateStatus("Admin Detected. Redirecting...");
                     // Show a quick message before redirecting
                     document.getElementById('loading-overlay').innerHTML = "<h3 style='color:white;text-align:center;margin-top:200px;'>🔐 Redirecting to Admin Portal...</h3>";
                     window.location.replace("admin.html");
                     return;
                 }
 
-                updateStatus("Finalizing User Environment...");
                 document.getElementById('loading-overlay').classList.add('hidden');
                 document.getElementById('main-app').classList.remove('hidden');
 
@@ -1527,47 +180,24 @@
                 document.getElementById('u-group-badge').innerText = myGroup;
 
                 // Load Data
-                updateStatus("Fetching System Quests...");
                 checkUser();
                 loadAllQuests();
-                updateStatus("Loading Assigned Quizzes...");
                 loadMySubmissions();
                 loadMyWorks();
-                updateStatus("Loading History...");
                 loadMyReflectiveLogs();
                 loadSideQuests();
                 loadQuizzes();
                 loadDivisionConfig();
                 loadGroupSettings();
-                loadMyCases();
-                loadReflectiveLogs();
+                loadMyCases(); // 🔥 Added V84.1
+                loadReflectiveLogs(); // 🔥 Added V84.8
 
-                updateStatus("Ready!");
                 // Start Timer Loop
                 setInterval(checkExpiry, 1000);
             } catch (e) {
-                console.error("Init Error Details:", e);
-                updateStatus("❌ Error: " + e.message);
-                if (typeof showToast === 'function') showToast("Error: " + e.message);
-                document.getElementById('btn-manual-login').style.display = 'inline-block';
-                document.getElementById('btn-manual-login').innerText = "Retry / Refresh";
-                document.getElementById('btn-manual-login').onclick = () => window.location.reload(true);
+                alert("Init Error: " + e.message);
             }
         }
-
-        // --- V89.81: Boot Watchdog ---
-        setTimeout(() => {
-            const status = document.getElementById('loading-status');
-            if (status && status.innerText.includes("Starting...")) {
-                console.warn("Boot Watchdog Triggered: main() hung or not called.");
-                updateStatus("<span style='color:#ffc107;'>⚠ Initializing taking longer than usual...</span>");
-                const manualBtn = document.getElementById('btn-manual-login');
-                if (manualBtn) {
-                    manualBtn.style.display = 'inline-block';
-                    manualBtn.innerText = "Force Start / Refresh";
-                }
-            }
-        }, 5000);
         // Removed direct main() call to prevent double execution or execution before SDK load
 
 
@@ -1619,9 +249,6 @@
                     document.getElementById('u-group-badge').innerHTML = `<i class="fa-solid ${getGroupIcon(myGroup)}"></i> ${myGroup}`;
                     document.getElementById('u-group-badge').style.background = getGroupColor(myGroup);
                     document.getElementById('u-group-badge').style.display = myGroup !== 'Public' ? 'inline-block' : 'none';
-                    
-                    // Check graduation eligibility when score updates
-                    checkGraduation(da);
 
                     if (da.startDate) {
                         document.getElementById('u-start-date').value = da.startDate;
@@ -1644,12 +271,6 @@
                         document.getElementById('date-alert').style.display = 'block';
                     } else {
                         document.getElementById('date-alert').style.display = 'none';
-                    }
-
-                    // 🔥 Hide Period if requested by Admin (Tester mode)
-                    const periodBox = document.getElementById('u-period-box');
-                    if (periodBox) {
-                        periodBox.style.display = da.hidePeriod === true ? 'none' : 'flex';
                     }
 
                     // Render Special Awards (Support multiple V78.91)
@@ -1905,17 +526,121 @@
             if (!data.startDate || !data.endDate) return;
             const e = new Date(data.endDate), now = new Date();
             const btn = document.getElementById('grad-action');
-            const score = parseInt(document.getElementById('u-score').innerText) || 0;
+            const certBtnContainer = document.getElementById('cert-request-btn-container');
 
-            // Logic: now >= end_date AND score >= 30 (Inclusive)
-            if (now >= e && score >= 30) {
+            // Update certificate request button
+            updateCertificateButton(data);
+
+            // Logic: now >= end_date (Inclusive)
+            if (now >= e) {
                 if (data.certRequested) btn.innerHTML = `<span style="color:#28a745;">✅ ส่งคำร้องขอใบรับรองแล้ว</span>`;
                 else btn.innerHTML = `<button onclick="requestCert()" class="btn-warning" style="width:100%"><i class="fa-solid fa-certificate"></i> ขอใบรับรองจบ (Request Cert)</button>`;
-            } else if (now >= e && score < 30) {
-                btn.innerHTML = `<span style="color:#dc3545; display:inline-block; background:#f8d7da; padding:3px 8px; border-radius:6px; font-weight:600;"><i class="fa-solid fa-exclamation-triangle"></i> ต้องได้คะแนน >= 30 แต้ม (ปัจจุบัน: ${score} แต้ม)</span>`;
             } else {
                 const left = Math.ceil((e - now) / 86400000);
                 btn.innerHTML = `<span style="color:#17a2b8; display:inline-block; background:#e0f7fa; padding:3px 8px; border-radius:6px; font-weight:600;"><i class="fa-solid fa-hourglass-half"></i> เหลือเวลาฝึกงานอีก ${left} วัน</span>`;
+            }
+        }
+
+        function updateCertificateButton(userData) {
+            const container = document.getElementById('cert-request-btn-container');
+            if (!container) return;
+
+            const hasCert = userData.startDate && userData.endDate && (userData.score || 0) > 0;
+            const certRequested = userData.certRequested || false;
+            const certApproved = userData.certApproved || false;
+            const score = userData.score || 0;
+
+            if (certApproved) {
+                container.innerHTML = `
+                    <button class="btn-sm btn-success" disabled style="width:100%; background:#28a745; border:none; border-radius:25px; padding:10px 15px; font-weight:600;">
+                        <i class="fa-solid fa-certificate"></i> Certificate Approved
+                    </button>
+                `;
+            } else if (certRequested) {
+                container.innerHTML = `
+                    <button class="btn-sm btn-warning" disabled style="width:100%; background:#f39c12; border:none; border-radius:25px; padding:10px 15px; font-weight:600;">
+                        <i class="fa-solid fa-clock"></i> Request Pending
+                    </button>
+                `;
+            } else if (hasCert) {
+                container.innerHTML = `
+                    <button onclick="requestCertificateFromLIFF()" class="btn-sm btn-primary" style="width:100%; background:linear-gradient(135deg, #667eea, #764ba2); border:none; border-radius:25px; padding:10px 15px; font-weight:600; color:white;">
+                        <i class="fa-solid fa-certificate"></i> Request Certificate
+                    </button>
+                `;
+            } else {
+                container.innerHTML = `
+                    <button class="btn-sm" disabled style="width:100%; background:#e0e0e0; border:none; border-radius:25px; padding:10px 15px; font-weight:600; color:#999;" title="Complete more tasks to unlock certificate">
+                        <i class="fa-solid fa-lock"></i> Request Certificate (Score: ${score.toFixed(1)})
+                    </button>
+                `;
+            }
+        }
+
+        async function requestCertificateFromLIFF() {
+            try {
+                // Mark user as requested certificate
+                await db.collection("users").doc(userId).update({
+                    certRequested: true,
+                    certRequestedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                // Send notification to admin
+                await sendCertificateRequestToAdmin();
+                
+                // Update UI
+                showToast("🎓 Certificate request sent! Admin will review your request.");
+                
+                // Refresh user data
+                checkUser();
+                
+            } catch (error) {
+                console.error("Error requesting certificate:", error);
+                showToast("❌ Failed to request certificate. Please try again.");
+            }
+        }
+
+        async function sendCertificateRequestToAdmin() {
+            try {
+                // Get user data
+                const userDoc = await db.collection("users").doc(userId).get();
+                const userData = userDoc.data();
+                
+                // Create notification in admin notifications collection
+                const notification = {
+                    type: 'certificate_request',
+                    userId: userId,
+                    userName: userData.displayName || userProfile.displayName,
+                    userPicture: userData.pictureUrl || userProfile.pictureUrl,
+                    userScore: (userData.score || 0).toFixed(2),
+                    userGroup: userData.group || 'Public',
+                    message: `${userData.displayName || userProfile.displayName} requested a certificate`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    read: false,
+                    actionUrl: `#certificate-${userId}`
+                };
+                
+                await db.collection("admin_notifications").add(notification);
+                
+                // Also create a task in kanban for admin to review
+                const taskData = {
+                    title: `Certificate Request - ${userData.displayName || userProfile.displayName}`,
+                    description: `User: ${userData.displayName || userProfile.displayName}\nScore: ${(userData.score || 0).toFixed(2)}\nGroup: ${userData.group || 'Public'}\nReview and approve certificate request.`,
+                    assigneeIds: [], // Admin will assign
+                    status: 'Backlog',
+                    priority: 'Medium',
+                    isCertificateRequest: true,
+                    requestedBy: userId,
+                    requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                await db.collection("side_quests").add(taskData);
+                
+                console.log("Certificate request notification sent to admin");
+                
+            } catch (error) {
+                console.error("Error sending certificate request notification:", error);
             }
         }
 
@@ -2427,7 +1152,6 @@
                                 <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
                                     ${statusBadge}
                                     ${typeTags.join('')}
-                                    ${(q.tags || "").split(',').map(t => t.trim()).filter(t => t !== "").slice(0, 3).map(t => `<span class="assign-tag" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; font-size:0.75em;"><i class="fa-solid fa-tag" style="font-size:0.8em; opacity:0.7;"></i> ${t}</span>`).join('')}
                                 </div>
                             </div>
                             ${isCollapsed ? '<i class="fa-solid fa-chevron-down" style="color:#ccc; font-size:0.9em; margin-left:10px;"></i>' : ''}
@@ -3123,17 +1847,17 @@
                         </div>
                         <button class="btn-sm btn-danger" onclick="userAnswers[currentStep]=[]; renderQuizStep(true);" style="margin-top:10px; width:auto; background:#eee; color:#666;">ล้างลำดับ (Reset Order)</button>
                     `;
-                } else if (qType === 'short_answer') {
-                    if (typeof userAnswers[currentStep] !== 'string') userAnswers[currentStep] = '';
+                } else if (qType === 'flashcard') {
                     inputHtml = `
-                        <div style="display:flex; flex-direction:column; gap:10px;">
-                            <textarea id="q-short-ans" 
-                                placeholder="Type your answer here..." 
-                                style="width:100%; height:120px; padding:15px; border:2px solid #ddd; border-radius:12px; font-size:1em; outline:none; transition:0.3s;"
-                                onfocus="this.style.borderColor='var(--primary)'"
-                                onblur="this.style.borderColor='#ddd'; userAnswers[${currentStep}] = this.value; triggerAutoSave();"
-                                oninput="userAnswers[${currentStep}] = this.value;"
-                            >${userAnswers[currentStep]}</textarea>
+                        <div class="flash-container">
+                            <button class="flash-btn flash-true" onclick="confirmFlashAnswer(0)">
+                                <i class="fa-solid fa-circle-check"></i>
+                                <span>ถูก (TRUE)</span>
+                            </button>
+                            <button class="flash-btn flash-false" onclick="confirmFlashAnswer(1)">
+                                <i class="fa-solid fa-circle-xmark"></i>
+                                <span>ผิด (FALSE)</span>
+                            </button>
                         </div>
                     `;
                 } else {
@@ -3900,6 +2624,510 @@
             }
         }
 
+        function toggleQuizFeedback() {
+            const content = document.getElementById('quiz-feedback-content');
+            const icon = document.getElementById('quiz-feedback-icon');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.style.transform = 'rotate(180deg)';
+                loadQuizFeedback();
+            } else {
+                content.style.display = 'none';
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function toggleLearningAnalytics() {
+            const content = document.getElementById('learning-analytics-content');
+            const icon = document.getElementById('learning-analytics-icon');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.style.transform = 'rotate(180deg)';
+                loadLearningAnalytics();
+            } else {
+                content.style.display = 'none';
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function loadLearningAnalytics() {
+            const container = document.getElementById('learning-analytics-container');
+            container.innerHTML = `
+                <div style="text-align:center; padding:20px;">
+                    <div style="color:#6f42c1; font-weight:bold; margin-bottom:15px;">
+                        <i class="fa-solid fa-chart-line"></i> การวิเคราะห์การเรียนรู้ของคุณ
+                    </div>
+                    <div style="font-size:0.9em; color:#666; margin-bottom:20px;">
+                        Admin จะวิเคราะห์พฤติกรรมการเรียนรู้ของคุณด้วย AI เพื่อให้คำแนะนำที่เหมาะสมที่สุด
+                    </div>
+                    
+                    <div style="background:#f8f9fa; padding:15px; border-radius:10px; margin-bottom:20px; text-align:left;">
+                        <div style="font-weight:bold; margin-bottom:10px; color:#333;">📊 ที่ Admin จะวิเคราะห์:</div>
+                        <ul style="margin:0; padding-left:20px; font-size:0.85em; color:#666;">
+                            <li>🕐 เวลาที่คุณทำข้อสอบ (ช่วงเวลาที่เรียนรู้ดีที่สุด)</li>
+                            <li>📈 แนวโน้มคะแนน (การพัฒนาตามเวลา)</li>
+                            <li>🎯 ข้อที่ผิดบ่อย (จุดอ่อนที่ต้องพัฒนา)</li>
+                            <li>📚 หัวข้อที่ต้องการศึกษาเพิ่มเติม</li>
+                            <li>⏱️ ความเร็วในการตอบคำถาม</li>
+                            <li>🔄 พฤติกรรมการทำซ้ำข้อสอบ</li>
+                        </ul>
+                    </div>
+                    
+                    <div style="background:#fff3cd; padding:15px; border-radius:10px; margin-bottom:20px; text-align:left; border-left:4px solid #ffc107;">
+                        <div style="font-weight:bold; margin-bottom:10px; color:#856404;">🎯 ประโยชน์ที่คุณจะได้รับ:</div>
+                        <ul style="margin:0; padding-left:20px; font-size:0.85em; color:#856404;">
+                            <li>คำแนะนำส่วนตัวจาก Admin ที่วิเคราะห์ด้วย AI</li>
+                            <li>แผนการเรียนรู้ที่เหมาะสมกับเวลาของคุณ</li>
+                            <li>แนะนำเนื้อหาที่ตรงกับจุดอ่อนของคุณ</li>
+                            <li>กลยุทธ์การทำข้อสอบให้ได้คะแนนสูงขึ้น</li>
+                        </ul>
+                    </div>
+                    
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; font-size:0.9em; font-weight:bold; margin-bottom:5px;">ขอให้ Admin วิเคราะห์:</label>
+                        <select id="analytics-type-select" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:5px;">
+                            <option value="">-- เลือกประเภทการวิเคราะห์ --</option>
+                            <option value="behavior">พฤติกรรมการเรียนรู้ทั้งหมด</option>
+                            <option value="quiz">การทำข้อสอบเฉพาะ</option>
+                            <option value="time">การวิเคราะห์เวลาเรียน</option>
+                            <option value="improvement">แนวทางการพัฒนา</option>
+                            <option value="recommendation">แนะนำเนื้อหาเพิ่มเติม</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; font-size:0.9em; font-weight:bold; margin-bottom:5px;">เพิ่มเติม (ถ้ามี):</label>
+                        <textarea id="analytics-note-text" rows="3" placeholder="เช่น อยากให้ช่วยดูพฤติกรรมการเรียนในช่วงเย็น หรือ แนะนำวิธีการจดจำ..." 
+                            style="width:100%; padding:8px; border:1px solid #ddd; border-radius:5px; resize:none;"></textarea>
+                    </div>
+                    
+                    <button onclick="requestLearningAnalytics()" class="btn-sm btn-primary" style="width:100%; background:#6f42c1; border:none; padding:10px; border-radius:5px; font-weight:bold;">
+                        <i class="fa-solid fa-chart-line"></i> ขอให้ Admin วิเคราะห์
+                    </button>
+                    
+                    <div id="analytics-request-status" style="margin-top:15px;"></div>
+                </div>
+            `;
+        }
+
+        async function requestLearningAnalytics() {
+            const analysisType = document.getElementById('analytics-type-select').value;
+            const note = document.getElementById('analytics-note-text').value.trim();
+            const statusEl = document.getElementById('analytics-request-status');
+            
+            if (!analysisType) {
+                statusEl.innerHTML = '<div style="color:#dc3545;"><i class="fa-solid fa-exclamation-triangle"></i> กรุณาเลือกประเภทการวิเคราะห์</div>';
+                return;
+            }
+            
+            try {
+                // Disable button
+                const button = event.target;
+                button.disabled = true;
+                button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่งคำขอ...';
+                
+                // Create notification for admin
+                const notification = {
+                    type: 'learning_analytics_request',
+                    userId: userId,
+                    userName: userProfile.displayName,
+                    userPicture: userProfile.pictureUrl || "",
+                    analysisType: analysisType,
+                    note: note,
+                    message: `${userProfile.displayName} ขอให้วิเคราะห์ ${getAnalysisTypeName(analysisType)}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    read: false,
+                    actionUrl: `#analytics-${userId}`
+                };
+                
+                await db.collection("admin_notifications").add(notification);
+                
+                // Create task in kanban for admin to review
+                const taskData = {
+                    title: `Learning Analytics - ${userProfile.displayName}`,
+                    description: `User: ${userProfile.displayName}\nAnalysis Type: ${getAnalysisTypeName(analysisType)}\nNote: ${note || 'ไม่มีเพิ่มเติม'}\n\nAdmin กรุณาวิเคราะห์พฤติกรรมการเรียนรู้ของ user ด้วย AI และให้คำแนะนำที่เหมาะสม`,
+                    assigneeIds: [],
+                    status: 'Backlog',
+                    priority: 'Medium',
+                    isLearningAnalyticsRequest: true,
+                    requestedBy: userId,
+                    analysisType: analysisType,
+                    note: note,
+                    requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                await db.collection("side_quests").add(taskData);
+                
+                // Update UI
+                statusEl.innerHTML = `
+                    <div style="color:#28a745;">
+                        <i class="fa-solid fa-check-circle"></i> ส่งคำขอสำเร็จ!
+                    </div>
+                    <div style="font-size:0.8em; color:#666; margin-top:5px;">
+                        Admin จะวิเคราะห์ด้วย AI และตอบกลับโดยเร็ว
+                    </div>
+                `;
+                
+                // Reset form
+                document.getElementById('analytics-type-select').value = '';
+                document.getElementById('analytics-note-text').value = '';
+                
+                // Show success in main UI
+                showToast("📊 คำขอการวิเคราะห์ส่งให้ Admin แล้ว");
+                
+            } catch (error) {
+                console.error("Error requesting learning analytics:", error);
+                statusEl.innerHTML = '<div style="color:#dc3545;"><i class="fa-solid fa-exclamation-triangle"></i> ไม่สามารถส่งคำขอได้ กรุณาลองใหม่</div>';
+            } finally {
+                // Re-enable button
+                const button = document.querySelector('button[onclick="requestLearningAnalytics()"]');
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fa-solid fa-chart-line"></i> ขอให้ Admin วิเคราะห์';
+                }
+            }
+        }
+
+        function getAnalysisTypeName(type) {
+            const names = {
+                'behavior': 'พฤติกรรมการเรียนรู้ทั้งหมด',
+                'quiz': 'การทำข้อสอบเฉพาะ',
+                'time': 'การวิเคราะห์เวลาเรียน',
+                'improvement': 'แนวทางการพัฒนา',
+                'recommendation': 'แนะนำเนื้อหาเพิ่มเติม'
+            };
+            return names[type] || type;
+        }
+
+        async function loadQuizFeedback() {
+            const container = document.getElementById('quiz-feedback-container');
+            container.innerHTML = '<div style="text-align:center; padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading feedback...</div>';
+            
+            try {
+                // Get user's quiz attempts
+                const attemptsSnapshot = await db.collection("quiz_attempts")
+                    .where("userId", "==", userId)
+                    .where("status", "in", ["completed", "graded"])
+                    .orderBy("submittedAt", "desc")
+                    .limit(10)
+                    .get();
+                
+                if (attemptsSnapshot.empty) {
+                    container.innerHTML = `
+                        <div style="text-align:center; padding:30px; color:#999;">
+                            <i class="fa-solid fa-chart-line" style="font-size:3em; margin-bottom:10px; opacity:0.3;"></i>
+                            <div style="font-weight:bold; margin-bottom:5px;">ยังไม่มีผลการเรียนรู้</div>
+                            <div style="font-size:0.9em;">ทำข้อสอบเพื่อดู feedback และวิเคราะห์การเรียนรู้ของคุณ</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let feedbackHTML = '';
+                const attempts = attemptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // Generate feedback for each attempt
+                for (const attempt of attempts) {
+                    const quiz = quizzesCache.find(q => q.id === attempt.quizId);
+                    if (!quiz) continue;
+                    
+                    const score = attempt.score || 0;
+                    const totalScore = attempt.totalScore || quiz.totalScore || 100;
+                    const percentage = Math.round((score / totalScore) * 100);
+                    const submittedAt = attempt.submittedAt ? attempt.submittedAt.toDate().toLocaleString('th-TH', { 
+                        day: 'numeric', 
+                        month: 'short', 
+                        year: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    }) : '-';
+                    
+                    const scoreColor = percentage >= 80 ? '#28a745' : percentage >= 60 ? '#ffc107' : '#dc3545';
+                    const scoreIcon = percentage >= 80 ? 'fa-trophy' : percentage >= 60 ? 'fa-star' : 'fa-redo';
+                    
+                    feedbackHTML += `
+                        <div style="background:#f8f9fa; border-radius:12px; padding:15px; margin-bottom:15px; border-left:4px solid ${scoreColor};">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <div style="font-weight:bold; color:#333; font-size:1em;">${quiz.shortTitle || quiz.title || 'Quiz'}</div>
+                                <div style="color:#999; font-size:0.8em;">${submittedAt}</div>
+                            </div>
+                            
+                            <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                                <div style="background:${scoreColor}; color:white; padding:5px 12px; border-radius:20px; font-weight:bold; font-size:0.9em;">
+                                    <i class="fa-solid ${scoreIcon}"></i> ${score}/${totalScore} (${percentage}%)
+                                </div>
+                                <div style="font-size:0.8em; color:#666;">
+                                    ${attempt.isPractice ? '<span style="background:#e3f2fd; color:#1976d2; padding:2px 8px; border-radius:10px;">Practice</span>' : '<span style="background:#fff3e0; color:#f57c00; padding:2px 8px; border-radius:10px;">Official</span>'}
+                                </div>
+                            </div>
+                            
+                            <div style="margin-bottom:10px;">
+                                <div style="font-size:0.85em; font-weight:bold; color:#555; margin-bottom:5px;">💡 คำแนะนำการพัฒนา:</div>
+                                <div id="feedback-${attempt.id}" style="font-size:0.9em; color:#666; line-height:1.4; padding:10px; background:#fff; border-radius:8px;">
+                                    <i class="fa-solid fa-spinner fa-spin"></i> กำลังวิเคราะห์ผลการเรียนรู้...
+                                </div>
+                            </div>
+                            
+                            <div id="weakness-${attempt.id}" style="margin-bottom:10px; display:none;">
+                                <div style="font-size:0.85em; font-weight:bold; color:#dc3545; margin-bottom:5px;">
+                                    <i class="fa-solid fa-exclamation-triangle"></i> จุดที่ต้องพัฒนา:
+                                </div>
+                                <div style="font-size:0.9em; color:#666; line-height:1.4; padding:10px; background:#fff5f5; border-radius:8px; border-left:3px solid #dc3545;">
+                                    <i class="fa-solid fa-spinner fa-spin"></i> กำลังวิเคราะห์จุดอ่อน...
+                                </div>
+                            </div>
+                            
+                            <div id="learning-${attempt.id}" style="display:none;">
+                                <div style="font-size:0.85em; font-weight:bold; color:#007bff; margin-bottom:5px;">
+                                    <i class="fa-solid fa-graduation-cap"></i> แนวทางการเรียนรู้:
+                                </div>
+                                <div style="font-size:0.9em; color:#666; line-height:1.4; padding:10px; background:#f0f8ff; border-radius:8px; border-left:3px solid #007bff;">
+                                    <i class="fa-solid fa-spinner fa-spin"></i> กำลังวางแผนการเรียน...
+                                </div>
+                            </div>
+                            
+                            <div style="margin-top:10px; text-align:right;">
+                                <button onclick="toggleDetailedFeedback('${attempt.id}')" class="btn-sm" style="background:#6c757d; color:white; border:none; border-radius:15px; padding:5px 12px; font-size:0.8em;">
+                                    <i class="fa-solid fa-chevron-down"></i> ดูเพิ่มเติม
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                container.innerHTML = feedbackHTML;
+                
+                // Generate AI feedback for each attempt
+                for (const attempt of attempts) {
+                    const quiz = quizzesCache.find(q => q.id === attempt.quizId);
+                    if (!quiz) continue;
+                    
+                    setTimeout(() => {
+                        generateQuizFeedback(attempt, quiz);
+                    }, 500);
+                }
+                
+                // Store attempts data for detailed feedback
+                window.attemptsData = attempts;
+                
+            } catch (error) {
+                console.error("Error loading quiz feedback:", error);
+                container.innerHTML = `
+                    <div style="text-align:center; padding:20px; color:#dc3545;">
+                        <i class="fa-solid fa-exclamation-triangle"></i>
+                        <div>ไม่สามารถโหลด feedback ได้</div>
+                    </div>
+                `;
+            }
+        }
+
+        function toggleDetailedFeedback(attemptId) {
+            const weaknessEl = document.getElementById(`weakness-${attemptId}`);
+            const learningEl = document.getElementById(`learning-${attemptId}`);
+            const button = event.target;
+            
+            if (weaknessEl.style.display === 'none') {
+                weaknessEl.style.display = 'block';
+                learningEl.style.display = 'block';
+                button.innerHTML = '<i class="fa-solid fa-chevron-up"></i> ซ่อนรายละเอียด';
+                
+                // Generate detailed feedback if not already generated
+                if (weaknessEl.querySelector('.fa-spinner')) {
+                    const attempt = attemptsData.find(a => a.id === attemptId);
+                    const quiz = quizzesCache.find(q => q.id === attempt.quizId);
+                    if (attempt && quiz) {
+                        generateDetailedFeedback(attempt, quiz);
+                    }
+                }
+            } else {
+                weaknessEl.style.display = 'none';
+                learningEl.style.display = 'none';
+                button.innerHTML = '<i class="fa-solid fa-chevron-down"></i> ดูเพิ่มเติม';
+            }
+        }
+
+        // 🔥 Multi-Model AI Feedback System V88.83
+// - Basic Feedback: GPT-4o (deep analysis, educational expertise)
+// - Weakness Analysis: GPT-4o (pattern recognition, diagnostic accuracy)  
+// - Learning Path: Claude-3.5-Sonnet (creative recommendations, educational strategies)
+// - Cost Optimization: Use right model for right task
+
+        async function generateQuizFeedback(attempt, quiz) {
+            const feedbackEl = document.getElementById(`feedback-${attempt.id}`);
+            if (!feedbackEl) return;
+            
+            try {
+                // Analyze performance
+                const score = attempt.score || 0;
+                const totalScore = attempt.totalScore || quiz.totalScore || 100;
+                const percentage = Math.round((score / totalScore) * 100);
+                
+                // Get quiz questions for analysis
+                const questions = quiz.questions || [];
+                const userAnswers = attempt.answers || {};
+                
+                // Analyze correct/incorrect answers
+                let correctCount = 0;
+                let incorrectQuestions = [];
+                
+                questions.forEach((q, index) => {
+                    const userAnswer = userAnswers[index];
+                    const correctAnswers = Array.isArray(q.correct) ? q.correct : [q.correct];
+                    
+                    if (correctAnswers.includes(userAnswer)) {
+                        correctCount++;
+                    } else {
+                        incorrectQuestions.push({
+                            index: index + 1,
+                            question: q.question,
+                            userAnswer: userAnswer,
+                            correctAnswer: correctAnswers,
+                            explanation: q.explanation
+                        });
+                    }
+                });
+                
+                // Generate AI feedback with enhanced educational insight
+                const feedbackPrompt = `จากผลการทำข้อสอดความ "${quiz.shortTitle || quiz.title}" คะแนน ${score}/${totalScore} (${percentage}%) ถูก ${correctCount}/${questions.length} ข้อ
+
+${incorrectQuestions.length > 0 ? `ข้อที่ตอบผิด:
+${incorrectQuestions.slice(0, 3).map(q => `- ข้อ ${q.index}: ${q.question.substring(0, 50)}...`).join('\n')}` : 'ทำข้อสอบได้คะแนนสูง!'}
+
+กรุณาวิเคราะห์และให้คำแนะนำเชิงการศึกษา:
+1. จุดเด่นและสิ่งที่ทำได้ดี (เชิงบวก)
+2. ปรับปรุงในส่วนที่ต้องการพัฒนา (เฉพาะจุด)
+3. แนวทางการเรียนรู้ต่อ (actionable)
+4. คำปรึกษาเป็นกำลังใจ (motivational)
+
+ตอบเป็นภาษาไทย ไม่เกิน 200 ตัวอักษร กระชับ เป็นประโยชน์ เหมือนครูให้คำแนะนำ`;
+
+                // 🎯 Use GPT-4o for deep educational analysis
+                const response = await callUniversalAI('gpt-4o', feedbackPrompt);
+                
+                feedbackEl.innerHTML = `
+                    <div style="color:#28a745; font-weight:600; margin-bottom:8px;">
+                        <i class="fa-solid fa-lightbulb"></i> ${response.text}
+                    </div>
+                    ${incorrectQuestions.length > 0 ? `
+                        <div style="margin-top:8px; padding-top:8px; border-top:1px solid #e9ecef;">
+                            <div style="font-size:0.8em; color:#666;">
+                                <i class="fa-solid fa-redo"></i> แนะนำ: ทบทวน ${incorrectQuestions.length} ข้อที่ตอบผิดเพื่อพัฒนาการเรียนรู้
+                            </div>
+                        </div>
+                    ` : ''}
+                `;
+                
+            } catch (error) {
+                console.error("Error generating feedback:", error);
+                feedbackEl.innerHTML = `
+                    <div style="color:#666;">
+                        <i class="fa-solid fa-info-circle"></i> ทำข้อสอบได้ดี! ลองทบทวนคำตอบเพื่อพัฒนาความเข้าใจ
+                    </div>
+                `;
+            }
+        }
+
+        async function generateDetailedFeedback(attempt, quiz) {
+            const weaknessEl = document.getElementById(`weakness-${attempt.id}`);
+            const learningEl = document.getElementById(`learning-${attempt.id}`);
+            
+            if (!weaknessEl || !learningEl) return;
+            
+            try {
+                // Get quiz questions for analysis
+                const questions = quiz.questions || [];
+                const userAnswers = attempt.answers || {};
+                
+                // Analyze incorrect answers by topic/concept
+                const incorrectQuestions = [];
+                const topicAnalysis = {};
+                
+                questions.forEach((q, index) => {
+                    const userAnswer = userAnswers[index];
+                    const correctAnswers = Array.isArray(q.correct) ? q.correct : [q.correct];
+                    
+                    if (!correctAnswers.includes(userAnswer)) {
+                        incorrectQuestions.push({
+                            index: index + 1,
+                            question: q.question,
+                            userAnswer: userAnswer,
+                            correctAnswer: correctAnswers,
+                            explanation: q.explanation,
+                            topic: q.topic || q.category || 'General',
+                            difficulty: q.difficulty || 'medium'
+                        });
+                        
+                        // Group by topic for pattern analysis
+                        const topic = q.topic || q.category || 'General';
+                        if (!topicAnalysis[topic]) {
+                            topicAnalysis[topic] = { incorrect: 0, total: 0 };
+                        }
+                        topicAnalysis[topic].incorrect++;
+                        topicAnalysis[topic].total++;
+                    }
+                });
+                
+                // 🔍 Enhanced Weakness Analysis with GPT-4o
+                const weaknessPrompt = `จากการทำข้อสอดความ "${quiz.shortTitle || quiz.title}" พบว่าตอบผิด ${incorrectQuestions.length} ข้อ
+
+${incorrectQuestions.length > 0 ? `การวิเคราะห์ตามหัวข้อ:
+${Object.entries(topicAnalysis).map(([topic, data]) => `- ${topic}: ${data.incorrect}/${data.total} ข้อผิด (${Math.round(data.incorrect/data.total*100)}%)`).join('\n')}` : ''}
+
+กรุณาวิเคราะห์เชิงจิตวิทยาการเรียนรู้:
+1. จุดอ่อนที่พบบ่อยที่สุด (2-3 อันดับแรก) พร้อมเปอร์เซ็นต์
+2. สาเหตุรากฐานที่อาจทำให้ตอบผิด (misconception, lack of practice, etc.)
+3. แนวทางการแก้ไขเฉพาะจุดนั้นๆ (concrete actions)
+
+ตอบเป็นภาษาไทย กระชับ ใช้ bullet point ไม่เกิน 150 ตัวอักษร เหมือนนักจิตวิทยาการศึกษาวิเคราะห์`;
+
+                // 🎯 Use GPT-4o for diagnostic accuracy
+                const weaknessResponse = await callUniversalAI('gpt-4o', weaknessPrompt);
+                
+                weaknessEl.innerHTML = `
+                    <div style="color:#dc3545; font-weight:600;">
+                        <i class="fa-solid fa-exclamation-triangle"></i> ${weaknessResponse.text}
+                    </div>
+                `;
+                
+                // 🎓 Creative Learning Path with Claude-3.5-Sonnet
+                const learningPrompt = `จากผลการทำข้อสอดความ "${quiz.shortTitle || quiz.title}" คะแนน ${attempt.score || 0}/${attempt.totalScore || 100}
+
+${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข้อ: ${Object.keys(topicAnalysis).join(', ')}
+ระดับความยากของข้อที่ผิด: ${incorrectQuestions.map(q => q.difficulty).join(', ')}` : 'ทำได้ดีมาก!'}
+
+กรุณาแนะนำแนวทางการเรียนรู้แบบสร้างสรรค์:
+1. แหล่งเรียนรู้ที่เหมาะสม (YouTube channels, websites, apps) - ระบุชื่อเฉพาะ
+2. วิธีการฝึกฝนเฉพาะหัวข้อที่อ่อน (practice techniques)
+3. กลยุทธ์การทำข้อสอบให้ดีขึ้น (test-taking strategies)
+4. ระยะเวลาที่ควรใช้ในการฝึก (realistic timeline)
+
+ตอบเป็นภาษาไทย กระชับ ใช้ bullet point ไม่เกิน 200 ตัวอักษร เหมือนครูผู้เชี่ยวชาญแนะนำ`;
+
+                // 🚀 Use Claude-3.5-Sonnet for creative educational strategies
+                const learningResponse = await callUniversalAI('claude-3.5-sonnet', learningPrompt);
+                
+                learningEl.innerHTML = `
+                    <div style="color:#007bff; font-weight:600;">
+                        <i class="fa-solid fa-graduation-cap"></i> ${learningResponse.text}
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error("Error generating detailed feedback:", error);
+                weaknessEl.innerHTML = `
+                    <div style="color:#666;">
+                        <i class="fa-solid fa-info-circle"></i> วิเคราะห์จุดที่ต้องพัฒนาเพื่อปรับปรุงการเรียนรู้
+                    </div>
+                `;
+                learningEl.innerHTML = `
+                    <div style="color:#666;">
+                        <i class="fa-solid fa-info-circle"></i> ฝึกปฏิบัติเพิ่มเติมเพื่อเสริมสร้างความเข้าใจ
+                    </div>
+                `;
+            }
+        }
+
         function toggleKanban() {
             const content = document.getElementById('kanban-content');
             const icon = document.getElementById('kanban-icon');
@@ -3982,11 +3210,6 @@
 
             // Sorting by date descending for streak calculation
             const sortedLogs = [...reflectiveLogsCache].sort((a,b) => b.timestamp?.toDate() - a.timestamp?.toDate());
-
-            // 🔥 Update total count [V89.54]
-            const totalCount = reflectiveLogsCache.length;
-            const totalCountEl = document.getElementById('rl-total-count');
-            if (totalCountEl) totalCountEl.innerText = `ส่งแล้ว ${totalCount} ครั้ง`;
 
             sortedLogs.forEach((log, i) => {
                 if (!log.timestamp) return;
@@ -4402,20 +3625,10 @@
                     }
                 });
 
-                // Update Count Badges & Notification Badge (V89.51)
+                // Update count badges
                 for (const [status, count] of Object.entries(counts)) {
                     const el = document.getElementById('cnt-' + status);
                     if (el) el.innerText = count;
-                }
-                const activeCount = counts['Backlog'] + counts['Doing'];
-                const kBadge = document.getElementById('kanban-badge');
-                if (kBadge) {
-                    if (activeCount > 0) {
-                        kBadge.innerText = activeCount;
-                        kBadge.style.display = 'inline-block';
-                    } else {
-                        kBadge.style.display = 'none';
-                    }
                 }
 
                 // If currently showing a tab with 0 items, and there's another with > 0, maybe auto-switch?
@@ -4905,32 +4118,16 @@
             `).join('');
         }
 
-        // Wait for window load or interactive state to ensure SDK is ready
-        if (document.readyState === 'complete' || document.readyState === 'interactive') {
-            try { bootstrapMain(); } catch (e) {
-                console.error("Immediate Bootstrap Error:", e);
-                updateStatus("❌ Boot Error: " + e.message);
-            }
-        } else {
-            window.addEventListener('load', () => {
-                try { bootstrapMain(); } catch (e) {
-                    console.error("Delayed Bootstrap Error:", e);
-                    updateStatus("❌ Boot Load Error: " + e.message);
-                }
-            });
-        }
-
-        function bootstrapMain() {
-            console.log("Bootstrap Triggered. Checking LIFF...");
+        // Wait for window load to ensure SDK is ready
+        window.addEventListener('load', function () {
+            console.log("Window Loaded. Checking LIFF...");
             if (window.liff) {
                 main();
             } else {
                 console.error("LIFF SDK not loaded from CDN");
-                updateStatus("<span style='color:#ef233c;'>❌ SDK Failed to Load</span>");
-                // Fallback attempt to reload if SDK missing
-                setTimeout(() => window.location.reload(true), 15000);
+                alert("LIFF SDK Failed to Load. Please check your internet connection and refresh.");
             }
-        }
+        });
         // --- V80: Discussion Logic ---
         let activeDiscussionId = "";
         let discussionUnsubscribe = null;
@@ -4989,7 +4186,4 @@
                 alert("Cannot send comment: " + err.message);
             }
         }
-    </script>
-</body>
-
-</html>
+    
