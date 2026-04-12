@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V89.82) Overview
+# MLP Internship Portfolio (V89.83) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** 
@@ -79,6 +79,12 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-04-12] Session Updates (V89.82 → V89.83)
+### 1. Stats Upgrade — Quizzes Done (V89.83)
+- **New Metric:** Added "Quizzes Done" counter to the Member Detail Popup in Admin Dashboard.
+- **Activity Analysis:** Implemented logic to scan and count approved quiz sets from the user's check-in history.
+- **Enhanced UI:** Added a new status card with a lightbulb icon (💡) to provide mentors with a quick overview of quiz progress.
 
 ## [2026-04-12] Session Updates (V89.81 → V89.82)
 ### 1. LIFF Initialization Stabilization (V89.82)
@@ -636,4 +642,4 @@ service cloud.firestore {
     - **Date & Time Formatting:** ปรับการแสดงผลวันที่และเวลาให้ใช้รูปแบบ `en-US` (เช่น Mar 23, 2026) ทั่วทั้งระบบเพื่อความสม่ำเสมอ
 
 ---
-*บันทึกภาพรวมระบบสะท้อนความจริง (V89.82) โดย Antigravity AI*
+*บันทึกภาพรวมระบบสะท้อนความจริง (V89.83) โดย Antigravity AI*
