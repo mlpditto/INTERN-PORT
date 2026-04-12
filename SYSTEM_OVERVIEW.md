@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V89.84) Overview
+# MLP Internship Portfolio (V89.85) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** 
@@ -79,6 +79,13 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-04-13] Session Updates (V89.84 → V89.85)
+### 1. GLM-5.1 & Ollama Cloud Integration (V89.85)
+- **New AI Provider:** Integrated Ollama Cloud service into `callUniversalAI` to support next-generation flagship models.
+- **GLM-5.1 Support:** Added specific logic to handle `glm-5.1:cloud` for advanced agentic engineering and long-horizon tasks.
+- **Dynamic Config:** Implemented `OLLAMA_API_KEY` and `OLLAMA_ENDPOINT` management via Admin Settings and local storage.
+- **UI Expansion:** Added GLM-5.1 selection options to AI Tagging, Quizzes, and Content Analysis tools.
 
 ## [2026-04-12] Session Updates (V89.83 → V89.84)
 ### 1. UI Clarity & Title Resolution (V89.84)
@@ -648,4 +655,4 @@ service cloud.firestore {
     - **Date & Time Formatting:** ปรับการแสดงผลวันที่และเวลาให้ใช้รูปแบบ `en-US` (เช่น Mar 23, 2026) ทั่วทั้งระบบเพื่อความสม่ำเสมอ
 
 ---
-*บันทึกภาพรวมระบบสะท้อนความจริง (V89.84) โดย Antigravity AI*
+*บันทึกภาพรวมระบบสะท้อนความจริง (V89.85) โดย Antigravity AI*
