@@ -1,17 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard (V89.82 LIFF Stability)</title>
-    <!-- V89.82: LIFF Initialization Fix & Troubleshooting Guide -->
-    <!-- Release: 2026-04-12 23:08 UTC+7 -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-
-    <script>
         // V89.02: Reconstructed helper with nested modal and parent visibility support
         function forceShowModal(id, displayType) {
             const m = document.getElementById(id);
@@ -1436,7 +1423,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.3em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                                                <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,255,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.82</span>
+                                                <span style="font-size:0.55em; background:linear-gradient(135deg, rgba(147,197,253,0.7), rgba(196,181,253,0.7), rgba(252,191,255,0.5)); color:#1e3a5f; padding:4px 14px; border-radius:12px; font-weight:800; margin-left:8px; letter-spacing:0.5px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1.5px solid rgba(255,255,255,0.6); box-shadow:0 2px 12px rgba(147,197,253,0.4), inset 0 1px 2px rgba(255,255,255,0.8); text-shadow:0 0.5px 1px rgba(255,255,255,0.5);">V89.80</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -1655,7 +1642,7 @@
             <div class="kanban-board" style="min-height: 450px;">
                 <div class="kanban-col" id="col-Backlog">
                     <div style="font-weight:bold; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
-                        <span><span class="badge" style="background:#8e44ad; color:white;">V89.82 (LIFF Fix)</span> Backlog</span>
+                        <span><span class="badge" style="background:#8e44ad; color:white;">V89.80 (AI Interactive Fix)</span> Backlog</span>
                         <span class="badge" style="background:#e9ecef; color:#495057; border:1px solid #dee2e6;" id="cnt-Backlog">0</span>
                     </div>
                     <div id="Backlog"></div>
@@ -13772,164 +13759,4 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         window.AI_CORE_READY = true;
         if (window.loadAIKeys) window.loadAIKeys();
         console.log('%c V89.80 loaded OK (Priority AI Core) ', 'background:#4361ee;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
-    </script>
-
-    <!-- Knowledge Base Modal (V87.40) -->
-    <div id="knowledgeBaseModal" class="modal">
-        <div class="modal-content" style="max-width:800px; padding:30px; border-radius:25px;">
-            <span class="close-modal" onclick="document.getElementById('knowledgeBaseModal').style.display='none'">&times;</span>
-            <div style="display:flex; align-items:center; gap:15px; margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:15px;">
-                <div style="width:50px; height:50px; background:#f0f7ff; border-radius:15px; display:flex; align-items:center; justify-content:center; color:#2563eb;">
-                    <i class="fa-solid fa-book-medical" style="font-size:1.5em;"></i>
-                </div>
-                <div style="flex:1;">
-                    <h2 style="margin:0; font-size:1.5em; color:#1e293b;">Medical Knowledge Base</h2>
-                    <p style="margin:2px 0 0 0; font-size:0.85em; color:#64748b;">Manage documents and clinical guidelines for AI support.</p>
-                </div>
-                <div style="display:flex; gap:8px;">
-                    <button class="btn-sm" onclick="editKbFolder()" style="background:#f8fafc; color:#64748b; border:1px solid #e2e8f0; border-radius:10px; padding:8px 12px; cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='#f1f5f9'">
-                        <i class="fa-solid fa-pen-to-square"></i> Edit
-                    </button>
-                    <button class="btn-sm" onclick="deleteKbFolder()" style="background:#fef2f2; color:#ef4444; border:1px solid #fee2e2; border-radius:10px; padding:8px 12px; cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='#fee2e2'">
-                        <i class="fa-solid fa-trash-can"></i> Delete
-                    </button>
-                    <button class="btn-sm" onclick="createNewKbProject()" style="background:#f0fdf4; color:#16a34a; border:1px solid #dcfce7; border-radius:10px; padding:8px 12px; cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='#dcfce7'">
-                        <i class="fa-solid fa-folder-plus"></i> New
-                    </button>
-                </div>
-            </div>
-            
-            <div style="margin-bottom:20px;">
-                <label style="display:block; font-size:0.85em; font-weight:bold; color:#475569; margin-bottom:8px;">Select Project / Folder:</label>
-                <select id="kb-project-selector" onchange="loadKbFolder(this.value)" style="width:100%; padding:10px 15px; border-radius:12px; border:1px solid #e2e8f0; background:#f8fafc; font-weight:600; color:#334155;"></select>
-            </div>
-
-            <div style="display:flex; gap:10px; margin-bottom:20px;">
-                <input type="file" id="kb-file-input" multiple style="display:none;" onchange="handleKbUpload(this)">
-                <button class="magic-btn" onclick="document.getElementById('kb-file-input').click()" style="flex:1; background:linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); padding:12px; border-radius:12px; font-size:0.9em;">
-                    <i class="fa-solid fa-cloud-arrow-up"></i> Upload Documents (PDF/DOCX)
-                </button>
-                <button class="magic-btn" onclick="addKbText()" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); padding:12px 20px; border-radius:12px; font-size:0.9em;">
-                    <i class="fa-solid fa-keyboard"></i> Paste Text
-                </button>
-            </div>
-
-            <h4 style="margin:0 0 15px 0; display:flex; justify-content:space-between; align-items:center;">
-                Project Documents
-                <span id="kb-doc-count" style="font-size:0.7em; background:#f1f5f9; padding:2px 10px; border-radius:10px; color:#64748b;">0 Docs</span>
-            </h4>
-            
-            <div id="kb-document-list" style="max-height:350px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;"></div>
-
-            <div style="margin-top:25px; border-top:1px solid #f1f5f9; padding-top:15px; text-align:right;">
-                <button class="magic-btn" onclick="document.getElementById('knowledgeBaseModal').style.display='none'" style="padding:12px 45px; border-radius:50px; background:linear-gradient(135deg, #1e293b 0%, #334155 100%); font-weight:800;">
-                    <i class="fa-solid fa-circle-check"></i> Done
-                </button>
-            </div>
-        </div>
-    </div>
-    <!-- PDF-to-Quiz Document Selector Modal (V87.52) -->
-    <div id="pdfToQuizModal" class="modal" style="z-index:5200;">
-        <div class="modal-content" style="max-width:600px; padding:30px; border-radius:25px;">
-            <span class="close-modal" onclick="document.getElementById('pdfToQuizModal').style.display='none'">&times;</span>
-            <div style="display:flex; align-items:center; gap:15px; margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:15px;">
-                <div style="width:50px; height:50px; background:#e0f2f1; border-radius:15px; display:flex; align-items:center; justify-content:center; color:#00796b;">
-                    <i class="fa-solid fa-file-pdf" style="font-size:1.5em;"></i>
-                </div>
-                <div>
-                    <h3 style="margin:0;">Select Content Source</h3>
-                    <p style="margin:2px 0 0 0; font-size:0.85em; color:#666;">Choose a document to generate quiz questions from.</p>
-                </div>
-            </div>
-
-            <div style="margin-bottom:20px;">
-                <label style="display:block; font-size:0.8em; font-weight:bold; color:#666; margin-bottom:8px;">Desired Question Count:</label>
-                <select id="p2q-count" style="width:100%; border-radius:10px; padding:8px 12px; border:1px solid #ddd; font-weight:bold;">
-                    <option value="5">5 Questions</option>
-                    <option value="10" selected>10 Questions</option>
-                    <option value="15">15 Questions</option>
-                    <option value="20">20 Questions</option>
-                </select>
-            </div>
-
-            <div id="p2q-list" style="max-height:400px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:5px;">
-                <!-- KB documents will be listed here -->
-            </div>
-
-            <div style="margin-top:25px; border-top:1px solid #eee; padding-top:15px; text-align:right; display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:0.75em; color:#999; font-style:italic;">* AI will attempt to generate structured data.</span>
-                <button class="btn-dark" onclick="document.getElementById('pdfToQuizModal').style.display='none'" style="padding:10px 30px; border-radius:30px; font-weight:bold;">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Pre-registration Modal -->
-    <div id="preRegModal" class="modal">
-        <div class="modal-content" style="max-width:900px;">
-            <span class="close-modal"
-                onclick="document.getElementById('preRegModal').style.display='none'">&times;</span>
-            <h2 style="margin-bottom:5px;">📋 Pre-register Users</h2>
-            <p style="font-size:0.8em; color:#666; margin-top:0;">Create pre-registration codes — Users enter this code in LIFF to receive group/internship dates automatically.</p>
-
-            <div
-                style="background:#f8f9fa; padding:15px; border-radius:12px; margin-bottom:15px; border:1px solid #eee;">
-                <div style="display:flex; gap:8px; margin-bottom:8px;">
-                    <input type="text" id="prereg-name" placeholder="Full Name (English)" style="flex:2; margin:0;"
-                        title="English Full Name for Certificate">
-                    <input type="text" id="prereg-nick" placeholder="Nickname/AKA" style="flex:1; margin:0;"
-                        title="Nickname/AKA">
-                    <select id="prereg-group" style="flex:1; margin:0;">
-                        <option value="Junior">Junior</option>
-                        <option value="INTERN">INTERN</option>
-                        <option value="EXTERN">EXTERN</option>
-                        <option value="Public">Public</option>
-                    </select>
-                </div>
-                <div style="display:flex; gap:8px; margin-bottom:8px;">
-                    <div style="flex:1;"><label style="font-size:0.75em; color:#666;">Start:</label><input type="date"
-                            id="prereg-start" style="margin:0;"></div>
-                    <div style="flex:1;"><label style="font-size:0.75em; color:#666;">End:</label><input type="date"
-                            id="prereg-end" style="margin:0;"></div>
-                </div>
-                <button class="magic-btn" onclick="addPreRegUser()" style="width:100%; background:#6f42c1;"><i
-                        class="fa-solid fa-user-plus"></i> Generate Registration Code</button>
-            </div>
-
-            <div style="font-size:0.85em; font-weight:bold; color:#333; margin-bottom:8px;">📃 Pre-registered Items
-            </div>
-            <div id="prereg-list" style="max-height:400px; overflow-y:auto;"></div>
-        </div>
-    </div>
-    <!-- 🔥 User Merger Modal (V89.46) -->
-    <div id="mergeModal" class="modal" style="display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);">
-        <div class="modal-content" style="max-width:500px; width:90%; border-radius:20px; border:none; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                <h2 style="margin:0; font-size:1.4em; color:var(--primary);"><i class="fa-solid fa-link"></i> User Merger</h2>
-                <button onclick="forceHideModal('mergeModal')" style="background:none; border:none; font-size:1.5em; cursor:pointer; color:#ccc;">&times;</button>
-            </div>
-            <p style="font-size:0.9em; color:#666; margin-bottom:15px; background:#fff9db; padding:10px; border-radius:10px; border-left:4px solid #fcc419;">
-                <b>Merge</b> this user's data into another account. This will transfer all history/score and delete the source account.
-            </p>
-            <div id="merge-source-info" style="font-weight:800; color:var(--primary); background:rgba(67, 97, 238, 0.05); padding:10px; border-radius:10px; margin-bottom:15px; text-align:center; border:1px solid rgba(67, 97, 238, 0.1);">
-                -
-            </div>
-            
-            <div style="margin-bottom:12px;">
-                <div style="margin-bottom:6px; font-weight:bold; font-size:0.85em; color:#444;">Select Destination User:</div>
-                <input type="text" id="merge-search" placeholder="🔍 Search target user..." onkeyup="renderMergeTargetList(this.value)" 
-                    style="width:100%; padding:10px; border-radius:12px; border:1px solid #ddd; font-size:0.9em; outline:none; transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 3px rgba(67,97,238,0.1)';">
-            </div>
-
-            <div id="merge-target-list" style="max-height:350px; overflow-y:auto; border:1px solid #f1f5f9; border-radius:15px; padding:8px; background:#f8fafc;">
-                <p style="text-align:center; padding:20px; color:#999; font-size:0.85em;">Loading potential targets...</p>
-            </div>
-            
-            <div style="margin-top:20px; text-align:right;">
-                <button class="btn btn-secondary" onclick="forceHideModal('mergeModal')">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-</body>
-
-</html>
+    
