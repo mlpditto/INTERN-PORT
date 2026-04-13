@@ -1,9 +1,9 @@
-# MLP Internship Portfolio (V89.99) Overview
+# MLP Internship Portfolio (V90.10) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** 
 > 1. แก้ไขโค้ดที่ `production` เสมอ ห้ามแก้ที่ `main`
-> 2. ทุกครั้งที่ Commit ต้องอัปเดตเวอร์ชัน (V89.99) ใน `admin.html` (Title & Badge)
+> 2. ทุกครั้งที่ Commit ต้องอัปเดตเวอร์ชัน (V90.10) ใน `admin.html` (Title & Badge)
 > 3. ใช้ **"Turbo Mode"** (Merge `production` -> `main`) ทุกครั้งเมื่อต้องการ Deploy (ตามกฎใน `VERSION_SYNC_POLICY.md`)
 
 ระบบเว็บแอปพลิเคชันสำหรับจัดการการฝึกงานและระบบ Gamification (สะสมคะแนน) เพื่อจูงใจและติดตามความก้าวหน้าของนักศึกษาฝึกงาน
@@ -79,6 +79,20 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-04-13] Session Updates (V90.00 → V90.10)
+### 1. Super User Insight Hub (Unified Admin Terminal)
+- **Modal Consolidation**: Merged the separate "Activity Chart" and "Transaction History" modals into a single, high-performance UI Hub.
+- **Tabbed Experience**: Integrated three core views: Activity Dashboard, Quiz Insight (Mastery), and Full History Logs.
+- **Unified Data Stream**: Optimized Firestore queries to fetch all user-related data (Works, Quizzes, Logs) in a single unified boot sequence for the Hub.
+- **Improved UX**: Added quick-access buttons in the user table for direct entry into specific Hub tabs.
+
+## [2026-04-13] Session Updates (V89.99 → V90.00)
+### 1. Per-User Quiz Performance Insight (V90.00)
+- **Advanced Dashboard**: Implemented a tabbed interface in the Admin User Popup for switching between "Activity Points" and "Quiz Insight".
+- **Performance Trend SVG**: Added a dynamic SVG-based line chart showing Accuracy (%) development over time for approved quiz attempts.
+- **Tag-Based Proficiency**: Implemented category analysis that groups performance by quiz tags, displaying average scores as color-coded progress bars.
+- **Dynamic Skill Profiling**: Added an automated "Strengths & Weaknesses" summary that highlights the user's best and worst performing topics based on historical data.
 
 ## [2026-04-13] Session Updates (V89.97 → V89.99)
 ### 1. AI Model Stabilization & API Resilience (V89.99)
