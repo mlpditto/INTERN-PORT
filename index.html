@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Intern Progress Online (V89.92)</title>
+    <title>Intern Progress Online (V89.93)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -777,7 +777,10 @@
                 <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #8e44ad;">
                     <div onclick="toggleAssignmentList()"
                         style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fdf2ff;">
-                        <h4 style="margin: 0; font-size: 1.1em; color: #8e44ad;"><i class="fa-solid fa-clipboard-list"></i> Quiz 퀴즈</h4>
+                        <h4 style="margin: 0; font-size: 1.1em; color: #8e44ad; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-clipboard-list"></i> Quiz 퀴즈
+                            <span id="assign-count-badge" style="display:none; background:#ef233c; color:white; font-size:0.7em; padding:2px 10px; border-radius:12px; font-weight:800; box-shadow:0 2px 8px rgba(239, 35, 60, 0.3);">0</span>
+                        </h4>
                         <i id="assign-list-icon" class="fa-solid fa-chevron-down" style="color: #8e44ad; transition: 0.3s; font-size: 0.9em;"></i>
                     </div>
                     <div id="assignments-content" style="display: none; padding: 15px; border-top: 1px solid #f0f0f0; background: #fff;">
@@ -1404,8 +1407,8 @@
         }
 
         async function main() {
-            console.log("Main Execution Started (V89.92)");
-            updateStatus("System Starting (V89.92)...");
+            console.log("Main Execution Started (V89.93)");
+            updateStatus("System Starting (V89.93)...");
             try {
                 const urlParams = new URLSearchParams(window.location.search);
                 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -2082,6 +2085,9 @@
 
             const now = new Date();
             let allItems = [];
+            let activeQuizCount = 0;
+
+            console.log(`[Diagnostic] Rendering Assignments. User Group: "${myGroup}"`);
 
             // 1. Process Quests
             questsCache.forEach(q => {
@@ -2143,14 +2149,41 @@
 
                 if ((status === 'approved' || status === 'pending') && score > 0) return;
 
-                allItems.push({
+                const itemObj = {
                     type: 'quiz',
                     data: q,
                     myData: attempt,
                     isExpired: isExpired,
                     timestamp: q.createdAt ? q.createdAt.toDate() : (q.timestamp ? q.timestamp.toDate() : (dead || new Date(0)))
-                });
+                };
+
+                if (!isExpired) activeQuizCount++;
+                allItems.push(itemObj);
             });
+
+            // Diagnostic: Why is it empty?
+            if (activeQuizCount === 0 && quizzesCache.length > 0) {
+                console.log(`[Diagnostic] No active quizzes found for user ${userId}. Total in cache: ${quizzesCache.length}`);
+                quizzesCache.forEach(q => {
+                    const target = q.targetGroup || "Public";
+                    const hasStarted = (!q.startTime || now >= q.startTime.toDate());
+                    const dead = q.deadline ? q.deadline.toDate() : null;
+                    const isExpired = (dead && now > dead);
+                    console.log(` - Quiz "${q.title}": Active=${q.isActive}, Target=${target}, Started=${hasStarted}, Expired=${isExpired}`);
+                });
+            }
+
+            // Update Badge & Auto-Open (V89.93)
+            const badgeLabel = document.getElementById('assign-count-badge');
+            if (badgeLabel) {
+                badgeLabel.innerText = activeQuizCount;
+                badgeLabel.style.display = activeQuizCount > 0 ? 'inline-block' : 'none';
+                
+                // Auto-open if items found and currently closed (only once per session or on change)
+                if (activeQuizCount > 0 && document.getElementById('assignments-content').style.display === 'none') {
+                    toggleAssignmentList();
+                }
+            }
 
             // 3. Sort: Active First, then Newest First (V81.4)
             allItems.sort((a, b) => {
@@ -3985,7 +4018,7 @@
             // Sorting by date descending for streak calculation
             const sortedLogs = [...reflectiveLogsCache].sort((a,b) => b.timestamp?.toDate() - a.timestamp?.toDate());
 
-            // 🔥 Update total count [V89.92]
+            // 🔥 Update total count [V89.93]
             const totalCount = reflectiveLogsCache.length;
             const totalCountEl = document.getElementById('rl-total-count');
             if (totalCountEl) totalCountEl.innerText = `ส่งแล้ว ${totalCount} ครั้ง`;
