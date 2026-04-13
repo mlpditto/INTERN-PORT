@@ -61,8 +61,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"], ti
             const apiKey = process.env.OPENAI_API_KEY;
             const endpoint = model === 'dalle' ? "https://api.openai.com/v1/images/generations" : "https://api.openai.com/v1/chat/completions";
             
-            const isReasoner = model.includes('gpt-5.4') || model.includes('o1');
-            const actualModel = model === 'gpt-5.4' ? 'gpt-4o' : (model === 'gpt-5.4-mini' ? 'gpt-4o-mini' : (isReasoner ? model : (model.includes('gpt-4') ? model : (model.includes('gpt-3.5') ? model : 'gpt-4o-mini'))));
+            const actualModel = model.includes('gpt-5') ? model : (model.includes('gpt-4') ? 'gpt-5.4-mini' : model);
             
             // Ensure 'json' is in prompt for OpenAI if isJson is true (V89.15)
             let tailoredPrompt = prompt;
