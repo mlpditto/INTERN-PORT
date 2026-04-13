@@ -1,9 +1,9 @@
-# MLP Internship Portfolio (V89.96) Overview
+# MLP Internship Portfolio (V89.99) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** 
 > 1. แก้ไขโค้ดที่ `production` เสมอ ห้ามแก้ที่ `main`
-> 2. ทุกครั้งที่ Commit ต้องอัปเดตเวอร์ชัน (V89.34) ใน `admin.html` (Title & Badge)
+> 2. ทุกครั้งที่ Commit ต้องอัปเดตเวอร์ชัน (V89.99) ใน `admin.html` (Title & Badge)
 > 3. ใช้ **"Turbo Mode"** (Merge `production` -> `main`) ทุกครั้งเมื่อต้องการ Deploy (ตามกฎใน `VERSION_SYNC_POLICY.md`)
 
 ระบบเว็บแอปพลิเคชันสำหรับจัดการการฝึกงานและระบบ Gamification (สะสมคะแนน) เพื่อจูงใจและติดตามความก้าวหน้าของนักศึกษาฝึกงาน
@@ -80,6 +80,22 @@
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
 
+## [2026-04-13] Session Updates (V89.97 → V89.99)
+### 1. AI Model Stabilization & API Resilience (V89.99)
+- **Model Refactoring:** Replaced deprecated AI model identifiers (e.g., `gemini-3-flash`, `gpt-5.4`) with stable, supported versions (`gemini-1.5-flash-latest`, `gpt-4o`) across all Admin Portal components (Laugh Tale, Tagging, Quiz Analysis, Translation).
+- **Default Logic Fix:** Updated JavaScript fallback values and internal constants to use stable model names, preventing 404 proxy errors.
+- **UI Descriptions & Help:** Updated model descriptions and tooltips to accurately reflect the active AI infrastructure.
+
+### 2. Global Version Alignment (V89.99)
+- **Version Synchronization:** Synchronized version strings across `admin.html`, `index.html`, and `SYSTEM_OVERVIEW.md` to V89.99 for consistent audit trails.
+- **Smart Analysis Update:** Updated the AI Analysis popup badge to reflect the current system version.
+
+## [2026-04-13] Session Updates (V89.96 → V89.97)
+### 1. LIFF Initialization & Compatibility (V89.97)
+- **Initialize Optimization:** Resolved an infinite loop bug in the Firebase initialization check where a failure to re-initialize an existing app would block the boot sequence.
+- **Legacy Browser Support:** Removed Optional Chaining (`?.`) from the Reflective Log sorting logic, as it caused silent script crashes in older mobile browsers (WebKit/Android System WebView) used by LINE.
+- **Version Synchronization:** Aligned all UI and internal version strings to V89.97 for accurate diagnostics.
+
 ## [2026-04-13] Session Updates (V89.94 → V89.96)
 ### 1. LIFF Connection Resilience (V89.96)
 - **Embedded Configuration:** Embedded the Firebase configuration directly into `index.html` to eliminate external file dependency failures.
@@ -105,6 +121,19 @@
 - **Gemini Upgrade:** Upgraded from deprecated 1.5 versions to **Gemini 3 Flash** and **Gemini 3.1 Pro**.
 - **Resilience Engine:** Added a local SDK fallback for OpenAI models in the Admin Portal, ensuring AI features work even if the proxy linkage is interrupted (provided the admin has a local key).
 - **Proxy Sync:** Updated the backend cloud function (`callAIProxy`) to correctly route and map 2026 model strings to Vertex AI and OpenAI endpoints.
+
+## [2026-04-13] Session Updates (V89.97 → V89.98)
+### 1. Quiz Editor UI: High-Contrast Option Styling (V89.98)
+- **Visual Excellence:** Completely refactored the styling for question options in the Quiz Editor to ensure high contrast and professional aesthetics in the dark-themed portal.
+- **Readability Fix:** Eliminated inconsistent light-theme text colors (`#1e293b`) that were accidentally applied to dark background fields, restoring perfect legibility with off-white (`#f8fafc`) and neon-green (`#4ade80`) text.
+- **Logic Integrity:** Restored the robust `processQuizPaste` algorithm to its full capability after an accidental simplification, ensuring complex question/option patterns are correctly parsed.
+- **Harmony:** Synchronized option background, border, and text styles across `addQuestionUI`, `addOption`, and `updateOptionNumbers`.
+
+## [2026-04-13] Session Updates (V89.96 → V89.97)
+### 1. LIFF Initialization & Stability (V89.97)
+- **Infinite Loop Fix:** Resolved a critical bug where failed Firebase re-initialization caused the `main()` function to enter an infinite loop, hanging the mobile app. Added a robust readiness check for the database object.
+- **Mobile Compatibility:** Replaced modern JavaScript **Optional Chaining (`?.`)** with standard ternary/existence checks in the Reflective Log sorting logic to ensure compatibility with older mobile webviews typically found in the LINE app.
+- **System Synchronization:** Updated `admin.html`, `index.html`, and `SYSTEM_OVERVIEW.md` to V89.97.
 
 ## [2026-04-13] Session Updates (V89.88 → V89.89)
 ### 1. AI Engine: Gemini 404 SDK Fix (V89.89)
