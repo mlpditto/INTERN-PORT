@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MEDLIFE+ Admin V89.99</title>
-    <!-- V89.99: AI Model Stabilization & Global Version Sync -->
-    <!-- Release: 2026-04-13 10:00 UTC+7 -->
+    <title>MEDLIFE+ Admin V90.10</title>
+    <!-- V90.10: Super User Insight Hub (Unified History & Analytics) -->
+    <!-- Release: 2026-04-13 12:00 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -192,20 +192,82 @@
         </div>
     </div>
 
-    <!-- Leaderboard Chart Popup (V78.92) -->
+    <!-- Leaderboard Chart Popup (V90.00: Tabbox Insight) -->
     <div id="lbChartModal"
-        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9998; justify-content:center; align-items:center; backdrop-filter:blur(4px);">
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9998; justify-content:center; align-items:center; backdrop-filter:blur(8px);">
         <div
-            style="background:white; border-radius:18px; width:90%; max-width:750px; padding:30px; box-shadow:0 20px 60px rgba(0,0,0,0.3); position:relative; margin:auto; margin-top:8vh;">
+            style="background:white; border-radius:24px; width:92%; max-width:800px; padding:30px; box-shadow:0 30px 80px rgba(0,0,0,0.4); position:relative; margin:auto; margin-top:8vh; overflow:hidden;">
             <span onclick="document.getElementById('lbChartModal').style.display='none'"
-                style="position:absolute; top:12px; right:18px; font-size:28px; cursor:pointer; color:#999; z-index:10;">&times;</span>
-            <div id="lb-popup-header" style="display:flex; align-items:center; gap:15px; margin-bottom:20px;"></div>
-            <div id="lb-popup-chart"
-                style="width:100%; height:200px; position:relative; border-bottom:2px solid #eee; display:flex; align-items:flex-end; margin-bottom:15px; background:#fafafa; border-radius:8px; padding:10px 10px 0 10px;">
+                style="position:absolute; top:20px; right:25px; font-size:28px; cursor:pointer; color:#cbd5e1; z-index:11; transition:color 0.2s;" onmouseover="this.style.color='#64748b'" onmouseout="this.style.color='#cbd5e1'">&times;</span>
+            
+            <div id="lb-popup-header" style="display:flex; align-items:center; gap:20px; margin-bottom:25px; border-bottom:1.5px solid #f1f5f9; padding-bottom:20px;"></div>
+            
+            <!-- Insight Tabs -->
+            <div style="display:flex; gap:10px; margin-bottom:20px; background:#f8fafc; padding:5px; border-radius:12px; width:fit-content;">
+                <button class="insight-tab-btn active" onclick="switchInsightTab('activity')" id="tab-btn-activity" style="padding:8px 20px; border-radius:8px; border:none; font-weight:700; font-size:0.85em; cursor:pointer; transition:all 0.3s; background:#4361ee; color:white;">
+                    <i class="fa-solid fa-chart-line"></i> Activity
+                </button>
+                <button class="insight-tab-btn" onclick="switchInsightTab('quiz')" id="tab-btn-quiz" style="padding:8px 20px; border-radius:8px; border:none; font-weight:700; font-size:0.85em; cursor:pointer; transition:all 0.3s; background:transparent; color:#64748b;">
+                    <i class="fa-solid fa-brain"></i> Quiz Insight
+                </button>
+                <button class="insight-tab-btn" onclick="switchInsightTab('history')" id="tab-btn-history" style="padding:8px 20px; border-radius:8px; border:none; font-weight:700; font-size:0.85em; cursor:pointer; transition:all 0.3s; background:transparent; color:#64748b;">
+                    <i class="fa-solid fa-list-ul"></i> History
+                </button>
             </div>
-            <div id="lb-popup-stats"
-                style="display:flex; justify-content:space-around; align-items:center; font-size:1em; color:#444; padding:15px; background:#f8f9fa; border-radius:10px;">
+
+            <!-- Activity Container -->
+            <div id="insight-activity-view">
+                <div id="lb-popup-chart"
+                    style="width:100%; height:200px; position:relative; border-bottom:2px solid #eee; display:flex; align-items:flex-end; margin-bottom:15px; background:#fafafa; border-radius:12px; padding:10px 15px 0 15px; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02);">
+                </div>
+                <div id="lb-popup-stats"
+                    style="display:flex; justify-content:space-around; align-items:center; font-size:1em; color:#444; padding:20px; background:linear-gradient(to bottom, #f8f9fa, #ffffff); border:1px solid #f1f5f9; border-radius:16px;">
+                </div>
             </div>
+
+            <!-- Quiz Insight Container -->
+            <!-- Quiz Insight Container -->
+            <div id="insight-quiz-view" style="display:none;">
+                <div id="quiz-trend-chart" style="width:100%; height:200px; position:relative; margin-bottom:15px; background:#fdfdfd; border:1.5px solid #f1f5f9; border-radius:16px; padding:10px; display:flex; align-items:center; justify-content:center;">
+                    <div style="color:#94a3b8; font-size:0.85em; font-style:italic;"><i class="fa-solid fa-spinner fa-spin"></i> Loading Performance Trend...</div>
+                </div>
+                <div id="quiz-insight-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                    <div style="background:#f8fafc; padding:15px; border-radius:16px; border:1px solid #f1f5f9;">
+                         <div style="font-weight:800; color:#334155; font-size:0.85em; margin-bottom:10px;"><i class="fa-solid fa-tags" style="color:#6366f1;"></i> Performance by Tags</div>
+                         <div id="quiz-tags-stats" style="font-size:0.8em; color:#64748b;">(No data available)</div>
+                    </div>
+                    <div style="background:#f8fafc; padding:15px; border-radius:16px; border:1px solid #f1f5f9;">
+                         <div style="font-weight:800; color:#334155; font-size:0.85em; margin-bottom:10px;"><i class="fa-solid fa-bolt" style="color:#f59e0b;"></i> Strengths & Weaknesses</div>
+                         <div id="quiz-summary-tips" style="font-size:0.8em; color:#64748b;">Analysis pending...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History Container (Merged V90.10) -->
+            <div id="insight-history-view" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div id="hub-history-summary" style="font-weight:800; color:#334155;">-</div>
+                    <button class="btn-sm btn-warning" onclick="recalculateUserScore(window._currentPopupUser)" style="font-size:0.75em; border-radius:8px; padding:5px 12px; font-weight:800;">Recalculate Score</button>
+                </div>
+                
+                <div id="hub-dash-box" style="display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; margin-bottom:15px; background:#fcfdff; padding:12px; border-radius:15px; border:1px solid #eef2f7; text-align:center;">
+                    <div><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Quizzes</span><br><b id="hub-dash-quizzes" style="color:#4361ee; font-size:1.1em;">0</b></div>
+                    <div><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Works</span><br><b id="hub-dash-works" style="color:#10b981; font-size:1.1em;">0</b></div>
+                    <div><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Logs</span><br><b id="hub-dash-logs" style="color:#f43f5e; font-size:1.1em;">0</b></div>
+                    <div><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Bonus</span><br><b id="hub-dash-bonus" style="color:#f59e0b; font-size:1.1em;">0</b></div>
+                    <div><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Manual</span><br><b id="hub-dash-manual" style="color:#8b5cf6; font-size:1.1em;">0</b></div>
+                </div>
+
+                <div id="hub-history-list" style="margin-bottom:15px; max-height:280px; overflow-y:auto; padding-right:5px;"></div>
+                
+                <div id="hub-history-pagination" style="display:flex; justify-content:center; align-items:center; gap:15px; font-size:0.85em;">
+                    <button class="btn-sm btn-dark" onclick="changeHubHistoryPage(-1)" style="border-radius:8px; padding:4px 15px;">&lt; Prev</button>
+                    <span id="hub-history-page-info" style="font-weight:bold; color:#64748b;">1 / 1</span>
+                    <button class="btn-sm btn-dark" onclick="changeHubHistoryPage(1)" style="border-radius:8px; padding:4px 15px;">Next &gt;</button>
+                </div>
+            </div>
+            
+            <div id="lb-popup-footer" style="margin-top:20px; border-top:1.5px solid #f1f5f9; padding-top:15px;"></div>
         </div>
     </div>
     
@@ -10736,8 +10798,8 @@ async function saveQuiz() {
 
                 await db.collection("users").doc(uid).update({ score: totalScore });
                 showToast(`New Score: ${totalScore.toFixed(2)}`);
-                const user = usersData.find(u => u.id === uid);
-                document.getElementById('historyModal').style.display = 'none'; // Close history modal to refresh
+                // Refresh Hub
+                openUserHub(uid, 'history');
             } catch (e) { alert(e.message); }
         }
 
@@ -11075,8 +11137,389 @@ async function saveQuiz() {
             }
         }
 
-        // Popup enlarged chart (V78.96)
+        // --- Super User Insight Hub (V90.10) ---
+        window._hubUserCache = {};
+        window.switchInsightTab = function(tab) {
+            document.querySelectorAll('.insight-tab-btn').forEach(b => {
+                b.style.background = 'transparent';
+                b.style.color = '#64748b';
+                b.classList.remove('active');
+            });
+            const activeBtn = document.getElementById('tab-btn-' + tab);
+            if (activeBtn) {
+                activeBtn.style.background = '#4361ee';
+                activeBtn.style.color = 'white';
+                activeBtn.classList.add('active');
+            }
+
+            document.getElementById('insight-activity-view').style.display = tab === 'activity' ? 'block' : 'none';
+            document.getElementById('insight-quiz-view').style.display = tab === 'quiz' ? 'block' : 'none';
+            document.getElementById('insight-history-view').style.display = tab === 'history' ? 'block' : 'none';
+            
+            if (tab === 'quiz' && window._currentPopupUser) renderQuizInsight(window._currentPopupUser);
+            if (tab === 'history' && window._currentPopupUser) renderHubHistoryPage();
+        };
+
+        window.openUserHub = async function(userId, initialTab = 'activity') {
+            window._currentPopupUser = userId;
+            const modal = document.getElementById('lbChartModal');
+            modal.style.display = 'block';
+            
+            // 1. Find user object
+            const u = leaderboardCache.find(x => x.id === userId) || {};
+            
+            // 2. Fetch Data if not in Hub Cache or just fetch fresh for accuracy
+            document.getElementById('lb-popup-header').innerHTML = `<div style="padding:20px; color:#94a3b8;"><i class="fa-solid fa-spinner fa-spin"></i> Initializing User Hub...</div>`;
+            
+            try {
+                const [worksSnap, questsSnap, logsSnap, qAzSnap, rLogsSnap] = await Promise.all([
+                    db.collection("works").where("userId", "==", userId).get(),
+                    db.collection("quest_submissions").where("userId", "==", userId).get(),
+                    db.collection("checkin_logs").where("userId", "==", userId).get(),
+                    db.collection("quiz_attempts").where("userId", "==", userId).where("status", "==", "approved").get(),
+                    db.collection("reflective_logs").where("userId", "==", userId).get()
+                ]);
+
+                const pointsMap = {};
+                const detailsMap = {};
+                const allLogs = [];
+                const dash = { quizzes: 0, works: 0, logs: 0, bonus: 0, manual: 0 };
+
+                const addP = (dateObj, score, type, note, extra = {}) => {
+                    if (!dateObj || score === undefined) return;
+                    const dRaw = dateObj.toDate();
+                    const dStr = dRaw.toISOString().split('T')[0];
+                    if (!pointsMap[dStr]) pointsMap[dStr] = 0;
+                    pointsMap[dStr] += parseFloat(score);
+                    if (!detailsMap[dStr]) detailsMap[dStr] = [];
+                    if (parseFloat(score) !== 0) detailsMap[dStr].push({ type, note, amount: parseFloat(score) });
+                    
+                    allLogs.push({ t: dRaw, type, text: note, score: parseFloat(score), ...extra });
+                };
+
+                worksSnap.forEach(doc => { 
+                    const d = doc.data(); 
+                    addP(d.timestamp, d.score, 'work', `📁 ${d.title || 'Work'}`); 
+                    dash.works += (d.score || 0);
+                });
+                
+                questsSnap.forEach(doc => { 
+                    const d = doc.data();
+                    const s = (d.earnedScore || 0) + (d.bonusGiven || 0);
+                    if (d.status !== 'none') {
+                        addP(d.receivedAt, 0.1, 'bonus', `🚀 Receive: ${d.questTitle}`);
+                        dash.bonus += 0.1;
+                    }
+                    if (s > 0) {
+                        addP(d.submittedAt, s, 'quest', `⚡ Submit: ${d.questTitle}`);
+                        dash.quizzes += s;
+                    }
+                });
+
+                logsSnap.forEach(doc => { 
+                    const d = doc.data();
+                    const s = parseFloat(d.amount) || 0;
+                    addP(d.timestamp, s, d.type || 'log', d.note || '-', { docId: doc.id, source: 'checkin_logs' });
+                    if (d.type === 'streak') dash.bonus += s;
+                    else if (d.type === 'manual' || d.type === 'manual_adjust') dash.manual += s;
+                    else if (d.type === 'reflective_log' || d.type === 'reflective_bonus') dash.logs += s;
+                });
+
+                qAzSnap.forEach(doc => {
+                    const att = doc.data();
+                    const qData = quizzesData.find(x => x.id === att.quizId) || {};
+                    const qTitle = qData.shortTitle || qData.title || "Quiz";
+                    const score = (att.correctCount / att.totalQuestions) * (qData.totalPoints || 1.0);
+                    addP(att.timestamp, score, 'quiz', `📝 Quiz: ${qTitle}`);
+                    dash.quizzes += score;
+                });
+
+                rLogsSnap.forEach(doc => {
+                    const x = doc.data();
+                    const score = x.adminBonus || 0;
+                    allLogs.push({
+                        t: x.timestamp?.toDate(),
+                        type: 'reflective_log',
+                        text: `📔 Reflective Log: ${x.content?.substring(0, 50)}...`,
+                        score: score,
+                        isReflective: true,
+                        docId: doc.id,
+                        fullContent: x.content,
+                        adminComment: x.adminComment || ""
+                    });
+                    dash.logs += score;
+                });
+
+                allLogs.sort((a,b) => (b.t || 0) - (a.t || 0));
+                
+                // Save to Hub Cache
+                window._hubUserCache[userId] = { pointsMap, detailsMap, allLogs, dash, user: u };
+                historyCache = allLogs;
+                historyPage = 1;
+
+                // Sync UI
+                renderHubHeader(u);
+                renderActivityTab(userId);
+                updateHubDashUI(dash);
+                switchInsightTab(initialTab);
+
+            } catch (err) {
+                console.error("Hub Load Error:", err);
+                document.getElementById('lb-popup-header').innerHTML = `<div style="padding:20px; color:#ef4444;">Error loading user data.</div>`;
+            }
+        };
+
+        function renderHubHeader(u) {
+            const lv = Math.floor((u.score || 0) / 10) + 1;
+            document.getElementById('lb-popup-header').innerHTML = `
+                <img src="${u.pictureUrl}" style="width:65px; height:65px; border-radius:50%; object-fit:cover; border:3px solid #4361ee; box-shadow:0 8px 20px rgba(67,97,238,0.2);">
+                <div style="flex:1">
+                    <div style="font-size:1.4em; font-weight:900; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                        ${u.displayName} <span style="font-size:0.5em; background:linear-gradient(135deg, #4361ee, #7209b7); color:white; padding:3px 10px; border-radius:30px; letter-spacing:1px;">LV.${lv}</span>
+                    </div>
+                    <div style="font-size:0.85em; color:#64748b; margin-top:4px;">
+                        <i class="fa-regular fa-calendar" style="margin-right:4px;"></i> ${u.startDate || '?'} — ${u.endDate || '?'} 
+                        <span style="margin:0 10px; color:#cbd5e1;">|</span> 
+                        <i class="fa-solid fa-star" style="color:#f59e0b; margin-right:4px;"></i> Total Score: <b style="color:#4361ee; font-size:1.1em;">${(u.score || 0).toFixed(2)}</b>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateHubDashUI(dash) {
+            document.getElementById('hub-dash-quizzes').innerText = dash.quizzes.toFixed(2);
+            document.getElementById('hub-dash-works').innerText = dash.works.toFixed(2);
+            document.getElementById('hub-dash-logs').innerText = dash.logs.toFixed(2);
+            document.getElementById('hub-dash-bonus').innerText = dash.bonus.toFixed(2);
+            document.getElementById('hub-dash-manual').innerText = dash.manual.toFixed(2);
+            document.getElementById('hub-history-summary').innerText = `Activity Logs (${historyCache.length})`;
+        }
+
+        window.renderHubHistoryPage = function() {
+            const l = document.getElementById("hub-history-list");
+            l.innerHTML = "";
+            const s = (historyPage - 1) * 20; // Hub uses 20 per page
+            const p = historyCache.slice(s, s + 20);
+            const totalPages = Math.ceil(historyCache.length / 20);
+            
+            p.forEach((e, idx) => {
+                const globalIdx = s + idx;
+                const d = e.t ? e.t.toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
+                let cls = e.type === 'bonus' ? 'bonus' : (e.type === 'manual' ? 'manual' : '');
+                let delBtn = (e.source === 'checkin_logs' && e.docId) ? `<button class="btn-sm" style="background:none; color:#ef4444; border:none; padding:0; margin-left:8px; cursor:pointer;" onclick="deleteHubHistoryLog('${e.docId}', ${e.score})"><i class="fa-solid fa-trash-can"></i></button>` : "";
+                
+                l.innerHTML += `
+                    <div style="padding:10px 15px; border-radius:12px; border:1px solid #f1f5f9; margin-bottom:8px; background:white; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="flex:1">
+                            <div style="font-size:0.9em; font-weight:700; color:#334155;">${e.text} ${delBtn}</div>
+                            <div style="font-size:0.75em; color:#94a3b8; margin-top:2px;">${d} <span style="margin-left:5px; color:#e2e8f0;">|</span> <span style="margin-left:5px; text-transform:uppercase; font-weight:800; color:${e.type === 'quiz' ? '#4361ee' : '#64748b'}">${e.type}</span></div>
+                        </div>
+                        <div style="font-size:1em; font-weight:900; color:${e.score >=0 ? '#10b981' : '#ef4444'}">${e.score >=0 ? '+' : ''}${e.score.toFixed(2)}</div>
+                    </div>
+                `;
+            });
+            document.getElementById('hub-history-page-info').innerText = `${historyPage} / ${totalPages || 1}`;
+        }
+        
+        window.changeHubHistoryPage = function(dir) {
+            const t = Math.ceil(historyCache.length / 20);
+            const n = historyPage + dir;
+            if (n >= 1 && n <= t) {
+                historyPage = n;
+                renderHubHistoryPage();
+            }
+        }
+
+        function renderActivityTab(userId) {
+            const cache = window._hubUserCache[userId];
+            const { pointsMap, detailsMap, user: u } = cache;
+            
+            // Re-calculate Min/Max/Streak for the large chart
+            // This logic is mostly copied from renderLeaderboard but focused on this user
+            let start = u.startDate ? new Date(u.startDate) : new Date(Date.now() - 90 * 86400000);
+            let end = u.endDate ? new Date(u.endDate) : new Date();
+            const totalDays = Math.max(1, Math.ceil((end - start) / 86400000));
+            
+            let maxDaily = 0.5, minS = Infinity, maxS = -Infinity, minDate = '', maxDate = '';
+            let activeDays = 0;
+            Object.entries(pointsMap).forEach(([d, s]) => {
+                if (s > maxDaily) maxDaily = s;
+                if (s > 0) {
+                    activeDays++;
+                    if (s < minS) { minS = s; minDate = d; }
+                    if (s > maxS) { maxS = s; maxDate = d; }
+                }
+            });
+            if (minS === Infinity) minS = 0;
+            if (maxS === -Infinity) maxS = 0;
+
+            const chart = document.getElementById('lb-popup-chart');
+            chart.innerHTML = '';
+            
+            Object.keys(pointsMap).forEach(dateStr => {
+                const d = new Date(dateStr);
+                const dayOffset = (d - start) / 86400000;
+                const leftPct = (dayOffset / totalDays) * 100;
+                if (leftPct < 0 || leftPct > 100) return;
+                const score = pointsMap[dateStr];
+                const heightPct = Math.min((Math.max(0, score) / maxDaily) * 100, 100);
+                if (heightPct > 0) {
+                    const bar = document.createElement('div');
+                    const barColor = dateStr === minDate ? '#ef233c' : dateStr === maxDate ? '#28a745' : '#4361ee';
+                    bar.style.cssText = `position:absolute; bottom:0; left:${leftPct}%; height:${Math.max(3, heightPct * 0.9)}%; width:${Math.max(1, 100 / totalDays)}%; background:${barColor}; opacity:0.65; border-radius:2px 2px 0 0; cursor:pointer;`;
+                    bar.title = `${dateStr}: ${score.toFixed(2)} pts`;
+                    chart.appendChild(bar);
+                }
+            });
+
+            const elapsed = Math.max(1, Math.ceil((new Date() - start) / 86400000));
+            const activePct = Math.round((activeDays / elapsed) * 100);
+
+            document.getElementById('lb-popup-stats').innerHTML = `
+                <div style="text-align:center;"><span style="font-size:0.8em; color:#999;">Min Daily</span><br><b style="font-size:1.3em; color:#ef4444">${minS.toFixed(2)}</b></div>
+                <div style="text-align:center;"><span style="font-size:0.8em; color:#999;">Max Daily</span><br><b style="font-size:1.3em; color:#10b981">${maxS.toFixed(2)}</b></div>
+                <div style="text-align:center;"><span style="font-size:0.8em; color:#999;">Active Days</span><br><b>${activeDays}/${elapsed}</b> <small>(${activePct}%)</small></div>
+            `;
+            
+            // Footer with Cert
+            const hasCert = u.startDate && u.endDate && (u.score || 0) > 0;
+            const certRequested = u.certRequested || false;
+            document.getElementById('lb-popup-footer').innerHTML = certRequested 
+                ? `<div style="background:#fff9db; padding:12px; border-radius:12px; text-align:center; color:#e67e22; font-weight:800;"><i class="fa-solid fa-certificate"></i> Certificate Requested - Pending Approval</div>`
+                : (hasCert ? `<button class="btn btn-primary" onclick="requestCertificate('${u.id}')" style="width:100%"><i class="fa-solid fa-award"></i> Request Certificate</button>` : '');
+        }
+
+        // --- Compatibility Wrappers ---
+        window.openLbPopup = (uid) => openUserHub(uid, 'activity');
+        window.showHistory = (uid) => openUserHub(uid, 'history');
+
+        async function renderQuizInsight(userId) {
+            const chartBox = document.getElementById('quiz-trend-chart');
+            const tagBox = document.getElementById('quiz-tags-stats');
+            const summaryBox = document.getElementById('quiz-summary-tips');
+            
+            try {
+                // Fetch attempts for this user
+                const snap = await db.collection("quiz_attempts").where("userId", "==", userId).where("status", "==", "approved").get();
+                if (snap.empty) {
+                    chartBox.innerHTML = '<div style="color:#94a3b8; font-size:0.85em;">No quiz data available for trend analysis.</div>';
+                    tagBox.innerHTML = '(No quiz history)';
+                    summaryBox.innerHTML = 'Complete quizzes to see analysis.';
+                    return;
+                }
+
+                const attempts = snap.docs.map(doc => ({id: doc.id, ...doc.data()})).sort((a,b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
+                
+                // 1. Render Trend SVG
+                chartBox.innerHTML = drawQuizTrendLine(attempts);
+
+                // 2. Tag Performance
+                const tagScores = {}; // {tag: {sumPct, count}}
+                attempts.forEach(att => {
+                    const qData = quizzesData.find(x => x.id === att.quizId);
+                    if (qData && qData.tags) {
+                        const tags = qData.tags.split(',').map(t => t.trim()).filter(t => t);
+                        const pct = (att.correctCount / att.totalQuestions) * 100;
+                        tags.forEach(t => {
+                            if (!tagScores[t]) tagScores[t] = { sum: 0, count: 0 };
+                            tagScores[t].sum += pct;
+                            tagScores[t].count++;
+                        });
+                    }
+                });
+
+                let tagHtml = "";
+                const sortedTags = Object.entries(tagScores).sort((a,b) => (b[1].sum / b[1].count) - (a[1].sum / a[1].count));
+                
+                if (sortedTags.length === 0) tagHtml = "(No tagged quizzes found)";
+                sortedTags.forEach(([tag, data]) => {
+                    const avg = data.sum / data.count;
+                    const color = avg >= 80 ? '#10b981' : avg >= 50 ? '#f59e0b' : '#ef4444';
+                    tagHtml += `
+                        <div style="margin-bottom:8px;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:3px; font-weight:700;">
+                                <span>${tag}</span>
+                                <span style="color:${color}">${avg.toFixed(1)}%</span>
+                            </div>
+                            <div style="width:100%; height:6px; background:#e2e8f0; border-radius:10px; overflow:hidden;">
+                                <div style="width:${avg}%; height:100%; background:${color}; border-radius:10px;"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+                tagBox.innerHTML = tagHtml;
+
+                // 3. Simple Strength/Weakness
+                if (sortedTags.length > 0) {
+                    const best = sortedTags[0];
+                    const worst = sortedTags[sortedTags.length - 1];
+                    summaryBox.innerHTML = `
+                        <div style="margin-bottom:10px; padding:10px; background:rgba(16,185,129,0.05); border-radius:10px; border-left:4px solid #10b981;">
+                            <div style="font-weight:bold; color:#065f46; font-size:0.9em;">🌟 Strength</div>
+                            <div style="font-size:0.85em;">Excellent performance in <b>${best[0]}</b>. Keep it up!</div>
+                        </div>
+                        <div style="padding:10px; background:rgba(239,68,68,0.05); border-radius:10px; border-left:4px solid #ef4444;">
+                            <div style="font-weight:bold; color:#991b1b; font-size:0.9em;">⚠️ Area for Improvement</div>
+                            <div style="font-size:0.85em;">Consider reviewing <b>${worst[0]}</b> modules (Avg: ${(worst[1].sum / worst[1].count).toFixed(1)}%).</div>
+                        </div>
+                    `;
+                } else {
+                    summaryBox.innerHTML = "Participate in more tagged quizzes to unlock skill profiling.";
+                }
+
+            } catch (err) {
+                console.error("Quiz Insight error:", err);
+                chartBox.innerHTML = "Error loading trend.";
+            }
+        }
+
+        function drawQuizTrendLine(attempts) {
+            const w = 700, h = 180;
+            const padding = 30;
+            const points = attempts.map((att, i) => ({
+                x: padding + (i * ((w - 2 * padding) / Math.max(1, attempts.length - 1))),
+                y: h - padding - (((att.correctCount / att.totalQuestions)) * (h - 2 * padding)),
+                pct: (att.correctCount / att.totalQuestions) * 100,
+                title: att.quizTitle || 'Quiz'
+            }));
+
+            let pathD = "M" + points.map(p => `${p.x},${p.y}`).join(" L");
+            let areaD = pathD + ` L${points[points.length-1].x},${h-padding} L${points[0].x},${h-padding} Z`;
+
+            let dots = points.map(p => `
+                <circle cx="${p.x}" cy="${p.y}" r="4" fill="white" stroke="#4361ee" stroke-width="2">
+                    <title>${p.title}: ${p.pct.toFixed(1)}%</title>
+                </circle>
+            `).join("");
+
+            return `
+                <svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="overflow:visible;">
+                    <defs>
+                        <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#4361ee" stop-opacity="0.2"/>
+                            <stop offset="100%" stop-color="#4361ee" stop-opacity="0"/>
+                        </linearGradient>
+                    </defs>
+                    <!-- Grid Lines -->
+                    <line x1="${padding}" y1="${padding}" x2="${w-padding}" y2="${padding}" stroke="#f1f5f9" stroke-width="1" />
+                    <line x1="${padding}" y1="${(h-2*padding)/2 + padding}" x2="${w-padding}" y2="${(h-2*padding)/2 + padding}" stroke="#f1f5f9" stroke-width="1" />
+                    <line x1="${padding}" y1="${h-padding}" x2="${w-padding}" y2="${h-padding}" stroke="#e2e8f0" stroke-width="1.5" />
+                    
+                    <!-- Labels -->
+                    <text x="${padding-5}" y="${padding+4}" text-anchor="end" font-size="10" fill="#94a3b8">100%</text>
+                    <text x="${padding-5}" y="${h-padding+4}" text-anchor="end" font-size="10" fill="#94a3b8">0%</text>
+
+                    <!-- Area & Line -->
+                    <path d="${areaD}" fill="url(#trendGrad)" />
+                    <path d="${pathD}" fill="none" stroke="#4361ee" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                    ${dots}
+                </svg>
+            `;
+        }
+
         function openLbPopup(userId) {
+            window._currentPopupUser = userId;
+            switchInsightTab('activity');
             const cache = window._lbChartCache && window._lbChartCache[userId];
             if (!cache) return;
             const { pointsMap, detailsMap, start, end, maxDaily, totalDays, minS, maxS, minDate, maxDate, minDateTh, maxDateTh, longestStreak, streakRange, activeDays, elapsedDays, activePct, user: u } = cache;
