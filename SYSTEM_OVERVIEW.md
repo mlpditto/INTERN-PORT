@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V89.92) Overview
+# MLP Internship Portfolio (V89.94) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** 
@@ -79,6 +79,15 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-04-13] Session Updates (V89.92 → V89.94)
+### 1. Tag UI Polish: Visibility & Deletion (V89.94)
+- **Enhanced Tag Chips:** Increased the visibility of the "X" (Delete) icon on each tag. The icon now turns red and enlarges on hover to make it clear that it is an interactive deletion button.
+- **Improved Contrast:** Adjusted tag chip backgrounds and padding for better readability.
+
+### 2. LIFF Quiz Discovery: Auto-Open & Badges (V89.93)
+- **Auto-Expansion:** The Quiz section in the user LIFF now automatically expands if there are active quizzes.
+- **Task Badges:** Added a red count badge to the Quiz header to notify users of pending tasks.
 
 ## [2026-04-13] Session Updates (V89.89 → V89.92)
 ### 1. AI Modernization: GPT-5.4 & Gemini 3.1 (Standard 2026)
@@ -684,4 +693,4 @@ service cloud.firestore {
     - **Date & Time Formatting:** ปรับการแสดงผลวันที่และเวลาให้ใช้รูปแบบ `en-US` (เช่น Mar 23, 2026) ทั่วทั้งระบบเพื่อความสม่ำเสมอ
 
 ---
-*บันทึกภาพรวมระบบสะท้อนความจริง (V89.92) โดย Antigravity AI*
+*บันทึกภาพรวมระบบสะท้อนความจริง (V89.94) โดย Antigravity AI*
