@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V89.94) Overview
+# MLP Internship Portfolio (V89.96) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** 
@@ -79,6 +79,16 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-04-13] Session Updates (V89.94 → V89.96)
+### 1. LIFF Connection Resilience (V89.96)
+- **Embedded Configuration:** Embedded the Firebase configuration directly into `index.html` to eliminate external file dependency failures.
+- **Fail-safe Global Boot:** Implemented a robust "Check & Re-init" loop that ensures the `db` (Firestore) object is active before allowing the UI to load, resolving stuck "Connecting to Database" screens.
+- **Enhanced Status Indicators:** Improved visual feedback on the loading screen to differentiate between "Connecting" and "SDK Loading" phases.
+
+### 2. UI Polish & Stability (V89.95)
+- **Participant Modal UI:** Redesigned the Quiz Participant table in Admin Portal with high-contrast icons, professional action buttons, and better row legibility.
+- **Boot Readiness Check:** Initial implementation of the Firebase readiness check in LIFF.
 
 ## [2026-04-13] Session Updates (V89.92 → V89.94)
 ### 1. Tag UI Polish: Visibility & Deletion (V89.94)
@@ -693,4 +703,4 @@ service cloud.firestore {
     - **Date & Time Formatting:** ปรับการแสดงผลวันที่และเวลาให้ใช้รูปแบบ `en-US` (เช่น Mar 23, 2026) ทั่วทั้งระบบเพื่อความสม่ำเสมอ
 
 ---
-*บันทึกภาพรวมระบบสะท้อนความจริง (V89.94) โดย Antigravity AI*
+*บันทึกภาพรวมระบบสะท้อนความจริง (V89.96) โดย Antigravity AI*

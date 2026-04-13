@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Intern Progress Online (V89.95)</title>
+    <title>Intern Progress Online (V89.96)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -1334,9 +1334,25 @@
         </div>
     </div>
 
-    <script src="firebase-config.js?v=65"></script>
-
+    <!-- 🔥 V89.96: Embedded Config for maximum reliability in LIFF/Preview -->
     <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCnyZoNfk_YE7TfLeEXFo9GgA-QMj3tv6Q",
+            authDomain: "intern-port-edfa7.firebaseapp.com",
+            projectId: "intern-port-edfa7",
+            storageBucket: "intern-port-edfa7.firebasestorage.app",
+            messagingSenderId: "367076866368",
+            appId: "1:367076866368:web:9c6559652cb0a78ddce2a5",
+            measurementId: "G-5R5CEKCN44"
+        };
+        var db; 
+        try {
+            if (typeof firebase !== 'undefined') {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+            }
+        } catch(e) { console.warn("Initial Firebase boot delayed"); }
+
         const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ✅ Updated ID
 
         let userId = "", userProfile = {}, userSubmissions = {};
@@ -1407,16 +1423,29 @@
         }
 
         async function main() {
-            // 🔥 V89.95: Critical Readiness Check for Firebase
-            if (typeof firebase === 'undefined' || typeof db === 'undefined') {
-                console.warn("[Firebase] SDK/Config not ready yet. Booting retry...");
-                updateStatus("<i class='fa-solid fa-spinner fa-spin'></i> ⚡ Connecting to Database...");
-                setTimeout(main, 400); // Retry boot
+            // 🔥 V89.96: Enhanced Readiness Check
+            if (typeof firebase === 'undefined' || typeof firebase.initializeApp !== 'function') {
+                updateStatus("<span style='color:#ef233c;'>❌ Firebase SDK Error</span><br><small>กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต</small>");
+                setTimeout(main, 2000);
                 return;
             }
 
-            console.log("Main Execution Started (V89.95)");
-            updateStatus("System Starting (V89.95)...");
+            if (typeof db === 'undefined') {
+                try {
+                    // Force Re-init if SDK is there but db is not
+                    firebase.initializeApp(firebaseConfig);
+                    db = firebase.firestore();
+                } catch(e) { console.warn("DB Re-init attempt..."); }
+                
+                if (typeof db === 'undefined') {
+                    updateStatus("<i class='fa-solid fa-spinner fa-spin'></i> ⚡ Connecting to Core...");
+                    setTimeout(main, 500);
+                    return;
+                }
+            }
+
+            console.log("Main Execution Started (V89.96)");
+            updateStatus("System Starting (V89.96)...");
             try {
                 const urlParams = new URLSearchParams(window.location.search);
                 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
