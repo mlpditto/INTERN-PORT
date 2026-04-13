@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V89.89) Overview
+# MLP Internship Portfolio (V89.92) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** 
@@ -79,6 +79,13 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-04-13] Session Updates (V89.89 → V89.92)
+### 1. AI Modernization: GPT-5.4 & Gemini 3.1 (Standard 2026)
+- **GPT Migration:** Fully migrated from retired GPT-4o models to the new **GPT-5.4 family** (Flagship and Mini).
+- **Gemini Upgrade:** Upgraded from deprecated 1.5 versions to **Gemini 3 Flash** and **Gemini 3.1 Pro**.
+- **Resilience Engine:** Added a local SDK fallback for OpenAI models in the Admin Portal, ensuring AI features work even if the proxy linkage is interrupted (provided the admin has a local key).
+- **Proxy Sync:** Updated the backend cloud function (`callAIProxy`) to correctly route and map 2026 model strings to Vertex AI and OpenAI endpoints.
 
 ## [2026-04-13] Session Updates (V89.88 → V89.89)
 ### 1. AI Engine: Gemini 404 SDK Fix (V89.89)
@@ -677,4 +684,4 @@ service cloud.firestore {
     - **Date & Time Formatting:** ปรับการแสดงผลวันที่และเวลาให้ใช้รูปแบบ `en-US` (เช่น Mar 23, 2026) ทั่วทั้งระบบเพื่อความสม่ำเสมอ
 
 ---
-*บันทึกภาพรวมระบบสะท้อนความจริง (V89.89) โดย Antigravity AI*
+*บันทึกภาพรวมระบบสะท้อนความจริง (V89.92) โดย Antigravity AI*
