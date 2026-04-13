@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Intern Progress Online (V89.96)</title>
+    <title>Intern Progress Online (V89.99)</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -975,7 +975,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V89.81 (Login Recovery Update)
+                V89.97 (Stability & Compat Fix)
             </div>
         </div>
     </div>
@@ -1430,22 +1430,30 @@
                 return;
             }
 
-            if (typeof db === 'undefined') {
+            if (typeof db === 'undefined' || db === null) {
                 try {
-                    // Force Re-init if SDK is there but db is not
-                    firebase.initializeApp(firebaseConfig);
+                    if (firebase.apps.length === 0) {
+                        firebase.initializeApp(firebaseConfig);
+                    }
                     db = firebase.firestore();
-                } catch(e) { console.warn("DB Re-init attempt..."); }
+                } catch(e) { 
+                    console.warn("Firebase Init Error/Already Exists: ", e);
+                    try {
+                        db = firebase.app().firestore();
+                    } catch(e2) {
+                        console.error("Critical Firestore Failure:", e2);
+                    }
+                }
                 
-                if (typeof db === 'undefined') {
-                    updateStatus("<i class='fa-solid fa-spinner fa-spin'></i> ⚡ Connecting to Core...");
-                    setTimeout(main, 500);
+                if (typeof db === 'undefined' || db === null) {
+                    updateStatus("<i class='fa-solid fa-spinner fa-spin'></i> ⚡ Connecting to Core (Retry)...");
+                    setTimeout(main, 1000);
                     return;
                 }
             }
 
-            console.log("Main Execution Started (V89.96)");
-            updateStatus("System Starting (V89.96)...");
+            console.log("Main Execution Started (V89.97)");
+            updateStatus("System Starting (V89.97)...");
             try {
                 const urlParams = new URLSearchParams(window.location.search);
                 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -4053,7 +4061,11 @@
             let lastDate = null;
 
             // Sorting by date descending for streak calculation
-            const sortedLogs = [...reflectiveLogsCache].sort((a,b) => b.timestamp?.toDate() - a.timestamp?.toDate());
+            const sortedLogs = [...reflectiveLogsCache].sort((a,b) => {
+                const tA = a.timestamp ? a.timestamp.toDate().getTime() : 0;
+                const tB = b.timestamp ? b.timestamp.toDate().getTime() : 0;
+                return tB - tA;
+            });
 
             // 🔥 Update total count [V89.95]
             const totalCount = reflectiveLogsCache.length;
