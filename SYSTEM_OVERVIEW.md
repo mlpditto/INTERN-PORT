@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V89.85) Overview
+# MLP Internship Portfolio (V89.86) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** 
@@ -79,6 +79,12 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-04-13] Session Updates (V89.85 → V89.86)
+### 1. User Portfolio: Log Counter & Quiz Clarity (V89.86)
+- **Log Counter:** Added a total submission counter `rl-header-count` to the Mission header in `index.html`. Users can now see their total Reflective Log count at a glance even when the section is collapsed.
+- **Empty Quiz Guidance:** Improved the "No Quizzes" message to include a prompt suggesting users check their assigned "Group" in their profile, addressing cases where quizzes exist but are filtered by `targetGroup`.
+- **System Synchronization:** Updated `admin.html`, `index.html`, and `SYSTEM_OVERVIEW.md` to V89.86.
 
 ## [2026-04-13] Session Updates (V89.84 → V89.85)
 ### 1. GLM-5.1 & Ollama Cloud Integration (V89.85)
@@ -655,4 +661,4 @@ service cloud.firestore {
     - **Date & Time Formatting:** ปรับการแสดงผลวันที่และเวลาให้ใช้รูปแบบ `en-US` (เช่น Mar 23, 2026) ทั่วทั้งระบบเพื่อความสม่ำเสมอ
 
 ---
-*บันทึกภาพรวมระบบสะท้อนความจริง (V89.85) โดย Antigravity AI*
+*บันทึกภาพรวมระบบสะท้อนความจริง (V89.86) โดย Antigravity AI*
