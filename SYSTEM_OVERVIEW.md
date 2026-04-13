@@ -1,4 +1,4 @@
-# MLP Internship Portfolio (V89.86) Overview
+# MLP Internship Portfolio (V89.87) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):** 
@@ -79,6 +79,11 @@
     - ใช้ Typography ระดับพรีเมียม (Garamond & Montserrat) พร้อมระบบ Auto-fit ชื่อผู้รับ
     - เพิ่มระดับความปลอดภัยด้วย Watermark, Serial Number และ Digital QR Placeholder
     - ดีไซน์ทันสมัยด้วย Gold Accent และ Modern Navy Curve สำหรับพิมพ์ลงกระดาษ A4
+
+## [2026-04-13] Session Updates (V89.86 → V89.87)
+### 1. Admin Clarity: Target Group Visibility (V89.87)
+- **Target Group Labels:** Updated the Admin Poratal's quiz table to always display the `targetGroup` badge (e.g., "Public", "INTERN"). This helps admins identify why certain users might not see a specific quiz.
+- **Visual Polish:** Used distinct colors for "Public" (neutral slate) vs. custom groups (vibrant blue) to make scanning easier.
 
 ## [2026-04-13] Session Updates (V89.85 → V89.86)
 ### 1. User Portfolio: Log Counter & Quiz Clarity (V89.86)
@@ -661,4 +666,4 @@ service cloud.firestore {
     - **Date & Time Formatting:** ปรับการแสดงผลวันที่และเวลาให้ใช้รูปแบบ `en-US` (เช่น Mar 23, 2026) ทั่วทั้งระบบเพื่อความสม่ำเสมอ
 
 ---
-*บันทึกภาพรวมระบบสะท้อนความจริง (V89.86) โดย Antigravity AI*
+*บันทึกภาพรวมระบบสะท้อนความจริง (V89.87) โดย Antigravity AI*
