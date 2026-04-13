@@ -102,16 +102,17 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"], ti
 
             let actualModelName = model || "gemini-1.5-flash-002";
             
-            // Standardize model name for Vertex AI targeting
+            // Standardize model name for Vertex AI targeting (V89.90 - April 2026)
             if (model?.startsWith('gemini-') || !model) {
                 if (model?.includes('pro')) {
-                    actualModelName = "gemini-1.5-pro-002";
-                } else if (model?.includes('flash') || model?.includes('2.0') || model?.includes('3.1') || !model) {
-                    // All variants of flash (including 2.0 exp or 3.1 placeholders) map to 1.5-flash stability
-                    actualModelName = "gemini-1.5-flash-002";
+                    actualModelName = "gemini-3.1-pro-001"; // Latest Pro on Vertex
+                } else if (model?.includes('3.1')) {
+                    actualModelName = "gemini-3.1-flash-001"; 
+                } else if (model?.includes('3')) {
+                    actualModelName = "gemini-3-flash-001";
                 } else {
-                    // Fallback for generic 'gemini-' or empty model
-                    actualModelName = "gemini-1.5-flash-002";
+                    // Fallback for generic 'gemini-' or legacy requests
+                    actualModelName = "gemini-3-flash-001";
                 }
             }
 
