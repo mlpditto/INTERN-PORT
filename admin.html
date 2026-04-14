@@ -12943,10 +12943,10 @@ async function saveQuiz() {
             let fontSize = 72;
             const maxWidth = w * 0.55;
 
-            ctx.font = `bold italic ${fontSize}px 'Montserrat', sans-serif`;
+            ctx.font = 'bold italic ' + fontSize + 'px Montserrat, sans-serif';
             while (ctx.measureText(recipientName).width > maxWidth && fontSize > 24) {
                 fontSize -= 2;
-                ctx.font = `bold italic ${fontSize}px 'Montserrat', sans-serif`;
+                ctx.font = 'bold italic ' + fontSize + 'px Montserrat, sans-serif';
             }
 
             // Add subtle shadow to name
@@ -13230,31 +13230,46 @@ async function saveQuiz() {
             });
         }
 
-        async function updateCertPreview() {
-            const c = document.getElementById('cert-canvas');
-            const ctx = c.getContext('2d');
+                async function updateCertPreview() {
+            try {
+                const c = document.getElementById('cert-canvas');
+                if (!c) return;
+                const ctx = c.getContext('2d');
+                if (!ctx) return;
 
-            c.width = 800;
-            c.height = 600;
+                // Reset canvas
+                c.width = 800;
+                c.height = 600;
+                ctx.clearRect(0, 0, 800, 600);
 
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
+                const s = document.getElementById('cert-start').value || "";
+                const e = document.getElementById('cert-end').value || "";
+                const fn = document.getElementById('cert-fullname').value || "";
+                const nn = document.getElementById('cert-nickname') ? document.getElementById('cert-nickname').value : '';
+                const includeNn = document.getElementById('cert-include-nickname') ? document.getElementById('cert-include-nickname').checked : true;
 
-            const s = document.getElementById('cert-start').value;
-            const e = document.getElementById('cert-end').value;
-            const fn = document.getElementById('cert-fullname').value;
-            const nn = document.getElementById('cert-nickname') ? document.getElementById('cert-nickname').value : '';
-            const includeNn = document.getElementById('cert-include-nickname') ? document.getElementById('cert-include-nickname').checked : true;
+                const awardCheckboxes = document.querySelectorAll('input[name="cert-award"]:checked');
+                const awards = Array.from(awardCheckboxes).map(cb => cb.value);
 
-            const awardCheckboxes = document.querySelectorAll('input[name="cert-award"]:checked');
-            const awards = Array.from(awardCheckboxes).map(cb => cb.value);
+                // Safety checks for certUser
+                const level = certUser ? certUser.level : 1;
+                const score = certUser ? certUser.score : 0;
+                const baseName = certUser ? certUser.name : "Intern";
 
-            let displayNameForCert = fn || (certUser ? certUser.name : "Student Name");
-            if (nn && includeNn) {
-                displayNameForCert += `|${nn}`;
+                let displayNameForCert = fn || baseName;
+                if (nn && includeNn) {
+                    displayNameForCert += `|${nn}`;
+                }
+
+                const dateStr = s && e ? `${s} - ${e}` : "";
+                
+                // Final Draw Call
+                drawCertificate(ctx, displayNameForCert, dateStr, awards, level, score);
+            } catch(err) {
+                console.error("Cert Preview Error:", err);
             }
-
-            drawCertificate(ctx, displayNameForCert, s && e ? `${s} - ${e}` : "", awards, certUser.level, certUser.score);
         }
+
         async function generateBulkCert() {
             const { jsPDF } = window.jspdf;
             const users = usersData.filter(u => !u.isIgnored && u.startDate && u.endDate);
