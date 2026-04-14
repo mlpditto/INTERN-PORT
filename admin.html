@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MEDLIFE+ Admin V90.22 (Turbo)</title>
-    <!-- V90.22: Laugh Tale Dark Mode Stabilization -->
-    <!-- Release: 2026-04-14 19:55 UTC+7 -->
+    <title>MEDLIFE+ Admin V90.23 (Turbo)</title>
+    <!-- V90.23: User Hub Dashboard - Added Item Counters -->
+    <!-- Release: 2026-04-14 20:25 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -251,11 +251,11 @@
                 </div>
                 
                 <div id="hub-dash-box" style="display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; margin-bottom:15px; background:#fcfdff; padding:12px; border-radius:15px; border:1px solid #eef2f7; text-align:center;">
-                    <div><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Quizzes</span><br><b id="hub-dash-quizzes" style="color:#4361ee; font-size:1.1em;">0</b></div>
-                    <div><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Works</span><br><b id="hub-dash-works" style="color:#10b981; font-size:1.1em;">0</b></div>
-                    <div><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Logs</span><br><b id="hub-dash-logs" style="color:#f43f5e; font-size:1.1em;">0</b></div>
-                    <div><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Bonus</span><br><b id="hub-dash-bonus" style="color:#f59e0b; font-size:1.1em;">0</b></div>
-                    <div><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Manual</span><br><b id="hub-dash-manual" style="color:#8b5cf6; font-size:1.1em;">0</b></div>
+                    <div><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Quizzes</span><br><b id="hub-dash-quizzes" style="color:#4361ee; font-size:1.1em;">0</b> <small id="hub-dash-quizzes-count" style="font-size:0.7em; color:#94a3b8; font-weight:700;">(0)</small></div>
+                    <div><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Works</span><br><b id="hub-dash-works" style="color:#10b981; font-size:1.1em;">0</b> <small id="hub-dash-works-count" style="font-size:0.7em; color:#94a3b8; font-weight:700;">(0)</small></div>
+                    <div><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Logs</span><br><b id="hub-dash-logs" style="color:#f43f5e; font-size:1.1em;">0</b> <small id="hub-dash-logs-count" style="font-size:0.7em; color:#94a3b8; font-weight:700;">(0)</small></div>
+                    <div><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Bonus</span><br><b id="hub-dash-bonus" style="color:#f59e0b; font-size:1.1em;">0</b> <small id="hub-dash-bonus-count" style="font-size:0.7em; color:#94a3b8; font-weight:700;">(0)</small></div>
+                    <div><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Manual</span><br><b id="hub-dash-manual" style="color:#8b5cf6; font-size:1.1em;">0</b> <small id="hub-dash-manual-count" style="font-size:0.7em; color:#94a3b8; font-weight:700;">(0)</small></div>
                 </div>
 
                 <div id="hub-history-list" style="margin-bottom:15px; max-height:280px; overflow-y:auto; padding-right:5px;"></div>
@@ -11336,7 +11336,7 @@ async function saveQuiz() {
                 const pointsMap = {};
                 const detailsMap = {};
                 const allLogs = [];
-                const dash = { quizzes: 0, works: 0, logs: 0, bonus: 0, manual: 0 };
+                const dash = { quizzes: 0, works: 0, logs: 0, bonus: 0, manual: 0, qc:0, wc:0, lc:0, bc:0, mc:0 };
 
                 const addP = (dateObj, score, type, note, extra = {}) => {
                     if (!dateObj || score === undefined) return;
@@ -11354,6 +11354,7 @@ async function saveQuiz() {
                     const d = doc.data(); 
                     addP(d.timestamp, d.score, 'work', `📁 ${d.title || 'Work'}`); 
                     dash.works += (d.score || 0);
+                    dash.wc++;
                 });
                 
                 questsSnap.forEach(doc => { 
@@ -11362,10 +11363,12 @@ async function saveQuiz() {
                     if (d.status !== 'none') {
                         addP(d.receivedAt, 0.1, 'bonus', `🚀 Receive: ${d.questTitle}`);
                         dash.bonus += 0.1;
+                        dash.bc++;
                     }
                     if (s > 0) {
                         addP(d.submittedAt, s, 'quest', `⚡ Submit: ${d.questTitle}`);
                         dash.quizzes += s;
+                        dash.qc++;
                     }
                 });
 
@@ -11373,9 +11376,9 @@ async function saveQuiz() {
                     const d = doc.data();
                     const s = parseFloat(d.amount) || 0;
                     addP(d.timestamp, s, d.type || 'log', d.note || '-', { docId: doc.id, source: 'checkin_logs' });
-                    if (d.type === 'streak') dash.bonus += s;
-                    else if (d.type === 'manual' || d.type === 'manual_adjust') dash.manual += s;
-                    else if (d.type === 'reflective_log' || d.type === 'reflective_bonus') dash.logs += s;
+                    if (d.type === 'streak') { dash.bonus += s; dash.bc++; }
+                    else if (d.type === 'manual' || d.type === 'manual_adjust') { dash.manual += s; dash.mc++; }
+                    else if (d.type === 'reflective_log' || d.type === 'reflective_bonus') { dash.logs += s; dash.lc++; }
                 });
 
                 qAzSnap.forEach(doc => {
@@ -11385,6 +11388,7 @@ async function saveQuiz() {
                     const score = (att.correctCount / att.totalQuestions) * (qData.totalPoints || 1.0);
                     addP(att.timestamp, score, 'quiz', `📝 Quiz: ${qTitle}`);
                     dash.quizzes += score;
+                    dash.qc++;
                 });
 
                 rLogsSnap.forEach(doc => {
@@ -11401,6 +11405,7 @@ async function saveQuiz() {
                         adminComment: x.adminComment || ""
                     });
                     dash.logs += score;
+                    dash.lc++;
                 });
 
                 allLogs.sort((a,b) => (b.t || 0) - (a.t || 0));
@@ -11445,10 +11450,15 @@ async function saveQuiz() {
 
         function updateHubDashUI(dash) {
             document.getElementById('hub-dash-quizzes').innerText = dash.quizzes.toFixed(2);
+            document.getElementById('hub-dash-quizzes-count').innerText = `(${dash.qc})`;
             document.getElementById('hub-dash-works').innerText = dash.works.toFixed(2);
+            document.getElementById('hub-dash-works-count').innerText = `(${dash.wc})`;
             document.getElementById('hub-dash-logs').innerText = dash.logs.toFixed(2);
+            document.getElementById('hub-dash-logs-count').innerText = `(${dash.lc})`;
             document.getElementById('hub-dash-bonus').innerText = dash.bonus.toFixed(2);
+            document.getElementById('hub-dash-bonus-count').innerText = `(${dash.bc})`;
             document.getElementById('hub-dash-manual').innerText = dash.manual.toFixed(2);
+            document.getElementById('hub-dash-manual-count').innerText = `(${dash.mc})`;
             document.getElementById('hub-history-summary').innerText = `Activity Logs (${historyCache.length})`;
         }
 
