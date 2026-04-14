@@ -11282,6 +11282,7 @@ async function saveQuiz() {
 
         window.openUserHub = async function(userId, initialTab = 'activity') {
             window._currentPopupUser = userId;
+            window._hubTagPage = 1;
             const modal = document.getElementById('lbChartModal');
             modal.style.display = 'block';
             
@@ -11587,25 +11588,45 @@ async function saveQuiz() {
                     }
                 });
 
-                let tagHtml = "";
+                if (!window._hubTagPage) window._hubTagPage = 1;
+                const tagsPerPage = 8;
                 const sortedTags = Object.entries(tagScores).sort((a,b) => (b[1].sum / b[1].count) - (a[1].sum / a[1].count));
+                const totalTagPages = Math.ceil(sortedTags.length / tagsPerPage);
                 
-                if (sortedTags.length === 0) tagHtml = "(No tagged quizzes found)";
-                sortedTags.forEach(([tag, data]) => {
-                    const avg = data.sum / data.count;
-                    const color = avg >= 80 ? '#10b981' : avg >= 50 ? '#f59e0b' : '#ef4444';
-                    tagHtml += `
-                        <div style="margin-bottom:8px;">
-                            <div style="display:flex; justify-content:space-between; margin-bottom:3px; font-weight:700;">
-                                <span>${tag}</span>
-                                <span style="color:${color}">${avg.toFixed(1)}%</span>
+                let tagHtml = "";
+                if (sortedTags.length === 0) {
+                    tagHtml = "(No tagged quizzes found)";
+                } else {
+                    const startIdx = (window._hubTagPage - 1) * tagsPerPage;
+                    const paginatedTags = sortedTags.slice(startIdx, startIdx + tagsPerPage);
+                    
+                    paginatedTags.forEach(([tag, data]) => {
+                        const avg = data.sum / data.count;
+                        const color = avg >= 80 ? '#10b981' : avg >= 50 ? '#f59e0b' : '#ef4444';
+                        tagHtml += `
+                            <div style="margin-bottom:8px;">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:3px; font-weight:700;">
+                                    <span style="font-size:0.85em; color:#475569;">${tag}</span>
+                                    <span style="font-size:0.85em; color:${color}">${avg.toFixed(1)}%</span>
+                                </div>
+                                <div style="width:100%; height:6px; background:#e2e8f0; border-radius:10px; overflow:hidden;">
+                                    <div style="width:${avg}%; height:100%; background:${color}; border-radius:10px; transition:width 0.5s ease-out;"></div>
+                                </div>
                             </div>
-                            <div style="width:100%; height:6px; background:#e2e8f0; border-radius:10px; overflow:hidden;">
-                                <div style="width:${avg}%; height:100%; background:${color}; border-radius:10px;"></div>
+                        `;
+                    });
+
+                    // Tag Pagination Controls (Turbo Style)
+                    if (totalTagPages > 1) {
+                        tagHtml += `
+                            <div style="display:flex; justify-content:center; align-items:center; gap:12px; margin-top:15px; padding-top:10px; border-top:1px dashed #e2e8f0;">
+                                <button onclick="changeTagPage('${userId}', -1)" ${window._hubTagPage === 1 ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''} style="background:#f1f5f9; border:none; padding:4px 10px; border-radius:8px; font-weight:900; cursor:pointer;">⬅️</button>
+                                <span style="font-size:0.75em; font-weight:900; color:#94a3b8;">${window._hubTagPage} / ${totalTagPages}</span>
+                                <button onclick="changeTagPage('${userId}', 1)" ${window._hubTagPage >= totalTagPages ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''} style="background:#f1f5f9; border:none; padding:4px 10px; border-radius:8px; font-weight:900; cursor:pointer;">➡️</button>
                             </div>
-                        </div>
-                    `;
-                });
+                        `;
+                    }
+                }
                 tagBox.innerHTML = tagHtml;
 
                 // 3. Simple Strength/Weakness
@@ -11630,6 +11651,11 @@ async function saveQuiz() {
                 console.error("Quiz Insight error:", err);
                 chartBox.innerHTML = "Error loading trend.";
             }
+        }
+
+        window.changeTagPage = function(userId, dir) {
+            window._hubTagPage = (window._hubTagPage || 1) + dir;
+            renderQuizInsight(userId);
         }
 
         function drawQuizTrendLine(attempts) {
