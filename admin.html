@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MEDLIFE+ Admin V90.24 (Turbo)</title>
-    <!-- V90.24: User Hub UI Expansion - 20 items/page & Larger Popup -->
-    <!-- Release: 2026-04-14 20:30 UTC+7 -->
+    <title>MEDLIFE+ Admin V90.25 (Turbo)</title>
+    <!-- V90.25: Integrated Daily Quests into Kanban Board -->
+    <!-- Release: 2026-04-14 20:45 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -1790,37 +1790,18 @@
                 </div>
             </div>
 
-            <!-- 🔥 Daily Quests Management Section (Moved below Kanban Board) -->
-            <div id="daily-quest-management-section" class="review-card" style="border-color:#ffe8d1; border-radius:12px; margin-top:30px; margin-bottom:15px; background:#fffaf5;">
-                <h4 style="color:#d35400; font-size:1.1em; border-bottom:1px solid #ffe8d1; padding-bottom:10px; margin-bottom:15px; display:flex; align-items:center; gap:8px;">
-                    <i class="fa-solid fa-scroll"></i> Daily Quests Management
-                    <button class="btn-sm" style="margin-left:auto; background:none; border:none; color:#999; cursor:pointer;" title="Quest History"
-                        onclick="const el = document.getElementById('questHistoryContainer'); el.style.display = el.style.display === 'none' ? 'block' : 'none'">
-                        <i class="fa-solid fa-clock-rotate-left"></i>
-                    </button>
-                </h4>
-
-                <!-- 🔥 Integrated Quest Bounty Board (V90.20+) -->
-                <div id="active-quest-section" style="display:none; margin-bottom:25px;">
-                    <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px; padding-left:5px;">
-                        <span style="width:12px; height:12px; background:#f59e0b; border-radius:50%; animation: pulse-gold 2s infinite;"></span>
-                        <h4 style="margin:0; color:#d35400; font-size:1.1em; font-weight:900; letter-spacing:-0.4px;">LIVE BOUNTIES (Daily Quests)</h4>
-                    </div>
-                    <div id="activeQuestGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:15px;">
-                        <!-- Quest Cards injected here -->
-                    </div>
-                    <style>
-                        @keyframes pulse-gold { 0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); } 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); } }
-                    </style>
-                </div>
-
+                <!-- 🔥 Consolidated Quest History (Bounty Board moved to Kanban) -->
                 <div style="margin-top:10px;">
-                    <div id="questHistoryContainer" style="display:none; margin-top:15px; overflow-x:auto;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                        <i class="fa-solid fa-clock-rotate-left" style="color:#d35400;"></i>
+                        <h4 style="margin:0; color:#d35400; font-size:1em; font-weight:800;">QUEST HISTORY & ARCHIVE</h4>
+                    </div>
+                    <div id="questHistoryTable_wrapper" style="margin-top:5px; overflow-x:auto; background:white; padding:15px; border-radius:15px; border:1px solid #f1f5f9;">
                         <table id="questHistoryTable" class="admin-table">
                             <thead>
                                 <tr>
                                     <th>Quest</th>
-                                    <th>Score</th>
+                                    <th>Base Score</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -1828,7 +1809,6 @@
                         </table>
                     </div>
                 </div>
-            </div>
 
         </div>
 
@@ -5497,7 +5477,7 @@ Do not include any explanation other than the feedback body.`;
 
         const auth = firebase.auth();
 
-        var usersData = [], worksData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {};
+        var usersData = [], worksData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {}, questsSubList = [];
         var reflectiveLogsCache = []; 
         var accessRequestsCache = []; 
         var pendingQuizzesCache = [];  
@@ -10055,7 +10035,12 @@ async function saveQuiz() {
                 drawKanban(); // Update board cards (e.g. if filtering by group)
             });
             db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban);
-            db.collection("quests").onSnapshot(s => { questsCache = s.docs.map(d => ({ id: d.id, ...d.data() })); loadActiveQuests(); loadQuestHistory(); loadReflectiveLogsAdmin(); });
+            db.collection("quests").onSnapshot(s => { 
+                questsCache = s.docs.map(d => ({ id: d.id, ...d.data() })); 
+                loadQuestHistory(); 
+                loadReflectiveLogsAdmin(); 
+                filterBoard(); // Update Kanban too
+            });
             db.collection("knowledge_base").orderBy("createdAt", "desc").onSnapshot(s => {
                 knowledgeBaseCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderKnowledgeBase();
@@ -10097,7 +10082,12 @@ async function saveQuiz() {
                 window.pollData = polls;
                 if (!hideCompletedWorks) renderTable('works');
             });
-            db.collection("quest_submissions").onSnapshot(s => { questsSubCache = {}; s.forEach(d => { questsSubCache[`${d.data().questId}_${d.data().userId}`] = d.data(); }); filterBoard(); });
+            db.collection("quest_submissions").onSnapshot(s => { 
+                questsSubCache = {}; 
+                questsSubList = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                s.forEach(d => { questsSubCache[`${d.data().questId}_${d.data().userId}`] = d.data(); }); 
+                filterBoard(); 
+            });
 
             // 🔥 Load Division Config (V77.8)
             db.collection("quizzes").doc("--divisions-config--").onSnapshot(doc => {
@@ -12346,6 +12336,86 @@ async function saveQuiz() {
                     cols["Review"].appendChild(d);
                 });
             } catch (e) { console.error("Kanban Section 6 Error:", e); }
+
+            // 7. Render Active Daily Quests (Bounties) in "Backlog"
+            try {
+                questsCache.forEach(q => {
+                    const isLive = q.deadline && q.deadline.toDate() > new Date();
+                    if (!isLive) return;
+                    
+                    const title = q.question || "Untitled Quest";
+                    if (filter && !title.toLowerCase().includes(filter)) return;
+
+                    cnt["Backlog"]++;
+                    const d = document.createElement('div');
+                    d.className = 'kanban-card card-Backlog live-quest';
+                    d.style.borderLeft = "4px solid #f59e0b";
+                    d.style.background = "#fffaf5";
+                    
+                    const dlVal = q.deadline.toMillis ? q.deadline.toMillis() : new Date(q.deadline).getTime();
+                    
+                    d.innerHTML = `
+                        <div class="card-header-row" style="margin-bottom:12px;">
+                            <span class="badge" style="background:linear-gradient(135deg, #f59e0b, #d97706); padding:4px 12px; border-radius:8px; font-size:0.7em; letter-spacing:0.5px;">DAILY QUEST</span>
+                            <div class="card-header-right" onclick="recallQuest('${q.id}')" style="color:#f59e0b; cursor:pointer; font-size:1.1em; opacity:0.7; transition:0.2s;" onmouseover="this.style.opacity='1'; this.style.transform='scale(1.2)';" onmouseout="this.style.opacity='0.7'; this.style.transform='scale(1)'"><i class="fa-solid fa-pen-to-square"></i></div>
+                        </div>
+                        <div style="font-weight:800; font-size:1.05em; color:#1e293b; margin-bottom:8px; line-height:1.4;">${title}</div>
+                        <div style="font-size:0.8em; color:#64748b; background:white; padding:12px; border-radius:12px; border:1px solid #ffe8d1;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-weight:700;">
+                                <span>🔥 +${q.baseScore} PTS</span>
+                                <span>⏱️ ${q.durationMinutes || 30}m</span>
+                            </div>
+                            <div class="timer-global" data-dead="${dlVal}" style="color:#d35400; font-weight:900; font-size:0.9em;">⏳ Exp: ...</div>
+                        </div>
+                    `;
+                    cols["Backlog"].appendChild(d);
+                });
+            } catch (e) { console.error("Kanban Section 7 (Quests) Error:", e); }
+
+            // 8. Render Quest Submissions in "Review"
+            try {
+                questsSubList.forEach(sub => {
+                    if (sub.status === 'none') return; // Skip non-submitted or legacy
+                    
+                    // If it has been scored recently, maybe move it to Done?
+                    // For now, let's show items that haven't been reviewed or have status flags
+                    const qData = questsCache.find(x => x.id === sub.questId);
+                    if (!qData) return;
+
+                    const u = usersData.find(x => x.id === sub.userId) || { displayName: 'Intern' };
+                    if (filter && !qData.question.toLowerCase().includes(filter) && !u.displayName.toLowerCase().includes(filter)) return;
+                    if (activeBoardGroup !== 'All' && (u.group || 'Public') !== activeBoardGroup) return;
+
+                    // Logic: If status is 'submitted' or similar, show in Review
+                    // If it has earnedScore > 0, we can still show it in Review for a while or move to Done
+                    const isNew = !sub.adminAcknowledged; 
+                    if (!isNew) return; // Only show new/pending reviews
+
+                    cnt["Review"]++;
+                    const d = document.createElement('div');
+                    d.className = 'kanban-card card-Review quest-submission-card';
+                    d.style.borderLeft = "4px solid #f59e0b";
+                    d.style.background = "#fffcf5";
+
+                    d.innerHTML = `
+                        <div class="card-header-row">
+                            <span class="badge" style="background:#f59e0b;">QUEST SUBMIT</span>
+                            <div class="card-header-right"><img src="${u.pictureUrl || ''}" class="assignee-img" title="${u.displayName}"></div>
+                        </div>
+                        <div style="font-weight:bold; font-size:0.95em; margin-bottom:4px; color:#1e293b;">${u.displayName}</div>
+                        <div style="font-size:0.85em; color:#64748b; background:white; padding:10px; border-radius:10px; border:1px solid #ffe8d1;">
+                            <div style="font-weight:800; color:#d35400; margin-bottom:5px;">${qData.question}</div>
+                            <div style="font-size:0.8em; color:#94a3b8;">Submitted: ${sub.submittedAt ? sub.submittedAt.toDate().toLocaleString() : 'Recently'}</div>
+                        </div>
+                        <div style="margin-top:12px;">
+                            <button class="btn-sm btn-warning" style="width:100%; font-weight:900;" onclick="reviewQuestSubmission('${sub.id}')">
+                                <i class="fa-solid fa-graduation-cap"></i> Review & Award
+                            </button>
+                        </div>
+                    `;
+                    cols["Review"].appendChild(d);
+                });
+            } catch (e) { console.error("Kanban Section 8 (Quest Subs) Error:", e); }
 
             Object.keys(cnt).forEach(k => {
                 const badge = document.getElementById(`cnt-${k}`);
@@ -14703,7 +14773,43 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
         window.AI_CORE_READY = true;
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V90.20 loaded OK (AI Stabilization) ', 'background:#4361ee;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V90.25 loaded OK (Daily Quest Integration) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+
+        async function reviewQuestSubmission(subId) {
+            const sub = questsSubList.find(x => x.id === subId);
+            if (!sub) return;
+            const q = questsCache.find(x => x.id === sub.questId);
+            const u = usersData.find(x => x.id === sub.userId) || {};
+            
+            const bonusStr = prompt(`Reviewing Quest: ${q ? q.question : '?'}\nUser: ${u.displayName}\n\nBase Score: ${q ? q.baseScore : '?'}\nEnter Bonus (can be negative or zero):`, "0");
+            if (bonusStr === null) return;
+            
+            const bonus = parseFloat(bonusStr) || 0;
+            try {
+                await db.collection("quest_submissions").doc(subId).update({
+                    bonusGiven: bonus,
+                    adminAcknowledged: true,
+                    reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                if (bonus !== 0) {
+                    await db.collection("users").doc(sub.userId).update({
+                        score: firebase.firestore.FieldValue.increment(bonus)
+                    });
+                    await db.collection("checkin_logs").add({
+                        userId: sub.userId,
+                        type: 'bonus',
+                        amount: bonus,
+                        note: `Quest Bonus: ${q ? q.question : 'Quest'}`,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+                
+                showToast("Submission Reviewed & Awarded!");
+            } catch (e) {
+                alert(e.message);
+            }
+        }
     </script>
 
     <!-- Knowledge Base Modal (V87.40) -->
