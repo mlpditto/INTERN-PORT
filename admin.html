@@ -2591,14 +2591,19 @@
                 </div>
             </div>
         </div>
-        <div id="chatModal" class="modal">
-            <div class="modal-content"><span class="close-modal"
-                    onclick="document.getElementById('chatModal').style.display='none'">&times;</span>
-                <h3 id="chat-title">💬 Project Chat</h3><input type="hidden" id="chat-card-id">
-                <div id="chat-box" class="chat-box"></div>
-                <div style="display:flex; gap:5px;"><input type="text" id="chat-input" placeholder="Type @name..."
-                        style="margin:0;"><button class="btn-primary" onclick="sendChat()"><i
-                            class="fa-solid fa-paper-plane"></i></button></div>
+        <div id="chatModal" class="modal" style="z-index:9000;">
+            <div class="modal-content" style="max-width:600px; padding:30px; border-radius:30px; background:var(--bg-card); box-shadow:0 25px 50px rgba(0,0,0,0.2);">
+                <span class="close-modal" onclick="document.getElementById('chatModal').style.display='none'">&times;</span>
+                <h3 id="chat-title" style="margin-top:0; font-weight:900; color:var(--primary); display:flex; align-items:center; gap:10px;">💬 Project Chat</h3>
+                <input type="hidden" id="chat-card-id">
+                <div id="chat-box" class="chat-box" style="height:400px; overflow-y:auto; background:#f8fafc; border-radius:20px; padding:20px; margin-bottom:20px; border:1px solid #edf2f7; display:flex; flex-direction:column; gap:12px;"></div>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="text" id="chat-input" placeholder="Type @name to tag..." 
+                        style="flex:1; margin:0; padding:12px 20px; border-radius:15px; border:1.5px solid #edf2f7; font-size:0.95em; outline:none; background:#fff; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02);">
+                    <button onclick="sendChat()" style="background:var(--primary); color:white; border:none; width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1.2em; transition:0.3s; box-shadow:0 4px 15px rgba(67,97,238,0.3);" onmouseover="this.style.transform='scale(1.1) rotate(-15deg)'" onmouseout="this.style.transform='scale(1) rotate(0)'">
+                        🚀
+                    </button>
+                </div>
             </div>
         </div>
         <div id="historyModal" class="modal">
@@ -12269,7 +12274,51 @@ async function saveQuiz() {
             }
         }
         async function saveSideQuest() { const id = document.getElementById('edit-id').value; const t = document.getElementById('sq-title').value; if (!t) return alert("Title?"); const d = { title: t, description: document.getElementById('sq-desc').value, priority: document.getElementById('sq-priority').value, dueDate: document.getElementById('sq-due').value, isProject: document.getElementById('sq-isProject').checked, assigneeIds: [...document.querySelectorAll('.sq-user-check:checked')].map(c => c.value), assignees: [...document.querySelectorAll('.sq-user-check:checked')].map(c => ({ uid: c.value, name: c.dataset.name, pic: c.dataset.pic })) }; if (id) { await db.collection("side_quests").doc(id).update(d); showToast("Updated"); } else { d.status = "Backlog"; d.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").add(d); showToast("Created"); } document.getElementById('taskModal').style.display = 'none'; }
-        let chatUnsub; function openChat(id, title) { document.getElementById('chatModal').style.display = 'block'; document.getElementById('chat-title').innerText = `💬 ${title}`; document.getElementById('chat-card-id').value = id; const box = document.getElementById('chat-box'); box.innerHTML = "Loading..."; if (chatUnsub) chatUnsub(); chatUnsub = db.collection("side_quests").doc(id).collection("comments").orderBy("timestamp", "asc").onSnapshot(snap => { box.innerHTML = ""; snap.forEach(d => { const m = d.data(); const cls = m.sender === 'Admin' ? 'msg-admin' : 'msg-user'; let pic = m.pic ? `<img src="${m.pic}" class="chat-avatar">` : '<div class="chat-avatar" style="background:#ccc;">?</div>'; if (m.sender === 'Admin') pic = '<div class="chat-avatar" style="background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;">A</div>'; let msg = m.msg.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#007bff;text-decoration:underline;">$1</a>'); msg = msg.replace(/@([^\s]+)/g, (match, name) => { const q = sideQuestsCache[id]; const inP = q.assignees && q.assignees.some(u => u.name.toLowerCase().includes(name.toLowerCase())); return inP ? `<span class="tag-in">${match}</span>` : `<span class="tag-out">${match}</span>`; }); box.innerHTML += `<div class="chat-msg ${cls}">${pic}<div><b>${m.sender}</b>: ${msg}</div></div>`; }); box.scrollTop = box.scrollHeight; }); }
+        let chatUnsub; 
+        function openChat(id, title) { 
+            document.getElementById('chatModal').style.display = 'block'; 
+            document.getElementById('chat-title').innerText = `💬 ${title}`; 
+            document.getElementById('chat-card-id').value = id; 
+            const box = document.getElementById('chat-box'); 
+            box.innerHTML = "<div style='text-align:center; padding:20px; color:#94a3b8; font-weight:bold;'>🛰️ Establishing Uplink...</div>"; 
+            if (chatUnsub) chatUnsub(); 
+            chatUnsub = db.collection("side_quests").doc(id).collection("comments").orderBy("timestamp", "asc").onSnapshot(snap => { 
+                box.innerHTML = ""; 
+                snap.forEach(d => { 
+                    const m = d.data(); 
+                    const isAdmin = (m.sender === 'Admin');
+                    const cls = isAdmin ? 'msg-admin' : 'msg-user'; 
+                    
+                    let pic = m.pic ? `<img src="${m.pic}" style="width:32px; height:32px; border-radius:50%; object-fit:cover;">` : '<div style="width:32px; height:32px; border-radius:50%; background:#cbd5e1; display:flex; align-items:center; justify-content:center; font-size:0.7em; color:white;">?</div>'; 
+                    if (isAdmin) pic = '<div style="width:32px; height:32px; border-radius:50%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.8em;">A</div>'; 
+                    
+                    let msg = (m.msg || "").replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#4361ee; text-decoration:underline;">$1</a>'); 
+                    msg = msg.replace(/@([^\s]+)/g, (match, name) => { 
+                        const q = sideQuestsCache[id]; 
+                        const inP = q && q.assignees && q.assignees.some(u => u.name.toLowerCase().includes(name.toLowerCase())); 
+                        return inP ? `<span style="color:#4361ee; font-weight:bold; background:rgba(67,97,238,0.1); padding:2px 6px; border-radius:4px;">${match}</span>` : `<span style="color:#d35400;">${match}</span>`; 
+                    }); 
+                    
+                    const bubbleStyle = isAdmin 
+                        ? "background:white; color:#1e293b; align-self:flex-end; border-radius:18px 18px 4px 18px; border:1px solid #edf2f7; box-shadow:0 2px 5px rgba(0,0,0,0.02);" 
+                        : "background:#4361ee; color:white; align-self:flex-start; border-radius:18px 18px 18px 4px; box-shadow:0 4px 10px rgba(67,97,238,0.2);";
+                    
+                    const flexDir = isAdmin ? "row-reverse" : "row";
+                    const marginSide = isAdmin ? "margin-left:50px;" : "margin-right:50px;";
+
+                    box.innerHTML += `
+                        <div style="display:flex; gap:10px; flex-direction:${flexDir}; ${marginSide}">
+                            ${pic}
+                            <div style="max-width:85%; padding:10px 15px; ${bubbleStyle}">
+                                <div style="font-size:0.7em; opacity:0.7; font-weight:800; margin-bottom:4px;">${m.sender}</div>
+                                <div style="font-size:0.9em; line-height:1.4;">${msg}</div>
+                            </div>
+                        </div>
+                    `; 
+                }); 
+                box.scrollTop = box.scrollHeight; 
+            }); 
+        }
         async function sendChat() { const t = document.getElementById('chat-input').value.trim(); const id = document.getElementById('chat-card-id').value; if (!t) return; await db.collection("side_quests").doc(id).collection("comments").add({ msg: t, sender: 'Admin', timestamp: firebase.firestore.FieldValue.serverTimestamp() }); document.getElementById('chat-input').value = ""; }
         async function openArchiveModal() {
             const l = document.getElementById("archive-list");
