@@ -218,7 +218,7 @@
             <!-- Activity Container -->
             <div id="insight-activity-view">
                 <div id="lb-popup-chart"
-                    style="width:100%; height:200px; position:relative; border-bottom:2px solid #eee; display:flex; align-items:flex-end; margin-bottom:15px; background:#fafafa; border-radius:12px; padding:10px 15px 0 15px; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02);">
+                    style="width:calc(100% - 50px); height:180px; position:relative; border-bottom:2px solid #e2e8f0; margin-left:40px; margin-bottom:30px; margin-top:10px; background:white; border-radius:8px; padding:0; display:flex; align-items:flex-end;">
                 </div>
                 <div id="lb-popup-stats"
                     style="display:flex; justify-content:space-around; align-items:center; font-size:1em; color:#444; padding:20px; background:linear-gradient(to bottom, #f8f9fa, #ffffff); border:1px solid #f1f5f9; border-radius:16px;">
@@ -11479,7 +11479,28 @@ async function saveQuiz() {
 
             const chart = document.getElementById('lb-popup-chart');
             chart.innerHTML = '';
+            chart.style.position = 'relative';
             
+            // 🔥 Add Y-Axis Guide Lines & Labels (Turbo V90.15)
+            const guidePoints = [
+                { val: maxDaily, label: maxDaily.toFixed(1), top: '0%' },
+                { val: maxDaily / 2, label: (maxDaily/2).toFixed(1), top: '50%' },
+                { val: 0, label: '0', top: '100%' }
+            ];
+            
+            guidePoints.forEach(pt => {
+                // Line
+                const line = document.createElement('div');
+                line.style.cssText = `position:absolute; left:0; right:0; top:${pt.top}; height:1px; background:rgba(0,0,0,0.05); z-index:0;`;
+                chart.appendChild(line);
+                
+                // Label
+                const lb = document.createElement('div');
+                lb.style.cssText = `position:absolute; left:-35px; top:${pt.top}; transform:translateY(-50%); font-size:10px; color:#94a3b8; font-weight:800; width:30px; text-align:right;`;
+                lb.innerText = pt.label;
+                chart.appendChild(lb);
+            });
+
             Object.keys(pointsMap).forEach(dateStr => {
                 const d = new Date(dateStr);
                 const dayOffset = (d - start) / 86400000;
@@ -11489,11 +11510,25 @@ async function saveQuiz() {
                 const heightPct = Math.min((Math.max(0, score) / maxDaily) * 100, 100);
                 if (heightPct > 0) {
                     const bar = document.createElement('div');
-                    const barColor = dateStr === minDate ? '#ef233c' : dateStr === maxDate ? '#28a745' : '#4361ee';
-                    bar.style.cssText = `position:absolute; bottom:0; left:${leftPct}%; height:${Math.max(3, heightPct * 0.9)}%; width:${Math.max(1, 100 / totalDays)}%; background:${barColor}; opacity:0.65; border-radius:2px 2px 0 0; cursor:pointer;`;
+                    const barColor = dateStr === minDate ? '#ef233c' : dateStr === maxDate ? '#10b981' : '#4361ee';
+                    bar.style.cssText = `position:absolute; bottom:0; left:${leftPct}%; height:${Math.max(3, heightPct * 0.9)}%; width:${Math.max(1, 95 / totalDays)}%; background:${barColor}; opacity:0.75; border-radius:3px 3px 0 0; cursor:pointer; z-index:1; transition:0.2s;`;
                     bar.title = `${dateStr}: ${score.toFixed(2)} pts`;
+                    bar.onmouseover = () => { bar.style.opacity = '1'; bar.style.transform = 'scaleX(1.1)'; };
+                    bar.onmouseout = () => { bar.style.opacity = '0.75'; bar.style.transform = 'scaleX(1)'; };
                     chart.appendChild(bar);
                 }
+            });
+
+            // 🔥 Add X-Axis Date Labels (Start & End)
+            const dateLabels = [
+                { label: u.startDate || 'Start', left: '0%' },
+                { label: u.endDate || 'End', left: '100%', align: 'right' }
+            ];
+            dateLabels.forEach(dl => {
+                const lb = document.createElement('div');
+                lb.style.cssText = `position:absolute; bottom:-20px; left:${dl.left}; transform:${dl.align === 'right' ? 'translateX(-100%)' : 'none'}; font-size:10px; color:#94a3b8; font-weight:800; white-space:nowrap;`;
+                lb.innerText = dl.label;
+                chart.appendChild(lb);
             });
 
             const elapsed = Math.max(1, Math.ceil((new Date() - start) / 86400000));
