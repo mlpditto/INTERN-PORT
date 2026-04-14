@@ -3671,6 +3671,50 @@
                     });
                     const d = await resp.json();
                     return { text: d.choices[0].message.content, tokens: d.usage?.total_tokens || 0, model: modelName };
+                } else if ((modelName.toLowerCase().includes('glm-5.1') || modelName.includes('ollama')) && (window.OLLAMA_API_KEY || window.OLLAMA_ENDPOINT)) {
+                    const resp = await fetch(`${window.OLLAMA_ENDPOINT}/chat/completions`, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json', 
+                            'Authorization': window.OLLAMA_API_KEY ? `Bearer ${window.OLLAMA_API_KEY}` : 'Bearer ollama' 
+                        },
+                        body: JSON.stringify({ model: modelName, messages: [{role: 'user', content: prompt}], temperature: 0.6 })
+                    });
+                    const d = await resp.json();
+                    if (d.error) throw new Error(`Ollama Cloud Error: ${d.error.message || d.error}`);
+                    return { text: d.choices[0].message.content, tokens: d.usage?.total_tokens || 0, model: modelName };
+                } else if (modelName.toLowerCase().includes('claude')) {
+                    const apiKey = quickApiKey || window.ANTHROPIC_API_KEY;
+                    if (!apiKey || apiKey.startsWith("__")) throw new Error("Anthropic API Key not found for local fallback.");
+                    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json', 
+                            'x-api-key': apiKey,
+                            'anthropic-version': '2023-06-01'
+                        },
+                        body: JSON.stringify({ 
+                            model: modelName.replace('claude-4', 'claude-3-5'), 
+                            messages: [{role: 'user', content: prompt}], 
+                            max_tokens: 4096,
+                            temperature: 0.7 
+                        })
+                    });
+                    const d = await resp.json();
+                    if (d.error) throw new Error(`Anthropic Local Error: ${d.error.message}`);
+                    return { text: d.content[0].text, tokens: d.usage?.total_tokens || 0, model: modelName };
+                } else if (modelName.includes('gpt')) {
+                    const apiKey = quickApiKey || window.OPENAI_API_KEY;
+                    if (!apiKey) throw new Error("OpenAI API Key not found for local fallback.");
+                    const actualModel = (modelName.includes('5.4') || modelName.includes('4o')) ? 'gpt-4o' : 'gpt-4o-mini';
+                    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                        body: JSON.stringify({ model: actualModel, messages: [{role: 'user', content: prompt}], temperature: 0.7 })
+                    });
+                    const d = await resp.json();
+                    if (d.error) throw new Error(`OpenAI Local Error: ${d.error.message}`);
+                    return { text: d.choices[0].message.content, tokens: d.usage?.total_tokens || 0, model: actualModel };
                 }
                 throw new Error("No provider active for " + modelName + ". Please check API keys or Proxy status.");
             } catch (err) {
