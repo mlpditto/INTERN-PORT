@@ -9023,6 +9023,12 @@
             const cnt = { "Backlog": 0, "Doing": 0, "Review": 0, "Done": 0 };
             const filterEl = document.getElementById('board-search');
             const filter = filterEl ? filterEl.value.toLowerCase() : "";
+            const escapeKanbanText = (val) => String(val || "")
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
 
             // 1. Render Side Quests
             try {
@@ -9112,7 +9118,11 @@
                     const isPending = !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null);
                     if (log.isArchived) return;
                     if (isPending) {
-                        if (filter && !(log.content || "").toLowerCase().includes(filter) && !(log.userName || '').toLowerCase().includes(filter)) return;
+                        const rawContent = log.content || "";
+                        const rawUserName = log.userName || 'Unknown';
+                        const safeContent = escapeKanbanText(rawContent);
+                        const safeUserName = escapeKanbanText(rawUserName);
+                        if (filter && !rawContent.toLowerCase().includes(filter) && !rawUserName.toLowerCase().includes(filter)) return;
 
                         if (activeBoardGroup !== 'All') {
                             const user = usersData.find(u => u.id === log.userId);
@@ -9129,12 +9139,12 @@
                         d.innerHTML = `
                             <div class="card-header-row">
                                 <span class="badge" style="background:#d35400;">Reflective</span>
-                                <div class="card-header-right"><img src="${log.pictureUrl || ''}" class="assignee-img" title="${log.userName || ''}"></div>
+                                <div class="card-header-right"><img src="${log.pictureUrl || ''}" class="assignee-img" title="${safeUserName}"></div>
                             </div>
-                            <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${log.userName || 'Unknown'}</div>
-                            <div style="font-size:0.85em; color:#444; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${moodEmoji} ${log.content || ''}</div>
+                            <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${safeUserName}</div>
+                            <div style="font-size:0.85em; color:#444; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${moodEmoji} ${safeContent}</div>
                             <div style="margin-top:8px;">
-                                <button class="btn-sm" style="width:100%; background:#d35400; color:white; border:none;" onclick="reviewReflective('${log.id}', '${(log.userName || '').replace(/'/g, "")}', '${log.userId}')">
+                                <button class="btn-sm" style="width:100%; background:#d35400; color:white; border:none;" onclick="reviewReflective('${log.id}', '${rawUserName.replace(/'/g, "")}', '${log.userId}')">
                                     <i class="fa-solid fa-comment-dots"></i> Review & Score
                                 </button>
                             </div>
@@ -9216,6 +9226,7 @@
             try {
                 pointsClaimedCache.forEach(log => {
                     const uName = log.displayName || log.userName || 'Unknown';
+                    const safeUName = escapeKanbanText(uName);
                     if (filter && !uName.toLowerCase().includes(filter)) return;
                     
                     if (activeBoardGroup !== 'All') {
@@ -9231,9 +9242,9 @@
                     d.innerHTML = `
                         <div class="card-header-row">
                             <span class="badge" style="background:#00b894;">Points Claimed</span>
-                            <div class="card-header-right"><img src="${log.pictureUrl || ''}" class="assignee-img" title="${uName}"></div>
+                            <div class="card-header-right"><img src="${log.pictureUrl || ''}" class="assignee-img" title="${safeUName}"></div>
                         </div>
-                        <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${uName}</div>
+                        <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${safeUName}</div>
                         <div style="font-size:0.85em; color:#444;">🎉 Bonus already claimed: <span style="font-weight:bold; color:#00b894;">+${log.adminBonus || 0} pts</span></div>
                         <div style="margin-top:8px;">
                             <button class="btn-sm btn-success" style="width:100%; background:#00b894; border:none;" onclick="acknowledgeClaimedPoints('${log.id}')">
@@ -9925,9 +9936,10 @@
                     ctx.fill();
                     ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
                     ctx.textAlign = "center"; ctx.fillStyle = "#5d4037";
-                    ctx.font = "bold 20px Arial"; ctx.fillText("🌟", specX, specY - 5);
-                    ctx.font = "bold 7.5px Montserrat"; ctx.fillText("RISING STAR", specX, specY + 9);
-                    ctx.font = "6.5px Montserrat"; ctx.fillText("RAPID GROWTH", specX, specY + 20);
+                    ctx.font = "bold 18px Arial"; ctx.fillText("🌟", specX, specY - 7);
+                    ctx.font = "bold 6.4px Montserrat"; ctx.fillText("RISING", specX, specY + 7);
+                    ctx.font = "bold 6.4px Montserrat"; ctx.fillText("STAR", specX, specY + 14);
+                    ctx.font = "5.4px Montserrat"; ctx.fillText("RAPID GROWTH", specX, specY + 21);
 
                 } else if (award === 'mvp') {
                     // 👑 MVP — Double-ring circle, Gold-Crimson gradient
