@@ -1,61 +1,75 @@
-# Intern Admin Portal - Version & Git Development Rules (V89.50)
+# INTERN-PORT Version Sync Policy
 
-## 🎯 Golden Rule: Absolute Version Sync
+## Objective
+Ensure release version consistency across all deploy surfaces and both git branches.
 
-**Intern Admin Portal title on GitHub Pages MUST always match the current version number and badge.**
-No exceptions. All components (Admin, User, Functions) must be synchronized before a major push.
+## Authoritative Source
+- This file defines operational sync policy.
+- VERSION_RULES.md defines version semantics and increment logic.
 
----
+If policy and notes conflict, follow this file and then update notes.
 
-## 🚀 Best Practices: Git Workflow
+## Mandatory Sync Targets Per Release
+Every release-impact commit must keep these files on the same release version:
+- admin.html
+- index.html
+- public/admin.html
+- public/index.html
+- netlify-deploy/admin.html
+- netlify-deploy/index.html
 
-เพื่อให้เวอร์ชันมีความสอดคล้องกัน (Version Sync) และการแสดงผลหน้าเว็บถูกต้องเสมอ ให้ปฏิบัติดังนี้:
+Supporting docs to keep aligned in same release:
+- SYSTEM_OVERVIEW.md
+- RELEASE_NOTES_Vxx.xx.md
 
-### 1. แก้ไขโค้ดที่ `production` เสมอ
-ห้ามแก้ไขโค้ดที่ branch `main` โดยตรง การพัฒนาทั้งหมดต้องเกิดขึ้นบน branch **`production`** เท่านั้น
+## Branch Policy
+- Develop on production only.
+- Do not commit release changes directly on main.
 
-### 2. อัปเดตเวอร์ชันทุกครั้ง
-ทุกครั้งที่มีการ Commit ให้เปลี่ยนเลขเวอร์ชันในไฟล์เหล่านี้:
--   **`admin.html`**: แก้ไข `<title>` และปุ่ม `Badge` (Vxx.xx)
--   **`index.html`**: แก้ไข `<title>`
--   **`SYSTEM_OVERVIEW.md`**: ระบุเวอร์ชันล่าสุดที่หัวข้อและท้ายไฟล์
+Release sequence:
+1. git checkout production
+2. git add .
+3. git commit -m "Vxx.xx: summary"
+4. git push origin production
+5. git checkout main
+6. git merge production --no-ff -m "Merge production: Vxx.xx summary"
+7. git push origin main
+8. git checkout production
 
-### 3. Deploy กลาโหม (Turbo Mode) ⚡
-เมื่อทำการแก้ไขและทดสอบเสร็จสิ้น ให้รวบรวมคำสั่งเพื่อ Push ทั้ง 2 Branch (เพื่ออัปเดตทั้ง Server และ GitHub Pages) ดังนี้:
+## Release Gate Checklist
+Before pushing production:
+1. Titles reflect same Vxx.xx in six targets
+2. Any visible version badge reflects same Vxx.xx
+3. Release notes file exists and matches Vxx.xx
+4. SYSTEM_OVERVIEW.md header/version notes updated
+5. Working tree clean except intended changes
 
-```bash
-# 🛠️ 1. บันทึกงานใน production (Development Branch)
-git add .
-git commit -m "Vxx.xx: รายละเอียดงานที่ทำ"
-git push origin production
+## Verification Commands
+PowerShell quick checks:
 
-# 🌐 2. ส่งงานไปที่ main เพื่ออัปเดต GitHub Pages (Public URL)
-git checkout main
-git merge production
-git push origin main
+Select-String -Path admin.html,index.html,public/admin.html,public/index.html,netlify-deploy/admin.html,netlify-deploy/index.html -Pattern "<title>"
 
-# 🔙 3. กลับมาทำงานต่อที่ production (Stay on Development)
-git checkout production
-```
+Select-String -Path admin.html,index.html,public/admin.html,public/index.html,netlify-deploy/admin.html,netlify-deploy/index.html -Pattern "V[0-9]+\.[0-9]+"
 
----
+git branch -v
+git status --short
 
-## 📋 Version Update Checklist
+## Drift Handling Procedure
+If versions diverge across targets:
+1. Pick one target version as canonical next release version
+2. Sync all six targets to that version in one commit
+3. Add release note describing resync
+4. Push production and merge to main immediately
 
-### **Before EVERY commit:**
-- [ ] `<title>` Tag: `Intern Admin Portal (Vxx.xx)`
-- [ ] `Header Badge`: `<span ...>Vxx.xx</span>` ในส่วน Dashboard
-- [ ] `Header Comment`: `<!-- Vxx.xx: Description -->`
-- [ ] `Console Log`: `console.log('%c Vxx.xx loaded OK ', ...)`
+## Allowed No-Bump Cases
+Skip version bump only for:
+- docs-only changes
+- local scripts/scratch changes
+- git metadata/config changes
 
----
+Any user-visible runtime behavior change requires version bump and sync.
 
-## 🔍 Verification
-หลังจากการ Deploy (Turbo Mode) ให้รอประมาณ 2-5 นาทีแล้วตรวจสอบที่:
-- **Production URL:** [https://mlp-int.work/admin.html](https://mlp-int.work/admin.html)
-- **Public URL:** [https://mlpditto.github.io/INTERN-PORT/admin.html](https://mlpditto.github.io/INTERN-PORT/admin.html)
+## Current Enforcement Window
+As of 2026-04-15, project contains historical version drift; next release should include a full six-target resync commit.
 
-**หากพบว่าเลขเวอร์ชันไม่ตรงกัน ให้ใช้ "Turbo Mode" ซ้ำอีกครั้งเพื่อยืนยันการ Sync ข้อมูล**
-
----
-*อัปเดตกฎล่าสุดเมื่อ: V89.14 - 2026-04-08*
+Last updated: 2026-04-15

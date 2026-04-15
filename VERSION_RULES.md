@@ -1,209 +1,84 @@
-# Intern Admin Portal - Version Management Rules
+# INTERN-PORT Version Rules
 
-## 🎯 Core Rule: Always Update Version Number
+## Scope
+These rules apply to all runtime entry pages and mirrored deployment copies.
 
-### Mandatory Version Update
-**EVERY commit to `admin.html` MUST include a version number update.**
+## Current Version Baseline
+- Current baseline family: V90.xx
+- Version string format: VMAJOR.MINOR where MINOR is two digits when needed (example: V90.29)
 
-No exceptions. No matter how small the change.
+## Single Version Rule
+Any release commit that changes app behavior must use one shared version number across all required targets.
 
----
+Required targets:
+- admin.html
+- index.html
+- public/admin.html
+- public/index.html
+- netlify-deploy/admin.html
+- netlify-deploy/index.html
 
-## 📍 Where to Update
+If one target is intentionally excluded, the commit message must explicitly state why.
 
-### 1. HTML Title Tag
-```html
-<title>Intern Admin Portal (V88.73)</title>
-```
+## Where Version Must Be Updated
+At minimum for each required target:
+- HTML title
+- Any visible header badge version, if present
+- Top release comment near document head, if present
 
-### 2. Comment Header
-```html
-<!-- V88.73: AI Magic buttons restored + Timer widths expanded + Language flags -->
-<!-- Release: 2026-04-05 19:40 UTC+7 -->
-```
+Project-level sync references:
+- SYSTEM_OVERVIEW.md header/version notes
+- Release note file name and heading (example: RELEASE_NOTES_V90.30.md)
 
-### 3. Version Format
-- **Format:** `V[MAJOR].[MINOR].[PATCH]`
-- **Example:** `V88.73`
-- **Location:** Both title tag and comment header
+## Increment Policy
+Use simple, predictable bumps:
+- Patch/UI hotfix: V90.29 -> V90.30
+- Feature release: V90.29 -> V90.40 (optional grouped jump)
+- Breaking architecture: V90.xx -> V91.00
 
----
+Recommended default: increment by +0.01 for each production release commit.
 
-## 🔄 Version Increment Rules
+## Branch Flow (Mandatory)
+All development and fixes start from production branch.
 
-### PATCH Version (+0.0.1)
-- Bug fixes
-- Small UI improvements
-- Text changes
-- CSS tweaks
-- API endpoint fixes
+Required flow:
+1. Commit and push on production
+2. Merge production into main
+3. Push main
+4. Return to production for ongoing work
 
-**Examples:**
-- V88.73 → V88.74
-- V88.74 → V88.75
+This prevents version drift between deploy branch and public branch.
 
-### MINOR Version (+0.1.0)
-- New features
-- Major UI redesigns
-- New AI models added
-- New functionality
+## Commit Message Standard
+Use this template for release-impact commits:
+- V90.30: short summary
 
-**Examples:**
-- V88.73 → V88.80
-- V88.80 → V88.90
+Examples:
+- V90.30: Fix Rising Star badge text overflow
+- V90.31: Improve reflective leaderboard filtering
 
-### MAJOR Version (+1.0.0)
-- Complete rewrite
-- Major architecture changes
-- Breaking changes
-- New major modules
+## Pre-Push Checklist
+Before push origin production:
+1. Confirm one shared version exists in all six required targets
+2. Confirm release notes match the same version
+3. Confirm SYSTEM_OVERVIEW.md references latest version
+4. Run quick search check for title/version mismatch
 
-**Examples:**
-- V88.73 → V89.0
-- V89.0 → V90.0
+## Quick Verification Commands
+PowerShell examples:
 
----
+Select-String -Path admin.html,index.html,public/admin.html,public/index.html,netlify-deploy/admin.html,netlify-deploy/index.html -Pattern "<title>"
 
-## 📝 Commit Message Template
+Select-String -Path admin.html,index.html,public/admin.html,public/index.html,netlify-deploy/admin.html,netlify-deploy/index.html -Pattern "V90\."
 
-### Required Format
-```bash
-git commit -m "V88.74: [Brief description of change]"
-```
+## Exceptions
+Version bump may be skipped only when both conditions are true:
+1. Change is docs-only or tooling-only
+2. No runtime HTML/JS/CSS behavior changed
 
-### Examples
-```bash
-# Bug fix
-git commit -m "V88.74: Fix Typhoon API JSON mode error"
+If any runtime page behavior changes, version bump is required.
 
-# Small improvement
-git commit -m "V88.75: Remove text from Translate button for UI consistency"
+## Enforcement Priority
+When conflicts exist between old notes and this file, this file wins.
 
-# New feature
-git commit -m "V88.80: Add quiz pagination navigation arrows"
-```
-
----
-
-## ✅ Pre-Commit Checklist
-
-### Before EVERY commit:
-1. [ ] Update version number in `<title>` tag
-2. [ ] Update version in comment header
-3. [ ] Update release date/time
-4. [ ] Add brief change description in comment
-5. [ ] Use version in commit message
-
-### Example Complete Update:
-```html
-<!-- BEFORE -->
-<title>Intern Admin Portal (V88.73)</title>
-<!-- V88.73: AI Magic buttons restored + Timer widths expanded + Language flags -->
-<!-- Release: 2026-04-05 19:40 UTC+7 -->
-
-<!-- AFTER -->
-<title>Intern Admin Portal (V88.74)</title>
-<!-- V88.74: Fix Typhoon API JSON mode + Remove duplicate Translate text -->
-<!-- Release: 2026-04-05 20:15 UTC+7 -->
-```
-
----
-
-## 🚫 Common Mistakes to Avoid
-
-### NEVER Do This:
-- ❌ Commit without updating version
-- ❌ Update only one location (title OR comment)
-- ❌ Use wrong version format
-- ❌ Forget release timestamp
-- ❌ Use generic commit messages
-
-### ALWAYS Do This:
-- ✅ Update BOTH title and comment
-- ✅ Increment version appropriately
-- ✅ Add timestamp
-- ✅ Describe changes briefly
-- ✅ Use version in commit message
-
----
-
-## 🔍 Quality Assurance
-
-### Version Validation Script
-```bash
-# Check if version is updated correctly
-grep -n "Intern Admin Portal" admin.html
-grep -n "Release:" admin.html
-```
-
-### Pre-Push Verification
-Before pushing to production:
-1. Verify version is updated
-2. Check commit message includes version
-3. Ensure timestamp is current
-4. Test functionality works
-
----
-
-## 📊 Version History Tracking
-
-### Current Version: V88.74
-### Last Updated: 2026-04-05 20:15 UTC+7
-
-### Recent Changes:
-- V88.73: AI Magic buttons restored + Timer widths expanded + Language flags
-- V88.74: Fix Typhoon API JSON mode + Remove duplicate Translate text
-
----
-
-## 🎯 Enforcement
-
-### Git Hooks (Recommended)
-```bash
-# Pre-commit hook to check version update
-#!/bin/bash
-if ! grep -q "V[0-9]\+\.[0-9]\+\.[0-9]\+" admin.html; then
-    echo "ERROR: Version number not found or not updated!"
-    exit 1
-fi
-```
-
-### Code Review Checklist
-- [ ] Version number updated?
-- [ ] Both locations updated?
-- [ ] Commit message includes version?
-- [ ] Timestamp current?
-
----
-
-## 🚨 Emergency Exceptions
-
-### ONLY Skip Version Update For:
-- **Hotfixes to documentation files** (README.md, *.md)
-- **Git configuration changes**
-- **CI/CD pipeline fixes**
-
-### NEVER Skip For:
-- ❌ Any changes to `admin.html`
-- ❌ CSS changes
-- ❌ JavaScript changes
-- ❌ HTML structure changes
-- ❌ API integration changes
-
----
-
-## 📋 Quick Reference
-
-| Change Type | Version Increment | Example |
-|-------------|------------------|---------|
-| Bug Fix | +0.0.1 | V88.73 → V88.74 |
-| UI Tweak | +0.0.1 | V88.74 → V88.75 |
-| Small Feature | +0.1.0 | V88.75 → V88.80 |
-| Major Feature | +0.1.0 | V88.80 → V88.90 |
-| Breaking Change | +1.0.0 | V88.90 → V89.0 |
-
----
-
-**REMEMBER: If you touch `admin.html`, you MUST update the version number. No exceptions!**
-
-*Last Updated: V88.74 - 2026-04-05*
+Last updated: 2026-04-15
