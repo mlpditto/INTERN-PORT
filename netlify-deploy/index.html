@@ -833,6 +833,22 @@
                                         <i class="fa-solid fa-paper-plane"></i> ส่งบันทึก
                                     </button>
                                 </div>
+
+                                <div style="margin-top:12px; border-top:1px dashed #f3d8bd; padding-top:12px;">
+                                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                                        <span style="font-weight:700; color:#c56b1f; font-size:0.84em;"><i class="fa-solid fa-medal"></i> Badge Collection</span>
+                                        <button class="btn-sm" onclick="openReflectiveBadgeModal()"
+                                            style="min-height:auto; height:28px; border-radius:999px; font-size:0.72em; background:#fff3cd; color:#8a6d3b; border:1px solid #f6d88f; padding:0 10px;">
+                                            ดูทั้งหมด
+                                        </button>
+                                    </div>
+                                    <div id="rl-badge-collection" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+                                </div>
+
+                                <div style="margin-top:10px; border-top:1px dashed #f3d8bd; padding-top:10px;">
+                                    <div style="font-weight:700; color:#355070; font-size:0.84em; margin-bottom:7px;"><i class="fa-solid fa-ranking-star"></i> Reflective Leaderboard</div>
+                                    <div id="rl-reflective-leaderboard-mini"></div>
+                                </div>
                             </div>
                             <!-- Small History Toggle -->
                             <div onclick="document.getElementById('rl-history-area').style.display = document.getElementById('rl-history-area').style.display==='none'?'block':'none'" 
@@ -1144,6 +1160,16 @@
                 <i class="fa-solid fa-crown"
                     style="font-size: 3em; margin-bottom: 10px; filter: drop-shadow(0 4px 5px rgba(0,0,0,0.2));"></i>
                 <h2 style="margin: 0; font-size: 1.5em; letter-spacing: 1px;">Top Interns</h2>
+                <div style="display:flex; justify-content:center; gap:8px; margin-top:10px;">
+                    <button id="lb-mode-score" class="btn-sm" onclick="switchLeaderboardMode('score')"
+                        style="min-height:auto; height:30px; border-radius:999px; border:1px solid rgba(255,255,255,0.4); background:#ffffff; color:#1d4ed8; font-size:0.75em; padding:0 12px; font-weight:700;">
+                        Total Points
+                    </button>
+                    <button id="lb-mode-reflective" class="btn-sm" onclick="switchLeaderboardMode('reflective')"
+                        style="min-height:auto; height:30px; border-radius:999px; border:1px solid rgba(255,255,255,0.4); background:rgba(255,255,255,0.15); color:#ffffff; font-size:0.75em; padding:0 12px; font-weight:700;">
+                        Reflective
+                    </button>
+                </div>
                 <div id="lb-div-name" style="font-size: 0.9em; opacity: 0.9; margin-top: 5px; font-weight: 300;">Overall
                     Division</div>
             </div>
@@ -1154,6 +1180,15 @@
                 <button class="btn-primary" onclick="document.getElementById('leaderboardModal').style.display='none'"
                     style="width: 100%; border-radius: 12px; margin: 0;">Awesome!</button>
             </div>
+        </div>
+    </div>
+
+    <div id="reflectiveBadgeModal" class="modal" style="z-index: 10003;">
+        <div class="modal-content" style="max-width: 500px; border-radius: 20px; border-top: 8px solid #f39c12; padding: 24px;">
+            <span class="close-modal" onclick="document.getElementById('reflectiveBadgeModal').style.display='none'">&times;</span>
+            <h3 style="margin:0 0 8px 0; color:#d35400;"><i class="fa-solid fa-medal"></i> Reflective Badge Collection</h3>
+            <p style="margin:0 0 14px 0; color:#8a8a8a; font-size:0.88em;">ปลดล็อกได้จากการเขียน log ต่อเนื่องและรับ feedback จากพี่เลี้ยง</p>
+            <div id="rl-badge-modal-list" style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px;"></div>
         </div>
     </div>
 
@@ -1344,6 +1379,17 @@
         let currentPointsForFeedback = 0;
         let isAdmin = false; // 🔥 V84.6: Track admin status for history deletion
         let isPreview = false; // 🔥 Global flag for preview mode
+        let leaderboardMode = 'score';
+        let reflectiveGamificationSyncKey = '';
+
+        const reflectiveBadgeCatalog = [
+            { id: 'first_log', icon: '📝', title: 'First Reflection', desc: 'ส่ง Reflective Log ครั้งแรก', cond: m => m.totalLogs >= 1 },
+            { id: 'writer_7', icon: '📚', title: 'Weekly Writer', desc: 'ส่งครบ 7 ครั้ง', cond: m => m.totalLogs >= 7 },
+            { id: 'streak_3', icon: '🔥', title: 'Streak x3', desc: 'ต่อเนื่อง 3 วัน', cond: m => m.currentStreak >= 3 || m.longestStreak >= 3 },
+            { id: 'streak_7', icon: '🚀', title: 'Streak x7', desc: 'ต่อเนื่อง 7 วัน', cond: m => m.currentStreak >= 7 || m.longestStreak >= 7 },
+            { id: 'reviewed_5', icon: '💬', title: 'Mentor Feedback', desc: 'ได้รับ feedback 5 ครั้ง', cond: m => m.reviewedLogs >= 5 },
+            { id: 'bonus_3', icon: '🎁', title: 'Bonus Hunter', desc: 'รับโบนัสจาก feedback 3 ครั้ง', cond: m => m.claimedBonuses >= 3 }
+        ];
 
         // --- Initialization ---
         function updateStatus(msg) {
@@ -1895,6 +1941,7 @@
             // Also load all users for leaderboard
             db.collection("users").orderBy("score", "desc").onSnapshot(s => {
                 allUsersData = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderReflectiveMiniLeaderboard();
             });
         }
 
@@ -1948,15 +1995,30 @@
             return "General Division"; // Default
         }
 
+        function switchLeaderboardMode(mode) {
+            leaderboardMode = mode === 'reflective' ? 'reflective' : 'score';
+            const scoreBtn = document.getElementById('lb-mode-score');
+            const reflectiveBtn = document.getElementById('lb-mode-reflective');
+            if (scoreBtn && reflectiveBtn) {
+                const scoreActive = leaderboardMode === 'score';
+                scoreBtn.style.background = scoreActive ? '#ffffff' : 'rgba(255,255,255,0.15)';
+                scoreBtn.style.color = scoreActive ? '#1d4ed8' : '#ffffff';
+                reflectiveBtn.style.background = scoreActive ? 'rgba(255,255,255,0.15)' : '#ffffff';
+                reflectiveBtn.style.color = scoreActive ? '#ffffff' : '#1d4ed8';
+            }
+            renderLeaderboard();
+        }
+
         function openLeaderboard() {
             document.getElementById('leaderboardModal').style.display = 'flex';
+            switchLeaderboardMode(leaderboardMode);
             renderLeaderboard();
         }
 
         function renderLeaderboard() {
             const leaderboardContainer = document.getElementById('lb-list');
             const myDiv = getMyDivision();
-            document.getElementById('lb-div-name').innerText = myDiv;
+            document.getElementById('lb-div-name').innerText = `${myDiv} • ${leaderboardMode === 'reflective' ? 'Reflective Rank' : 'Overall Rank'}`;
 
             // Filter users in the same division
             const relevantGroups = divisionConfig[myDiv] || [myGroup];
@@ -1965,8 +2027,23 @@
             // If myDiv is General and no groups match, it might just be myGroup
             let finalUsers = divUsers.length > 0 ? divUsers : allUsersData.filter(u => (u.group || "Public") === myGroup);
 
-            // Explicit Sort by Score (Desc) to ensure rank #1 is highest
-            finalUsers.sort((a, b) => (b.score || 0) - (a.score || 0));
+            if (leaderboardMode === 'reflective') {
+                finalUsers = finalUsers.filter(u => (u.reflectiveTotalLogs || 0) > 0 || u.id === userId);
+                finalUsers.sort((a, b) => {
+                    const diffLogs = (b.reflectiveTotalLogs || 0) - (a.reflectiveTotalLogs || 0);
+                    if (diffLogs !== 0) return diffLogs;
+                    const diffStreak = (b.reflectiveBestStreak || 0) - (a.reflectiveBestStreak || 0);
+                    if (diffStreak !== 0) return diffStreak;
+                    return (b.score || 0) - (a.score || 0);
+                });
+            } else {
+                finalUsers.sort((a, b) => (b.score || 0) - (a.score || 0));
+            }
+
+            if (!finalUsers.length) {
+                leaderboardContainer.innerHTML = `<div style="padding:20px; text-align:center; color:#999;">ยังไม่มีข้อมูล leaderboard</div>`;
+                return;
+            }
 
             leaderboardContainer.innerHTML = "";
             finalUsers.forEach((u, i) => {
@@ -1978,8 +2055,16 @@
                 const displayName = isMe ? u.displayName : `Intern #${i + 1}`;
                 const pictureUrl = isMe ? (u.pictureUrl || "https://via.placeholder.com/150") : "https://cdn-icons-png.flaticon.com/512/847/847969.png";
                 const infoText = isMe
-                    ? `Lv.${lv} | <span style="color:${getGroupColor(u.group)}; font-weight:bold;"><i class="fa-solid ${getGroupIcon(u.group)}"></i> ${u.group || 'Public'}</span>`
+                    ? (leaderboardMode === 'reflective'
+                        ? `📝 ${u.reflectiveTotalLogs || 0} logs | 🔥 Best ${u.reflectiveBestStreak || 0} วัน`
+                        : `Lv.${lv} | <span style="color:${getGroupColor(u.group)}; font-weight:bold;"><i class="fa-solid ${getGroupIcon(u.group)}"></i> ${u.group || 'Public'}</span>`)
                     : `<span style="color:#ccc;"><i>Identity Hidden</i></span>`;
+
+                const valueText = leaderboardMode === 'reflective'
+                    ? `${u.reflectiveTotalLogs || 0}`
+                    : `${parseFloat((u.score || 0).toFixed(2))}`;
+
+                const valueSuffix = leaderboardMode === 'reflective' ? ' logs' : '';
 
                 leaderboardContainer.innerHTML += `
                     <div class="lb-item" style="${isMe ? 'background:#eef2ff; border:1px solid #4361ee;' : ''}">
@@ -1991,7 +2076,7 @@
                                 <div style="font-size:0.75em; color:#999;">${infoText}</div>
                             </div>
                         </div>
-                        <div style="font-weight:800; color:#4361ee; font-size:1.1em;">${parseFloat((u.score || 0).toFixed(2))}</div>
+                        <div style="font-weight:800; color:#4361ee; font-size:1.1em;">${valueText}${valueSuffix}</div>
                     </div>
                 `;
             });
@@ -3891,6 +3976,200 @@
 
         // --- 🔥 V84.8: Reflective Log System ---
         let reflectiveLogsCache = [];
+
+        function toDateKey(d) {
+            return d.toLocaleDateString('en-CA');
+        }
+
+        function collectReflectiveMetrics(logs) {
+            const dateSet = new Set();
+            let reviewedLogs = 0;
+            let claimedBonuses = 0;
+
+            logs.forEach(log => {
+                if (!log.timestamp) return;
+                dateSet.add(toDateKey(log.timestamp.toDate()));
+                if (log.adminComment || (log.adminBonus || 0) > 0) reviewedLogs++;
+                if (log.pointsClaimed === true) claimedBonuses++;
+            });
+
+            const today = new Date();
+            const todayKey = toDateKey(today);
+            let pointer = new Date(today);
+            let currentStreak = 0;
+
+            if (!dateSet.has(todayKey)) pointer = new Date(Date.now() - 86400000);
+            while (dateSet.has(toDateKey(pointer))) {
+                currentStreak++;
+                pointer = new Date(pointer.getTime() - 86400000);
+            }
+
+            const orderedDates = Array.from(dateSet).sort();
+            let longestStreak = 0;
+            let run = 0;
+            let prevDate = null;
+            orderedDates.forEach(ds => {
+                const cur = new Date(ds);
+                if (!prevDate) {
+                    run = 1;
+                } else {
+                    const expected = new Date(prevDate.getTime() + 86400000);
+                    run = toDateKey(expected) === ds ? run + 1 : 1;
+                }
+                if (run > longestStreak) longestStreak = run;
+                prevDate = cur;
+            });
+
+            return {
+                totalLogs: logs.length,
+                currentStreak,
+                longestStreak,
+                reviewedLogs,
+                claimedBonuses,
+                doneToday: dateSet.has(todayKey)
+            };
+        }
+
+        function getReflectiveUnlockedBadges(metrics, existingBadgeIds = []) {
+            const seed = Array.isArray(existingBadgeIds) ? existingBadgeIds : [];
+            const unlocks = new Set(seed);
+            reflectiveBadgeCatalog.forEach(b => {
+                if (b.cond(metrics)) unlocks.add(b.id);
+            });
+            return Array.from(unlocks);
+        }
+
+        function renderReflectiveBadgeCollection(unlockedBadgeIds) {
+            const badgeWrap = document.getElementById('rl-badge-collection');
+            if (!badgeWrap) return;
+            const unlocked = new Set(unlockedBadgeIds || []);
+            const preview = [...reflectiveBadgeCatalog].sort((a, b) => {
+                const aUnlocked = unlocked.has(a.id) ? 1 : 0;
+                const bUnlocked = unlocked.has(b.id) ? 1 : 0;
+                return bUnlocked - aUnlocked;
+            }).slice(0, 4);
+
+            badgeWrap.innerHTML = preview.map(b => {
+                const isUnlocked = unlocked.has(b.id);
+                return `<span style="display:inline-flex; align-items:center; gap:4px; font-size:0.74em; border-radius:999px; padding:4px 10px; border:1px solid ${isUnlocked ? '#f0c36d' : '#ddd'}; background:${isUnlocked ? '#fff7e6' : '#f6f6f6'}; color:${isUnlocked ? '#8a5a14' : '#9aa0a6'};">
+                    <span>${b.icon}</span><span>${b.title}</span>
+                </span>`;
+            }).join('');
+        }
+
+        function openReflectiveBadgeModal() {
+            const list = document.getElementById('rl-badge-modal-list');
+            if (!list) return;
+
+            const me = allUsersData.find(u => u.id === userId) || {};
+            const unlocked = new Set(Array.isArray(me.reflectiveBadges) ? me.reflectiveBadges : []);
+            list.innerHTML = reflectiveBadgeCatalog.map(b => {
+                const got = unlocked.has(b.id);
+                return `<div style="padding:10px; border:1px solid ${got ? '#f0d197' : '#eee'}; border-radius:12px; background:${got ? '#fffaf0' : '#f9fafb'};">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                        <span style="font-size:1.2em;">${b.icon}</span>
+                        <strong style="font-size:0.9em; color:${got ? '#915f16' : '#555'};">${b.title}</strong>
+                    </div>
+                    <div style="font-size:0.78em; color:#888;">${b.desc}</div>
+                    <div style="margin-top:6px; font-size:0.72em; color:${got ? '#2d7f5e' : '#b0b0b0'}; font-weight:700;">${got ? 'UNLOCKED' : 'LOCKED'}</div>
+                </div>`;
+            }).join('');
+
+            document.getElementById('reflectiveBadgeModal').style.display = 'flex';
+        }
+
+        function renderReflectiveMiniLeaderboard() {
+            const mini = document.getElementById('rl-reflective-leaderboard-mini');
+            if (!mini) return;
+
+            const myDiv = getMyDivision();
+            const relevantGroups = divisionConfig[myDiv] || [myGroup];
+            let ranked = allUsersData.filter(u => relevantGroups.includes(u.group || 'Public') || (u.group === myGroup));
+            if (!ranked.length) ranked = allUsersData.filter(u => (u.group || 'Public') === myGroup);
+
+            ranked = ranked
+                .filter(u => (u.reflectiveTotalLogs || 0) > 0 || u.id === userId)
+                .sort((a, b) => {
+                    const diff = (b.reflectiveTotalLogs || 0) - (a.reflectiveTotalLogs || 0);
+                    if (diff !== 0) return diff;
+                    return (b.reflectiveBestStreak || 0) - (a.reflectiveBestStreak || 0);
+                })
+                .slice(0, 5);
+
+            if (!ranked.length) {
+                mini.innerHTML = `<div style="font-size:0.78em; color:#999;">ยังไม่มีข้อมูลสะสมใน Division นี้</div>`;
+                return;
+            }
+
+            mini.innerHTML = ranked.map((u, idx) => {
+                const isMe = u.id === userId;
+                const name = isMe ? (u.displayName || 'Me') : `Intern #${idx + 1}`;
+                return `<div style="display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-top:${idx === 0 ? 'none' : '1px dashed #f0e2cf'}; font-size:0.78em;">
+                    <div style="display:flex; align-items:center; gap:6px; color:${isMe ? '#1d4ed8' : '#5f6368'};">
+                        <strong style="min-width:18px;">#${idx + 1}</strong>
+                        <span>${name}${isMe ? ' ⭐' : ''}</span>
+                    </div>
+                    <div style="font-weight:700; color:#374151;">${u.reflectiveTotalLogs || 0} logs • 🔥${u.reflectiveBestStreak || 0}</div>
+                </div>`;
+            }).join('');
+        }
+
+        function notifyNewReflectiveBadges(unlockedBadgeIds, existingBadgeIds) {
+            const oldSet = new Set(Array.isArray(existingBadgeIds) ? existingBadgeIds : []);
+            const newOnes = unlockedBadgeIds.filter(id => !oldSet.has(id));
+            if (!newOnes.length) return;
+
+            try {
+                const keyPrefix = `rl-badge-toast-${userId}-`;
+                const unseen = newOnes.filter(id => !localStorage.getItem(keyPrefix + id));
+                if (!unseen.length) return;
+
+                const names = unseen.map(id => {
+                    const f = reflectiveBadgeCatalog.find(b => b.id === id);
+                    return f ? `${f.icon} ${f.title}` : id;
+                }).join(', ');
+
+                if (typeof showToast === 'function') showToast(`🏅 ปลดล็อก Badge ใหม่: ${names}`);
+                else alert(`🏅 ปลดล็อก Badge ใหม่: ${names}`);
+
+                unseen.forEach(id => localStorage.setItem(keyPrefix + id, '1'));
+            } catch (e) {
+                console.warn('Badge notify error:', e);
+            }
+        }
+
+        async function syncReflectiveGamification(metrics, unlockedBadgeIds) {
+            const syncKey = JSON.stringify([
+                metrics.totalLogs,
+                metrics.currentStreak,
+                metrics.longestStreak,
+                metrics.reviewedLogs,
+                metrics.claimedBonuses,
+                [...unlockedBadgeIds].sort().join(',')
+            ]);
+            if (reflectiveGamificationSyncKey === syncKey) return;
+            reflectiveGamificationSyncKey = syncKey;
+
+            const payload = {
+                reflectiveTotalLogs: metrics.totalLogs,
+                reflectiveCurrentStreak: metrics.currentStreak,
+                reflectiveBestStreak: metrics.longestStreak,
+                reflectiveReviewedLogs: metrics.reviewedLogs,
+                reflectiveClaimedBonuses: metrics.claimedBonuses,
+                reflectiveBadges: unlockedBadgeIds,
+                reflectiveLastSync: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            try {
+                await db.collection('users').doc(userId).set(payload, { merge: true });
+                const meIndex = allUsersData.findIndex(u => u.id === userId);
+                if (meIndex >= 0) allUsersData[meIndex] = { ...allUsersData[meIndex], ...payload };
+                renderReflectiveMiniLeaderboard();
+            } catch (e) {
+                console.warn('Reflective sync failed:', e);
+            }
+        }
+
         function toggleReflectiveSection() {
             const content = document.getElementById('rl-section-content');
             const icon = document.getElementById('rl-section-icon');
@@ -3922,23 +4201,22 @@
             if (!list) return;
             list.innerHTML = "";
 
-            const now = new Date();
-            const todayStr = now.toLocaleDateString('en-CA'); // YYYY-MM-DD
-            
-            let doneToday = false;
-            let streak = 0;
-            let lastDate = null;
-
             // Sorting by date descending for streak calculation
             const sortedLogs = [...reflectiveLogsCache].sort((a,b) => b.timestamp?.toDate() - a.timestamp?.toDate());
+
+            const metrics = collectReflectiveMetrics(sortedLogs);
+            const currentUserRow = allUsersData.find(u => u.id === userId) || {};
+            const existingBadgeIds = Array.isArray(currentUserRow.reflectiveBadges) ? currentUserRow.reflectiveBadges : [];
+            const unlockedBadgeIds = getReflectiveUnlockedBadges(metrics, existingBadgeIds);
+
+            renderReflectiveBadgeCollection(unlockedBadgeIds);
+            renderReflectiveMiniLeaderboard();
+            notifyNewReflectiveBadges(unlockedBadgeIds, existingBadgeIds);
+            syncReflectiveGamification(metrics, unlockedBadgeIds);
 
             sortedLogs.forEach((log, i) => {
                 if (!log.timestamp) return;
                 const d = log.timestamp.toDate();
-                const dStr = d.toLocaleDateString('en-CA');
-                
-                if (dStr === todayStr) doneToday = true;
-
                 // Render Item
                 if (i < 7) { // Show only last 7 items in list
                     const item = document.createElement('div');
@@ -3974,32 +4252,14 @@
                 }
             });
 
-            // Streak Logic (Simple Version)
-            let checkDate = new Date();
-            // If already done today, start from today, if not start from yesterday
-            let streakCheckDateStr = doneToday ? todayStr : new Date(Date.now() - 86400000).toLocaleDateString('en-CA');
-            
-            for (let log of sortedLogs) {
-                if (!log.timestamp) continue;
-                const logDateStr = log.timestamp.toDate().toLocaleDateString('en-CA');
-                if (logDateStr === streakCheckDateStr) {
-                    streak++;
-                    // Move to previous day
-                    let prev = new Date(new Date(streakCheckDateStr).getTime() - 86400000);
-                    streakCheckDateStr = prev.toLocaleDateString('en-CA');
-                } else if (new Date(logDateStr) < new Date(streakCheckDateStr)) {
-                    break;
-                }
-            }
-
-            if (streak > 0) {
-                streakBadge.innerText = `🔥 ${streak} วัน`;
+            if (metrics.currentStreak > 0) {
+                streakBadge.innerText = `🔥 ${metrics.currentStreak} วัน`;
                 streakBadge.style.display = 'inline-block';
             } else {
                 streakBadge.style.display = 'none';
             }
 
-            if (doneToday) {
+            if (metrics.doneToday) {
                 status.innerHTML = '<span style="color:#28a745;"><i class="fa-solid fa-check-circle"></i> เรียบร้อย</span>';
                 formArea.style.opacity = '0.5';
                 formArea.style.pointerEvents = 'none';
