@@ -415,6 +415,15 @@
             margin-bottom: 10px;
             border-left: 5px solid #ccc;
             position: relative;
+            overflow: hidden;
+            word-break: break-word;
+        }
+
+        .kanban-card img:not(.assignee-img):not(.lt-avatar):not(.user-pic):not(.chat-avatar) {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 8px;
         }
 
         .kanban-card.project {
@@ -9060,8 +9069,12 @@
                         d.dataset.id = id;
 
                         let imgs = '<div class="assignee-stack">';
-                        if (q.assignees) q.assignees.forEach(u => imgs += `<img src="${u.pic || ''}" class="assignee-img" title="${u.name || ''}">`);
+                        if (q.assignees) q.assignees.forEach(u => imgs += `<img src="${u.pic || ''}" class="assignee-img" title="${escapeKanbanText(u.name || '')}">`);
                         imgs += '</div>';
+
+                        const safePriority = escapeKanbanText(q.priority || 'Medium');
+                        const safeTitle = escapeKanbanText(q.title || 'Untitled Task');
+                        const safeDescription = escapeKanbanText(q.description || '');
 
                         let timersHtml = "";
                         if (q.deadline) {
@@ -9091,15 +9104,15 @@
                                 <span><i class="fa-solid fa-align-left"></i> Description</span>
                                 <i id="icon-${descId}" class="fa-solid fa-chevron-down"></i>
                             </div>
-                            <div id="${descId}" style="display:none; font-size:0.8em; color:#666; margin-bottom:5px; white-space:pre-wrap; background:#fafafa; padding:8px; border-radius:6px; border:1px solid #eee;">${q.description}</div>
+                            <div id="${descId}" style="display:none; font-size:0.8em; color:#666; margin-bottom:5px; white-space:pre-wrap; background:#fafafa; padding:8px; border-radius:6px; border:1px solid #eee;">${safeDescription}</div>
                         ` : "";
 
                         d.innerHTML = `
                             <div class="card-header-row">
-                                <span class="badge" style="background:${pColor}">${q.priority || 'Medium'}</span>
+                                <span class="badge" style="background:${pColor}">${safePriority}</span>
                                 <div class="card-header-right">${imgs} ${arrows}</div>
                             </div>
-                            <div style="font-weight:bold;">${isProj ? '<span class="badge" style="background:#e83e8c;font-size:0.6em;">PROJ</span>' : ''} ${q.title}</div>
+                            <div style="font-weight:bold;">${isProj ? '<span class="badge" style="background:#e83e8c;font-size:0.6em;">PROJ</span>' : ''} ${safeTitle}</div>
                             <div class="card-timers">${timersHtml}</div>
                             ${descHtml}
                             <div class="card-tool-row">
