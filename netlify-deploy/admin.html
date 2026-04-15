@@ -9951,15 +9951,33 @@
             });
         }
 
-        async function updateCertPreview() {
-            const c = document.getElementById('cert-canvas');
-            const ctx = c.getContext('2d');
+        const CERT_BASE_WIDTH = 800;
+        const CERT_BASE_HEIGHT = 600;
+        const CERT_EXPORT_SCALE = 4; // 800x600 -> 3200x2400
 
-            c.width = 800;
-            c.height = 600;
+        function renderCertificateCanvas(canvas, drawArgs, scale = 1) {
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return null;
+
+            canvas.width = CERT_BASE_WIDTH * scale;
+            canvas.height = CERT_BASE_HEIGHT * scale;
+
+            if (scale === 1) {
+                canvas.style.width = `${CERT_BASE_WIDTH}px`;
+                canvas.style.height = `${CERT_BASE_HEIGHT}px`;
+            }
 
             ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
+            drawCertificate(ctx, ...drawArgs);
+            return ctx;
+        }
+
+        function getCurrentCertificateDrawArgs() {
             const s = document.getElementById('cert-start').value;
             const e = document.getElementById('cert-end').value;
             const fn = document.getElementById('cert-fullname').value;
@@ -9974,7 +9992,13 @@
                 displayNameForCert += `|${nn}`;
             }
 
-            drawCertificate(ctx, displayNameForCert, s && e ? `${s} - ${e}` : "", awards);
+            return [displayNameForCert, s && e ? `${s} - ${e}` : "", awards];
+        }
+
+        async function updateCertPreview() {
+            const c = document.getElementById('cert-canvas');
+            const drawArgs = getCurrentCertificateDrawArgs();
+            renderCertificateCanvas(c, drawArgs, 1);
         }
         async function generateBulkCert() {
             const { jsPDF } = window.jspdf;
@@ -9986,9 +10010,6 @@
             showToast("Generating Bulk PDF... Please wait.");
 
             const c = document.createElement('canvas');
-            const ctx = c.getContext('2d');
-            c.width = 800;
-            c.height = 600;
 
             const doc = new jsPDF('l', 'mm', 'a4');
 
@@ -10001,11 +10022,11 @@
                     displayNameForCert += `|${u.nickname}`;
                 }
 
-                drawCertificate(ctx, displayNameForCert, `${u.startDate} - ${u.endDate}`, finalAwards);
+                renderCertificateCanvas(c, [displayNameForCert, `${u.startDate} - ${u.endDate}`, finalAwards], CERT_EXPORT_SCALE);
 
-                const imgData = c.toDataURL('image/jpeg', 0.95);
+                const imgData = c.toDataURL('image/png');
                 if (i > 0) doc.addPage();
-                doc.addImage(imgData, 'JPEG', 0, 0, 297, 210); // Fill A4
+                doc.addImage(imgData, 'PNG', 0, 0, 297, 210); // Fill A4
             }
 
             doc.save("Bulk_Certificates.pdf");
@@ -10015,9 +10036,11 @@
         function generateCertPDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('l', 'mm', 'a4');
-            const canvas = document.getElementById('cert-canvas');
-            const imgData = canvas.toDataURL('image/jpeg', 1.0);
-            doc.addImage(imgData, 'JPEG', 0, 0, 297, 210);
+            const exportCanvas = document.createElement('canvas');
+            const drawArgs = getCurrentCertificateDrawArgs();
+            renderCertificateCanvas(exportCanvas, drawArgs, CERT_EXPORT_SCALE);
+            const imgData = exportCanvas.toDataURL('image/png');
+            doc.addImage(imgData, 'PNG', 0, 0, 297, 210);
             doc.save(`Certificate_${document.getElementById('cert-fullname').value || "User"}.pdf`);
         }
         async function delQuizAttempt(id, collection = 'quiz_attempts') {
