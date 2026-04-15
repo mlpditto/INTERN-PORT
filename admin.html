@@ -12075,6 +12075,12 @@ async function saveQuiz() {
             const cnt = { "Backlog": 0, "Doing": 0, "Review": 0, "Done": 0 };
             const filterEl = document.getElementById('board-search');
             const filter = filterEl ? filterEl.value.toLowerCase() : "";
+            const escapeKanbanText = (val) => String(val || "")
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
 
             // 1. Render Side Quests from sideQuestsCache
             try {
@@ -12170,6 +12176,8 @@ async function saveQuiz() {
                     
                     const contentText = log.content || "";
                     const userName = log.userName || log.displayName || 'Unknown';
+                    const safeContentText = escapeKanbanText(contentText);
+                    const safeUserName = escapeKanbanText(userName);
                     if (filter && !contentText.toLowerCase().includes(filter) && !userName.toLowerCase().includes(filter)) return;
 
                     if (activeBoardGroup !== 'All') {
@@ -12210,11 +12218,11 @@ async function saveQuiz() {
                     d.innerHTML = `
                         <div class="card-header-row" style="margin-bottom:12px;">
                             <span class="badge" style="background:${isPending ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #10b981, #059669)'}; padding:4px 12px; border-radius:8px; font-size:0.7em; letter-spacing:0.5px;">REFLECTIVE</span>
-                            <div class="card-header-right"><img class="lt-avatar" src="${log.pictureUrl || ''}" style="width:32px; height:32px; border-radius:10px; object-fit:cover; border:2px solid white; box-shadow:0 3px 6px rgba(0,0,0,0.1);" title="${userName}"></div>
+                            <div class="card-header-right"><img class="lt-avatar" src="${log.pictureUrl || ''}" style="width:32px; height:32px; border-radius:10px; object-fit:cover; border:2px solid white; box-shadow:0 3px 6px rgba(0,0,0,0.1);" title="${safeUserName}"></div>
                         </div>
-                        <div style="font-weight:800; font-size:1.05em; color:var(--text-main); margin-bottom:4px;">${userName}</div>
+                        <div style="font-weight:800; font-size:1.05em; color:var(--text-main); margin-bottom:4px;">${safeUserName}</div>
                         <div style="font-size:0.85em; color:var(--text-sub); line-height:1.6; background:var(--col-bg); padding:10px; border-radius:10px; margin-top:8px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">
-                            <span style="font-size:1.2em; margin-right:4px;">${moodEmoji}</span> ${contentText}
+                            <span style="font-size:1.2em; margin-right:4px;">${moodEmoji}</span> ${safeContentText}
                         </div>
                         ${!isPending ? `<div style="font-size:0.75em; color:var(--success); font-weight:700; margin-top:10px; display:flex; align-items:center; gap:5px;"><i class="fa-solid fa-circle-check"></i> Reviewed (+${log.adminBonus || 0} pts)</div>` : ''}
                         <div style="margin-top:15px;">
@@ -12300,6 +12308,8 @@ async function saveQuiz() {
             try {
                 pointsClaimedCache.forEach(log => {
                     const uName = log.displayName || log.userName || 'Unknown';
+                    const safeUName = escapeKanbanText(uName);
+                    const safeLogPreview = escapeKanbanText(log.content ? log.content.substring(0, 50) + '...' : 'No content');
                     if (filter && !uName.toLowerCase().includes(filter)) return;
                     
                     if (activeBoardGroup !== 'All') {
@@ -12315,11 +12325,11 @@ async function saveQuiz() {
                     d.innerHTML = `
                         <div class="card-header-row">
                             <span class="badge" style="background:#00b894;">Points Claimed</span>
-                            <div class="card-header-right"><img class="lt-avatar" src="${log.pictureUrl || ''}" class="assignee-img" title="${uName}"></div>
+                            <div class="card-header-right"><img class="lt-avatar" src="${log.pictureUrl || ''}" class="assignee-img" title="${safeUName}"></div>
                         </div>
-                        <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${uName}</div>
+                        <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${safeUName}</div>
                         <div style="font-size:0.85em; color:#444;">🎉 Bonus already claimed: <span style="font-weight:bold; color:#00b894;">+${log.adminBonus || 0} pts</span></div>
-                        <div style="font-size:0.75em; color:#666; margin-top:4px;">📔 Reflective Log: ${log.content ? log.content.substring(0, 50) + '...' : 'No content'}</div>
+                        <div style="font-size:0.75em; color:#666; margin-top:4px;">📔 Reflective Log: ${safeLogPreview}</div>
                         <div style="margin-top:8px;">
                             <button class="btn-sm btn-success" style="width:100%; background:#00b894; border:none;" onclick="acknowledgeClaimedPoints('${log.id}')">
                                 <i class="fa-solid fa-check"></i> Acknowledge
@@ -13350,9 +13360,10 @@ async function saveQuiz() {
                     ctx.fill();
                     ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
                     ctx.textAlign = "center"; ctx.fillStyle = "#5d4037";
-                    ctx.font = "bold 20px Arial"; ctx.fillText("🌟", specX, specY - 5);
-                    ctx.font = "bold 7.5px Montserrat"; ctx.fillText("RISING STAR", specX, specY + 9);
-                    ctx.font = "6.5px Montserrat"; ctx.fillText("RAPID GROWTH", specX, specY + 20);
+                    ctx.font = "bold 18px Arial"; ctx.fillText("🌟", specX, specY - 7);
+                    ctx.font = "bold 6.4px Montserrat"; ctx.fillText("RISING", specX, specY + 7);
+                    ctx.font = "bold 6.4px Montserrat"; ctx.fillText("STAR", specX, specY + 14);
+                    ctx.font = "5.4px Montserrat"; ctx.fillText("RAPID GROWTH", specX, specY + 21);
 
                 } else if (award === 'mvp') {
                     // 👑 MVP — Double-ring circle, Gold-Crimson gradient
