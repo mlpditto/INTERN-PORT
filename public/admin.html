@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intern Admin Portal (V90.33)</title>
-    <!-- V90.33: Timing telemetry + profile-based timing config -->
+    <title>Intern Admin Portal (V90.34)</title>
+    <!-- V90.34: Timing telemetry + profile-based timing config -->
     <!-- Release: 2026-04-15 23:33 UTC+7 -->
 
     <style>
@@ -390,22 +390,34 @@
         }
 
         .kanban-board {
-            display: flex;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 15px;
-            overflow-x: auto;
+            width: 100%;
             padding-bottom: 20px;
             min-height: 600px;
         }
 
         .kanban-col {
-            flex: 1;
-            min-width: 300px;
+            min-width: 0;
             background: var(--col-bg);
             border-radius: 12px;
             padding: 15px;
             display: flex;
             flex-direction: column;
             border: 1px solid var(--border-color);
+        }
+
+        @media (max-width: 1200px) {
+            .kanban-board {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            .kanban-board {
+                grid-template-columns: minmax(0, 1fr);
+            }
         }
 
         .kanban-card {
@@ -1125,7 +1137,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; color:var(--primary); font-size:1.4em; display:flex; align-items:center; gap:10px; line-height:1.2;">
                         🚀 Intern Admin Portal
-                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V90.33</span>
+                        <span style="font-size:0.5em; background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-weight:bold; margin-left:5px;">V90.34</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -1372,10 +1384,6 @@
             <div id="daily-quest-management-section" class="review-card" style="border-color:#ffe8d1; border-radius:12px; margin-top:30px; margin-bottom:15px; background:#fffaf5;">
                 <h4 style="color:#d35400; font-size:1.1em; border-bottom:1px solid #ffe8d1; padding-bottom:10px; margin-bottom:15px; display:flex; align-items:center; gap:8px;">
                     <i class="fa-solid fa-scroll"></i> Daily Quests Management
-                    <button class="btn-sm" style="margin-left:auto; background:none; border:none; color:#999; cursor:pointer;" title="Quest History"
-                        onclick="const el = document.getElementById('questHistoryContainer'); el.style.display = el.style.display === 'none' ? 'block' : 'none'">
-                        <i class="fa-solid fa-clock-rotate-left"></i>
-                    </button>
                 </h4>
 
                 <div id="active-quest-section" style="display:none; background:#d1e7dd; padding:15px; border-radius:10px; margin-bottom:20px;">
@@ -1387,21 +1395,6 @@
                                     <th>Quest</th>
                                     <th>Expires</th>
                                     <th>Duration</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div style="margin-top:10px;">
-                    <div id="questHistoryContainer" style="display:none; margin-top:15px; overflow-x:auto;">
-                        <table id="questHistoryTable" class="admin-table">
-                            <thead>
-                                <tr>
-                                    <th>Quest</th>
-                                    <th>Score</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -2101,6 +2094,24 @@
                         onclick="confirmClearArchive()">🧨 Clear All</button>
                 </div>
                 <div id="archive-list" style="margin-top:10px;"></div>
+                <div style="margin-top:14px; border-top:1px dashed #ddd; padding-top:14px;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                        <i class="fa-solid fa-clock-rotate-left" style="color:#d35400;"></i>
+                        <h4 style="margin:0; color:#d35400; font-size:1em; font-weight:800;">QUEST HISTORY & ARCHIVE</h4>
+                    </div>
+                    <div style="overflow-x:auto; background:white; padding:12px; border-radius:12px; border:1px solid #f1f5f9;">
+                        <table id="questHistoryTable" class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Quest</th>
+                                    <th>Base Score</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
         <div id="delCardModal" class="modal" style="z-index:2200;">
@@ -2611,6 +2622,34 @@
                 <div style="margin-top: 15px; text-align: right;">
                     <button class="btn-sm btn-dark"
                         onclick="document.getElementById('pollResultModal').style.display='none'">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quiz Feedback Panel Modal (V90.34) -->
+        <div id="quizFeedbackPanelModal" class="modal" style="z-index: 2501;">
+            <div class="modal-content" style="max-width:700px; border-top:5px solid #f59e0b; border-radius:18px;">
+                <span class="close-modal" onclick="document.getElementById('quizFeedbackPanelModal').style.display='none'">&times;</span>
+                <h3 style="margin:0 0 4px 0; display:flex; align-items:center; gap:10px; color:#b45309;">
+                    <i class="fa-solid fa-star-half-stroke"></i> Quiz Feedback Panel
+                </h3>
+                <div id="qfp-quiz-title" style="font-size:0.85em; color:#64748b; margin-bottom:18px;"></div>
+                <div id="qfp-summary" style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px;"></div>
+                <div style="background:#fefce8; border:1px solid #fde68a; border-radius:12px; padding:14px; margin-bottom:18px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-weight:800; font-size:0.9em; color:#78350f;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Insight</span>
+                        <button id="qfp-ai-btn" onclick="generateAIFeedbackInsight()" style="background:linear-gradient(135deg,#f59e0b,#d97706); color:white; border:none; border-radius:10px; padding:6px 16px; font-weight:800; font-size:0.8em; cursor:pointer;">✨ Generate</button>
+                    </div>
+                    <div id="qfp-ai-result" style="font-size:0.88em; color:#78350f; line-height:1.6; min-height:30px; white-space:pre-wrap;"></div>
+                </div>
+                <div style="font-weight:800; font-size:0.88em; color:#475569; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+                    <i class="fa-solid fa-comments"></i> Individual Feedback
+                </div>
+                <div id="qfp-comments" style="max-height:350px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-right:4px;">
+                    <p style="text-align:center; color:#94a3b8; padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</p>
+                </div>
+                <div style="text-align:right; margin-top:16px;">
+                    <button class="btn-sm" onclick="document.getElementById('quizFeedbackPanelModal').style.display='none'" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; border-radius:10px; padding:8px 20px; font-weight:700;">Close</button>
                 </div>
             </div>
         </div>
@@ -4616,7 +4655,7 @@
                             <i class="fa-solid fa-copy" style="font-size:0.8em;"></i>
                         </button>
                         <button type="button" class="btn-sm" onclick="duplicateQuestion(this)" title="Clone Question" style="width:30px; height:30px; border-radius:10px; background:#fff; border:1px solid #d0d7de; color:#2ecc71; padding:0; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
-                            <i class="fa-solid fa-clone" style="font-size:0.8em;"></i>
+                            <span style="font-size:0.9em; line-height:1;">🐑</span>
                         </button>
                         <button class="btn-sm btn-danger" onclick="if(confirm('Delete this question?')){this.closest('.quiz-q-item').remove(); updateQuizPagination();}" style="width:30px; height:30px; padding:0; border-radius:10px; flex-shrink:0; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(239,35,60,0.15);" title="Remove Question"><i class="fa-solid fa-trash-can" style="font-size:0.8em;"></i></button>
                     </div>
@@ -7422,8 +7461,9 @@
                 return `
                     <tr>
                         <td>
-                            <div style="font-weight:800; color:#333; margin-bottom:3px;">
+                            <div style="font-weight:800; color:#333; margin-bottom:3px; display:flex; align-items:center; gap:8px;">
                                 ${q.title ? q.title.replace(/\s*\(Template\)$/i, '') : '-'}
+                                <span id="fb-badge-${q.id}" style="font-size:0.7em; background:#fff7ed; color:#b45309; border:1px solid #fed7aa; border-radius:8px; padding:2px 7px; font-weight:800; cursor:pointer; white-space:nowrap;" onclick="event.stopPropagation(); showQuizFeedbackPanel('${q.id}')" title="View user feedback">⭐ —</span>
                             </div>
                             <div style="display:flex; flex-wrap:wrap; gap:3px; align-items:center;">
                                 ${modeLabel} ${oneTimeLabel} ${homeworkLabel} 
@@ -7490,6 +7530,7 @@
                                 <button class="btn-sm" style="background:#2e7d32; color:white; padding:2px 6px;" onclick="openHomeworkAssignModal('${q.id}')" title="Homework"><i class="fa-solid fa-book"></i></button>
                                 ${(q.isPoll || hasWriting) ? `<button class="btn-sm" style="background:#8e44ad; color:white; padding:2px 6px;" onclick="showPollResults('${q.id}')" title="Result">📊</button>` : ''}
                                 <button class="btn-sm" style="background:#8e44ad; color:white; padding:2px 6px;" onclick="showQuizDiscussions('${q.id}')" title="Discussion">💬</button>
+                                <button class="btn-sm" style="background:#fff7ed; color:#b45309; border:1px solid #fed7aa; padding:2px 6px;" onclick="event.stopPropagation(); showQuizFeedbackPanel('${q.id}')" title="User Feedback">⭐</button>
                                 ${(!isActiveSection) ? `<button class="btn-sm btn-warning" style="padding:2px 6px; font-size:0.75em;" onclick="repostQuiz('${q.id}')">♻️</button>` : ''}
                                 <button class="btn-sm btn-danger" style="padding:2px 6px;" onclick="deleteQuiz('${q.id}')">Del</button>
                             </div>
@@ -7520,6 +7561,7 @@
                     <button class="btn-sm btn-dark" ${inactiveQuizPage >= totalInactivePages ? 'disabled' : ''} onclick="changeInactiveQuizPage(1)">Next</button>
                 `;
             }
+            if (typeof loadQuizFeedbackBadges === 'function') loadQuizFeedbackBadges();
         }
 
         function changeInactiveQuizPage(dir) {
@@ -11104,6 +11146,107 @@
         };
 
         if (window.loadAIKeys) window.loadAIKeys();
+
+        // --- V90.34: Quiz Feedback Panel ---
+        let _qfpCurrentId = null;
+        let _qfpFeedbacks = [];
+
+        async function showQuizFeedbackPanel(quizId) {
+            _qfpCurrentId = quizId;
+            _qfpFeedbacks = [];
+            document.getElementById('qfp-ai-result').innerText = '';
+            document.getElementById('qfp-summary').innerHTML = '';
+            document.getElementById('qfp-comments').innerHTML = `<p style="text-align:center;color:#94a3b8;padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</p>`;
+            const quiz = quizzesData.find(x => x.id === quizId);
+            document.getElementById('qfp-quiz-title').innerText = quiz ? quiz.title : quizId;
+            document.getElementById('quizFeedbackPanelModal').style.display = 'flex';
+            try {
+                const snap = await db.collection('quiz_feedback').where('quizId', '==', quizId).orderBy('timestamp', 'desc').limit(100).get();
+                _qfpFeedbacks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            } catch (e) {
+                try {
+                    const snap2 = await db.collection('quiz_feedback').where('quizId', '==', quizId).get();
+                    _qfpFeedbacks = snap2.docs.map(d => ({ id: d.id, ...d.data() }));
+                } catch (e2) { document.getElementById('qfp-comments').innerHTML = `<p style='color:#ef4444;'>Error: ${e2.message}</p>`; return; }
+            }
+            if (!_qfpFeedbacks.length) {
+                document.getElementById('qfp-comments').innerHTML = `<p style="text-align:center;color:#94a3b8;padding:20px;">ยังไม่มี feedback สำหรับชุดข้อสอบนี้</p>`;
+                document.getElementById('qfp-summary').innerHTML = `<span style="color:#94a3b8;font-size:0.85em;">No data yet.</span>`;
+                return;
+            }
+            const ratings = _qfpFeedbacks.map(f => f.rating).filter(r => typeof r === 'number');
+            const avgRating = ratings.length ? (ratings.reduce((a, b) => a + b, 0) / ratings.length) : null;
+            const topics = _qfpFeedbacks.map(f => f.nextTopic).filter(t => t && t.trim());
+            const avgTime = _qfpFeedbacks.reduce((a, f) => a + (f.timeUsedSeconds || 0), 0) / _qfpFeedbacks.length;
+            const starFill = avgRating !== null ? Math.round(avgRating / 10 * 5) : null;
+            const starsHtml = starFill !== null ? '★'.repeat(starFill) + '☆'.repeat(5 - starFill) : '—';
+            document.getElementById('qfp-summary').innerHTML = `
+                <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:12px 18px;flex:1;min-width:140px;">
+                    <div style="font-size:0.75em;font-weight:700;color:#92400e;text-transform:uppercase;">Avg Rating</div>
+                    <div style="font-size:2em;font-weight:900;color:#b45309;">${avgRating !== null ? avgRating.toFixed(1) : '—'}<span style="font-size:0.5em;color:#d97706;">/10</span></div>
+                    <div style="color:#f59e0b;font-size:1.1em;">${starsHtml}</div>
+                </div>
+                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 18px;flex:1;min-width:140px;">
+                    <div style="font-size:0.75em;font-weight:700;color:#166534;text-transform:uppercase;">Responses</div>
+                    <div style="font-size:2em;font-weight:900;color:#15803d;">${_qfpFeedbacks.length}</div>
+                </div>
+                <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 18px;flex:1;min-width:140px;">
+                    <div style="font-size:0.75em;font-weight:700;color:#1e40af;text-transform:uppercase;">Avg Time</div>
+                    <div style="font-size:2em;font-weight:900;color:#1d4ed8;">${Math.round(avgTime / 60)}<span style="font-size:0.5em;color:#3b82f6;"> min</span></div>
+                </div>
+                ${topics.length ? `<div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:12px;padding:12px 18px;flex:2;min-width:200px;">
+                    <div style="font-size:0.75em;font-weight:700;color:#6b21a8;margin-bottom:6px;">🎯 Next Topics</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:5px;">${topics.slice(0,8).map(t=>`<span style="background:white;border:1px solid #d8b4fe;border-radius:8px;padding:3px 9px;font-size:0.8em;color:#7c3aed;font-weight:600;">${t}</span>`).join('')}</div>
+                </div>` : ''}
+            `;
+            const badge = document.getElementById(`fb-badge-${quizId}`);
+            if (badge && avgRating !== null) badge.innerText = `⭐ ${avgRating.toFixed(1)} (${_qfpFeedbacks.length})`;
+            document.getElementById('qfp-comments').innerHTML = _qfpFeedbacks.map(f => {
+                const ts = f.timestamp ? (typeof f.timestamp.toDate === 'function' ? f.timestamp.toDate() : new Date(f.timestamp.seconds * 1000)) : null;
+                const dateStr = ts ? ts.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+                const stars = typeof f.rating === 'number' ? ('★'.repeat(Math.round(f.rating/10*5))+'☆'.repeat(5-Math.round(f.rating/10*5))) : '';
+                const mins = Math.floor((f.timeUsedSeconds||0)/60); const secs = (f.timeUsedSeconds||0)%60;
+                return `<div style="background:white;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;">
+                    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+                        <div><span style="font-weight:800;font-size:0.9em;">${f.displayName||'Anonymous'}</span> <span style="color:#f59e0b;margin-left:8px;">${stars}</span> <span style="font-size:0.8em;color:#64748b;">${typeof f.rating==='number'?f.rating+'/10':''}</span></div>
+                        <div style="font-size:0.75em;color:#94a3b8;">${dateStr} · ⏱ ${mins}:${String(secs).padStart(2,'0')}</div>
+                    </div>
+                    ${f.nextTopic?`<div style="margin-bottom:6px;"><span style="font-size:0.75em;font-weight:700;color:#7c3aed;">🎯 อยากทำต่อ:</span> <span style="font-size:0.82em;color:#6d28d9;">${f.nextTopic}</span></div>`:''}
+                    ${f.comment?`<div style="font-size:0.85em;color:#475569;background:#f8fafc;padding:8px 12px;border-radius:8px;border-left:3px solid #cbd5e1;">${f.comment}</div>`:''}
+                </div>`;
+            }).join('');
+        }
+
+        async function generateAIFeedbackInsight() {
+            if (!_qfpFeedbacks.length) return;
+            const btn = document.getElementById('qfp-ai-btn');
+            const resultEl = document.getElementById('qfp-ai-result');
+            const oldText = btn.innerHTML;
+            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            resultEl.innerText = 'กำลังวิเคราะห์...';
+            const quiz = quizzesData.find(x => x.id === _qfpCurrentId);
+            const ratings = _qfpFeedbacks.map(f => f.rating).filter(r => typeof r === 'number');
+            const avg = ratings.length ? (ratings.reduce((a,b)=>a+b,0)/ratings.length).toFixed(1) : 'N/A';
+            const topics = _qfpFeedbacks.map(f=>f.nextTopic).filter(t=>t&&t.trim()).join(', ')||'ไม่มี';
+            const comments = _qfpFeedbacks.map(f=>f.comment).filter(c=>c&&c.trim()).slice(0,15).join('\n- ')||'ไม่มี';
+            const prompt = `คุณเป็นที่ปรึกษาการออกข้อสอบ วิเคราะห์ feedback จากผู้เรียนสำหรับชุดข้อสอบ "${quiz?quiz.title:_qfpCurrentId}":\n- จำนวน: ${_qfpFeedbacks.length} คน\n- Rating เฉลี่ย: ${avg}/10\n- หัวข้อที่อยากทำต่อ: ${topics}\n- ความคิดเห็น:\n- ${comments}\nสรุปภาษาไทย 3-5 บรรทัด: 1) ความรู้สึกผู้เรียน 2) จุดเด่น/อ่อน 3) ข้อเสนอแนะครั้งต่อไป`;
+            try {
+                const model = document.getElementById('ai-model-selector') ? document.getElementById('ai-model-selector').value : 'gemini-1.5-flash';
+                const { text } = await window.callUniversalAI(model, prompt);
+                resultEl.innerText = text || '(ไม่มีคำตอบ)';
+            } catch (e) { resultEl.innerText = 'Error: ' + e.message; }
+            finally { btn.disabled = false; btn.innerHTML = oldText; }
+        }
+
+        async function loadQuizFeedbackBadges() {
+            if (!quizzesData.length) return;
+            try {
+                const snap = await db.collection('quiz_feedback').get();
+                const agg = {};
+                snap.docs.forEach(d => { const f = d.data(); if (!f.quizId) return; if (!agg[f.quizId]) agg[f.quizId]={sum:0,count:0}; if (typeof f.rating==='number'){agg[f.quizId].sum+=f.rating;agg[f.quizId].count++;} });
+                Object.entries(agg).forEach(([qid,{sum,count}])=>{ const badge=document.getElementById(`fb-badge-${qid}`); if(badge&&count>0){const avg=(sum/count).toFixed(1);badge.innerText=`⭐ ${avg} (${count})`;} });
+            } catch (e) { console.warn('Quiz feedback badge load error:',e.message); }
+        }
     </script>
 
     <!-- Quick Review Modal -->
