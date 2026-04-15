@@ -7379,6 +7379,7 @@ async function saveQuiz() {
                                 <th>Name</th>
                                 ${!hideQuizScores ? '<th style="text-align:center;">Score</th>' : ''}
                                 <th style="text-align:center;">Status</th>
+                                <th style="text-align:center;">Security</th>
                                 <th>Time / Duration</th>
                                 <th style="text-align:center;">Action</th>
                             </tr>
@@ -7402,6 +7403,13 @@ async function saveQuiz() {
                     const statusColor = att.status === 'approved' ? '#2ec4b6' :
                         (att.status === 'practice_done' ? '#f57f17' :
                             (att.status === 'requesting' ? '#ff9f1c' : '#666'));
+                    const cheatSummary = att.cheatMonitoring?.summary || {};
+                    const cheatEvents = Array.isArray(att.cheatMonitoring?.events) ? att.cheatMonitoring.events : [];
+                    const cheatCount = cheatSummary.totalEvents || cheatEvents.length || 0;
+                    const cheatLabel = cheatSummary.riskLabel || (cheatCount >= 5 ? 'High' : (cheatCount >= 2 ? 'Moderate' : (cheatCount === 1 ? 'Low' : 'None')));
+                    const cheatScore = cheatSummary.riskScore ?? cheatCount;
+                    const cheatColor = cheatLabel === 'High' ? '#ef4444' : (cheatLabel === 'Moderate' ? '#f59e0b' : (cheatLabel === 'Low' ? '#22c55e' : '#94a3b8'));
+                    const rowWarning = cheatLabel === 'High' ? 'background:#fff1f2;' : (cheatLabel === 'Moderate' ? 'background:#fffbf0;' : '');
                     const timeStr = att.timestamp ? att.timestamp.toDate().toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' }) : "-";
 
                     // Calculate Duration
@@ -7417,7 +7425,7 @@ async function saveQuiz() {
                     }
 
                     html += `
-                        <tr style="${isDimmed ? 'opacity:0.35; filter:grayscale(0.8); background:#f1f5f9;' : ''} border-bottom:1px solid #f1f5f9; transition:0.3s;" class="participant-row">
+                        <tr style="${isDimmed ? 'opacity:0.35; filter:grayscale(0.8); background:#f1f5f9;' : rowWarning} border-bottom:1px solid #f1f5f9; transition:0.3s;" class="participant-row">
                             <td style="padding:12px 10px;">
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     <img src="${pic}" style="width:32px; height:32px; border-radius:50%; border:1.5px solid white; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
@@ -7430,6 +7438,10 @@ async function saveQuiz() {
                             ${!hideQuizScores ? `<td style="font-weight:800; text-align:center; color:var(--primary); font-size:1.1em;">${score}</td>` : ''}
                             <td style="text-align:center;">
                                 <span class="badge" style="background:${statusColor}; font-size:0.75em; padding:4px 10px; border-radius:8px; font-weight:700;">${att.status.toUpperCase()}</span>
+                            </td>
+                            <td style="text-align:center;">
+                                <span style="display:inline-flex; align-items:center; gap:6px; justify-content:center; padding:6px 10px; border-radius:999px; background:${cheatColor}; color:white; font-weight:700; font-size:0.8em; min-width:72px;">${cheatLabel}</span>
+                                <div style="font-size:0.75em; color:#475569; margin-top:6px;">${cheatCount ? `${cheatScore} pts · ${cheatCount} events` : 'No alerts'}</div>
                             </td>
                             <td style="font-size:0.82em; color:#64748b; line-height:1.4;">
                                 <i class="fa-regular fa-calendar" style="font-size:0.9em;"></i> ${timeStr} ${durationStr}
@@ -7493,13 +7505,62 @@ async function saveQuiz() {
                 const quiz = quizzesData.find(x => x.id === att.quizId);
                 if (!quiz) return alert("Quiz Reference missing");
 
-                let cardsHtml = '';
+                const cheat = att.cheatMonitoring || {};
+                const cheatSummary = cheat.summary || {};
+                const cheatEvents = Array.isArray(cheat.events) ? cheat.events : [];
+                const cheatCount = cheatSummary.totalEvents || cheatEvents.length || 0;
+                const cheatRisk = cheatCount >= 5 ? 'High' : (cheatCount >= 2 ? 'Moderate' : (cheatCount === 1 ? 'Low' : 'None'));
+                const cheatColor = cheatCount >= 5 ? '#ef4444' : (cheatCount >= 2 ? '#f59e0b' : (cheatCount === 1 ? '#22c55e' : '#94a3b8'));
+                const createCheatBadge = (label, value) => `
+                    <div style="background:#fff; border:1px solid rgba(15,23,42,0.08); border-radius:12px; padding:12px; min-width:120px;">
+                        <div style="font-size:0.72em; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">${label}</div>
+                        <div style="margin-top:8px; font-weight:800; color:#162f48; font-size:1.05em;">${value}</div>
+                    </div>`;
+                const cheatSummaryHtml = `
+                    <div style="border:1px solid ${cheatColor}; border-radius:16px; background:${cheatCount ? 'rgba(254,228,228,0.92)' : 'rgba(237,247,255,0.92)'}; padding:20px; margin-bottom:20px; box-shadow:0 12px 24px rgba(15,23,42,0.06);">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+                            <div style="min-width:220px; flex:1;">
+                                <div style="font-size:1.05em; font-weight:800; color:#102a43;">Cheat Monitoring Summary</div>
+                                <div style="margin-top:8px; color:#475569; line-height:1.6;">Browser-level events recorded during the quiz session. Use this as a quick risk checkpoint before reviewing answers.</div>
+                            </div>
+                            <span style="display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:10px 16px; border-radius:999px; background:${cheatColor}; color:white; font-weight:800; font-size:0.95em; box-shadow:0 8px 16px rgba(15,23,42,0.12);">${cheatRisk} • ${cheatCount}</span>
+                        </div>
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin-top:18px;">
+                            ${createCheatBadge('Tab Hidden', cheatSummary.tabSwitchCount || 0)}
+                            ${createCheatBadge('Window Blur', cheatSummary.blurCount || 0)}
+                            ${createCheatBadge('Copy/Paste Blocked', cheatSummary.copyPasteBlocked || 0)}
+                            ${createCheatBadge('FullScreen Exits', cheatSummary.fullscreenExitCount || 0)}
+                            ${createCheatBadge('Mouse boundary', cheatSummary.mouseBoundaryCount || 0)}
+                        </div>
+                        ${cheatEvents.length ? `
+                            <div style="margin-top:18px;">
+                                <div style="font-weight:700; color:#102a43; margin-bottom:10px;">Recent Events</div>
+                                <div style="display:grid; gap:10px;">
+                                    ${cheatEvents.slice(-5).map(evt => {
+                                        const details = evt.details || {};
+                                        const detailText = details.hiddenDurationSec ? `Hidden ${details.hiddenDurationSec}s` : details.count ? `Count ${details.count}` : (details.key ? `Key ${details.key}` : '');
+                                        const ts = evt.timestamp ? new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-';
+                                        return `
+                                            <div style="padding:12px; border-radius:12px; background:#ffffff; border:1px solid rgba(15,23,42,0.08); display:flex; justify-content:space-between; gap:12px; align-items:center;">
+                                                <div style="min-width:0; flex:1;">
+                                                    <div style="font-weight:700; color:#1f2937;">${evt.type.replace(/_/g, ' ')}</div>
+                                                    <div style="font-size:0.82em; color:#475569; margin-top:4px;">${detailText}</div>
+                                                </div>
+                                                <div style="font-size:0.8em; color:#64748b; white-space:nowrap;">${ts}</div>
+                                            </div>`;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        ` : '<div style="margin-top:18px; color:#475569;">No suspicious browser activity was recorded for this quiz attempt.</div>'}
+                    </div>`;
+
+                let cardsHtml = cheatSummaryHtml;
 
                 // Read-only Review Display
                 if (quiz.quizType === 'read_only') {
                     const rawFeedback = (att.answers || [])[att.answers.length - 1] || 'No feedback provided.';
                     const feedbackText = Array.isArray(rawFeedback) ? rawFeedback.join("\n---\n") : rawFeedback;
-                    cardsHtml = `
+                    cardsHtml = cheatSummaryHtml + `
                         <div style="background:#f0f7ff; border:1px solid #4361ee; padding:20px; border-radius:15px; border-left:8px solid #4361ee; margin-bottom:20px;">
                             <b style="font-size:1.1em; color:#0d47a1; display:flex; align-items:center; gap:8px;">
                                 <i class="fa-solid fa-book-open"></i> Read-only Feedback / Reflection

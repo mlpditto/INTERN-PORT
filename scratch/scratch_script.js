@@ -1,5 +1,4 @@
-
-        const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ✅ Updated ID
+const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ✅ Updated ID
 
         let userId = "", userProfile = {}, userSubmissions = {};
         let questsCache = [], mySubmissionsCache = {}, myWorksCache = [], sideQuestsCache = {}, myGroup = "Public";
@@ -1132,7 +1131,7 @@
         let quizTimerInterval = null;
         let timeLeftForStep = 0;
         let accumulatedTime = 0; // 🔥 Added for V77.24 Carrying over time
-        let stepStartTimestamp = Date.now(); // V86.14: Track duration per question
+        let stepStart_timestamp = Date.now(); // V86.14: Track duration per question
         let durationsPerQuestion = [];
         let lastBonusTime = 0;   // 🔥 V81.3: Track bonus for UI display
 
@@ -1150,7 +1149,7 @@
                 const practiceMsg = `🔄 โหมด ONE-TIME\n` +
                     `------------------------------\n` +
                     `แบบทดสอบนี้เป็นโหมด ONE-TIME:\n` +
-                    `1. ครั้งแรก: ฝึกซ้อม (Practice) — ไม่มีคะแนนจริง\n` +
+                    `1. ครั้งแรก: ฝึกซ้อม (Practice) — ไม
                     `   → หลังส่ง จะเห็นเฉพาะข้อที่ตอบถูกเท่านั้น\n` +
                     `2. ครั้งที่สอง: สอบจริง — ต้องขออนุมัติจากแอดมินก่อน\n` +
                     `------------------------------\n` +
@@ -1241,7 +1240,7 @@
                 currentStep = 0;
                 accumulatedTime = 0;
                 durationsPerQuestion = new Array(currentQuiz.questions.length).fill(0); // V86.14
-                stepStartTimestamp = Date.now();
+                stepStart_timestamp = Date.now();
                 userAnswers = new Array(currentQuiz.questions.length).fill(null);
                 // 🔥 V78.1: Timer initialization based on mode
                 if (currentQuiz.timerMode === 'total_time') {
@@ -1260,7 +1259,7 @@
                 currentStep = 0;
                 accumulatedTime = 0;
                 durationsPerQuestion = new Array(currentQuiz.questions ? currentQuiz.questions.length : 1).fill(0); // V86.14
-                stepStartTimestamp = Date.now();
+                stepStart_timestamp = Date.now();
                 userAnswers = new Array(currentQuiz.questions ? currentQuiz.questions.length : 1).fill(null);
                 // 🔥 V78.1: Timer initialization based on mode
                 if (currentQuiz.quizType === 'read_only') {
@@ -1423,7 +1422,7 @@
                         pollFeedback = `<div style="margin-top:10px; font-size:0.85em; color:#b91c1c;">เฉลยคือ: <b>${correctText}</b></div>`;
                     }
                 } else {
-                    statusBadge = '<span style="background:#fdf2f8; color:#d81b60; padding:2px 8px; border-radius:10px; font-size:0.8em; font-weight:bold;">📮 บันทึกโพลแล้ว</span>';
+                    statusBadge = '<span style="background:#fdf2f8; color:#d81b60; padding:2px 8px; border-radius:10px; font-size:0.8em; font-weight:bold;">📮 บันทึกโพลแล้ว</span>`;
                 }
             }
 
@@ -1628,7 +1627,7 @@
                         <i class="fa-solid fa-feather-pointed"></i> ✍️ Reflection (สรุปบทเรียน)
                     </h3>
                     <p style="color:#666; font-size:0.9em; margin-bottom:20px;">
-                        ยอดเยี่ยม! คุณอ่านครบทุกหน้าแล้ว ช่วยพิมพ์สรุปสิ่งที่ได้เรียนรู้/ข้อคิดเห็นในรูปแบบ **Tweetstorm** ด้านล่างเพื่อจบการเรียนรู้ครับ (จำกัด ${charLimit} อักษรต่อข้อความ)
+                        ยอดเยี่ยม! คุณอ่านครบทุกหน้าแล้ว ช่วยพิมพ์สรุปสิ่งที่ได้เรียนรู้/ข้อคิดเห็นในรูปแบบ ** Tweetstorm** ด้านล่างเพื่อจบการเรียนรู้ครับ (จำกัด ${charLimit} อักษรต่อข้อความ)
                     </p>
 
                     <div id="read-only-tweetstorm-container" style="display:flex; flex-direction:column; gap:15px;">
@@ -2116,11 +2115,11 @@
         
         // V86.14: Track duration per question
         function recordStepDuration() {
-            if (!currentQuiz || !currentQuiz.questions || !stepStartTimestamp) return;
-            const spent = Math.floor((Date.now() - stepStartTimestamp) / 1000);
+            if (!currentQuiz || !currentQuiz.questions || !stepStart_timestamp) return;
+            const spent = Math.floor((Date.now() - stepStart_timestamp) / 1000);
             if (!Array.isArray(durationsPerQuestion)) durationsPerQuestion = [];
             durationsPerQuestion[currentStep] = (durationsPerQuestion[currentStep] || 0) + spent;
-            stepStartTimestamp = Date.now();
+            stepStart_timestamp = Date.now();
         }
 
         async function nextQuizStep() {
@@ -2203,7 +2202,8 @@
                     if (timeLeftForStep <= 0) {
                         clearInterval(quizTimerInterval);
                         if (currentQuiz.timerMode === 'total_time') {
-                            alert("🍭 หมดเวลารวมแล้ว!"); submitQuiz();
+                            alert("🍭 หมดเวลารวมแล้ว! ระบบจะส่งคำตอบให้อัตโนมัติ");
+                            submitQuiz();
                         } else {
                             alert("🍭 หมดเวลาสำหรับข้อนี้!");
                             if (currentStep < currentQuiz.questions.length - 1) { nextQuizStep(); } else { submitQuiz(); }
@@ -2255,7 +2255,7 @@
                     if (qType === 'choice' || qType === 'flashcard') {
                         if (hasCorrect) {
                             const target = Array.isArray(q.correct) ? q.correct : [q.correct];
-                            const mineArray = Array.isArray(mine) ? (Array.isArray(mine) ? mine : [mine]) : (mine !== null && mine !== undefined ? [mine] : []);
+                            const mineArray = (Array.isArray(mine) ? mine : [mine]).sort().join(',');
                             if (target.length > 0 && target.length === mineArray.length && target.every(val => mineArray.includes(val))) {
                                 correctCount++;
                             }
@@ -2263,7 +2263,7 @@
                             correctCount++; // poll
                         }
                     } else if (qType === 'ordering') {
-                        const target = q.correct || q.options.map((_, idx) => idx);
+                        const target = q.correct || q.options.map((_, i) => i);
                         if (Array.isArray(mine) && target.join(',') === mine.join(',')) {
                             correctCount++;
                         }
@@ -2768,7 +2768,7 @@
                 // Log score change
                 const scoreLogRef = db.collection("checkin_logs").doc();
                 b.set(scoreLogRef, {
-                    userId,
+                    userId: userId,
                     type: 'reflective_log',
                     amount: 0.1,
                     note: 'Daily Reflective Log',
@@ -3141,7 +3141,7 @@
                 snap.forEach(d => {
                     const m = d.data();
                     const cls = m.sender === 'User' ? 'msg-user' : 'msg-admin';
-                    const time = m.timestamp ? m.timestamp.toDate().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '';
+                    const time = m.timestamp ? m.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
                     // Linkify
                     let msg = m.msg.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#fff;text-decoration:underline;">$1</a>');
@@ -3647,4 +3647,29 @@
                 alert("Cannot send comment: " + err.message);
             }
         }
-    
+
+        // --- Add Badge System for Reflective Logs ---
+        function checkAndAwardBadges(userId) {
+            const userRef = db.collection("users").doc(userId);
+            const badgeRef = db.collection("badges").doc(userId);
+
+            userRef.get().then(doc => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    const reflectiveCount = data.reflectiveLogCount || 0;
+                    const badges = [];
+
+                    if (reflectiveCount >= 5) badges.push("5 Days Streak");
+                    if (reflectiveCount >= 10) badges.push("10 Days Streak");
+                    if (reflectiveCount >= 20) badges.push("20 Days Streak");
+
+                    badgeRef.set({
+                        userId: userId,
+                        badges: badges,
+                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+            });
+        }
+    }
+}
