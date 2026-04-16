@@ -1,11 +1,11 @@
-# Deploy Artifact - 2026-04-16 (V90.53)
+# Deploy Artifact - 2026-04-16 (V90.55)
 
 ## Scope
 
-- Hotfix for LIFF case submission permission issue (Missing or insufficient permissions).
-- Added Firebase anonymous auth bootstrap before LIFF Firestore workflows.
-- Added submitCase retry path on permission-denied after auth bootstrap.
-- Version synced across all six mandatory runtime targets to V90.53.
+- Grand Line dashboard compacted to lean list rows with single active highlight and neutral non-active state.
+- Added details toggle for Lean Metrics with default collapsed mode and zero-activity header state.
+- Hardened reflective listeners with auth-ready guard to reduce permission-denied race noise.
+- Version synced across all six mandatory runtime targets to V90.55.
 
 ## Files Included
 
@@ -16,7 +16,7 @@
 - netlify-deploy/admin.html
 - netlify-deploy/index.html
 - SYSTEM_OVERVIEW.md
-- RELEASE_NOTES_V90.53.md
+- RELEASE_NOTES_V90.55.md
 
 ## Deployment Notes
 

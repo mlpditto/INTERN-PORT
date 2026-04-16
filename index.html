@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Intern Progress Online (V90.53)</title>
-    <!-- V90.53: Case submission permission hotfix + auth bootstrap -->
+    <title>Intern Progress Online (V90.55)</title>
+    <!-- V90.55: Grand Line compact lean rows + metrics details toggle + auth-ready reflective listeners -->
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -14,6 +14,7 @@
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
     <style>
@@ -155,12 +156,83 @@
             padding: 3px 8px;
         }
 
+        .grandline-summary-bar {
+            margin: 12px 0 8px;
+            padding: 8px 10px;
+            border-radius: 12px;
+            border: 1px solid #dbe5f5;
+            background: linear-gradient(135deg, #f8fbff 0%, #eef4ff 100%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .grandline-summary-item {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 6px;
+            font-size: 0.76em;
+            color: #475569;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.75);
+            border: 1px solid #e2e8f0;
+        }
+
+        .grandline-summary-item strong {
+            font-size: 1.06em;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .grandline-summary-dot {
+            color: #94a3b8;
+            font-size: 0.72em;
+            font-weight: 800;
+        }
+
         .lean-kpi-wrap {
-            margin: 12px 0;
-            padding: 10px;
+            margin: 8px 0 12px;
+            padding: 8px;
             border-radius: 12px;
             border: 1px solid #e2e8f0;
             background: rgba(255, 255, 255, 0.9);
+        }
+
+        .lean-metrics-toggle {
+            margin: 8px 0 6px;
+            min-height: 42px;
+            border-radius: 10px;
+            border: 1px solid #dbe4f0;
+            background: #f8fafc;
+            padding: 8px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .lean-metrics-title {
+            font-size: 0.74em;
+            font-weight: 800;
+            color: #334155;
+            letter-spacing: 0.2px;
+        }
+
+        .lean-metrics-details-btn {
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #334155;
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 0.7em;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 28px;
         }
 
         .lean-kpi-head {
@@ -173,34 +245,39 @@
         }
 
         .lean-kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            display: flex;
             gap: 6px;
+            flex-wrap: wrap;
         }
 
         .lean-kpi {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 8px;
+            border-radius: 999px;
+            padding: 4px 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 28px;
         }
 
         .lean-kpi-label {
-            font-size: 0.62em;
+            font-size: 0.64em;
             color: #64748b;
             font-weight: 700;
-            margin-bottom: 2px;
+            margin-bottom: 0;
+            text-transform: uppercase;
         }
 
         .lean-kpi-value {
-            font-size: 0.85em;
+            font-size: 0.8em;
             font-weight: 800;
             color: #0f172a;
         }
 
         .lean-flow-track {
             margin-top: 8px;
-            height: 6px;
+            height: 5px;
             border-radius: 999px;
             background: #e2e8f0;
             overflow: hidden;
@@ -241,8 +318,16 @@
         }
 
         @media (max-width: 480px) {
-            .lean-kpi-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
+            .grandline-summary-bar {
+                gap: 6px;
+            }
+
+            .grandline-summary-item {
+                font-size: 0.72em;
+            }
+
+            .grandline-tool-title {
+                font-size: 0.74em;
             }
         }
 
@@ -274,20 +359,62 @@
             color: #9d174d;
         }
 
+        .status-neutral {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        .status-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+
+        .status-dot-neutral {
+            background: #94a3b8;
+        }
+
+        .status-dot-progress {
+            background: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+        }
+
         .grandline-tool-card {
             border: 1px solid #e5e7eb;
             background: #fff;
             border-radius: 10px;
-            padding: 8px;
+            padding: 8px 10px;
             text-align: left;
             cursor: pointer;
             transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            min-height: 44px;
         }
 
         .grandline-tool-card.active {
             border-color: #4361ee;
             background: #eef2ff;
             box-shadow: 0 4px 12px rgba(67, 97, 238, 0.2);
+        }
+
+        .grandline-tool-title {
+            font-size: 0.78em;
+            font-weight: 800;
+            color: #111827;
+            letter-spacing: 0.1px;
+        }
+
+        .grandline-tool-meta {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
         }
 
         .gl-minimal-header {
@@ -1077,22 +1204,20 @@
                         </button>
                     </div>
 
-                    <div class="voyage-reveal reveal-4" style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:12px 0;">
-                        <div style="background:#eef2ff; border-radius:10px; padding:8px;">
-                            <div style="font-size:0.65em; color:#64748b; font-weight:700;">Current Bounty</div>
-                            <div id="bounty-current" style="font-size:0.86em; font-weight:800; color:#1e3a8a;">0 pts</div>
-                        </div>
-                        <div style="background:#ecfdf5; border-radius:10px; padding:8px;">
-                            <div style="font-size:0.65em; color:#64748b; font-weight:700;">Next Reward</div>
-                            <div id="bounty-next" style="font-size:0.86em; font-weight:800; color:#065f46;">50 pts</div>
-                        </div>
-                        <div style="background:#fff7ed; border-radius:10px; padding:8px;">
-                            <div style="font-size:0.65em; color:#64748b; font-weight:700;">Crew Rank</div>
-                            <div id="bounty-rank" style="font-size:0.86em; font-weight:800; color:#9a3412;">LV.1 Rookie Navigator</div>
-                        </div>
+                    <div class="grandline-summary-bar voyage-reveal reveal-4">
+                        <span class="grandline-summary-item">Current Bounty <strong id="bounty-current">0 pts</strong></span>
+                        <span class="grandline-summary-dot">•</span>
+                        <span class="grandline-summary-item">Next Reward <strong id="bounty-next">50 pts</strong></span>
+                        <span class="grandline-summary-dot">•</span>
+                        <span class="grandline-summary-item">Crew Rank <strong id="bounty-rank">LV.1 Rookie Navigator</strong></span>
                     </div>
 
-                    <div class="lean-kpi-wrap voyage-reveal reveal-4">
+                    <div class="lean-metrics-toggle voyage-reveal reveal-4" onclick="toggleLeanMetricsDetails()">
+                        <span id="lean-metrics-title" class="lean-metrics-title">Metrics (0 activity)</span>
+                        <span class="lean-metrics-details-btn">Details <i id="lean-metrics-icon" class="fa-solid fa-chevron-down" style="font-size:0.9em; transition:transform 0.2s ease;"></i></span>
+                    </div>
+
+                    <div id="lean-metrics-details" class="lean-kpi-wrap voyage-reveal reveal-4" style="display:none;">
                         <div class="lean-kpi-head">Lean Voyage Metrics</div>
                         <div class="lean-kpi-grid">
                             <div class="lean-kpi">
@@ -1117,21 +1242,21 @@
                         </div>
                     </div>
 
-                    <div id="grandline-tool-cards-row" class="voyage-reveal reveal-5" style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;">
+                    <div id="grandline-tool-cards-row" class="voyage-reveal reveal-5" style="display:flex; flex-direction:column; gap:6px;">
                         <button id="gl-card-quiz" class="grandline-tool-card" onclick="openJourneySection('section-assignments', 'toggleAssignmentList', 'quiz')">
-                            <div style="font-size:0.7em; font-weight:700;">Quiz Tool</div>
+                            <div class="grandline-tool-meta"><span id="crew-dot-quiz" class="status-dot status-dot-neutral"></span><div class="grandline-tool-title">Quiz Tool</div></div>
                             <span id="crew-status-quiz" class="status-pill status-ready">Ready</span>
                         </button>
                         <button id="gl-card-mission" class="grandline-tool-card" onclick="openJourneySection('section-kanban', 'toggleKanban', 'mission')">
-                            <div style="font-size:0.7em; font-weight:700;">Mission Tool</div>
+                            <div class="grandline-tool-meta"><span id="crew-dot-mission" class="status-dot status-dot-neutral"></span><div class="grandline-tool-title">Mission Tool</div></div>
                             <span id="crew-status-mission" class="status-pill status-progress">In Progress</span>
                         </button>
                         <button id="gl-card-case" class="grandline-tool-card" onclick="openJourneySection('section-cases', 'toggleCaseSection', 'case')">
-                            <div style="font-size:0.7em; font-weight:700;">Case Tool</div>
+                            <div class="grandline-tool-meta"><span id="crew-dot-case" class="status-dot status-dot-neutral"></span><div class="grandline-tool-title">Case Tool</div></div>
                             <span id="crew-status-case" class="status-pill status-waiting">Waiting Review</span>
                         </button>
-                        <button id="gl-card-work" class="grandline-tool-card" onclick="openJourneySection('section-general-work', 'toggleWorkSection', 'work')" style="grid-column:1/-1;">
-                            <div style="font-size:0.7em; font-weight:700;">Work Tool</div>
+                        <button id="gl-card-work" class="grandline-tool-card" onclick="openJourneySection('section-general-work', 'toggleWorkSection', 'work')">
+                            <div class="grandline-tool-meta"><span id="crew-dot-work" class="status-dot status-dot-neutral"></span><div class="grandline-tool-title">Work Tool</div></div>
                             <span id="crew-status-work" class="status-pill status-reward">Reward Available</span>
                         </button>
                     </div>
@@ -1361,7 +1486,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V90.53 (Grand Line LEAN+ONE PIECE Refresh)
+                V90.55 (Grand Line LEAN+ONE PIECE Refresh)
             </div>
         </div>
     </div>
@@ -1861,6 +1986,36 @@
             }
         }
 
+        async function ensureFirebaseAuthReady(timeoutMs = 6000) {
+            const bootUser = await ensureFirebaseAuth();
+            if (!firebase || !firebase.auth) return bootUser;
+
+            const auth = firebase.auth();
+            if (auth.currentUser) return auth.currentUser;
+
+            return new Promise((resolve) => {
+                let settled = false;
+                let unsub = null;
+                const finish = (user) => {
+                    if (settled) return;
+                    settled = true;
+                    if (typeof unsub === 'function') unsub();
+                    clearTimeout(timer);
+                    resolve(user || null);
+                };
+                const timer = setTimeout(() => finish(auth.currentUser || bootUser || null), timeoutMs);
+                unsub = auth.onAuthStateChanged((user) => {
+                    if (user) finish(user);
+                });
+            });
+        }
+
+        function notifyMissingFirebaseAuth(contextLabel) {
+            const msg = `Auth required for ${contextLabel}. ตรวจสอบว่าเปิด Firebase Anonymous provider แล้ว`;
+            console.warn(msg);
+            if (typeof showToast === 'function') showToast(msg);
+        }
+
         async function main() {
             // 🔥 V89.96: Enhanced Readiness Check
             if (typeof firebase === 'undefined' || typeof firebase.initializeApp !== 'function') {
@@ -1891,8 +2046,8 @@
                 }
             }
 
-            console.log("Main Execution Started (V90.53)");
-            updateStatus("System Starting (V90.53)...");
+            console.log("Main Execution Started (V90.55)");
+            updateStatus("System Starting (V90.55)...");
             try {
                 const urlParams = new URLSearchParams(window.location.search);
                 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -4725,13 +4880,30 @@
             const cardsRow = document.getElementById('grandline-tool-cards-row');
             if (!cardsRow) return;
 
-            const openContents = ['assignments-content', 'kanban-content', 'case-section-content', 'work-section-content'];
-            const hasOpenSection = openContents.some(id => {
-                const el = document.getElementById(id);
-                return el && el.style.display === 'block';
+            cardsRow.style.display = 'flex';
+        }
+
+        function syncActiveGrandLineToolFromSection() {
+            const sectionToTool = [
+                ['assignments-content', 'quiz'],
+                ['kanban-content', 'mission'],
+                ['case-section-content', 'case'],
+                ['work-section-content', 'work']
+            ];
+
+            let activeKey = '';
+            sectionToTool.some(([contentId, toolKey]) => {
+                const el = document.getElementById(contentId);
+                const isOpen = el && el.style.display === 'block';
+                if (isOpen) {
+                    activeKey = toolKey;
+                    return true;
+                }
+                return false;
             });
 
-            cardsRow.style.display = hasOpenSection ? 'none' : 'grid';
+            setActiveGrandLineToolCards(activeKey || null);
+            return activeKey;
         }
 
         function getCrewRankByScore(score) {
@@ -4752,6 +4924,23 @@
             if (!el) return;
             el.className = `status-pill status-${tone}`;
             el.textContent = text;
+
+            const dot = document.getElementById('crew-dot-' + key);
+            if (dot) {
+                dot.className = `status-dot status-dot-${tone === 'progress' ? 'progress' : 'neutral'}`;
+            }
+        }
+
+        let leanMetricsExpanded = false;
+        function toggleLeanMetricsDetails(forceExpand = null) {
+            const details = document.getElementById('lean-metrics-details');
+            const icon = document.getElementById('lean-metrics-icon');
+            if (!details) return;
+
+            const shouldExpand = forceExpand === null ? !leanMetricsExpanded : !!forceExpand;
+            leanMetricsExpanded = shouldExpand;
+            details.style.display = shouldExpand ? 'block' : 'none';
+            if (icon) icon.style.transform = shouldExpand ? 'rotate(180deg)' : 'rotate(0deg)';
         }
 
         function updateGrandLineDashboard() {
@@ -4778,17 +4967,20 @@
             const wipCount = doingCount + reviewCount;
             const totalFlow = backlogCount + doingCount + reviewCount + doneCount;
             const flowRate = totalFlow > 0 ? Math.round((doneCount / totalFlow) * 100) : 0;
+            const zeroActivity = backlogCount === 0 && doingCount === 0 && reviewCount === 0 && doneCount === 0;
 
             const quizOpen = (document.getElementById('assignments-content') || {}).style?.display === 'block';
             const missionOpen = (document.getElementById('kanban-content') || {}).style?.display === 'block';
             const caseOpen = (document.getElementById('case-section-content') || {}).style?.display === 'block';
             const workOpen = (document.getElementById('work-section-content') || {}).style?.display === 'block';
+            const activeTool = syncActiveGrandLineToolFromSection();
 
             const kpiWipEl = document.getElementById('lean-kpi-wip');
             const kpiQueueEl = document.getElementById('lean-kpi-queue');
             const kpiThroughputEl = document.getElementById('lean-kpi-throughput');
             const kpiFlowEl = document.getElementById('lean-kpi-flow');
             const flowBarEl = document.getElementById('lean-flow-bar');
+            const metricsTitleEl = document.getElementById('lean-metrics-title');
 
             if (kpiWipEl) {
                 kpiWipEl.textContent = `${wipCount}/${wipLimit}`;
@@ -4798,6 +4990,15 @@
             if (kpiThroughputEl) kpiThroughputEl.textContent = `${doneCount}`;
             if (kpiFlowEl) kpiFlowEl.textContent = `${flowRate}%`;
             if (flowBarEl) flowBarEl.style.width = `${Math.max(6, flowRate)}%`;
+            if (metricsTitleEl) {
+                metricsTitleEl.textContent = zeroActivity
+                    ? 'Metrics (0 activity)'
+                    : `Metrics (${wipCount} WIP • ${doneCount} shipped • ${flowRate}% flow)`;
+            }
+
+            if (!leanMetricsExpanded) {
+                toggleLeanMetricsDetails(false);
+            }
 
             const cpQuiz = document.getElementById('cp-sub-quiz');
             const cpMission = document.getElementById('cp-sub-mission');
@@ -4808,10 +5009,10 @@
             if (cpCase) cpCase.textContent = caseOpen ? 'In Progress' : 'Waiting Review';
             if (cpWork) cpWork.textContent = score >= 30 ? 'Reward Available' : 'Ready';
 
-            setCrewStatus('quiz', quizOpen ? 'In Progress' : (quizCount > 0 ? 'Ready' : 'Waiting Review'), quizOpen ? 'progress' : (quizCount > 0 ? 'ready' : 'waiting'));
-            setCrewStatus('mission', missionOpen ? 'In Progress' : (missionCount > 0 ? 'Ready' : 'Waiting Review'), missionOpen ? 'progress' : (missionCount > 0 ? 'ready' : 'waiting'));
-            setCrewStatus('case', caseOpen ? 'In Progress' : 'Waiting Review', caseOpen ? 'progress' : 'waiting');
-            setCrewStatus('work', workOpen ? 'In Progress' : (score >= 30 ? 'Reward Available' : 'Ready'), workOpen ? 'progress' : (score >= 30 ? 'reward' : 'ready'));
+            setCrewStatus('quiz', activeTool === 'quiz' ? 'In Progress' : (quizCount > 0 ? 'Ready' : 'Waiting Review'), activeTool === 'quiz' ? 'progress' : 'neutral');
+            setCrewStatus('mission', activeTool === 'mission' ? 'In Progress' : (missionCount > 0 ? 'Ready' : 'Waiting Review'), activeTool === 'mission' ? 'progress' : 'neutral');
+            setCrewStatus('case', activeTool === 'case' ? 'In Progress' : 'Waiting Review', activeTool === 'case' ? 'progress' : 'neutral');
+            setCrewStatus('work', activeTool === 'work' ? 'In Progress' : (score >= 30 ? 'Reward Available' : 'Ready'), activeTool === 'work' ? 'progress' : 'neutral');
         }
 
         function startGrandLineAutoRefresh() {
@@ -5110,13 +5311,27 @@
             }
         }
 
+        let reflectiveLogsUnsub = null;
         function loadReflectiveLogs() {
-            db.collection("reflective_logs")
-                .where("userId", "==", userId)
-                .onSnapshot(s => {
-                    reflectiveLogsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
-                    renderReflectiveLogs();
-                }, e => console.error("Error loading reflective logs:", e));
+            ensureFirebaseAuthReady().then((authUser) => {
+                if (!authUser) {
+                    notifyMissingFirebaseAuth('reflective logs');
+                    return;
+                }
+                if (reflectiveLogsUnsub) {
+                    reflectiveLogsUnsub();
+                    reflectiveLogsUnsub = null;
+                }
+                reflectiveLogsUnsub = db.collection("reflective_logs")
+                    .where("userId", "==", userId)
+                    .onSnapshot(s => {
+                        reflectiveLogsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                        renderReflectiveLogs();
+                    }, e => {
+                        console.error("Error loading reflective logs:", e);
+                        if (e && e.code === 'permission-denied') notifyMissingFirebaseAuth('reflective logs');
+                    });
+            });
         }
 
         function renderReflectiveLogs() {
@@ -5693,11 +5908,25 @@
             }, e => console.error("Error loading my works:", e));
         }
 
+        let myReflectiveLogsUnsub = null;
         function loadMyReflectiveLogs() {
-            db.collection("reflective_logs").where("userId", "==", userId).onSnapshot(s => {
-                window.myReflectiveLogsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
-                renderHistory();
-            }, e => console.error("Error loading my reflective logs:", e));
+            ensureFirebaseAuthReady().then((authUser) => {
+                if (!authUser) {
+                    notifyMissingFirebaseAuth('my reflective logs');
+                    return;
+                }
+                if (myReflectiveLogsUnsub) {
+                    myReflectiveLogsUnsub();
+                    myReflectiveLogsUnsub = null;
+                }
+                myReflectiveLogsUnsub = db.collection("reflective_logs").where("userId", "==", userId).onSnapshot(s => {
+                    window.myReflectiveLogsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                    renderHistory();
+                }, e => {
+                    console.error("Error loading my reflective logs:", e);
+                    if (e && e.code === 'permission-denied') notifyMissingFirebaseAuth('my reflective logs');
+                });
+            });
         }
 
         // --- Delete History Item (V84.6) ---
