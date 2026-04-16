@@ -11176,6 +11176,23 @@
         let _qfpCurrentId = null;
         let _qfpFeedbacks = [];
 
+        function qfpEscapeHtml(text) {
+            return String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        async function qfpCallAI(model, prompt) {
+            const resp = await window.callUniversalAI(model, prompt);
+            if (resp && typeof resp === 'object') {
+                return String(resp.text || resp.outputText || resp.response || '').trim();
+            }
+            return String(resp || '').trim();
+        }
+
         async function showQuizFeedbackPanel(quizId) {
             _qfpCurrentId = quizId;
             _qfpFeedbacks = [];
@@ -11231,15 +11248,145 @@
                 const dateStr = ts ? ts.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '—';
                 const stars = typeof f.rating === 'number' ? ('★'.repeat(Math.round(f.rating/10*5))+'☆'.repeat(5-Math.round(f.rating/10*5))) : '';
                 const mins = Math.floor((f.timeUsedSeconds||0)/60); const secs = (f.timeUsedSeconds||0)%60;
+                const rawComment = (f.comment || '').trim();
+                const safeComment = qfpEscapeHtml(rawComment);
+                const commentLength = rawComment.length;
+                const meetsMin = commentLength >= 100;
+                const aiScoreText = typeof f.aiFeedbackScore === 'number' ? `${f.aiFeedbackScore.toFixed(1)}/10` : 'ยังไม่ประเมิน';
+                const aiIssue = qfpEscapeHtml(f.aiFeedbackIssue || '');
+                const aiSuggestion = qfpEscapeHtml(f.aiFeedbackSuggestion || '');
+                const adminScoreValue = typeof f.adminExtraScore === 'number' ? f.adminExtraScore : '';
+                const adminNoteValue = qfpEscapeHtml(f.adminScoreNote || '');
                 return `<div style="background:white;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;">
                     <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
                         <div><span style="font-weight:800;font-size:0.9em;">${f.displayName||'Anonymous'}</span> <span style="color:#f59e0b;margin-left:8px;">${stars}</span> <span style="font-size:0.8em;color:#64748b;">${typeof f.rating==='number'?f.rating+'/10':''}</span></div>
                         <div style="font-size:0.75em;color:#94a3b8;">${dateStr} · ⏱ ${mins}:${String(secs).padStart(2,'0')}</div>
                     </div>
                     ${f.nextTopic?`<div style="margin-bottom:6px;"><span style="font-size:0.75em;font-weight:700;color:#7c3aed;">🎯 อยากทำต่อ:</span> <span style="font-size:0.82em;color:#6d28d9;">${f.nextTopic}</span></div>`:''}
-                    ${f.comment?`<div style="font-size:0.85em;color:#475569;background:#f8fafc;padding:8px 12px;border-radius:8px;border-left:3px solid #cbd5e1;">${f.comment}</div>`:''}
+                    ${rawComment?`<div style="font-size:0.85em;color:#475569;background:#f8fafc;padding:8px 12px;border-radius:8px;border-left:3px solid #cbd5e1; white-space:pre-wrap;">${safeComment}</div>`:''}
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap;">
+                        <span style="font-size:0.76em; font-weight:700; color:${meetsMin ? '#166534' : '#b45309'}; background:${meetsMin ? '#dcfce7' : '#ffedd5'}; border:1px solid ${meetsMin ? '#86efac' : '#fdba74'}; border-radius:999px; padding:3px 10px;">
+                            ความยาว Feedback: ${commentLength} ตัวอักษร ${meetsMin ? 'ผ่านเกณฑ์' : 'ต่ำกว่าเกณฑ์ 100'}
+                        </span>
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            <button id="qfp-ai-btn-${f.id}" class="btn-sm" onclick="runAIFeedbackScoring('${f.id}')" style="background:#1d4ed8; color:white; border:none; border-radius:8px; padding:5px 10px;">🤖 AI ช่วยให้คะแนน</button>
+                            <button class="btn-sm" onclick="deleteQuizFeedbackItem('${f.id}')" style="background:#dc2626; color:white; border:none; border-radius:8px; padding:5px 10px;"><i class="fa-solid fa-trash"></i> Delete</button>
+                        </div>
+                    </div>
+                    <div id="qfp-ai-review-${f.id}" style="margin-top:8px; font-size:0.8em; color:#334155; background:#eef2ff; border:1px solid #c7d2fe; border-radius:8px; padding:8px 10px; line-height:1.5;">
+                        <div><b>AI Score:</b> ${aiScoreText}</div>
+                        ${aiIssue ? `<div><b>Issue:</b> ${aiIssue}</div>` : ''}
+                        ${aiSuggestion ? `<div><b>Suggestion:</b> ${aiSuggestion}</div>` : ''}
+                    </div>
+                    <div style="margin-top:10px; padding:10px; border:1px dashed #cbd5e1; border-radius:8px; background:#f8fafc;">
+                        <div style="font-size:0.78em; font-weight:800; color:#334155; margin-bottom:8px;">คะแนนเพิ่มเติมโดย Admin (ให้ย้อนหลังได้)</div>
+                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                            <input id="qfp-admin-score-${f.id}" type="number" min="0" max="10" step="0.5" value="${adminScoreValue}" placeholder="0-10" style="width:90px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">
+                            <input id="qfp-admin-note-${f.id}" type="text" value="${adminNoteValue}" placeholder="เหตุผล/หมายเหตุ" style="flex:1; min-width:180px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">
+                            <button class="btn-sm" onclick="saveAdminFeedbackScore('${f.id}')" style="background:#0f766e; color:white; border:none; border-radius:8px; padding:6px 12px;">บันทึกคะแนนเพิ่ม</button>
+                        </div>
+                    </div>
                 </div>`;
             }).join('');
+        }
+
+        async function runAIFeedbackScoring(feedbackId) {
+            const item = _qfpFeedbacks.find(x => x.id === feedbackId);
+            if (!item) return;
+            const comment = (item.comment || '').trim();
+            if (!comment) {
+                alert('Feedback นี้ไม่มีข้อความให้ AI ประเมิน');
+                return;
+            }
+
+            const btn = document.getElementById(`qfp-ai-btn-${feedbackId}`);
+            const reviewEl = document.getElementById(`qfp-ai-review-${feedbackId}`);
+            const oldText = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            }
+            if (reviewEl) reviewEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> AI กำลังประเมินคุณภาพ feedback...';
+
+            const model = document.getElementById('ai-model-selector') ? document.getElementById('ai-model-selector').value : 'gemini-1.5-flash';
+            const prompt = `คุณเป็นผู้ช่วย admin ประเมินคุณภาพ feedback ของผู้เรียน\nให้คะแนน feedback แบบเข้มข้นจาก 0-10 โดยพิจารณา 4 ด้าน:\n1) ชัดเจนและเจาะจง\n2) มีคำแนะนำที่นำไปปรับปรุงข้อสอบได้จริง\n3) สะท้อนประสบการณ์ผู้เรียนอย่างเป็นรูปธรรม\n4) สุภาพและสร้างสรรค์\n\nข้อมูล feedback:\n- rating เดิมของผู้เรียน: ${item.rating ?? 'N/A'}/10\n- ความยาวข้อความ: ${comment.length} ตัวอักษร\n- หัวข้อที่อยากทำต่อ: ${(item.nextTopic || 'ไม่มี').toString()}\n- ข้อความ feedback:\n${comment}\n\nตอบกลับเป็น JSON เท่านั้น ห้ามมี markdown ตามรูปแบบนี้:\n{"score": 0-10, "issue": "จุดอ่อนหลักสั้นๆ", "suggestion": "คำแนะนำเชิงปฏิบัติสำหรับผู้เรียน"}`;
+
+            try {
+                const raw = await qfpCallAI(model, prompt);
+                const jsonText = (raw.match(/\{[\s\S]*\}/) || [raw])[0];
+                const parsed = JSON.parse(jsonText);
+                const score = Math.max(0, Math.min(10, Number(parsed.score) || 0));
+                const issue = String(parsed.issue || '').trim();
+                const suggestion = String(parsed.suggestion || '').trim();
+
+                await db.collection('quiz_feedback').doc(feedbackId).update({
+                    aiFeedbackScore: score,
+                    aiFeedbackIssue: issue,
+                    aiFeedbackSuggestion: suggestion,
+                    aiFeedbackModel: model,
+                    aiFeedbackReviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                item.aiFeedbackScore = score;
+                item.aiFeedbackIssue = issue;
+                item.aiFeedbackSuggestion = suggestion;
+                if (reviewEl) {
+                    reviewEl.innerHTML = `<div><b>AI Score:</b> ${score.toFixed(1)}/10</div>${issue ? `<div><b>Issue:</b> ${qfpEscapeHtml(issue)}</div>` : ''}${suggestion ? `<div><b>Suggestion:</b> ${qfpEscapeHtml(suggestion)}</div>` : ''}`;
+                }
+                showToast('AI ประเมิน feedback เรียบร้อยแล้ว');
+            } catch (e) {
+                if (reviewEl) reviewEl.innerText = 'AI วิเคราะห์ไม่สำเร็จ: ' + e.message;
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = oldText;
+                }
+            }
+        }
+
+        async function saveAdminFeedbackScore(feedbackId) {
+            const scoreEl = document.getElementById(`qfp-admin-score-${feedbackId}`);
+            const noteEl = document.getElementById(`qfp-admin-note-${feedbackId}`);
+            if (!scoreEl || !noteEl) return;
+
+            const score = Number(scoreEl.value);
+            const note = (noteEl.value || '').trim();
+            if (Number.isNaN(score) || score < 0 || score > 10) {
+                alert('กรุณาระบุคะแนนเพิ่มเติมระหว่าง 0 ถึง 10');
+                return;
+            }
+
+            try {
+                await db.collection('quiz_feedback').doc(feedbackId).update({
+                    adminExtraScore: score,
+                    adminScoreNote: note,
+                    adminScoreUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                const item = _qfpFeedbacks.find(x => x.id === feedbackId);
+                if (item) {
+                    item.adminExtraScore = score;
+                    item.adminScoreNote = note;
+                }
+                showToast('บันทึกคะแนนเพิ่มเติมเรียบร้อย');
+            } catch (e) {
+                alert('บันทึกคะแนนไม่สำเร็จ: ' + e.message);
+            }
+        }
+
+        async function deleteQuizFeedbackItem(feedbackId) {
+            if (!feedbackId) return;
+            if (!confirm('ยืนยันการลบ feedback รายการนี้? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
+
+            try {
+                await db.collection('quiz_feedback').doc(feedbackId).delete();
+                _qfpFeedbacks = _qfpFeedbacks.filter(x => x.id !== feedbackId);
+                showToast('ลบ feedback เรียบร้อยแล้ว');
+                if (_qfpCurrentId) {
+                    await showQuizFeedbackPanel(_qfpCurrentId);
+                }
+            } catch (e) {
+                alert('ลบ feedback ไม่สำเร็จ: ' + e.message);
+            }
         }
 
         async function generateAIFeedbackInsight() {
