@@ -1124,8 +1124,12 @@
             <label style="font-weight:bold; display:block; margin-bottom:5px;">🎯 ชุดข้อสอบต่อไปที่อยากทำ?</label>
             <input type="text" id="fb-next-topic" placeholder="เช่น ขั้นตอนการจ่ายยา, การดูแลเคส..." style="width:100%;">
 
-            <label style="font-weight:bold; display:block; margin-bottom:5px;">💬 ความเห็นอื่นๆ (Optional):</label>
-            <textarea id="fb-comment" rows="3" placeholder="ระบุความยาก-ง่าย หรือข้อเสนอแนะ..." style="width:100%; resize:none;"></textarea>
+            <label style="font-weight:bold; display:block; margin-bottom:5px;">💬 คำแนะนำต่อชุดข้อสอบ (อย่างน้อย 100 ตัวอักษร):</label>
+            <textarea id="fb-comment" rows="4" placeholder="ระบุจุดที่ดี จุดที่ควรปรับ และข้อแนะนำสำหรับชุดข้อสอบนี้..." style="width:100%; resize:none;" oninput="updateFeedbackCommentCounter()"></textarea>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; margin-bottom:2px;">
+                <span id="fb-comment-hint" style="font-size:0.78em; color:#64748b;">โปรดเขียนข้อเสนอแนะให้ครบอย่างน้อย 100 ตัวอักษร</span>
+                <span id="fb-comment-count" style="font-size:0.8em; font-weight:700; color:#ef4444;">0/100</span>
+            </div>
 
             <button class="btn-primary" onclick="submitFeedback()" style="width:100%; margin-top:10px; font-weight:bold; height:50px; border-radius:15px; background:linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%);">
                 ส่งความเห็น (Submit Feedback)
@@ -3998,6 +4002,7 @@
                     document.getElementById('fb-rating-num').innerText = "10";
                     document.getElementById('fb-next-topic').value = "";
                     document.getElementById('fb-comment').value = "";
+                    updateFeedbackCommentCounter();
 
                     setTimeout(() => {
                         document.getElementById('quizFeedbackModal').style.display = 'flex';
@@ -4099,12 +4104,28 @@
         }
 
         // 🔥 V84.1: Submit Quiz Feedback
+        function updateFeedbackCommentCounter() {
+            const el = document.getElementById('fb-comment');
+            const countEl = document.getElementById('fb-comment-count');
+            if (!el || !countEl) return;
+
+            const length = (el.value || '').trim().length;
+            countEl.innerText = `${length}/100`;
+            countEl.style.color = length >= 100 ? '#16a34a' : '#ef4444';
+        }
+
         async function submitFeedback() {
             const rating = document.getElementById('fb-rating').value;
             const nextTopic = document.getElementById('fb-next-topic').value;
             const comment = document.getElementById('fb-comment').value;
+            const trimmedComment = (comment || '').trim();
 
             if (!currentQuizIdForFeedback) return;
+            if (trimmedComment.length < 100) {
+                alert(`กรุณาเขียนคำแนะนำอย่างน้อย 100 ตัวอักษร (ปัจจุบัน ${trimmedComment.length}/100)`);
+                updateFeedbackCommentCounter();
+                return;
+            }
 
             try {
                 const timeUsed = quizTotalStartTime ? Math.floor((new Date() - quizTotalStartTime) / 1000) : 0;
@@ -4114,7 +4135,7 @@
                     displayName: userProfile.displayName,
                     rating: parseInt(rating),
                     nextTopic: nextTopic,
-                    comment: comment,
+                    comment: trimmedComment,
                     timeUsedSeconds: timeUsed,
                     pointsEarned: currentPointsForFeedback,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
