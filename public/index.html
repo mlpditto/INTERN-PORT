@@ -807,6 +807,52 @@
                 <div id="status-row" style="display: none;"></div>
             </div>
 
+            <style>
+                .grandline-tool-btn {
+                    border: 1px solid #e5e7eb;
+                    background: #fff;
+                    border-radius: 10px;
+                    padding: 8px;
+                    text-align: left;
+                    cursor: pointer;
+                    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+                }
+
+                .grandline-tool-btn.active {
+                    border-color: #4361ee;
+                    background: #eef2ff;
+                    box-shadow: 0 4px 12px rgba(67, 97, 238, 0.2);
+                }
+            </style>
+
+            <div id="section-grand-line" style="margin-bottom: 20px;">
+                <div class="card" style="padding: 12px; border: 1px solid #dce6ff; background: linear-gradient(180deg, #ffffff 0%, #f4f8ff 100%);">
+                    <button type="button" onclick="toggleGrandLineDashboard()" style="width:100%; border:none; background:transparent; padding:0; display:flex; justify-content:space-between; align-items:center; gap:8px; cursor:pointer;">
+                        <h4 style="margin:0; font-size:1em; color:#34495e;"><i class="fa-solid fa-route"></i> Grand Line Dashboard</h4>
+                        <span style="font-size:0.72em; color:#64748b; font-weight:700; display:flex; align-items:center; gap:8px;">Journey Map <i id="grandline-collapse-icon" class="fa-solid fa-chevron-down" style="transition:transform 0.25s ease; transform:rotate(180deg);"></i></span>
+                    </button>
+
+                    <div id="grandline-dashboard-content" style="display:block; margin-top:10px; overflow:hidden; max-height:5000px; opacity:1; transition:max-height 0.32s ease, opacity 0.24s ease;">
+                        <div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;">
+                            <button id="gl-btn-quiz" class="grandline-tool-btn" onclick="openJourneySection('section-assignments', 'toggleAssignmentList')">
+                                <div style="font-size:0.75em; font-weight:700;">Quiz 퀴즈</div>
+                            </button>
+                            <button id="gl-btn-mission" class="grandline-tool-btn" onclick="openJourneySection('section-kanban', 'toggleKanban')">
+                                <div style="font-size:0.75em; font-weight:700;">Mission 미션</div>
+                            </button>
+                            <button id="gl-btn-case" class="grandline-tool-btn" onclick="openJourneySection('section-cases', 'toggleCaseSection')">
+                                <div style="font-size:0.75em; font-weight:700;">Case 케이스</div>
+                            </button>
+                            <button id="gl-btn-work" class="grandline-tool-btn" onclick="openJourneySection('section-general-work', 'toggleWorkSection')">
+                                <div style="font-size:0.75em; font-weight:700;">Work 워크</div>
+                            </button>
+                        </div>
+
+                        <div id="grandline-tool-sections-host" style="margin-top:12px;"></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Reflective Log moved into Side Quests section below -->
 
             <div id="section-assignments" style="margin-bottom: 20px;">
@@ -1559,6 +1605,8 @@
                     // Hide Loading
                     document.getElementById('loading-overlay').classList.add('hidden');
                     document.getElementById('main-app').classList.remove('hidden');
+                    mountGrandLineToolSections();
+                    toggleGrandLineDashboard(true);
 
                     // Show Preview Badge
                     const badge = document.createElement('div');
@@ -1627,6 +1675,8 @@
 
                 document.getElementById('loading-overlay').classList.add('hidden');
                 document.getElementById('main-app').classList.remove('hidden');
+                mountGrandLineToolSections();
+                toggleGrandLineDashboard(true);
 
                 // Set Profile
                 document.getElementById('u-img').src = userProfile.pictureUrl || "https://via.placeholder.com/150";
@@ -4127,16 +4177,98 @@
             }
         }
 
+        function mountGrandLineToolSections() {
+            const host = document.getElementById('grandline-tool-sections-host');
+            if (!host) return;
+
+            ['section-assignments', 'section-kanban', 'section-cases', 'section-general-work'].forEach(sectionId => {
+                const section = document.getElementById(sectionId);
+                if (section && section.parentElement !== host) host.appendChild(section);
+            });
+        }
+
+        function toggleGrandLineDashboard(forceOpen = false) {
+            const content = document.getElementById('grandline-dashboard-content');
+            const icon = document.getElementById('grandline-collapse-icon');
+            if (!content) return;
+
+            const currentlyOpen = content.style.maxHeight !== '0px';
+            const shouldOpen = forceOpen === true ? true : !currentlyOpen;
+            content.style.pointerEvents = shouldOpen ? 'auto' : 'none';
+            content.style.opacity = shouldOpen ? '1' : '0';
+            content.style.maxHeight = shouldOpen ? '5000px' : '0px';
+            if (icon) icon.style.transform = shouldOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+        }
+
+        function setActiveGrandLineToolButton(activeButtonId) {
+            document.querySelectorAll('.grandline-tool-btn').forEach(btn => {
+                btn.classList.toggle('active', !!activeButtonId && btn.id === activeButtonId);
+            });
+        }
+
+        function closeOtherGrandLineSections(activeContentId) {
+            const sectionMap = [
+                ['assignments-content', 'assign-list-icon'],
+                ['kanban-content', 'kanban-icon'],
+                ['case-section-content', 'case-section-icon'],
+                ['work-section-content', 'work-section-icon']
+            ];
+
+            sectionMap.forEach(([contentId, iconId]) => {
+                if (contentId === activeContentId) return;
+                const content = document.getElementById(contentId);
+                if (content && content.style.display !== 'none') {
+                    content.style.display = 'none';
+                    const icon = document.getElementById(iconId);
+                    if (icon) icon.style.transform = 'rotate(0deg)';
+                }
+            });
+        }
+
+        function openJourneySection(sectionId, toggleFunctionName) {
+            mountGrandLineToolSections();
+            toggleGrandLineDashboard(true);
+
+            const section = document.getElementById(sectionId);
+            if (!section) return;
+
+            let contentId = '';
+            if (sectionId === 'section-assignments') contentId = 'assignments-content';
+            else if (sectionId === 'section-kanban') contentId = 'kanban-content';
+            else if (sectionId === 'section-cases') contentId = 'case-section-content';
+            else if (sectionId === 'section-general-work') contentId = 'work-section-content';
+
+            let buttonId = '';
+            if (sectionId === 'section-assignments') buttonId = 'gl-btn-quiz';
+            else if (sectionId === 'section-kanban') buttonId = 'gl-btn-mission';
+            else if (sectionId === 'section-cases') buttonId = 'gl-btn-case';
+            else if (sectionId === 'section-general-work') buttonId = 'gl-btn-work';
+
+            const toggleFn = window[toggleFunctionName];
+            if (typeof toggleFn === 'function' && contentId) {
+                closeOtherGrandLineSections(contentId);
+                const content = document.getElementById(contentId);
+                if (content && content.style.display === 'none') toggleFn();
+            }
+
+            setActiveGrandLineToolButton(buttonId);
+
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
         function toggleAssignmentList() {
             const content = document.getElementById('assignments-content');
             const icon = document.getElementById('assign-list-icon');
             if (content.style.display === 'none') {
+                closeOtherGrandLineSections('assignments-content');
                 content.style.display = 'block';
                 icon.style.transform = 'rotate(180deg)';
+                setActiveGrandLineToolButton('gl-btn-quiz');
                 renderAssignments();
             } else {
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
+                setActiveGrandLineToolButton('');
             }
         }
 
@@ -4648,12 +4780,15 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             const content = document.getElementById('kanban-content');
             const icon = document.getElementById('kanban-icon');
             if (content.style.display === 'none') {
+                closeOtherGrandLineSections('kanban-content');
                 content.style.display = 'block';
                 icon.style.transform = 'rotate(180deg)';
+                setActiveGrandLineToolButton('gl-btn-mission');
                 loadSideQuests();
             } else {
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
+                setActiveGrandLineToolButton('');
             }
         }
 
@@ -4661,13 +4796,16 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             const content = document.getElementById('case-section-content');
             const icon = document.getElementById('case-section-icon');
             if (content.style.display === 'none') {
+                closeOtherGrandLineSections('case-section-content');
                 content.style.display = 'block';
                 icon.style.transform = 'rotate(180deg)';
+                setActiveGrandLineToolButton('gl-btn-case');
                 renderCases();
                 setTimeout(() => document.getElementById('c-id').focus(), 100);
             } else {
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
+                setActiveGrandLineToolButton('');
             }
         }
 
@@ -4675,12 +4813,15 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             const content = document.getElementById('work-section-content');
             const icon = document.getElementById('work-section-icon');
             if (content.style.display === 'none') {
+                closeOtherGrandLineSections('work-section-content');
                 content.style.display = 'block';
                 icon.style.transform = 'rotate(180deg)';
+                setActiveGrandLineToolButton('gl-btn-work');
                 renderHistory();
             } else {
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
+                setActiveGrandLineToolButton('');
             }
         }
 
