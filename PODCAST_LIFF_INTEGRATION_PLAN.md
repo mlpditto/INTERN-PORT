@@ -39,7 +39,7 @@ Prepare a safe, phased integration plan to surface Podcast capabilities in LIFF 
    - Keep reads paginated and sorted by `publishedAt desc`.
 
 3. **UI Layer (LIFF)**
-   - New collapsible section: `🎧 Podcast Studio` (hidden by flag).
+   - New collapsible section: `🎧 Podcasts` (hidden by flag).
    - Components:
      - Episode list cards (title, duration, date, status badge)
      - Episode detail sheet (summary, transcript link if allowed)
@@ -52,12 +52,12 @@ Prepare a safe, phased integration plan to surface Podcast capabilities in LIFF 
 
 ## 5) Data Model Plan
 
-## `podcastEpisodes` (existing/extended)
+### `podcastEpisodes` (existing/extended)
 - `title`, `description`, `audioUrl`, `durationSec`, `publishedAt`, `isPublished`
 - `transcriptPreview` (optional, truncated)
 - `coverImageUrl` (optional)
 
-## `podcastProgress/{userId_episodeId}` (new)
+### `podcastProgress/{userId_episodeId}` (new)
 - `userId`
 - `episodeId`
 - `positionSec`
