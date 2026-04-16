@@ -57,7 +57,7 @@ Prepare a safe, phased integration plan to surface Podcast capabilities in LIFF 
 - `transcriptPreview` (optional, truncated)
 - `coverImageUrl` (optional)
 
-### `podcastProgress/{userId}_{episodeId}` (new)
+### `podcastProgress/{userId}/episodes/{episodeId}` (new)
 - `userId`
 - `episodeId`
 - `positionSec`
