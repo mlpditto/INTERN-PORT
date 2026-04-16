@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MEDLIFE+ Admin V90.51 (Turbo)</title>
-    <!-- V90.51: Version sync with latest LIFF UI release -->
+    <title>MEDLIFE+ Admin V90.52 (Turbo)</title>
+    <!-- V90.52: Version sync with LIFF/UI diagnostic release -->
     <!-- Release: 2026-04-16 12:00 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1962,7 +1962,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; background:linear-gradient(135deg, #4361ee, #8e44ad); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.4em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         🛸 Intern Admin Portal
-                        <span style="font-size:0.45em; background:linear-gradient(135deg, rgba(67, 97, 238, 0.8), rgba(142, 68, 173, 0.8)); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(67,97,238,0.3);">V90.51</span>
+                        <span style="font-size:0.45em; background:linear-gradient(135deg, rgba(67, 97, 238, 0.8), rgba(142, 68, 173, 0.8)); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(67,97,238,0.3);">V90.52</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -10891,6 +10891,118 @@ async function saveQuiz() {
             }
         }
 
+        function toSafeDate(ts) {
+            if (!ts) return null;
+            if (typeof ts.toDate === 'function') return ts.toDate();
+            if (ts instanceof Date) return ts;
+            if (ts.seconds) return new Date(ts.seconds * 1000);
+            const parsed = new Date(ts);
+            return Number.isNaN(parsed.getTime()) ? null : parsed;
+        }
+
+        function resolveDiagnosticUser(userRef) {
+            if (!userRef) return null;
+            const key = String(userRef).trim().toLowerCase();
+            return usersData.find(u => u.id === userRef)
+                || usersData.find(u => (u.displayName || '').toLowerCase() === key)
+                || usersData.find(u => (u.displayName || '').toLowerCase().includes(key))
+                || usersData.find(u => (u.nickName || '').toLowerCase() === key);
+        }
+
+        function buildLatestAttemptMapForUser(userId) {
+            const map = {};
+            const list = (quizAttemptsAllCache || []).filter(a => a.userId === userId && a.quizId);
+            list.forEach(att => {
+                if (!map[att.quizId]) map[att.quizId] = att;
+            });
+            return map;
+        }
+
+        async function diagnoseUserQuizVisibility(userRef, options = {}) {
+            const opts = {
+                onlyAdminActive: false,
+                titleIncludes: '',
+                ...options
+            };
+
+            const user = resolveDiagnosticUser(userRef);
+            if (!user) {
+                console.warn('[Diagnostic] User not found. Provide userId/displayName/nickName.');
+                return [];
+            }
+
+            if (!quizzesData || quizzesData.length === 0) {
+                console.warn('[Diagnostic] quizzesData is empty. Wait for Firestore onSnapshot to finish.');
+                return [];
+            }
+
+            const myGroup = user.group || 'Public';
+            const userId = user.id;
+            const now = new Date();
+            const attemptMap = buildLatestAttemptMapForUser(userId);
+            const gs = groupSettings[myGroup] || { showAssignments: true };
+            const assignmentVisibleByGroupSetting = gs.showAssignments !== false;
+
+            const rows = quizzesData
+                .filter(q => {
+                    if (!opts.titleIncludes) return true;
+                    const title = (q.title || q.shortTitle || '').toLowerCase();
+                    return title.includes(String(opts.titleIncludes).toLowerCase());
+                })
+                .map(q => {
+                    const attempt = attemptMap[q.id] || null;
+                    const start = toSafeDate(q.startTime);
+                    const dead = toSafeDate(q.deadline);
+                    const target = q.targetGroup || 'Public';
+                    const status = attempt ? (attempt.status || 'none') : 'none';
+                    const score = attempt ? (attempt.score || 0) : 0;
+                    const isExpired = !!(dead && now > dead);
+                    const hasStarted = !start || now >= start;
+                    const isActive = q.isActive !== false;
+                    const isAdminActive = !!(q.isActive && (!dead || now <= dead));
+                    const reasons = [];
+
+                    if (!assignmentVisibleByGroupSetting) reasons.push('groupSettings.showAssignments=false');
+                    if (target !== 'Public' && target !== myGroup) reasons.push('targetGroup mismatch');
+                    if (q.isHomework && Array.isArray(q.assignedUsers) && q.assignedUsers.length > 0 && !q.assignedUsers.includes(userId)) {
+                        reasons.push('homework not assigned to user');
+                    }
+                    if (!hasStarted) reasons.push('startTime not reached');
+                    if (!isActive) reasons.push('isActive=false');
+                    if (isExpired && status === 'none') reasons.push('expired and not started');
+                    if ((status === 'approved' || status === 'pending') && score > 0) {
+                        reasons.push('hidden from Assignments because result exists');
+                    }
+
+                    return {
+                        quizId: q.id,
+                        title: q.title || q.shortTitle || '(untitled)',
+                        userId,
+                        displayName: user.displayName || '',
+                        userGroup: myGroup,
+                        targetGroup: target,
+                        isHomework: !!q.isHomework,
+                        assignedUsersCount: Array.isArray(q.assignedUsers) ? q.assignedUsers.length : 0,
+                        isActive,
+                        adminActive: isAdminActive,
+                        startTime: start ? start.toLocaleString() : '-',
+                        deadline: dead ? dead.toLocaleString() : '-',
+                        attemptStatus: status,
+                        attemptScore: score,
+                        visibleInUserAssignments: reasons.length === 0,
+                        blockedBy: reasons.join(' | ') || '-'
+                    };
+                })
+                .filter(r => (opts.onlyAdminActive ? r.adminActive : true))
+                .sort((a, b) => a.title.localeCompare(b.title));
+
+            const visibleCount = rows.filter(r => r.visibleInUserAssignments).length;
+            const blockedCount = rows.length - visibleCount;
+            console.log(`[Diagnostic] User="${user.displayName || userId}" (${userId}), Group="${myGroup}", Total=${rows.length}, Visible=${visibleCount}, Blocked=${blockedCount}`);
+            console.table(rows);
+            return rows;
+        }
+
         // Export to Global window for HTML onclick (V88.49)
         window.openQuizModal = openQuizModal;
         window.showPollResults = showPollResults;
@@ -10904,6 +11016,8 @@ async function saveQuiz() {
         window.toggleTemplateStatus = toggleTemplateStatus;
         window.deleteQuiz = deleteQuiz;
         window.openHomeworkAssignModal = openHomeworkAssignModal;
+        window.diagnoseUserQuizVisibility = diagnoseUserQuizVisibility;
+        window.diagnoseQuizVisibilityForUser = diagnoseUserQuizVisibility;
 
         // 🔥 V78.2: Quick Homework Assignment Modal
         let hwModalQuizId = null;
@@ -16792,7 +16906,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
         window.AI_CORE_READY = true;
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V90.51 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V90.52 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
 
         // --- V90.36: Quiz Feedback Panel ---
         let _qfpCurrentId = null;
