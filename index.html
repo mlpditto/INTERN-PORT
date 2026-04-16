@@ -22,6 +22,16 @@
             50% { transform: scale(1.02); }
             100% { transform: scale(1); }
         }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
         /* -----------------------
            1. Global Styles
            ----------------------- */
@@ -34,10 +44,21 @@
         }
 
         .container {
+            width: 100%;
             max-width: 600px;
             margin: 0 auto;
             position: relative;
             padding-bottom: 80px;
+        }
+
+        @media (min-width: 1024px) {
+            body {
+                padding: 20px 24px;
+            }
+
+            .container {
+                max-width: min(1400px, calc(100vw - 48px));
+            }
         }
 
         .hidden {
@@ -62,6 +83,12 @@
             gap: 8px;
             overflow-x: auto;
             padding-bottom: 4px;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .journey-route::-webkit-scrollbar {
+            display: none;
         }
 
         .journey-checkpoint {
@@ -272,6 +299,12 @@
             padding-bottom: 20px;
             scroll-snap-type: x mandatory;
             -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .sq-container::-webkit-scrollbar {
+            display: none;
         }
 
         .sq-col {
@@ -985,11 +1018,6 @@
                             <small id="cp-sub-mission" style="color:#64748b;">In Progress</small>
                         </button>
                         <span class="journey-dotline"></span>
-                        <button class="journey-checkpoint" id="cp-podcast" onclick="openJourneySection('section-podcast', 'togglePodcastSection', 'podcast')">
-                            <div style="font-size:0.75em; font-weight:700;">Podcast</div>
-                            <small id="cp-sub-podcast" style="color:#64748b;">Ready</small>
-                        </button>
-                        <span class="journey-dotline"></span>
                         <button class="journey-checkpoint" id="cp-case" onclick="openJourneySection('section-cases', 'toggleCaseSection', 'case')">
                             <div style="font-size:0.75em; font-weight:700;">Case</div>
                             <small id="cp-sub-case" style="color:#64748b;">Waiting Review</small>
@@ -1012,7 +1040,7 @@
                         </div>
                         <div style="background:#fff7ed; border-radius:10px; padding:8px;">
                             <div style="font-size:0.65em; color:#64748b; font-weight:700;">Crew Rank</div>
-                            <div id="bounty-rank" style="font-size:0.86em; font-weight:800; color:#9a3412;">Rookie</div>
+                            <div id="bounty-rank" style="font-size:0.86em; font-weight:800; color:#9a3412;">LV.1 Rookie Navigator</div>
                         </div>
                     </div>
 
@@ -1049,10 +1077,6 @@
                         <button onclick="openJourneySection('section-kanban', 'toggleKanban', 'mission')" style="border:1px solid #e5e7eb; background:#fff; border-radius:10px; padding:8px; text-align:left; cursor:pointer;">
                             <div style="font-size:0.7em; font-weight:700;">Mission Tool</div>
                             <span id="crew-status-mission" class="status-pill status-progress">In Progress</span>
-                        </button>
-                        <button onclick="openJourneySection('section-podcast', 'togglePodcastSection', 'podcast')" style="border:1px solid #e5e7eb; background:#fff; border-radius:10px; padding:8px; text-align:left; cursor:pointer;">
-                            <div style="font-size:0.7em; font-weight:700;">Podcast Tool</div>
-                            <span id="crew-status-podcast" class="status-pill status-ready">Ready</span>
                         </button>
                         <button onclick="openJourneySection('section-cases', 'toggleCaseSection', 'case')" style="border:1px solid #e5e7eb; background:#fff; border-radius:10px; padding:8px; text-align:left; cursor:pointer;">
                             <div style="font-size:0.7em; font-weight:700;">Case Tool</div>
@@ -1197,24 +1221,6 @@
                                 style="min-width:100%; display:none; padding:0; background:transparent; border:none;">
                                 <div id="sq-Done"></div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="section-podcast" style="margin-bottom: 20px;">
-                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #e84393;">
-                    <div onclick="togglePodcastSection()"
-                        style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fff0f7;">
-                        <h4 style="margin: 0; font-size: 1.1em; color: #e84393;">
-                            🎙️ Podcast
-                            <span id="podcast-count-badge" style="font-size:0.7em; background:#e84393; color:white; padding:2px 8px; border-radius:10px; margin-left:8px; display:none;">0</span>
-                        </h4>
-                        <i id="podcast-section-icon" class="fa-solid fa-chevron-down" style="color: #e84393; transition: 0.3s; font-size: 0.9em; transform: rotate(180deg);"></i>
-                    </div>
-                    <div id="podcast-section-content" style="display: block; padding: 15px; border-top: 1px solid #fce4f3; background: #fff;">
-                        <div id="user-podcast-list">
-                            <div style="text-align:center; padding:30px; color:#aaa;">⏳ Loading...</div>
                         </div>
                     </div>
                 </div>
@@ -4553,7 +4559,6 @@
             let contentId = '';
             if (sectionId === 'section-assignments') contentId = 'assignments-content';
             else if (sectionId === 'section-kanban') contentId = 'kanban-content';
-            else if (sectionId === 'section-podcast') contentId = 'podcast-section-content';
             else if (sectionId === 'section-cases') contentId = 'case-section-content';
             else if (sectionId === 'section-general-work') contentId = 'work-section-content';
 
@@ -4573,11 +4578,16 @@
         }
 
         function getCrewRankByScore(score) {
-            if (score >= 500) return 'Pirate King';
-            if (score >= 300) return 'Captain';
-            if (score >= 150) return 'Navigator';
-            if (score >= 50) return 'Cadet';
-            return 'Rookie';
+            if (score >= 90) return 'LV.10 Captain';
+            if (score >= 80) return 'LV.9 Vice Captain';
+            if (score >= 70) return 'LV.8 Helmsman';
+            if (score >= 60) return 'LV.7 Musician';
+            if (score >= 50) return 'LV.6 Leading Shipwright';
+            if (score >= 40) return 'LV.5 Senior Archaeologist';
+            if (score >= 30) return 'LV.4 Experienced Doctor';
+            if (score >= 20) return 'LV.3 Cook';
+            if (score >= 10) return 'LV.2 Probationary Sniper';
+            return 'LV.1 Rookie Navigator';
         }
 
         function setCrewStatus(key, text, tone) {
@@ -4602,7 +4612,6 @@
 
             const quizCount = parseInt((document.getElementById('assign-count-badge') || {}).innerText || '0', 10) || 0;
             const missionCount = parseInt((document.getElementById('kanban-badge') || {}).innerText || '0', 10) || 0;
-            const podcastCount = parseInt((document.getElementById('podcast-count-badge') || {}).innerText || '0', 10) || 0;
 
             const backlogCount = parseInt((document.getElementById('cnt-Backlog') || {}).innerText || '0', 10) || 0;
             const doingCount = parseInt((document.getElementById('cnt-Doing') || {}).innerText || '0', 10) || 0;
@@ -4615,7 +4624,6 @@
 
             const quizOpen = (document.getElementById('assignments-content') || {}).style?.display === 'block';
             const missionOpen = (document.getElementById('kanban-content') || {}).style?.display === 'block';
-            const podcastOpen = (document.getElementById('podcast-section-content') || {}).style?.display === 'block';
             const caseOpen = (document.getElementById('case-section-content') || {}).style?.display === 'block';
             const workOpen = (document.getElementById('work-section-content') || {}).style?.display === 'block';
 
@@ -4636,18 +4644,15 @@
 
             const cpQuiz = document.getElementById('cp-sub-quiz');
             const cpMission = document.getElementById('cp-sub-mission');
-            const cpPodcast = document.getElementById('cp-sub-podcast');
             const cpCase = document.getElementById('cp-sub-case');
             const cpWork = document.getElementById('cp-sub-work');
             if (cpQuiz) cpQuiz.textContent = quizCount > 0 ? `${quizCount} missions` : 'Ready';
             if (cpMission) cpMission.textContent = missionCount > 0 ? `${missionCount} active` : 'In Progress';
-            if (cpPodcast) cpPodcast.textContent = podcastCount > 0 ? `${podcastCount} episodes` : 'Ready';
             if (cpCase) cpCase.textContent = caseOpen ? 'In Progress' : 'Waiting Review';
             if (cpWork) cpWork.textContent = score >= 30 ? 'Reward Available' : 'Ready';
 
             setCrewStatus('quiz', quizOpen ? 'In Progress' : (quizCount > 0 ? 'Ready' : 'Waiting Review'), quizOpen ? 'progress' : (quizCount > 0 ? 'ready' : 'waiting'));
             setCrewStatus('mission', missionOpen ? 'In Progress' : (missionCount > 0 ? 'Ready' : 'Waiting Review'), missionOpen ? 'progress' : (missionCount > 0 ? 'ready' : 'waiting'));
-            setCrewStatus('podcast', podcastOpen ? 'In Progress' : (podcastCount > 0 ? 'Reward Available' : 'Ready'), podcastOpen ? 'progress' : (podcastCount > 0 ? 'reward' : 'ready'));
             setCrewStatus('case', caseOpen ? 'In Progress' : 'Waiting Review', caseOpen ? 'progress' : 'waiting');
             setCrewStatus('work', workOpen ? 'In Progress' : (score >= 30 ? 'Reward Available' : 'Ready'), workOpen ? 'progress' : (score >= 30 ? 'reward' : 'ready'));
         }
@@ -5303,59 +5308,6 @@
                 if (btn) { btn.disabled = false; btn.innerText = 'ส่งคำตอบ (Submit)'; }
             }
         }
-
-        // ===================================================================
-        // 🎙️ PODCAST FEED — User View (V90.38)
-        // ===================================================================
-        let podcastLoaded = false;
-        function ensurePodcastLoaded() {
-            if (!podcastLoaded) {
-                podcastLoaded = true;
-                loadUserPodcasts();
-            }
-        }
-        function togglePodcastSection() {
-            const content = document.getElementById('podcast-section-content');
-            const icon = document.getElementById('podcast-section-icon');
-            const isHidden = content.style.display === 'none';
-            content.style.display = isHidden ? 'block' : 'none';
-            icon.style.transform = isHidden ? 'rotate(180deg)' : '';
-            if (isHidden) ensurePodcastLoaded();
-            updateGrandLineDashboard();
-        }
-
-        function loadUserPodcasts() {
-            const el = document.getElementById('user-podcast-list');
-            db.collection('podcasts').orderBy('createdAt', 'desc').limit(30).onSnapshot(snap => {
-                const badge = document.getElementById('podcast-count-badge');
-                if (snap.empty) {
-                    el.innerHTML = '<div style="text-align:center;padding:30px;color:#aaa;">🎧 ยังไม่มี Podcast ครับ</div>';
-                    badge.style.display = 'none';
-                    updateGrandLineDashboard();
-                    return;
-                }
-                badge.style.display = 'inline';
-                badge.textContent = snap.size;
-                updateGrandLineDashboard();
-                el.innerHTML = snap.docs.map(doc => {
-                    const p = doc.data();
-                    const date = p.createdAt?.toDate().toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' }) || '';
-                    const dur = p.durationSec ? `${Math.floor(p.durationSec/60)}:${String(p.durationSec%60).padStart(2,'0')}` : '';
-                    return `
-                    <div style="padding:12px; border-radius:12px; background:#fff0f7; margin-bottom:10px; border:1px solid #fce4f3;">
-                        <div style="font-weight:700; color:#c0392b; margin-bottom:3px;">🎙️ ${p.title}</div>
-                        ${p.description ? `<div style="font-size:0.85em; color:#888; margin-bottom:8px;">${p.description}</div>` : ''}
-                        <audio src="${p.audioUrl}" controls style="width:100%; height:38px; margin-bottom:6px;"></audio>
-                        <div style="font-size:0.75em; color:#ccc; display:flex; gap:12px;">
-                            ${date ? `<span>📅 ${date}</span>` : ''}
-                            ${dur ? `<span>⏱️ ${dur}</span>` : ''}
-                        </div>
-                    </div>`;
-                }).join('');
-            });
-        }
-        ensurePodcastLoaded();
-        // ===================================================================
 
         // --- Side Quests & Kanban ---
         let activeSqTab = 'Backlog';

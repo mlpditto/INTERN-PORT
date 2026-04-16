@@ -1982,9 +1982,6 @@
                 <button class="btn-sm" onclick="openLiffPreview()" title="UI Preview" style="background:#0284c7; color:white; border:none; border-radius:12px; padding:6px 16px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
                     📱 <span class="hide-mobile">UI</span>
                 </button>
-                <button class="btn-sm" onclick="openShareModal()" title="Share Link" style="background:#4361ee; color:white; border:none; border-radius:12px; padding:6px 16px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-                    🔗 <span class="hide-mobile">Share</span>
-                </button>
                 <button class="btn-sm" onclick="console.log('AI button clicked'); setTimeout(() => { if (document.getElementById('aiKeysModal')) { openAIKeysModal(); } else { alert('AI Settings Modal not loaded yet. Please refresh the page.'); } }, 100);" title="AI Engine Settings" style="background:linear-gradient(135deg, #8e44ad, #5b21b6); color:white; border:none; border-radius:12px; padding:6px 16px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s; box-shadow:0 4px 10px rgba(142,68,173,0.3);" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
                     🤖 <span class="hide-mobile">AI Config</span>
                 </button>
@@ -4333,6 +4330,7 @@
         <div id="shareModal" class="modal" style="z-index:3000;">
             <div class="modal-content" style="max-width:320px; text-align:center; padding:30px; border-radius:30px; box-shadow:0 25px 50px rgba(0,0,0,0.3);">
                 <h3 style="font-weight:900; color:var(--primary); margin-top:0; border-bottom:1px solid #f1f5f9; padding-bottom:15px; margin-bottom:20px;">🔗 Share Center</h3>
+                <div id="share-modal-group-label" style="margin-top:-10px; margin-bottom:14px; font-size:0.78em; color:#64748b; font-weight:700;">Subgroup: All</div>
                 <button class="magic-btn" style="width:100%; margin-bottom:12px; padding:12px; font-weight:900; border-radius:15px; background:linear-gradient(135deg, #4361ee, #3a0ca3);" onclick="copyLB(true)">📋 Copy: Names</button>
                 <button class="magic-btn" style="width:100%; background:#64748b; padding:12px; font-weight:900; border-radius:15px;" onclick="copyLB(false)">🕵️ Copy: Anonymous</button>
                 <button class="btn-sm" style="margin-top:15px; background:none; border:none; color:#94a3b8; font-weight:bold; cursor:pointer;" onclick="document.getElementById('shareModal').style.display='none'">Cancel</button>
@@ -12215,6 +12213,7 @@ async function saveQuiz() {
                 const isActive = g === activeUserGroup;
                 const icon = g === 'All' ? 'fa-users' : getGroupIcon(g);
                 const color = g === 'All' ? '#333' : getGroupColor(g);
+                const safeGroup = String(g).replace(/'/g, "\\'");
                 
                 let count = 0;
                 if (g === 'All') count = allUsersAndPre.length;
@@ -12224,12 +12223,17 @@ async function saveQuiz() {
                     count = allUsersAndPre.filter(u => (u.group || 'Public') === g).length;
                 }
 
-                return `<button onclick="setUserGroupFilter('${g}')" style="
-                    padding:6px 16px; border-radius:20px; border:2px solid ${isActive ? color : '#ddd'};
-                    background:${isActive ? color : '#fff'}; color:${isActive ? '#fff' : color};
-                    font-size:0.82em; font-weight:bold; cursor:pointer; white-space:nowrap;
-                    display:flex; align-items:center; gap:5px; transition:all 0.2s;
-                "><i class="fa-solid ${icon}"></i> ${g} <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${count}</span></button>`;
+                return `<div style="display:flex; align-items:center; gap:4px;">
+                    <button onclick="setUserGroupFilter('${safeGroup}')" style="
+                        padding:6px 16px; border-radius:20px; border:2px solid ${isActive ? color : '#ddd'};
+                        background:${isActive ? color : '#fff'}; color:${isActive ? '#fff' : color};
+                        font-size:0.82em; font-weight:bold; cursor:pointer; white-space:nowrap;
+                        display:flex; align-items:center; gap:5px; transition:all 0.2s;
+                    "><i class="fa-solid ${icon}"></i> ${g} <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${count}</span></button>
+                    <button onclick="event.stopPropagation(); openShareModalForGroup('${safeGroup}')" title="Share ${g} ranking" style="padding:5px 8px; border-radius:999px; border:1px solid ${isActive ? color : '#dbe3ef'}; background:${isActive ? 'rgba(255,255,255,0.2)' : '#f8fafc'}; color:${isActive ? '#fff' : color}; font-size:0.72em; font-weight:900; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:3px; transition:all 0.2s;">
+                        <i class="fa-solid fa-share-nodes"></i>
+                    </button>
+                </div>`;
             }).join('');
         }
 
@@ -14800,7 +14804,18 @@ async function saveQuiz() {
                 renderMergeTargetList(""); // Restore UI
             }
         }
-        function openShareModal() { document.getElementById('shareModal').style.display = 'block'; }
+        function openShareModal(group = null) {
+            if (group) {
+                activeUserGroup = group;
+                renderUserGroupTabs();
+                renderTable('users');
+                renderLeaderboard();
+            }
+            const groupLabel = document.getElementById('share-modal-group-label');
+            if (groupLabel) groupLabel.textContent = `Subgroup: ${activeUserGroup}`;
+            document.getElementById('shareModal').style.display = 'block';
+        }
+        function openShareModalForGroup(group) { openShareModal(group); }
         async function copyLB(showName) {
             document.getElementById('shareModal').style.display = 'none';
             if (!usersData.length) return alert("No Data");
