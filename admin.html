@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MEDLIFE+ Admin V90.37 (Turbo)</title>
-    <!-- V90.37: User profile modal for task assignments + visual enhancements -->
-    <!-- Release: 2026-04-16 10:15 UTC+7 -->
+    <title>MEDLIFE+ Admin V90.38 (Turbo)</title>
+    <!-- V90.38: Podcast Studio – browser recording + Firebase Storage + playback feed -->
+    <!-- Release: 2026-04-16 12:00 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -294,6 +294,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
     <script>
         // Firebase Config (V88.63 - Inlined for GitHub Pages)
         const firebaseConfig = {
@@ -1674,6 +1675,7 @@
             <button class="tab-btn" onclick="switchTab('tab-users')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">👥 User Hub</button>
             <button class="tab-btn" onclick="switchTab('tab-ai-hub')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🤖 AI Digital Lab</button>
             <button class="tab-btn" onclick="switchTab('tab-laughtale')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🏝️ Laugh Tale</button>
+            <button class="tab-btn" onclick="switchTab('tab-podcast')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🎙️ Podcast</button>
         </div>
 
         <!-- Old tab-works removed -->
@@ -3804,6 +3806,74 @@
                     <button class="btn-sm btn-dark"
                         onclick="forceHideModal('quizParticipantsModal')">Close</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- ===== PODCAST TAB ===== -->
+        <div id="tab-podcast" class="tab-content" style="padding:30px 15px;">
+            <div style="max-width:900px; margin:0 auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px; padding-bottom:20px; border-bottom:2px solid var(--border-color);">
+                    <div>
+                        <h1 style="margin:0; font-size:2em; font-weight:900;">🎙️ Podcast Studio</h1>
+                        <p style="margin:5px 0 0; color:#888; font-size:0.9em;">Record, upload, and manage podcast episodes.</p>
+                    </div>
+                    <button class="magic-btn" onclick="openPodcastRecorder()" style="display:flex; align-items:center; gap:8px; padding:12px 22px; border-radius:14px; background:linear-gradient(135deg,#e84393,#c0392b); font-weight:900;">
+                        🔴 New Episode
+                    </button>
+                </div>
+
+                <!-- Episode List -->
+                <div id="podcast-episode-list">
+                    <div style="text-align:center; padding:60px 20px; color:#aaa;">
+                        <div style="font-size:3em;">🎧</div>
+                        <p>Loading episodes...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Podcast Recorder Modal -->
+        <div id="podcastRecorderModal" class="modal" style="z-index:3000;">
+            <div class="modal-content" style="max-width:560px; border-radius:24px; padding:30px;">
+                <span class="close-modal" onclick="closePodcastRecorder()">&times;</span>
+                <h2 style="margin-top:0; font-weight:900;">🎙️ Record Episode</h2>
+
+                <!-- Episode Meta -->
+                <div style="margin-bottom:15px;">
+                    <input type="text" id="pod-title" placeholder="Episode title..." style="margin-bottom:8px;">
+                    <textarea id="pod-desc" rows="2" placeholder="Short description..." style="resize:none;"></textarea>
+                </div>
+
+                <!-- Waveform Visualizer -->
+                <canvas id="pod-waveform" height="60" style="width:100%; border-radius:10px; background:#0f172a; margin-bottom:15px; display:block;"></canvas>
+
+                <!-- Timer -->
+                <div style="text-align:center; font-size:2.2em; font-weight:900; font-family:monospace; color:var(--primary); margin-bottom:15px;" id="pod-timer">00:00</div>
+
+                <!-- Controls -->
+                <div style="display:flex; gap:10px; justify-content:center; margin-bottom:20px;">
+                    <button id="btn-pod-rec" onclick="startPodcastRecording()" style="background:linear-gradient(135deg,#e84393,#c0392b); color:white; border:none; border-radius:50%; width:64px; height:64px; font-size:1.6em; cursor:pointer; box-shadow:0 6px 20px rgba(232,67,147,0.4); transition:0.2s;" title="Record">🔴</button>
+                    <button id="btn-pod-pause" onclick="pausePodcastRecording()" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:50%; width:56px; height:56px; font-size:1.4em; cursor:pointer; transition:0.2s;" title="Pause" disabled>⏸️</button>
+                    <button id="btn-pod-stop" onclick="stopPodcastRecording()" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:50%; width:56px; height:56px; font-size:1.4em; cursor:pointer; transition:0.2s;" title="Stop" disabled>⏹️</button>
+                </div>
+
+                <!-- Playback preview -->
+                <div id="pod-playback-section" style="display:none; background:#f8fafc; border-radius:12px; padding:15px; margin-bottom:15px;">
+                    <p style="margin:0 0 8px; font-weight:700; font-size:0.9em; color:#64748b;">PREVIEW</p>
+                    <audio id="pod-preview" controls style="width:100%; height:40px;"></audio>
+                </div>
+
+                <!-- Upload progress -->
+                <div id="pod-upload-bar" style="display:none; margin-bottom:15px;">
+                    <div style="font-size:0.85em; color:#64748b; margin-bottom:5px;" id="pod-upload-label">Uploading...</div>
+                    <div style="background:#e2e8f0; border-radius:999px; height:8px;">
+                        <div id="pod-upload-progress" style="background:linear-gradient(135deg,#4361ee,#e84393); height:8px; border-radius:999px; width:0%; transition:width 0.3s;"></div>
+                    </div>
+                </div>
+
+                <button id="btn-pod-save" onclick="savePodcastEpisode()" style="width:100%; padding:14px; background:linear-gradient(135deg,#4361ee,#3a0ca3); color:white; border:none; border-radius:14px; font-weight:900; font-size:1em; cursor:pointer; display:none;">
+                    🚀 Publish Episode
+                </button>
             </div>
         </div>
 
@@ -10547,7 +10617,248 @@ async function saveQuiz() {
                     loadReflectiveLogsAdmin();
                 }
                 renderLaughTale();
+            } else if (id === 'tab-podcast') {
+                loadPodcastEpisodes();
             }
+        }
+
+        // ===================================================================
+        // 🎙️ PODCAST STUDIO — V90.38
+        // ===================================================================
+        let podMediaRecorder = null;
+        let podChunks = [];
+        let podAudioBlob = null;
+        let podTimerInterval = null;
+        let podSeconds = 0;
+        let podStream = null;
+        let podAudioContext = null;
+        let podAnalyser = null;
+        let podWaveAnimId = null;
+
+        function openPodcastRecorder() {
+            document.getElementById('podcastRecorderModal').style.display = 'block';
+            document.getElementById('pod-title').value = '';
+            document.getElementById('pod-desc').value = '';
+            document.getElementById('pod-timer').textContent = '00:00';
+            document.getElementById('pod-playback-section').style.display = 'none';
+            document.getElementById('pod-upload-bar').style.display = 'none';
+            document.getElementById('btn-pod-save').style.display = 'none';
+            document.getElementById('btn-pod-pause').disabled = true;
+            document.getElementById('btn-pod-stop').disabled = true;
+            podAudioBlob = null; podChunks = []; podSeconds = 0;
+            drawIdleWaveform();
+        }
+
+        function closePodcastRecorder() {
+            stopPodcastRecording();
+            document.getElementById('podcastRecorderModal').style.display = 'none';
+        }
+
+        function drawIdleWaveform() {
+            const canvas = document.getElementById('pod-waveform');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth || 500;
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height / 2);
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+        }
+
+        function drawLiveWaveform() {
+            if (!podAnalyser) return;
+            const canvas = document.getElementById('pod-waveform');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth || 500;
+            const bufLen = podAnalyser.frequencyBinCount;
+            const dataArr = new Uint8Array(bufLen);
+
+            function draw() {
+                podWaveAnimId = requestAnimationFrame(draw);
+                podAnalyser.getByteTimeDomainData(dataArr);
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#e84393';
+                ctx.beginPath();
+                const sliceW = canvas.width / bufLen;
+                let x = 0;
+                for (let i = 0; i < bufLen; i++) {
+                    const v = dataArr[i] / 128.0;
+                    const y = (v * canvas.height) / 2;
+                    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                    x += sliceW;
+                }
+                ctx.lineTo(canvas.width, canvas.height / 2);
+                ctx.stroke();
+            }
+            draw();
+        }
+
+        function updatePodTimer() {
+            podSeconds++;
+            const m = String(Math.floor(podSeconds / 60)).padStart(2, '0');
+            const s = String(podSeconds % 60).padStart(2, '0');
+            document.getElementById('pod-timer').textContent = `${m}:${s}`;
+        }
+
+        async function startPodcastRecording() {
+            try {
+                podStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                podAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = podAudioContext.createMediaStreamSource(podStream);
+                podAnalyser = podAudioContext.createAnalyser();
+                podAnalyser.fftSize = 1024;
+                source.connect(podAnalyser);
+
+                podMediaRecorder = new MediaRecorder(podStream);
+                podChunks = [];
+                podMediaRecorder.ondataavailable = e => podChunks.push(e.data);
+                podMediaRecorder.onstop = () => {
+                    podAudioBlob = new Blob(podChunks, { type: 'audio/webm' });
+                    const url = URL.createObjectURL(podAudioBlob);
+                    document.getElementById('pod-preview').src = url;
+                    document.getElementById('pod-playback-section').style.display = 'block';
+                    document.getElementById('btn-pod-save').style.display = 'block';
+                };
+                podMediaRecorder.start();
+                podSeconds = 0;
+                podTimerInterval = setInterval(updatePodTimer, 1000);
+                drawLiveWaveform();
+
+                document.getElementById('btn-pod-rec').disabled = true;
+                document.getElementById('btn-pod-rec').style.opacity = '0.4';
+                document.getElementById('btn-pod-pause').disabled = false;
+                document.getElementById('btn-pod-stop').disabled = false;
+                showToast('🔴 Recording started');
+            } catch (e) {
+                alert('Microphone access denied: ' + e.message);
+            }
+        }
+
+        function pausePodcastRecording() {
+            if (!podMediaRecorder) return;
+            if (podMediaRecorder.state === 'recording') {
+                podMediaRecorder.pause();
+                clearInterval(podTimerInterval);
+                cancelAnimationFrame(podWaveAnimId);
+                document.getElementById('btn-pod-pause').textContent = '▶️';
+                document.getElementById('btn-pod-pause').title = 'Resume';
+            } else if (podMediaRecorder.state === 'paused') {
+                podMediaRecorder.resume();
+                podTimerInterval = setInterval(updatePodTimer, 1000);
+                drawLiveWaveform();
+                document.getElementById('btn-pod-pause').textContent = '⏸️';
+                document.getElementById('btn-pod-pause').title = 'Pause';
+            }
+        }
+
+        function stopPodcastRecording() {
+            if (podMediaRecorder && podMediaRecorder.state !== 'inactive') podMediaRecorder.stop();
+            if (podStream) podStream.getTracks().forEach(t => t.stop());
+            clearInterval(podTimerInterval);
+            cancelAnimationFrame(podWaveAnimId);
+            if (podAudioContext) podAudioContext.close();
+            document.getElementById('btn-pod-rec').disabled = false;
+            document.getElementById('btn-pod-rec').style.opacity = '1';
+            document.getElementById('btn-pod-pause').disabled = true;
+            document.getElementById('btn-pod-stop').disabled = true;
+        }
+
+        async function savePodcastEpisode() {
+            const title = document.getElementById('pod-title').value.trim();
+            const desc = document.getElementById('pod-desc').value.trim();
+            if (!title) return alert('กรุณาใส่ชื่อ Episode');
+            if (!podAudioBlob) return alert('ยังไม่มีไฟล์เสียงครับ');
+
+            const saveBtn = document.getElementById('btn-pod-save');
+            saveBtn.disabled = true; saveBtn.textContent = '⏳ Uploading...';
+            document.getElementById('pod-upload-bar').style.display = 'block';
+
+            try {
+                const storage = firebase.storage();
+                const filename = `podcasts/${Date.now()}_${title.replace(/\s+/g, '_')}.webm`;
+                const ref = storage.ref(filename);
+                const uploadTask = ref.put(podAudioBlob);
+
+                uploadTask.on('state_changed',
+                    snap => {
+                        const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+                        document.getElementById('pod-upload-progress').style.width = pct + '%';
+                        document.getElementById('pod-upload-label').textContent = `Uploading... ${pct}%`;
+                    },
+                    err => {
+                        alert('Upload failed: ' + err.message);
+                        saveBtn.disabled = false; saveBtn.textContent = '🚀 Publish Episode';
+                    },
+                    async () => {
+                        const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
+                        await db.collection('podcasts').add({
+                            title,
+                            description: desc,
+                            audioUrl: downloadURL,
+                            filename,
+                            durationSec: podSeconds,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        showToast('✅ Episode published!');
+                        closePodcastRecorder();
+                        loadPodcastEpisodes();
+                    }
+                );
+            } catch (e) {
+                alert('Error: ' + e.message);
+                saveBtn.disabled = false; saveBtn.textContent = '🚀 Publish Episode';
+            }
+        }
+
+        function loadPodcastEpisodes() {
+            const el = document.getElementById('podcast-episode-list');
+            if (!el) return;
+            el.innerHTML = '<div style="text-align:center; padding:40px; color:#aaa;">⏳ Loading...</div>';
+            db.collection('podcasts').orderBy('createdAt', 'desc').limit(50)
+                .onSnapshot(snap => {
+                    if (snap.empty) {
+                        el.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#aaa;"><div style="font-size:3em;">🎙️</div><p>No episodes yet. Hit <strong>New Episode</strong> to record!</p></div>';
+                        return;
+                    }
+                    el.innerHTML = snap.docs.map(doc => {
+                        const p = doc.data();
+                        const date = p.createdAt?.toDate().toLocaleDateString('th-TH') || '-';
+                        const dur = p.durationSec ? `${Math.floor(p.durationSec/60)}m ${p.durationSec%60}s` : '-';
+                        return `
+                        <div style="background:var(--bg-card); border-radius:16px; padding:18px 20px; margin-bottom:12px; box-shadow:0 2px 8px rgba(0,0,0,0.06); border:1px solid var(--border-color);">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+                                <div style="flex:1;">
+                                    <div style="font-weight:800; font-size:1.05em; margin-bottom:4px;">🎧 ${p.title}</div>
+                                    <div style="color:#888; font-size:0.85em; margin-bottom:10px;">${p.description || '—'}</div>
+                                    <audio src="${p.audioUrl}" controls style="width:100%; height:38px;"></audio>
+                                    <div style="margin-top:8px; font-size:0.78em; color:#aaa; display:flex; gap:15px;">
+                                        <span>📅 ${date}</span>
+                                        <span>⏱️ ${dur}</span>
+                                    </div>
+                                </div>
+                                <button onclick="deletePodcastEpisode('${doc.id}','${p.filename || ''}')" style="background:#fee2e2; border:none; color:#ef4444; border-radius:8px; padding:6px 10px; cursor:pointer; font-size:0.85em; flex-shrink:0;">🗑️</button>
+                            </div>
+                        </div>`;
+                    }).join('');
+                });
+        }
+
+        async function deletePodcastEpisode(docId, filename) {
+            if (!confirm('ลบ Episode นี้?')) return;
+            try {
+                await db.collection('podcasts').doc(docId).delete();
+                if (filename) {
+                    try { await firebase.storage().ref(filename).delete(); } catch(e) { /* file may not exist */ }
+                }
+                showToast('🗑️ Deleted!');
+            } catch(e) { alert(e.message); }
         }
 
         let divisionConfig = {}; // 🔥 Added for Divisions V77.8
