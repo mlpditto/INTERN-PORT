@@ -2554,11 +2554,21 @@
                 document.getElementById('hub-view-laboon').style.display = mode === 'laboon' ? 'flex' : 'none';
 
                 if (mode === 'research') { loadResearchHistory(); }
-                if (mode === 'laboon') { loadPodcastEpisodes(); }
+                if (mode === 'laboon') {
+                    if (auth && auth.currentUser) {
+                        loadPodcastEpisodes();
+                        loadStorageUsage();
+                    } else {
+                        const podEl = document.getElementById('podcast-episode-list');
+                        if (podEl) {
+                            podEl.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#94a3b8;"><div style="font-size:2.2em;">🔒</div><p>Please sign in as admin to view Podcast Studio data.</p></div>';
+                        }
+                        showToast('Please sign in to access Laboon data', 'warning');
+                    }
+                }
                 const _modeLabels = { design: 'Design Lab', research: 'Research Assistant', laboon: 'Laboon' };
-                    if (mode === 'laboon') { loadStorageUsage(); }
-                    document.getElementById('hub-storage-indicator').style.display = mode === 'laboon' ? 'block' : 'none';
-                    showToast('Switched to ' + (_modeLabels[mode] || mode));
+                document.getElementById('hub-storage-indicator').style.display = mode === 'laboon' ? 'block' : 'none';
+                showToast('Switched to ' + (_modeLabels[mode] || mode));
             }
 
             // Prompt Suggestions Functions
@@ -10982,6 +10992,10 @@ async function saveQuiz() {
         function loadPodcastEpisodes() {
             const el = document.getElementById('podcast-episode-list');
             if (!el) return;
+            if (!auth || !auth.currentUser) {
+                el.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#94a3b8;"><div style="font-size:2.2em;">🔒</div><p>Login required to load episodes.</p></div>';
+                return;
+            }
             el.innerHTML = '<div style="text-align:center; padding:40px; color:#aaa;">⏳ Loading...</div>';
             db.collection('podcasts').orderBy('createdAt', 'desc').limit(50)
                 .onSnapshot(snap => {
@@ -11010,6 +11024,13 @@ async function saveQuiz() {
                             </div>
                         </div>`;
                     }).join('');
+                }, err => {
+                    console.warn('Podcast snapshot error:', err);
+                    if (err && err.code === 'permission-denied') {
+                        el.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#ef4444;"><div style="font-size:2.2em;">⛔</div><p>Firestore permission denied for podcasts. Please deploy/update Firestore rules.</p></div>';
+                    } else {
+                        el.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#ef4444;"><div style="font-size:2.2em;">⚠️</div><p>Failed to load episodes: ' + (err?.message || 'Unknown error') + '</p></div>';
+                    }
                 });
         }
 
@@ -11039,6 +11060,17 @@ async function saveQuiz() {
             async function loadStorageUsage() {
                 const FREE_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB free tier
                 const WARN_PCT = 80;
+                if (!auth || !auth.currentUser) {
+                    const usedLbl = document.getElementById('storage-used-label');
+                    const pctLbl = document.getElementById('storage-pct-label');
+                    const fileCnt = document.getElementById('storage-file-count');
+                    const bar = document.getElementById('storage-bar');
+                    if (usedLbl) usedLbl.textContent = 'Login required';
+                    if (pctLbl) pctLbl.textContent = '--';
+                    if (fileCnt) fileCnt.textContent = '-';
+                    if (bar) bar.style.width = '0%';
+                    return;
+                }
                 try {
                     const doc = await db.collection('_meta').doc('storageUsage').get();
                     const data = doc.exists ? doc.data() : { totalBytes: 0, fileCount: 0 };
@@ -11075,6 +11107,10 @@ async function saveQuiz() {
                     }
                 } catch(e) {
                     console.warn('loadStorageUsage error:', e);
+                    const usedLbl = document.getElementById('storage-used-label');
+                    if (usedLbl && e && e.code === 'permission-denied') {
+                        usedLbl.textContent = 'Permission denied (check Firestore rules)';
+                    }
                 }
             }
 
