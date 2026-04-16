@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MEDLIFE+ Admin V90.39 (Turbo)</title>
-    <title>MEDLIFE+ Admin V90.40 (Turbo)</title>
-    <!-- V90.40: Storage usage indicator + 80%/90% warning toast in Laboon tab -->
+    <title>MEDLIFE+ Admin V90.41 (Turbo)</title>
+    <!-- V90.41: Optional Google Drive backup for Podcast episodes + backup status -->
     <!-- Release: 2026-04-16 12:00 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -3895,6 +3895,15 @@
                     <div style="background:#e2e8f0; border-radius:999px; height:8px;">
                         <div id="pod-upload-progress" style="background:linear-gradient(135deg,#4361ee,#e84393); height:8px; border-radius:999px; width:0%; transition:width 0.3s;"></div>
                     </div>
+                </div>
+
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px; margin-bottom:14px;">
+                    <label style="display:flex; align-items:center; gap:8px; font-size:0.86em; font-weight:700; color:#334155; cursor:pointer; margin-bottom:8px;">
+                        <input type="checkbox" id="pod-backup-drive-toggle" style="width:16px; height:16px; accent-color:#2563eb;">
+                        Backup this episode to Google Drive
+                    </label>
+                    <input id="pod-backup-folder-id" type="text" placeholder="Google Drive Folder ID (optional)" style="width:100%; padding:9px 11px; border-radius:10px; border:1px solid #cbd5e1; font-size:0.82em; box-sizing:border-box;">
+                    <div style="font-size:0.72em; color:#64748b; margin-top:6px;">Leave Folder ID empty to store backups in My Drive root.</div>
                 </div>
 
                 <button id="btn-pod-save" onclick="savePodcastEpisode()" style="width:100%; padding:14px; background:linear-gradient(135deg,#4361ee,#3a0ca3); color:white; border:none; border-radius:14px; font-weight:900; font-size:1em; cursor:pointer; display:none;">
@@ -8414,20 +8423,51 @@ async function saveQuiz() {
         let gdriveTokenClient = null;
         let gdriveAccessToken = null;
         let gdrivePickerReady = false;
+        let gdriveOnTokenReady = null;
+        let gdriveOnTokenError = null;
 
         function initGdriveTokenClient() {
             if (!window.google?.accounts?.oauth2) return;
             gdriveTokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: GDRIVE_CLIENT_ID,
-                scope: 'https://www.googleapis.com/auth/drive.readonly',
+                scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file',
                 callback: (tokenResponse) => {
                     if (tokenResponse.error) {
+                        if (typeof gdriveOnTokenError === 'function') {
+                            gdriveOnTokenError(tokenResponse.error);
+                            gdriveOnTokenError = null;
+                            gdriveOnTokenReady = null;
+                            return;
+                        }
                         alert('Google Drive auth failed: ' + tokenResponse.error);
                         return;
                     }
                     gdriveAccessToken = tokenResponse.access_token;
+                    if (typeof gdriveOnTokenReady === 'function') {
+                        gdriveOnTokenReady(gdriveAccessToken);
+                        gdriveOnTokenReady = null;
+                        gdriveOnTokenError = null;
+                        return;
+                    }
                     _openPickerNow();
                 }
+            });
+        }
+
+        async function ensureGdriveWriteToken() {
+            if (!GDRIVE_CLIENT_ID || GDRIVE_CLIENT_ID.startsWith('YOUR_')) {
+                throw new Error('Google Drive config is missing. Please configure GDRIVE_CLIENT_ID first.');
+            }
+            if (!window.google?.accounts?.oauth2) {
+                throw new Error('Google Identity API not loaded yet.');
+            }
+            if (!gdriveTokenClient) initGdriveTokenClient();
+            if (gdriveAccessToken) return gdriveAccessToken;
+
+            return new Promise((resolve, reject) => {
+                gdriveOnTokenReady = resolve;
+                gdriveOnTokenError = (err) => reject(new Error(String(err || 'Google Drive auth failed')));
+                gdriveTokenClient.requestAccessToken({ prompt: 'consent' });
             });
         }
 
@@ -10660,6 +10700,63 @@ async function saveQuiz() {
         let podAudioContext = null;
         let podAnalyser = null;
         let podWaveAnimId = null;
+        const POD_BACKUP_PREF_KEY = 'MLP_PODCAST_DRIVE_BACKUP';
+
+        function getPodcastBackupPref() {
+            try {
+                const raw = localStorage.getItem(POD_BACKUP_PREF_KEY);
+                if (!raw) return { enabled: false, folderId: '' };
+                const parsed = JSON.parse(raw);
+                return {
+                    enabled: !!parsed.enabled,
+                    folderId: String(parsed.folderId || '').trim()
+                };
+            } catch (_) {
+                return { enabled: false, folderId: '' };
+            }
+        }
+
+        function setPodcastBackupPref(enabled, folderId) {
+            localStorage.setItem(POD_BACKUP_PREF_KEY, JSON.stringify({
+                enabled: !!enabled,
+                folderId: String(folderId || '').trim()
+            }));
+        }
+
+        async function backupPodcastToGoogleDrive(blob, episodeTitle, folderId) {
+            const token = await ensureGdriveWriteToken();
+            const safeTitle = String(episodeTitle || 'podcast').replace(/[^a-z0-9_-]/gi, '_');
+            const driveFilename = `podcast_backup_${Date.now()}_${safeTitle}.webm`;
+            const metadata = { name: driveFilename, mimeType: blob.type || 'audio/webm' };
+            if (folderId) metadata.parents = [folderId];
+
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append('file', blob, driveFilename);
+
+            const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: form
+            });
+
+            if (!res.ok) {
+                throw new Error(`Drive upload failed: ${res.status} ${res.statusText}`);
+            }
+            return await res.json();
+        }
+
+        async function deleteDriveBackupById(fileId) {
+            if (!fileId) return;
+            const token = await ensureGdriveWriteToken();
+            const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (!res.ok && res.status !== 404) {
+                throw new Error(`Drive delete failed: ${res.status} ${res.statusText}`);
+            }
+        }
 
         function openPodcastRecorder() {
             document.getElementById('podcastRecorderModal').style.display = 'block';
@@ -10671,6 +10768,11 @@ async function saveQuiz() {
             document.getElementById('btn-pod-save').style.display = 'none';
             document.getElementById('btn-pod-pause').disabled = true;
             document.getElementById('btn-pod-stop').disabled = true;
+            const backupPref = getPodcastBackupPref();
+            const backupToggle = document.getElementById('pod-backup-drive-toggle');
+            const backupFolder = document.getElementById('pod-backup-folder-id');
+            if (backupToggle) backupToggle.checked = backupPref.enabled;
+            if (backupFolder) backupFolder.value = backupPref.folderId;
             podAudioBlob = null; podChunks = []; podSeconds = 0;
             drawIdleWaveform();
         }
@@ -10801,6 +10903,9 @@ async function saveQuiz() {
             const desc = document.getElementById('pod-desc').value.trim();
             if (!title) return alert('กรุณาใส่ชื่อ Episode');
             if (!podAudioBlob) return alert('ยังไม่มีไฟล์เสียงครับ');
+            const backupEnabled = !!document.getElementById('pod-backup-drive-toggle')?.checked;
+            const backupFolderId = (document.getElementById('pod-backup-folder-id')?.value || '').trim();
+            setPodcastBackupPref(backupEnabled, backupFolderId);
 
             const saveBtn = document.getElementById('btn-pod-save');
             saveBtn.disabled = true; saveBtn.textContent = '⏳ Uploading...';
@@ -10825,19 +10930,44 @@ async function saveQuiz() {
                     async () => {
                         const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
                             const fileSizeBytes = podAudioBlob.size;
-                            await db.collection('podcasts').add({
+                        const docRef = await db.collection('podcasts').add({
                             title,
                             description: desc,
                             audioUrl: downloadURL,
                             filename,
                             durationSec: podSeconds,
                                 fileSizeBytes,
+                            backupEnabled,
+                            gdriveBackupStatus: backupEnabled ? 'pending' : 'disabled',
                             createdAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
                             await db.collection('_meta').doc('storageUsage').set({
                                 totalBytes: firebase.firestore.FieldValue.increment(fileSizeBytes),
                                 fileCount: firebase.firestore.FieldValue.increment(1)
                             }, { merge: true });
+
+                        if (backupEnabled) {
+                            document.getElementById('pod-upload-label').textContent = 'Backing up to Google Drive...';
+                            try {
+                                const driveFile = await backupPodcastToGoogleDrive(podAudioBlob, title, backupFolderId);
+                                await docRef.update({
+                                    gdriveBackupStatus: 'ok',
+                                    gdriveBackupFileId: driveFile.id || '',
+                                    gdriveBackupFileName: driveFile.name || '',
+                                    gdriveBackupWebViewLink: driveFile.webViewLink || '',
+                                    gdriveBackupFolderId: backupFolderId || ''
+                                });
+                                showToast('☁️ Google Drive backup completed');
+                            } catch (backupErr) {
+                                await docRef.update({
+                                    gdriveBackupStatus: 'failed',
+                                    gdriveBackupError: String(backupErr?.message || backupErr || '').slice(0, 200),
+                                    gdriveBackupFolderId: backupFolderId || ''
+                                });
+                                showToast('⚠️ Saved to Firebase แต่สำรอง Google Drive ไม่สำเร็จ', 'warning');
+                            }
+                        }
+
                         showToast('✅ Episode published!');
                         closePodcastRecorder();
                         loadPodcastEpisodes();
@@ -10874,16 +11004,17 @@ async function saveQuiz() {
                                     <div style="margin-top:8px; font-size:0.78em; color:#aaa; display:flex; gap:15px;">
                                         <span>📅 ${date}</span>
                                         <span>⏱️ ${dur}</span>
+                                        <span>${p.gdriveBackupStatus === 'ok' ? '☁️ Drive backup' : (p.gdriveBackupStatus === 'failed' ? '⚠️ Backup failed' : (p.gdriveBackupStatus === 'pending' ? '⏳ Backing up...' : ''))}</span>
                                     </div>
                                 </div>
-                                <button onclick="deletePodcastEpisode('${doc.id}','${p.filename || ''}')" style="background:#fee2e2; border:none; color:#ef4444; border-radius:8px; padding:6px 10px; cursor:pointer; font-size:0.85em; flex-shrink:0;">🗑️</button>
+                                <button onclick="deletePodcastEpisode('${doc.id}','${p.filename || ''}','${p.gdriveBackupFileId || ''}')" style="background:#fee2e2; border:none; color:#ef4444; border-radius:8px; padding:6px 10px; cursor:pointer; font-size:0.85em; flex-shrink:0;">🗑️</button>
                             </div>
                         </div>`;
                     }).join('');
                 });
         }
 
-        async function deletePodcastEpisode(docId, filename) {
+        async function deletePodcastEpisode(docId, filename, gdriveBackupFileId = '') {
             if (!confirm('ลบ Episode นี้?')) return;
             try {
                     const docSnap = await db.collection('podcasts').doc(docId).get();
@@ -10891,6 +11022,9 @@ async function saveQuiz() {
                     await db.collection('podcasts').doc(docId).delete();
                 if (filename) {
                     try { await firebase.storage().ref(filename).delete(); } catch(e) { /* file may not exist */ }
+                }
+                if (gdriveBackupFileId) {
+                    try { await deleteDriveBackupById(gdriveBackupFileId); } catch(e) { console.warn('Drive backup delete failed:', e); }
                 }
                     if (fileSizeBytes > 0) {
                         await db.collection('_meta').doc('storageUsage').set({
