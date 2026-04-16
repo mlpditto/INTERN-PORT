@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MEDLIFE+ Admin V90.39 (Turbo)</title>
-    <!-- V90.39: Laboon tab – Podcast Studio + TTS moved inside AI Digital Lab hub -->
+    <title>MEDLIFE+ Admin V90.40 (Turbo)</title>
+    <!-- V90.40: Storage usage indicator + 80%/90% warning toast in Laboon tab -->
     <!-- Release: 2026-04-16 12:00 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -2250,7 +2251,23 @@
                         </div>
 
                         <!-- Mode-Specific Sidebar: Design Styles -->
-                        <div id="hub-sidebar-design">
+                            <!-- Storage Usage Indicator (Laboon only) -->
+                            <div id="hub-storage-indicator" style="display:none; margin-bottom:20px; padding:16px; border-radius:18px; background:linear-gradient(160deg,#f0f9ff,#e0f2fe); border:1px solid #bae6fd;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <div style="font-weight:900; color:#0369a1; font-size:0.8em; text-transform:uppercase; letter-spacing:0.8px;">☁️ Firebase Storage</div>
+                                    <button onclick="loadStorageUsage()" style="background:none; border:none; cursor:pointer; font-size:1em; color:#0369a1;" title="Refresh">&#x21bb;</button>
+                                </div>
+                                <div style="background:#e0f2fe; border-radius:999px; height:10px; margin-bottom:8px; overflow:hidden;">
+                                    <div id="storage-bar" style="height:10px; border-radius:999px; background:linear-gradient(90deg,#38bdf8,#0ea5e9); width:0%; transition:width 0.6s;"></div>
+                                </div>
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span id="storage-used-label" style="font-size:0.78em; color:#0c4a6e; font-weight:700;">— MB used</span>
+                                    <span id="storage-pct-label" style="font-size:0.82em; font-weight:900; color:#0369a1;">0%</span>
+                                </div>
+                                <div style="font-size:0.7em; color:#64748b; margin-top:5px;">Free tier: 5 GB · <span id="storage-file-count">0</span> files</div>
+                            </div>
+
+                            <div id="hub-sidebar-design">
                              <div style="margin-bottom:20px;">
                                 <label style="display:block; font-weight:bold; color:#34495e; font-size:0.9em; margin-bottom:12px;">🖌️ Visual Style Collection</label>
                                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;" id="design-style-grid">
@@ -2540,7 +2557,9 @@
                 if (mode === 'research') { loadResearchHistory(); }
                 if (mode === 'laboon') { loadPodcastEpisodes(); }
                 const _modeLabels = { design: 'Design Lab', research: 'Research Assistant', laboon: 'Laboon' };
-                showToast('Switched to ' + (_modeLabels[mode] || mode));
+                    if (mode === 'laboon') { loadStorageUsage(); }
+                    document.getElementById('hub-storage-indicator').style.display = mode === 'laboon' ? 'block' : 'none';
+                    showToast('Switched to ' + (_modeLabels[mode] || mode));
             }
 
             // Prompt Suggestions Functions
@@ -10805,17 +10824,24 @@ async function saveQuiz() {
                     },
                     async () => {
                         const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
-                        await db.collection('podcasts').add({
+                            const fileSizeBytes = podAudioBlob.size;
+                            await db.collection('podcasts').add({
                             title,
                             description: desc,
                             audioUrl: downloadURL,
                             filename,
                             durationSec: podSeconds,
+                                fileSizeBytes,
                             createdAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
+                            await db.collection('_meta').doc('storageUsage').set({
+                                totalBytes: firebase.firestore.FieldValue.increment(fileSizeBytes),
+                                fileCount: firebase.firestore.FieldValue.increment(1)
+                            }, { merge: true });
                         showToast('✅ Episode published!');
                         closePodcastRecorder();
                         loadPodcastEpisodes();
+                            loadStorageUsage();
                     }
                 );
             } catch (e) {
@@ -10860,13 +10886,64 @@ async function saveQuiz() {
         async function deletePodcastEpisode(docId, filename) {
             if (!confirm('ลบ Episode นี้?')) return;
             try {
-                await db.collection('podcasts').doc(docId).delete();
+                    const docSnap = await db.collection('podcasts').doc(docId).get();
+                    const fileSizeBytes = docSnap.exists ? (docSnap.data().fileSizeBytes || 0) : 0;
+                    await db.collection('podcasts').doc(docId).delete();
                 if (filename) {
                     try { await firebase.storage().ref(filename).delete(); } catch(e) { /* file may not exist */ }
                 }
-                showToast('🗑️ Deleted!');
+                    if (fileSizeBytes > 0) {
+                        await db.collection('_meta').doc('storageUsage').set({
+                            totalBytes: firebase.firestore.FieldValue.increment(-fileSizeBytes),
+                            fileCount: firebase.firestore.FieldValue.increment(-1)
+                        }, { merge: true });
+                    }
+                    showToast('🗑️ Deleted!');
+                    loadStorageUsage();
             } catch(e) { alert(e.message); }
         }
+
+            async function loadStorageUsage() {
+                const FREE_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB free tier
+                const WARN_PCT = 80;
+                try {
+                    const doc = await db.collection('_meta').doc('storageUsage').get();
+                    const data = doc.exists ? doc.data() : { totalBytes: 0, fileCount: 0 };
+                    const used = Math.max(0, data.totalBytes || 0);
+                    const count = Math.max(0, data.fileCount || 0);
+                    const pct = Math.min(100, Math.round((used / FREE_BYTES) * 100));
+                    const usedMB = (used / (1024 * 1024)).toFixed(1);
+
+                    const bar = document.getElementById('storage-bar');
+                    const usedLbl = document.getElementById('storage-used-label');
+                    const pctLbl = document.getElementById('storage-pct-label');
+                    const fileCnt = document.getElementById('storage-file-count');
+                    if (!bar) return;
+
+                    bar.style.width = pct + '%';
+                    bar.style.background = pct >= 90
+                        ? 'linear-gradient(90deg,#f87171,#ef4444)'
+                        : pct >= 80 ? 'linear-gradient(90deg,#fb923c,#f97316)'
+                        : 'linear-gradient(90deg,#38bdf8,#0ea5e9)';
+                    usedLbl.textContent = usedMB + ' MB used / 5,120 MB';
+                    pctLbl.textContent = pct + '%';
+                    pctLbl.style.color = pct >= 90 ? '#dc2626' : pct >= 80 ? '#ea580c' : '#0369a1';
+                    fileCnt.textContent = count;
+
+                    // Notify once per session per 10% tier
+                    const warnKey = 'storageWarn_' + Math.floor(pct / 10) * 10;
+                    if (pct >= WARN_PCT && !sessionStorage.getItem(warnKey)) {
+                        sessionStorage.setItem(warnKey, '1');
+                        const icon = pct >= 90 ? '🚨' : '⚠️';
+                        const msg = pct >= 90
+                            ? `${icon} Storage ใกล้เต็มแล้ว! ใช้ไป ${pct}% (${usedMB} MB) — กรุณาลบไฟล์เก่าหรือ upgrade plan`
+                            : `${icon} Storage ใช้ไป ${pct}% แล้ว (${usedMB} MB / 5 GB) — ควรพิจารณาลบไฟล์ที่ไม่ใช้`;
+                        setTimeout(() => showToast(msg, pct >= 90 ? 'error' : 'warning'), 800);
+                    }
+                } catch(e) {
+                    console.warn('loadStorageUsage error:', e);
+                }
+            }
 
         let divisionConfig = {}; // 🔥 Added for Divisions V77.8
         let groupSettings = {}; // 🔥 Added for Visibility Settings V69.0
