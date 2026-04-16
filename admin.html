@@ -4,9 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MEDLIFE+ Admin V90.36 (Turbo)</title>
-    <!-- V90.36: Timing telemetry + profile-based timing config -->
-    <!-- Release: 2026-04-15 23:33 UTC+7 -->
+    <title>MEDLIFE+ Admin V90.39 (Turbo)</title>
+    <title>MEDLIFE+ Admin V90.41 (Turbo)</title>
+    <!-- V90.41: Optional Google Drive backup for Podcast episodes + backup status -->
+    <!-- Release: 2026-04-16 12:00 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -294,6 +295,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
     <script>
         // Firebase Config (V88.63 - Inlined for GitHub Pages)
         const firebaseConfig = {
@@ -885,6 +887,44 @@
         .arrow-controls {
             display: flex;
             gap: 2px;
+        }
+
+        .sq-user-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            background: var(--col-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            cursor: pointer;
+            transition: 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .sq-user-item:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .sq-user-item img {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .sq-user-item input[type="checkbox"] {
+            width: auto;
+            margin: 0 !important;
+            cursor: pointer;
+        }
+
+        .sq-user-check {
+            cursor: pointer;
         }
 
         .btn-arrow {
@@ -1636,6 +1676,7 @@
             <button class="tab-btn" onclick="switchTab('tab-users')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">👥 User Hub</button>
             <button class="tab-btn" onclick="switchTab('tab-ai-hub')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🤖 AI Digital Lab</button>
             <button class="tab-btn" onclick="switchTab('tab-laughtale')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🏝️ Laugh Tale</button>
+
         </div>
 
         <!-- Old tab-works removed -->
@@ -2080,6 +2121,9 @@
                         <button class="hub-mode-btn" id="btn-hub-research" onclick="switchHubMode('research')">
                             🔬 Research Asst
                         </button>
+                        <button class="hub-mode-btn" id="btn-hub-laboon" onclick="switchHubMode('laboon')">
+                            🎈 Laboon
+                        </button>
                     </div>
 
                     <div style="display:flex; align-items:center; gap:12px;">
@@ -2145,7 +2189,7 @@
                             </div>
                         </div>
 
-                        <div id="hub-tts-studio" style="margin-bottom:25px; padding:18px; border-radius:24px; background:linear-gradient(180deg, #fffdf8 0%, #fff8ef 100%); border:1px solid #fde7c8; box-shadow:0 10px 24px rgba(217, 119, 6, 0.08);">
+                        <div id="hub-tts-studio" style="display:none; margin-bottom:25px; padding:18px; border-radius:24px; background:linear-gradient(180deg, #fffdf8 0%, #fff8ef 100%); border:1px solid #fde7c8; box-shadow:0 10px 24px rgba(217, 119, 6, 0.08);">
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;">
                                 <div>
                                     <div style="font-weight:900; color:#9a3412; font-size:0.82em; text-transform:uppercase; letter-spacing:0.9px;">Gemini 3.1 Flash TTS</div>
@@ -2207,7 +2251,23 @@
                         </div>
 
                         <!-- Mode-Specific Sidebar: Design Styles -->
-                        <div id="hub-sidebar-design">
+                            <!-- Storage Usage Indicator (Laboon only) -->
+                            <div id="hub-storage-indicator" style="display:none; margin-bottom:20px; padding:16px; border-radius:18px; background:linear-gradient(160deg,#f0f9ff,#e0f2fe); border:1px solid #bae6fd;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <div style="font-weight:900; color:#0369a1; font-size:0.8em; text-transform:uppercase; letter-spacing:0.8px;">☁️ Firebase Storage</div>
+                                    <button onclick="loadStorageUsage()" style="background:none; border:none; cursor:pointer; font-size:1em; color:#0369a1;" title="Refresh">&#x21bb;</button>
+                                </div>
+                                <div style="background:#e0f2fe; border-radius:999px; height:10px; margin-bottom:8px; overflow:hidden;">
+                                    <div id="storage-bar" style="height:10px; border-radius:999px; background:linear-gradient(90deg,#38bdf8,#0ea5e9); width:0%; transition:width 0.6s;"></div>
+                                </div>
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span id="storage-used-label" style="font-size:0.78em; color:#0c4a6e; font-weight:700;">— MB used</span>
+                                    <span id="storage-pct-label" style="font-size:0.82em; font-weight:900; color:#0369a1;">0%</span>
+                                </div>
+                                <div style="font-size:0.7em; color:#64748b; margin-top:5px;">Free tier: 5 GB · <span id="storage-file-count">0</span> files</div>
+                            </div>
+
+                            <div id="hub-sidebar-design">
                              <div style="margin-bottom:20px;">
                                 <label style="display:block; font-weight:bold; color:#34495e; font-size:0.9em; margin-bottom:12px;">🖌️ Visual Style Collection</label>
                                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;" id="design-style-grid">
@@ -2371,6 +2431,27 @@
                             </div>
                         </div>
 
+                        <!-- Laboon Interior View — Podcast Studio -->
+                        <div id="hub-view-laboon" style="display:none; flex-direction:column; gap:20px;">
+                            <div style="background:white; border-radius:28px; border:1px solid #e0e6ed; padding:30px; box-shadow:0 10px 30px rgba(0,0,0,0.05);">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                                    <div>
+                                        <h2 style="margin:0; font-size:1.6em; font-weight:900;">🎙️ Podcast Studio</h2>
+                                        <p style="margin:5px 0 0; color:#888; font-size:0.9em;">Record, upload, and manage podcast episodes.</p>
+                                    </div>
+                                    <button class="magic-btn" onclick="openPodcastRecorder()" style="display:flex; align-items:center; gap:8px; padding:12px 22px; border-radius:14px; background:linear-gradient(135deg,#e84393,#c0392b); font-weight:900;">
+                                        🔴 New Episode
+                                    </button>
+                                </div>
+                                <div id="podcast-episode-list">
+                                    <div style="text-align:center; padding:60px 20px; color:#aaa;">
+                                        <div style="font-size:3em;">🎧</div>
+                                        <p>Loading episodes...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -2457,23 +2538,28 @@
                 // Update Buttons
                 document.getElementById('btn-hub-design').classList.toggle('active', mode === 'design');
                 document.getElementById('btn-hub-research').classList.toggle('active', mode === 'research');
-                
+                document.getElementById('btn-hub-laboon').classList.toggle('active', mode === 'laboon');
+
                 // Update Sidebar Parts
                 document.getElementById('hub-sidebar-design').style.display = mode === 'design' ? 'block' : 'none';
                 document.getElementById('hub-sidebar-research').style.display = mode === 'research' ? 'block' : 'none';
-                
+                document.getElementById('hub-tts-studio').style.display = mode === 'laboon' ? 'block' : 'none';
+
                 // Update Sidebar AI Selects
                 document.getElementById('hub-ctrl-design-engine').style.display = mode === 'design' ? 'block' : 'none';
                 document.getElementById('hub-ctrl-research-engine').style.display = mode === 'research' ? 'block' : 'none';
-                
+
                 // Update View Parts
                 document.getElementById('hub-view-design').style.display = mode === 'design' ? 'flex' : 'none';
                 document.getElementById('hub-view-research').style.display = mode === 'research' ? 'flex' : 'none';
-                
-                if (mode === 'research') {
-                    loadResearchHistory();
-                }
-                showToast("Switched to " + (mode === 'design' ? 'Design Lab' : 'Research Assistant'));
+                document.getElementById('hub-view-laboon').style.display = mode === 'laboon' ? 'flex' : 'none';
+
+                if (mode === 'research') { loadResearchHistory(); }
+                if (mode === 'laboon') { loadPodcastEpisodes(); }
+                const _modeLabels = { design: 'Design Lab', research: 'Research Assistant', laboon: 'Laboon' };
+                    if (mode === 'laboon') { loadStorageUsage(); }
+                    document.getElementById('hub-storage-indicator').style.display = mode === 'laboon' ? 'block' : 'none';
+                    showToast('Switched to ' + (_modeLabels[mode] || mode));
             }
 
             // Prompt Suggestions Functions
@@ -3769,12 +3855,121 @@
             </div>
         </div>
 
+        <!-- ===== PODCAST TAB ===== -->
+
+
+        <!-- Podcast Recorder Modal -->
+        <div id="podcastRecorderModal" class="modal" style="z-index:3000;">
+            <div class="modal-content" style="max-width:560px; border-radius:24px; padding:30px;">
+                <span class="close-modal" onclick="closePodcastRecorder()">&times;</span>
+                <h2 style="margin-top:0; font-weight:900;">🎙️ Record Episode</h2>
+
+                <!-- Episode Meta -->
+                <div style="margin-bottom:15px;">
+                    <input type="text" id="pod-title" placeholder="Episode title..." style="margin-bottom:8px;">
+                    <textarea id="pod-desc" rows="2" placeholder="Short description..." style="resize:none;"></textarea>
+                </div>
+
+                <!-- Waveform Visualizer -->
+                <canvas id="pod-waveform" height="60" style="width:100%; border-radius:10px; background:#0f172a; margin-bottom:15px; display:block;"></canvas>
+
+                <!-- Timer -->
+                <div style="text-align:center; font-size:2.2em; font-weight:900; font-family:monospace; color:var(--primary); margin-bottom:15px;" id="pod-timer">00:00</div>
+
+                <!-- Controls -->
+                <div style="display:flex; gap:10px; justify-content:center; margin-bottom:20px;">
+                    <button id="btn-pod-rec" onclick="startPodcastRecording()" style="background:linear-gradient(135deg,#e84393,#c0392b); color:white; border:none; border-radius:50%; width:64px; height:64px; font-size:1.6em; cursor:pointer; box-shadow:0 6px 20px rgba(232,67,147,0.4); transition:0.2s;" title="Record">🔴</button>
+                    <button id="btn-pod-pause" onclick="pausePodcastRecording()" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:50%; width:56px; height:56px; font-size:1.4em; cursor:pointer; transition:0.2s;" title="Pause" disabled>⏸️</button>
+                    <button id="btn-pod-stop" onclick="stopPodcastRecording()" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:50%; width:56px; height:56px; font-size:1.4em; cursor:pointer; transition:0.2s;" title="Stop" disabled>⏹️</button>
+                </div>
+
+                <!-- Playback preview -->
+                <div id="pod-playback-section" style="display:none; background:#f8fafc; border-radius:12px; padding:15px; margin-bottom:15px;">
+                    <p style="margin:0 0 8px; font-weight:700; font-size:0.9em; color:#64748b;">PREVIEW</p>
+                    <audio id="pod-preview" controls style="width:100%; height:40px;"></audio>
+                </div>
+
+                <!-- Upload progress -->
+                <div id="pod-upload-bar" style="display:none; margin-bottom:15px;">
+                    <div style="font-size:0.85em; color:#64748b; margin-bottom:5px;" id="pod-upload-label">Uploading...</div>
+                    <div style="background:#e2e8f0; border-radius:999px; height:8px;">
+                        <div id="pod-upload-progress" style="background:linear-gradient(135deg,#4361ee,#e84393); height:8px; border-radius:999px; width:0%; transition:width 0.3s;"></div>
+                    </div>
+                </div>
+
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px; margin-bottom:14px;">
+                    <label style="display:flex; align-items:center; gap:8px; font-size:0.86em; font-weight:700; color:#334155; cursor:pointer; margin-bottom:8px;">
+                        <input type="checkbox" id="pod-backup-drive-toggle" style="width:16px; height:16px; accent-color:#2563eb;">
+                        Backup this episode to Google Drive
+                    </label>
+                    <input id="pod-backup-folder-id" type="text" placeholder="Google Drive Folder ID (optional)" style="width:100%; padding:9px 11px; border-radius:10px; border:1px solid #cbd5e1; font-size:0.82em; box-sizing:border-box;">
+                    <div style="font-size:0.72em; color:#64748b; margin-top:6px;">Leave Folder ID empty to store backups in My Drive root.</div>
+                </div>
+
+                <button id="btn-pod-save" onclick="savePodcastEpisode()" style="width:100%; padding:14px; background:linear-gradient(135deg,#4361ee,#3a0ca3); color:white; border:none; border-radius:14px; font-weight:900; font-size:1em; cursor:pointer; display:none;">
+                    🚀 Publish Episode
+                </button>
+            </div>
+        </div>
+
         <div id="shareModal" class="modal" style="z-index:3000;">
             <div class="modal-content" style="max-width:320px; text-align:center; padding:30px; border-radius:30px; box-shadow:0 25px 50px rgba(0,0,0,0.3);">
                 <h3 style="font-weight:900; color:var(--primary); margin-top:0; border-bottom:1px solid #f1f5f9; padding-bottom:15px; margin-bottom:20px;">🔗 Share Center</h3>
                 <button class="magic-btn" style="width:100%; margin-bottom:12px; padding:12px; font-weight:900; border-radius:15px; background:linear-gradient(135deg, #4361ee, #3a0ca3);" onclick="copyLB(true)">📋 Copy: Names</button>
                 <button class="magic-btn" style="width:100%; background:#64748b; padding:12px; font-weight:900; border-radius:15px;" onclick="copyLB(false)">🕵️ Copy: Anonymous</button>
                 <button class="btn-sm" style="margin-top:15px; background:none; border:none; color:#94a3b8; font-weight:bold; cursor:pointer;" onclick="document.getElementById('shareModal').style.display='none'">Cancel</button>
+            </div>
+        </div>
+
+        <!-- User Profile Modal V1 -->
+        <div id="userProfileModal" class="modal" style="z-index:3000;">
+            <div class="modal-content" style="max-width:500px;">
+                <span class="close-modal" onclick="document.getElementById('userProfileModal').style.display='none'">&times;</span>
+                <div style="display:flex; align-items:flex-start; gap:15px; margin-bottom:20px; border-bottom:2px solid var(--border-color); padding-bottom:15px;">
+                    <img id="profile-pic" src="" style="width:80px; height:80px; border-radius:50%; object-fit:cover; box-shadow:0 4px 8px rgba(0,0,0,0.1);">
+                    <div style="flex:1;">
+                        <h2 id="profile-name" style="margin:0 0 5px 0;"></h2>
+                        <div id="profile-level" style="font-size:1.1em; color:var(--primary); font-weight:bold; margin-bottom:8px;"></div>
+                        <div style="display:flex; gap:15px; font-size:0.9em;">
+                            <div>
+                                <div style="color:var(--text-sub);">Total Score</div>
+                                <div id="profile-score" style="font-weight:bold; font-size:1.2em; color:var(--primary);"></div>
+                            </div>
+                            <div>
+                                <div style="color:var(--text-sub);">Status</div>
+                                <div id="profile-status" style="font-weight:bold;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:15px;">
+                    <h3 style="color:var(--primary); margin-bottom:10px;">📊 Progress Details</h3>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div style="background:var(--col-bg); padding:10px; border-radius:8px; border-left:4px solid #4361ee;">
+                            <div style="color:var(--text-sub); font-size:0.85em;">Tasks Completed</div>
+                            <div id="profile-tasks" style="font-size:1.3em; font-weight:bold;"></div>
+                        </div>
+                        <div style="background:var(--col-bg); padding:10px; border-radius:8px; border-left:4px solid #ff9f1c;">
+                            <div style="color:var(--text-sub); font-size:0.85em;">Days in Program</div>
+                            <div id="profile-days" style="font-size:1.3em; font-weight:bold;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:15px;">
+                    <h3 style="color:var(--primary); margin-bottom:10px;">🎓 Program Dates</h3>
+                    <div style="background:var(--col-bg); padding:10px; border-radius:8px; font-size:0.9em;">
+                        <div style="margin-bottom:5px;"><span style="color:var(--text-sub);">Start:</span> <strong id="profile-start">-</strong></div>
+                        <div><span style="color:var(--text-sub);">End:</span> <strong id="profile-end">-</strong></div>
+                    </div>
+                </div>
+
+                <div style="background:#f0f8ff; padding:10px; border-radius:8px; border-left:4px solid #4361ee; margin-bottom:15px;">
+                    <strong style="color:#4361ee;">💡 Tip:</strong> Click user avatar or name in "Assign to" list to view full profile
+                </div>
+
+                <button class="magic-btn" style="width:100%;" onclick="document.getElementById('userProfileModal').style.display='none'">Close</button>
             </div>
         </div>
 
@@ -8228,20 +8423,51 @@ async function saveQuiz() {
         let gdriveTokenClient = null;
         let gdriveAccessToken = null;
         let gdrivePickerReady = false;
+        let gdriveOnTokenReady = null;
+        let gdriveOnTokenError = null;
 
         function initGdriveTokenClient() {
             if (!window.google?.accounts?.oauth2) return;
             gdriveTokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: GDRIVE_CLIENT_ID,
-                scope: 'https://www.googleapis.com/auth/drive.readonly',
+                scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file',
                 callback: (tokenResponse) => {
                     if (tokenResponse.error) {
+                        if (typeof gdriveOnTokenError === 'function') {
+                            gdriveOnTokenError(tokenResponse.error);
+                            gdriveOnTokenError = null;
+                            gdriveOnTokenReady = null;
+                            return;
+                        }
                         alert('Google Drive auth failed: ' + tokenResponse.error);
                         return;
                     }
                     gdriveAccessToken = tokenResponse.access_token;
+                    if (typeof gdriveOnTokenReady === 'function') {
+                        gdriveOnTokenReady(gdriveAccessToken);
+                        gdriveOnTokenReady = null;
+                        gdriveOnTokenError = null;
+                        return;
+                    }
                     _openPickerNow();
                 }
+            });
+        }
+
+        async function ensureGdriveWriteToken() {
+            if (!GDRIVE_CLIENT_ID || GDRIVE_CLIENT_ID.startsWith('YOUR_')) {
+                throw new Error('Google Drive config is missing. Please configure GDRIVE_CLIENT_ID first.');
+            }
+            if (!window.google?.accounts?.oauth2) {
+                throw new Error('Google Identity API not loaded yet.');
+            }
+            if (!gdriveTokenClient) initGdriveTokenClient();
+            if (gdriveAccessToken) return gdriveAccessToken;
+
+            return new Promise((resolve, reject) => {
+                gdriveOnTokenReady = resolve;
+                gdriveOnTokenError = (err) => reject(new Error(String(err || 'Google Drive auth failed')));
+                gdriveTokenClient.requestAccessToken({ prompt: 'consent' });
             });
         }
 
@@ -10457,8 +10683,401 @@ async function saveQuiz() {
                     loadReflectiveLogsAdmin();
                 }
                 renderLaughTale();
+            } else if (id === 'tab-podcast') {
+                loadPodcastEpisodes();
             }
         }
+
+        // ===================================================================
+        // 🎙️ PODCAST STUDIO — V90.38
+        // ===================================================================
+        let podMediaRecorder = null;
+        let podChunks = [];
+        let podAudioBlob = null;
+        let podTimerInterval = null;
+        let podSeconds = 0;
+        let podStream = null;
+        let podAudioContext = null;
+        let podAnalyser = null;
+        let podWaveAnimId = null;
+        const POD_BACKUP_PREF_KEY = 'MLP_PODCAST_DRIVE_BACKUP';
+
+        function getPodcastBackupPref() {
+            try {
+                const raw = localStorage.getItem(POD_BACKUP_PREF_KEY);
+                if (!raw) return { enabled: false, folderId: '' };
+                const parsed = JSON.parse(raw);
+                return {
+                    enabled: !!parsed.enabled,
+                    folderId: String(parsed.folderId || '').trim()
+                };
+            } catch (_) {
+                return { enabled: false, folderId: '' };
+            }
+        }
+
+        function setPodcastBackupPref(enabled, folderId) {
+            localStorage.setItem(POD_BACKUP_PREF_KEY, JSON.stringify({
+                enabled: !!enabled,
+                folderId: String(folderId || '').trim()
+            }));
+        }
+
+        async function backupPodcastToGoogleDrive(blob, episodeTitle, folderId) {
+            const token = await ensureGdriveWriteToken();
+            const safeTitle = String(episodeTitle || 'podcast').replace(/[^a-z0-9_-]/gi, '_');
+            const driveFilename = `podcast_backup_${Date.now()}_${safeTitle}.webm`;
+            const metadata = { name: driveFilename, mimeType: blob.type || 'audio/webm' };
+            if (folderId) metadata.parents = [folderId];
+
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append('file', blob, driveFilename);
+
+            const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: form
+            });
+
+            if (!res.ok) {
+                throw new Error(`Drive upload failed: ${res.status} ${res.statusText}`);
+            }
+            return await res.json();
+        }
+
+        async function deleteDriveBackupById(fileId) {
+            if (!fileId) return;
+            const token = await ensureGdriveWriteToken();
+            const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (!res.ok && res.status !== 404) {
+                throw new Error(`Drive delete failed: ${res.status} ${res.statusText}`);
+            }
+        }
+
+        function openPodcastRecorder() {
+            document.getElementById('podcastRecorderModal').style.display = 'block';
+            document.getElementById('pod-title').value = '';
+            document.getElementById('pod-desc').value = '';
+            document.getElementById('pod-timer').textContent = '00:00';
+            document.getElementById('pod-playback-section').style.display = 'none';
+            document.getElementById('pod-upload-bar').style.display = 'none';
+            document.getElementById('btn-pod-save').style.display = 'none';
+            document.getElementById('btn-pod-pause').disabled = true;
+            document.getElementById('btn-pod-stop').disabled = true;
+            const backupPref = getPodcastBackupPref();
+            const backupToggle = document.getElementById('pod-backup-drive-toggle');
+            const backupFolder = document.getElementById('pod-backup-folder-id');
+            if (backupToggle) backupToggle.checked = backupPref.enabled;
+            if (backupFolder) backupFolder.value = backupPref.folderId;
+            podAudioBlob = null; podChunks = []; podSeconds = 0;
+            drawIdleWaveform();
+        }
+
+        function closePodcastRecorder() {
+            stopPodcastRecording();
+            document.getElementById('podcastRecorderModal').style.display = 'none';
+        }
+
+        function drawIdleWaveform() {
+            const canvas = document.getElementById('pod-waveform');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth || 500;
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height / 2);
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+        }
+
+        function drawLiveWaveform() {
+            if (!podAnalyser) return;
+            const canvas = document.getElementById('pod-waveform');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth || 500;
+            const bufLen = podAnalyser.frequencyBinCount;
+            const dataArr = new Uint8Array(bufLen);
+
+            function draw() {
+                podWaveAnimId = requestAnimationFrame(draw);
+                podAnalyser.getByteTimeDomainData(dataArr);
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#e84393';
+                ctx.beginPath();
+                const sliceW = canvas.width / bufLen;
+                let x = 0;
+                for (let i = 0; i < bufLen; i++) {
+                    const v = dataArr[i] / 128.0;
+                    const y = (v * canvas.height) / 2;
+                    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                    x += sliceW;
+                }
+                ctx.lineTo(canvas.width, canvas.height / 2);
+                ctx.stroke();
+            }
+            draw();
+        }
+
+        function updatePodTimer() {
+            podSeconds++;
+            const m = String(Math.floor(podSeconds / 60)).padStart(2, '0');
+            const s = String(podSeconds % 60).padStart(2, '0');
+            document.getElementById('pod-timer').textContent = `${m}:${s}`;
+        }
+
+        async function startPodcastRecording() {
+            try {
+                podStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                podAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = podAudioContext.createMediaStreamSource(podStream);
+                podAnalyser = podAudioContext.createAnalyser();
+                podAnalyser.fftSize = 1024;
+                source.connect(podAnalyser);
+
+                podMediaRecorder = new MediaRecorder(podStream);
+                podChunks = [];
+                podMediaRecorder.ondataavailable = e => podChunks.push(e.data);
+                podMediaRecorder.onstop = () => {
+                    podAudioBlob = new Blob(podChunks, { type: 'audio/webm' });
+                    const url = URL.createObjectURL(podAudioBlob);
+                    document.getElementById('pod-preview').src = url;
+                    document.getElementById('pod-playback-section').style.display = 'block';
+                    document.getElementById('btn-pod-save').style.display = 'block';
+                };
+                podMediaRecorder.start();
+                podSeconds = 0;
+                podTimerInterval = setInterval(updatePodTimer, 1000);
+                drawLiveWaveform();
+
+                document.getElementById('btn-pod-rec').disabled = true;
+                document.getElementById('btn-pod-rec').style.opacity = '0.4';
+                document.getElementById('btn-pod-pause').disabled = false;
+                document.getElementById('btn-pod-stop').disabled = false;
+                showToast('🔴 Recording started');
+            } catch (e) {
+                alert('Microphone access denied: ' + e.message);
+            }
+        }
+
+        function pausePodcastRecording() {
+            if (!podMediaRecorder) return;
+            if (podMediaRecorder.state === 'recording') {
+                podMediaRecorder.pause();
+                clearInterval(podTimerInterval);
+                cancelAnimationFrame(podWaveAnimId);
+                document.getElementById('btn-pod-pause').textContent = '▶️';
+                document.getElementById('btn-pod-pause').title = 'Resume';
+            } else if (podMediaRecorder.state === 'paused') {
+                podMediaRecorder.resume();
+                podTimerInterval = setInterval(updatePodTimer, 1000);
+                drawLiveWaveform();
+                document.getElementById('btn-pod-pause').textContent = '⏸️';
+                document.getElementById('btn-pod-pause').title = 'Pause';
+            }
+        }
+
+        function stopPodcastRecording() {
+            if (podMediaRecorder && podMediaRecorder.state !== 'inactive') podMediaRecorder.stop();
+            if (podStream) podStream.getTracks().forEach(t => t.stop());
+            clearInterval(podTimerInterval);
+            cancelAnimationFrame(podWaveAnimId);
+            if (podAudioContext) podAudioContext.close();
+            document.getElementById('btn-pod-rec').disabled = false;
+            document.getElementById('btn-pod-rec').style.opacity = '1';
+            document.getElementById('btn-pod-pause').disabled = true;
+            document.getElementById('btn-pod-stop').disabled = true;
+        }
+
+        async function savePodcastEpisode() {
+            const title = document.getElementById('pod-title').value.trim();
+            const desc = document.getElementById('pod-desc').value.trim();
+            if (!title) return alert('กรุณาใส่ชื่อ Episode');
+            if (!podAudioBlob) return alert('ยังไม่มีไฟล์เสียงครับ');
+            const backupEnabled = !!document.getElementById('pod-backup-drive-toggle')?.checked;
+            const backupFolderId = (document.getElementById('pod-backup-folder-id')?.value || '').trim();
+            setPodcastBackupPref(backupEnabled, backupFolderId);
+
+            const saveBtn = document.getElementById('btn-pod-save');
+            saveBtn.disabled = true; saveBtn.textContent = '⏳ Uploading...';
+            document.getElementById('pod-upload-bar').style.display = 'block';
+
+            try {
+                const storage = firebase.storage();
+                const filename = `podcasts/${Date.now()}_${title.replace(/\s+/g, '_')}.webm`;
+                const ref = storage.ref(filename);
+                const uploadTask = ref.put(podAudioBlob);
+
+                uploadTask.on('state_changed',
+                    snap => {
+                        const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+                        document.getElementById('pod-upload-progress').style.width = pct + '%';
+                        document.getElementById('pod-upload-label').textContent = `Uploading... ${pct}%`;
+                    },
+                    err => {
+                        alert('Upload failed: ' + err.message);
+                        saveBtn.disabled = false; saveBtn.textContent = '🚀 Publish Episode';
+                    },
+                    async () => {
+                        const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
+                            const fileSizeBytes = podAudioBlob.size;
+                        const docRef = await db.collection('podcasts').add({
+                            title,
+                            description: desc,
+                            audioUrl: downloadURL,
+                            filename,
+                            durationSec: podSeconds,
+                                fileSizeBytes,
+                            backupEnabled,
+                            gdriveBackupStatus: backupEnabled ? 'pending' : 'disabled',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                            await db.collection('_meta').doc('storageUsage').set({
+                                totalBytes: firebase.firestore.FieldValue.increment(fileSizeBytes),
+                                fileCount: firebase.firestore.FieldValue.increment(1)
+                            }, { merge: true });
+
+                        if (backupEnabled) {
+                            document.getElementById('pod-upload-label').textContent = 'Backing up to Google Drive...';
+                            try {
+                                const driveFile = await backupPodcastToGoogleDrive(podAudioBlob, title, backupFolderId);
+                                await docRef.update({
+                                    gdriveBackupStatus: 'ok',
+                                    gdriveBackupFileId: driveFile.id || '',
+                                    gdriveBackupFileName: driveFile.name || '',
+                                    gdriveBackupWebViewLink: driveFile.webViewLink || '',
+                                    gdriveBackupFolderId: backupFolderId || ''
+                                });
+                                showToast('☁️ Google Drive backup completed');
+                            } catch (backupErr) {
+                                await docRef.update({
+                                    gdriveBackupStatus: 'failed',
+                                    gdriveBackupError: String(backupErr?.message || backupErr || '').slice(0, 200),
+                                    gdriveBackupFolderId: backupFolderId || ''
+                                });
+                                showToast('⚠️ Saved to Firebase แต่สำรอง Google Drive ไม่สำเร็จ', 'warning');
+                            }
+                        }
+
+                        showToast('✅ Episode published!');
+                        closePodcastRecorder();
+                        loadPodcastEpisodes();
+                            loadStorageUsage();
+                    }
+                );
+            } catch (e) {
+                alert('Error: ' + e.message);
+                saveBtn.disabled = false; saveBtn.textContent = '🚀 Publish Episode';
+            }
+        }
+
+        function loadPodcastEpisodes() {
+            const el = document.getElementById('podcast-episode-list');
+            if (!el) return;
+            el.innerHTML = '<div style="text-align:center; padding:40px; color:#aaa;">⏳ Loading...</div>';
+            db.collection('podcasts').orderBy('createdAt', 'desc').limit(50)
+                .onSnapshot(snap => {
+                    if (snap.empty) {
+                        el.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#aaa;"><div style="font-size:3em;">🎙️</div><p>No episodes yet. Hit <strong>New Episode</strong> to record!</p></div>';
+                        return;
+                    }
+                    el.innerHTML = snap.docs.map(doc => {
+                        const p = doc.data();
+                        const date = p.createdAt?.toDate().toLocaleDateString('th-TH') || '-';
+                        const dur = p.durationSec ? `${Math.floor(p.durationSec/60)}m ${p.durationSec%60}s` : '-';
+                        return `
+                        <div style="background:var(--bg-card); border-radius:16px; padding:18px 20px; margin-bottom:12px; box-shadow:0 2px 8px rgba(0,0,0,0.06); border:1px solid var(--border-color);">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+                                <div style="flex:1;">
+                                    <div style="font-weight:800; font-size:1.05em; margin-bottom:4px;">🎧 ${p.title}</div>
+                                    <div style="color:#888; font-size:0.85em; margin-bottom:10px;">${p.description || '—'}</div>
+                                    <audio src="${p.audioUrl}" controls style="width:100%; height:38px;"></audio>
+                                    <div style="margin-top:8px; font-size:0.78em; color:#aaa; display:flex; gap:15px;">
+                                        <span>📅 ${date}</span>
+                                        <span>⏱️ ${dur}</span>
+                                        <span>${p.gdriveBackupStatus === 'ok' ? '☁️ Drive backup' : (p.gdriveBackupStatus === 'failed' ? '⚠️ Backup failed' : (p.gdriveBackupStatus === 'pending' ? '⏳ Backing up...' : ''))}</span>
+                                    </div>
+                                </div>
+                                <button onclick="deletePodcastEpisode('${doc.id}','${p.filename || ''}','${p.gdriveBackupFileId || ''}')" style="background:#fee2e2; border:none; color:#ef4444; border-radius:8px; padding:6px 10px; cursor:pointer; font-size:0.85em; flex-shrink:0;">🗑️</button>
+                            </div>
+                        </div>`;
+                    }).join('');
+                });
+        }
+
+        async function deletePodcastEpisode(docId, filename, gdriveBackupFileId = '') {
+            if (!confirm('ลบ Episode นี้?')) return;
+            try {
+                    const docSnap = await db.collection('podcasts').doc(docId).get();
+                    const fileSizeBytes = docSnap.exists ? (docSnap.data().fileSizeBytes || 0) : 0;
+                    await db.collection('podcasts').doc(docId).delete();
+                if (filename) {
+                    try { await firebase.storage().ref(filename).delete(); } catch(e) { /* file may not exist */ }
+                }
+                if (gdriveBackupFileId) {
+                    try { await deleteDriveBackupById(gdriveBackupFileId); } catch(e) { console.warn('Drive backup delete failed:', e); }
+                }
+                    if (fileSizeBytes > 0) {
+                        await db.collection('_meta').doc('storageUsage').set({
+                            totalBytes: firebase.firestore.FieldValue.increment(-fileSizeBytes),
+                            fileCount: firebase.firestore.FieldValue.increment(-1)
+                        }, { merge: true });
+                    }
+                    showToast('🗑️ Deleted!');
+                    loadStorageUsage();
+            } catch(e) { alert(e.message); }
+        }
+
+            async function loadStorageUsage() {
+                const FREE_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB free tier
+                const WARN_PCT = 80;
+                try {
+                    const doc = await db.collection('_meta').doc('storageUsage').get();
+                    const data = doc.exists ? doc.data() : { totalBytes: 0, fileCount: 0 };
+                    const used = Math.max(0, data.totalBytes || 0);
+                    const count = Math.max(0, data.fileCount || 0);
+                    const pct = Math.min(100, Math.round((used / FREE_BYTES) * 100));
+                    const usedMB = (used / (1024 * 1024)).toFixed(1);
+
+                    const bar = document.getElementById('storage-bar');
+                    const usedLbl = document.getElementById('storage-used-label');
+                    const pctLbl = document.getElementById('storage-pct-label');
+                    const fileCnt = document.getElementById('storage-file-count');
+                    if (!bar) return;
+
+                    bar.style.width = pct + '%';
+                    bar.style.background = pct >= 90
+                        ? 'linear-gradient(90deg,#f87171,#ef4444)'
+                        : pct >= 80 ? 'linear-gradient(90deg,#fb923c,#f97316)'
+                        : 'linear-gradient(90deg,#38bdf8,#0ea5e9)';
+                    usedLbl.textContent = usedMB + ' MB used / 5,120 MB';
+                    pctLbl.textContent = pct + '%';
+                    pctLbl.style.color = pct >= 90 ? '#dc2626' : pct >= 80 ? '#ea580c' : '#0369a1';
+                    fileCnt.textContent = count;
+
+                    // Notify once per session per 10% tier
+                    const warnKey = 'storageWarn_' + Math.floor(pct / 10) * 10;
+                    if (pct >= WARN_PCT && !sessionStorage.getItem(warnKey)) {
+                        sessionStorage.setItem(warnKey, '1');
+                        const icon = pct >= 90 ? '🚨' : '⚠️';
+                        const msg = pct >= 90
+                            ? `${icon} Storage ใกล้เต็มแล้ว! ใช้ไป ${pct}% (${usedMB} MB) — กรุณาลบไฟล์เก่าหรือ upgrade plan`
+                            : `${icon} Storage ใช้ไป ${pct}% แล้ว (${usedMB} MB / 5 GB) — ควรพิจารณาลบไฟล์ที่ไม่ใช้`;
+                        setTimeout(() => showToast(msg, pct >= 90 ? 'error' : 'warning'), 800);
+                    }
+                } catch(e) {
+                    console.warn('loadStorageUsage error:', e);
+                }
+            }
 
         let divisionConfig = {}; // 🔥 Added for Divisions V77.8
         let groupSettings = {}; // 🔥 Added for Visibility Settings V69.0
@@ -13415,8 +14034,62 @@ async function saveQuiz() {
             modal.style.display = 'block';
         }
         async function deleteHistoryLog(logId, amount) { if (!confirm(`Delete log and revert ${amount} points?`)) return; try { await db.collection("users").doc(currentHistoryUserId).update({ score: firebase.firestore.FieldValue.increment(-amount) }); await db.collection("checkin_logs").doc(logId).delete(); showToast("Reverted!"); const user = usersData.find(u => u.id === currentHistoryUserId); showHistory(currentHistoryUserId, user ? user.displayName : 'User', (user ? user.score : 0) - amount); } catch (e) { alert(e.message); } }
-        function updateAssigneeList() { const d = document.getElementById('sq-user-list'); d.innerHTML = ""; usersData.forEach(u => { if (!u.isIgnored) d.innerHTML += `<label style="margin-right:5px"><input type="checkbox" class="sq-user-check" value="${u.id}" data-name="${u.displayName}" data-pic="${u.pictureUrl}"> ${u.displayName}</label>` }); }
+        function updateAssigneeList() { 
+            const d = document.getElementById('sq-user-list'); 
+            d.innerHTML = ""; 
+            usersData.forEach(u => { 
+                if (!u.isIgnored) {
+                    d.innerHTML += `<div class="sq-user-item" style="margin-bottom:5px;">
+                        <input type="checkbox" class="sq-user-check" value="${u.id}" data-name="${u.displayName}" data-pic="${u.pictureUrl}"> 
+                        <img src="${u.pictureUrl}" alt="${u.displayName}" onclick="event.stopPropagation(); openUserProfile('${u.id}')" style="cursor:pointer; transition:0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+                        <span onclick="event.stopPropagation(); openUserProfile('${u.id}')" style="cursor:pointer; flex:1;">${u.displayName}</span>
+                    </div>`; 
+                }
+            }); 
+        }
+
+        function openUserProfile(userId) {
+            const user = usersData.find(u => u.id === userId);
+            if (!user) return;
+            
+            // Calculate user level
+            const level = Math.floor((user.score || 0) / 10) + 1;
+            
+            // Calculate days in program
+            let daysLeft = '-';
+            let status = '🟢 Active';
+            if (user.endDate) {
+                const end = new Date(user.endDate);
+                const now = new Date();
+                const diff = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+                if (diff < 0) {
+                    status = '✅ Completed';
+                    daysLeft = 'Finished';
+                } else {
+                    status = `⏳ ${diff} days`;
+                    daysLeft = diff + ' days remaining';
+                }
+            }
+            
+            // Count completed tasks (works with score > 0)
+            const completedTasks = worksData.filter(w => w.userId === userId && w.score > 0).length;
+            
+            // Update modal content
+            document.getElementById('profile-pic').src = user.pictureUrl;
+            document.getElementById('profile-name').textContent = user.displayName;
+            document.getElementById('profile-level').textContent = `🎖️ Level ${level}`;
+            document.getElementById('profile-score').textContent = parseFloat((user.score || 0).toFixed(2));
+            document.getElementById('profile-status').textContent = status;
+            document.getElementById('profile-tasks').textContent = completedTasks || 0;
+            document.getElementById('profile-days').textContent = daysLeft;
+            document.getElementById('profile-start').textContent = user.startDate || '-';
+            document.getElementById('profile-end').textContent = user.endDate || '-';
+            
+            // Show modal
+            document.getElementById('userProfileModal').style.display = 'block';
+        }
         async function moveCard(id, dir) { const q = sideQuestsCache[id]; const f = ['Backlog', 'Doing', 'Review', 'Done']; const c = f.indexOf(q.status); let n = q.status; if (dir === 'next' && c < 3) n = f[c + 1]; if (dir === 'prev' && c > 0) n = f[c - 1]; if (n !== q.status) { const u = { status: n }; if (n === 'Done') u.doneAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").doc(id).update(u); } }
+        
         async function giveScore(id) { const q = sideQuestsCache[id]; if (!q) return; const s = prompt("Score:", "0.5"); if (!s) return; const n = prompt("Note:", q.title); const b = db.batch(); q.assigneeIds.forEach(u => { b.update(db.collection("users").doc(u), { score: firebase.firestore.FieldValue.increment(parseFloat(s)) }); b.set(db.collection("checkin_logs").doc(), { userId: u, type: 'manual', amount: parseFloat(s), note: n, timestamp: firebase.firestore.FieldValue.serverTimestamp() }) }); b.update(db.collection("side_quests").doc(id), { status: 'Done', isScored: true, archiveScore: parseFloat(s), doneAt: firebase.firestore.FieldValue.serverTimestamp() }); await b.commit(); showToast("Scored!"); }
         async function archiveSQ(id) { if (confirm("Archive?")) await db.collection("side_quests").doc(id).update({ status: 'Archived' }); }
         async function delUser(id) { if (confirm("Del?")) await db.collection("users").doc(id).delete(); }
