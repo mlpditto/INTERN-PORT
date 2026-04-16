@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MEDLIFE+ Admin V90.38 (Turbo)</title>
-    <!-- V90.38: Podcast Studio – browser recording + Firebase Storage + playback feed -->
+    <title>MEDLIFE+ Admin V90.39 (Turbo)</title>
+    <!-- V90.39: Laboon tab – Podcast Studio + TTS moved inside AI Digital Lab hub -->
     <!-- Release: 2026-04-16 12:00 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1675,7 +1675,7 @@
             <button class="tab-btn" onclick="switchTab('tab-users')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">👥 User Hub</button>
             <button class="tab-btn" onclick="switchTab('tab-ai-hub')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🤖 AI Digital Lab</button>
             <button class="tab-btn" onclick="switchTab('tab-laughtale')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🏝️ Laugh Tale</button>
-            <button class="tab-btn" onclick="switchTab('tab-podcast')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🎙️ Podcast</button>
+
         </div>
 
         <!-- Old tab-works removed -->
@@ -2120,6 +2120,9 @@
                         <button class="hub-mode-btn" id="btn-hub-research" onclick="switchHubMode('research')">
                             🔬 Research Asst
                         </button>
+                        <button class="hub-mode-btn" id="btn-hub-laboon" onclick="switchHubMode('laboon')">
+                            🎈 Laboon
+                        </button>
                     </div>
 
                     <div style="display:flex; align-items:center; gap:12px;">
@@ -2185,7 +2188,7 @@
                             </div>
                         </div>
 
-                        <div id="hub-tts-studio" style="margin-bottom:25px; padding:18px; border-radius:24px; background:linear-gradient(180deg, #fffdf8 0%, #fff8ef 100%); border:1px solid #fde7c8; box-shadow:0 10px 24px rgba(217, 119, 6, 0.08);">
+                        <div id="hub-tts-studio" style="display:none; margin-bottom:25px; padding:18px; border-radius:24px; background:linear-gradient(180deg, #fffdf8 0%, #fff8ef 100%); border:1px solid #fde7c8; box-shadow:0 10px 24px rgba(217, 119, 6, 0.08);">
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;">
                                 <div>
                                     <div style="font-weight:900; color:#9a3412; font-size:0.82em; text-transform:uppercase; letter-spacing:0.9px;">Gemini 3.1 Flash TTS</div>
@@ -2411,6 +2414,27 @@
                             </div>
                         </div>
 
+                        <!-- Laboon Interior View — Podcast Studio -->
+                        <div id="hub-view-laboon" style="display:none; flex-direction:column; gap:20px;">
+                            <div style="background:white; border-radius:28px; border:1px solid #e0e6ed; padding:30px; box-shadow:0 10px 30px rgba(0,0,0,0.05);">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                                    <div>
+                                        <h2 style="margin:0; font-size:1.6em; font-weight:900;">🎙️ Podcast Studio</h2>
+                                        <p style="margin:5px 0 0; color:#888; font-size:0.9em;">Record, upload, and manage podcast episodes.</p>
+                                    </div>
+                                    <button class="magic-btn" onclick="openPodcastRecorder()" style="display:flex; align-items:center; gap:8px; padding:12px 22px; border-radius:14px; background:linear-gradient(135deg,#e84393,#c0392b); font-weight:900;">
+                                        🔴 New Episode
+                                    </button>
+                                </div>
+                                <div id="podcast-episode-list">
+                                    <div style="text-align:center; padding:60px 20px; color:#aaa;">
+                                        <div style="font-size:3em;">🎧</div>
+                                        <p>Loading episodes...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -2497,23 +2521,26 @@
                 // Update Buttons
                 document.getElementById('btn-hub-design').classList.toggle('active', mode === 'design');
                 document.getElementById('btn-hub-research').classList.toggle('active', mode === 'research');
-                
+                document.getElementById('btn-hub-laboon').classList.toggle('active', mode === 'laboon');
+
                 // Update Sidebar Parts
                 document.getElementById('hub-sidebar-design').style.display = mode === 'design' ? 'block' : 'none';
                 document.getElementById('hub-sidebar-research').style.display = mode === 'research' ? 'block' : 'none';
-                
+                document.getElementById('hub-tts-studio').style.display = mode === 'laboon' ? 'block' : 'none';
+
                 // Update Sidebar AI Selects
                 document.getElementById('hub-ctrl-design-engine').style.display = mode === 'design' ? 'block' : 'none';
                 document.getElementById('hub-ctrl-research-engine').style.display = mode === 'research' ? 'block' : 'none';
-                
+
                 // Update View Parts
                 document.getElementById('hub-view-design').style.display = mode === 'design' ? 'flex' : 'none';
                 document.getElementById('hub-view-research').style.display = mode === 'research' ? 'flex' : 'none';
-                
-                if (mode === 'research') {
-                    loadResearchHistory();
-                }
-                showToast("Switched to " + (mode === 'design' ? 'Design Lab' : 'Research Assistant'));
+                document.getElementById('hub-view-laboon').style.display = mode === 'laboon' ? 'flex' : 'none';
+
+                if (mode === 'research') { loadResearchHistory(); }
+                if (mode === 'laboon') { loadPodcastEpisodes(); }
+                const _modeLabels = { design: 'Design Lab', research: 'Research Assistant', laboon: 'Laboon' };
+                showToast('Switched to ' + (_modeLabels[mode] || mode));
             }
 
             // Prompt Suggestions Functions
@@ -3810,27 +3837,7 @@
         </div>
 
         <!-- ===== PODCAST TAB ===== -->
-        <div id="tab-podcast" class="tab-content" style="padding:30px 15px;">
-            <div style="max-width:900px; margin:0 auto;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px; padding-bottom:20px; border-bottom:2px solid var(--border-color);">
-                    <div>
-                        <h1 style="margin:0; font-size:2em; font-weight:900;">🎙️ Podcast Studio</h1>
-                        <p style="margin:5px 0 0; color:#888; font-size:0.9em;">Record, upload, and manage podcast episodes.</p>
-                    </div>
-                    <button class="magic-btn" onclick="openPodcastRecorder()" style="display:flex; align-items:center; gap:8px; padding:12px 22px; border-radius:14px; background:linear-gradient(135deg,#e84393,#c0392b); font-weight:900;">
-                        🔴 New Episode
-                    </button>
-                </div>
 
-                <!-- Episode List -->
-                <div id="podcast-episode-list">
-                    <div style="text-align:center; padding:60px 20px; color:#aaa;">
-                        <div style="font-size:3em;">🎧</div>
-                        <p>Loading episodes...</p>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <!-- Podcast Recorder Modal -->
         <div id="podcastRecorderModal" class="modal" style="z-index:3000;">
