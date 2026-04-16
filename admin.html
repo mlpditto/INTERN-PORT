@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MEDLIFE+ Admin V90.46 (Turbo)</title>
-    <!-- V90.46: Bounty Stacking relocation + Manage Documents modal fix -->
+    <title>MEDLIFE+ Admin V90.49 (Turbo)</title>
+    <!-- V90.49: Dialogue Mode (2-speaker TTS) -->
     <!-- Release: 2026-04-16 12:00 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1962,7 +1962,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; background:linear-gradient(135deg, #4361ee, #8e44ad); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.4em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         🛸 Intern Admin Portal
-                        <span style="font-size:0.45em; background:linear-gradient(135deg, rgba(67, 97, 238, 0.8), rgba(142, 68, 173, 0.8)); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(67,97,238,0.3);">V90.46</span>
+                        <span style="font-size:0.45em; background:linear-gradient(135deg, rgba(67, 97, 238, 0.8), rgba(142, 68, 173, 0.8)); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(67,97,238,0.3);">V90.49</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -2517,11 +2517,17 @@
                                     <div style="font-size:0.78em; color:#7c2d12; margin-top:3px;">Step 1: Test text-to-speech in the admin panel before publishing.</div>
                                 </div>
                                 <button class="btn-sm" type="button" onclick="fillTtsFromSelection()" style="background:white; color:#b45309; border:1px solid #fdba74; border-radius:999px; padding:6px 12px; font-weight:800; font-size:0.72em;">
-                                    Use Selection
-                                </button>
+                                    Use Selection</button>
                             </div>
 
-                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                            <!-- Mode Toggle -->
+                            <div style="display:flex; gap:6px; margin-bottom:12px; background:#fff7ed; padding:5px; border-radius:12px; border:1px solid #fed7aa;">
+                                <button id="tts-mode-single" type="button" onclick="setTtsMode('single')" style="flex:1; padding:6px 10px; border-radius:9px; border:none; background:linear-gradient(135deg,#f59e0b,#ea580c); color:white; font-weight:900; font-size:0.72em; cursor:pointer;">🎙️ Single</button>
+                                <button id="tts-mode-dialogue" type="button" onclick="setTtsMode('dialogue')" style="flex:1; padding:6px 10px; border-radius:9px; border:none; background:transparent; color:#92400e; font-weight:800; font-size:0.72em; cursor:pointer;">🎭 Dialogue (2 Speakers)</button>
+                            </div>
+
+                            <!-- Single mode controls -->
+                            <div id="tts-single-controls" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
                                 <div>
                                     <label style="display:block; font-size:0.72em; font-weight:800; color:#7c2d12; margin-bottom:6px; text-transform:uppercase;">Voice</label>
                                     <select id="tts-voice-select" style="width:100%; padding:10px 12px; border-radius:12px; border:1px solid #fed7aa; background:white; color:#7c2d12; font-weight:700;">
@@ -2542,6 +2548,45 @@
                                         <option value="ja-JP">Japanese (ja-JP)</option>
                                     </select>
                                 </div>
+                            </div>
+
+                            <!-- Dialogue mode controls -->
+                            <div id="tts-dialogue-controls" style="display:none; margin-bottom:10px; background:#fffbeb; border:1px solid #fde68a; border-radius:14px; padding:12px;">
+                                <div style="font-size:0.7em; font-weight:900; color:#92400e; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">🎭 Speaker Voices</div>
+                                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:8px;">
+                                    <div>
+                                        <label style="display:block; font-size:0.68em; font-weight:800; color:#92400e; margin-bottom:4px;">Speaker 1</label>
+                                        <select id="tts-voice-s1" style="width:100%; padding:8px 10px; border-radius:10px; border:1px solid #fcd34d; background:white; color:#7c2d12; font-weight:700; font-size:0.85em;">
+                                            <option value="Kore">Kore</option>
+                                            <option value="Puck">Puck</option>
+                                            <option value="Charon">Charon</option>
+                                            <option value="Achird">Achird</option>
+                                            <option value="Sulafat">Sulafat</option>
+                                            <option value="Zephyr">Zephyr</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="display:block; font-size:0.68em; font-weight:800; color:#92400e; margin-bottom:4px;">Speaker 2</label>
+                                        <select id="tts-voice-s2" style="width:100%; padding:8px 10px; border-radius:10px; border:1px solid #fcd34d; background:white; color:#7c2d12; font-weight:700; font-size:0.85em;">
+                                            <option value="Puck">Puck</option>
+                                            <option value="Kore">Kore</option>
+                                            <option value="Charon">Charon</option>
+                                            <option value="Achird">Achird</option>
+                                            <option value="Sulafat">Sulafat</option>
+                                            <option value="Zephyr">Zephyr</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="display:block; font-size:0.68em; font-weight:800; color:#92400e; margin-bottom:4px;">Language</label>
+                                        <select id="tts-language-select-d" style="width:100%; padding:8px 10px; border-radius:10px; border:1px solid #fcd34d; background:white; color:#7c2d12; font-weight:700; font-size:0.85em;">
+                                            <option value="th-TH">Thai</option>
+                                            <option value="en-US">English</option>
+                                            <option value="en-GB">English UK</option>
+                                            <option value="ja-JP">Japanese</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div style="font-size:0.68em; color:#92400e; background:#fef3c7; padding:7px 10px; border-radius:8px;">📝 Format: <b>Speaker 1: ...</b> and <b>Speaker 2: ...</b> on separate lines</div>
                             </div>
 
                             <div style="margin-bottom:10px;">
@@ -2976,6 +3021,30 @@
                 ].filter(Boolean).join('\n\n');
             }
 
+            window._ttsMode = 'single';
+            window.setTtsMode = function(mode) {
+                const single = document.getElementById('tts-single-controls');
+                const dialogue = document.getElementById('tts-dialogue-controls');
+                const btnS = document.getElementById('tts-mode-single');
+                const btnD = document.getElementById('tts-mode-dialogue');
+                if (mode === 'dialogue') {
+                    if (single) single.style.display = 'none';
+                    if (dialogue) dialogue.style.display = 'block';
+                    if (btnS) { btnS.style.background = 'transparent'; btnS.style.color = '#92400e'; }
+                    if (btnD) { btnD.style.background = 'linear-gradient(135deg,#f59e0b,#ea580c)'; btnD.style.color = 'white'; }
+                    const inp = document.getElementById('tts-input');
+                    if (inp) inp.placeholder = 'Speaker 1: สวัสดีครับ วันนี้เรามาคุยเรื่อง...\nSpeaker 2: ใช่เลย เรื่องนี้น่าสนใจมากๆ...';
+                } else {
+                    if (single) single.style.display = 'grid';
+                    if (dialogue) dialogue.style.display = 'none';
+                    if (btnS) { btnS.style.background = 'linear-gradient(135deg,#f59e0b,#ea580c)'; btnS.style.color = 'white'; }
+                    if (btnD) { btnD.style.background = 'transparent'; btnD.style.color = '#92400e'; }
+                    const inp = document.getElementById('tts-input');
+                    if (inp) inp.placeholder = 'Step 2: Paste the script you want Gemini to narrate...';
+                }
+                window._ttsMode = mode;
+            };
+
             window.fillTtsFromSelection = function() {
                 const ttsInput = document.getElementById('tts-input');
                 if (!ttsInput) return;
@@ -3038,7 +3107,8 @@
                 const downloadEl = document.getElementById('tts-download-link');
                 const btnEl = document.getElementById('btn-generate-tts');
 
-                if (!inputEl || !voiceEl || !languageEl || !styleEl || !audioEl || !downloadEl || !btnEl) return;
+                const isDialogue = window._ttsMode === 'dialogue';
+                if (!inputEl || !styleEl || !audioEl || !downloadEl || !btnEl) return;
 
                 const transcript = inputEl.value.trim();
                 if (!transcript) {
@@ -3056,7 +3126,28 @@
                 const prompt = buildTtsPrompt(transcript, styleEl.value.trim());
                 btnEl.disabled = true;
                 btnEl.style.opacity = '0.7';
-                setTtsStatus(retryCount > 0 ? `Retrying TTS generation... (${retryCount + 1}/3)` : 'Generating audio with Gemini 3.1 Flash TTS...');
+                setTtsStatus(retryCount > 0 ? `Retrying TTS generation... (${retryCount + 1}/3)` : (isDialogue ? 'Generating dialogue audio (2 speakers)...' : 'Generating audio with Gemini 3.1 Flash TTS...'));
+
+                let speechConfig;
+                if (isDialogue) {
+                    const langD = document.getElementById('tts-language-select-d')?.value || 'th-TH';
+                    const v1 = document.getElementById('tts-voice-s1')?.value || 'Kore';
+                    const v2 = document.getElementById('tts-voice-s2')?.value || 'Puck';
+                    speechConfig = {
+                        languageCode: langD,
+                        multiSpeakerVoiceConfig: {
+                            speakerVoiceConfigs: [
+                                { speaker: 'Speaker 1', voiceConfig: { prebuiltVoiceConfig: { voiceName: v1 } } },
+                                { speaker: 'Speaker 2', voiceConfig: { prebuiltVoiceConfig: { voiceName: v2 } } }
+                            ]
+                        }
+                    };
+                } else {
+                    speechConfig = {
+                        languageCode: languageEl?.value || 'th-TH',
+                        voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceEl?.value || 'Kore' } }
+                    };
+                }
 
                 try {
                     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent?key=${encodeURIComponent(geminiKey)}`, {
@@ -3066,14 +3157,7 @@
                             contents: [{ parts: [{ text: prompt }] }],
                             generationConfig: {
                                 responseModalities: ['AUDIO'],
-                                speechConfig: {
-                                    languageCode: languageEl.value,
-                                    voiceConfig: {
-                                        prebuiltVoiceConfig: {
-                                            voiceName: voiceEl.value
-                                        }
-                                    }
-                                }
+                                speechConfig
                             }
                         })
                     });
@@ -3105,7 +3189,10 @@
                     downloadEl.style.display = 'inline-flex';
                     downloadEl.download = `gemini-tts-${Date.now()}.wav`;
                     if (typeof updateAIUsage === 'function') updateAIUsage('gemini-tts', data?.usageMetadata?.totalTokenCount || 0);
-                    setTtsStatus(`Audio ready. Voice: ${voiceEl.value} | Language: ${languageEl.value}`);
+                    const modeLabel = isDialogue
+                        ? `Dialogue | S1:${document.getElementById('tts-voice-s1')?.value} S2:${document.getElementById('tts-voice-s2')?.value}`
+                        : `Voice: ${voiceEl?.value} | Language: ${languageEl?.value}`;
+                    setTtsStatus(`Audio ready. ${modeLabel}`);
                     showToast('Gemini TTS audio ready');
                     audioEl.play().catch(() => {});
                 } catch (error) {
