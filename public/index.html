@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V90.46)</title>
-    <!-- V90.46: Bounty Stacking relocation + Manage Documents modal fix -->
+    <title>Internship Portfolio (V90.50)</title>
+    <!-- V90.50: LIFF bootstrap reliability fix for LINE in-app loading -->
     <!-- Release: 2026-04-16 12:00 UTC+7 -->
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -1044,6 +1044,10 @@
             <button id="btn-manual-login" onclick="liff.login()"
                 style="margin-top:20px; padding:10px 20px; border-radius:30px; border:none; background:#06c755; color:white; font-weight:bold; display:none;">
                 <i class="fa-brands fa-line"></i> Login with LINE
+            </button>
+            <button id="btn-force-start" onclick="bootstrapMain(true)"
+                style="margin-top:10px; padding:10px 20px; border-radius:30px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.08); color:white; font-weight:bold; display:none;">
+                Force Start
             </button>
         </div>
     </div>
@@ -5779,16 +5783,66 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             `).join('');
         }
 
-        // Wait for window load to ensure SDK is ready
+        let bootStarted = false;
+
+        function revealBootActions() {
+            const manualBtn = document.getElementById('btn-manual-login');
+            const forceBtn = document.getElementById('btn-force-start');
+            if (manualBtn) {
+                manualBtn.style.display = 'inline-block';
+                manualBtn.innerText = 'Login with LINE';
+                manualBtn.onclick = () => {
+                    if (window.liff && typeof liff.login === 'function') {
+                        liff.login();
+                    } else {
+                        window.location.reload();
+                    }
+                };
+            }
+            if (forceBtn) forceBtn.style.display = 'inline-block';
+        }
+
+        setTimeout(() => {
+            const status = document.getElementById('loading-status');
+            if (status && (status.innerText.includes('Starting...') || status.innerText.includes('Preparing'))) {
+                updateStatus("<span style='color:#ffc107;'>⚠ Initializing taking longer than usual...</span>");
+                revealBootActions();
+            }
+        }, 5000);
+
+        document.addEventListener('DOMContentLoaded', function () {
+            try { bootstrapMain(); } catch (e) {
+                console.error('DOMContentLoaded Bootstrap Error:', e);
+                updateStatus('❌ Boot Load Error: ' + e.message);
+                revealBootActions();
+            }
+        }, { once: true });
+
         window.addEventListener('load', function () {
-            console.log("Window Loaded. Checking LIFF...");
+            try { bootstrapMain(); } catch (e) {
+                console.error('Window Load Bootstrap Error:', e);
+                updateStatus('❌ Boot Load Error: ' + e.message);
+                revealBootActions();
+            }
+        }, { once: true });
+
+        function bootstrapMain(forceRetry = false) {
+            if (bootStarted && !forceRetry) return;
+            if (forceRetry) bootStarted = false;
+            bootStarted = true;
+            updateStatus('Preparing startup...');
+            console.log('Window Loaded. Checking LIFF...');
             if (window.liff) {
                 main();
             } else {
-                console.error("LIFF SDK not loaded from CDN");
-                alert("LIFF SDK Failed to Load. Please check your internet connection and refresh.");
+                console.error('LIFF SDK not loaded from CDN');
+                updateStatus("<span style='color:#ef233c;'>❌ SDK Failed to Load</span>");
+                revealBootActions();
+                setTimeout(() => {
+                    if (!window.liff) window.location.reload();
+                }, 15000);
             }
-        });
+        }
         // --- V80: Discussion Logic ---
         let activeDiscussionId = "";
         let discussionUnsubscribe = null;
