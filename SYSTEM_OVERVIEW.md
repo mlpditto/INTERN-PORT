@@ -1,10 +1,10 @@
-# MLP Internship Portfolio (V90.44) Overview
+# MLP Internship Portfolio (V90.51) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):**
 >
 > 1. แก้ไขโค้ดที่ `production` เสมอ ห้ามแก้ที่ `main`
-> 2. ทุกครั้งที่ Commit ต้องอัปเดตเวอร์ชัน (V90.44) ใน `admin.html` (Title & Badge)
+> 2. ทุกครั้งที่ Commit ต้องอัปเดตเวอร์ชัน (V90.51) ใน `admin.html` (Title & Badge)
 > 3. ใช้ **"Turbo Mode"** (Merge `production` -> `main`) ทุกครั้งเมื่อต้องการ Deploy (ตามกฎใน `VERSION_SYNC_POLICY.md`)
 
 ระบบเว็บแอปพลิเคชันสำหรับจัดการการฝึกงานและระบบ Gamification (สะสมคะแนน) เพื่อจูงใจและติดตามความก้าวหน้าของนักศึกษาฝึกงาน
