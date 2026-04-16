@@ -360,6 +360,90 @@
             color: #ffedd5 !important;
         }
 
+        body.onepiece-scope #ai-storyteller-content .op-story-shell {
+            background: linear-gradient(180deg, rgba(255, 251, 235, 0.96), rgba(255, 237, 213, 0.96));
+            border: 1px solid #fdba74;
+            border-radius: 18px;
+            padding: 16px;
+            box-shadow: 0 14px 26px rgba(124, 45, 18, 0.2);
+            color: #7c2d12;
+        }
+
+        body.onepiece-scope #ai-storyteller-content .op-story-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        body.onepiece-scope #ai-storyteller-content .op-story-title {
+            font-weight: 900;
+            color: #9a3412;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            font-size: 0.8em;
+        }
+
+        body.onepiece-scope #ai-storyteller-content .op-story-badge {
+            background: linear-gradient(135deg, #f59e0b, #ea580c);
+            color: #fff;
+            border-radius: 999px;
+            padding: 4px 12px;
+            font-size: 0.72em;
+            font-weight: 800;
+            box-shadow: 0 6px 12px rgba(194, 65, 12, 0.28);
+        }
+
+        body.onepiece-scope #ai-storyteller-content .op-story-body {
+            white-space: pre-line;
+            line-height: 1.8;
+            font-size: 1.03em;
+            color: #7c2d12;
+            background: rgba(255,255,255,0.68);
+            border: 1px dashed #fdba74;
+            border-radius: 14px;
+            padding: 14px;
+            max-height: 380px;
+            overflow-y: auto;
+        }
+
+        body.onepiece-scope #ai-storyteller-content .op-story-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        body.onepiece-scope #ai-storyteller-content .op-story-btn {
+            border: 1px solid #fdba74;
+            background: #fff7ed;
+            color: #9a3412;
+            border-radius: 999px;
+            padding: 7px 12px;
+            font-size: 0.78em;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        body.onepiece-scope #ai-storyteller-content .op-story-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 14px rgba(194, 65, 12, 0.18);
+        }
+
+        body.onepiece-scope #ai-storyteller-content .op-story-btn.primary {
+            background: linear-gradient(135deg, #f59e0b, #ea580c);
+            color: #fff;
+            border-color: #fb923c;
+        }
+
+        body.onepiece-scope #ai-storyteller-content .op-story-error {
+            color: #dc2626;
+            background: rgba(254, 226, 226, 0.9);
+            border-color: #fca5a5;
+        }
+
         body.onepiece-scope #aiStorytellerModal button[onclick="saveAIStorytellerInsights()"] {
             background: linear-gradient(135deg, #f59e0b, #ea580c) !important;
             color: #fff !important;
@@ -15544,6 +15628,75 @@ async function saveQuiz() {
             document.getElementById('laughtale-ai-model').value = val;
         };
 
+        window.copyAiStorytellerText = function() {
+            const bodyEl = document.querySelector('#ai-storyteller-content .op-story-body') || document.getElementById('ai-storyteller-content');
+            if (!bodyEl) return;
+            const text = (bodyEl.textContent || '').trim();
+            if (!text) return;
+            navigator.clipboard.writeText(text)
+                .then(() => showToast('Copied storyteller insight to clipboard', 'success'))
+                .catch(() => showToast('Could not copy text', 'warning'));
+        };
+
+        function renderStorytellerLoading(iconClass, message, badgeText) {
+            document.getElementById('ai-storyteller-content').innerHTML = `
+                <div class="op-story-shell">
+                    <div class="op-story-head">
+                        <div class="op-story-title">Story Engine Running</div>
+                        <div class="op-story-badge">${badgeText || 'LOADING'}</div>
+                    </div>
+                    <div class="op-story-body" style="text-align:center;">
+                        <i class="fa-solid ${iconClass} fa-spin" style="font-size:2.4em; margin-bottom:12px;"></i>
+                        <div style="font-style:italic; opacity:0.9;">${message}</div>
+                    </div>
+                    <div class="op-story-actions">
+                        <button class="op-story-btn" onclick="document.getElementById('aiStorytellerModal').style.display='none'">Close</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderStorytellerResult(title, modelName, text, mode) {
+            const rerun = mode === 'patterns' ? 'findLaughTalePatterns()' : 'analyzeLaughTaleReflections()';
+            const rerunLabel = mode === 'patterns' ? 'Re-run Patterns' : 'Re-run Analysis';
+            document.getElementById('ai-storyteller-content').innerHTML = `
+                <div class="op-story-shell">
+                    <div class="op-story-head">
+                        <div class="op-story-title">${title}</div>
+                        <div class="op-story-badge">${modelName}</div>
+                    </div>
+                    <div class="op-story-body">${text}</div>
+                    <div class="op-story-actions">
+                        <button class="op-story-btn primary" onclick="copyAiStorytellerText()">📋 Copy Result</button>
+                        <button class="op-story-btn" onclick="${rerun}">🔁 ${rerunLabel}</button>
+                        <button class="op-story-btn" onclick="saveAIStorytellerInsights()">💾 Save Insight</button>
+                        <button class="op-story-btn" onclick="document.getElementById('aiStorytellerModal').style.display='none'">Close</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderStorytellerError(title, modelName, errMessage, mode) {
+            const retry = mode === 'patterns' ? 'findLaughTalePatterns()' : 'analyzeLaughTaleReflections()';
+            document.getElementById('ai-storyteller-content').innerHTML = `
+                <div class="op-story-shell op-story-error">
+                    <div class="op-story-head">
+                        <div class="op-story-title">${title}</div>
+                        <div class="op-story-badge">${modelName}</div>
+                    </div>
+                    <div class="op-story-body" style="color:#991b1b; background:rgba(255,255,255,0.7);">
+                        <div style="font-weight:800; margin-bottom:8px;">⚠️ Unable to generate output right now.</div>
+                        <div>${errMessage || 'Unknown error'}</div>
+                        <div style="margin-top:10px; font-size:0.9em;">Tip: switch model or verify API credits/keys and try again.</div>
+                    </div>
+                    <div class="op-story-actions">
+                        <button class="op-story-btn primary" onclick="${retry}">Retry</button>
+                        <button class="op-story-btn" onclick="document.getElementById('aiStorytellerModal').style.display='none'">Close</button>
+                    </div>
+                </div>
+            `;
+        }
+
         window.analyzeLaughTaleReflections = async function() {
             const archived = reflectiveLogsCache.filter(l => {
                 const isReviewed = l.adminComment || (l.adminBonus !== undefined && l.adminBonus !== null);
@@ -15560,12 +15713,7 @@ async function saveQuiz() {
             console.log("LaughTale Analysis using model:", activeModel);
 
             document.getElementById('aiStorytellerModal').style.display = 'block';
-            document.getElementById('ai-storyteller-content').innerHTML = `
-                <div style="text-align:center; padding:50px;">
-                    <i class="fa-solid fa-book-open fa-spin" style="font-size:3em; margin-bottom:20px;"></i>
-                    <p style="font-style:italic; opacity:0.9;">Storyteller is reading voyage logs with ${activeModel}...</p>
-                </div>
-            `;
+            renderStorytellerLoading('fa-book-open', `Storyteller is reading voyage logs with ${activeModel}...`, 'ANALYZING');
 
             const stories = archived.map(log => ({
                 content: log.content || '',
@@ -15595,21 +15743,10 @@ ${i+1}. **${s.author}** (${s.date.toLocaleDateString('th-TH')})
 
             try {
                 const response = await callUniversalAI(activeModel, prompt);
-                document.getElementById('ai-storyteller-content').innerHTML = `
-                    <div style="white-space: pre-line; line-height:1.8; font-size:1.05em;">
-                        ${response.text}
-                    </div>
-                `;
+                renderStorytellerResult('Voyage Narrative Analysis', activeModel, response.text, 'analysis');
             } catch (error) {
                 console.error("LaughTale Analysis Error:", error);
-                document.getElementById('ai-storyteller-content').innerHTML = `
-                    <div style="text-align:center; padding:30px; color:#ff6b6b;">
-                        <i class="fa-solid fa-exclamation-triangle" style="font-size:2em; margin-bottom:15px;"></i>
-                        <p style="font-weight:bold;">เกิดข้อผิดพลาดในการวิเคราะห์:</p>
-                        <p style="font-size:0.85em; background:rgba(0,0,0,0.05); padding:10px; border-radius:8px; margin-top:10px;">${error.message || 'Unknown Error'}</p>
-                        <p style="margin-top:15px; font-size:0.9em;">คำแนะนำ: ลองเปลี่ยนรุ่น AI หรือตรวจสอบ API Key นะครับ</p>
-                    </div>
-                `;
+                renderStorytellerError('Narrative Analysis Failed', activeModel, error.message || 'Unknown Error', 'analysis');
             }
         };
 
@@ -15628,12 +15765,7 @@ ${i+1}. **${s.author}** (${s.date.toLocaleDateString('th-TH')})
             const activeModel = document.getElementById('laughtale-ai-model').value;
 
             document.getElementById('aiStorytellerModal').style.display = 'block';
-            document.getElementById('ai-storyteller-content').innerHTML = `
-                <div style="text-align:center; padding:50px;">
-                    <i class="fa-solid fa-sparkles fa-spin" style="font-size:3em; margin-bottom:20px;"></i>
-                    <p style="font-style:italic; opacity:0.9;">กำลังค้นหาเส้นใยที่เชื่อมโยงด้วย ${activeModel}...</p>
-                </div>
-            `;
+            renderStorytellerLoading('fa-sparkles', `Pattern engine is mapping hidden links with ${activeModel}...`, 'PATTERNS');
 
             const stories = archived.map(log => log.content || '').slice(0, 15);
 
@@ -15653,21 +15785,10 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
             try {
                 const response = await callUniversalAI(activeModel, prompt);
-                document.getElementById('ai-storyteller-content').innerHTML = `
-                    <div style="white-space: pre-line; line-height:1.8; font-size:1.05em;">
-                        ${response.text}
-                    </div>
-                `;
+                renderStorytellerResult('Hidden Pattern Constellation', activeModel, response.text, 'patterns');
             } catch (error) {
                 console.error("LaughTale Patterns Error:", error);
-                document.getElementById('ai-storyteller-content').innerHTML = `
-                    <div style="text-align:center; padding:30px; color:#ff6b6b;">
-                        <i class="fa-solid fa-exclamation-triangle" style="font-size:2em; margin-bottom:15px;"></i>
-                        <p style="font-weight:bold;">ยังไม่สามารถค้นหาแพทเทิร์นได้:</p>
-                        <p style="font-size:0.85em; background:rgba(0,0,0,0.05); padding:10px; border-radius:8px; margin-top:10px;">${error.message || 'Unknown Error'}</p>
-                        <p style="margin-top:15px; font-size:0.9em;">คำแนะนำ: ลองสลับไปใช้รุ่น Flash หรือตรวจสอบเครดิตใน API Key นะครับ</p>
-                    </div>
-                `;
+                renderStorytellerError('Pattern Discovery Failed', activeModel, error.message || 'Unknown Error', 'patterns');
             }
         };
 
