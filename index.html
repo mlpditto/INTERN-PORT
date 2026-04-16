@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Intern Progress Online (V90.51)</title>
-    <!-- V90.51: Grand Line LEAN+ONE PIECE UI refresh -->
+    <title>Intern Progress Online (V90.52)</title>
+    <!-- V90.52: Grand Line LEAN+ONE PIECE UI refresh + visibility diagnostics -->
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -22,6 +22,16 @@
             50% { transform: scale(1.02); }
             100% { transform: scale(1); }
         }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
         /* -----------------------
            1. Global Styles
            ----------------------- */
@@ -34,10 +44,21 @@
         }
 
         .container {
+            width: 100%;
             max-width: 600px;
             margin: 0 auto;
             position: relative;
             padding-bottom: 80px;
+        }
+
+        @media (min-width: 1024px) {
+            body {
+                padding: 20px 24px;
+            }
+
+            .container {
+                max-width: min(1400px, calc(100vw - 48px));
+            }
         }
 
         .hidden {
@@ -62,6 +83,12 @@
             gap: 8px;
             overflow-x: auto;
             padding-bottom: 4px;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .journey-route::-webkit-scrollbar {
+            display: none;
         }
 
         .journey-checkpoint {
@@ -247,6 +274,50 @@
             color: #9d174d;
         }
 
+        .grandline-tool-card {
+            border: 1px solid #e5e7eb;
+            background: #fff;
+            border-radius: 10px;
+            padding: 8px;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .grandline-tool-card.active {
+            border-color: #4361ee;
+            background: #eef2ff;
+            box-shadow: 0 4px 12px rgba(67, 97, 238, 0.2);
+        }
+
+        .gl-minimal-header {
+            padding: 9px 12px !important;
+        }
+
+        .gl-minimal-header h4 {
+            margin: 0 !important;
+            font-size: 0.93em !important;
+            line-height: 1.2;
+        }
+
+        .gl-minimal-header .gl-minimal-hide {
+            display: none !important;
+        }
+
+        .gl-minimal-header i.fa-chevron-down {
+            font-size: 0.78em !important;
+        }
+
+        @media (max-width: 768px) {
+            .gl-minimal-header {
+                padding: 10px 12px !important;
+            }
+
+            .gl-minimal-header h4 {
+                font-size: 0.9em !important;
+            }
+        }
+
         .profile-img {
             width: 90px;
             height: 90px;
@@ -272,6 +343,12 @@
             padding-bottom: 20px;
             scroll-snap-type: x mandatory;
             -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .sq-container::-webkit-scrollbar {
+            display: none;
         }
 
         .sq-col {
@@ -970,9 +1047,13 @@
                         <span class="sea-badge"><i class="fa-solid fa-flag"></i> New World</span>
                     </div>
                     <div class="voyage-reveal reveal-2" style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px;">
-                        <h4 style="margin:0; font-size:1em; color:#34495e;"><i class="fa-solid fa-route"></i> Grand Line Dashboard</h4>
-                        <span style="font-size:0.68em; color:#64748b; font-weight:700;">Journey Map</span>
+                        <button type="button" onclick="toggleGrandLineDashboard()" style="width:100%; border:none; background:transparent; padding:0; display:flex; justify-content:space-between; align-items:center; gap:8px; cursor:pointer;">
+                            <h4 style="margin:0; font-size:1em; color:#34495e;"><i class="fa-solid fa-route"></i> Grand Line Dashboard</h4>
+                            <span style="font-size:0.68em; color:#64748b; font-weight:700; display:flex; align-items:center; gap:8px;">Journey Map <i id="grandline-collapse-icon" class="fa-solid fa-chevron-down" style="transition:transform 0.25s ease; transform:rotate(180deg);"></i></span>
+                        </button>
                     </div>
+
+                    <div id="grandline-dashboard-content" style="display:block; overflow:hidden; max-height:5000px; opacity:1; transition:max-height 0.32s ease, opacity 0.24s ease;">
 
                     <div class="journey-route voyage-reveal reveal-3">
                         <button class="journey-checkpoint" id="cp-quiz" onclick="openJourneySection('section-assignments', 'toggleAssignmentList', 'quiz')">
@@ -983,11 +1064,6 @@
                         <button class="journey-checkpoint" id="cp-mission" onclick="openJourneySection('section-kanban', 'toggleKanban', 'mission')">
                             <div style="font-size:0.75em; font-weight:700;">Mission</div>
                             <small id="cp-sub-mission" style="color:#64748b;">In Progress</small>
-                        </button>
-                        <span class="journey-dotline"></span>
-                        <button class="journey-checkpoint" id="cp-podcast" onclick="openJourneySection('section-podcast', 'togglePodcastSection', 'podcast')">
-                            <div style="font-size:0.75em; font-weight:700;">Podcast</div>
-                            <small id="cp-sub-podcast" style="color:#64748b;">Ready</small>
                         </button>
                         <span class="journey-dotline"></span>
                         <button class="journey-checkpoint" id="cp-case" onclick="openJourneySection('section-cases', 'toggleCaseSection', 'case')">
@@ -1012,7 +1088,7 @@
                         </div>
                         <div style="background:#fff7ed; border-radius:10px; padding:8px;">
                             <div style="font-size:0.65em; color:#64748b; font-weight:700;">Crew Rank</div>
-                            <div id="bounty-rank" style="font-size:0.86em; font-weight:800; color:#9a3412;">Rookie</div>
+                            <div id="bounty-rank" style="font-size:0.86em; font-weight:800; color:#9a3412;">LV.1 Rookie Navigator</div>
                         </div>
                     </div>
 
@@ -1041,27 +1117,26 @@
                         </div>
                     </div>
 
-                    <div class="voyage-reveal reveal-5" style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;">
-                        <button onclick="openJourneySection('section-assignments', 'toggleAssignmentList', 'quiz')" style="border:1px solid #e5e7eb; background:#fff; border-radius:10px; padding:8px; text-align:left; cursor:pointer;">
+                    <div id="grandline-tool-cards-row" class="voyage-reveal reveal-5" style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;">
+                        <button id="gl-card-quiz" class="grandline-tool-card" onclick="openJourneySection('section-assignments', 'toggleAssignmentList', 'quiz')">
                             <div style="font-size:0.7em; font-weight:700;">Quiz Tool</div>
                             <span id="crew-status-quiz" class="status-pill status-ready">Ready</span>
                         </button>
-                        <button onclick="openJourneySection('section-kanban', 'toggleKanban', 'mission')" style="border:1px solid #e5e7eb; background:#fff; border-radius:10px; padding:8px; text-align:left; cursor:pointer;">
+                        <button id="gl-card-mission" class="grandline-tool-card" onclick="openJourneySection('section-kanban', 'toggleKanban', 'mission')">
                             <div style="font-size:0.7em; font-weight:700;">Mission Tool</div>
                             <span id="crew-status-mission" class="status-pill status-progress">In Progress</span>
                         </button>
-                        <button onclick="openJourneySection('section-podcast', 'togglePodcastSection', 'podcast')" style="border:1px solid #e5e7eb; background:#fff; border-radius:10px; padding:8px; text-align:left; cursor:pointer;">
-                            <div style="font-size:0.7em; font-weight:700;">Podcast Tool</div>
-                            <span id="crew-status-podcast" class="status-pill status-ready">Ready</span>
-                        </button>
-                        <button onclick="openJourneySection('section-cases', 'toggleCaseSection', 'case')" style="border:1px solid #e5e7eb; background:#fff; border-radius:10px; padding:8px; text-align:left; cursor:pointer;">
+                        <button id="gl-card-case" class="grandline-tool-card" onclick="openJourneySection('section-cases', 'toggleCaseSection', 'case')">
                             <div style="font-size:0.7em; font-weight:700;">Case Tool</div>
                             <span id="crew-status-case" class="status-pill status-waiting">Waiting Review</span>
                         </button>
-                        <button onclick="openJourneySection('section-general-work', 'toggleWorkSection', 'work')" style="grid-column:1/-1; border:1px solid #e5e7eb; background:#fff; border-radius:10px; padding:8px; text-align:left; cursor:pointer;">
+                        <button id="gl-card-work" class="grandline-tool-card" onclick="openJourneySection('section-general-work', 'toggleWorkSection', 'work')" style="grid-column:1/-1;">
                             <div style="font-size:0.7em; font-weight:700;">Work Tool</div>
                             <span id="crew-status-work" class="status-pill status-reward">Reward Available</span>
                         </button>
+                    </div>
+
+                    <div id="grandline-tool-sections-host" style="margin-top:12px;"></div>
                     </div>
                 </div>
             </div>
@@ -1070,7 +1145,7 @@
 
             <div id="section-assignments" style="margin-bottom: 20px;">
                 <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #8e44ad;">
-                    <div onclick="toggleAssignmentList()"
+                    <div class="gl-minimal-header" onclick="toggleAssignmentList()"
                         style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fdf2ff;">
                         <h4 style="margin: 0; font-size: 1.1em; color: #8e44ad; display: flex; align-items: center; gap: 8px;">
                             <i class="fa-solid fa-clipboard-list"></i> Quiz 퀴즈
@@ -1087,7 +1162,7 @@
 
             <div id="section-kanban" style="margin-bottom: 20px;">
                 <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #333;">
-                    <div onclick="toggleKanban()"
+                    <div class="gl-minimal-header" onclick="toggleKanban()"
                         style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #f8f9fa;">
                         <h4 style="margin: 0; font-size: 1.1em; color: #333;">
                             <i class="fa-solid fa-scroll"></i> Mission 미션
@@ -1097,7 +1172,7 @@
                         <div style="display:flex; align-items:center; gap:10px;">
                             <span id="kanban-badge" style="font-size:0.75em; background:#ef233c; color:white; padding:1px 8px; border-radius:10px; display:none; font-weight:bold; box-shadow: 0 2px 4px rgba(239, 35, 60, 0.3);">0</span>
                             <span id="rl-today-status" style="font-size:0.8em; color:#999;"></span>
-                            <span style="font-size:0.7em; color:#999; font-weight:bold; background:#eee; padding:2px 8px; border-radius:10px;">KANBAN</span>
+                            <span class="gl-minimal-hide" style="font-size:0.7em; color:#999; font-weight:bold; background:#eee; padding:2px 8px; border-radius:10px;">KANBAN</span>
                             <i id="kanban-icon" class="fa-solid fa-chevron-down" style="color: #666; transition: 0.3s; font-size: 0.9em;"></i>
                         </div>
                     </div>
@@ -1202,27 +1277,9 @@
                 </div>
             </div>
 
-            <div id="section-podcast" style="margin-bottom: 20px;">
-                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #e84393;">
-                    <div onclick="togglePodcastSection()"
-                        style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fff0f7;">
-                        <h4 style="margin: 0; font-size: 1.1em; color: #e84393;">
-                            🎙️ Podcast
-                            <span id="podcast-count-badge" style="font-size:0.7em; background:#e84393; color:white; padding:2px 8px; border-radius:10px; margin-left:8px; display:none;">0</span>
-                        </h4>
-                        <i id="podcast-section-icon" class="fa-solid fa-chevron-down" style="color: #e84393; transition: 0.3s; font-size: 0.9em; transform: rotate(180deg);"></i>
-                    </div>
-                    <div id="podcast-section-content" style="display: block; padding: 15px; border-top: 1px solid #fce4f3; background: #fff;">
-                        <div id="user-podcast-list">
-                            <div style="text-align:center; padding:30px; color:#aaa;">⏳ Loading...</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <div id="section-cases" style="margin-bottom: 25px;">
                 <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #4361ee;">
-                    <div onclick="toggleCaseSection()"
+                    <div class="gl-minimal-header" onclick="toggleCaseSection()"
                         style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #f0f4ff;">
                         <h4 style="margin: 0; font-size: 1.1em; color: #4361ee;"><i class="fa-solid fa-stethoscope"></i> Case 케이스</h4>
                         <i id="case-section-icon" class="fa-solid fa-chevron-down" style="color: #4361ee; transition: 0.3s; font-size: 0.9em;"></i>
@@ -1279,7 +1336,7 @@
 
             <div id="section-general-work">
                 <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #28a745;">
-                    <div onclick="toggleWorkSection()"
+                    <div class="gl-minimal-header" onclick="toggleWorkSection()"
                         style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #f8fff9;">
                         <h4 style="margin: 0; font-size: 1.1em; color: #28a745;"><i class="fa-solid fa-upload"></i> Work 워크</h4>
                         <i id="work-section-icon" class="fa-solid fa-chevron-down" style="color: #28a745; transition: 0.3s; font-size: 0.9em;"></i>
@@ -1304,7 +1361,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V90.51 (Grand Line LEAN+ONE PIECE Refresh)
+                V90.52 (Grand Line LEAN+ONE PIECE Refresh)
             </div>
         </div>
     </div>
@@ -1821,8 +1878,8 @@
                 }
             }
 
-            console.log("Main Execution Started (V90.51)");
-            updateStatus("System Starting (V90.51)...");
+            console.log("Main Execution Started (V90.52)");
+            updateStatus("System Starting (V90.52)...");
             try {
                 const urlParams = new URLSearchParams(window.location.search);
                 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -1865,6 +1922,8 @@
                     // Hide Loading
                     document.getElementById('loading-overlay').classList.add('hidden');
                     document.getElementById('main-app').classList.remove('hidden');
+                    mountGrandLineToolSections();
+                    toggleGrandLineDashboard(true);
                     updateGrandLineDashboard();
                     startGrandLineAutoRefresh();
                     triggerGrandLineReveal();
@@ -1940,6 +1999,8 @@
                 updateStatus("Finalizing User Environment...");
                 document.getElementById('loading-overlay').classList.add('hidden');
                 document.getElementById('main-app').classList.remove('hidden');
+                mountGrandLineToolSections();
+                toggleGrandLineDashboard(true);
                 updateGrandLineDashboard();
                 startGrandLineAutoRefresh();
                 triggerGrandLineReveal();
@@ -4546,6 +4607,9 @@
         }
 
         function openJourneySection(sectionId, toggleFunctionName, checkpointKey) {
+            mountGrandLineToolSections();
+            toggleGrandLineDashboard(true);
+
             const section = document.getElementById(sectionId);
             if (!section) return;
 
@@ -4553,11 +4617,11 @@
             let contentId = '';
             if (sectionId === 'section-assignments') contentId = 'assignments-content';
             else if (sectionId === 'section-kanban') contentId = 'kanban-content';
-            else if (sectionId === 'section-podcast') contentId = 'podcast-section-content';
             else if (sectionId === 'section-cases') contentId = 'case-section-content';
             else if (sectionId === 'section-general-work') contentId = 'work-section-content';
 
             if (typeof toggleFn === 'function' && contentId) {
+                closeOtherGrandLineSections(contentId);
                 const content = document.getElementById(contentId);
                 if (content && content.style.display === 'none') toggleFn();
             }
@@ -4566,18 +4630,106 @@
                 document.querySelectorAll('.journey-checkpoint').forEach(el => el.classList.remove('active'));
                 const cp = document.getElementById('cp-' + checkpointKey);
                 if (cp) cp.classList.add('active');
+                setActiveGrandLineToolCards(checkpointKey);
             }
 
             section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            syncGrandLineRedundancy();
             updateGrandLineDashboard();
         }
 
+        function mountGrandLineToolSections() {
+            const host = document.getElementById('grandline-tool-sections-host');
+            if (!host) return;
+
+            ['section-assignments', 'section-kanban', 'section-cases', 'section-general-work'].forEach(sectionId => {
+                const section = document.getElementById(sectionId);
+                if (section && section.parentElement !== host) {
+                    host.appendChild(section);
+                }
+            });
+        }
+
+        function toggleGrandLineDashboard(forceOpen = false) {
+            const content = document.getElementById('grandline-dashboard-content');
+            const icon = document.getElementById('grandline-collapse-icon');
+            if (!content) return;
+
+            const currentlyOpen = content.style.maxHeight !== '0px';
+            const shouldOpen = forceOpen === true ? true : !currentlyOpen;
+
+            content.style.pointerEvents = shouldOpen ? 'auto' : 'none';
+            content.style.opacity = shouldOpen ? '1' : '0';
+            content.style.maxHeight = shouldOpen ? '5000px' : '0px';
+
+            if (icon) {
+                icon.style.transform = shouldOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+            }
+        }
+
+        function closeOtherGrandLineSections(activeContentId) {
+            const sectionMap = [
+                ['assignments-content', 'assign-list-icon'],
+                ['kanban-content', 'kanban-icon'],
+                ['case-section-content', 'case-section-icon'],
+                ['work-section-content', 'work-section-icon']
+            ];
+
+            sectionMap.forEach(([contentId, iconId]) => {
+                if (contentId === activeContentId) return;
+                const content = document.getElementById(contentId);
+                if (content && content.style.display !== 'none') {
+                    content.style.display = 'none';
+                    const icon = document.getElementById(iconId);
+                    if (icon) icon.style.transform = 'rotate(0deg)';
+                }
+            });
+        }
+
+        function setActiveGrandLineToolCards(activeKey) {
+            const cardMap = {
+                quiz: 'gl-card-quiz',
+                mission: 'gl-card-mission',
+                case: 'gl-card-case',
+                work: 'gl-card-work'
+            };
+
+            Object.values(cardMap).forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.remove('active');
+            });
+
+            const activeId = cardMap[activeKey];
+            if (activeId) {
+                const activeEl = document.getElementById(activeId);
+                if (activeEl) activeEl.classList.add('active');
+            }
+        }
+
+        function syncGrandLineRedundancy() {
+            const cardsRow = document.getElementById('grandline-tool-cards-row');
+            if (!cardsRow) return;
+
+            const openContents = ['assignments-content', 'kanban-content', 'case-section-content', 'work-section-content'];
+            const hasOpenSection = openContents.some(id => {
+                const el = document.getElementById(id);
+                return el && el.style.display === 'block';
+            });
+
+            cardsRow.style.display = hasOpenSection ? 'none' : 'grid';
+        }
+
         function getCrewRankByScore(score) {
-            if (score >= 500) return 'Pirate King';
-            if (score >= 300) return 'Captain';
-            if (score >= 150) return 'Navigator';
-            if (score >= 50) return 'Cadet';
-            return 'Rookie';
+            if (score >= 90) return 'LV.10 Captain';
+            if (score >= 80) return 'LV.9 Vice Captain';
+            if (score >= 70) return 'LV.8 Helmsman';
+            if (score >= 60) return 'LV.7 Musician';
+            if (score >= 50) return 'LV.6 Leading Shipwright';
+            if (score >= 40) return 'LV.5 Senior Archaeologist';
+            if (score >= 30) return 'LV.4 Experienced Doctor';
+            if (score >= 20) return 'LV.3 Cook';
+            if (score >= 10) return 'LV.2 Probationary Sniper';
+            return 'LV.1 Rookie Navigator';
         }
 
         function setCrewStatus(key, text, tone) {
@@ -4602,7 +4754,6 @@
 
             const quizCount = parseInt((document.getElementById('assign-count-badge') || {}).innerText || '0', 10) || 0;
             const missionCount = parseInt((document.getElementById('kanban-badge') || {}).innerText || '0', 10) || 0;
-            const podcastCount = parseInt((document.getElementById('podcast-count-badge') || {}).innerText || '0', 10) || 0;
 
             const backlogCount = parseInt((document.getElementById('cnt-Backlog') || {}).innerText || '0', 10) || 0;
             const doingCount = parseInt((document.getElementById('cnt-Doing') || {}).innerText || '0', 10) || 0;
@@ -4615,7 +4766,6 @@
 
             const quizOpen = (document.getElementById('assignments-content') || {}).style?.display === 'block';
             const missionOpen = (document.getElementById('kanban-content') || {}).style?.display === 'block';
-            const podcastOpen = (document.getElementById('podcast-section-content') || {}).style?.display === 'block';
             const caseOpen = (document.getElementById('case-section-content') || {}).style?.display === 'block';
             const workOpen = (document.getElementById('work-section-content') || {}).style?.display === 'block';
 
@@ -4636,18 +4786,15 @@
 
             const cpQuiz = document.getElementById('cp-sub-quiz');
             const cpMission = document.getElementById('cp-sub-mission');
-            const cpPodcast = document.getElementById('cp-sub-podcast');
             const cpCase = document.getElementById('cp-sub-case');
             const cpWork = document.getElementById('cp-sub-work');
             if (cpQuiz) cpQuiz.textContent = quizCount > 0 ? `${quizCount} missions` : 'Ready';
             if (cpMission) cpMission.textContent = missionCount > 0 ? `${missionCount} active` : 'In Progress';
-            if (cpPodcast) cpPodcast.textContent = podcastCount > 0 ? `${podcastCount} episodes` : 'Ready';
             if (cpCase) cpCase.textContent = caseOpen ? 'In Progress' : 'Waiting Review';
             if (cpWork) cpWork.textContent = score >= 30 ? 'Reward Available' : 'Ready';
 
             setCrewStatus('quiz', quizOpen ? 'In Progress' : (quizCount > 0 ? 'Ready' : 'Waiting Review'), quizOpen ? 'progress' : (quizCount > 0 ? 'ready' : 'waiting'));
             setCrewStatus('mission', missionOpen ? 'In Progress' : (missionCount > 0 ? 'Ready' : 'Waiting Review'), missionOpen ? 'progress' : (missionCount > 0 ? 'ready' : 'waiting'));
-            setCrewStatus('podcast', podcastOpen ? 'In Progress' : (podcastCount > 0 ? 'Reward Available' : 'Ready'), podcastOpen ? 'progress' : (podcastCount > 0 ? 'reward' : 'ready'));
             setCrewStatus('case', caseOpen ? 'In Progress' : 'Waiting Review', caseOpen ? 'progress' : 'waiting');
             setCrewStatus('work', workOpen ? 'In Progress' : (score >= 30 ? 'Reward Available' : 'Ready'), workOpen ? 'progress' : (score >= 30 ? 'reward' : 'ready'));
         }
@@ -4670,13 +4817,17 @@
             const content = document.getElementById('assignments-content');
             const icon = document.getElementById('assign-list-icon');
             if (content.style.display === 'none') {
+                closeOtherGrandLineSections('assignments-content');
                 content.style.display = 'block';
                 icon.style.transform = 'rotate(180deg)';
+                setActiveGrandLineToolCards('quiz');
                 renderAssignments();
             } else {
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
+                setActiveGrandLineToolCards('');
             }
+            syncGrandLineRedundancy();
             updateGrandLineDashboard();
         }
 
@@ -4684,13 +4835,17 @@
             const content = document.getElementById('kanban-content');
             const icon = document.getElementById('kanban-icon');
             if (content.style.display === 'none') {
+                closeOtherGrandLineSections('kanban-content');
                 content.style.display = 'block';
                 icon.style.transform = 'rotate(180deg)';
+                setActiveGrandLineToolCards('mission');
                 loadSideQuests();
             } else {
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
+                setActiveGrandLineToolCards('');
             }
+            syncGrandLineRedundancy();
             updateGrandLineDashboard();
         }
 
@@ -4698,14 +4853,18 @@
             const content = document.getElementById('case-section-content');
             const icon = document.getElementById('case-section-icon');
             if (content.style.display === 'none') {
+                closeOtherGrandLineSections('case-section-content');
                 content.style.display = 'block';
                 icon.style.transform = 'rotate(180deg)';
+                setActiveGrandLineToolCards('case');
                 renderCases();
                 setTimeout(() => document.getElementById('c-id').focus(), 100);
             } else {
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
+                setActiveGrandLineToolCards('');
             }
+            syncGrandLineRedundancy();
             updateGrandLineDashboard();
         }
 
@@ -4713,13 +4872,17 @@
             const content = document.getElementById('work-section-content');
             const icon = document.getElementById('work-section-icon');
             if (content.style.display === 'none') {
+                closeOtherGrandLineSections('work-section-content');
                 content.style.display = 'block';
                 icon.style.transform = 'rotate(180deg)';
+                setActiveGrandLineToolCards('work');
                 renderHistory();
             } else {
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
+                setActiveGrandLineToolCards('');
             }
+            syncGrandLineRedundancy();
             updateGrandLineDashboard();
         }
 
@@ -5303,59 +5466,6 @@
                 if (btn) { btn.disabled = false; btn.innerText = 'ส่งคำตอบ (Submit)'; }
             }
         }
-
-        // ===================================================================
-        // 🎙️ PODCAST FEED — User View (V90.38)
-        // ===================================================================
-        let podcastLoaded = false;
-        function ensurePodcastLoaded() {
-            if (!podcastLoaded) {
-                podcastLoaded = true;
-                loadUserPodcasts();
-            }
-        }
-        function togglePodcastSection() {
-            const content = document.getElementById('podcast-section-content');
-            const icon = document.getElementById('podcast-section-icon');
-            const isHidden = content.style.display === 'none';
-            content.style.display = isHidden ? 'block' : 'none';
-            icon.style.transform = isHidden ? 'rotate(180deg)' : '';
-            if (isHidden) ensurePodcastLoaded();
-            updateGrandLineDashboard();
-        }
-
-        function loadUserPodcasts() {
-            const el = document.getElementById('user-podcast-list');
-            db.collection('podcasts').orderBy('createdAt', 'desc').limit(30).onSnapshot(snap => {
-                const badge = document.getElementById('podcast-count-badge');
-                if (snap.empty) {
-                    el.innerHTML = '<div style="text-align:center;padding:30px;color:#aaa;">🎧 ยังไม่มี Podcast ครับ</div>';
-                    badge.style.display = 'none';
-                    updateGrandLineDashboard();
-                    return;
-                }
-                badge.style.display = 'inline';
-                badge.textContent = snap.size;
-                updateGrandLineDashboard();
-                el.innerHTML = snap.docs.map(doc => {
-                    const p = doc.data();
-                    const date = p.createdAt?.toDate().toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' }) || '';
-                    const dur = p.durationSec ? `${Math.floor(p.durationSec/60)}:${String(p.durationSec%60).padStart(2,'0')}` : '';
-                    return `
-                    <div style="padding:12px; border-radius:12px; background:#fff0f7; margin-bottom:10px; border:1px solid #fce4f3;">
-                        <div style="font-weight:700; color:#c0392b; margin-bottom:3px;">🎙️ ${p.title}</div>
-                        ${p.description ? `<div style="font-size:0.85em; color:#888; margin-bottom:8px;">${p.description}</div>` : ''}
-                        <audio src="${p.audioUrl}" controls style="width:100%; height:38px; margin-bottom:6px;"></audio>
-                        <div style="font-size:0.75em; color:#ccc; display:flex; gap:12px;">
-                            ${date ? `<span>📅 ${date}</span>` : ''}
-                            ${dur ? `<span>⏱️ ${dur}</span>` : ''}
-                        </div>
-                    </div>`;
-                }).join('');
-            });
-        }
-        ensurePodcastLoaded();
-        // ===================================================================
 
         // --- Side Quests & Kanban ---
         let activeSqTab = 'Backlog';

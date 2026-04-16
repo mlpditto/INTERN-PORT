@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MEDLIFE+ Admin V90.51 (Turbo)</title>
-    <!-- V90.51: Version sync with latest LIFF UI release -->
+    <title>MEDLIFE+ Admin V90.52 (Turbo)</title>
+    <!-- V90.52: Version sync with LIFF/UI diagnostic release -->
     <!-- Release: 2026-04-16 12:00 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1962,7 +1962,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; background:linear-gradient(135deg, #4361ee, #8e44ad); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.4em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         🛸 Intern Admin Portal
-                        <span style="font-size:0.45em; background:linear-gradient(135deg, rgba(67, 97, 238, 0.8), rgba(142, 68, 173, 0.8)); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(67,97,238,0.3);">V90.51</span>
+                        <span style="font-size:0.45em; background:linear-gradient(135deg, rgba(67, 97, 238, 0.8), rgba(142, 68, 173, 0.8)); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(67,97,238,0.3);">V90.52</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -1981,9 +1981,6 @@
                 <div style="width:1px; height:24px; background:rgba(0,0,0,0.1); margin:0 4px;"></div>
                 <button class="btn-sm" onclick="openLiffPreview()" title="UI Preview" style="background:#0284c7; color:white; border:none; border-radius:12px; padding:6px 16px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
                     📱 <span class="hide-mobile">UI</span>
-                </button>
-                <button class="btn-sm" onclick="openShareModal()" title="Share Link" style="background:#4361ee; color:white; border:none; border-radius:12px; padding:6px 16px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-                    🔗 <span class="hide-mobile">Share</span>
                 </button>
                 <button class="btn-sm" onclick="console.log('AI button clicked'); setTimeout(() => { if (document.getElementById('aiKeysModal')) { openAIKeysModal(); } else { alert('AI Settings Modal not loaded yet. Please refresh the page.'); } }, 100);" title="AI Engine Settings" style="background:linear-gradient(135deg, #8e44ad, #5b21b6); color:white; border:none; border-radius:12px; padding:6px 16px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s; box-shadow:0 4px 10px rgba(142,68,173,0.3);" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
                     🤖 <span class="hide-mobile">AI Config</span>
@@ -4333,6 +4330,7 @@
         <div id="shareModal" class="modal" style="z-index:3000;">
             <div class="modal-content" style="max-width:320px; text-align:center; padding:30px; border-radius:30px; box-shadow:0 25px 50px rgba(0,0,0,0.3);">
                 <h3 style="font-weight:900; color:var(--primary); margin-top:0; border-bottom:1px solid #f1f5f9; padding-bottom:15px; margin-bottom:20px;">🔗 Share Center</h3>
+                <div id="share-modal-group-label" style="margin-top:-10px; margin-bottom:14px; font-size:0.78em; color:#64748b; font-weight:700;">Subgroup: All</div>
                 <button class="magic-btn" style="width:100%; margin-bottom:12px; padding:12px; font-weight:900; border-radius:15px; background:linear-gradient(135deg, #4361ee, #3a0ca3);" onclick="copyLB(true)">📋 Copy: Names</button>
                 <button class="magic-btn" style="width:100%; background:#64748b; padding:12px; font-weight:900; border-radius:15px;" onclick="copyLB(false)">🕵️ Copy: Anonymous</button>
                 <button class="btn-sm" style="margin-top:15px; background:none; border:none; color:#94a3b8; font-weight:bold; cursor:pointer;" onclick="document.getElementById('shareModal').style.display='none'">Cancel</button>
@@ -10893,6 +10891,118 @@ async function saveQuiz() {
             }
         }
 
+        function toSafeDate(ts) {
+            if (!ts) return null;
+            if (typeof ts.toDate === 'function') return ts.toDate();
+            if (ts instanceof Date) return ts;
+            if (ts.seconds) return new Date(ts.seconds * 1000);
+            const parsed = new Date(ts);
+            return Number.isNaN(parsed.getTime()) ? null : parsed;
+        }
+
+        function resolveDiagnosticUser(userRef) {
+            if (!userRef) return null;
+            const key = String(userRef).trim().toLowerCase();
+            return usersData.find(u => u.id === userRef)
+                || usersData.find(u => (u.displayName || '').toLowerCase() === key)
+                || usersData.find(u => (u.displayName || '').toLowerCase().includes(key))
+                || usersData.find(u => (u.nickName || '').toLowerCase() === key);
+        }
+
+        function buildLatestAttemptMapForUser(userId) {
+            const map = {};
+            const list = (quizAttemptsAllCache || []).filter(a => a.userId === userId && a.quizId);
+            list.forEach(att => {
+                if (!map[att.quizId]) map[att.quizId] = att;
+            });
+            return map;
+        }
+
+        async function diagnoseUserQuizVisibility(userRef, options = {}) {
+            const opts = {
+                onlyAdminActive: false,
+                titleIncludes: '',
+                ...options
+            };
+
+            const user = resolveDiagnosticUser(userRef);
+            if (!user) {
+                console.warn('[Diagnostic] User not found. Provide userId/displayName/nickName.');
+                return [];
+            }
+
+            if (!quizzesData || quizzesData.length === 0) {
+                console.warn('[Diagnostic] quizzesData is empty. Wait for Firestore onSnapshot to finish.');
+                return [];
+            }
+
+            const myGroup = user.group || 'Public';
+            const userId = user.id;
+            const now = new Date();
+            const attemptMap = buildLatestAttemptMapForUser(userId);
+            const gs = groupSettings[myGroup] || { showAssignments: true };
+            const assignmentVisibleByGroupSetting = gs.showAssignments !== false;
+
+            const rows = quizzesData
+                .filter(q => {
+                    if (!opts.titleIncludes) return true;
+                    const title = (q.title || q.shortTitle || '').toLowerCase();
+                    return title.includes(String(opts.titleIncludes).toLowerCase());
+                })
+                .map(q => {
+                    const attempt = attemptMap[q.id] || null;
+                    const start = toSafeDate(q.startTime);
+                    const dead = toSafeDate(q.deadline);
+                    const target = q.targetGroup || 'Public';
+                    const status = attempt ? (attempt.status || 'none') : 'none';
+                    const score = attempt ? (attempt.score || 0) : 0;
+                    const isExpired = !!(dead && now > dead);
+                    const hasStarted = !start || now >= start;
+                    const isActive = q.isActive !== false;
+                    const isAdminActive = !!(q.isActive && (!dead || now <= dead));
+                    const reasons = [];
+
+                    if (!assignmentVisibleByGroupSetting) reasons.push('groupSettings.showAssignments=false');
+                    if (target !== 'Public' && target !== myGroup) reasons.push('targetGroup mismatch');
+                    if (q.isHomework && Array.isArray(q.assignedUsers) && q.assignedUsers.length > 0 && !q.assignedUsers.includes(userId)) {
+                        reasons.push('homework not assigned to user');
+                    }
+                    if (!hasStarted) reasons.push('startTime not reached');
+                    if (!isActive) reasons.push('isActive=false');
+                    if (isExpired && status === 'none') reasons.push('expired and not started');
+                    if ((status === 'approved' || status === 'pending') && score > 0) {
+                        reasons.push('hidden from Assignments because result exists');
+                    }
+
+                    return {
+                        quizId: q.id,
+                        title: q.title || q.shortTitle || '(untitled)',
+                        userId,
+                        displayName: user.displayName || '',
+                        userGroup: myGroup,
+                        targetGroup: target,
+                        isHomework: !!q.isHomework,
+                        assignedUsersCount: Array.isArray(q.assignedUsers) ? q.assignedUsers.length : 0,
+                        isActive,
+                        adminActive: isAdminActive,
+                        startTime: start ? start.toLocaleString() : '-',
+                        deadline: dead ? dead.toLocaleString() : '-',
+                        attemptStatus: status,
+                        attemptScore: score,
+                        visibleInUserAssignments: reasons.length === 0,
+                        blockedBy: reasons.join(' | ') || '-'
+                    };
+                })
+                .filter(r => (opts.onlyAdminActive ? r.adminActive : true))
+                .sort((a, b) => a.title.localeCompare(b.title));
+
+            const visibleCount = rows.filter(r => r.visibleInUserAssignments).length;
+            const blockedCount = rows.length - visibleCount;
+            console.log(`[Diagnostic] User="${user.displayName || userId}" (${userId}), Group="${myGroup}", Total=${rows.length}, Visible=${visibleCount}, Blocked=${blockedCount}`);
+            console.table(rows);
+            return rows;
+        }
+
         // Export to Global window for HTML onclick (V88.49)
         window.openQuizModal = openQuizModal;
         window.showPollResults = showPollResults;
@@ -10906,6 +11016,8 @@ async function saveQuiz() {
         window.toggleTemplateStatus = toggleTemplateStatus;
         window.deleteQuiz = deleteQuiz;
         window.openHomeworkAssignModal = openHomeworkAssignModal;
+        window.diagnoseUserQuizVisibility = diagnoseUserQuizVisibility;
+        window.diagnoseQuizVisibilityForUser = diagnoseUserQuizVisibility;
 
         // 🔥 V78.2: Quick Homework Assignment Modal
         let hwModalQuizId = null;
@@ -12215,6 +12327,7 @@ async function saveQuiz() {
                 const isActive = g === activeUserGroup;
                 const icon = g === 'All' ? 'fa-users' : getGroupIcon(g);
                 const color = g === 'All' ? '#333' : getGroupColor(g);
+                const safeGroup = String(g).replace(/'/g, "\\'");
                 
                 let count = 0;
                 if (g === 'All') count = allUsersAndPre.length;
@@ -12224,12 +12337,17 @@ async function saveQuiz() {
                     count = allUsersAndPre.filter(u => (u.group || 'Public') === g).length;
                 }
 
-                return `<button onclick="setUserGroupFilter('${g}')" style="
-                    padding:6px 16px; border-radius:20px; border:2px solid ${isActive ? color : '#ddd'};
-                    background:${isActive ? color : '#fff'}; color:${isActive ? '#fff' : color};
-                    font-size:0.82em; font-weight:bold; cursor:pointer; white-space:nowrap;
-                    display:flex; align-items:center; gap:5px; transition:all 0.2s;
-                "><i class="fa-solid ${icon}"></i> ${g} <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${count}</span></button>`;
+                return `<div style="display:flex; align-items:center; gap:4px;">
+                    <button onclick="setUserGroupFilter('${safeGroup}')" style="
+                        padding:6px 16px; border-radius:20px; border:2px solid ${isActive ? color : '#ddd'};
+                        background:${isActive ? color : '#fff'}; color:${isActive ? '#fff' : color};
+                        font-size:0.82em; font-weight:bold; cursor:pointer; white-space:nowrap;
+                        display:flex; align-items:center; gap:5px; transition:all 0.2s;
+                    "><i class="fa-solid ${icon}"></i> ${g} <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${count}</span></button>
+                    <button onclick="event.stopPropagation(); openShareModalForGroup('${safeGroup}')" title="Share ${g} ranking" style="padding:5px 8px; border-radius:999px; border:1px solid ${isActive ? color : '#dbe3ef'}; background:${isActive ? 'rgba(255,255,255,0.2)' : '#f8fafc'}; color:${isActive ? '#fff' : color}; font-size:0.72em; font-weight:900; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:3px; transition:all 0.2s;">
+                        <i class="fa-solid fa-share-nodes"></i>
+                    </button>
+                </div>`;
             }).join('');
         }
 
@@ -14800,7 +14918,18 @@ async function saveQuiz() {
                 renderMergeTargetList(""); // Restore UI
             }
         }
-        function openShareModal() { document.getElementById('shareModal').style.display = 'block'; }
+        function openShareModal(group = null) {
+            if (group) {
+                activeUserGroup = group;
+                renderUserGroupTabs();
+                renderTable('users');
+                renderLeaderboard();
+            }
+            const groupLabel = document.getElementById('share-modal-group-label');
+            if (groupLabel) groupLabel.textContent = `Subgroup: ${activeUserGroup}`;
+            document.getElementById('shareModal').style.display = 'block';
+        }
+        function openShareModalForGroup(group) { openShareModal(group); }
         async function copyLB(showName) {
             document.getElementById('shareModal').style.display = 'none';
             if (!usersData.length) return alert("No Data");
@@ -16777,7 +16906,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
         window.AI_CORE_READY = true;
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V90.51 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V90.52 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
 
         // --- V90.36: Quiz Feedback Panel ---
         let _qfpCurrentId = null;
