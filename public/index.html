@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V90.52)</title>
-    <!-- V90.52: Grand Line LEAN+ONE PIECE UI refresh + visibility diagnostics -->
+    <title>Internship Portfolio (V90.53)</title>
+    <!-- V90.53: Case submission permission hotfix + auth bootstrap -->
     <!-- Release: 2026-04-16 12:00 UTC+7 -->
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -1127,7 +1127,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V90.52 (Grand Line LEAN+ONE PIECE Refresh)
+                V90.53 (Grand Line LEAN+ONE PIECE Refresh)
             </div>
         </div>
     </div>
@@ -1591,6 +1591,19 @@
             return groupIconMap[key] || groupIconMap[key2] || groupIconMap[group] || 'fa-tag';
         }
 
+        async function ensureFirebaseAuth() {
+            if (!firebase || !firebase.auth) return null;
+            try {
+                const auth = firebase.auth();
+                if (auth.currentUser) return auth.currentUser;
+                const cred = await auth.signInAnonymously();
+                return cred.user || null;
+            } catch (err) {
+                console.warn("Firebase anonymous auth failed:", err);
+                return null;
+            }
+        }
+
         async function main() {
             try {
                 const urlParams = new URLSearchParams(window.location.search);
@@ -1598,6 +1611,7 @@
                 isPreview = urlParams.get('mode') === 'preview' || isLocal;
 
                 if (isPreview) {
+                    await ensureFirebaseAuth();
                     console.log("Entering Preview Mode...");
                     const forcedUserId = urlParams.get('userId');
 
@@ -1665,6 +1679,7 @@
                 }
 
                 updateStatus("Checking LIFF SDK...");
+                await ensureFirebaseAuth();
                 // Ensure liff is available
                 if (!window.liff) throw new Error("LIFF SDK not found on window");
 
@@ -5906,6 +5921,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             if (btn) { btn.disabled = true; btn.innerText = "กำลังบันทึก..."; }
 
             try {
+                await ensureFirebaseAuth();
                 await db.collection("cases").add({
                     userId,
                     displayName: userProfile.displayName,
@@ -5933,6 +5949,32 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 document.getElementById('c-note').value = "";
                 loadMyCases();
             } catch (e) {
+                if (e && e.code === 'permission-denied') {
+                    try {
+                        await ensureFirebaseAuth();
+                        await db.collection("cases").add({
+                            userId,
+                            displayName: userProfile.displayName,
+                            pictureUrl: userProfile.pictureUrl || "",
+                            caseId,
+                            customer,
+                            disease,
+                            note,
+                            status: "pending",
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        alert("บันทึกข้อมูลเคสเรียบร้อยแล้ว");
+                        document.getElementById('c-id').value = "";
+                        document.getElementById('c-customer').value = "";
+                        document.getElementById('c-disease').value = "";
+                        document.getElementById('c-note').value = "";
+                        loadMyCases();
+                        return;
+                    } catch (retryErr) {
+                        alert("Error: Missing or insufficient permissions. กรุณาติดต่อ Admin เพื่อตรวจสอบ Firebase Auth (Anonymous) และ Firestore Rules");
+                        return;
+                    }
+                }
                 alert("Error: " + e.message);
             } finally {
                 if (btn) { btn.disabled = false; btn.innerText = "🚀 ยืนยันส่งเคส"; }
