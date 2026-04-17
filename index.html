@@ -1123,6 +1123,10 @@
                         style="width: 32px; height: 32px; border-radius: 50%; padding: 0; background: #eef2ff; color: #4361ee; border: 1px solid #dbeafe; display: flex; align-items: center; justify-content: center; min-height: auto;">
                         <i class="fa-solid fa-ranking-star"></i>
                     </button>
+                    <button class="btn-sm" onclick="openEnrollmentCodeMatcher()" title="Match with Enrollment Key"
+                        style="width: 32px; height: 32px; border-radius: 50%; padding: 0; background: #f5f3ff; color: #6f42c1; border: 1px solid #ddd6fe; display: flex; align-items: center; justify-content: center; min-height: auto;">
+                        <i class="fa-solid fa-key"></i>
+                    </button>
                     <button class="btn-sm" onclick="openPersonalInfoModal()"
                         style="width: 32px; height: 32px; border-radius: 50%; padding: 0; background: #fff7ed; color: #e67e22; border: 1px solid #ffedd5; display: flex; align-items: center; justify-content: center; min-height: auto;">
                         <i class="fa-solid fa-user-pen"></i>
@@ -1753,8 +1757,8 @@
             
             <!-- View 1: Initial Entry (Code) -->
             <div id="enroll-initial-view">
-                <h3 style="margin-bottom:8px; color:#6f42c1;"><i class="fa-solid fa-id-card"></i> ลงทะเบียนเข้าร่วม</h3>
-                <p style="font-size:0.87em; color:#666; margin-top:0; line-height:1.4;">ยินดีต้อนรับ! กรุณากรอกรหัสลงทะเบียนที่คุณได้รับจากผู้ดูแลระบบ</p>
+                <h3 id="enroll-title" style="margin-bottom:8px; color:#6f42c1;"><i class="fa-solid fa-id-card"></i> ลงทะเบียนเข้าร่วม</h3>
+                <p id="enroll-subtitle" style="font-size:0.87em; color:#666; margin-top:0; line-height:1.4;">ยินดีต้อนรับ! กรุณากรอกรหัสลงทะเบียนที่คุณได้รับจากผู้ดูแลระบบ</p>
                 
                 <div style="margin: 20px 0;">
                     <input type="text" id="enroll-code-input" placeholder="รหัส 6 หลัก" maxlength="6"
@@ -1769,7 +1773,7 @@
                     <i class="fa-solid fa-unlock-keyhole"></i> ตรวจสอบรหัส
                 </button>
                 
-                <div style="margin-top:25px; border-top:1px solid #eee; padding-top:20px;">
+                <div id="enroll-request-cta" style="margin-top:25px; border-top:1px solid #eee; padding-top:20px;">
                     <p style="font-size:0.82em; color:#999; margin-bottom:10px;">หากคุณยังไม่มีรหัสลงทะเบียน</p>
                     <button class="btn-sm" onclick="showRequestView()" 
                         style="background:white; color:#6f42c1; border:1px solid #6f42c1; width:100%; font-weight:600; padding:12px; border-radius:10px; cursor:pointer; transition: 0.2s;">
@@ -2462,14 +2466,38 @@
         }
 
         // 🔥 V79.6 & V84.3: Enrollment Code & Request System
-        function showEnrollmentModal() {
+        function showEnrollmentModal(rematchMode = false) {
+            window.enrollmentRematchMode = rematchMode === true;
             document.getElementById('enrollModal').style.display = 'flex';
             document.getElementById('enroll-code-input').value = '';
             document.getElementById('enroll-status').innerHTML = '';
             showInitialView();
+
+            const titleEl = document.getElementById('enroll-title');
+            const subtitleEl = document.getElementById('enroll-subtitle');
+            const requestCtaEl = document.getElementById('enroll-request-cta');
+            if (titleEl) {
+                titleEl.innerHTML = window.enrollmentRematchMode
+                    ? '<i class="fa-solid fa-key"></i> Match with Enrollment Key'
+                    : '<i class="fa-solid fa-id-card"></i> ลงทะเบียนเข้าร่วม';
+            }
+            if (subtitleEl) {
+                subtitleEl.innerText = window.enrollmentRematchMode
+                    ? 'ผูกโปรไฟล์ปัจจุบันกับรหัสที่ผู้ดูแลสร้างไว้ โดยไม่ล้างคะแนนเดิม'
+                    : 'ยินดีต้อนรับ! กรุณากรอกรหัสลงทะเบียนที่คุณได้รับจากผู้ดูแลระบบ';
+            }
+            if (requestCtaEl) {
+                requestCtaEl.style.display = window.enrollmentRematchMode ? 'none' : 'block';
+            }
             
             // 🔥 V84.3: Check if already has pending request
-            checkPendingAccessRequest();
+            if (!window.enrollmentRematchMode) {
+                checkPendingAccessRequest();
+            }
+        }
+
+        function openEnrollmentCodeMatcher() {
+            showEnrollmentModal(true);
         }
 
         function showInitialView() {
@@ -2569,21 +2597,26 @@
                 const preData = preDoc.data();
 
                 if (preData.claimed) {
-                    statusEl.innerHTML = '<span style="color:#ef233c;">❌ รหัสนี้ถูกใช้งานไปแล้วครับ</span>';
-                    return;
+                    if (preData.claimedBy !== userId) {
+                        statusEl.innerHTML = '<span style="color:#ef233c;">❌ รหัสนี้ถูกใช้งานไปแล้วครับ</span>';
+                        return;
+                    }
                 }
 
-                // Create user with pre-filled data
+                const userRef = db.collection("users").doc(userId);
+                const userDoc = await userRef.get();
+                const existingUser = userDoc.exists ? (userDoc.data() || {}) : {};
+
+                // Build profile fields from enrollment key while preserving existing score/history.
                 const userData = {
                     displayName: userProfile.displayName,
                     pictureUrl: userProfile.pictureUrl || "",
-                    score: 0,
                     group: preData.group || "Public",
                     fullName: preData.fullName || "",
                     startDate: preData.startDate || "",
                     endDate: preData.endDate || "",
                     enrollmentCode: code,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    linkedByEnrollmentAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
 
                 // Split fullName into first/last if possible
@@ -2598,15 +2631,26 @@
                     }
                 }
 
-                await db.collection("users").doc(userId).set(userData);
+                if (!userDoc.exists) {
+                    userData.score = 0;
+                    userData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    await userRef.set(userData);
+                } else {
+                    await userRef.set({
+                        ...userData,
+                        score: Number.isFinite(parseFloat(existingUser.score)) ? parseFloat(existingUser.score) : (existingUser.score || 0)
+                    }, { merge: true });
+                }
 
                 // Mark pre_user as claimed
-                await db.collection("pre_users").doc(preDoc.id).update({
-                    claimed: true,
-                    claimedBy: userId,
-                    claimedByName: userProfile.displayName,
-                    claimedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                if (!preData.claimed) {
+                    await db.collection("pre_users").doc(preDoc.id).update({
+                        claimed: true,
+                        claimedBy: userId,
+                        claimedByName: userProfile.displayName,
+                        claimedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
                 
                 // 🔥 If they had a request, mark it as processed (Optional but good)
                 const reqSnap = await db.collection("reports").where("userId", "==", userId).where("type", "==", "access_request").get();
