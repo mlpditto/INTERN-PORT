@@ -13604,7 +13604,7 @@ async function saveQuiz() {
 
                 worksSnap.forEach(doc => { 
                     const d = doc.data(); 
-                    addP(d.timestamp, d.score, 'work', `📁 ${d.title || 'Work'}`); 
+                    addP(d.timestamp, d.score, 'work', `📁 ${d.title || 'Work'}`, { workDocId: doc.id, workData: d }); 
                     dash.works += (d.score || 0);
                     dash.wc++;
                 });
@@ -13815,13 +13815,16 @@ async function saveQuiz() {
                 const seqNum = filteredLogs.length - globalIdx;
                 const d = e.t ? e.t.toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
                 let delBtn = (e.source === 'checkin_logs' && e.docId) ? `<button class="btn-sm" style="background:none; color:#ef4444; border:none; padding:0; margin-left:8px; cursor:pointer;" onclick="deleteHubHistoryLog('${e.docId}', ${e.score})"><i class="fa-solid fa-trash-can"></i></button>` : "";
+                const isClickable = e.type === 'work' || e.isReflective;
+                const clickClass = isClickable ? 'cursor-pointer' : '';
+                const onClickAttr = isClickable ? ` onclick="showHubItemDetails(${JSON.stringify(e).replace(/"/g, '&quot;')})" ` : '';
                 
                 l.innerHTML += `
-                    <div style="padding:12px 15px; border-radius:12px; border:1px solid #f1f5f9; margin-bottom:10px; background:white; display:flex; justify-content:space-between; align-items:center; transition:0.2s;" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='#f1f5f9'">
+                    <div style="padding:12px 15px; border-radius:12px; border:1px solid #f1f5f9; margin-bottom:10px; background:white; display:flex; justify-content:space-between; align-items:center; transition:0.2s; ${isClickable ? 'cursor:pointer;' : ''}" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='#f1f5f9'" ${onClickAttr}>
                         <div style="flex:1">
                             <div style="font-size:0.9em; font-weight:800; color:#1e293b; display:flex; align-items:center; gap:8px;">
                                 <span style="background:#f1f5f9; color:#94a3b8; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:900;">#${seqNum}</span>
-                                ${e.text} ${delBtn}
+                                ${e.text}${isClickable ? ' <i class="fa-solid fa-arrow-up-right" style="font-size:0.7em; color:#94a3b8; margin-left:4px;"></i>' : ''} ${delBtn}
                             </div>
                             <div style="font-size:0.75em; color:#94a3b8; margin-top:4px;">${d} <span style="margin-left:5px; color:#e2e8f0;">|</span> <span style="margin-left:5px; text-transform:uppercase; font-weight:900; color:${e.type === 'quiz' ? '#4361ee' : '#64748b'}">${e.type}</span></div>
                         </div>
@@ -15043,6 +15046,151 @@ async function saveQuiz() {
             
             modal.style.display = 'block';
         }
+
+        function showHubItemDetails(item) {
+            if (item.type === 'work' && item.workData) {
+                const w = item.workData;
+                const d = w.timestamp ? w.timestamp.toDate().toLocaleString('th-TH') : '-';
+                const statusColor = w.status === 'ตรวจแล้ว' ? '#10b981' : w.status === 'ตรวจปฏิเสธ' ? '#ef4444' : '#f59e0b';
+                const statusBg = w.status === 'ตรวจแล้ว' ? '#ecfdf5' : w.status === 'ตรวจปฏิเสธ' ? '#fef2f2' : '#fffbeb';
+                
+                let detailsHtml = `
+                    <div style="padding:20px; border-radius:12px; background:white; border:1px solid #f1f5f9;">
+                        <h3 style="margin:0 0 15px 0; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:1.5em;">📁</span> ${w.title || 'Work Item'}
+                        </h3>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:15px;">
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #4361ee;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Status</div>
+                                <div style="background:${statusBg}; color:${statusColor}; padding:6px 10px; border-radius:6px; font-weight:700; margin-top:6px; display:inline-block; font-size:0.85em;">
+                                    ${w.status || 'ยังไม่ส่ง'}
+                                </div>
+                            </div>
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #10b981;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Score</div>
+                                <div style="font-size:1.3em; font-weight:900; color:#10b981; margin-top:6px;">
+                                    ${(w.score || 0).toFixed(2)} pts
+                                </div>
+                            </div>
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #f59e0b;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Submitted</div>
+                                <div style="font-size:0.85em; color:#475569; margin-top:6px; font-weight:600;">
+                                    ${d}
+                                </div>
+                            </div>
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #8b5cf6;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Type</div>
+                                <div style="font-size:0.85em; color:#475569; margin-top:6px; font-weight:600;">
+                                    ${w.taskType || 'General Work'}
+                                </div>
+                            </div>
+                        </div>
+                        ${w.description ? `
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:12px;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase; margin-bottom:8px;">Description</div>
+                                <div style="color:#475569; font-size:0.9em; line-height:1.5;">
+                                    ${w.description.replace(/\\n/g, '<br/>')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${w.fileUrl ? `
+                            <div style="background:#e3f2fd; padding:12px; border-radius:8px; border-left:3px solid #2196f3; margin-bottom:12px;">
+                                <div style="font-size:0.75em; color:#1565c0; font-weight:700; text-transform:uppercase; margin-bottom:8px;">
+                                    <i class="fa-solid fa-file"></i> Attachment
+                                </div>
+                                <a href="${w.fileUrl}" target="_blank" style="color:#2196f3; font-weight:700; text-decoration:none; word-break:break-all;">
+                                    <i class="fa-solid fa-download"></i> Open File
+                                </a>
+                            </div>
+                        ` : ''}
+                        ${w.comment ? `
+                            <div style="background:#fff3e0; padding:12px; border-radius:8px; border-left:3px solid #ff9800; margin-bottom:12px;">
+                                <div style="font-size:0.75em; color:#e65100; font-weight:700; text-transform:uppercase; margin-bottom:8px;">Teacher Comment</div>
+                                <div style="color:#e65100; font-size:0.9em; line-height:1.5;">
+                                    ${w.comment.replace(/\\n/g, '<br/>')}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                
+                alert("Work Details:\n\n" + (w.title || 'Work Item') + "\nScore: " + (w.score || 0).toFixed(2) + " pts\nStatus: " + (w.status || 'Not Submitted') + "\n\nFor full details, click OK to open detailed view.");
+                const modal = document.getElementById('workDetailModal') || createWorkDetailModal();
+                document.getElementById('work-detail-content').innerHTML = detailsHtml;
+                modal.style.display = 'block';
+            } else if (item.type === 'reflective_log' || item.isReflective) {
+                const d = item.t ? item.t.toLocaleString('th-TH') : '-';
+                const detailsHtml = `
+                    <div style="padding:20px; border-radius:12px; background:white; border:1px solid #f1f5f9;">
+                        <h3 style="margin:0 0 15px 0; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:1.5em;">📔</span> Reflective Log
+                        </h3>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:15px;">
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #10b981;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Bonus Points</div>
+                                <div style="font-size:1.3em; font-weight:900; color:#10b981; margin-top:6px;">
+                                    ${(item.score || 0).toFixed(2)} pts
+                                </div>
+                            </div>
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #f59e0b;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Date</div>
+                                <div style="font-size:0.85em; color:#475569; margin-top:6px; font-weight:600;">
+                                    ${d}
+                                </div>
+                            </div>
+                        </div>
+                        ${item.fullContent ? `
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:12px;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase; margin-bottom:8px;">Log Content</div>
+                                <div style="color:#475569; font-size:0.9em; line-height:1.6; max-height:300px; overflow-y:auto;">
+                                    ${item.fullContent.replace(/\\n/g, '<br/>')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${item.adminComment ? `
+                            <div style="background:#ede9fe; padding:12px; border-radius:8px; border-left:3px solid #7c3aed; margin-bottom:12px;">
+                                <div style="font-size:0.75em; color:#5b21b6; font-weight:700; text-transform:uppercase; margin-bottom:8px;">Admin Comment</div>
+                                <div style="color:#5b21b6; font-size:0.9em; line-height:1.5;">
+                                    ${item.adminComment.replace(/\\n/g, '<br/>')}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                const modal = document.getElementById('workDetailModal') || createWorkDetailModal();
+                document.getElementById('work-detail-content').innerHTML = detailsHtml;
+                modal.style.display = 'block';
+            }
+        }
+
+        function createWorkDetailModal() {
+            const modal = document.createElement('div');
+            modal.id = 'workDetailModal';
+            modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:none; z-index:10000; align-items:center; justify-content:center;';
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.style.display = 'none';
+            });
+            
+            const content = document.createElement('div');
+            content.style.cssText = 'background:white; border-radius:15px; max-width:600px; max-height:80vh; overflow-y:auto; padding:20px; position:relative; width:90%;';
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.innerHTML = '&times;';
+            closeBtn.style.cssText = 'position:absolute; top:10px; right:15px; background:none; border:none; font-size:2em; cursor:pointer; color:#94a3b8;';
+            closeBtn.onclick = () => modal.style.display = 'none';
+            
+            content.appendChild(closeBtn);
+            
+            const innerContent = document.createElement('div');
+            innerContent.id = 'work-detail-content';
+            content.appendChild(innerContent);
+            
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+            
+            return modal;
+        }
+
         async function deleteHistoryLog(logId, amount) { if (!confirm(`Delete log and revert ${amount} points?`)) return; try { await db.collection("users").doc(currentHistoryUserId).update({ score: firebase.firestore.FieldValue.increment(-amount) }); await db.collection("checkin_logs").doc(logId).delete(); showToast("Reverted!"); const user = usersData.find(u => u.id === currentHistoryUserId); showHistory(currentHistoryUserId, user ? user.displayName : 'User', (user ? user.score : 0) - amount); } catch (e) { alert(e.message); } }
         function updateAssigneeList() { 
             const d = document.getElementById('sq-user-list'); 
