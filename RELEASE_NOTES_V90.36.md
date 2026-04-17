@@ -4,9 +4,11 @@ Date: 2026-04-16
 Branch: production
 
 ## Summary
+
 Admin-side AI Hub now includes a Gemini TTS Studio prototype for generating and previewing speech from text.
 
 ## Changes
+
 - Added **Gemini 3.1 Flash TTS Studio** inside AI Digital Lab (admin side).
 - Added controls for:
   - Voice preset selection
@@ -23,11 +25,14 @@ Admin-side AI Hub now includes a Gemini TTS Studio prototype for generating and 
 - Added PCM-to-WAV conversion fallback for browser playback compatibility.
 
 ## Scope
+
 - Implemented in `admin.html` (prototype phase for admin-first validation).
-- `public/admin.html` and `netlify-deploy/admin.html` are unchanged functionally in this release.
+- `public/admin.html` and `netlify-deploy/admin.html` were unchanged functionally in this release (historical context).
 
 ## Version Sync
-Updated version string to `V90.36` across required release targets:
+
+Updated version string to `V90.36` across release targets used at that time (historical):
+
 - `admin.html`
 - `index.html`
 - `public/admin.html`
@@ -36,8 +41,10 @@ Updated version string to `V90.36` across required release targets:
 - `netlify-deploy/index.html`
 
 Also updated:
+
 - `SYSTEM_OVERVIEW.md`
 
 ## Notes
+
 - No backend schema changes.
 - No Firebase Functions endpoint changes in this release.

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -2207,6 +2207,35 @@
                         <span class="badge" style="background:#ebfbee; color:#087f5b; border:1px solid #b2f2bb;" id="cnt-Done">0</span>
                     </div>
                     <div id="Done"></div>
+                </div>
+            </div>
+
+            <div id="alabasta-case-section" class="review-card" style="margin-top:18px; border-color:#fcd34d; background:linear-gradient(180deg, #fffbeb 0%, #fff 100%); border-radius:14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; border-bottom:1px solid #fde68a; padding-bottom:10px; margin-bottom:12px;">
+                    <h4 style="margin:0; color:#92400e;"><i class="fa-solid fa-dungeon"></i> Alabasta Case Inbox</h4>
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <input type="text" id="alabasta-case-search" placeholder="🔎 Search case, user, disease..." onkeyup="renderAlabastaCases()" style="margin:0; width:230px; max-width:100%; padding:5px 12px; font-size:0.8em; border-radius:20px; border:1px solid #fcd34d;">
+                        <span style="font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:3px 10px;">Total <b id="alabasta-case-total">0</b></span>
+                        <span style="font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:3px 10px;">Pending <b id="alabasta-case-pending">0</b></span>
+                        <span style="font-size:0.72em; color:#166534; font-weight:700; background:#fff; border:1px solid #86efac; border-radius:999px; padding:3px 10px;">Reviewed <b id="alabasta-case-reviewed">0</b></span>
+                    </div>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table id="alabastaCaseTable" class="admin-table">
+                        <thead>
+                            <tr style="background:#fef3c7;">
+                                <th>Time</th>
+                                <th>User</th>
+                                <th>HN / Ref</th>
+                                <th>Disease</th>
+                                <th>Customer</th>
+                                <th>Note</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -6425,7 +6454,7 @@ Do not include any explanation other than the feedback body.`;
 
         const auth = firebase.auth();
 
-        var usersData = [], worksData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {}, questsSubList = [];
+        var usersData = [], worksData = [], casesData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {}, questsSubList = [];
         var reflectiveLogsCache = []; 
         var accessRequestsCache = []; 
         var pendingQuizzesCache = [];  
@@ -6571,34 +6600,93 @@ Do not include any explanation other than the feedback body.`;
         }
 
         auth.onAuthStateChanged(user => {
-            if (user) {
-                if (user.email === ALLOWED_EMAIL) {
-                    document.getElementById('login-screen').style.display = 'none';
-                    document.getElementById('dashboard-container').style.display = 'block';
-                    document.getElementById('admin-email').innerText = user.email;
-                    initSystem();
-                } else {
-                    // User logged in but not authorized
-                    alert(`❌ Access Denied\nEmail: ${user.email}\nThis account is not authorized to access the Admin Portal.`);
-                    auth.signOut(); // Force logout so they can try again
-                }
+            if (!user) return;
+
+            const userEmail = (user.email || '').trim().toLowerCase();
+            const allowedEmail = (ALLOWED_EMAIL || '').trim().toLowerCase();
+
+            if (userEmail && userEmail === allowedEmail) {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('dashboard-container').style.display = 'block';
+                document.getElementById('admin-email').innerText = user.email;
+                initSystem();
+                return;
             }
+
+            const providerIds = (user.providerData || []).map(p => p.providerId).filter(Boolean).join(', ') || 'unknown';
+            const loginErrorEl = document.getElementById('login-error');
+
+            if (!userEmail) {
+                if (loginErrorEl) {
+                    loginErrorEl.innerText = `Google did not return an email. Please sign in with ${ALLOWED_EMAIL} in Chrome/Safari.`;
+                }
+                alert(`❌ Access Denied\nEmail: missing\nPlease sign in with authorized account: ${ALLOWED_EMAIL}`);
+            } else {
+                if (loginErrorEl) {
+                    loginErrorEl.innerText = `Access denied for ${user.email}. Authorized account: ${ALLOWED_EMAIL}`;
+                }
+                alert(`❌ Access Denied\nEmail: ${user.email}\nThis account is not authorized to access the Admin Portal.`);
+            }
+
+            console.warn('Admin auth denied', { uid: user.uid, email: user.email, providerIds });
+            auth.signOut();
         });
 
         // 🔥 Google Sign-In Logic
-        // 🔥 Google Sign-In Logic
-        function loginWithGoogle() {
+        let googleLoginInProgress = false;
+
+        function setGoogleLoginButtonState(isLoading) {
+            const btn = document.querySelector('#login-screen .btn-google');
+            if (!btn) return;
+            if (isLoading) {
+                if (!btn.dataset.originalHtml) btn.dataset.originalHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.style.opacity = '0.7';
+                btn.style.cursor = 'wait';
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:6px;"></i>Signing in...';
+                return;
+            }
+            btn.disabled = false;
+            btn.style.opacity = '';
+            btn.style.cursor = '';
+            if (btn.dataset.originalHtml) btn.innerHTML = btn.dataset.originalHtml;
+        }
+
+        async function loginWithGoogle() {
+            if (googleLoginInProgress) return;
+            googleLoginInProgress = true;
+            setGoogleLoginButtonState(true);
+
             const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider)
-                .then((result) => {
-                    // Success handled by onAuthStateChanged
-                    console.log("Google Login Success:", result.user.email);
-                })
-                .catch((error) => {
+            try {
+                const result = await auth.signInWithPopup(provider);
+                // Success handled by onAuthStateChanged
+                console.log("Google Login Success:", result.user.email);
+            } catch (error) {
+                const shouldFallbackToRedirect = error && (
+                    error.code === 'auth/popup-blocked' ||
+                    error.code === 'auth/cancelled-popup-request' ||
+                    error.code === 'auth/popup-closed-by-user'
+                );
+
+                if (shouldFallbackToRedirect) {
+                    try {
+                        await auth.signInWithRedirect(provider);
+                        return;
+                    } catch (redirectError) {
+                        console.error("Google Redirect Login Error:", redirectError);
+                        alert("Google Redirect Login Error: " + redirectError.message);
+                        document.getElementById('login-error').innerText = "Google Error: " + redirectError.message;
+                    }
+                } else {
                     console.error("Google Login Error:", error);
                     alert("Google Login Error: " + error.message);
                     document.getElementById('login-error').innerText = "Google Error: " + error.message;
-                });
+                }
+            } finally {
+                googleLoginInProgress = false;
+                setGoogleLoginButtonState(false);
+            }
         }
 
         // 🔥 LINE Login Logic (Admin)
@@ -11935,6 +12023,10 @@ async function saveQuiz() {
                 renderTable('works'); 
                 drawKanban(); 
             });
+            db.collection("cases").orderBy("timestamp", "desc").limit(200).onSnapshot(s => {
+                casesData = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderAlabastaCases();
+            });
             db.collection("users").orderBy("score", "desc").onSnapshot(s => { 
                 usersData = s.docs.map(d => ({ id: d.id, ...d.data() })); 
                 renderUserGroupTabs();
@@ -11944,6 +12036,7 @@ async function saveQuiz() {
                 updateAssigneeList(); 
                 renderCertTable(); 
                 drawKanban(); // Update board cards (e.g. if filtering by group)
+                renderAlabastaCases();
             });
             db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban);
             db.collection("quests").onSnapshot(s => { 
@@ -12337,17 +12430,12 @@ async function saveQuiz() {
                     count = allUsersAndPre.filter(u => (u.group || 'Public') === g).length;
                 }
 
-                return `<div style="display:flex; align-items:center; gap:4px;">
-                    <button onclick="setUserGroupFilter('${safeGroup}')" style="
-                        padding:6px 16px; border-radius:20px; border:2px solid ${isActive ? color : '#ddd'};
-                        background:${isActive ? color : '#fff'}; color:${isActive ? '#fff' : color};
-                        font-size:0.82em; font-weight:bold; cursor:pointer; white-space:nowrap;
-                        display:flex; align-items:center; gap:5px; transition:all 0.2s;
-                    "><i class="fa-solid ${icon}"></i> ${g} <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${count}</span></button>
-                    <button onclick="event.stopPropagation(); openShareModalForGroup('${safeGroup}')" title="Share ${g} ranking" style="padding:5px 8px; border-radius:999px; border:1px solid ${isActive ? color : '#dbe3ef'}; background:${isActive ? 'rgba(255,255,255,0.2)' : '#f8fafc'}; color:${isActive ? '#fff' : color}; font-size:0.72em; font-weight:900; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:3px; transition:all 0.2s;">
-                        <i class="fa-solid fa-share-nodes"></i>
-                    </button>
-                </div>`;
+                return `<button onclick="setUserGroupFilter('${safeGroup}')" style="
+                    padding:6px 16px; border-radius:20px; border:2px solid ${isActive ? color : '#ddd'};
+                    background:${isActive ? color : '#fff'}; color:${isActive ? '#fff' : color};
+                    font-size:0.82em; font-weight:bold; cursor:pointer; white-space:nowrap;
+                    display:flex; align-items:center; gap:5px; transition:all 0.2s;
+                "><i class="fa-solid ${icon}"></i> ${g} <span style="background:${isActive ? 'rgba(255,255,255,0.3)' : '#eee'}; padding:1px 7px; border-radius:10px; font-size:0.85em;">${count}</span></button>`;
             }).join('');
         }
 
@@ -12375,6 +12463,7 @@ async function saveQuiz() {
             activeBoardGroup = group;
             renderBoardGroupTabs();
             drawKanban();
+            renderAlabastaCases();
         }
 
         function setUserGroupFilter(group) {
@@ -12382,6 +12471,89 @@ async function saveQuiz() {
             renderUserGroupTabs();
             renderTable('users');
             renderLeaderboard();
+        }
+
+        function renderAlabastaCases() {
+            const tbody = document.querySelector('#alabastaCaseTable tbody');
+            if (!tbody) return;
+
+            const totalEl = document.getElementById('alabasta-case-total');
+            const pendingEl = document.getElementById('alabasta-case-pending');
+            const reviewedEl = document.getElementById('alabasta-case-reviewed');
+            const keyword = ((document.getElementById('alabasta-case-search') || {}).value || '').toLowerCase().trim();
+
+            const safe = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const filtered = casesData.filter(c => {
+                if (activeBoardGroup !== 'All') {
+                    const user = usersData.find(u => u.id === c.userId);
+                    if ((user?.group || 'Public') !== activeBoardGroup) return false;
+                }
+
+                if (!keyword) return true;
+                const text = [
+                    c.caseId,
+                    c.displayName,
+                    c.customer,
+                    c.disease,
+                    c.note,
+                    c.userId,
+                    c.status
+                ].map(x => String(x || '').toLowerCase()).join(' ');
+                return text.includes(keyword);
+            });
+
+            const pendingCount = filtered.filter(c => (c.status || 'pending') !== 'reviewed').length;
+            const reviewedCount = filtered.filter(c => (c.status || '') === 'reviewed').length;
+            if (totalEl) totalEl.textContent = filtered.length;
+            if (pendingEl) pendingEl.textContent = pendingCount;
+            if (reviewedEl) reviewedEl.textContent = reviewedCount;
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#94a3b8; padding:14px;">No case submissions found</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(c => {
+                const isReviewed = (c.status || '') === 'reviewed';
+                const ts = c.timestamp && c.timestamp.toDate ? c.timestamp.toDate().toLocaleString('th-TH') : '-';
+                const statusColor = isReviewed ? '#16a34a' : '#d97706';
+                const statusBg = isReviewed ? '#ecfdf5' : '#fffbeb';
+                const actionBtn = isReviewed
+                    ? `<button class="btn-sm" style="background:#334155; color:white; border:none; border-radius:8px;" onclick="updateCaseStatus('${c.id}', 'pending')">Reopen</button>`
+                    : `<button class="btn-sm" style="background:#16a34a; color:white; border:none; border-radius:8px;" onclick="updateCaseStatus('${c.id}', 'reviewed')">Mark Reviewed</button>`;
+
+                return `
+                    <tr>
+                        <td style="font-size:0.8em; white-space:nowrap;">${safe(ts)}</td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <img src="${safe(c.pictureUrl || '')}" style="width:28px; height:28px; border-radius:50%; object-fit:cover; background:#e2e8f0;" onerror="this.style.display='none'">
+                                <div style="font-weight:700;">${safe(c.displayName || c.userId || '-')}</div>
+                            </div>
+                        </td>
+                        <td style="font-family:monospace; font-size:0.85em;">${safe(c.caseId || '-')}</td>
+                        <td>${safe(c.disease || '-')}</td>
+                        <td>${safe(c.customer || '-')}</td>
+                        <td style="max-width:260px; white-space:normal;">${safe(c.note || '-')}</td>
+                        <td><span class="badge" style="background:${statusBg}; color:${statusColor}; border:1px solid ${statusColor}33;">${isReviewed ? 'reviewed' : 'pending'}</span></td>
+                        <td>${actionBtn}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function updateCaseStatus(caseDocId, status) {
+            try {
+                await db.collection('cases').doc(caseDocId).update({
+                    status,
+                    adminUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    adminReviewedBy: ALLOWED_EMAIL || 'admin'
+                });
+                if (typeof showToast === 'function') showToast(`Case marked as ${status}`, 'success');
+            } catch (e) {
+                console.error('Failed to update case status:', e);
+                alert('Failed to update case status: ' + e.message);
+            }
         }
 
         function renderTable(type) {
@@ -12595,8 +12767,8 @@ async function saveQuiz() {
                                 ${d.periodScore !== undefined ? `<span style="font-weight:bold;color:var(--primary);">${d.periodScore.toFixed(2)}</span> <span style="font-size:0.75em; color:#999;">(+${parseFloat((d.score || 0).toFixed(2))})</span>` : `<span style="font-weight:bold;color:var(--primary);">${parseFloat((d.score || 0).toFixed(2))}</span>`}
                             </td>
                             <td style="text-align:center;">
-                                <span class="badge" style="background:rgba(230,126,34,0.1); color:#e67e22; border:1px solid rgba(230,126,34,0.2); font-weight:bold; cursor:pointer;" onclick="setReflectiveSearch('${(d.displayName || d.id).replace(/'/g, "\\'")}')" title="View Logs">
-                                    <i class="fa-solid fa-pen-fancy"></i> ${reflectiveLogsCache.filter(lg => lg.userId === d.id).length}
+                                <span class="badge" style="background:rgba(230,126,34,0.1); color:#e67e22; border:1px solid rgba(230,126,34,0.2); font-weight:bold; cursor:pointer;" onclick="setReflectiveSearch('${(d.displayName || d.id).replace(/'/g, "\\'")}')" title="Laugh Tale reviewed logs">
+                                    <i class="fa-solid fa-pen-fancy"></i> ${reflectiveLogsCache.filter(lg => lg.userId === d.id && lg.isArchived === true && ((lg.adminComment && String(lg.adminComment).trim() !== '') || (lg.adminBonus !== undefined && lg.adminBonus !== null))).length}
                                 </span>
                             </td>
                             <td><div style="display:flex;"><input type="number" step="0.1" id="adj-${d.id}" placeholder="0.0" style="width:70px;margin:0;" onkeypress="if(event.key==='Enter')adjDec('${d.id}')"><button class="btn-sm btn-success" onclick="adjDec('${d.id}')">Adj</button></div></td>
@@ -12899,12 +13071,18 @@ async function saveQuiz() {
 
         function renderDivisionSection(container, title, users, color = 'var(--primary)') {
             const avg = users.length > 0 ? (users.reduce((s, u) => s + (u.score || 0), 0) / users.length).toFixed(2) : 0;
+            const safeTitle = String(title).replace(/'/g, "\\'");
             container.innerHTML += `
                     <div style="background:#fff; border-radius:12px; margin-bottom:40px; border:1px solid #eee; overflow:hidden;">
                         <div style="background:${color}; padding:15px 20px; color:white; display:flex; justify-content:space-between; align-items:center;">
                             <h3 style="margin:0; font-size:1.2em;"><i class="fa-solid fa-trophy"></i> ${title}</h3>
-                            <div style="font-size:0.85em; background:rgba(255,255,255,0.2); padding:4px 12px; border-radius:20px;">
-                                👥 ${users.length} Users | Avg: ${avg} Pts
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <div style="font-size:0.85em; background:rgba(255,255,255,0.2); padding:4px 12px; border-radius:20px;">
+                                    👥 ${users.length} Users | Avg: ${avg} Pts
+                                </div>
+                                <button onclick="event.stopPropagation(); openShareModalForGroup('${safeTitle}')" title="Share ${title} ranking" style="padding:5px 10px; border-radius:999px; border:1px solid rgba(255,255,255,0.5); background:rgba(255,255,255,0.18); color:#fff; font-size:0.74em; font-weight:900; cursor:pointer; display:flex; align-items:center; gap:5px;">
+                                    <i class="fa-solid fa-share-nodes"></i> Share
+                                </button>
                             </div>
                         </div>
                         <div style="padding:10px;">

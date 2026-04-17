@@ -19,7 +19,7 @@ This release finalizes admin-side UX updates and deploy sync for dashboard/archi
 
 ## Version Sync
 
-Updated release version to `V90.34` across required targets:
+Updated release version to `V90.34` across release targets used at that time (historical):
 
 - `admin.html`
 - `index.html`

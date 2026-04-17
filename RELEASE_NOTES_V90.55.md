@@ -42,7 +42,7 @@ V90.55 delivers a lean UI refactor for Grand Line Dashboard and runtime stabilit
 ## Validation
 
 - No syntax/editor errors in updated runtime HTML files.
-- Version markers synced to V90.55 across all six mandatory runtime targets.
+- Version markers synced to V90.55 across the historical runtime target set used for this release.
 - Public and Netlify mirrors aligned with root runtime behavior.
 
 ## Deployment Notes
