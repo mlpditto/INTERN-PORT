@@ -6110,6 +6110,27 @@
             const customer = document.getElementById('c-customer').value.trim();
             const disease = document.getElementById('c-disease').value.trim() || 'General';
             const note = document.getElementById('c-note').value.trim();
+            const CASE_SUBMIT_AUTO_BONUS = 0.01;
+
+            const awardCaseSubmitBonus = async () => {
+                if (!userId) return;
+                try {
+                    const b = db.batch();
+                    b.update(db.collection('users').doc(userId), {
+                        score: firebase.firestore.FieldValue.increment(CASE_SUBMIT_AUTO_BONUS)
+                    });
+                    b.set(db.collection('checkin_logs').doc(), {
+                        userId,
+                        type: 'case_submit_bonus',
+                        amount: CASE_SUBMIT_AUTO_BONUS,
+                        note: `Alabasta submit: ${caseId}`,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    await b.commit();
+                } catch (bonusErr) {
+                    console.warn('Auto bonus failed for case submit:', bonusErr);
+                }
+            };
 
             if (!caseId) return alert("กรุณาระบุเลขที่เคส (HN / Ref No.)");
 
@@ -6129,6 +6150,8 @@
                     status: "pending",
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
+
+                await awardCaseSubmitBonus();
 
                 // Notify LINE
                 if (liff.isInClient()) {
@@ -6159,6 +6182,7 @@
                             status: "pending",
                             timestamp: firebase.firestore.FieldValue.serverTimestamp()
                         });
+                        await awardCaseSubmitBonus();
                         alert("บันทึกข้อมูลเคสเรียบร้อยแล้ว");
                         document.getElementById('c-id').value = "";
                         document.getElementById('c-customer').value = "";
