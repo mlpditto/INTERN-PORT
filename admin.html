@@ -4043,7 +4043,7 @@
         <!-- 🔥 Reflective Review Modal -->
         <div id="reflectiveReviewModal" class="modal" style="z-index: 2501;">
             <div class="modal-content" style="max-width: 500px; border-top: 5px solid #d35400; border-radius: 12px;">
-                <span class="close-modal" onclick="document.getElementById('reflectiveReviewModal').style.display='none'">&times;</span>
+                <span class="close-modal" onclick="forceHideModal('reflectiveReviewModal')">&times;</span>
                 <h3 style="color:#d35400; margin-bottom:15px;"><i class="fa-solid fa-comment-medical"></i> Reflective Log Review</h3>
                 
                 <div id="reflective-review-user-info" style="background:#f8f9fa; padding:12px; border-radius:10px; margin-bottom:15px; border:1px solid #eee;">
@@ -14522,9 +14522,14 @@ async function saveQuiz() {
                     
                     let buttons = "";
                     if (isPending) {
-                        buttons = `<button class="btn-sm" style="width:100%; background:linear-gradient(135deg, #f59e0b, #d97706); color:white; border:none; padding:10px; border-radius:10px; font-weight:800; cursor:pointer; box-shadow:0 4px 12px rgba(245, 158, 11, 0.2);" onclick="event.stopPropagation(); reviewReflective('${log.id}')">
-                            <i class="fa-solid fa-wand-sparkles"></i> Review & Score
-                        </button>`;
+                        buttons = `
+                            <button class="btn-sm" style="width:100%; background:linear-gradient(135deg, #f59e0b, #d97706); color:white; border:none; padding:10px; border-radius:10px; font-weight:800; cursor:pointer; box-shadow:0 4px 12px rgba(245, 158, 11, 0.2);" onclick="event.stopPropagation(); reviewReflective('${log.id}')">
+                                <i class="fa-solid fa-wand-sparkles"></i> Review & Score
+                            </button>
+                            <button class="btn-sm" style="width:100%; margin-top:8px; background:#ef4444; color:white; border:none; padding:8px; border-radius:10px; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); deleteReflectiveLog('${log.id}')">
+                                <i class="fa-solid fa-trash"></i> Delete
+                            </button>
+                        `;
                     } else {
                         buttons = `
                             <div style="display:flex; gap:8px; margin-top:8px;">
@@ -14533,6 +14538,9 @@ async function saveQuiz() {
                                 </button>
                                 <button class="btn-sm" style="flex:1; background:var(--col-bg); color:var(--text-main); border:1px solid var(--border-color); padding:8px; border-radius:10px; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); archiveReflective('${log.id}')">
                                     <i class="fa-solid fa-box-archive"></i> Archive
+                                </button>
+                                <button class="btn-sm" style="flex:1; background:#ef4444; color:white; border:none; padding:8px; border-radius:10px; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); deleteReflectiveLog('${log.id}')">
+                                    <i class="fa-solid fa-trash"></i> Delete
                                 </button>
                             </div>
                         `;
@@ -16289,6 +16297,7 @@ async function saveQuiz() {
                                             <i class="fa-solid fa-comment-dots"></i> ${isFinished ? 'Edit Review' : 'Review'}
                                         </button>
                                         ${isFinished ? `<button class="btn-sm" style="background:#6c757d; color:white; border:none; margin-top:4px;" onclick="archiveReflective('${log.id}')"><i class="fa-solid fa-box-archive"></i> Archive</button>` : ''}
+                                        <button class="btn-sm" style="background:#ef4444; color:white; border:none; margin-top:4px;" onclick="deleteReflectiveLog('${log.id}')"><i class="fa-solid fa-trash"></i> Delete</button>
                                     </td>
                                 </tr>
                             `;
@@ -16762,6 +16771,55 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 showToast("Moved back to Dashboard");
             } catch (e) { alert(e.message); }
         }
+
+        async function deleteReflectiveLog(id) {
+            if (!confirm('Delete this reflective log? คะแนนที่เคยให้จาก log นี้จะถูกลบอัตโนมัติ')) return;
+
+            try {
+                const logRef = db.collection("reflective_logs").doc(id);
+                const snap = await logRef.get();
+                if (!snap.exists) {
+                    showToast('Log not found (already deleted)');
+                    return;
+                }
+
+                const log = snap.data() || {};
+                const uid = log.userId || '';
+                const autoScore = Number.isFinite(parseFloat(log.autoScore)) ? parseFloat(log.autoScore) : 0.1;
+                const claimedBonus = log.pointsClaimed === true ? (parseFloat(log.adminBonus) || 0) : 0;
+                const totalRevert = autoScore + claimedBonus;
+
+                const batch = db.batch();
+                if (uid && totalRevert > 0) {
+                    batch.update(db.collection("users").doc(uid), {
+                        score: firebase.firestore.FieldValue.increment(-totalRevert)
+                    });
+
+                    batch.set(db.collection("checkin_logs").doc(), {
+                        userId: uid,
+                        type: 'reflective_delete_revert',
+                        amount: -totalRevert,
+                        note: `Admin deleted reflective log: ${id}`,
+                        relatedLogId: id,
+                        autoRevert: autoScore,
+                        bonusRevert: claimedBonus,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+
+                batch.delete(logRef);
+                await batch.commit();
+
+                if (document.getElementById('reflective-review-id')?.value === id) {
+                    forceHideModal('reflectiveReviewModal');
+                }
+
+                showToast(`Deleted reflective log${totalRevert > 0 ? ` and reverted ${totalRevert.toFixed(2)} pts` : ''}`);
+            } catch (e) {
+                alert('Delete failed: ' + e.message);
+            }
+        }
+
         async function reviewReflective(id) {
             console.log("DEBUG: reviewReflective triggered for:", id);
             console.log("DEBUG: reflectiveLogsCache length:", reflectiveLogsCache ? reflectiveLogsCache.length : 'undefined');
