@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V90.65)</title>
-    <!-- V90.65: Color-coded KPI chips (Today=green, Streak=orange, Rank=purple, Cert=gold) -->
+    <title>Internship Portfolio (V90.66)</title>
+    <!-- V90.66: Compact Next Rank/Certificate as progress bars (HP-style) -->
     <!-- Release: 2026-04-16 12:00 UTC+7 -->
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -790,8 +790,20 @@
                             <div class="profile-kpi-strip">
                                 <span class="grandline-summary-item" style="background:#ecfdf5; border-color:#6ee7b7; color:#065f46;">Today pts <strong id="profile-kpi-today" style="color:#059669;">+0.00</strong></span>
                                 <span class="grandline-summary-item" style="background:#fff7ed; border-color:#fdba74; color:#9a3412;">Streak <strong id="profile-kpi-streak" style="color:#ea580c;">0 วัน</strong></span>
-                                <span class="grandline-summary-item" style="background:#f5f3ff; border-color:#c4b5fd; color:#5b21b6;"><strong id="bounty-current" style="color:#7c3aed;">Next Rank: Lv.2 Probationary Sniper (Requires 10.00 pts)</strong></span>
-                                <span class="grandline-summary-item" style="background:#fffbeb; border-color:#fcd34d; color:#92400e;"><strong id="certificate-status" style="color:#b45309;">Certificate: Eligible at 30 pts</strong></span>
+                                <span class="grandline-summary-item" style="background:#f5f3ff; border-color:#c4b5fd; color:#5b21b6; min-width:230px;">
+                                    <span id="bounty-current" style="font-weight:800; color:#7c3aed;">Next Rank</span>
+                                    <span id="bounty-progress-meta" style="font-size:0.88em; color:#6d28d9; opacity:0.88;">Lv.2 Probationary Sniper</span>
+                                    <span style="display:block; width:100%; height:6px; background:#e9d5ff; border-radius:999px; overflow:hidden; margin-top:2px;">
+                                        <span id="bounty-progress-bar" style="display:block; width:0%; height:100%; background:linear-gradient(90deg, #7c3aed, #a78bfa);"></span>
+                                    </span>
+                                </span>
+                                <span class="grandline-summary-item" style="background:#fffbeb; border-color:#fcd34d; color:#92400e; min-width:210px;">
+                                    <span id="certificate-status" style="font-weight:800; color:#b45309;">Certificate</span>
+                                    <span id="certificate-progress-meta" style="font-size:0.88em; color:#92400e; opacity:0.88;">In Progress</span>
+                                    <span style="display:block; width:100%; height:6px; background:#fde68a; border-radius:999px; overflow:hidden; margin-top:2px;">
+                                        <span id="certificate-progress-bar" style="display:block; width:0%; height:100%; background:linear-gradient(90deg, #f59e0b, #facc15);"></span>
+                                    </span>
+                                </span>
                                 <button type="button" class="lean-metrics-details-btn" onclick="toggleLeanMetricsDetails()" style="min-height:24px; padding:3px 8px; font-size:0.66em;">
                                     See more <i id="lean-profile-see-more-icon" class="fa-solid fa-chevron-down" style="font-size:0.85em; transition:transform 0.2s ease;"></i>
                                 </button>
@@ -1328,7 +1340,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V90.65 (Colorful KPI chips)
+                V90.66 (Compact KPI progress bars)
             </div>
         </div>
     </div>
@@ -4700,14 +4712,18 @@
                 if (currentScore < step.threshold) {
                     return {
                         label: step.label,
-                        required: step.threshold - currentScore
+                        required: step.threshold - currentScore,
+                        threshold: step.threshold,
+                        current: currentScore
                     };
                 }
             }
 
             return {
                 label: 'Max Level Reached',
-                required: 0
+                required: 0,
+                threshold: 90,
+                current: currentScore
             };
         }
 
@@ -4722,22 +4738,38 @@
             const todayEl = document.getElementById('profile-kpi-today');
             const streakEl = document.getElementById('profile-kpi-streak');
             const certificateEl = document.getElementById('certificate-status');
+            const rankMetaEl = document.getElementById('bounty-progress-meta');
+            const rankBarEl = document.getElementById('bounty-progress-bar');
+            const certMetaEl = document.getElementById('certificate-progress-meta');
+            const certBarEl = document.getElementById('certificate-progress-bar');
             if (currentEl) {
-                currentEl.textContent = nextRank.required > 0
-                    ? `Next Rank: ${nextRank.label} (Requires ${nextRank.required.toFixed(2)} pts)`
-                    : 'Next Rank: Max Level Reached';
+                currentEl.textContent = nextRank.required > 0 ? 'Next Rank' : 'Max Rank';
+                currentEl.title = nextRank.required > 0
+                    ? `${nextRank.label} (Requires ${nextRank.required.toFixed(2)} pts)`
+                    : 'Max Level Reached';
+            }
+            if (rankMetaEl) {
+                rankMetaEl.textContent = nextRank.label;
+            }
+            if (rankBarEl) {
+                const rankPct = nextRank.required > 0
+                    ? Math.max(0, Math.min(100, ((nextRank.threshold - nextRank.required) / nextRank.threshold) * 100))
+                    : 100;
+                rankBarEl.style.width = `${rankPct.toFixed(1)}%`;
             }
             if (nextEl) nextEl.textContent = `${nextRank.label}`;
             if (rankEl) rankEl.textContent = getCrewRankByScore(score);
             if (certificateEl) {
                 if (score >= 30) {
-                    certificateEl.textContent = 'Certificate: Eligible now ✅';
-                    certificateEl.style.color = '#166534';
+                    certificateEl.textContent = 'Certificate';
+                    certificateEl.title = 'Eligible now';
                 } else {
-                    certificateEl.textContent = `Certificate: Need ${(30 - score).toFixed(2)} pts`;
-                    certificateEl.style.color = '';
+                    certificateEl.textContent = 'Certificate';
+                    certificateEl.title = `Need ${(30 - score).toFixed(2)} pts`;
                 }
             }
+            if (certMetaEl) certMetaEl.textContent = score >= 30 ? 'Eligible' : 'In Progress';
+            if (certBarEl) certBarEl.style.width = `${Math.max(0, Math.min(100, (score / 30) * 100)).toFixed(1)}%`;
 
             const todayKey = new Date().toDateString();
             const todayPoints = (usersWorksCache || []).reduce((sum, w) => {
