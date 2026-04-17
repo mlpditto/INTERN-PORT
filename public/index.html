@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V90.61)</title>
-    <!-- V90.61: Fix resolveEffectiveUserId stub doc skip for correct profile lookup -->
+    <title>Internship Portfolio (V90.62)</title>
+    <!-- V90.62: pre_users claimBy fallback + persist linkedLineUserIds on resolve -->
     <!-- Release: 2026-04-16 12:00 UTC+7 -->
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -1328,7 +1328,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V90.61 (Profile Resolver Fix)
+                V90.62 (pre_users Resolver + Persist Mapping)
             </div>
         </div>
     </div>
@@ -1873,6 +1873,25 @@
                     }
                 } catch (_) {}
 
+                // Fallback via pre_users: find enrollment code claimed by this LINE user
+                try {
+                    let preSnap = await db.collection("pre_users").where("claimedBy", "==", liffUserId).limit(1).get();
+                    if (preSnap.empty) {
+                        preSnap = await db.collection("pre_users").where("sourceUserId", "==", liffUserId).limit(1).get();
+                    }
+                    if (!preSnap.empty) {
+                        const preData = preSnap.docs[0].data();
+                        const code = preData.code;
+                        if (code) {
+                            const userByCode = await db.collection("users").where("enrollmentCode", "==", code).limit(1).get();
+                            if (!userByCode.empty) {
+                                const found = userByCode.docs[0];
+                                return { userId: found.id, usedFallback: found.id !== liffUserId };
+                            }
+                        }
+                    }
+                } catch (_) {}
+
                 const displayName = (profile && profile.displayName) ? String(profile.displayName).trim() : "";
                 if (!displayName) return { userId: liffUserId, usedFallback: false };
 
@@ -2034,10 +2053,17 @@
                 const resolvedUser = await resolveEffectiveUserId(userId, userProfile);
                 if (resolvedUser && resolvedUser.userId) {
                     if (resolvedUser.usedFallback && resolvedUser.userId !== userId) {
-                        console.warn(`Using legacy user mapping: ${userId} -> ${resolvedUser.userId}`);
+                        const rawLiffId = userId;
+                        console.warn(`Using legacy user mapping: ${rawLiffId} -> ${resolvedUser.userId}`);
                         if (typeof showToast === 'function') {
                             showToast('พบข้อมูลบัญชีเดิม ระบบเชื่อมต่อให้แล้วอัตโนมัติ');
                         }
+                        // Persist mapping so future lookups use fast path
+                        try {
+                            await db.collection("users").doc(resolvedUser.userId).update({
+                                linkedLineUserIds: firebase.firestore.FieldValue.arrayUnion(rawLiffId)
+                            });
+                        } catch (_) {}
                     }
                     userId = resolvedUser.userId;
                 }
