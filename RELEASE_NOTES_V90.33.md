@@ -37,7 +37,7 @@
 
 ## Deployment Surface Sync
 
-The release is synchronized across all required runtime targets:
+The release was synchronized across runtime targets used at that time (historical):
 
 - `admin.html`
 - `index.html`
@@ -58,7 +58,7 @@ The release is synchronized across all required runtime targets:
 
 ## Validation
 
-- Version markers updated to a single shared release version (`V90.33`) in required targets.
+- Version markers updated to a single shared release version (`V90.33`) in the historical target set for this release.
 - Runtime/admin changes previously validated in editor diagnostics during implementation.
 
 ---

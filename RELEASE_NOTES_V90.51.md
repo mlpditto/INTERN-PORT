@@ -5,11 +5,11 @@ Branch: production
 
 ## Summary
 
-Full version resync release to align Admin and LIFF surfaces across root, public, and netlify deploy targets.
+Full version resync release to align Admin and LIFF surfaces across release targets at that time.
 
 ## Changes
 
-- Synced release version to `V90.51` across mandatory runtime targets:
+- Synced release version to `V90.51` across release targets at that time (historical):
   - `admin.html`
   - `index.html`
   - `public/admin.html`
@@ -29,6 +29,6 @@ Version drift existed between root pages and mirror deploy targets, causing inco
 
 ## Verification
 
-- Confirm same `V90.51` appears in title/release markers across six mandatory targets.
+- Confirm same `V90.51` appears in title/release markers across the historical release target set.
 - Confirm admin visible version badge is `V90.51` in all deploy surfaces.
 - Confirm release flow completed: push `production`, merge into `main`, push `main`.

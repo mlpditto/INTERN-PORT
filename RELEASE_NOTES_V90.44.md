@@ -5,11 +5,11 @@ Branch: production
 
 ## Summary
 
-Version synchronization release to fix stale public version display and align all required deploy targets.
+Version synchronization release to fix stale public version display and align release targets at that time.
 
 ## Changes
 
-- Synced release version to `V90.44` across mandatory runtime targets:
+- Synced release version to `V90.44` across release targets at that time (historical):
   - `admin.html`
   - `index.html`
   - `public/admin.html`
@@ -20,7 +20,7 @@ Version synchronization release to fix stale public version display and align al
   - `admin.html`
   - `public/admin.html`
   - `netlify-deploy/admin.html`
-- Updated release comment headers to `V90.44` in all six targets.
+- Updated release comment headers to `V90.44` in all historical targets for this release.
 - Updated `SYSTEM_OVERVIEW.md` header/rule version reference to `V90.44`.
 
 ## Why This Release
@@ -29,6 +29,6 @@ Public URL still displayed `V90.41` because the runtime HTML titles and badge st
 
 ## Verification
 
-- Confirm all six target files contain `V90.44` in title/release comment.
+- Confirm all historical target files for this release contain `V90.44` in title/release comment.
 - Confirm admin header badge shows `V90.44`.
 - Confirm branch sync sequence: `production` push, then merge to `main`, then push `main`.
