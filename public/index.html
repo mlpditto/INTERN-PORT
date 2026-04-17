@@ -1859,6 +1859,15 @@
                 const primaryDoc = await db.collection("users").doc(liffUserId).get();
                 if (primaryDoc.exists) return { userId: liffUserId, usedFallback: false };
 
+                // Fast path: explicit linked LINE IDs if available
+                try {
+                    const linkedSnap = await db.collection("users").where("linkedLineUserIds", "array-contains", liffUserId).limit(2).get();
+                    if (!linkedSnap.empty) {
+                        const linked = linkedSnap.docs[0];
+                        return { userId: linked.id, usedFallback: linked.id !== liffUserId };
+                    }
+                } catch (_) {}
+
                 const displayName = (profile && profile.displayName) ? String(profile.displayName).trim() : "";
                 if (!displayName) return { userId: liffUserId, usedFallback: false };
 
@@ -1870,12 +1879,33 @@
                 const picMatches = profilePic ? candidates.filter(c => String(c.pictureUrl || "") === profilePic) : [];
 
                 const matchPool = picMatches.length > 0 ? picMatches : candidates;
-                if (matchPool.length !== 1) return { userId: liffUserId, usedFallback: false };
+                if (matchPool.length === 1) {
+                    return {
+                        userId: matchPool[0].id,
+                        usedFallback: matchPool[0].id !== liffUserId
+                    };
+                }
 
-                return {
-                    userId: matchPool[0].id,
-                    usedFallback: matchPool[0].id !== liffUserId
-                };
+                // Heuristic fallback for duplicate display names
+                const scored = matchPool.map(c => {
+                    let score = 0;
+                    if (profilePic && String(c.pictureUrl || "") === profilePic) score += 100;
+                    if (c.enrollmentCode) score += 25;
+                    if (c.startDate || c.endDate) score += 20;
+                    if (parseFloat(c.score || 0) > 0) score += 10;
+                    if (c.status === 'active') score += 5;
+                    return { c, score };
+                }).sort((a, b) => b.score - a.score);
+
+                if (scored.length > 0) {
+                    const top = scored[0];
+                    const second = scored[1];
+                    if (!second || (top.score - second.score) >= 15) {
+                        return { userId: top.c.id, usedFallback: top.c.id !== liffUserId };
+                    }
+                }
+
+                return { userId: liffUserId, usedFallback: false };
             } catch (e) {
                 console.warn("resolveEffectiveUserId error:", e);
                 return { userId: liffUserId, usedFallback: false };
@@ -2146,6 +2176,10 @@
 
                     checkGraduation(da);
                     updateDivisionAndVisibility(); // 🔥 Update UI
+
+                    // Ensure quiz/assignment lists refresh after group/profile is resolved
+                    renderAssignments();
+                    renderHistory();
                 } else {
                     // First time user — show enrollment modal
                     showEnrollmentModal();
