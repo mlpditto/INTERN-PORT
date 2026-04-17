@@ -2027,7 +2027,12 @@
 
             try {
                 const primaryDoc = await db.collection("users").doc(liffUserId).get();
-                if (primaryDoc.exists) return { userId: liffUserId, usedFallback: false };
+                // Only short-circuit if the doc is meaningfully populated
+                if (primaryDoc.exists) {
+                    const pd = primaryDoc.data();
+                    const isMeaningful = !!(pd.displayName || pd.score || pd.group || pd.enrollmentCode);
+                    if (isMeaningful) return { userId: liffUserId, usedFallback: false };
+                }
 
                 // Fast path: explicit linked LINE IDs if available
                 try {
