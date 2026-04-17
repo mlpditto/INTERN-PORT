@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MEDLIFE+ Admin V90.55 (Turbo)</title>
-    <!-- V90.55: Version sync with Grand Line compact lean dashboard release -->
+    <title>MEDLIFE+ Admin V90.58 (Turbo)</title>
+    <!-- V90.58: Alabasta scoring flow + LIFF profile KPI/rank sync release -->
     <!-- Release: 2026-04-16 12:00 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1962,7 +1962,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; background:linear-gradient(135deg, #4361ee, #8e44ad); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.4em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         🛸 Intern Admin Portal
-                        <span style="font-size:0.45em; background:linear-gradient(135deg, rgba(67, 97, 238, 0.8), rgba(142, 68, 173, 0.8)); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(67,97,238,0.3);">V90.55</span>
+                        <span style="font-size:0.45em; background:linear-gradient(135deg, rgba(67, 97, 238, 0.8), rgba(142, 68, 173, 0.8)); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(67,97,238,0.3);">V90.58</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -2215,6 +2215,10 @@
                     <h4 style="margin:0; color:#92400e;"><i class="fa-solid fa-dungeon"></i> Alabasta Case Inbox</h4>
                     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                         <input type="text" id="alabasta-case-search" placeholder="🔎 Search case, user, disease..." onkeyup="renderAlabastaCases()" style="margin:0; width:230px; max-width:100%; padding:5px 12px; font-size:0.8em; border-radius:20px; border:1px solid #fcd34d;">
+                        <label style="display:flex; align-items:center; gap:6px; font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:4px 10px; cursor:pointer;">
+                            <input type="checkbox" id="alabasta-case-show-archived" onchange="renderAlabastaCases()" style="margin:0;">
+                            Show Archived
+                        </label>
                         <span style="font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:3px 10px;">Total <b id="alabasta-case-total">0</b></span>
                         <span style="font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:3px 10px;">Pending <b id="alabasta-case-pending">0</b></span>
                         <span style="font-size:0.72em; color:#166534; font-weight:700; background:#fff; border:1px solid #86efac; border-radius:999px; padding:3px 10px;">Reviewed <b id="alabasta-case-reviewed">0</b></span>
@@ -12588,10 +12592,11 @@ async function saveQuiz() {
             const totalEl = document.getElementById('alabasta-case-total');
             const pendingEl = document.getElementById('alabasta-case-pending');
             const reviewedEl = document.getElementById('alabasta-case-reviewed');
+            const showArchived = !!document.getElementById('alabasta-case-show-archived')?.checked;
             const keyword = ((document.getElementById('alabasta-case-search') || {}).value || '').toLowerCase().trim();
 
             const safe = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-            const filtered = casesData.filter(c => !c.isArchived).filter(c => {
+            const filtered = casesData.filter(c => showArchived || !c.isArchived).filter(c => {
                 if (activeBoardGroup !== 'All') {
                     const user = usersData.find(u => u.id === c.userId);
                     if ((user?.group || 'Public') !== activeBoardGroup) return false;
@@ -12610,8 +12615,8 @@ async function saveQuiz() {
                 return text.includes(keyword);
             });
 
-            const pendingCount = filtered.filter(c => (c.status || 'pending') !== 'reviewed').length;
-            const reviewedCount = filtered.filter(c => (c.status || '') === 'reviewed').length;
+            const pendingCount = filtered.filter(c => !c.isArchived && (c.status || 'pending') !== 'reviewed').length;
+            const reviewedCount = filtered.filter(c => c.isArchived || (c.status || '') === 'reviewed').length;
             if (totalEl) totalEl.textContent = filtered.length;
             if (pendingEl) pendingEl.textContent = pendingCount;
             if (reviewedEl) reviewedEl.textContent = reviewedCount;
@@ -12622,10 +12627,11 @@ async function saveQuiz() {
             }
 
             tbody.innerHTML = filtered.map(c => {
-                const isReviewed = (c.status || '') === 'reviewed';
+                const isArchived = !!c.isArchived;
+                const isReviewed = isArchived || (c.status || '') === 'reviewed';
                 const ts = c.timestamp && c.timestamp.toDate ? c.timestamp.toDate().toLocaleString('th-TH') : '-';
-                const statusColor = isReviewed ? '#16a34a' : '#d97706';
-                const statusBg = isReviewed ? '#ecfdf5' : '#fffbeb';
+                const statusColor = isArchived ? '#334155' : (isReviewed ? '#16a34a' : '#d97706');
+                const statusBg = isArchived ? '#f1f5f9' : (isReviewed ? '#ecfdf5' : '#fffbeb');
                 const actionBtn = isReviewed
                     ? `<button class="btn-sm" style="background:#334155; color:white; border:none; border-radius:8px;" onclick="updateCaseStatus('${c.id}', 'pending')">Reopen</button>`
                     : `<button class="btn-sm" style="background:#16a34a; color:white; border:none; border-radius:8px;" onclick="updateCaseStatus('${c.id}', 'reviewed')">Mark Reviewed</button>`;
@@ -12643,7 +12649,7 @@ async function saveQuiz() {
                         <td>${safe(c.disease || '-')}</td>
                         <td>${safe(c.customer || '-')}</td>
                         <td style="max-width:260px; white-space:normal;">${safe(c.note || '-')}</td>
-                        <td><span class="badge" style="background:${statusBg}; color:${statusColor}; border:1px solid ${statusColor}33;">${isReviewed ? 'reviewed' : 'pending'}</span></td>
+                        <td><span class="badge" style="background:${statusBg}; color:${statusColor}; border:1px solid ${statusColor}33;">${isArchived ? 'archived' : (isReviewed ? 'reviewed' : 'pending')}</span></td>
                         <td>${actionBtn}</td>
                     </tr>
                 `;
@@ -13672,14 +13678,27 @@ async function saveQuiz() {
             }
         };
 
+        function getCrewRankByScore(score) {
+            if (score >= 90) return 'LV.10 Captain';
+            if (score >= 80) return 'LV.9 Vice Captain';
+            if (score >= 70) return 'LV.8 Helmsman';
+            if (score >= 60) return 'LV.7 Musician';
+            if (score >= 50) return 'LV.6 Leading Shipwright';
+            if (score >= 40) return 'LV.5 Senior Archaeologist';
+            if (score >= 30) return 'LV.4 Experienced Doctor';
+            if (score >= 20) return 'LV.3 Cook';
+            if (score >= 10) return 'LV.2 Probationary Sniper';
+            return 'LV.1 Rookie Navigator';
+        }
+
         function renderHubHeader(u) {
-            const lv = Math.floor((u.score || 0) / 10) + 1;
+            const crewRank = getCrewRankByScore(u.score || 0);
             document.getElementById('lb-popup-header').innerHTML = `
                 <img src="${u.pictureUrl}" style="width:65px; height:65px; border-radius:50%; object-fit:cover; border:3px solid #4361ee; box-shadow:0 8px 20px rgba(67,97,238,0.2);">
                 <div style="flex:1">
                     <div style="font-size:1.4em; font-weight:900; color:#1e293b; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                         ${u.displayName} 
-                        <span style="font-size:11px; background:linear-gradient(135deg, #4361ee, #7209b7); color:white; padding:4px 12px; border-radius:30px; letter-spacing:1px; font-weight:900;">LV.${lv}</span>
+                        <span style="font-size:11px; background:linear-gradient(135deg, #4361ee, #7209b7); color:white; padding:4px 12px; border-radius:30px; letter-spacing:1px; font-weight:900;">${crewRank}</span>
                         ${u.certRequested ? `
                             <div onclick="openCertModal('${u.id}')" title="Certificate Requested - Click to Issue" style="cursor:pointer; display:flex; align-items:center; justify-content:center; width:34px; height:34px; background:linear-gradient(135deg, #f59e0b, #d97706); border-radius:50%; box-shadow:0 0 15px rgba(245,158,11,0.5); animation: pulse-gold 2s infinite; font-size:1.1em;">🎓</div>
                         ` : ''}
@@ -14105,11 +14124,11 @@ async function saveQuiz() {
             modal.style.display = 'block';
 
             // Header
-            const lv = Math.floor((u.score || 0) / 10) + 1;
+            const crewRank = getCrewRankByScore(u.score || 0);
             document.getElementById('lb-popup-header').innerHTML = `
                 <img src="${u.pictureUrl}" style="width:60px; height:60px; border-radius:50%; object-fit:cover; border:3px solid #4361ee; box-shadow:0 4px 12px rgba(0,0,0,0.15);">
                 <div>
-                    <div style="font-size:1.3em; font-weight:bold;">${u.displayName} <span style="font-size:0.6em; background:#eee; padding:2px 8px; border-radius:10px; color:#999;">Lv.${lv}</span></div>
+                    <div style="font-size:1.3em; font-weight:bold;">${u.displayName} <span style="font-size:0.6em; background:#eee; padding:2px 8px; border-radius:10px; color:#999;">${crewRank}</span></div>
                     <div style="font-size:0.85em; color:#666;">${u.startDate || '?'} → ${u.endDate || '?'} | Score: <b style="color:#4361ee;">${(u.score || 0).toFixed(2)}</b></div>
                 </div>
             `;
@@ -15042,8 +15061,7 @@ async function saveQuiz() {
             const user = usersData.find(u => u.id === userId);
             if (!user) return;
             
-            // Calculate user level
-            const level = Math.floor((user.score || 0) / 10) + 1;
+            const crewRank = getCrewRankByScore(user.score || 0);
             
             // Calculate days in program
             let daysLeft = '-';
@@ -15067,7 +15085,7 @@ async function saveQuiz() {
             // Update modal content
             document.getElementById('profile-pic').src = user.pictureUrl;
             document.getElementById('profile-name').textContent = user.displayName;
-            document.getElementById('profile-level').textContent = `🎖️ Level ${level}`;
+            document.getElementById('profile-level').textContent = `🎖️ ${crewRank}`;
             document.getElementById('profile-score').textContent = parseFloat((user.score || 0).toFixed(2));
             document.getElementById('profile-status').textContent = status;
             document.getElementById('profile-tasks').textContent = completedTasks || 0;
@@ -17283,7 +17301,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
         window.AI_CORE_READY = true;
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V90.55 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V90.58 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
 
         // --- V90.36: Quiz Feedback Panel ---
         let _qfpCurrentId = null;
