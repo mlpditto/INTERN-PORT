@@ -2317,6 +2317,8 @@
             const codeInput = document.getElementById('enroll-code-input');
             const statusEl = document.getElementById('enroll-status');
             const code = codeInput.value.trim().toUpperCase();
+            const rawLiffUserId = (userProfile && userProfile.userId) ? userProfile.userId : userId;
+            const myKnownIds = new Set([userId, rawLiffUserId].filter(Boolean));
 
             if (!code || code.length < 4) {
                 statusEl.innerHTML = '<span style="color:#ef233c;">❌ กรุณากรอกรหัสให้ครบ</span>';
@@ -2337,7 +2339,8 @@
                 const preData = preDoc.data();
 
                 if (preData.claimed) {
-                    if (preData.claimedBy !== userId) {
+                    const isSameOwner = myKnownIds.has(preData.claimedBy) || myKnownIds.has(preData.sourceUserId);
+                    if (!isSameOwner) {
                         statusEl.innerHTML = '<span style="color:#ef233c;">❌ รหัสนี้ถูกใช้งานไปแล้วครับ</span>';
                         return;
                     }
@@ -2387,10 +2390,22 @@
                     await db.collection("pre_users").doc(preDoc.id).update({
                         claimed: true,
                         claimedBy: userId,
+                        sourceUserId: preData.sourceUserId || userId,
                         claimedByName: userProfile.displayName,
                         claimedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 }
+
+                // Reflect profile changes immediately on current screen (no hard refresh needed)
+                myGroup = userData.group || "Public";
+                document.getElementById('u-group-badge').innerHTML = `<i class="fa-solid ${getGroupIcon(myGroup)}"></i> ${myGroup}`;
+                document.getElementById('u-group-badge').style.background = getGroupColor(myGroup);
+                document.getElementById('u-group-badge').style.display = myGroup !== 'Public' ? 'inline-block' : 'none';
+                document.getElementById('u-start-date').value = userData.startDate || "";
+                document.getElementById('u-end-date').value = userData.endDate || "";
+                document.getElementById('u-start-date-text').innerText = userData.startDate ? formatCustomDate(userData.startDate) : 'Start Date';
+                document.getElementById('u-end-date-text').innerText = userData.endDate ? formatCustomDate(userData.endDate) : 'End Date';
+                document.getElementById('date-alert').style.display = (!userData.startDate || !userData.endDate) ? 'block' : 'none';
                 
                 // 🔥 If they had a request, mark it as processed (Optional but good)
                 const reqSnap = await db.collection("reports").where("userId", "==", userId).where("type", "==", "access_request").get();
