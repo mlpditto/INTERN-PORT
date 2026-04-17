@@ -3533,8 +3533,11 @@
         <div id="clearConfirmModal" class="modal" style="z-index:2100;">
             <div class="modal-content" style="max-width:350px;text-align:center;">
                 <h2 style="color:#ef233c;">⚠️ Clear Archive?</h2>
-                <p>Clear all task history?</p><button id="btn-confirm-clear" class="magic-btn"
-                    style="background:#ccc;width:100%;" disabled>Confirm (5)</button>
+                <p>Clear all task history?</p>
+                <div style="display:flex; gap:10px; justify-content:center; margin-top:8px;">
+                    <button id="btn-confirm-clear" class="magic-btn" style="background:#ccc; min-width:150px;" disabled>Confirm (5)</button>
+                    <button type="button" class="magic-btn" style="background:#64748b; min-width:120px;" onclick="closeClearArchiveConfirm()">Cancel</button>
+                </div>
             </div>
         </div>
         <div id="certModal" class="modal">
@@ -12588,7 +12591,7 @@ async function saveQuiz() {
             const keyword = ((document.getElementById('alabasta-case-search') || {}).value || '').toLowerCase().trim();
 
             const safe = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-            const filtered = casesData.filter(c => {
+            const filtered = casesData.filter(c => !c.isArchived).filter(c => {
                 if (activeBoardGroup !== 'All') {
                     const user = usersData.find(u => u.id === c.userId);
                     if ((user?.group || 'Public') !== activeBoardGroup) return false;
@@ -12649,8 +12652,51 @@ async function saveQuiz() {
 
         async function updateCaseStatus(caseDocId, status) {
             try {
-                await db.collection('cases').doc(caseDocId).update({
+                const caseItem = casesData.find(c => c.id === caseDocId) || {};
+                const caseRef = db.collection('cases').doc(caseDocId);
+
+                if (status === 'reviewed') {
+                    const input = prompt('เพิ่มคะแนนสำหรับเคสนี้ (pts):', String(caseItem.adminBonus || 0));
+                    if (input === null) return;
+
+                    const bonus = parseFloat(String(input).trim());
+                    if (!Number.isFinite(bonus) || bonus < 0) {
+                        alert('กรุณากรอกคะแนนเป็นตัวเลข 0 ขึ้นไป');
+                        return;
+                    }
+
+                    const batch = db.batch();
+                    batch.update(caseRef, {
+                        status: 'reviewed',
+                        isArchived: true,
+                        archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        adminBonus: bonus,
+                        adminUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        adminReviewedBy: ALLOWED_EMAIL || 'admin'
+                    });
+
+                    if (bonus > 0 && caseItem.userId) {
+                        batch.update(db.collection('users').doc(caseItem.userId), {
+                            score: firebase.firestore.FieldValue.increment(bonus)
+                        });
+                        batch.set(db.collection('checkin_logs').doc(), {
+                            userId: caseItem.userId,
+                            type: 'case_review_bonus',
+                            amount: bonus,
+                            note: `Alabasta reviewed: ${caseItem.caseId || caseDocId}`,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+
+                    await batch.commit();
+                    if (typeof showToast === 'function') showToast(`Archived +${bonus.toFixed(2)} pts`, 'success');
+                    return;
+                }
+
+                await caseRef.update({
                     status,
+                    isArchived: false,
                     adminUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     adminReviewedBy: ALLOWED_EMAIL || 'admin'
                 });
@@ -14866,7 +14912,55 @@ async function saveQuiz() {
 
         async function delArchiveDoc(id) { if (confirm("Del?")) await db.collection("side_quests").doc(id).delete(); openArchiveModal(); }
         async function restoreSQ(id, t) { await db.collection("side_quests").doc(id).update({ status: t, doneAt: firebase.firestore.FieldValue.serverTimestamp() }); openArchiveModal(); showToast("Restored"); }
-        function confirmClearArchive() { document.getElementById('clearConfirmModal').style.display = 'block'; const btn = document.getElementById('btn-confirm-clear'); btn.disabled = true; btn.style.background = '#ccc'; let c = 5; btn.innerText = `Confirm (${c})`; const t = setInterval(() => { c--; btn.innerText = `Confirm (${c})`; if (c <= 0) { clearInterval(t); btn.disabled = false; btn.style.background = '#ef233c'; btn.innerText = "CLEAR ALL"; btn.onclick = async () => { document.getElementById('clearConfirmModal').style.display = 'none'; const s = await db.collection("side_quests").where("status", "==", "Archived").get(); const b = db.batch(); s.forEach(d => b.delete(d.ref)); await b.commit(); showToast("Cleared!"); openArchiveModal(); } } }, 1000); }
+        let clearArchiveConfirmTimer = null;
+
+        function closeClearArchiveConfirm() {
+            if (clearArchiveConfirmTimer) {
+                clearInterval(clearArchiveConfirmTimer);
+                clearArchiveConfirmTimer = null;
+            }
+            document.getElementById('clearConfirmModal').style.display = 'none';
+        }
+
+        function confirmClearArchive() {
+            const modal = document.getElementById('clearConfirmModal');
+            const btn = document.getElementById('btn-confirm-clear');
+            if (!modal || !btn) return;
+
+            if (clearArchiveConfirmTimer) {
+                clearInterval(clearArchiveConfirmTimer);
+                clearArchiveConfirmTimer = null;
+            }
+
+            modal.style.display = 'block';
+            btn.disabled = true;
+            btn.style.background = '#ccc';
+            let c = 5;
+            btn.innerText = `Confirm (${c})`;
+
+            clearArchiveConfirmTimer = setInterval(() => {
+                c--;
+                btn.innerText = `Confirm (${c})`;
+                if (c <= 0) {
+                    clearInterval(clearArchiveConfirmTimer);
+                    clearArchiveConfirmTimer = null;
+                    btn.disabled = false;
+                    btn.style.background = '#ef233c';
+                    btn.innerText = 'CLEAR ALL';
+                }
+            }, 1000);
+
+            btn.onclick = async () => {
+                if (btn.disabled) return;
+                closeClearArchiveConfirm();
+                const s = await db.collection('side_quests').where('status', '==', 'Archived').get();
+                const b = db.batch();
+                s.forEach(d => b.delete(d.ref));
+                await b.commit();
+                showToast('Cleared!');
+                openArchiveModal();
+            };
+        }
         function renderHistoryPage() {
             const l = document.getElementById("history-list");
             const c = document.getElementById("history-controls");
