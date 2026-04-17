@@ -1000,28 +1000,6 @@
                     box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
                 }
 
-                .grandline-tool-btn {
-                    border: 1px solid #e5e7eb;
-                    background: #fff;
-                    border-radius: 10px;
-                    padding: 8px 10px;
-                    text-align: left;
-                    cursor: pointer;
-                    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-                    width: 100%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    gap: 10px;
-                    min-height: 44px;
-                }
-
-                .grandline-tool-btn.active {
-                    border-color: #4361ee;
-                    background: #eef2ff;
-                    box-shadow: 0 4px 12px rgba(67, 97, 238, 0.2);
-                }
-
                 .grandline-tool-meta {
                     display: inline-flex;
                     align-items: center;
@@ -1094,20 +1072,6 @@
                                 <div class="lean-kpi"><div class="lean-kpi-label">Flow</div><div class="lean-kpi-value" id="lean-kpi-flow">0%</div></div>
                             </div>
                             <div class="lean-flow-track"><div id="lean-flow-bar" class="lean-flow-bar"></div></div>
-                            <div id="grandline-tool-cards-row" style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
-                                <button id="gl-btn-mission" class="grandline-tool-btn" onclick="openJourneySection('section-kanban', 'toggleKanban')">
-                                    <div class="grandline-tool-meta"><span id="crew-dot-mission" class="status-dot status-dot-neutral"></span><div class="grandline-tool-title">Mission Tool</div></div>
-                                    <span id="crew-status-mission" class="status-pill status-neutral">Waiting Review</span>
-                                </button>
-                                <button id="gl-btn-case" class="grandline-tool-btn" onclick="openJourneySection('section-cases', 'toggleCaseSection')">
-                                    <div class="grandline-tool-meta"><span id="crew-dot-case" class="status-dot status-dot-neutral"></span><div class="grandline-tool-title">Case Tool</div></div>
-                                    <span id="crew-status-case" class="status-pill status-neutral">Waiting Review</span>
-                                </button>
-                                <button id="gl-btn-work" class="grandline-tool-btn" onclick="openJourneySection('section-general-work', 'toggleWorkSection')">
-                                    <div class="grandline-tool-meta"><span id="crew-dot-work" class="status-dot status-dot-neutral"></span><div class="grandline-tool-title">Work Tool</div></div>
-                                    <span id="crew-status-work" class="status-pill status-neutral">Ready</span>
-                                </button>
-                            </div>
                         </div>
 
                         <div id="grandline-tool-sections-host" style="margin-top:12px;"></div>
@@ -4537,22 +4501,6 @@
             if (icon) icon.style.transform = shouldOpen ? 'rotate(180deg)' : 'rotate(0deg)';
         }
 
-        function setActiveGrandLineToolButton(activeButtonId) {
-            document.querySelectorAll('.grandline-tool-btn').forEach(btn => {
-                btn.classList.toggle('active', !!activeButtonId && btn.id === activeButtonId);
-            });
-        }
-
-        function setCrewStatus(key, text, tone) {
-            const el = document.getElementById('crew-status-' + key);
-            if (el) {
-                el.className = `status-pill status-${tone}`;
-                el.textContent = text;
-            }
-            const dot = document.getElementById('crew-dot-' + key);
-            if (dot) dot.className = `status-dot status-dot-${tone === 'progress' ? 'progress' : 'neutral'}`;
-        }
-
         let leanMetricsExpanded = false;
         function toggleLeanMetricsDetails(forceExpand = null) {
             const details = document.getElementById('lean-metrics-details');
@@ -4618,21 +4566,6 @@
             }
             if (!leanMetricsExpanded) toggleLeanMetricsDetails(false);
 
-            const toolMap = [
-                ['mission', 'kanban-content', doingCount > 0 ? 'Ready' : 'Waiting Review'],
-                ['case', 'case-section-content', 'Waiting Review'],
-                ['work', 'work-section-content', score >= 30 ? 'Reward Available' : 'Ready']
-            ];
-
-            let active = '';
-            toolMap.forEach(([key, contentId]) => {
-                const el = document.getElementById(contentId);
-                if (!active && el && el.style.display === 'block') active = key;
-            });
-
-            toolMap.forEach(([key, _, idleText]) => {
-                setCrewStatus(key, active === key ? 'In Progress' : idleText, active === key ? 'progress' : 'neutral');
-            });
         }
 
         function closeOtherGrandLineSections(activeContentId) {
@@ -4667,11 +4600,6 @@
             else if (sectionId === 'section-cases') contentId = 'case-section-content';
             else if (sectionId === 'section-general-work') contentId = 'work-section-content';
 
-            let buttonId = '';
-            if (sectionId === 'section-kanban') buttonId = 'gl-btn-mission';
-            else if (sectionId === 'section-cases') buttonId = 'gl-btn-case';
-            else if (sectionId === 'section-general-work') buttonId = 'gl-btn-work';
-
             const toggleFn = window[toggleFunctionName];
             if (typeof toggleFn === 'function' && contentId) {
                 closeOtherGrandLineSections(contentId);
@@ -4679,24 +4607,8 @@
                 if (content && content.style.display === 'none') toggleFn();
             }
 
-            setActiveGrandLineToolButton(buttonId);
-
             section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            syncGrandLineRedundancy();
             updateGrandLineDashboard();
-        }
-
-        function syncGrandLineRedundancy() {
-            const cardsRow = document.getElementById('grandline-tool-cards-row');
-            if (!cardsRow) return;
-
-            const openContents = ['assignments-content', 'kanban-content', 'case-section-content', 'work-section-content'];
-            const hasOpenSection = openContents.some(id => {
-                const el = document.getElementById(id);
-                return el && el.style.display === 'block';
-            });
-
-            cardsRow.style.display = 'flex';
         }
 
         function toggleAssignmentList() {
@@ -4710,9 +4622,7 @@
             } else {
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
-                setActiveGrandLineToolButton('');
             }
-            syncGrandLineRedundancy();
             updateGrandLineDashboard();
         }
 
@@ -5227,14 +5137,11 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 closeOtherGrandLineSections('kanban-content');
                 content.style.display = 'block';
                 icon.style.transform = 'rotate(180deg)';
-                setActiveGrandLineToolButton('gl-btn-mission');
                 loadSideQuests();
             } else {
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
-                setActiveGrandLineToolButton('');
             }
-            syncGrandLineRedundancy();
             updateGrandLineDashboard();
         }
 
@@ -5245,15 +5152,12 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 closeOtherGrandLineSections('case-section-content');
                 content.style.display = 'block';
                 icon.style.transform = 'rotate(180deg)';
-                setActiveGrandLineToolButton('gl-btn-case');
                 renderCases();
                 setTimeout(() => document.getElementById('c-id').focus(), 100);
             } else {
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
-                setActiveGrandLineToolButton('');
             }
-            syncGrandLineRedundancy();
             updateGrandLineDashboard();
         }
 
@@ -5264,14 +5168,11 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 closeOtherGrandLineSections('work-section-content');
                 content.style.display = 'block';
                 icon.style.transform = 'rotate(180deg)';
-                setActiveGrandLineToolButton('gl-btn-work');
                 renderHistory();
             } else {
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
-                setActiveGrandLineToolButton('');
             }
-            syncGrandLineRedundancy();
             updateGrandLineDashboard();
         }
 
