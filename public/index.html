@@ -5552,11 +5552,13 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             btn.innerText = "กำลังส่ง...";
 
             try {
-                const b = db.batch();
-                const logRef = db.collection("reflective_logs").doc();
-                const userRef = db.collection("users").doc(userId);
+                const authUser = await ensureFirebaseAuthReady(10000);
+                if (!authUser) {
+                    throw new Error("Missing Firebase auth. โปรดรีเฟรชหน้าแล้วลองใหม่อีกครั้ง");
+                }
 
-                b.set(logRef, {
+                // Step 1: Save reflective log first so user data is not lost even if score update is denied.
+                await db.collection("reflective_logs").add({
                     userId,
                     displayName: userProfile.displayName,
                     pictureUrl: userProfile.pictureUrl || "",
@@ -5567,24 +5569,28 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     autoScore: 0.1
                 });
 
-                // Add 0.1 pts immediately
-                b.update(userRef, {
-                    score: firebase.firestore.FieldValue.increment(0.1)
-                });
+                let scoreGranted = true;
+                try {
+                    await db.collection("users").doc(userId).update({
+                        score: firebase.firestore.FieldValue.increment(0.1)
+                    });
 
-                // Log score change
-                const scoreLogRef = db.collection("checkin_logs").doc();
-                b.set(scoreLogRef, {
-                    userId,
-                    type: 'reflective_log',
-                    amount: 0.1,
-                    note: 'Daily Reflective Log',
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                    await db.collection("checkin_logs").add({
+                        userId,
+                        type: 'reflective_log',
+                        amount: 0.1,
+                        note: 'Daily Reflective Log',
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } catch (scoreErr) {
+                    scoreGranted = false;
+                    console.warn("Reflective log saved but score update failed:", scoreErr);
+                }
 
-                await b.commit();
                 document.getElementById('rl-content').value = "";
-                alert("✨ บันทึกสำเร็จ! ได้รับ 0.1 คะแนนครับ");
+                alert(scoreGranted
+                    ? "✨ บันทึกสำเร็จ! ได้รับ 0.1 คะแนนครับ"
+                    : "✨ บันทึกสำเร็จ! (คะแนน 0.1 จะอัปเดตให้อัตโนมัติภายหลัง)");
             } catch (e) {
                 console.error(e);
                 alert("Error: " + e.message);
