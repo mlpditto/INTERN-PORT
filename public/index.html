@@ -793,12 +793,12 @@
                                 </button>
                             </div>
                             <div id="lean-metrics-details" class="lean-kpi-wrap" style="display:none; margin-top:8px;">
-                                <div class="lean-kpi-head">Lean Voyage Metrics</div>
+                                <div class="lean-kpi-head">Voyage Metrics</div>
                                 <div class="lean-kpi-grid">
-                                    <div class="lean-kpi"><div class="lean-kpi-label">WIP</div><div class="lean-kpi-value" id="lean-kpi-wip">0/3</div></div>
-                                    <div class="lean-kpi"><div class="lean-kpi-label">Queue</div><div class="lean-kpi-value" id="lean-kpi-queue">0</div></div>
-                                    <div class="lean-kpi"><div class="lean-kpi-label">Shipped</div><div class="lean-kpi-value" id="lean-kpi-throughput">0</div></div>
-                                    <div class="lean-kpi"><div class="lean-kpi-label">Flow</div><div class="lean-kpi-value" id="lean-kpi-flow">0%</div></div>
+                                    <div class="lean-kpi"><div class="lean-kpi-label">Quiz</div><div class="lean-kpi-value" id="lean-kpi-wip">0</div></div>
+                                    <div class="lean-kpi"><div class="lean-kpi-label">Reflective</div><div class="lean-kpi-value" id="lean-kpi-queue">0</div></div>
+                                    <div class="lean-kpi"><div class="lean-kpi-label">Case</div><div class="lean-kpi-value" id="lean-kpi-throughput">0</div></div>
+                                    <div class="lean-kpi"><div class="lean-kpi-label">Total</div><div class="lean-kpi-value" id="lean-kpi-flow">0</div></div>
                                 </div>
                                 <div class="lean-flow-track"><div id="lean-flow-bar" class="lean-flow-bar"></div></div>
                             </div>
@@ -4598,24 +4598,24 @@
             if (todayEl) todayEl.textContent = `+${todayPointsWithReflective.toFixed(2)}`;
             if (streakEl) streakEl.textContent = `${reflectiveMetrics.currentStreak || 0} วัน`;
 
-            const backlogCount = parseInt((document.getElementById('cnt-Backlog') || {}).innerText || '0', 10) || 0;
-            const doingCount = parseInt((document.getElementById('cnt-Doing') || {}).innerText || '0', 10) || 0;
-            const reviewCount = parseInt((document.getElementById('cnt-Review') || {}).innerText || '0', 10) || 0;
-            const doneCount = parseInt((document.getElementById('cnt-Done') || {}).innerText || '0', 10) || 0;
-            const wipCount = doingCount + reviewCount;
-            const totalFlow = backlogCount + doingCount + reviewCount + doneCount;
-            const flowRate = totalFlow > 0 ? Math.round((doneCount / totalFlow) * 100) : 0;
+            const quizzesWithPoints = (usersWorksCache || []).filter(w => w.type === 'quiz' && (parseFloat(w.score) || 0) > 0).length;
+            const reflectiveWithPoints = (window.myReflectiveLogsCache || []).filter(l => (parseFloat(l.adminBonus) || 0) > 0).length;
+            const casesWithPoints = (window.myCasesCache || []).filter(c => (parseFloat(c.adminBonus) || 0) > 0).length;
+            const allWithPoints = quizzesWithPoints + reflectiveWithPoints + casesWithPoints;
 
             const kpiWipEl = document.getElementById('lean-kpi-wip');
             const kpiQueueEl = document.getElementById('lean-kpi-queue');
             const kpiThroughputEl = document.getElementById('lean-kpi-throughput');
             const kpiFlowEl = document.getElementById('lean-kpi-flow');
             const flowBarEl = document.getElementById('lean-flow-bar');
-            if (kpiWipEl) kpiWipEl.textContent = `${wipCount}/3`;
-            if (kpiQueueEl) kpiQueueEl.textContent = `${backlogCount}`;
-            if (kpiThroughputEl) kpiThroughputEl.textContent = `${doneCount}`;
-            if (kpiFlowEl) kpiFlowEl.textContent = `${flowRate}%`;
-            if (flowBarEl) flowBarEl.style.width = `${Math.max(6, flowRate)}%`;
+            if (kpiWipEl) {
+                kpiWipEl.textContent = `${quizzesWithPoints}`;
+                kpiWipEl.style.color = '#065f46';
+            }
+            if (kpiQueueEl) kpiQueueEl.textContent = `${reflectiveWithPoints}`;
+            if (kpiThroughputEl) kpiThroughputEl.textContent = `${casesWithPoints}`;
+            if (kpiFlowEl) kpiFlowEl.textContent = `${allWithPoints}`;
+            if (flowBarEl) flowBarEl.style.width = `${Math.max(6, allWithPoints * 5)}%`;
             if (!leanMetricsExpanded) toggleLeanMetricsDetails(false);
 
         }
@@ -6392,6 +6392,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             if (!userId) return;
             db.collection("cases").where("userId", "==", userId).orderBy("timestamp", "desc").get().then(snap => {
                 const cases = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                window.myCasesCache = cases;
                 renderCaseGrouped(cases);
             });
         }
