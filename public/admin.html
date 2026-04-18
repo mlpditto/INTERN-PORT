@@ -2028,7 +2028,7 @@
             <button class="tab-btn" onclick="switchTab('tab-users')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">👥 User Hub</button>
             <button class="tab-btn" onclick="switchTab('tab-ai-hub')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🤖 AI Digital Lab</button>
             <button class="tab-btn" onclick="switchTab('tab-laughtale')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🏝️ Laugh Tale</button>
-            <button class="tab-btn" onclick="switchTab('tab-poneglyph')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🪨 Poneglyph (ポーネグリフ)</button>
+            <button class="tab-btn" onclick="switchTab('tab-poneglyph')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🪨 Poneglyph</button>
 
         </div>
 
@@ -3343,7 +3343,7 @@
                     </div>
 
                     <div id="poneglyph-editor-col" style="background:#fff; border:1px solid var(--border-color); border-radius:16px; padding:14px; box-shadow:0 8px 20px rgba(15,23,42,0.05);">
-                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:nowrap; overflow-x:auto; white-space:nowrap; margin-bottom:10px; padding-bottom:4px;">
                             <button id="poneglyph-btn-save" class="btn-sm" onclick="savePoneglyphNote()" style="background:#16a34a; color:#fff; border:none; border-radius:10px; padding:8px 12px;">💾 Save</button>
                             <button id="poneglyph-btn-duplicate" class="btn-sm" onclick="duplicatePoneglyphNote()" style="background:#7c3aed; color:#fff; border:none; border-radius:10px; padding:8px 12px;">🧬 Duplicate</button>
                             <button id="poneglyph-btn-pin" class="btn-sm" onclick="togglePoneglyphPin()" style="background:#f59e0b; color:#fff; border:none; border-radius:10px; padding:8px 12px;">📌 Pin/Unpin</button>
@@ -3352,7 +3352,9 @@
                             <button id="poneglyph-btn-export-pdf" class="btn-sm" onclick="exportPoneglyphPdf()" style="background:#0f766e; color:#fff; border:none; border-radius:10px; padding:8px 12px;">🧾 Export PDF</button>
                             <button id="poneglyph-btn-ai-summary" class="btn-sm" onclick="summarizePoneglyphNote()" style="background:#5b21b6; color:#fff; border:none; border-radius:10px; padding:8px 12px;">🤖 Summary</button>
                             <button id="poneglyph-btn-ai-actions" class="btn-sm" onclick="generatePoneglyphActionItems()" style="background:#6d28d9; color:#fff; border:none; border-radius:10px; padding:8px 12px;">🧭 Action Items</button>
-                            <span id="poneglyph-save-status" style="font-size:0.8em; color:#64748b; margin-left:auto;">Ready</span>
+                            <button id="poneglyph-btn-tts" class="btn-sm" onclick="speakPoneglyphContent()" style="background:#0b7285; color:#fff; border:none; border-radius:10px; padding:8px 12px;">🔊 Speak</button>
+                            <button id="poneglyph-btn-tts-stop" class="btn-sm" onclick="stopPoneglyphSpeech()" style="background:#334155; color:#fff; border:none; border-radius:10px; padding:8px 12px;">⏹ Stop</button>
+                            <span id="poneglyph-save-status" style="font-size:0.8em; color:#64748b; margin-left:auto; flex-shrink:0;">Ready</span>
                         </div>
 
                         <input id="poneglyph-title" type="text" placeholder="Note title..." oninput="onPoneglyphEditorInput()" style="margin:0 0 8px 0; font-size:1.05em; font-weight:800; border-radius:10px; padding:10px 12px;">
@@ -16899,6 +16901,7 @@ async function saveQuiz() {
         let poneglyphInitialized = false;
         let poneglyphDraftTimer = null;
         let poneglyphResponsiveBound = false;
+        let poneglyphSpeechUtterance = null;
 
         function getPoneglyphCurrentUserId() {
             return (auth && auth.currentUser && auth.currentUser.uid) ? auth.currentUser.uid : 'admin-local';
@@ -16994,6 +16997,54 @@ async function saveQuiz() {
             });
             const pct = total > 0 ? Math.round((done / total) * 100) : 0;
             return { total: total, done: done, percent: pct };
+        }
+
+        function speakPoneglyphContent() {
+            if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
+                alert('Text-to-speech is not supported in this browser.');
+                return;
+            }
+            const title = (document.getElementById('poneglyph-title')?.value || '').trim();
+            const content = (document.getElementById('poneglyph-content')?.value || '').trim();
+            const aiOutput = (document.getElementById('poneglyph-ai-output')?.value || '').trim();
+            const textBody = content || aiOutput;
+            if (!textBody) {
+                if (typeof showToast === 'function') showToast('⚠️ No text available in note content or AI output.');
+                return;
+            }
+
+            const fullText = `${title ? `${title}. ` : ''}${textBody}`;
+            const langGuess = /[\u0E00-\u0E7F]/.test(fullText) ? 'th-TH' : 'en-US';
+
+            window.speechSynthesis.cancel();
+            const utter = new SpeechSynthesisUtterance(fullText);
+            utter.lang = langGuess;
+            utter.rate = 0.95;
+            utter.pitch = 1;
+
+            const statusEl = document.getElementById('poneglyph-save-status');
+            utter.onstart = () => {
+                if (statusEl) statusEl.innerText = 'Speaking...';
+            };
+            utter.onend = () => {
+                if (statusEl) statusEl.innerText = 'Ready';
+                poneglyphSpeechUtterance = null;
+            };
+            utter.onerror = () => {
+                if (statusEl) statusEl.innerText = 'Speech failed';
+                poneglyphSpeechUtterance = null;
+            };
+
+            poneglyphSpeechUtterance = utter;
+            window.speechSynthesis.speak(utter);
+        }
+
+        function stopPoneglyphSpeech() {
+            if (!('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel();
+            poneglyphSpeechUtterance = null;
+            const statusEl = document.getElementById('poneglyph-save-status');
+            if (statusEl) statusEl.innerText = 'Speech stopped';
         }
 
         function createEmptyPoneglyphNote(ownerId) {
