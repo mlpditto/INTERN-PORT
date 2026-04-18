@@ -12030,8 +12030,13 @@ async function saveQuiz() {
         async function backupPodcastToGoogleDrive(blob, episodeTitle, folderId) {
             const token = await ensureGdriveWriteToken();
             const safeTitle = String(episodeTitle || 'podcast').replace(/[^a-z0-9_-]/gi, '_');
-            const driveFilename = `podcast_backup_${Date.now()}_${safeTitle}.webm`;
-            const metadata = { name: driveFilename, mimeType: blob.type || 'audio/webm' };
+            const mime = String(blob?.type || 'audio/webm').toLowerCase();
+            let ext = 'webm';
+            if (mime.includes('wav')) ext = 'wav';
+            else if (mime.includes('mpeg') || mime.includes('mp3')) ext = 'mp3';
+            else if (mime.includes('ogg')) ext = 'ogg';
+            const driveFilename = `podcast_backup_${Date.now()}_${safeTitle}.${ext}`;
+            const metadata = { name: driveFilename, mimeType: blob.type || `audio/${ext}` };
             if (folderId) metadata.parents = [folderId];
 
             const form = new FormData();
@@ -12217,9 +12222,14 @@ async function saveQuiz() {
 
             try {
                 const storage = firebase.storage();
-                const filename = `podcasts/${Date.now()}_${title.replace(/\s+/g, '_')}.webm`;
+                const mime = String(podAudioBlob.type || 'audio/webm').toLowerCase();
+                let ext = 'webm';
+                if (mime.includes('wav')) ext = 'wav';
+                else if (mime.includes('mpeg') || mime.includes('mp3')) ext = 'mp3';
+                else if (mime.includes('ogg')) ext = 'ogg';
+                const filename = `podcasts/${Date.now()}_${title.replace(/\s+/g, '_')}.${ext}`;
                 const ref = storage.ref(filename);
-                const uploadTask = ref.put(podAudioBlob);
+                const uploadTask = ref.put(podAudioBlob, { contentType: podAudioBlob.type || `audio/${ext}` });
 
                 uploadTask.on('state_changed',
                     snap => {
@@ -17373,7 +17383,19 @@ async function saveQuiz() {
                 const previewEl = document.getElementById('pod-preview');
                 const playbackSection = document.getElementById('pod-playback-section');
                 const saveBtn = document.getElementById('btn-pod-save');
-                if (previewEl) previewEl.src = URL.createObjectURL(podAudioBlob);
+                if (previewEl) {
+                    previewEl.src = URL.createObjectURL(podAudioBlob);
+                    previewEl.onloadedmetadata = () => {
+                        const sec = Number(previewEl.duration || 0);
+                        if (Number.isFinite(sec) && sec > 0) {
+                            podSeconds = Math.round(sec);
+                            const m = String(Math.floor(podSeconds / 60)).padStart(2, '0');
+                            const s = String(podSeconds % 60).padStart(2, '0');
+                            const timerEl = document.getElementById('pod-timer');
+                            if (timerEl) timerEl.textContent = `${m}:${s}`;
+                        }
+                    };
+                }
                 if (playbackSection) playbackSection.style.display = 'block';
                 if (saveBtn) saveBtn.style.display = 'block';
                 if (typeof showToast === 'function') showToast('🎙 Podcast draft ready with latest exported audio');
