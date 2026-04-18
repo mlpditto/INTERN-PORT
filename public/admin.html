@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MEDLIFE+ Admin V90.69 (Turbo)</title>
-    <!-- V90.69: Quiz Editor "Split to New Quiz" label + version parity sync -->
+    <title>MEDLIFE+ Admin V90.70 (Turbo)</title>
+    <!-- V90.70: Quiz Editor "Split to New Quiz" label + version parity sync -->
     <!-- Release: 2026-04-18 12:00 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -2082,7 +2082,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; background:linear-gradient(135deg, #4361ee, #8e44ad); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.4em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         🛸 Intern Admin Portal
-                        <span style="font-size:0.45em; background:linear-gradient(135deg, rgba(67, 97, 238, 0.8), rgba(142, 68, 173, 0.8)); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(67,97,238,0.3);">V90.69</span>
+                        <span style="font-size:0.45em; background:linear-gradient(135deg, rgba(67, 97, 238, 0.8), rgba(142, 68, 173, 0.8)); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(67,97,238,0.3);">V90.70</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -2740,6 +2740,14 @@
 
                             <div style="margin-bottom:10px;">
                                 <label style="display:block; font-size:0.72em; font-weight:800; color:#7c2d12; margin-bottom:6px; text-transform:uppercase;">Performance Notes</label>
+                                <select id="tts-preset-select" style="width:100%; margin-bottom:8px; padding:9px 12px; border-radius:12px; border:1px solid #fed7aa; background:#fff; color:#7c2d12; font-weight:700;" onchange="applyLaboonTtsPreset(this.value)">
+                                    <option value="custom">Custom Preset</option>
+                                    <option value="warm">Warm Thai Narration</option>
+                                    <option value="podcast">Podcast Host</option>
+                                    <option value="energetic">Energetic Announcement</option>
+                                    <option value="narrator">Documentary Narrator</option>
+                                    <option value="dialogue">Dialogue Two Speakers</option>
+                                </select>
                                 <input id="tts-style-input" type="text" value="Warm, clear, confident Thai narration with natural pacing." placeholder="Example: warm, clear, concise, energetic announcement" style="width:100%; padding:10px 12px; border-radius:12px; border:1px solid #fed7aa; background:white; color:#7c2d12; box-sizing:border-box;">
                             </div>
 
@@ -3170,6 +3178,148 @@
                 ].filter(Boolean).join('\n\n');
             }
 
+            const LABOON_TTS_SETTINGS_KEY = 'laboon_tts_settings_v1';
+
+            function getLaboonTtsSettings() {
+                try {
+                    const raw = localStorage.getItem(LABOON_TTS_SETTINGS_KEY);
+                    return raw ? JSON.parse(raw) : {};
+                } catch (_) {
+                    return {};
+                }
+            }
+
+            function setSelectValueIfExists(el, value) {
+                if (!el || value == null) return;
+                if ([...el.options].some(opt => opt.value === value)) {
+                    el.value = value;
+                }
+            }
+
+            function persistLaboonTtsSettings(skipTranscript = false) {
+                const prev = getLaboonTtsSettings();
+                const transcriptEl = document.getElementById('tts-input');
+                const next = {
+                    mode: window._ttsMode || 'single',
+                    preset: document.getElementById('tts-preset-select')?.value || 'custom',
+                    voice: document.getElementById('tts-voice-select')?.value || 'Kore',
+                    language: document.getElementById('tts-language-select')?.value || 'th-TH',
+                    voiceS1: document.getElementById('tts-voice-s1')?.value || 'Kore',
+                    voiceS2: document.getElementById('tts-voice-s2')?.value || 'Puck',
+                    languageD: document.getElementById('tts-language-select-d')?.value || 'th-TH',
+                    styleText: document.getElementById('tts-style-input')?.value || '',
+                    transcript: skipTranscript ? (prev.transcript || '') : (transcriptEl?.value || '')
+                };
+                try {
+                    localStorage.setItem(LABOON_TTS_SETTINGS_KEY, JSON.stringify(next));
+                } catch (_) {
+                    // Ignore quota/storage failures in browser localStorage.
+                }
+            }
+
+            function restoreLaboonTtsSettings() {
+                const saved = getLaboonTtsSettings();
+                if (!saved || typeof saved !== 'object') return;
+
+                setSelectValueIfExists(document.getElementById('tts-voice-select'), saved.voice);
+                setSelectValueIfExists(document.getElementById('tts-language-select'), saved.language);
+                setSelectValueIfExists(document.getElementById('tts-voice-s1'), saved.voiceS1);
+                setSelectValueIfExists(document.getElementById('tts-voice-s2'), saved.voiceS2);
+                setSelectValueIfExists(document.getElementById('tts-language-select-d'), saved.languageD);
+                setSelectValueIfExists(document.getElementById('tts-preset-select'), saved.preset || 'custom');
+
+                const styleEl = document.getElementById('tts-style-input');
+                if (styleEl && saved.styleText) styleEl.value = saved.styleText;
+
+                const inputEl = document.getElementById('tts-input');
+                if (inputEl && !inputEl.value.trim() && saved.transcript) inputEl.value = saved.transcript;
+
+                if (saved.mode === 'dialogue' || saved.mode === 'single') {
+                    window.setTtsMode(saved.mode);
+                }
+            }
+
+            function bindLaboonTtsPersistenceHandlers() {
+                const changeIds = [
+                    'tts-voice-select', 'tts-language-select', 'tts-voice-s1', 'tts-voice-s2',
+                    'tts-language-select-d', 'tts-style-input', 'tts-preset-select'
+                ];
+                changeIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (!el || el.dataset.persistBound === '1') return;
+                    el.addEventListener('change', () => persistLaboonTtsSettings(true));
+                    el.dataset.persistBound = '1';
+                });
+
+                const inputIds = ['tts-style-input', 'tts-input'];
+                inputIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (!el || el.dataset.persistInputBound === '1') return;
+                    el.addEventListener('input', () => persistLaboonTtsSettings(id !== 'tts-input'));
+                    el.dataset.persistInputBound = '1';
+                });
+            }
+
+            function validateDialogueTranscript(transcript) {
+                const lines = String(transcript || '').split('\n').map(l => l.trim()).filter(Boolean);
+                if (lines.length < 2) {
+                    return { ok: false, message: 'Dialogue mode requires at least 2 lines (Speaker 1 and Speaker 2).' };
+                }
+                const lineFormat = /^(speaker\s*1|speaker\s*2)\s*:/i;
+                const hasS1 = lines.some(l => /^speaker\s*1\s*:/i.test(l));
+                const hasS2 = lines.some(l => /^speaker\s*2\s*:/i.test(l));
+                if (!hasS1 || !hasS2) {
+                    return { ok: false, message: 'Dialogue format must include both "Speaker 1:" and "Speaker 2:" lines.' };
+                }
+                const invalidLine = lines.find(l => !lineFormat.test(l));
+                if (invalidLine) {
+                    return { ok: false, message: `Invalid dialogue line: "${invalidLine.slice(0, 50)}". Use Speaker 1:/Speaker 2:.` };
+                }
+                return { ok: true };
+            }
+
+            window.applyLaboonTtsPreset = function(preset) {
+                const styleEl = document.getElementById('tts-style-input');
+                const voiceEl = document.getElementById('tts-voice-select');
+                const languageEl = document.getElementById('tts-language-select');
+                const voiceS1El = document.getElementById('tts-voice-s1');
+                const voiceS2El = document.getElementById('tts-voice-s2');
+                const languageDEl = document.getElementById('tts-language-select-d');
+
+                if (preset === 'warm') {
+                    if (styleEl) styleEl.value = 'Warm, clear, confident Thai narration with natural pacing.';
+                    if (voiceEl) voiceEl.value = 'Kore';
+                    if (languageEl) languageEl.value = 'th-TH';
+                    window.setTtsMode('single');
+                } else if (preset === 'podcast') {
+                    if (styleEl) styleEl.value = 'Podcast host style, conversational, warm, smooth transitions.';
+                    if (voiceEl) voiceEl.value = 'Kore';
+                    if (languageEl) languageEl.value = 'th-TH';
+                    window.setTtsMode('single');
+                } else if (preset === 'energetic') {
+                    if (styleEl) styleEl.value = 'Energetic, engaging, bright delivery with upbeat pacing.';
+                    if (voiceEl) voiceEl.value = 'Puck';
+                    if (languageEl) languageEl.value = 'th-TH';
+                    window.setTtsMode('single');
+                } else if (preset === 'narrator') {
+                    if (styleEl) styleEl.value = 'Documentary narrator voice, steady, articulate, rich low-mid tone.';
+                    if (voiceEl) voiceEl.value = 'Charon';
+                    if (languageEl) languageEl.value = 'en-US';
+                    window.setTtsMode('single');
+                } else if (preset === 'dialogue') {
+                    if (styleEl) styleEl.value = 'Two-host podcast dialogue, natural turn-taking, friendly and clear delivery.';
+                    if (voiceS1El) voiceS1El.value = 'Kore';
+                    if (voiceS2El) voiceS2El.value = 'Puck';
+                    if (languageDEl) languageDEl.value = 'th-TH';
+                    window.setTtsMode('dialogue');
+                }
+
+                persistLaboonTtsSettings(true);
+                if (typeof showToast === 'function' && preset !== 'custom') {
+                    showToast('Applied TTS preset: ' + preset);
+                }
+            };
+
             window._ttsMode = 'single';
             window.setTtsMode = function(mode) {
                 const single = document.getElementById('tts-single-controls');
@@ -3192,6 +3342,7 @@
                     if (inp) inp.placeholder = 'Step 2: Paste the script you want Gemini to narrate...';
                 }
                 window._ttsMode = mode;
+                persistLaboonTtsSettings(true);
             };
 
             window.fillTtsFromSelection = function() {
@@ -3217,6 +3368,7 @@
                 ttsInput.value = selectedText;
                 setTtsStatus('Selected text loaded into TTS Studio.');
                 showToast('Loaded selected text into TTS Studio');
+                persistLaboonTtsSettings();
             };
 
             window.stopGeminiTTS = function() {
@@ -3265,12 +3417,22 @@
                     return;
                 }
 
+                if (isDialogue) {
+                    const validation = validateDialogueTranscript(transcript);
+                    if (!validation.ok) {
+                        setTtsStatus(validation.message, true);
+                        return;
+                    }
+                }
+
                 if (window.loadAIKeys) window.loadAIKeys();
                 const geminiKey = window.GEMINI_API_KEY || localStorage.getItem('ai_gemini_key') || '';
                 if (!geminiKey || geminiKey.startsWith('__')) {
                     setTtsStatus('Gemini API key not found. Open AI Config and save a valid Gemini key first.', true);
                     return;
                 }
+
+                persistLaboonTtsSettings();
 
                 const prompt = buildTtsPrompt(transcript, styleEl.value.trim());
                 btnEl.disabled = true;
@@ -3352,6 +3514,9 @@
                     btnEl.style.opacity = '1';
                 }
             };
+
+            bindLaboonTtsPersistenceHandlers();
+            restoreLaboonTtsSettings();
         </script>
 
 
@@ -4560,6 +4725,12 @@
                     <button id="btn-pod-rec" onclick="startPodcastRecording()" style="background:linear-gradient(135deg,#e84393,#c0392b); color:white; border:none; border-radius:50%; width:64px; height:64px; font-size:1.6em; cursor:pointer; box-shadow:0 6px 20px rgba(232,67,147,0.4); transition:0.2s;" title="Record">🔴</button>
                     <button id="btn-pod-pause" onclick="pausePodcastRecording()" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:50%; width:56px; height:56px; font-size:1.4em; cursor:pointer; transition:0.2s;" title="Pause" disabled>⏸️</button>
                     <button id="btn-pod-stop" onclick="stopPodcastRecording()" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:50%; width:56px; height:56px; font-size:1.4em; cursor:pointer; transition:0.2s;" title="Stop" disabled>⏹️</button>
+                </div>
+
+                <div style="display:flex; justify-content:center; margin:-8px 0 16px 0;">
+                    <button type="button" onclick="useLatestTtsAudioForPodcast()" style="background:#fff7ed; color:#9a3412; border:1px solid #fdba74; border-radius:999px; padding:8px 14px; font-weight:800; font-size:0.8em; cursor:pointer;">
+                        🎧 Use Latest TTS Audio
+                    </button>
                 </div>
 
                 <!-- Playback preview -->
@@ -12144,6 +12315,42 @@ async function saveQuiz() {
             document.getElementById('pod-timer').textContent = `${m}:${s}`;
         }
 
+        function setPodcastPreviewFromBlob(audioBlob) {
+            if (!audioBlob) return false;
+            podAudioBlob = audioBlob;
+
+            const previewEl = document.getElementById('pod-preview');
+            const playbackSection = document.getElementById('pod-playback-section');
+            const saveBtn = document.getElementById('btn-pod-save');
+
+            if (previewEl) {
+                previewEl.src = URL.createObjectURL(podAudioBlob);
+                previewEl.onloadedmetadata = () => {
+                    const sec = Number(previewEl.duration || 0);
+                    if (Number.isFinite(sec) && sec > 0) {
+                        podSeconds = Math.round(sec);
+                        const m = String(Math.floor(podSeconds / 60)).padStart(2, '0');
+                        const s = String(podSeconds % 60).padStart(2, '0');
+                        const timerEl = document.getElementById('pod-timer');
+                        if (timerEl) timerEl.textContent = `${m}:${s}`;
+                    }
+                };
+            }
+            if (playbackSection) playbackSection.style.display = 'block';
+            if (saveBtn) saveBtn.style.display = 'block';
+            return true;
+        }
+
+        function useLatestTtsAudioForPodcast() {
+            if (!window._geminiTtsBlob) {
+                if (typeof showToast === 'function') showToast('No latest TTS audio found. Generate audio first.', 'warning');
+                return;
+            }
+            if (setPodcastPreviewFromBlob(window._geminiTtsBlob) && typeof showToast === 'function') {
+                showToast('🎧 Imported latest TTS audio into Podcast Studio');
+            }
+        }
+
         async function startPodcastRecording() {
             try {
                 podStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -17378,26 +17585,7 @@ async function saveQuiz() {
             if (podTitleEl) podTitleEl.value = title || `Poneglyph Audio ${new Date().toLocaleDateString()}`;
             if (podDescEl) podDescEl.value = tags ? `${tags}\n${shortDesc}` : shortDesc;
 
-            if (window._geminiTtsBlob) {
-                podAudioBlob = window._geminiTtsBlob;
-                const previewEl = document.getElementById('pod-preview');
-                const playbackSection = document.getElementById('pod-playback-section');
-                const saveBtn = document.getElementById('btn-pod-save');
-                if (previewEl) {
-                    previewEl.src = URL.createObjectURL(podAudioBlob);
-                    previewEl.onloadedmetadata = () => {
-                        const sec = Number(previewEl.duration || 0);
-                        if (Number.isFinite(sec) && sec > 0) {
-                            podSeconds = Math.round(sec);
-                            const m = String(Math.floor(podSeconds / 60)).padStart(2, '0');
-                            const s = String(podSeconds % 60).padStart(2, '0');
-                            const timerEl = document.getElementById('pod-timer');
-                            if (timerEl) timerEl.textContent = `${m}:${s}`;
-                        }
-                    };
-                }
-                if (playbackSection) playbackSection.style.display = 'block';
-                if (saveBtn) saveBtn.style.display = 'block';
+            if (window._geminiTtsBlob && setPodcastPreviewFromBlob(window._geminiTtsBlob)) {
                 if (typeof showToast === 'function') showToast('🎙 Podcast draft ready with latest exported audio');
             } else if (typeof showToast === 'function') {
                 showToast('Podcast draft opened. Generate/export audio first or record with mic.');
@@ -19103,7 +19291,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
         window.AI_CORE_READY = true;
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V90.69 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V90.70 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
 
         // --- V90.36: Quiz Feedback Panel ---
         let _qfpCurrentId = null;
