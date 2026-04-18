@@ -1,6 +1,18 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwnerFromResource() {
+      return isSignedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    function isOwnerFromRequest() {
+      return isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+    }
+
     // Default: Deny all unless explicitly allowed
     match /{document=**} {
       allow read, write: if false;
@@ -50,9 +62,18 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // Poneglyph notes are owner-scoped only
+    match /poneglyph_notes/{id} {
+      allow create: if isOwnerFromRequest();
+      allow read, delete: if isOwnerFromResource();
+      allow update: if isOwnerFromResource()
+                    && isOwnerFromRequest()
+                    && request.resource.data.ownerId == resource.data.ownerId;
+    }
+
     // Catch-all for other authenticated collections
     match /{path=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isSignedIn() && !(path.size() > 0 && path[0] == "poneglyph_notes");
     }
   }
 }
