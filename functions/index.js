@@ -14,7 +14,7 @@ const AUTH_SECRET = "mlp-secret-8888"; // Basic shared secret between admin.html
  * 🤖 AI Proxy Function (V89.19)
  * Handles: Gemini, OpenAI, and Vertex AI (Imagen 3)
  */
-exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"], timeoutSeconds: 300, memory: "512MiB" }, async (req, res) => {
+exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "THAILLM_API_KEY"], timeoutSeconds: 300, memory: "512MiB" }, async (req, res) => {
     try {
         // 1. Basic Auth Check (Custom Header)
         const authHeader = req.headers["x-mlp-secret"];
@@ -174,6 +174,33 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"], ti
             });
 
             return res.json({ text: response.data.choices[0].message.content, tokens: response.data.usage.total_tokens });
+        }
+
+        // --- 🟤 ThaiLLM OpenThaiGPT (Phase 1: Intelligence Translate) ---
+        if (provider === "thaillm") {
+            const apiKey = process.env.THAILLM_API_KEY;
+            if (!apiKey) return res.status(500).json({ error: "ThaiLLM API Key not configured on server." });
+
+            let tailoredPrompt = prompt;
+            if (isJson && !prompt.toLowerCase().includes("json")) {
+                tailoredPrompt += "\n\n(Respond in strictly valid JSON format)";
+            }
+
+            const modelName = model && model.startsWith("thaillm") ? "/model" : (model || "/model");
+            const response = await axios.post("http://thaillm.or.th/api/openthaigpt/v1/chat/completions", {
+                model: modelName,
+                messages: [{ role: "user", content: tailoredPrompt }],
+                max_tokens: isJson ? 4096 : 2048,
+                temperature: 0.3
+            }, {
+                headers: { "apikey": apiKey, "Content-Type": "application/json" }
+            });
+
+            return res.json({
+                text: response.data?.choices?.[0]?.message?.content || "",
+                tokens: response.data?.usage?.total_tokens || 0,
+                model: modelName
+            });
         }
 
         // --- 🔴 Anthropic (Claude 3.5 Sonnet / Haiku) (V87.54) ---

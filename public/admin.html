@@ -925,6 +925,30 @@
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
         }
 
+        #quiz-q-nav button.has-missing-answer:not(.active) {
+            border-color: rgba(248, 113, 113, 0.7);
+            box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.2), 0 6px 16px rgba(127, 29, 29, 0.35);
+        }
+
+        #quiz-q-nav .q-nav-missing-indicator {
+            position: absolute;
+            top: -3px;
+            right: -2px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ef4444;
+            border: 1px solid rgba(255, 255, 255, 0.75);
+            box-shadow: 0 3px 10px rgba(127, 29, 29, 0.45);
+            z-index: 4;
+            pointer-events: none;
+        }
+
+        #quiz-q-nav button.active .q-nav-missing-indicator {
+            background: #dc2626;
+            border-color: rgba(255, 255, 255, 0.85);
+        }
+
         @keyframes pulse {
             0%, 100% { 
                 transform: scale(1.18);
@@ -3927,6 +3951,7 @@
                             <button class="btn-sm" onclick="moveQuizQ(1)" title="Next" style="width:36px; height:36px; border-radius:12px; background:linear-gradient(135deg, #3b82f6, #2563eb); color:white; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1.1em; transition:0.2s; box-shadow:0 4px 10px rgba(59,130,246,0.3);">➡️</button>
                             <button class="btn-sm" onclick="addQuestionUI()" title="Add New Question" style="width:36px; height:36px; border-radius:12px; background:#f8fafc; color:#1e293b; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1.1em; transition:0.2s; margin-left:4px;">➕</button>
                         </div>
+                        <span id="quiz-missing-answer-summary" style="display:none; margin-left:6px; padding:4px 10px; border-radius:999px; background:rgba(239,68,68,0.18); border:1px solid rgba(248,113,113,0.45); color:#fecaca; font-size:0.68em; font-weight:800; white-space:nowrap;">ยังไม่เฉลย 0 ข้อ</span>
                         <span id="auto-save-status" style="font-size:0.6em; font-weight:bold; color:#fb7185; display:none; margin-left:8px;">Saving...</span>
                         </div>
 
@@ -3955,6 +3980,7 @@
                                 <span style="font-size:0.65em; font-weight:900; color:#4ade80; letter-spacing:0.8px; white-space:nowrap; text-transform:uppercase; margin-right:4px;"><i class="fa-solid fa-language"></i> Translate</span>
                                 <div class="glass-toggle-container" id="ai-translate-model-toggle" style="margin:0; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.05); padding:3px; height:32px; border-radius:10px; gap:2px;">
                                     <div class="glass-toggle-item active" data-value="gemini-1.5-flash-latest" onclick="window.selectAiToolbarToggle(this,'toolbar-ai-translate-model')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#fbbf24;">Flash</div>
+                                    <div class="glass-toggle-item" data-value="thaillm-openthaigpt" onclick="window.selectAiToolbarToggle(this,'toolbar-ai-translate-model')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#fbbf24;">ThaiLLM</div>
                                     <div class="glass-toggle-item" data-value="glm-5.1:cloud" onclick="window.selectAiToolbarToggle(this,'toolbar-ai-translate-model')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#fbbf24;">GLM-5.1</div>
                                     <div class="glass-toggle-item" data-value="gemini-1.5-pro-latest" onclick="window.selectAiToolbarToggle(this,'toolbar-ai-translate-model')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#94a3b8;">Pro</div>
                                     <div class="glass-toggle-item" data-value="gpt-4o" onclick="window.selectAiToolbarToggle(this,'toolbar-ai-translate-model')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#94a3b8;">GPT</div>
@@ -4831,6 +4857,7 @@
                 else if (modelName === 'imagen' || modelName === 'imagen-nano') proxyProvider = "imagen";
                 else if (modelName === 'dalle') proxyProvider = "openai";
                 else if (modelName.includes('gemini') || modelName === 'multimodal') proxyProvider = "gemini";
+                else if (modelName.toLowerCase().includes('thaillm') || modelName.toLowerCase().includes('openthaigpt')) proxyProvider = "thaillm";
                 else if (modelName.includes('gpt')) proxyProvider = "openai";
                 else if (modelName.includes('typhoon')) proxyProvider = "typhoon";
                 else if (modelName.includes('llama')) proxyProvider = "together";
@@ -7282,6 +7309,23 @@ Do not include any explanation other than the feedback body.`;
             quizQPageIndex = newIndex;
             updateQuizPagination();
         }
+
+        function shouldMarkQuestionMissingAnswer(item) {
+            if (!item) return false;
+
+            const quizTypeEl = document.getElementById('quiz-type');
+            const isPollEl = document.getElementById('quiz-is-poll');
+            const qTypeEl = item.querySelector('.q-type');
+
+            const quizType = quizTypeEl ? quizTypeEl.value : '';
+            const isPoll = isPollEl ? isPollEl.checked : false;
+            const qType = qTypeEl ? qTypeEl.value : 'choice';
+
+            // Only warn for normal multiple-choice scoring questions.
+            if (isPoll || quizType === 'read_only' || qType !== 'choice') return false;
+
+            return item.querySelectorAll('.q-correct-check:checked').length === 0;
+        }
         
         function updateQuizPagination() {
             updatePollUI();
@@ -7289,6 +7333,7 @@ Do not include any explanation other than the feedback body.`;
             const total = items.length;
             if (quizQPageIndex >= total && total > 0) quizQPageIndex = total - 1;
             if (quizQPageIndex < 0) quizQPageIndex = 0;
+            const missingCount = Array.from(items).filter(it => shouldMarkQuestionMissingAnswer(it)).length;
 
             items.forEach((item, i) => {
                 if (i === quizQPageIndex) {
@@ -7350,11 +7395,24 @@ Do not include any explanation other than the feedback body.`;
                 nav.innerHTML = "";
                 items.forEach((item, i) => {
                     const btn = document.createElement('button');
+                    const hasMissingAnswer = shouldMarkQuestionMissingAnswer(item);
                     btn.className = (i === quizQPageIndex) ? 'active' : '';
-                    btn.innerHTML = `<span>${i + 1}</span>`;
+                    if (hasMissingAnswer) btn.classList.add('has-missing-answer');
+                    btn.innerHTML = `<span>${i + 1}</span>${hasMissingAnswer ? '<span class="q-nav-missing-indicator" title="ยังไม่กำหนดเฉลย"></span>' : ''}`;
+                    btn.title = hasMissingAnswer ? `Q${i + 1}: ยังไม่กำหนดเฉลย` : `Q${i + 1}`;
                     btn.onclick = (e) => { e.preventDefault(); quizQPageIndex = i; updateQuizPagination(); };
                     nav.appendChild(btn);
                 });
+            }
+
+            const missingSummary = document.getElementById('quiz-missing-answer-summary');
+            if (missingSummary) {
+                if (missingCount > 0) {
+                    missingSummary.textContent = `ยังไม่เฉลย ${missingCount} ข้อ`;
+                    missingSummary.style.display = 'inline-flex';
+                } else {
+                    missingSummary.style.display = 'none';
+                }
             }
         }
 
@@ -7922,6 +7980,8 @@ Do not include any explanation other than the feedback body.`;
             const item = btn.closest('.quiz-q-item');
             btn.closest('.q-opt-row').remove();
             updateOptionNumbers(item);
+            updateQuizPagination();
+            triggerAutoSave();
         }
 
         function updateOptionNumbers(item) {
