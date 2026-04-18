@@ -4964,6 +4964,19 @@
                 console.warn("🚀 [AI Proxy] Link failed. Reason:", e.message, "Trying Local SDK...");
             }
 
+            // ThaiLLM is proxy-first. If proxy fails, fall back to an available local provider.
+            if (modelName.toLowerCase().includes('thaillm') || modelName.toLowerCase().includes('openthaigpt')) {
+                if (window.TYPHOON_API_KEY) {
+                    console.warn("[AI Fallback] ThaiLLM proxy unavailable. Falling back to Typhoon local API.");
+                    modelName = 'typhoon-v2.5-30b-a3b-instruct';
+                } else if (quickApiKey || window.GEMINI_API_KEY) {
+                    console.warn("[AI Fallback] ThaiLLM proxy unavailable. Falling back to Gemini Flash local SDK.");
+                    modelName = 'gemini-1.5-flash-latest';
+                } else {
+                    throw new Error("ThaiLLM is currently unavailable because AI Proxy failed and no local fallback key is configured.");
+                }
+            }
+
             try {
                 if (modelName.includes('gemini') || modelName === 'multimodal') {
                     const genAI = new GoogleGenerativeAI(quickApiKey || window.GEMINI_API_KEY);

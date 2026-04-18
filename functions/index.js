@@ -187,7 +187,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "TH
             }
 
             const modelName = model && model.startsWith("thaillm") ? "/model" : (model || "/model");
-            const response = await axios.post("http://thaillm.or.th/api/openthaigpt/v1/chat/completions", {
+            const response = await axios.post("https://thaillm.or.th/api/openthaigpt/v1/chat/completions", {
                 model: modelName,
                 messages: [{ role: "user", content: tailoredPrompt }],
                 max_tokens: isJson ? 4096 : 2048,
