@@ -3999,6 +3999,7 @@
                         <!-- Group 2: Bulk Actions -->
                         <div style="display:flex; align-items:center; gap:4px; padding-right:8px; border-right:1px solid rgba(217,119,6,0.2);">
                             <button class="btn-sm" onclick="openImportQuizModal()" title="Import Items" style="background:#2563eb; color:white; border:none; padding:0 10px; border-radius:8px; font-weight:800; font-size:0.68em; height:28px; cursor:pointer; display:flex; align-items:center; gap:4px;"><i class="fa-solid fa-file-import"></i> Import</button>
+                            <button class="btn-sm" onclick="openExportQuizPdfModal()" title="Export Quiz to PDF" style="background:#0ea5e9; color:white; border:none; padding:0 10px; border-radius:8px; font-weight:800; font-size:0.68em; height:28px; cursor:pointer; display:flex; align-items:center; gap:4px;"><i class="fa-solid fa-file-pdf"></i> Export</button>
                             <button class="btn-sm" onclick="openBulkExportModal()" title="Extract Items" style="background:#4f46e5; color:white; border:none; padding:0 10px; border-radius:8px; font-weight:800; font-size:0.68em; height:28px; cursor:pointer; display:flex; align-items:center; gap:4px;"><i class="fa-solid fa-file-export"></i> Extract</button>
                         </div>
 
@@ -4518,6 +4519,43 @@
                 style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; margin-top:5px; margin-bottom:15px; font-size:0.9em;">
             </select>
             <button class="magic-btn" style="width:100%;" onclick="executeImportQuiz()">➕ Import Selected</button>
+        </div>
+    </div>
+
+    <div id="exportQuizPdfModal" class="modal" style="z-index:4200;">
+        <div class="modal-content" style="max-width:560px; text-align:left;">
+            <span class="close-modal" onclick="closeExportQuizPdfModal()">&times;</span>
+            <h3 style="margin-top:0;">📄 Export Quiz PDF</h3>
+            <p id="export-quiz-pdf-count" style="margin-top:0; color:#64748b; font-size:0.9em;">Questions ready for export</p>
+
+            <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px; margin-bottom:16px;">
+                <label style="display:flex; align-items:flex-start; gap:10px; border:1px solid #e2e8f0; border-radius:12px; padding:12px; cursor:pointer;">
+                    <input type="radio" name="quiz-export-pdf-mode" value="with_options_no_answers" checked>
+                    <div>
+                        <div style="font-weight:800;">แบบข้อสอบ + ตัวเลือก (ไม่เฉลย)</div>
+                        <div style="font-size:0.82em; color:#64748b;">เหมาะสำหรับแจกผู้เรียนทำแบบทดสอบ</div>
+                    </div>
+                </label>
+                <label style="display:flex; align-items:flex-start; gap:10px; border:1px solid #e2e8f0; border-radius:12px; padding:12px; cursor:pointer;">
+                    <input type="radio" name="quiz-export-pdf-mode" value="with_answers">
+                    <div>
+                        <div style="font-weight:800;">แบบข้อสอบ + ตัวเลือก (มีเฉลย)</div>
+                        <div style="font-size:0.82em; color:#64748b;">เหมาะสำหรับเฉลย/ตรวจสอบคุณภาพข้อสอบ</div>
+                    </div>
+                </label>
+                <label style="display:flex; align-items:flex-start; gap:10px; border:1px solid #e2e8f0; border-radius:12px; padding:12px; cursor:pointer;">
+                    <input type="radio" name="quiz-export-pdf-mode" value="questions_only">
+                    <div>
+                        <div style="font-weight:800;">แบบเฉพาะโจทย์ (ไม่มีตัวเลือก)</div>
+                        <div style="font-size:0.82em; color:#64748b;">เหมาะสำหรับข้ออภิปรายหรือโจทย์ปลายเปิด</div>
+                    </div>
+                </label>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+                <button class="btn-sm" onclick="closeExportQuizPdfModal()" style="padding:8px 18px;">Cancel</button>
+                <button class="magic-btn" onclick="exportQuizToPdfFromModal()" style="padding:8px 20px;"><i class="fa-solid fa-file-pdf"></i> Export PDF</button>
+            </div>
         </div>
     </div>
 
@@ -5411,6 +5449,10 @@
                                 ${result.items.map((item, arrIdx) => {
                                     let qIdx = (item.qNumber !== undefined) ? item.qNumber - 1 : (item.index !== undefined ? item.index : 0);
                                     qIdx = Math.max(0, Math.min(qIdx, formData.questions.length - 1));
+                                    const improvedJson = JSON.stringify(item.improvedQuestion || {})
+                                        .replace(/\\/g, '\\\\')
+                                        .replace(/'/g, "\\'")
+                                        .replace(/"/g, '&quot;');
                                     return `
                                         <div style="background:#fcfdff; border:1.5px solid #edf2f7; border-radius:15px; padding:15px; border-left:5px solid #4361ee;">
                                             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
@@ -5421,7 +5463,7 @@
                                                         <i class="fa-solid fa-code-compare"></i> Compare
                                                     </button>
                                                     <button class="btn-sm" style="background:#22c55e; color:white; border:none; padding:4px 12px; border-radius:8px; font-weight:bold; font-size:0.75em;"
-                                                        onclick="applySingleAiFix(${qIdx}, ${arrIdx})">
+                                                        onclick="applySingleAiFix(${qIdx}, '${improvedJson}')">
                                                         Fix
                                                     </button>
                                                 </div>
@@ -6469,6 +6511,7 @@ Do not include any explanation other than the feedback body.`;
         const auth = firebase.auth();
 
         var usersData = [], worksData = [], casesData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {}, questsSubList = [];
+        var knowledgeBaseCache = []; // Required by PDF-to-Quiz and Research grounding
         var reflectiveLogsCache = []; 
         var accessRequestsCache = []; 
         var pendingQuizzesCache = [];  
@@ -6613,16 +6656,25 @@ Do not include any explanation other than the feedback body.`;
             return Object.values(uniqueMap).sort((a, b) => a.localeCompare(b));
         }
 
-        auth.onAuthStateChanged(user => {
+        auth.onAuthStateChanged(async user => {
             if (!user) return;
 
-            const userEmail = (user.email || '').trim().toLowerCase();
+            // Some providers occasionally return empty user.email on first auth callback.
+            // Resolve email from multiple reliable sources before denying access.
+            const providerEmails = (user.providerData || [])
+                .map(p => (p && p.email ? String(p.email).trim() : ''))
+                .filter(Boolean);
+            const reloadEmail = user && user.reloadUserInfo && user.reloadUserInfo.email
+                ? String(user.reloadUserInfo.email).trim()
+                : '';
+            const resolvedEmailRaw = [String(user.email || '').trim(), ...providerEmails, reloadEmail].find(Boolean) || '';
+            const userEmail = resolvedEmailRaw.toLowerCase();
             const allowedEmail = (ALLOWED_EMAIL || '').trim().toLowerCase();
 
             if (userEmail && userEmail === allowedEmail) {
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('dashboard-container').style.display = 'block';
-                document.getElementById('admin-email').innerText = user.email;
+                document.getElementById('admin-email').innerText = resolvedEmailRaw;
                 initSystem();
                 return;
             }
@@ -6637,12 +6689,12 @@ Do not include any explanation other than the feedback body.`;
                 alert(`❌ Access Denied\nEmail: missing\nPlease sign in with authorized account: ${ALLOWED_EMAIL}`);
             } else {
                 if (loginErrorEl) {
-                    loginErrorEl.innerText = `Access denied for ${user.email}. Authorized account: ${ALLOWED_EMAIL}`;
+                    loginErrorEl.innerText = `Access denied for ${resolvedEmailRaw}. Authorized account: ${ALLOWED_EMAIL}`;
                 }
-                alert(`❌ Access Denied\nEmail: ${user.email}\nThis account is not authorized to access the Admin Portal.`);
+                alert(`❌ Access Denied\nEmail: ${resolvedEmailRaw}\nThis account is not authorized to access the Admin Portal.`);
             }
 
-            console.warn('Admin auth denied', { uid: user.uid, email: user.email, providerIds });
+            console.warn('Admin auth denied', { uid: user.uid, email: resolvedEmailRaw || user.email, providerIds });
             auth.signOut();
         });
 
@@ -7429,6 +7481,134 @@ Do not include any explanation other than the feedback body.`;
             }
         }
 
+        function openExportQuizPdfModal() {
+            const formData = getQuizFormData();
+            const qCount = (formData.questions || []).length;
+            if (!qCount) return alert("No questions to export. Please add at least 1 question.");
+
+            const statEl = document.getElementById('export-quiz-pdf-count');
+            if (statEl) statEl.innerText = `${qCount} questions will be exported`;
+            forceShowModal('exportQuizPdfModal');
+        }
+
+        function closeExportQuizPdfModal() {
+            forceHideModal('exportQuizPdfModal');
+        }
+
+        function exportQuizToPdfFromModal() {
+            const selected = document.querySelector('input[name="quiz-export-pdf-mode"]:checked');
+            const mode = selected ? selected.value : 'with_options_no_answers';
+            exportQuizToPdf(mode);
+        }
+
+        function exportQuizToPdf(mode) {
+            const jsPdfCtor = window.jspdf && window.jspdf.jsPDF;
+            if (!jsPdfCtor) {
+                alert("PDF engine is not ready. Please refresh and try again.");
+                return;
+            }
+
+            const formData = getQuizFormData();
+            const questions = formData.questions || [];
+            if (!questions.length) {
+                alert("No questions to export.");
+                return;
+            }
+
+            const doc = new jsPdfCtor('p', 'mm', 'a4');
+            const pageW = doc.internal.pageSize.getWidth();
+            const pageH = doc.internal.pageSize.getHeight();
+            const left = 14;
+            const right = 14;
+            const maxW = pageW - left - right;
+            const bottomPad = 14;
+            let y = 16;
+
+            const modeLabelMap = {
+                with_options_no_answers: 'Questions + Options (No Answers)',
+                with_answers: 'Questions + Options + Answers',
+                questions_only: 'Questions Only'
+            };
+
+            const addPageHeader = (firstPage = false) => {
+                if (!firstPage) doc.addPage();
+                y = 16;
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(14);
+                doc.text(formData.title || 'Quiz Export', left, y);
+                y += 6;
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                doc.setTextColor(90, 90, 90);
+                doc.text(`Mode: ${modeLabelMap[mode] || mode}`, left, y);
+                y += 4;
+                doc.text(`Generated: ${new Date().toLocaleString()}`, left, y);
+                y += 6;
+                doc.setTextColor(20, 20, 20);
+                doc.setDrawColor(220, 220, 220);
+                doc.line(left, y, pageW - right, y);
+                y += 6;
+            };
+
+            const ensureSpace = (needed = 8) => {
+                if (y + needed > pageH - bottomPad) addPageHeader(false);
+            };
+
+            const addWrapped = (text, indent = 0, lineGap = 4.8, size = 11, style = 'normal') => {
+                const safeText = String(text || '').trim() || '-';
+                doc.setFont('helvetica', style);
+                doc.setFontSize(size);
+                const lines = doc.splitTextToSize(safeText, maxW - indent);
+                lines.forEach((ln) => {
+                    ensureSpace(lineGap + 1);
+                    doc.text(ln, left + indent, y);
+                    y += lineGap;
+                });
+            };
+
+            const isCorrectIndex = (q, idx) => {
+                const correct = Array.isArray(q.correct) ? q.correct : [q.correct];
+                return correct.map(n => Number(n)).includes(Number(idx));
+            };
+
+            addPageHeader(true);
+
+            questions.forEach((q, qi) => {
+                ensureSpace(10);
+                addWrapped(`${qi + 1}. ${q.q || '(No question text)'}`, 0, 5.2, 11, 'bold');
+
+                if (mode === 'questions_only') {
+                    y += 2;
+                    return;
+                }
+
+                const qType = q.type || 'choice';
+                const opts = Array.isArray(q.options) ? q.options : [];
+
+                if (opts.length > 0 && (qType === 'choice' || qType === 'ordering' || qType === 'flashcard' || qType === 'short_answer')) {
+                    opts.forEach((opt, oi) => {
+                        let line = `${String.fromCharCode(65 + (oi % 26))}. ${opt || '-'}`;
+                        if (mode === 'with_answers' && isCorrectIndex(q, oi)) {
+                            line += '  [Correct]';
+                        }
+                        addWrapped(line, 5, 4.6, 10, 'normal');
+                    });
+                }
+
+                if (mode === 'with_answers' && qType === 'short_answer' && opts.length > 0) {
+                    addWrapped(`Guideline: ${opts.join(' | ')}`, 5, 4.6, 10, 'italic');
+                }
+
+                y += 2;
+            });
+
+            const base = (formData.shortTitle || formData.title || 'quiz').replace(/[^a-zA-Z0-9-_]/g, '_');
+            const modeShort = mode === 'with_answers' ? 'with_answers' : (mode === 'questions_only' ? 'questions_only' : 'no_answers');
+            doc.save(`${base}_${modeShort}.pdf`);
+            showToast(`📄 Exported PDF (${questions.length} questions)`);
+            closeExportQuizPdfModal();
+        }
+
         function toggleQType(el) {
             const item = el.closest('.quiz-q-item');
             const type = el.value;
@@ -7928,6 +8108,27 @@ Do not include any explanation other than the feedback body.`;
                 btn.innerHTML = oldContent;
             }
         };
+async function ensureAuthForQuizWrite(timeoutMs = 3000) {
+            if (auth && auth.currentUser) return auth.currentUser;
+            if (!auth || typeof auth.onAuthStateChanged !== 'function') return null;
+
+            return new Promise((resolve) => {
+                let done = false;
+                let unsub = null;
+                const finish = (user) => {
+                    if (done) return;
+                    done = true;
+                    if (typeof unsub === 'function') unsub();
+                    clearTimeout(timer);
+                    resolve(user || null);
+                };
+                const timer = setTimeout(() => finish(auth.currentUser || null), timeoutMs);
+                unsub = auth.onAuthStateChanged((user) => {
+                    if (user) finish(user);
+                });
+            });
+        }
+
 async function saveQuiz() {
             const id = document.getElementById('edit-quiz-id').value;
             const formData = getQuizFormData();
@@ -7971,8 +8172,18 @@ async function saveQuiz() {
             };
 
             try {
+                const authUser = await ensureAuthForQuizWrite(3500);
+                if (!authUser) {
+                    alert("❌ Firebase auth session not found.\n\nPlease sign in with the admin account again, then retry Save Quiz.");
+                    const loginErrorEl = document.getElementById('login-error');
+                    if (loginErrorEl) {
+                        loginErrorEl.innerText = "Session missing for Firestore write. Please sign in again.";
+                    }
+                    return;
+                }
+
                 console.log("🔍 Saving quiz data:", data);
-                console.log("🔍 Firebase auth state:", auth.currentUser);
+                console.log("🔍 Firebase auth state:", authUser);
                 
                 if (id) {
                     console.log("🔍 Updating existing quiz:", id);
@@ -8004,7 +8215,9 @@ async function saveQuiz() {
                 
                 // More specific error messages
                 if (e.code === 'permission-denied') {
-                    alert("❌ Permission denied: You don't have rights to create quizzes. Please check your admin role.");
+                    const opLabel = id ? 'update' : 'create';
+                    const email = (auth && auth.currentUser && auth.currentUser.email) ? auth.currentUser.email : 'missing';
+                    alert(`❌ Permission denied (${opLabel} quiz).\n\nSigned-in email: ${email}\nPlease verify Firestore rules/admin role for collection: quizzes`);
                 } else if (e.code === 'unavailable') {
                     alert("❌ Firebase is unavailable. Please check your internet connection.");
                 } else {
@@ -9570,18 +9783,26 @@ async function saveQuiz() {
 
         // --- 🔥 V87.52: PDF-to-Quiz Generator (NotebookLM-like) ---
         function openPdfToQuizModal() {
+            const modal = document.getElementById('pdfToQuizModal');
+            if (!modal) {
+                showToast("PDF-to-Quiz modal is missing. Please refresh page.", "error");
+                return;
+            }
             renderPdfToQuizList();
-            document.getElementById('pdfToQuizModal').style.display = 'block';
+            modal.style.display = 'block';
         }
 
         function renderPdfToQuizList() {
             const container = document.getElementById('p2q-list');
-            if (knowledgeBaseCache.length === 0) {
+            if (!container) return;
+            const docs = Array.isArray(knowledgeBaseCache) ? knowledgeBaseCache : [];
+
+            if (docs.length === 0) {
                 container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">No documents in Knowledge Base.</div>';
                 return;
             }
 
-            container.innerHTML = knowledgeBaseCache.map(doc => `
+            container.innerHTML = docs.map(doc => `
                 <div style="background:#fff; border:1.5px solid #eee; border-radius:15px; padding:12px 15px; display:flex; align-items:center; gap:12px; cursor:pointer; transition:0.2s;" 
                      onclick="generateFromDoc('${doc.id}')"
                      onmouseover="this.style.borderColor='#00796b'; this.style.background='#f0fdfa';" 
@@ -9599,11 +9820,19 @@ async function saveQuiz() {
         }
 
         async function generateFromDoc(docId) {
-            const doc = knowledgeBaseCache.find(d => d.id === docId);
+            const docs = Array.isArray(knowledgeBaseCache) ? knowledgeBaseCache : [];
+            const doc = docs.find(d => d.id === docId);
             if (!doc) return alert("Document not found.");
 
-            const qCount = document.getElementById('p2q-count').value;
-            const model = document.getElementById('ai-analyzer-model-val').value;
+            const countEl = document.getElementById('p2q-count');
+            const modelEl = document.getElementById('ai-analyzer-model-val');
+            const qCount = countEl ? countEl.value : '10';
+            const model = modelEl ? modelEl.value : 'gemini-1.5-flash-latest';
+
+            if (typeof callUniversalAI !== 'function') {
+                alert("AI engine is not ready. Please reload and try again.");
+                return;
+            }
 
             if (!confirm(`Generate ${qCount} questions from "${doc.name}"? This will append to your current quiz.`)) return;
 
@@ -17387,6 +17616,10 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 if (currentQ.type !== improvedQ.type) diffs.push('🔀 Type Changed');
 
                 const diffHtml = diffs.map(d => `<span style="background:rgba(99,102,241,0.1); color:#4338ca; padding:4px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid rgba(99,102,241,0.2);">${d}</span>`).join('');
+                const improvedJson = JSON.stringify(improvedQ || {})
+                    .replace(/\\/g, '\\\\')
+                    .replace(/'/g, "\\'")
+                    .replace(/"/g, '&quot;');
 
                 const overlay = document.createElement('div');
                 overlay.id = "ai-compare-overlay";
@@ -17410,7 +17643,8 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
                         <div style="padding:20px 30px; background:#fff; border-top:1.5px solid #edf2f7; display:flex; justify-content:flex-end; gap:12px;">
                             <button class="btn btn-secondary" onclick="document.getElementById('ai-compare-overlay').remove()" style="padding:10px 25px; border-radius:12px; font-weight:700;">Keep Original</button>
-                            <button class="btn btn-primary" onclick="applySingleAiFix(${index}, ${arrIdx}); document.getElementById('ai-compare-overlay').remove();" style="padding:10px 30px; border-radius:12px; font-weight:700; background:#22c55e; border:none; box-shadow:0 4px 15px rgba(34,197,94,0.3);">✅ Apply This Fix</button>
+                            <button class="btn" onclick="addSingleAiAsNewQuestion(${index}, '${improvedJson}'); document.getElementById('ai-compare-overlay').remove();" style="padding:10px 22px; border-radius:12px; font-weight:700; background:#0ea5e9; color:white; border:none; box-shadow:0 4px 15px rgba(14,165,233,0.28);">➕ Add as New Question</button>
+                            <button class="btn btn-primary" onclick="applySingleAiFix(${index}, '${improvedJson}'); document.getElementById('ai-compare-overlay').remove();" style="padding:10px 30px; border-radius:12px; font-weight:700; background:#22c55e; border:none; box-shadow:0 4px 15px rgba(34,197,94,0.3);">✅ Apply This Fix</button>
                         </div>
                     </div>
                 `;
@@ -17418,6 +17652,115 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             } catch (err) {
                 console.error("AI Compare Error:", err);
                 alert("Comparison failed: " + err.message);
+            }
+        };
+
+        function getImprovedQuestionPayload(index, improvedArg) {
+            let improvedQ = null;
+
+            if (typeof improvedArg === 'number') {
+                const item = window._aiAnalysisItems && window._aiAnalysisItems[improvedArg];
+                improvedQ = item && item.improvedQuestion ? item.improvedQuestion : null;
+            } else if (typeof improvedArg === 'string') {
+                try {
+                    improvedQ = JSON.parse(improvedArg.replace(/&quot;/g, '"').replace(/&#39;/g, "'"));
+                } catch (_) {
+                    improvedQ = null;
+                }
+            } else if (improvedArg && typeof improvedArg === 'object') {
+                improvedQ = improvedArg;
+            }
+
+            // Fallback: if payload is missing, resolve by question index from AI items.
+            if (!improvedQ && Array.isArray(window._aiAnalysisItems)) {
+                const matched = window._aiAnalysisItems.find((it) => {
+                    const mappedIdx = (it && it.qNumber !== undefined)
+                        ? (Number(it.qNumber) - 1)
+                        : Number(it && it.index);
+                    return Number.isFinite(mappedIdx) && mappedIdx === index && it && it.improvedQuestion;
+                });
+                if (matched) improvedQ = matched.improvedQuestion;
+            }
+
+            if (!improvedQ) throw new Error('No improvement data found.');
+
+            const allQs = getQuizFormData().questions;
+            if (index < 0 || index >= allQs.length) {
+                throw new Error('Question index out of sync. Please refresh and try again.');
+            }
+
+            return { improvedQ, allQs };
+        }
+
+        function pickAiInsertMode() {
+            const mode = (prompt('Insert improved question where?\n- before\n- after\n- end', 'after') || '').trim().toLowerCase();
+            if (!mode) return null;
+            if (mode === 'before' || mode === 'after' || mode === 'end') return mode;
+            alert("Invalid position. Please use: before, after, or end.");
+            return null;
+        }
+
+        function ensureQuizTag(tagName) {
+            const hiddenInput = document.getElementById('quiz-tags');
+            if (!hiddenInput || !tagName) return;
+            const tags = (hiddenInput.value || '')
+                .split(',')
+                .map(t => t.trim())
+                .filter(Boolean);
+            if (!tags.includes(tagName)) {
+                tags.push(tagName);
+                hiddenInput.value = tags.join(', ');
+                if (typeof refreshTagChips === 'function') refreshTagChips();
+            }
+        }
+
+        window.applySingleAiFix = function(index, improvedArg) {
+            try {
+                const { improvedQ, allQs } = getImprovedQuestionPayload(index, improvedArg);
+                if (!confirm(`Apply improved version to Question ${index + 1}?`)) return;
+
+                allQs[index] = improvedQ;
+
+                const container = document.getElementById('quiz-questions-container');
+                container.innerHTML = "";
+                allQs.forEach(q => addQuestionUI(q));
+
+                quizQPageIndex = index;
+                updateQuizPagination();
+                showToast(`✅ Q${index + 1} updated with AI fix`);
+                triggerAutoSave();
+            } catch (e) {
+                console.error("Single fix error:", e);
+                alert("Error applying fix: " + e.message);
+            }
+        };
+
+        window.addSingleAiAsNewQuestion = function(index, improvedArg) {
+            try {
+                const { improvedQ, allQs } = getImprovedQuestionPayload(index, improvedArg);
+                const mode = pickAiInsertMode();
+                if (!mode) return;
+
+                let insertAt = Math.min(allQs.length, index + 1);
+                if (mode === 'before') insertAt = Math.max(0, index);
+                if (mode === 'end') insertAt = allQs.length;
+
+                if (!confirm(`Add improved version as a NEW question (${mode})?`)) return;
+
+                allQs.splice(insertAt, 0, improvedQ);
+                ensureQuizTag('AI_VARIANT');
+
+                const container = document.getElementById('quiz-questions-container');
+                container.innerHTML = "";
+                allQs.forEach(q => addQuestionUI(q));
+
+                quizQPageIndex = insertAt;
+                updateQuizPagination();
+                showToast(`➕ Added improved question as Q${insertAt + 1}`);
+                triggerAutoSave();
+            } catch (e) {
+                console.error("Add improved question error:", e);
+                alert("Error adding improved question: " + e.message);
             }
         };
 
