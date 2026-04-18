@@ -1,10 +1,10 @@
-# MLP Internship Portfolio (V90.58) Overview
+# MLP Internship Portfolio (V90.68) Overview
 
 > [!IMPORTANT]
 > **📢 กฎการพัฒนา (Development Rule):**
 >
 > 1. แก้ไขโค้ดที่ `production` เสมอ ห้ามแก้ที่ `main`
-> 2. ทุกครั้งที่ Commit ต้องอัปเดตเวอร์ชัน (V90.58) ใน `admin.html` (Title & Badge)
+> 2. ทุกครั้งที่ Commit ต้องอัปเดตเวอร์ชัน (V90.68) ใน `admin.html` (Title & Badge)
 > 3. ใช้ **"Turbo Mode"** (Merge `production` -> `main`) ทุกครั้งเมื่อต้องการ Deploy (ตามกฎใน [[06 Runbooks/VERSION_SYNC_POLICY|VERSION_SYNC_POLICY.md]])
 
 ระบบเว็บแอปพลิเคชันสำหรับจัดการการฝึกงานและระบบ Gamification (สะสมคะแนน) เพื่อจูงใจและติดตามความก้าวหน้าของนักศึกษาฝึกงาน
@@ -841,4 +841,3 @@ service cloud.firestore {
 ---
 
 _บันทึกภาพรวมระบบสะท้อนความจริง (V89.96) โดย Antigravity AI_
-
