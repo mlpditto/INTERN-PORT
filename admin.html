@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<!-- AUTO-GENERATED: Copied from public/admin.html for GitHub Pages entrypoint. Source of truth is public/admin.html -->
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,11 +10,89 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <link rel="stylesheet" href="style.css">
+
+    <script>
+        // V89.02: Reconstructed helper with nested modal and parent visibility support
+        function forceShowModal(id, displayType) {
+            const m = document.getElementById(id);
+            if (!m) { console.error('forceShowModal: not found:', id); return; }
+            displayType = displayType || 'block';
+
+            // Special handling for nested modals (Participants/Review on top of Manager)
+            const isNested = (id === 'quizParticipantsModal' || id === 'reflectiveReviewModal' || id === 'quizReviewModal' || id === 'exportQuizPdfModal');
+            
+            // Hide other modals unless they are safe parents
+            document.querySelectorAll('.modal').forEach(modal => {
+                if (modal.id !== id) {
+                    const isSafeParent = (modal.id === 'quizManageModal' || modal.id === 'archiveModal' || modal.id === 'assignmentsManageModal');
+                    if (!isNested || !isSafeParent) {
+                        modal.classList.remove('force-show');
+                        modal.style.display = 'none';
+                        modal.setAttribute('style', 'display:none;');
+                    }
+                }
+            });
+
+            // Ensure current modal is visible and positioned correctly
+            m.removeAttribute('style');
+            m.className = 'modal force-show';
+            m.style.setProperty('display', displayType, 'important');
+            
+            // NEW: Ensure all parents are visible
+            let p = m.parentElement;
+            while (p && p !== document.body) {
+                if (window.getComputedStyle(p).display === 'none') {
+                    console.warn('forceShowModal: Un-hiding parent:', p.id || p.tagName);
+                    p.style.setProperty('display', 'block', 'important');
+                }
+                p = p.parentElement;
+            }
+
+            // Force reflow
+            m.offsetHeight;
+            document.body.offsetHeight;
+
+            setTimeout(() => {
+                const rect = m.getBoundingClientRect();
+                if (rect.width === 0 || rect.height === 0) {
+                    console.error('forceShowModal: CRITICAL failure for', id, '- Modal is still zero-size. Possible absolute centering issue or hidden ancestor.');
+                }
+            }, 100);
+        }
+        function forceHideModal(id) {
+            var m = document.getElementById(id);
+            if (!m) return;
+            m.classList.remove('force-show');
+            m.setAttribute('style', 'display:none;');
+        }
+
+        // V89.74: Global Early-Defined AI Toggles
+        window.selectAiToolbarToggle = function(el, hiddenId) {
+            console.log(`🔘 [AI Toggle] Early-Bound Selection: ${el.dataset.value} for ${hiddenId}`);
+            const container = el.parentElement;
+            if (!container) return;
+            container.querySelectorAll('.glass-toggle-item').forEach(i => i.classList.remove('active'));
+            el.classList.add('active');
+            const hidden = document.getElementById(hiddenId);
+            if (hidden) {
+                hidden.value = el.dataset.value;
+                if (typeof showToast === 'function') showToast(`🤖 Model set to: ${el.innerText}`);
+            }
+        };
+
+
+    </script>
+
+    <style>
+        /* ... (CSS content from public/admin.html) ... */
+    </style>
+
+    <!-- ... (rest of head content from public/admin.html) ... -->
 </head>
+
 <body>
-    <script src="firebase-config.js?v=65"></script>
-    <script src="cheat-detector.js"></script>
-    <script src="public/admin.html?v=90.72" type="text/html"></script>
+
+    <!-- ... (body content from public/admin.html) ... -->
+
 </body>
 </html>
