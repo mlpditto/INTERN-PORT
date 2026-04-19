@@ -1,4 +1,4 @@
-// Firebase config for production (copied from root)
+// เอาค่าที่ได้จาก Step 1 มาวางทับตรงนี้
 const firebaseConfig = {
   apiKey: "AIzaSyCnyZoNfk_YE7TfLeEXFo9GgA-QMj3tv6Q",
   authDomain: "intern-port-edfa7.firebaseapp.com",
@@ -15,6 +15,6 @@ let TYPHOON_API_KEY = "__TYPHOON_API_KEY__";
 let OPENAI_API_KEY = "__OPENAI_API_KEY__";
 let ANTHROPIC_API_KEY = "__ANTHROPIC_API_KEY__";
 
-// Initialize Firebase
+// เริ่มต้นการทำงาน Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
