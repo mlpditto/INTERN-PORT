@@ -8423,7 +8423,12 @@ Do not include any explanation other than the feedback body.`;
             if (statEl) statEl.innerText = `${qCount} questions will be exported`;
             const showGeneratedEl = document.getElementById('quiz-export-pdf-show-generated');
             if (showGeneratedEl) showGeneratedEl.checked = false;
+            const showFooterEl = document.getElementById('quiz-export-pdf-show-footer');
+            if (showFooterEl) showFooterEl.checked = true;
+            const layoutEl = document.getElementById('quiz-export-pdf-layout');
+            if (layoutEl) layoutEl.value = 'premium';
             forceShowModal('exportQuizPdfModal');
+            refreshQuizPdfPreview();
         }
 
         function closeExportQuizPdfModal() {
@@ -8431,11 +8436,187 @@ Do not include any explanation other than the feedback body.`;
         }
 
         function exportQuizToPdfFromModal() {
+            const settings = getQuizPdfSettingsFromModal();
+            exportQuizToPdf(settings.mode, settings);
+        }
+
+        function getQuizPdfSettingsFromModal() {
             const selected = document.querySelector('input[name="quiz-export-pdf-mode"]:checked');
-            const mode = selected ? selected.value : 'with_options_no_answers';
             const showGeneratedEl = document.getElementById('quiz-export-pdf-show-generated');
-            const showGenerated = showGeneratedEl ? showGeneratedEl.checked : true;
-            exportQuizToPdf(mode, { showGenerated: showGenerated });
+            const showFooterEl = document.getElementById('quiz-export-pdf-show-footer');
+            const layoutEl = document.getElementById('quiz-export-pdf-layout');
+            return {
+                mode: selected ? selected.value : 'with_options_no_answers',
+                showGenerated: showGeneratedEl ? showGeneratedEl.checked : true,
+                showFooter: showFooterEl ? showFooterEl.checked : true,
+                layout: layoutEl ? layoutEl.value : 'premium'
+            };
+        }
+
+        function normalizePdfText(value) {
+            return String(value || '')
+                .replace(/[\u200B-\u200D\uFEFF]/g, '')
+                .replace(/\u00A0/g, ' ')
+                .replace(/\t+/g, ' ')
+                .split(/\r?\n+/)
+                .map(line => line.replace(/\s+/g, ' ').trim())
+                .filter(Boolean)
+                .join(' ')
+                .trim();
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function getQuizPdfLayoutConfig(layout) {
+            const map = {
+                compact: {
+                    left: 12,
+                    right: 12,
+                    top: 14,
+                    bottom: 12,
+                    headerGap: 5,
+                    qGap: 4.7,
+                    optionGap: 4.15,
+                    blockGap: 1.6,
+                    titleSize: 13,
+                    metaSize: 8.5,
+                    qSize: 10.4,
+                    optionSize: 9.5,
+                    footerSize: 8,
+                    optionIndent: 8,
+                    maxPreviewQuestions: 4
+                },
+                wide: {
+                    left: 20,
+                    right: 20,
+                    top: 18,
+                    bottom: 16,
+                    headerGap: 6.2,
+                    qGap: 5.4,
+                    optionGap: 4.9,
+                    blockGap: 2.4,
+                    titleSize: 14,
+                    metaSize: 9,
+                    qSize: 11,
+                    optionSize: 10.1,
+                    footerSize: 8.4,
+                    optionIndent: 10,
+                    maxPreviewQuestions: 3
+                },
+                premium: {
+                    left: 17,
+                    right: 17,
+                    top: 16,
+                    bottom: 14,
+                    headerGap: 5.8,
+                    qGap: 5.2,
+                    optionGap: 4.6,
+                    blockGap: 2,
+                    titleSize: 14,
+                    metaSize: 9,
+                    qSize: 10.9,
+                    optionSize: 9.9,
+                    footerSize: 8.2,
+                    optionIndent: 9,
+                    maxPreviewQuestions: 3
+                }
+            };
+            return map[layout] || map.premium;
+        }
+
+        function buildQuizPdfBlocks(formData, mode) {
+            const questions = Array.isArray(formData.questions) ? formData.questions : [];
+            const isCorrectIndex = (q, idx) => {
+                const correct = Array.isArray(q.correct) ? q.correct : [q.correct];
+                return correct.map(n => Number(n)).includes(Number(idx));
+            };
+
+            return questions.map((q, qi) => {
+                const questionText = normalizePdfText(q.q) || '(No question text)';
+                const qType = q.type || 'choice';
+                const opts = Array.isArray(q.options) ? q.options : [];
+                const options = mode === 'questions_only' ? [] : opts.map((opt, oi) => ({
+                    prefix: `${String.fromCharCode(65 + (oi % 26))}.`,
+                    text: `${normalizePdfText(opt) || '-'}`,
+                    correct: mode === 'with_answers' && isCorrectIndex(q, oi)
+                }));
+                const guideline = mode === 'with_answers' && qType === 'short_answer' && opts.length > 0
+                    ? `Guideline: ${opts.map(normalizePdfText).filter(Boolean).join(' | ')}`
+                    : '';
+
+                return {
+                    number: qi + 1,
+                    questionText,
+                    qType,
+                    options,
+                    guideline
+                };
+            });
+        }
+
+        function refreshQuizPdfPreview() {
+            const previewEl = document.getElementById('quiz-export-pdf-preview');
+            const metaEl = document.getElementById('quiz-export-preview-meta');
+            if (!previewEl) return;
+
+            const formData = getQuizFormData();
+            const settings = getQuizPdfSettingsFromModal();
+            const layout = getQuizPdfLayoutConfig(settings.layout);
+            const blocks = buildQuizPdfBlocks(formData, settings.mode);
+            const previewBlocks = blocks.slice(0, layout.maxPreviewQuestions);
+            const modeLabel = {
+                with_options_no_answers: 'Exam + Options',
+                with_answers: 'With Answer Key',
+                questions_only: 'Questions Only'
+            }[settings.mode] || settings.mode;
+
+            if (metaEl) {
+                metaEl.textContent = `${modeLabel} • ${settings.layout} layout • ${settings.showFooter ? 'footer on' : 'footer off'}`;
+            }
+
+            if (!blocks.length) {
+                previewEl.innerHTML = '<div style="color:#64748b; font-size:0.92em;">No questions available to preview.</div>';
+                return;
+            }
+
+            const footerHtml = settings.showFooter
+                ? '<div style="margin-top:16px; padding-top:10px; border-top:1px solid #e2e8f0; font-size:0.75em; color:#64748b; display:flex; justify-content:space-between;"><span>Intern Admin Portal • Quiz Export</span><span>Page 1 / ?</span></div>'
+                : '';
+
+            previewEl.innerHTML = `
+                <div style="max-width:760px; margin:0 auto; color:#0f172a;">
+                    <div style="padding-bottom:10px; border-bottom:1px solid #e2e8f0; margin-bottom:14px;">
+                        <div style="font-size:1.25em; font-weight:900; line-height:1.25;">${escapeHtml(formData.title || 'Quiz Export')}</div>
+                        <div style="margin-top:5px; display:flex; gap:10px; flex-wrap:wrap; font-size:0.76em; color:#64748b;">
+                            ${settings.showGenerated ? `<span>Generated: ${escapeHtml(new Date().toLocaleString())}</span>` : ''}
+                            <span>${blocks.length} questions</span>
+                            <span>${escapeHtml(modeLabel)}</span>
+                        </div>
+                    </div>
+                    ${previewBlocks.map(block => `
+                        <div style="margin-bottom:16px;">
+                            <div style="font-size:1.02em; font-weight:900; line-height:1.45; margin-bottom:7px;">${block.number}. ${escapeHtml(block.questionText)}</div>
+                            ${block.options.map(opt => `
+                                <div style="display:grid; grid-template-columns:26px 1fr auto; gap:8px; margin:0 0 6px 0; font-size:0.95em; line-height:1.5; align-items:start;">
+                                    <span style="font-weight:800; color:#334155;">${escapeHtml(opt.prefix)}</span>
+                                    <span>${escapeHtml(opt.text)}</span>
+                                    ${opt.correct ? '<span style="font-size:0.72em; font-weight:800; color:#166534; background:#dcfce7; padding:3px 8px; border-radius:999px;">Correct</span>' : ''}
+                                </div>
+                            `).join('')}
+                            ${block.guideline ? `<div style="margin-top:7px; padding:8px 10px; border-radius:10px; background:#f8fafc; color:#475569; font-size:0.85em; font-style:italic;">${escapeHtml(block.guideline)}</div>` : ''}
+                        </div>
+                    `).join('')}
+                    ${blocks.length > previewBlocks.length ? `<div style="padding:10px 12px; border-radius:10px; background:#eff6ff; color:#1d4ed8; font-size:0.8em; font-weight:700;">Preview shows the first ${previewBlocks.length} questions. The exported PDF will include all ${blocks.length} questions.</div>` : ''}
+                    ${footerHtml}
+                </div>
+            `;
         }
 
         function exportQuizToPdf(mode, options = {}) {
@@ -8455,31 +8636,42 @@ Do not include any explanation other than the feedback body.`;
             const doc = new jsPdfCtor('p', 'mm', 'a4');
             const pageW = doc.internal.pageSize.getWidth();
             const pageH = doc.internal.pageSize.getHeight();
-            const left = 14;
-            const right = 14;
+            const layout = getQuizPdfLayoutConfig(options.layout || 'premium');
+            const left = layout.left;
+            const right = layout.right;
             const maxW = pageW - left - right;
-            const bottomPad = 14;
-            let y = 16;
+            const bottomPad = layout.bottom + (options.showFooter !== false ? 7 : 0);
+            let y = layout.top;
             const showGenerated = options.showGenerated !== false;
+            const showFooter = options.showFooter !== false;
+            const blocks = buildQuizPdfBlocks(formData, mode);
+
+            const getWrappedHeight = (text, width, lineGap, size, style = 'normal') => {
+                const safeText = String(text || '').trim() || '-';
+                doc.setFont('helvetica', style);
+                doc.setFontSize(size);
+                const lines = doc.splitTextToSize(safeText, width);
+                return { lines, height: Math.max(1, lines.length) * lineGap };
+            };
 
             const addPageHeader = (firstPage = false) => {
                 if (!firstPage) doc.addPage();
-                y = 16;
+                y = layout.top;
                 doc.setFont('helvetica', 'bold');
-                doc.setFontSize(14);
+                doc.setFontSize(layout.titleSize);
                 doc.text(formData.title || 'Quiz Export', left, y);
-                y += 6;
+                y += layout.headerGap;
                 doc.setFont('helvetica', 'normal');
-                doc.setFontSize(9);
+                doc.setFontSize(layout.metaSize);
                 doc.setTextColor(90, 90, 90);
                 if (showGenerated) {
                     doc.text(`Generated: ${new Date().toLocaleString()}`, left, y);
-                    y += 6;
+                    y += layout.headerGap;
                 }
                 doc.setTextColor(20, 20, 20);
                 doc.setDrawColor(220, 220, 220);
                 doc.line(left, y, pageW - right, y);
-                y += 6;
+                y += layout.headerGap;
             };
 
             const ensureSpace = (needed = 8) => {
@@ -8498,41 +8690,85 @@ Do not include any explanation other than the feedback body.`;
                 });
             };
 
-            const isCorrectIndex = (q, idx) => {
-                const correct = Array.isArray(q.correct) ? q.correct : [q.correct];
-                return correct.map(n => Number(n)).includes(Number(idx));
+            const addOptionWrapped = (prefix, text, isCorrect = false) => {
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(layout.optionSize);
+                const prefixWidth = Math.max(8, doc.getTextWidth(`${prefix} `) + 2);
+                const bodyX = left + layout.optionIndent + prefixWidth;
+                const bodyWidth = Math.max(10, pageW - right - bodyX);
+                const wrapped = getWrappedHeight(text, bodyWidth, layout.optionGap, layout.optionSize, 'normal').lines;
+                wrapped.forEach((ln, idx) => {
+                    ensureSpace(layout.optionGap + 1);
+                    doc.setFont('helvetica', idx === 0 ? 'bold' : 'normal');
+                    doc.setFontSize(layout.optionSize);
+                    if (idx === 0) {
+                        doc.text(prefix, left + layout.optionIndent, y);
+                    }
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(ln, bodyX, y);
+                    y += layout.optionGap;
+                });
+                if (isCorrect) {
+                    ensureSpace(layout.optionGap + 1);
+                    doc.setFont('helvetica', 'italic');
+                    doc.setFontSize(layout.optionSize - 0.3);
+                    doc.setTextColor(22, 101, 52);
+                    doc.text('Correct answer', bodyX, y);
+                    doc.setTextColor(20, 20, 20);
+                    y += layout.optionGap - 0.5;
+                }
+            };
+
+            const estimateBlockHeight = (block) => {
+                const questionHeight = getWrappedHeight(`${block.number}. ${block.questionText}`, maxW, layout.qGap, layout.qSize, 'bold').height;
+                const optionsHeight = block.options.reduce((sum, opt) => {
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(layout.optionSize);
+                    const prefixWidth = Math.max(8, doc.getTextWidth(`${opt.prefix} `) + 2);
+                    const bodyWidth = Math.max(10, maxW - layout.optionIndent - prefixWidth);
+                    const wrapped = getWrappedHeight(opt.text, bodyWidth, layout.optionGap, layout.optionSize, 'normal').height;
+                    return sum + wrapped + (opt.correct ? layout.optionGap - 0.5 : 0);
+                }, 0);
+                const guidelineHeight = block.guideline
+                    ? getWrappedHeight(block.guideline, maxW - layout.optionIndent, layout.optionGap, layout.optionSize - 0.1, 'italic').height
+                    : 0;
+                return questionHeight + optionsHeight + guidelineHeight + layout.blockGap + 2;
             };
 
             addPageHeader(true);
 
-            questions.forEach((q, qi) => {
-                ensureSpace(10);
-                addWrapped(`${qi + 1}. ${q.q || '(No question text)'}`, 0, 5.2, 11, 'bold');
+            blocks.forEach((block) => {
+                ensureSpace(estimateBlockHeight(block));
+                addWrapped(`${block.number}. ${block.questionText}`, 0, layout.qGap, layout.qSize, 'bold');
 
                 if (mode === 'questions_only') {
-                    y += 2;
+                    y += layout.blockGap;
                     return;
                 }
 
-                const qType = q.type || 'choice';
-                const opts = Array.isArray(q.options) ? q.options : [];
+                block.options.forEach(opt => addOptionWrapped(opt.prefix, opt.text, opt.correct));
 
-                if (opts.length > 0 && (qType === 'choice' || qType === 'ordering' || qType === 'flashcard' || qType === 'short_answer')) {
-                    opts.forEach((opt, oi) => {
-                        let line = `${String.fromCharCode(65 + (oi % 26))}. ${opt || '-'}`;
-                        if (mode === 'with_answers' && isCorrectIndex(q, oi)) {
-                            line += '  [Correct]';
-                        }
-                        addWrapped(line, 5, 4.6, 10, 'normal');
-                    });
+                if (block.guideline) {
+                    addWrapped(block.guideline, layout.optionIndent, layout.optionGap, layout.optionSize - 0.1, 'italic');
                 }
 
-                if (mode === 'with_answers' && qType === 'short_answer' && opts.length > 0) {
-                    addWrapped(`Guideline: ${opts.join(' | ')}`, 5, 4.6, 10, 'italic');
-                }
-
-                y += 2;
+                y += layout.blockGap;
             });
+
+            if (showFooter) {
+                const totalPages = doc.getNumberOfPages();
+                for (let i = 1; i <= totalPages; i++) {
+                    doc.setPage(i);
+                    doc.setDrawColor(226, 232, 240);
+                    doc.line(left, pageH - layout.bottom - 4, pageW - right, pageH - layout.bottom - 4);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(layout.footerSize);
+                    doc.setTextColor(100, 116, 139);
+                    doc.text('Intern Admin Portal • Quiz Export', left, pageH - layout.bottom + 1);
+                    doc.text(`Page ${i} / ${totalPages}`, pageW - right, pageH - layout.bottom + 1, { align: 'right' });
+                    doc.setTextColor(20, 20, 20);
+                }
+            }
 
             const base = (formData.shortTitle || formData.title || 'quiz').replace(/[^a-zA-Z0-9-_]/g, '_');
             const modeShort = mode === 'with_answers' ? 'with_answers' : (mode === 'questions_only' ? 'questions_only' : 'no_answers');
@@ -8540,6 +8776,9 @@ Do not include any explanation other than the feedback body.`;
             showToast(`📄 Exported PDF (${questions.length} questions)`);
             closeExportQuizPdfModal();
         }
+
+        document.querySelectorAll('input[name="quiz-export-pdf-mode"], #quiz-export-pdf-show-generated, #quiz-export-pdf-show-footer, #quiz-export-pdf-layout')
+            .forEach(el => el.addEventListener('change', refreshQuizPdfPreview));
 
         function toggleQType(el) {
             const item = el.closest('.quiz-q-item');
