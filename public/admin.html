@@ -5836,6 +5836,66 @@
             }
         };
 
+
+        window.regenerateSingleAiSuggestion = async function(qIdx, arrIdx, fromPreview = false) {
+            const btnId = fromPreview ? null : `btn-regen-ai-${arrIdx}`;
+            const btn = btnId ? document.getElementById(btnId) : null;
+            
+            try {
+                if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+                
+                const item = window._aiAnalysisItems[arrIdx];
+                const currentQs = getQuizFormData().questions;
+                const originalQ = currentQs[qIdx];
+                
+                const prompt = `Based on this question and the identified issue, provide a DIFFERENT improved version.
+                
+                Question: ${JSON.stringify(originalQ)}
+                Identified Issue: ${item.issue}
+                Previous Suggestion: ${item.suggestion}
+                
+                Output ONLY a JSON object representing the improved question:
+                {
+                  "q": "...",
+                  "options": [...],
+                  "correct": [...],
+                  "suggestion": "Brief explanation of why this new improvement is better..."
+                }`;
+                
+                const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-1.5-flash';
+                const { text: resultJson } = await callUniversalAI(selectedModel, prompt, true);
+                const cleanJson = resultJson.replace(/```json/g, "").replace(/```/g, "").trim();
+                const newSuggestion = JSON.parse(cleanJson);
+                
+                if (newSuggestion) {
+                    window._aiAnalysisItems[arrIdx].improvedQuestion = newSuggestion;
+                    if (newSuggestion.suggestion) {
+                        window._aiAnalysisItems[arrIdx].suggestion = newSuggestion.suggestion;
+                    }
+                    const suggestionText = document.getElementById(`ai-suggestion-text-${arrIdx}`);
+                    if (suggestionText) {
+                        suggestionText.innerHTML = `<b>Suggestion:</b> ${window._aiAnalysisItems[arrIdx].suggestion}`;
+                    }
+                    const fixBtn = document.getElementById(`btn-fix-ai-${arrIdx}`);
+                    if (fixBtn) {
+                        const improvedJson = JSON.stringify(newSuggestion).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                        fixBtn.setAttribute('onclick', `applySingleAiFix(${qIdx}, '${improvedJson}', ${arrIdx})`);
+                    }
+                    if (fromPreview) {
+                        document.getElementById('ai-compare-overlay').remove();
+                        previewAiFix(qIdx, arrIdx);
+                    } else {
+                        showToast(`✨ Q${qIdx + 1} Suggestion Regenerated`);
+                    }
+                }
+            } catch (e) {
+                console.error("Regen error:", e);
+                alert("Regeneration failed: " + e.message);
+            } finally {
+                if (btn) btn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>';
+            }
+        };
+
         window.AI_CORE_READY = true;
         console.log("🤖 [AI Engine] Global Core V90.20 Ready");
         
@@ -6347,7 +6407,14 @@
                                         .replace(/'/g, "\\'")
                                         .replace(/"/g, '&quot;');
                                     return `
-                                        <div style="background:#fcfdff; border:1.5px solid #edf2f7; border-radius:15px; padding:15px; border-left:5px solid #4361ee;">
+                                        <div id="ai-fix-card-${arrIdx}" style="background:#fcfdff; border:1.5px solid #edf2f7; border-radius:15px; padding:15px; border-left:5px solid #4361ee; transition: all 0.3s ease;">
+                                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                                                <b style="color:#2d3748;">Q${qIdx + 1} Issue</b>
+                                                <div style="display:flex; gap:6px;">
+                                                    <button id="btn-regen-ai-${arrIdx}" class="btn-sm" style="background:#f8fafc; color:#64748b; border:1px solid #e2e8f0; padding:4px 10px; border-radius:8px; font-weight:bold; font-size:0.75em;"
+                                                        onclick="regenerateSingleAiSuggestion(${qIdx}, ${arrIdx})" title="Regenerate different suggestion">
+                                                        <i class="fa-solid fa-arrows-rotate"></i>
+                                                    </button>
                                             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
                                                 <b style="color:#2d3748;">Q${qIdx + 1} Issue</b>
                                                 <div style="display:flex; gap:6px;">
@@ -6356,13 +6423,13 @@
                                                         <i class="fa-solid fa-code-compare"></i> Compare
                                                     </button>
                                                     <button class="btn-sm" style="background:#22c55e; color:white; border:none; padding:4px 12px; border-radius:8px; font-weight:bold; font-size:0.75em;"
-                                                        onclick="applySingleAiFix(${qIdx}, '${improvedJson}')">
+                                                        onclick="applySingleAiFix(${qIdx}, '${improvedJson}', ${arrIdx})" id="btn-fix-ai-${arrIdx}">
                                                         Fix
                                                     </button>
                                                 </div>
                                             </div>
                                             <div style="font-size:0.9em; color:#4a5568; margin-bottom:8px;"><b>Issue:</b> ${item.issue}</div>
-                                            <div style="font-size:0.9em; color:#4361ee;"><b>Suggestion:</b> ${item.suggestion}</div>
+                                            <div id="ai-suggestion-text-${arrIdx}" style="font-size:0.9em; color:#4361ee;"><b>Suggestion:</b> ${item.suggestion}</div>
                                         </div>
                                     `;
                                 }).join('')}
@@ -19772,8 +19839,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
                         <div style="padding:20px 30px; background:#fff; border-top:1.5px solid #edf2f7; display:flex; justify-content:flex-end; gap:12px;">
                             <button class="btn btn-secondary" onclick="document.getElementById('ai-compare-overlay').remove()" style="padding:10px 25px; border-radius:12px; font-weight:700;">Keep Original</button>
+                            <button class="btn" style="padding:10px 22px; border-radius:12px; font-weight:700; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;" onclick="regenerateSingleAiSuggestion(${index}, ${arrIdx}, true)">🔄 Regenerate</button>
                             <button class="btn" onclick="addSingleAiAsNewQuestion(${index}, '${improvedJson}'); document.getElementById('ai-compare-overlay').remove();" style="padding:10px 22px; border-radius:12px; font-weight:700; background:#0ea5e9; color:white; border:none; box-shadow:0 4px 15px rgba(14,165,233,0.28);">➕ Add as New Question</button>
-                            <button class="btn btn-primary" onclick="applySingleAiFix(${index}, '${improvedJson}'); document.getElementById('ai-compare-overlay').remove();" style="padding:10px 30px; border-radius:12px; font-weight:700; background:#22c55e; border:none; box-shadow:0 4px 15px rgba(34,197,94,0.3);">✅ Apply This Fix</button>
+                            <button class="btn btn-primary" onclick="applySingleAiFix(${index}, '${improvedJson}', ${arrIdx}); document.getElementById('ai-compare-overlay').remove();" style="padding:10px 30px; border-radius:12px; font-weight:700; background:#22c55e; border:none; box-shadow:0 4px 15px rgba(34,197,94,0.3);">✅ Apply This Fix</button>
                         </div>
                     </div>
                 `;
@@ -19843,7 +19911,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             }
         }
 
-        window.applySingleAiFix = function(index, improvedArg) {
+        window.applySingleAiFix = function(index, improvedArg, arrIdx) {
             try {
                 const { improvedQ, allQs } = getImprovedQuestionPayload(index, improvedArg);
                 if (!confirm(`Apply improved version to Question ${index + 1}?`)) return;
@@ -19858,6 +19926,21 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 updateQuizPagination();
                 showToast(`✅ Q${index + 1} updated with AI fix`);
                 triggerAutoSave();
+                
+                if (arrIdx !== undefined) {
+                    const card = document.getElementById(`ai-fix-card-${arrIdx}`);
+                    if (card) {
+                        card.style.background = "#f0fff4";
+                        card.style.borderColor = "#22c55e";
+                        card.style.borderLeftColor = "#22c55e";
+                        const fixBtn = document.getElementById(`btn-fix-ai-${arrIdx}`);
+                        if (fixBtn) {
+                            fixBtn.innerHTML = "✅ Applied";
+                            fixBtn.style.background = "#15803d";
+                            fixBtn.disabled = true;
+                        }
+                    }
+                }
             } catch (e) {
                 console.error("Single fix error:", e);
                 alert("Error applying fix: " + e.message);
@@ -19996,6 +20079,66 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = oldText;
+            }
+        };
+
+
+        window.regenerateSingleAiSuggestion = async function(qIdx, arrIdx, fromPreview = false) {
+            const btnId = fromPreview ? null : `btn-regen-ai-${arrIdx}`;
+            const btn = btnId ? document.getElementById(btnId) : null;
+            
+            try {
+                if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+                
+                const item = window._aiAnalysisItems[arrIdx];
+                const currentQs = getQuizFormData().questions;
+                const originalQ = currentQs[qIdx];
+                
+                const prompt = `Based on this question and the identified issue, provide a DIFFERENT improved version.
+                
+                Question: ${JSON.stringify(originalQ)}
+                Identified Issue: ${item.issue}
+                Previous Suggestion: ${item.suggestion}
+                
+                Output ONLY a JSON object representing the improved question:
+                {
+                  "q": "...",
+                  "options": [...],
+                  "correct": [...],
+                  "suggestion": "Brief explanation of why this new improvement is better..."
+                }`;
+                
+                const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-1.5-flash';
+                const { text: resultJson } = await callUniversalAI(selectedModel, prompt, true);
+                const cleanJson = resultJson.replace(/```json/g, "").replace(/```/g, "").trim();
+                const newSuggestion = JSON.parse(cleanJson);
+                
+                if (newSuggestion) {
+                    window._aiAnalysisItems[arrIdx].improvedQuestion = newSuggestion;
+                    if (newSuggestion.suggestion) {
+                        window._aiAnalysisItems[arrIdx].suggestion = newSuggestion.suggestion;
+                    }
+                    const suggestionText = document.getElementById(`ai-suggestion-text-${arrIdx}`);
+                    if (suggestionText) {
+                        suggestionText.innerHTML = `<b>Suggestion:</b> ${window._aiAnalysisItems[arrIdx].suggestion}`;
+                    }
+                    const fixBtn = document.getElementById(`btn-fix-ai-${arrIdx}`);
+                    if (fixBtn) {
+                        const improvedJson = JSON.stringify(newSuggestion).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                        fixBtn.setAttribute('onclick', `applySingleAiFix(${qIdx}, '${improvedJson}', ${arrIdx})`);
+                    }
+                    if (fromPreview) {
+                        document.getElementById('ai-compare-overlay').remove();
+                        previewAiFix(qIdx, arrIdx);
+                    } else {
+                        showToast(`✨ Q${qIdx + 1} Suggestion Regenerated`);
+                    }
+                }
+            } catch (e) {
+                console.error("Regen error:", e);
+                alert("Regeneration failed: " + e.message);
+            } finally {
+                if (btn) btn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>';
             }
         };
 
