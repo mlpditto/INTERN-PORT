@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MEDLIFE+ Admin V90.70 (Turbo)</title>
-    <!-- V90.70: Quiz Editor "Split to New Quiz" label + version parity sync -->
+    <title>MEDLIFE+ Admin V90.71</title>
+    <!-- V90.71: Add Opal model, move ThaiLLM after Llama, UI sync -->
     <!-- Release: 2026-04-18 12:00 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4348,6 +4348,7 @@
                                 <span style="font-size:0.65em; font-weight:900; color:#4ade80; letter-spacing:0.8px; white-space:nowrap; text-transform:uppercase; margin-right:4px;"><i class="fa-solid fa-language"></i> Translate</span>
                                 <div class="glass-toggle-container" id="ai-translate-model-toggle" style="margin:0; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.05); padding:3px; height:32px; border-radius:10px; gap:2px;">
                                     <div class="glass-toggle-item active" data-value="gemini-1.5-flash-latest" onclick="window.selectAiToolbarToggle(this,'toolbar-ai-translate-model')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#fbbf24;">Flash</div>
+                                    <div class="glass-toggle-item" data-value="opal-tiny" onclick="window.selectAiToolbarToggle(this,'toolbar-ai-translate-model')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#38bdf8;">Opal</div>
                                     <div class="glass-toggle-item" data-value="glm-5.1:cloud" onclick="window.selectAiToolbarToggle(this,'toolbar-ai-translate-model')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#fbbf24;">GLM-5.1</div>
                                     <div class="glass-toggle-item" data-value="gemini-1.5-pro-latest" onclick="window.selectAiToolbarToggle(this,'toolbar-ai-translate-model')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#94a3b8;">Pro</div>
                                     <div class="glass-toggle-item" data-value="gpt-4o" onclick="window.selectAiToolbarToggle(this,'toolbar-ai-translate-model')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#94a3b8;">GPT</div>
@@ -5516,41 +5517,59 @@
                 if (usageList) usageList.innerHTML = "No usage recorded today.";
                 if (badgeBreakdown) badgeBreakdown.innerHTML = "AI: 0";
             } else {
-                let listHtml = "";
-                let badgeStr = "";
-                
-                for (const [provider, total] of Object.entries(usage.totals)) {
-                    listHtml += `<div style="display:flex; justify-content:space-between; margin-bottom:2px;"><span>${provider}:</span> <b>${total.toLocaleString()} tokens</b></div>`;
-                    
-                    const shortName = provider.substring(0, 1).toUpperCase();
-                    const kVal = total >= 1000 ? (total/1000).toFixed(1) + 'k' : total;
-                    badgeStr += (badgeStr ? ' ' : '') + `${shortName}:${kVal}`;
-                }
-                
-                if (usageList) usageList.innerHTML = listHtml;
-                if (badgeBreakdown) badgeBreakdown.innerHTML = badgeStr;
-            }
-            return count;
-        };
-
-        window.openAIKeysModal = function() {
-            console.log("Opening AI Keys Modal...");
-            try {
-                loadAIKeys();
-                const modal = document.getElementById('aiKeysModal');
-                if (!modal) {
-                    console.error("AI Keys Modal not found!");
-                    alert("Error: AI Settings Modal not found. Please refresh the page and try again.");
-                    return;
-                }
-                
-                const allFields = [
-                    'local-gemini-key', 'local-openai-key', 'local-typhoon-key', 
-                    'local-anthropic-key', 'local-llama-key', 'local-gcp-mode',
-                    'local-gcp-project', 'local-gcp-location', 'local-gcp-token'
-                ];
-                
-                for (const fieldId of allFields) {
+                let improvementsHtml = "";
+                // Track fixed questions globally
+                window._aiFixedQuestions = window._aiFixedQuestions || [];
+                if (result.items && result.items.length > 0) {
+                    improvementsHtml = `
+                        <div style="margin-top:25px; border-top:2px solid #f8f9fa; padding-top:20px;">
+                            <h4 style="color:var(--primary); margin-bottom:15px;"><i class="fa-solid fa-list-check"></i> Individual Improvements (${result.items.length})</h4>
+                            <div style="display:flex; flex-direction:column; gap:12px;">
+                                ${result.items.map((item, arrIdx) => {
+                                    let qIdx = (item.qNumber !== undefined) ? item.qNumber - 1 : (item.index !== undefined ? item.index : 0);
+                                    qIdx = Math.max(0, Math.min(qIdx, formData.questions.length - 1));
+                                    const improvedJson = JSON.stringify(item.improvedQuestion || {})
+                                        .replace(/\\/g, '\\\\')
+                                        .replace(/'/g, "\\'")
+                                        .replace(/"/g, '&quot;');
+                                    const isFixed = window._aiFixedQuestions.includes(qIdx);
+                                    return `
+                                        <div style="background:#fcfdff; border:1.5px solid #edf2f7; border-radius:15px; padding:15px; border-left:5px solid #4361ee; opacity:${isFixed ? 0.7 : 1};">
+                                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                                                <b style="color:#2d3748;">Q${qIdx + 1} Issue</b>
+                                                <div style="display:flex; gap:6px; align-items:center;">
+                                                    <button class="btn-sm" style="background:#6366f1; color:white; border:none; padding:4px 12px; border-radius:8px; font-weight:bold; font-size:0.75em;"
+                                                        onclick="previewAiFix(${qIdx}, ${arrIdx})">
+                                                        <i class="fa-solid fa-code-compare"></i> Compare
+                                                    </button>
+                                                    <button class="btn-sm" style="background:#22c55e; color:white; border:none; padding:4px 12px; border-radius:8px; font-weight:bold; font-size:0.75em;${isFixed ? 'opacity:0.5;pointer-events:none;' : ''}"
+                                                        onclick="if(!this.disabled){applySingleAiFix(${qIdx}, '${improvedJson}')}">
+                                                        ${isFixed ? '✅ ได้รับการปรับปรุงแล้ว' : 'Fix'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div style="font-size:0.9em; color:#4a5568; margin-bottom:8px;"><b>Issue:</b> ${item.issue}</div>
+                                            <div style="font-size:0.9em; color:#4361ee;"><b>Suggestion:</b> ${item.suggestion}</div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>`;
+                    <script>
+                    // Track fixed questions after applying fix
+                    const origApplySingleAiFix = window.applySingleAiFix;
+                    window.applySingleAiFix = function(index, improvedArg) {
+                        window._aiFixedQuestions = window._aiFixedQuestions || [];
+                        if (!window._aiFixedQuestions.includes(index)) window._aiFixedQuestions.push(index);
+                        origApplySingleAiFix(index, improvedArg);
+                        // Re-render the improvements section if present
+                        const aiAnalysisPopup = document.getElementById('ai-analysis-popup');
+                        if (aiAnalysisPopup) {
+                            // Re-run analyzeQuizAI to refresh the UI (ideally, refactor to only update the section)
+                            if (typeof analyzeQuizAI === 'function') analyzeQuizAI();
+                        }
+                    };
+                    </script>
                     const field = document.getElementById(fieldId);
                     if (!field) {
                         console.error(`Field ${fieldId} not found in modal!`);
@@ -5903,7 +5922,37 @@
                     <div style="background:#f5f3ff; border:1px solid #ddd6fe; border-radius:15px; padding:15px; margin-bottom:20px;">
                         <h4 style="margin:0 0 10px 0; color:#5b21b6; font-size:0.92em; display:flex; justify-content:space-between; align-items:center;">
                             <span><i class="fa-solid fa-tag"></i> Suggested Titles</span>
-                            <button onclick="analyzeQuizAI()" style="background:rgba(139,92,246,0.1); border:none; border-radius:8px; cursor:pointer; font-size:1.15em; padding:4px 8px; line-height:1; transition:all 0.2s;" onmouseover="this.style.background='rgba(139,92,246,0.2)'" onmouseout="this.style.background='rgba(139,92,246,0.1)'" title="Regenerate Titles & Analysis">🔄</button>
+                            <button onclick="refreshSuggestedTitles(this)" style="background:rgba(139,92,246,0.1); border:none; border-radius:8px; cursor:pointer; font-size:1.15em; padding:4px 8px; line-height:1; transition:all 0.2s;" onmouseover="this.style.background='rgba(139,92,246,0.2)'" onmouseout="this.style.background='rgba(139,92,246,0.1)'" title="Regenerate Titles & Analysis">🔄</button>
+                        <script>
+                        // Patch: In-place refresh for AI Suggested Titles
+                        window.refreshSuggestedTitles = async function(btn) {
+                            if (!btn) return;
+                            btn.disabled = true;
+                            const original = btn.innerHTML;
+                            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+                            try {
+                                // Call the same logic as analyzeQuizAI, but only update the suggested titles section
+                                const result = await analyzeQuizAI(true); // Pass a flag to only update titles if needed
+                                if (!result || !result.suggestedTitles) throw new Error("No suggestions returned");
+                                // Find the title section container
+                                const titleSection = btn.closest('div[style*="background:#f5f3ff"]');
+                                if (titleSection) {
+                                    // Update the full and short titles
+                                    const spans = titleSection.querySelectorAll('span');
+                                    if (spans && spans.length >= 2) {
+                                        spans[1].innerText = 'Full: ' + result.suggestedTitles.full;
+                                        spans[3].innerText = 'Short: ' + result.suggestedTitles.short;
+                                    }
+                                }
+                                showToast('Suggested Titles refreshed!');
+                            } catch(e) {
+                                alert('Refresh error: ' + e.message);
+                            } finally {
+                                btn.disabled = false;
+                                btn.innerHTML = original;
+                            }
+                        };
+                        </script>
                         </h4>
                         <div style="display:flex; flex-direction:column; gap:8px;">
                             <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:8px 12px; border-radius:10px; border:1px solid #ede9fe;">
@@ -7641,62 +7690,81 @@ Do not include any explanation other than the feedback body.`;
             showToast(`⏱️ Set all ${timers.length} questions to ${val}s`);
         }
 
-        function getQuizFormData() {
-            const title = document.getElementById('quiz-title').value.trim();
-            const shortTitle = document.getElementById('quiz-short-title').value.trim();
-            const targetGroup = document.getElementById('quiz-target-group').value.trim() || "Public";
-            const description = document.getElementById('quiz-description').value;
-            const totalPoints = parseFloat(document.getElementById('quiz-total-points').value) || 1.0;
-            const isPoll = document.getElementById('quiz-is-poll').checked;
-            const oneTimeMode = document.getElementById('quiz-one-time').checked;
-            const isHomework = document.getElementById('quiz-is-homework').checked;
-            const assignedUsers = isHomework ? [...homeworkSelectedUsers] : [];
-            const timerMode = document.getElementById('quiz-timer-mode').value;
-            const totalTimer = parseInt(document.getElementById('quiz-total-timer').value) || 300;
-            const shuffleChoices = document.getElementById('quiz-shuffle-choices').checked;
-            const quizType = document.getElementById('quiz-type').value;
-            const feedbackLimit = parseInt(document.getElementById('quiz-feedback-limit').value) || 280;
-            const caseContent = document.getElementById('quiz-case-content').value;
-            const tags = document.getElementById('quiz-tags').value.trim();
+        function addQuestionUI(data = null) {
+            const container = document.getElementById('quiz-questions-container');
+            const qId = Date.now() + Math.floor(Math.random() * 1000);
+            const qType = data ? data.type : 'choice';
+            const options = data ? data.options : ["Option 1", "Option 2"];
+            const correct = data ? (Array.isArray(data.correct) ? data.correct : [data.correct]) : [];
 
-            const qItems = document.querySelectorAll('.quiz-q-item');
-            const questions = [];
-            qItems.forEach(item => {
-                const qText = item.querySelector('.q-text').value;
-                const qContent = item.querySelector('.q-page-content') ? item.querySelector('.q-page-content').value : "";
-                const qType = item.querySelector('.q-type').value;
-                let opts = [];
-                let correct = 0;
-
-                if (qType === 'choice') {
-                    opts = [...item.querySelectorAll('.q-opt')].map(i => i.value);
-                    correct = [...item.querySelectorAll('.q-correct-check:checked')].map(c => parseInt(c.value));
-                    if (correct.length === 0) correct = [0]; // Fallback
-                }
-
-                const timer = parseInt(item.querySelector('.q-timer').value) || 60;
-                questions.push({ q: qText, content: qContent, type: qType, options: opts, correct, timer });
+            // --- Custom Timer Badge Logic ---
+            // Find all timers in the quiz to determine the most common (default) value
+            let allTimers = [];
+            document.querySelectorAll('.quiz-q-item .q-timer').forEach(input => {
+                const val = parseInt(input.value);
+                if (!isNaN(val)) allTimers.push(val);
             });
+            if (data && typeof data.timer === 'number') allTimers.push(data.timer);
+            // Find the most common timer value
+            let defaultTimer = 60;
+            if (allTimers.length > 0) {
+                const freq = {};
+                allTimers.forEach(t => { freq[t] = (freq[t] || 0) + 1; });
+                defaultTimer = parseInt(Object.keys(freq).reduce((a, b) => freq[a] > freq[b] ? a : b));
+            }
+            const thisTimer = data ? (data.timer || 60) : (document.getElementById('quiz-set-all-timer') ? parseInt(document.getElementById('quiz-set-all-timer').value) : 60);
+            const showCustomTimer = thisTimer !== defaultTimer;
 
-            return {
-                title, shortTitle, targetGroup, description, tags, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, quizType, feedbackLimit, caseContent, questions,
-                startTime: document.getElementById('quiz-start-time').value,
-                deadline: document.getElementById('quiz-deadline').value
-            };
+            const div = document.createElement('div');
+            div.className = 'quiz-q-item';
+            div.innerHTML = `
+                <input type="hidden" class="q-type" value="${qType}">
+                <input type="hidden" class="ai-model-quiz" value="gemini-1.5-flash">
+                <input type="hidden" class="ai-lang-quiz" value="Thai">
+                <div class="glass-toggle-container q-type-toggle" style="display:none;">
+                    <div class="glass-toggle-item ${qType === 'choice' ? 'active' : ''}" data-value="choice"></div>
+                    <div class="glass-toggle-item ${qType === 'short_answer' ? 'active' : ''}" data-value="short_answer"></div>
+                    <div class="glass-toggle-item ${qType === 'ordering' ? 'active' : ''}" data-value="ordering"></div>
+                    <div class="glass-toggle-item ${qType === 'flashcard' ? 'active' : ''}" data-value="flashcard"></div>
+                </div>
+                <div style="background:#1e293b; border:1px solid #334155; border-radius:24px; padding:20px; box-shadow:0 8px 30px rgba(0,0,0,0.2);">
+                    <!-- Main Text Area -->
+                    <div style="margin-bottom:15px; position:relative;">
+                        <textarea class="q-text" onpaste="handleQuestionPaste(event, this)" placeholder="Type question or paste formatted content..." style="width:100%; height:100px; font-size:1.05em; border-radius:16px; border:1.5px solid #334155; padding:15px; background:#0f172a; color:#f1f5f9; box-shadow:inset 0 2px 4px rgba(0,0,0,0.2); line-height:1.6;"></textarea>
+                    </div>
+                ...existing code...
+                <div class="options-actions" style="margin-top:15px; margin-bottom:10px;">
+                    <div style="display:flex; align-items:center; gap:12px; justify-content:space-between;">
+                        <div class="q-type-actions" style="display:flex; align-items:center; gap:8px;">
+                            ${qType === 'choice' ? `
+                                <button type="button" class="btn-sm" onclick="addOption(this)" style="padding:6px 20px; background:#fff; color:var(--primary); border:1.5px solid var(--primary); border-radius:12px; font-weight:900; font-size:0.8em; transition:all 0.2s; box-shadow:0 4px 10px rgba(99,102,241,0.05);" onmouseover="this.style.background='var(--primary)'; this.style.color='white';"><i class="fa-solid fa-plus"></i> Add Option</button>
+                                <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Magic - enhance this question" style="padding:4px 12px; background:linear-gradient(135deg, #8b5cf6, #7c3aed); color:white; border:none; border-radius:12px; font-weight:900; font-size:0.75em; transition:all 0.2s;"><i class="fa-solid fa-wand-magic-sparkles"></i> Magic</button>
+                            ` : ''}
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <button type="button" class="btn-sm" onclick="forceHideModal('quizManageModal')" style="padding:6px 16px; background:#334155; color:#f1f5f9; border:none; border-radius:10px; font-weight:700; font-size:0.75em; height:32px;">Cancel</button>
+                            <button type="button" class="btn-sm" onclick="saveQuiz()" style="padding:6px 20px; background:linear-gradient(135deg, #6366f1, #a855f7); color:white; border:none; border-radius:10px; font-weight:800; font-size:0.75em; height:32px; box-shadow:0 4px 12px rgba(99,102,241,0.3);"><i class="fa-solid fa-save"></i> Save Quiz</button>
+                            <div style="display:flex; align-items:center; gap:3px; background:#f8fafc; padding:2px 10px; border-radius:10px; border:1px solid #edf2f7; height:32px; position:relative;" title="Seconds per Q">
+                                <i class="fa-solid fa-stopwatch" style="color:#6366f1; font-size:0.75em;"></i>
+                                <input type="number" class="q-timer" value="${thisTimer}" style="width:50px; border:none; background:transparent; font-weight:800; color:#1e293b; font-size:0.85em; outline:none; padding:0; text-align:center;">
+                                <span style="font-size:0.65em; color:#94a3b8; font-weight:800;">s</span>
+                                ${showCustomTimer ? `<span style='margin-left:8px; background:#fde68a; color:#b45309; font-size:0.7em; font-weight:900; border-radius:8px; padding:2px 10px; display:inline-block;'>⏱️ Custom Timer</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(div);
+
+            // Sync text value
+            if (data) div.querySelector('.q-text').value = data.q;
+
+            if (!data) {
+                const total = document.querySelectorAll('.quiz-q-item').length;
+                quizQPageIndex = total - 1;
+            }
+            updateQuizPagination();
         }
-
-        let quizQPageIndex = 0;
-        
-        function moveQuizQ(direction) {
-            const items = document.querySelectorAll('.quiz-q-item');
-            const total = items.length;
-            
-            if (total === 0) return;
-            
-            // Calculate new index
-            let newIndex = quizQPageIndex + direction;
-            
-            // Wrap around or stay within bounds
             if (newIndex < 0) newIndex = total - 1;
             if (newIndex >= total) newIndex = 0;
             
@@ -8015,8 +8083,26 @@ Do not include any explanation other than the feedback body.`;
                 if (y + needed > pageH - bottomPad) addPageHeader(false);
             };
 
+            // --- Preprocess text for PDF export ---
+            const preprocessExportText = (raw) => {
+                let txt = String(raw || '').trim();
+                // Replace <br> and <br/> with newlines
+                txt = txt.replace(/<br\s*\/?>/gi, '\n');
+                // Replace <li> with bullet and newline
+                txt = txt.replace(/<li[^>]*>/gi, '\n• ');
+                txt = txt.replace(/<\/li>/gi, '');
+                // Remove all other HTML tags
+                txt = txt.replace(/<[^>]+>/g, '');
+                // Replace multiple newlines with single
+                txt = txt.replace(/\n{2,}/g, '\n');
+                // Insert zero-width space in long words (20+ chars)
+                txt = txt.replace(/(\S{20,})/g, (m) => m.replace(/(.{15})/g, '$1\u200B'));
+                // Remove non-breaking spaces and decode common HTML entities
+                txt = txt.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+                return txt;
+            };
             const addWrapped = (text, indent = 0, lineGap = 4.8, size = 11, style = 'normal') => {
-                const safeText = String(text || '').trim() || '-';
+                const safeText = preprocessExportText(text) || '-';
                 doc.setFont('helvetica', style);
                 doc.setFontSize(size);
                 const lines = doc.splitTextToSize(safeText, maxW - indent);
