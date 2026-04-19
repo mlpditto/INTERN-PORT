@@ -2,7 +2,7 @@
 type: dashboard
 status: active
 owner: intern-port-team
-updated: 2026-04-18
+updated: 2026-04-19
 ---
 
 # INTERN-PORT OPS Dashboard
@@ -12,6 +12,14 @@ updated: 2026-04-18
 - [ ] Complete QA session for next release
 - [ ] Verify LIFF with 1-2 real accounts
 - [ ] Confirm source/public UI mirror changes
+
+## Today Update (2026-04-19)
+
+- ThaiLLM hardening shipped: switched proxy endpoint to HTTPS and added proxy-failure fallback path (ThaiLLM -> Typhoon -> Gemini).
+- Commit 4dba3f6: Poneglyph hardening + PDF metadata toggle + Firestore rules/index updates.
+- Commit 643c529: ThaiLLM HTTPS + fallback improvements (source/public mirror + functions proxy).
+- Branch sync status confirmed: origin/main and origin/production now point to the same latest commit.
+- Safety guard kept: local dump files remain excluded from accidental tracking.
 
 ## Quick Links
 
