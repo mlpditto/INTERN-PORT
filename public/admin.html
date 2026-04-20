@@ -3332,8 +3332,13 @@
                                     </div>
 
                                     <div class="laboon-section-shell">
-                                        <div class="laboon-transcript-meta">
-                                            <div class="laboon-section-title" style="margin:0;">Transcript</div>
+                                        <div class="laboon-transcript-meta" style="display:flex; justify-content:space-between; align-items:center;">
+                                            <div style="display:flex; align-items:center; gap:10px;">
+                                                <div class="laboon-section-title" style="margin:0;">Transcript</div>
+                                                <button class="laboon-secondary-btn" style="padding:4px 10px; font-size:0.75em; min-height:auto;" type="button" onclick="polishTranscript()" id="btn-polish-transcript" title="Use AI to polish and structure the script for narration">
+                                                    ✨ AI Polish
+                                                </button>
+                                            </div>
                                             <div id="tts-transcript-counter" class="laboon-transcript-counter">0 chars</div>
                                         </div>
                                         <textarea id="tts-input" placeholder="Paste the script you want the AI to narrate..." style="min-height: 200px;"></textarea>
@@ -3997,6 +4002,40 @@
                 }
                 window._ttsMode = mode;
                 persistLaboonTtsSettings(true);
+            };
+
+            window.polishTranscript = async function() {
+                const ttsInput = document.getElementById('tts-input');
+                if (!ttsInput || !ttsInput.value.trim()) {
+                    showToast('Please enter some text in the transcript first', 'warning');
+                    return;
+                }
+                const btn = document.getElementById('btn-polish-transcript');
+                if (btn) {
+                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Polishing...';
+                    btn.disabled = true;
+                }
+                
+                try {
+                    const prompt = "Please review the following transcript and polish it to make it sound natural, professional, and well-structured for spoken audio/podcast narration. Fix any grammatical errors and improve the flow. Only return the final polished text without any conversational filler or introductory remarks.\n\n" + ttsInput.value;
+                    
+                    const response = await window.callUniversalAI("gemini-1.5-flash", prompt, true);
+                    if (response && response.text) {
+                        ttsInput.value = response.text;
+                        if (typeof updateTtsTranscriptCounter === 'function') updateTtsTranscriptCounter();
+                        showToast('Transcript polished successfully!', 'success');
+                    } else {
+                        throw new Error("No response from AI");
+                    }
+                } catch (e) {
+                    console.error("Polish Error:", e);
+                    showToast('Failed to polish transcript: ' + e.message, 'error');
+                } finally {
+                    if (btn) {
+                        btn.innerHTML = '✨ AI Polish';
+                        btn.disabled = false;
+                    }
+                }
             };
 
             window.fillTtsFromSelection = function() {
