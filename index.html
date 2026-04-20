@@ -1434,16 +1434,38 @@
                         <i id="work-section-icon" class="fa-solid fa-chevron-down" style="color: #28a745; transition: 0.3s; font-size: 0.9em;"></i>
                     </div>
                     <div id="work-section-content" style="display: none; border-top: 1px solid #f0f0f0; background: #fff;">
-                        <!-- Form -->
-                        <div style="padding: 20px; border-bottom: 1px solid #f9f9f9;">
-                            <h5 style="margin-top:0; color:#28a745;"><i class="fa-solid fa-plus-circle"></i> Submit New Work</h5>
-                            <input type="text" id="w-title" placeholder="Work Title...">
-                            <input type="url" id="w-link" placeholder="Work Link (Optional)...">
-                            <button class="btn-success" onclick="submitWork()" style="width:100%; font-weight:bold; border-radius:12px; height:45px;">Submit Work</button>
+                        <!-- Flattened Tab Bar for Work Categories -->
+                        <div style="padding: 15px 15px 5px; background: #f9fdf9; border-bottom: 1px solid #f0f0f0;">
+                             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                                <div style="font-size:0.75em; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">Submission History</div>
+                                <button id="btn-toggle-work-form" onclick="toggleWorkForm()" style="background:#28a745; color:#fff; border:none; padding:4px 10px; border-radius:8px; font-size:0.75em; font-weight:bold; cursor:pointer;">
+                                    <i class="fa-solid fa-plus-circle"></i> New Work
+                                </button>
+                             </div>
+                             <!-- Correct container for Work Filter tabs -->
+                             <div id="work-tabs-container" style="display:flex; overflow-x:auto; gap:8px; padding-bottom:10px; scrollbar-width:none;"></div>
                         </div>
-                        <!-- History -->
-                        <div style="padding: 20px; background: #f9fdf9;">
-                            <h5 style="margin-top:0; color:#333;"><i class="fa-solid fa-clock-rotate-left"></i> Work Submission History</h5>
+
+                        <!-- Toggleable Work Form -->
+                        <div id="work-form-pane" style="display:none; padding: 20px; background:#fff; border-bottom: 1px solid #f9f9f9; animation: fadeIn 0.3s ease-out;">
+                             <h5 style="margin-top:0; color:#28a745; display:flex; align-items:center; gap:8px;">
+                                <i class="fa-solid fa-file-circle-plus"></i> Submit General Work
+                             </h5>
+                             <div style="margin-bottom:12px;">
+                                <label style="font-size:0.75em; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">Work Title</label>
+                                <input type="text" id="w-title" placeholder="What did you do?..." style="margin:0;">
+                             </div>
+                             <div style="margin-bottom:15px;">
+                                <label style="font-size:0.75em; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">Reference Link (Optional)</label>
+                                <input type="url" id="w-link" placeholder="Google Drive, Github, etc..." style="margin:0;">
+                             </div>
+                             <button class="btn-success" onclick="submitWork()" style="width:100%; font-weight:800; border-radius:12px; height:45px; background:linear-gradient(135deg, #28a745, #5ad47a);">
+                                🚀 Submit Work
+                             </button>
+                        </div>
+
+                        <!-- Work History List (Filtered) -->
+                        <div style="padding: 15px; background: #f9fdf9; min-height:100px;">
                             <div id="work-list"></div>
                         </div>
                     </div>
@@ -6042,7 +6064,6 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     throw new Error("Missing Firebase auth. โปรดรีเฟรชหน้าแล้วลองใหม่อีกครั้ง");
                 }
 
-                // Step 1: Save reflective log first so user data is not lost even if score update is denied.
                 await db.collection("reflective_logs").add({
                     userId,
                     displayName: userProfile.displayName,
@@ -6078,15 +6099,12 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 const historyArea = document.getElementById('rl-history-area');
                 if (historyArea) historyArea.style.display = 'block';
                 
-                // 🔥 Show +0.1 animation
                 showFloatingPoints(btn);
 
                 if (typeof showToast === 'function') {
                     showToast(scoreGranted ? "✨ บันทึกสำเร็จ! +0.1 pts" : "✨ บันทึกสำเร็จ!");
                 } else {
-                    alert(scoreGranted
-                        ? "✨ บันทึกสำเร็จ! ได้รับ 0.1 คะแนนครับ"
-                        : "✨ บันทึกสำเร็จ! (คะแนน 0.1 จะอัปเดตให้อัตโนมัติภายหลัง)");
+                    alert(scoreGranted ? "✨ บันทึกสำเร็จ! ได้รับ 0.1 คะแนนครับ" : "✨ บันทึกสำเร็จ!");
                 }
             } catch (e) {
                 console.error(e);
@@ -6105,7 +6123,8 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
 
         function updateCharCount() {
             const content = document.getElementById('rl-content').value;
-            document.getElementById('char-count').innerText = content.length;
+            const countEl = document.getElementById('char-count');
+            if (countEl) countEl.innerText = content.length;
         }
 
         function showFloatingPoints(anchorEl) {
@@ -6119,17 +6138,13 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             setTimeout(() => el.remove(), 1000);
         }
 
-        // 🔥 Claim Reflective Log Bonus Points
         function openReflectiveFeedback(logId) {
             const log = (window.myReflectiveLogsCache || []).find(l => l.id === logId);
             if (!log) return;
-
             const modal = document.getElementById('reflectiveFeedbackModal');
             document.getElementById('rf-feedback-text').innerText = log.adminComment || "พี่เลี้ยงตรวจให้แล้วครับ (ไม่มีความเห็นเพิ่มเติม)";
-            
             const mood = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
             document.getElementById('rf-mood-emoji').innerText = mood;
-
             const claimSection = document.getElementById('rf-claim-section');
             if (log.pointsClaimed) {
                 claimSection.innerHTML = `<div style="padding:15px; background:#e6fffa; border-radius:12px; color:#00b894; font-weight:bold;">✅ คุณรับคะแนนโบนัสนี้ไปแล้วครับ</div>`;
@@ -6137,10 +6152,8 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 claimSection.innerHTML = `
                     <button class="magic-btn" onclick="claimReflectivePoints('${logId}')" style="width:100%; height:60px; font-size:1.1em; background:linear-gradient(135deg, #00b894, #55efc4); box-shadow:0 10px 20px rgba(0,184,148,0.2);">
                         <i class="fa-solid fa-gift"></i> อ่านจบแล้ว กดรับ +${log.adminBonus || 0} คะแนน
-                    </button>
-                `;
+                    </button>`;
             }
-
             modal.style.display = 'flex';
         }
 
@@ -6149,13 +6162,233 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             if (!log) return alert("ไม่พบข้อมูล กรุณารีเฟรชหน้าแล้วลองใหม่ครับ");
             if (log.pointsClaimed) return alert("รับ Points ไปแล้วครับ");
             if (!log.adminBonus || log.adminBonus <= 0) return;
-
             const bonus = log.adminBonus;
-
             try {
                 const b = db.batch();
                 const logRef = db.collection("reflective_logs").doc(logId);
                 const userRef = db.collection("users").doc(userId);
+                b.update(logRef, { pointsClaimed: true, claimedAt: firebase.firestore.FieldValue.serverTimestamp(), adminAcknowledged: false });
+                b.update(userRef, { score: firebase.firestore.FieldValue.increment(bonus) });
+                b.set(db.collection("checkin_logs").doc(), { userId, type: 'reflective_bonus', amount: bonus, note: 'โบนัสบันทึกรายวัน: ' + (log.adminComment || '').substring(0, 50), timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+                await b.commit();
+                document.getElementById('reflectiveFeedbackModal').style.display = 'none';
+                alert(`✨ รับ +${bonus} คะแนนเรียบร้อยครับ!`);
+            } catch (e) { alert("Error: " + e.message); }
+        }
+
+        function checkExpiry() {
+            const now = Date.now();
+            document.querySelectorAll('.global-expiry').forEach(el => {
+                const d = parseInt(el.dataset.dead);
+                const diff = d - now;
+                if (diff <= 0) { el.innerText = "หมดเวลา"; el.style.color = "#ef233c"; }
+                else {
+                    const h = Math.floor(diff / 3600000);
+                    const m = Math.floor((diff % 3600000) / 60000);
+                    el.innerText = `⏳ หมดเขตรับใน: ${h} ชม. ${m} นาที`;
+                }
+            });
+            document.querySelectorAll('.quiz-global-expiry').forEach(el => {
+                const d = parseInt(el.dataset.dead);
+                const diff = d - now;
+                if (diff <= 0) { el.innerText = "หมดเวลา (Expired)"; el.style.color = "#ccc"; }
+                else {
+                    const h = Math.floor(diff / 3600000);
+                    const m = Math.floor((diff % 3600000) / 60000);
+                    el.innerHTML = `<i class="fa-solid fa-hourglass-half"></i> เหลือเวลา: ${h}ชม. ${m}น.`;
+                }
+            });
+            document.querySelectorAll('[id^="timer-"]').forEach(el => {
+                const d = parseInt(el.dataset.deadline);
+                const diff = d - now;
+                if (diff <= 0) el.innerText = "00:00";
+                else {
+                    const m = Math.floor(diff / 60000);
+                    const s = Math.floor((diff % 60000) / 1000);
+                    el.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+                }
+            });
+            document.querySelectorAll('[id^="cd-"]').forEach(el => {
+                const until = parseInt(el.dataset.until);
+                const diff = until - now;
+                if (diff <= 0) el.innerText = "พร้อมรับภารกิจ (Refresh)";
+                else {
+                    const m = Math.floor(diff / 60000);
+                    const s = Math.floor((diff % 60000) / 1000);
+                    el.innerText = `รออีก ${m} นาที ${s} วินาที`;
+                }
+            });
+            for (let qid in mySubmissionsCache) {
+                const q = mySubmissionsCache[qid];
+                if (q.status === 'received' && q.deadline) {
+                    if (now > q.deadline.toDate()) failQuest(qid);
+                }
+            }
+        }
+
+        async function failQuest(qid) {
+            if (mySubmissionsCache[qid].status === 'unsuccessful') return;
+            const cd = new Date(Date.now() + 15 * 60000);
+            const b = db.batch();
+            b.update(db.collection("quest_submissions").doc(`${qid}_${userId}`), { status: 'unsuccessful', cooldownUntil: firebase.firestore.Timestamp.fromDate(cd) });
+            b.update(db.collection("users").doc(userId), { score: firebase.firestore.FieldValue.increment(-0.1) });
+            try { await b.commit(); } catch (e) { }
+        }
+
+        let pendingQuestId = null;
+        let confirmCountdown = null;
+        function openConfirmStart(qId, title, duration) {
+            pendingQuestId = qId;
+            const modal = document.getElementById('confirmModal');
+            const btn = document.getElementById('btn-confirm-start');
+            modal.style.display = 'flex';
+            let sec = 5;
+            btn.disabled = true;
+            btn.innerText = `ยืนยัน (${sec})`;
+            btn.style.opacity = '0.6';
+            if (confirmCountdown) clearInterval(confirmCountdown);
+            confirmCountdown = setInterval(() => {
+                sec--;
+                if (sec <= 0) { clearInterval(confirmCountdown); btn.disabled = false; btn.innerText = `⚡ ยืนยันรับภารกิจ`; btn.style.opacity = '1'; }
+                else btn.innerText = `ยืนยัน (${sec})`;
+            }, 1000);
+            btn.onclick = async function () {
+                btn.disabled = true;
+                btn.innerText = '🔄 กำลังรับภารกิจ...';
+                try {
+                    const dl = new Date(Date.now() + (duration || 30) * 60000);
+                    await db.collection("quest_submissions").doc(`${qId}_${userId}`).set({
+                        questId: qId, userId: userId, displayName: userProfile.displayName, pictureUrl: userProfile.pictureUrl || "", status: 'received', deadline: firebase.firestore.Timestamp.fromDate(dl), startedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                    modal.style.display = 'none';
+                } catch (e) { alert("Error: " + e.message); btn.disabled = false; btn.innerText = `⚡ ยืนยันรับภารกิจ`; }
+            };
+        }
+
+        async function subQ(qId, baseScore) {
+            const ans = document.getElementById(`ans-${qId}`);
+            const text = ans ? ans.value.trim() : "";
+            if (!text) { alert("กรุณาพิมพ์คำตอบก่อนส่งครับ"); return; }
+            const btn = document.getElementById(`btn-sub-${qId}`);
+            if (btn) { btn.disabled = true; btn.innerText = '🔄 กำลังส่ง...'; }
+            try {
+                await db.collection("quest_submissions").doc(`${qId}_${userId}`).update({ status: 'submitted', answer: text, baseScore: baseScore || 0, submittedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                alert("✅ ส่งคำตอบเรียบร้อย!");
+            } catch (e) { alert("Error: " + e.message); if (btn) { btn.disabled = false; btn.innerText = 'ส่งคำตอบ (Submit)'; } }
+        }
+
+        let activeWorkHistoryTab = 'All';
+        function switchWorkHistoryTab(tab) {
+            activeWorkHistoryTab = tab;
+            renderHistory();
+        }
+
+        function toggleWorkForm() {
+            const pane = document.getElementById('work-form-pane');
+            const btn = document.getElementById('btn-toggle-work-form');
+            if (pane.style.display === 'none') {
+                pane.style.display = 'block';
+                btn.innerHTML = '<i class="fa-solid fa-times-circle"></i> Cancel';
+                btn.style.background = '#f1f3f5'; btn.style.color = '#64748b';
+            } else {
+                pane.style.display = 'none';
+                btn.innerHTML = '<i class="fa-solid fa-plus-circle"></i> New Work';
+                btn.style.background = '#28a745'; btn.style.color = '#fff';
+            }
+        }
+
+        function renderHistory() {
+            const historyContainer = document.getElementById('work-list');
+            const tabsContainer = document.getElementById('work-tabs-container');
+            if (!historyContainer || !tabsContainer) return;
+
+            let allItems = [];
+            Object.keys(mySubmissionsCache).forEach(qid => {
+                const sub = mySubmissionsCache[qid];
+                const quest = questsCache.find(x => x.id === qid);
+                if (sub) allItems.push({ id: sub.id, title: quest ? quest.title : (sub.questTitle || "ภารกิจ (Quest)"), type: 'Quest', timestamp: sub.timestamp, status: 'ตรวจแล้ว', score: quest ? quest.points : 0, link: sub.link, icon: 'fa-star', color: '#f1c40f' });
+            });
+            Object.keys(quizAttemptsCache).forEach(qid => {
+                const att = quizAttemptsCache[qid];
+                if (att.status === 'pending' || att.status === 'approved') {
+                    const quiz = quizzesCache.find(q => q.id === qid);
+                    const qTitle = quiz ? quiz.title : (att.quizTitle || "แบบทดสอบ (Quiz)");
+                    let score = Number(att.score);
+                    if (!Number.isFinite(score) || score === 0) {
+                        if (att.correctCount !== undefined && att.totalQuestions) score = (att.correctCount / att.totalQuestions) * (quiz ? (quiz.totalPoints || 1.0) : 1.0);
+                        else score = 0;
+                    }
+                    let qTypePrefix = "";
+                    if (quiz) {
+                        if (quiz.quizType === 'read_only') qTypePrefix = "📚 ";
+                        else if (quiz.questions && quiz.questions.some(x => x.type === 'ordering')) qTypePrefix = "🔢 ";
+                        else if (quiz.questions && quiz.questions.some(x => x.type === 'flashcard')) qTypePrefix = "⚡ ";
+                    }
+                    allItems.push({ id: `${qid}_${userId}`, title: qTypePrefix + qTitle, type: 'Quiz', timestamp: att.timestamp, status: att.status === 'pending' ? 'รอตรวจ' : 'ตรวจแล้ว', score: score, icon: 'fa-brain', color: '#8e44ad', isPoll: att.isPoll, adminComment: att.adminComment, quizId: qid });
+                }
+            });
+            (usersWorksCache || []).forEach(w => allItems.push({ id: w.id, title: w.title, type: 'Work', timestamp: w.timestamp, status: w.status, score: w.score || 0, link: w.link, icon: 'fa-file-lines', color: '#4361ee', adminComment: w.adminComment }));
+            if (window.myReflectiveLogsCache) {
+                window.myReflectiveLogsCache.forEach(log => {
+                    const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
+                    allItems.push({ id: log.id, title: `${moodEmoji} Daily Reflective: ${log.content.substring(0, 30)}...`, type: 'Reflective', timestamp: log.timestamp, status: (log.adminComment || log.adminBonus) ? 'ตรวจแล้ว' : 'รอตรวจ', score: log.adminBonus || 0, icon: 'fa-book-journal-whills', color: '#d35400', adminComment: log.adminComment, canClaimPoints: log.adminBonus > 0 && !log.pointsClaimed, pointsClaimed: log.pointsClaimed === true, claimBonus: log.adminBonus || 0 });
+                });
+            }
+
+            const items = activeWorkHistoryTab === 'All' ? allItems : allItems.filter(i => i.type === activeWorkHistoryTab);
+            items.sort((a,b) => {
+                const tA = a.timestamp ? (typeof a.timestamp.toDate === 'function' ? a.timestamp.toDate().getTime() : new Date(a.timestamp).getTime()) : 0;
+                const tB = b.timestamp ? (typeof b.timestamp.toDate === 'function' ? b.timestamp.toDate().getTime() : new Date(b.timestamp).getTime()) : 0;
+                return tB - tA;
+            });
+
+            const types = ['All', 'Quest', 'Quiz', 'Work', 'Reflective'];
+            tabsContainer.innerHTML = types.map(t => {
+                const isActive = activeWorkHistoryTab === t;
+                const count = t === 'All' ? allItems.length : allItems.filter(i => i.type === t).length;
+                const bg = isActive ? 'linear-gradient(135deg, #28a745, #5ad47a)' : '#fff';
+                const color = isActive ? '#fff' : '#64748b';
+                const border = isActive ? 'none' : '1px solid #e2e8f0';
+                return `<button onclick="switchWorkHistoryTab('${t}')" style="background:${bg}; color:${color}; border:${border}; padding:8px 16px; border-radius:12px; font-size:0.75em; font-weight:800; white-space:nowrap; cursor:pointer; flex-shrink:0; box-shadow:${isActive ? '0 4px 12px rgba(40, 167, 69, 0.2)' : 'none'}; transition:0.3s;">${t} (${count})</button>`;
+            }).join('');
+
+            if (allItems.length === 0) {
+                historyContainer.innerHTML = `<div style="text-align:center; color:#999; padding:20px; font-size:0.9em;">ยังไม่มีประวัติการส่งงาน</div>`;
+                return;
+            }
+
+            historyContainer.innerHTML = items.map(item => {
+                const date = item.timestamp ? (typeof item.timestamp.toDate === 'function' ? item.timestamp.toDate() : new Date(item.timestamp)).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
+                const isPending = item.status === 'รอตรวจ' || item.status === 'pending';
+                const statusBadge = isPending ? `<span style="background:#fff7ed; color:#c2410c; padding:2px 8px; border-radius:6px; font-size:0.7em; font-weight:800;">⌛ รอตรวจ</span>` : `<span style="background:#f0fdf4; color:#15803d; padding:2px 8px; border-radius:6px; font-size:0.7em; font-weight:800;">✅ ตรวจแล้ว</span>`;
+                const scoreVal = parseFloat(item.score);
+                const scoreDisplay = item.isPoll ? '📊' : `${scoreVal.toFixed(2)}`;
+                return `
+                    <div style="background:#fff; border:1px solid #f0f0f0; padding:12px; border-radius:15px; margin-bottom:10px; position:relative; overflow:hidden; animation: fadeIn 0.3s ease-out;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+                            <div style="display:flex; align-items:center; gap:8px; width:70%;">
+                                <div style="width:32px; height:32px; background:${item.color}20; color:${item.color}; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="fa-solid ${item.icon}" style="font-size:0.9em;"></i></div>
+                                <div style="font-size:0.9em; font-weight:bold; color:#333; line-height:1.2; word-break:break-all;">${item.title}</div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="font-size:0.85em; font-weight:900; color:${item.color}">${scoreDisplay} pts</div>
+                                ${statusBadge}
+                            </div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+                            <span style="font-size:0.75em; color:#999;"><i class="fa-solid fa-clock"></i> ${date}</span>
+                            <div style="display:flex; gap:8px;">
+                                ${item.quizId ? `<button onclick="viewQuizAnswers('${item.quizId}')" style="background:#f0f4ff; color:#4361ee; border:none; padding:4px 10px; border-radius:8px; font-size:0.75em; font-weight:bold;"><i class="fa-solid fa-eye"></i> View</button>` : ''}
+                                ${item.link ? `<a href="${item.link}" target="_blank" style="background:#f0f4ff; color:#4361ee; border:none; padding:4px 10px; border-radius:8px; font-size:0.75em; font-weight:bold; text-decoration:none;"><i class="fa-solid fa-link"></i> Link</a>` : ''}
+                                ${(item.type === 'Work' || item.type === 'Quest') ? `<button onclick="deleteHistoryItem(event, '${item.id}', '${item.type}')" style="color:#ef4444; background:none; border:none; padding:0; cursor:pointer;"><i class="fa-solid fa-trash-can"></i></button>` : ''}
+                                ${item.type === 'Reflective' && !item.pointsClaimed && item.claimBonus > 0 ? `<button onclick="openReflectiveFeedback('${item.id}')" style="background:#fff3cd; color:#856404; border:none; padding:4px 10px; border-radius:8px; font-size:0.75em; font-weight:bold;"><i class="fa-solid fa-gift"></i> Bonus</button>` : ''}
+                            </div>
+                        </div>
+                        ${item.adminComment ? `<div style="margin-top:10px; padding:10px; background:#f0f7ff; border-radius:10px; font-size:0.82em; color:#0369a1; border-left:3px solid #4361ee;"><b>Admin:</b> ${item.adminComment}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
 
                 // 1. Mark as claimed
                 b.update(logRef, {
