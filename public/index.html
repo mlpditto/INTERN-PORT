@@ -646,6 +646,53 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
+        /* --- Mission Tabs System (V90.75) --- */
+        .mission-tabs-bar {
+            display: flex;
+            background: #fff8f0;
+            padding: 8px 15px;
+            gap: 8px;
+            border-bottom: 1px solid #fee2e2;
+        }
+
+        .mission-tab-btn {
+            flex: 1;
+            padding: 10px 5px;
+            border: none;
+            background: transparent;
+            color: #e67e22;
+            font-size: 0.85em;
+            font-weight: 700;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            opacity: 0.6;
+        }
+
+        .mission-tab-btn i {
+            font-size: 1.2em;
+        }
+
+        .mission-tab-btn.active {
+            background: white;
+            color: #e67e22;
+            opacity: 1;
+            box-shadow: 0 4px 12px rgba(230, 126, 34, 0.15);
+        }
+
+        .mission-tab-pane {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .mission-tab-pane.active {
+            display: block;
+        }
+
         /* --- Mood Emoji Picker (V90.72) --- */
         .mood-picker {
             display: flex;
@@ -1154,109 +1201,132 @@
                             <i id="kanban-icon" class="fa-solid fa-chevron-down" style="color: #666; transition: 0.3s; font-size: 0.9em;"></i>
                         </div>
                     </div>
-                    <div id="kanban-content" style="display: none; padding: 15px; border-top: 1px solid #f0f0f0; background: #fff;">
-                        <!-- 🔥 Integrated Reflective Log (Daily Mission) -->
-                        <div id="rl-integrated-area" style="margin-bottom: 20px;">
-                            <div style="padding-bottom: 10px; border-bottom: 1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-                                <h5 style="margin:0; color:#e67e22; display:flex; align-items:center; gap:8px;">
-                                    <i class="fa-solid fa-pen-fancy"></i> Daily Reflective Log 
-                                </h5>
-                                <div style="display:flex; align-items:center; gap:8px;">
-                                    <button onclick="document.getElementById('rl-history-area').style.display = document.getElementById('rl-history-area').style.display==='none'?'block':'none'" style="background:none; border:none; color:#999; cursor:pointer; font-size:0.8em; display:flex; align-items:center; gap:4px; padding:0;"><i class="fa-solid fa-clock-rotate-left"></i> History</button>
-                                    <span id="rl-total-count" style="font-size:0.75em; background:rgba(230, 126, 34, 0.1); color:#e67e22; padding:2px 10px; border-radius:12px; font-weight:bold;">0/? Logs</span>
-                                </div>
-                            </div>
-                            <!-- Form -->
-                            <div id="rl-form-area" style="padding-top: 12px;">
-                                <div class="mood-picker" id="mood-picker">
-                                    <button class="mood-btn" onclick="selectMood('😭', this)" title="Crying">😭</button>
-                                    <button class="mood-btn" onclick="selectMood('😓', this)" title="Tired">😓</button>
-                                    <button class="mood-btn" onclick="selectMood('😐', this)" title="Neutral">😐</button>
-                                    <button class="mood-btn selected" onclick="selectMood('😊', this)" title="Happy">😊</button>
-                                    <button class="mood-btn" onclick="selectMood('😍', this)" title="Love">😍</button>
-                                    <button class="mood-btn" onclick="selectMood('💪', this)" title="Strong">💪</button>
-                                    <button class="mood-btn" onclick="selectMood('🎉', this)" title="Party">🎉</button>
-                                </div>
-                                <input type="hidden" id="rl-mood" value="😊">
+                    <div id="kanban-content" style="display: none; border-top: 1px solid #f0f0f0; background: #fff;">
+                        <!-- Mission Tabs Bar -->
+                        <div class="mission-tabs-bar">
+                            <button class="mission-tab-btn active" id="mtab-log" onclick="switchMissionTab('log')">
+                                <i class="fa-solid fa-pen-fancy"></i>
+                                <span>Reflective Log</span>
+                            </button>
+                            <button class="mission-tab-btn" id="mtab-leaderboard" onclick="switchMissionTab('leaderboard')">
+                                <i class="fa-solid fa-trophy"></i>
+                                <span>Leaderboard</span>
+                            </button>
+                            <button class="mission-tab-btn" id="mtab-badges" onclick="switchMissionTab('badges')">
+                                <i class="fa-solid fa-medal"></i>
+                                <span>Badges</span>
+                            </button>
+                        </div>
 
-                                <div style="position:relative;">
-                                    <textarea id="rl-content" rows="5" placeholder="What did I learn today? What problems did I face? What's next?" 
-                                        oninput="updateCharCount()"
-                                        style="margin:0; border-radius:12px; resize:none; font-size:0.95em; padding:15px; border:1px solid #ddd; width:100%;"></textarea>
-                                    <div class="char-counter"><span id="char-count">0</span> characters</div>
+                        <div style="padding: 15px;">
+                            <!-- Tab 1: Daily Reflective Log & Tasks -->
+                            <div id="pane-mission-log" class="mission-tab-pane active">
+                                <div id="rl-integrated-area" style="margin-bottom: 20px;">
+                                    <div style="padding-bottom: 10px; border-bottom: 1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                                        <h5 style="margin:0; color:#e67e22; display:flex; align-items:center; gap:8px;">
+                                            <i class="fa-solid fa-pen-fancy"></i> Daily Reflective Log 
+                                        </h5>
+                                        <div style="display:flex; align-items:center; gap:8px;">
+                                            <button onclick="document.getElementById('rl-history-area').style.display = document.getElementById('rl-history-area').style.display==='none'?'block':'none'" style="background:none; border:none; color:#999; cursor:pointer; font-size:0.8em; display:flex; align-items:center; gap:4px; padding:0;"><i class="fa-solid fa-clock-rotate-left"></i> History</button>
+                                            <span id="rl-total-count" style="font-size:0.75em; background:rgba(230, 126, 34, 0.1); color:#e67e22; padding:2px 10px; border-radius:12px; font-weight:bold;">0/? Logs</span>
+                                        </div>
+                                    </div>
                                     
-                                    <div style="margin-top: 12px; display:flex; justify-content:flex-end; align-items:center;">
-                                        <button id="rl-submit-btn" class="btn-primary" onclick="submitReflectiveLog()" 
-                                            style="width:auto; height:36px; border-radius:18px; padding:0 20px; font-size:0.9em; font-weight:bold; background:linear-gradient(135deg, #ff9f1c 0%, #ffbf00 100%); border:none; display:flex; align-items:center; gap:8px; min-height:auto; box-shadow: 0 4px 12px rgba(255, 159, 28, 0.2);">
-                                            <i class="fa-solid fa-paper-plane"></i> Submit
+                                    <div id="rl-form-area" style="padding-top: 12px;">
+                                        <div class="mood-picker" id="mood-picker">
+                                            <button class="mood-btn" onclick="selectMood('😭', this)" title="Crying">😭</button>
+                                            <button class="mood-btn" onclick="selectMood('😓', this)" title="Tired">😓</button>
+                                            <button class="mood-btn" onclick="selectMood('😐', this)" title="Neutral">😐</button>
+                                            <button class="mood-btn selected" onclick="selectMood('😊', this)" title="Happy">😊</button>
+                                            <button class="mood-btn" onclick="selectMood('😍', this)" title="Love">😍</button>
+                                            <button class="mood-btn" onclick="selectMood('💪', this)" title="Strong">💪</button>
+                                            <button class="mood-btn" onclick="selectMood('🎉', this)" title="Party">🎉</button>
+                                        </div>
+                                        <input type="hidden" id="rl-mood" value="😊">
+
+                                        <div style="position:relative;">
+                                            <textarea id="rl-content" rows="5" placeholder="What did I learn today? What problems did I face? What's next?" 
+                                                oninput="updateCharCount()"
+                                                style="margin:0; border-radius:12px; resize:none; font-size:0.95em; padding:15px; border:1px solid #ddd; width:100%;"></textarea>
+                                            <div class="char-counter"><span id="char-count">0</span> characters</div>
+                                            
+                                            <div style="margin-top: 12px; display:flex; justify-content:flex-end; align-items:center;">
+                                                <button id="rl-submit-btn" class="btn-primary" onclick="submitReflectiveLog()" 
+                                                    style="width:auto; height:36px; border-radius:18px; padding:0 20px; font-size:0.9em; font-weight:bold; background:linear-gradient(135deg, #ff9f1c 0%, #ffbf00 100%); border:none; display:flex; align-items:center; gap:8px; min-height:auto; box-shadow: 0 4px 12px rgba(255, 159, 28, 0.2);">
+                                                    <i class="fa-solid fa-paper-plane"></i> Submit
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="rl-history-area" style="display:none; padding: 15px; background: #fafafa; border-radius: 8px; margin-top: 10px; border: 1px solid #eee;">
+                                        <div id="rl-history-list"></div>
+                                    </div>
+                                </div>
+
+                                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
+                                    <div style="text-align:right; font-size:0.7em; color:#aaa; margin-bottom:5px;">
+                                        <i class="fa-solid fa-circle-info"></i> Click task to update progress
+                                    </div>
+
+                                    <div class="sq-tabs">
+                                        <button class="sq-tab-btn active" id="tab-Backlog" onclick="switchSqTab('Backlog')">
+                                            <span class="sq-tab-count" id="cnt-Backlog">0</span>
+                                            <span>Backlog</span>
+                                        </button>
+                                        <button class="sq-tab-btn" id="tab-Doing" onclick="switchSqTab('Doing')">
+                                            <span class="sq-tab-count" id="cnt-Doing">0</span>
+                                            <span>Doing</span>
+                                        </button>
+                                        <button class="sq-tab-btn" id="tab-Review" onclick="switchSqTab('Review')">
+                                            <span class="sq-tab-count" id="cnt-Review">0</span>
+                                            <span>Review</span>
+                                        </button>
+                                        <button class="sq-tab-btn" id="tab-Done" onclick="switchSqTab('Done')">
+                                            <span class="sq-tab-count" id="cnt-Done">0</span>
+                                            <span>Done</span>
                                         </button>
                                     </div>
-                                </div>
 
-                                <details style="margin-top:12px; font-size:0.85em;">
-                                    <summary style="cursor:pointer; color:#666; font-weight:bold; outline:none; user-select:none;">
-                                        🏆 View Achievements & Leaderboard
-                                    </summary>
-                                    <div style="padding-top:10px;">
-                                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-                                            <span style="font-weight:700; color:#c56b1f; font-size:0.9em;"><i class="fa-solid fa-medal"></i> Badge Collection</span>
-                                            <button class="btn-sm" onclick="openReflectiveBadgeModal()"
-                                                style="min-height:auto; height:24px; border-radius:999px; font-size:0.8em; background:#fff3cd; color:#8a6d3b; border:1px solid #f6d88f; padding:0 8px;">
-                                                View All
-                                            </button>
+                                    <div class="sq-container" style="display:block; overflow:visible;">
+                                        <div id="col-Backlog" class="sq-col" style="min-width:100%; display:block; padding:0; background:transparent; border:none;">
+                                            <div id="sq-Backlog"></div>
                                         </div>
-                                        <div id="rl-badge-collection" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;"></div>
-                                        
-                                        <div style="font-weight:700; color:#355070; font-size:0.9em; margin-bottom:7px;"><i class="fa-solid fa-ranking-star"></i> Leaderboard</div>
-                                        <div id="rl-reflective-leaderboard-mini"></div>
+                                        <div id="col-Doing" class="sq-col" style="min-width:100%; display:none; padding:0; background:transparent; border:none;">
+                                            <div id="sq-Doing"></div>
+                                        </div>
+                                        <div id="col-Review" class="sq-col" style="min-width:100%; display:none; padding:0; background:transparent; border:none;">
+                                            <div id="sq-Review"></div>
+                                        </div>
+                                        <div id="col-Done" class="sq-col" style="min-width:100%; display:none; padding:0; background:transparent; border:none;">
+                                            <div id="sq-Done"></div>
+                                        </div>
                                     </div>
-                                </details>
+                                </div>
                             </div>
-                            
-                            <div id="rl-history-area" style="display:none; padding: 15px; background: #fafafa; border-radius: 8px; margin-top: 10px; border: 1px solid #eee;">
-                                <div id="rl-history-list"></div>
-                            </div>
-                        </div>
 
-                        <div style="text-align:right; font-size:0.7em; color:#aaa; margin-bottom:5px;">
-                            <i class="fa-solid fa-circle-info"></i> Click task to update progress
-                        </div>
+                            <!-- Tab 2: Leaderboard -->
+                            <div id="pane-mission-leaderboard" class="mission-tab-pane">
+                                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                                    <h5 style="margin:0; color:#4361ee; display:flex; align-items:center; gap:8px;">
+                                        <i class="fa-solid fa-ranking-star"></i> Leaderboard
+                                    </h5>
+                                </div>
+                                <div id="rl-reflective-leaderboard-mini"></div>
+                            </div>
 
-                        <div class="sq-tabs">
-                            <button class="sq-tab-btn active" id="tab-Backlog" onclick="switchSqTab('Backlog')">
-                                <span class="sq-tab-count" id="cnt-Backlog">0</span>
-                                <span>Backlog</span>
-                            </button>
-                            <button class="sq-tab-btn" id="tab-Doing" onclick="switchSqTab('Doing')">
-                                <span class="sq-tab-count" id="cnt-Doing">0</span>
-                                <span>Doing</span>
-                            </button>
-                            <button class="sq-tab-btn" id="tab-Review" onclick="switchSqTab('Review')">
-                                <span class="sq-tab-count" id="cnt-Review">0</span>
-                                <span>Review</span>
-                            </button>
-                            <button class="sq-tab-btn" id="tab-Done" onclick="switchSqTab('Done')">
-                                <span class="sq-tab-count" id="cnt-Done">0</span>
-                                <span>Done</span>
-                            </button>
-                        </div>
-
-                        <div class="sq-container" style="display:block; overflow:visible;">
-                            <div id="col-Backlog" class="sq-col"
-                                style="min-width:100%; display:block; padding:0; background:transparent; border:none;">
-                                <div id="sq-Backlog"></div>
-                            </div>
-                            <div id="col-Doing" class="sq-col"
-                                style="min-width:100%; display:none; padding:0; background:transparent; border:none;">
-                                <div id="sq-Doing"></div>
-                            </div>
-                            <div id="col-Review" class="sq-col"
-                                style="min-width:100%; display:none; padding:0; background:transparent; border:none;">
-                                <div id="sq-Review"></div>
-                            </div>
-                            <div id="col-Done" class="sq-col"
-                                style="min-width:100%; display:none; padding:0; background:transparent; border:none;">
-                                <div id="sq-Done"></div>
+                            <!-- Tab 3: Badge Collection -->
+                            <div id="pane-mission-badges" class="mission-tab-pane">
+                                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                                    <h5 style="margin:0; color:#c56b1f; display:flex; align-items:center; gap:8px;">
+                                        <i class="fa-solid fa-medal"></i> Badge Collection
+                                    </h5>
+                                    <button class="btn-sm" onclick="openReflectiveBadgeModal()"
+                                        style="min-height:auto; height:24px; border-radius:999px; font-size:0.8em; background:#fff3cd; color:#8a6d3b; border:1px solid #f6d88f; padding:0 12px;">
+                                        View All
+                                    </button>
+                                </div>
+                                <div id="rl-badge-collection" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
                             </div>
                         </div>
                     </div>
@@ -2691,6 +2761,8 @@
             db.collection("users").orderBy("score", "desc").onSnapshot(s => {
                 allUsersData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderReflectiveMiniLeaderboard();
+                const me = allUsersData.find(u => u.id === userId) || {};
+                renderReflectiveBadgeCollection(me.reflectiveBadges || []);
             }, e => handleFirestoreListenerError('users leaderboard listener', e));
         }
 
@@ -5498,11 +5570,37 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 content.style.display = 'block';
                 icon.style.transform = 'rotate(180deg)';
                 loadSideQuests();
+                // Refresh active tab data
+                const activeTab = document.querySelector('.mission-tab-btn.active');
+                if (activeTab) {
+                    const tabId = activeTab.id.replace('mtab-', '');
+                    switchMissionTab(tabId);
+                }
             } else {
                 content.style.display = 'none';
                 icon.style.transform = 'rotate(0deg)';
             }
             updateGrandLineDashboard();
+        }
+
+        function switchMissionTab(tab) {
+            // Update buttons
+            document.querySelectorAll('.mission-tab-btn').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.getElementById(`mtab-${tab}`);
+            if (activeBtn) activeBtn.classList.add('active');
+            
+            // Update panes
+            document.querySelectorAll('.mission-tab-pane').forEach(pane => pane.classList.remove('active'));
+            const activePane = document.getElementById(`pane-mission-${tab}`);
+            if (activePane) activePane.classList.add('active');
+            
+            // Trigger data loading if needed
+            if (tab === 'leaderboard') {
+                renderReflectiveMiniLeaderboard();
+            } else if (tab === 'badges') {
+                const me = allUsersData.find(u => u.id === userId) || {};
+                renderReflectiveBadgeCollection(me.reflectiveBadges || []);
+            }
         }
 
         function toggleCaseSection() {
