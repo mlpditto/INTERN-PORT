@@ -5839,64 +5839,7 @@
         };
 
 
-        window.regenerateSingleAiSuggestion = async function(qIdx, arrIdx, fromPreview = false) {
-            const btnId = fromPreview ? null : `btn-regen-ai-${arrIdx}`;
-            const btn = btnId ? document.getElementById(btnId) : null;
-            
-            try {
-                if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-                
-                const item = window._aiAnalysisItems[arrIdx];
-                const currentQs = getQuizFormData().questions;
-                const originalQ = currentQs[qIdx];
-                
-                const prompt = `Based on this question and the identified issue, provide a DIFFERENT improved version.
-                
-                Question: ${JSON.stringify(originalQ)}
-                Identified Issue: ${item.issue}
-                Previous Suggestion: ${item.suggestion}
-                
-                Output ONLY a JSON object representing the improved question:
-                {
-                  "q": "...",
-                  "options": [...],
-                  "correct": [...],
-                  "suggestion": "Brief explanation of why this new improvement is better..."
-                }`;
-                
-                const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-1.5-flash';
-                const { text: resultJson } = await callUniversalAI(selectedModel, prompt, true);
-                const cleanJson = resultJson.replace(/```json/g, "").replace(/```/g, "").trim();
-                const newSuggestion = JSON.parse(cleanJson);
-                
-                if (newSuggestion) {
-                    window._aiAnalysisItems[arrIdx].improvedQuestion = newSuggestion;
-                    if (newSuggestion.suggestion) {
-                        window._aiAnalysisItems[arrIdx].suggestion = newSuggestion.suggestion;
-                    }
-                    const suggestionText = document.getElementById(`ai-suggestion-text-${arrIdx}`);
-                    if (suggestionText) {
-                        suggestionText.innerHTML = `<b>Suggestion:</b> ${window._aiAnalysisItems[arrIdx].suggestion}`;
-                    }
-                    const fixBtn = document.getElementById(`btn-fix-ai-${arrIdx}`);
-                    if (fixBtn) {
-                        const improvedJson = JSON.stringify(newSuggestion).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                        fixBtn.setAttribute('onclick', `applySingleAiFix(${qIdx}, '${improvedJson}', ${arrIdx})`);
-                    }
-                    if (fromPreview) {
-                        document.getElementById('ai-compare-overlay').remove();
-                        previewAiFix(qIdx, arrIdx);
-                    } else {
-                        showToast(`✨ Q${qIdx + 1} Suggestion Regenerated`);
-                    }
-                }
-            } catch (e) {
-                console.error("Regen error:", e);
-                alert("Regeneration failed: " + e.message);
-            } finally {
-                if (btn) btn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>';
-            }
-        };
+
 
         window.AI_CORE_READY = true;
         console.log("🤖 [AI Engine] Global Core V90.20 Ready");
@@ -19843,7 +19786,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
                         <div style="padding:20px 30px; background:#fff; border-top:1.5px solid #edf2f7; display:flex; justify-content:flex-end; gap:12px;">
                             <button class="btn btn-secondary" onclick="document.getElementById('ai-compare-overlay').remove()" style="padding:10px 25px; border-radius:12px; font-weight:700;">Keep Original</button>
-                            <button class="btn" style="padding:10px 22px; border-radius:12px; font-weight:700; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;" onclick="regenerateSingleAiSuggestion(${index}, ${arrIdx}, true)">🔄 Regenerate</button>
+                            <button class="btn" style="padding:10px 22px; border-radius:12px; font-weight:700; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; display:flex; align-items:center; gap:8px;" onclick="regenerateSingleAiSuggestion(${index}, ${arrIdx}, true, this)">🔄 Regenerate</button>
                             <button class="btn" onclick="addSingleAiAsNewQuestion(${index}, '${improvedJson}'); document.getElementById('ai-compare-overlay').remove();" style="padding:10px 22px; border-radius:12px; font-weight:700; background:#0ea5e9; color:white; border:none; box-shadow:0 4px 15px rgba(14,165,233,0.28);">➕ Add as New Question</button>
                             <button class="btn btn-primary" onclick="applySingleAiFix(${index}, '${improvedJson}', ${arrIdx}); document.getElementById('ai-compare-overlay').remove();" style="padding:10px 30px; border-radius:12px; font-weight:700; background:#22c55e; border:none; box-shadow:0 4px 15px rgba(34,197,94,0.3);">✅ Apply This Fix</button>
                         </div>
@@ -20087,20 +20030,29 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         };
 
 
-        window.regenerateSingleAiSuggestion = async function(qIdx, arrIdx, fromPreview = false) {
-            const btnId = fromPreview ? null : `btn-regen-ai-${arrIdx}`;
-            const btn = btnId ? document.getElementById(btnId) : null;
+        window.regenerateSingleAiSuggestion = async function(qIdx, arrIdx, fromPreview = false, btnElement = null) {
+            const btn = btnElement || (fromPreview ? null : document.getElementById(`btn-regen-ai-${arrIdx}`));
+            const oldHtml = btn ? btn.innerHTML : null;
             
             try {
-                if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+                if (btn) {
+                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + (fromPreview ? 'Regenerating...' : '');
+                    btn.disabled = true;
+                }
                 
                 const item = window._aiAnalysisItems[arrIdx];
                 const currentQs = getQuizFormData().questions;
                 const originalQ = currentQs[qIdx];
                 
-                const prompt = `Based on this question and the identified issue, provide a DIFFERENT improved version.
+                const prompt = `Based on this question and the identified issue, provide a DIFFERENT and MORE CHALLENGING improved version.
                 
-                Question: ${JSON.stringify(originalQ)}
+                CRITICAL REQUIREMENTS:
+                1. INCREASE DIFFICULTY: Use high-order clinical reasoning (Bloom's Taxonomy: Analysis/Evaluation).
+                2. DEEP INTEGRATION: If it's a medical/clinical question, provide a rich, realistic patient case with subtle clues.
+                3. PLAUSIBLE DISTRACTORS: All options must be highly plausible to someone with only superficial knowledge. Avoid "none of the above" or obviously wrong answers.
+                4. NO EASY CLUES: Ensure the correct answer requires synthesis of information, not just simple recall.
+                
+                Question to improve: ${JSON.stringify(originalQ)}
                 Identified Issue: ${item.issue}
                 Previous Suggestion: ${item.suggestion}
                 
@@ -20109,7 +20061,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                   "q": "...",
                   "options": [...],
                   "correct": [...],
-                  "suggestion": "Brief explanation of why this new improvement is better..."
+                  "suggestion": "Brief explanation of how this version increases challenge and addresses the issue..."
                 }`;
                 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-1.5-flash';
@@ -20142,7 +20094,10 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 console.error("Regen error:", e);
                 alert("Regeneration failed: " + e.message);
             } finally {
-                if (btn) btn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>';
+                if (btn) {
+                    btn.innerHTML = oldHtml || '<i class="fa-solid fa-arrows-rotate"></i>';
+                    btn.disabled = false;
+                }
             }
         };
 
