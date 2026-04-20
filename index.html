@@ -2838,8 +2838,8 @@
             const colors = { DIS:'#3b82f6', INFOGRAPHIC:'#8b5cf6', WRITING:'#10b981', CASE_STUDY:'#f59e0b', PRESENTATION:'#ef4444', RESEARCH:'#06b6d4', REVIEW:'#6366f1', OTHER:'#6b7280' };
             return colors[tag] || '#6b7280';
         }
-        function loadAllQuests() { db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(s => { questsCache = s.docs.map(doc => ({ id: doc.id, ...doc.data() })); renderAssignments(); renderHistory(); }, e => handleFirestoreListenerError('quests listener', e)); }
-        function loadMySubmissions() { db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => { mySubmissionsCache = {}; s.forEach(doc => { mySubmissionsCache[doc.data().questId] = { id: doc.id, ...doc.data() }; }); renderAssignments(); renderHistory(); }, e => handleFirestoreListenerError('quest submissions listener', e)); }
+        function loadAllQuests() { db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(s => { questsCache = s.docs.map(doc => ({ id: doc.id, ...doc.data() })); renderAssignments(); renderHistory(); updateGrandLineDashboard(); }, e => handleFirestoreListenerError('quests listener', e)); }
+        function loadMySubmissions() { db.collection("quest_submissions").where("userId", "==", userId).onSnapshot(s => { mySubmissionsCache = {}; s.forEach(doc => { mySubmissionsCache[doc.data().questId] = { id: doc.id, ...doc.data() }; }); renderAssignments(); renderHistory(); updateGrandLineDashboard(); }, e => handleFirestoreListenerError('quest submissions listener', e)); }
 
         // --- Quiz System ---
         // (Variables declared globally)
@@ -2849,12 +2849,14 @@
                 quizzesCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderAssignments();
                 renderHistory();
+                updateGrandLineDashboard();
             }, e => handleFirestoreListenerError('quizzes listener', e));
             db.collection("quiz_attempts").where("userId", "==", userId).onSnapshot(s => {
                 quizAttemptsCache = {};
                 s.forEach(d => quizAttemptsCache[d.data().quizId] = d.data());
                 renderAssignments();
                 renderHistory();
+                updateGrandLineDashboard();
             }, e => handleFirestoreListenerError('quiz attempts listener', e));
         }
 
@@ -4793,6 +4795,7 @@
             const rankBarEl = document.getElementById('bounty-progress-bar');
             const certMetaEl = document.getElementById('certificate-progress-meta');
             const certBarEl = document.getElementById('certificate-progress-bar');
+            
             if (currentEl) {
                 currentEl.textContent = nextRank.required > 0 ? 'Next Rank' : 'Max Rank';
                 currentEl.title = nextRank.required > 0
@@ -4823,48 +4826,107 @@
             if (certBarEl) certBarEl.style.width = `${Math.max(0, Math.min(100, (score / 30) * 100)).toFixed(1)}%`;
 
             const todayKey = new Date().toDateString();
-            const todayPoints = (usersWorksCache || []).reduce((sum, w) => {
-                if (!w || !w.timestamp || !w.timestamp.toDate) return sum;
-                if (w.timestamp.toDate().toDateString() !== todayKey) return sum;
-                return sum + (parseFloat(w.score) || 0);
-            }, 0);
+            let todayPoints = 0;
 
+            // 1. Quizzes KPI & Today Score
+            let quizzesWithPointsCount = 0;
+            let totalQuizScore = 0;
+            Object.values(quizAttemptsCache || {}).forEach(att => {
+                if (att.status === 'approved' || att.status === 'pending' || att.status === 'completed') {
+                    const quiz = quizzesCache.find(q => q.id === att.quizId);
+                    let s = Number(att.score);
+                    // Fallback to auto-calculated score if missing
+                    if (!Number.isFinite(s) || s === 0) {
+                        if (att.correctCount !== undefined && att.totalQuestions) {
+                            s = (att.correctCount / att.totalQuestions) * (quiz ? (quiz.totalPoints || 1.0) : 1.0);
+                        }
+                    }
+                    if (s > 0) {
+                        quizzesWithPointsCount++;
+                        totalQuizScore += s;
+                        if (att.timestamp && att.timestamp.toDate && att.timestamp.toDate().toDateString() === todayKey) {
+                            todayPoints += s;
+                        }
+                    }
+                }
+            });
+
+            // 2. Reflective Logs KPI & Today Score
             const sortedLogs = [...(window.myReflectiveLogsCache || [])].sort((a, b) => {
                 const tA = a.timestamp ? a.timestamp.toDate().getTime() : 0;
                 const tB = b.timestamp ? b.timestamp.toDate().getTime() : 0;
                 return tB - tA;
             });
             const reflectiveMetrics = collectReflectiveMetrics(sortedLogs);
-            const todayPointsWithReflective = todayPoints + (reflectiveMetrics.doneToday ? 0.1 : 0);
-            if (todayEl) todayEl.textContent = `+${todayPointsWithReflective.toFixed(2)}`;
-            if (streakEl) streakEl.textContent = `${reflectiveMetrics.currentStreak || 0} วัน`;
+            
+            let reflectiveWithPointsCount = 0;
+            let totalReflectiveScore = 0;
+            (window.myReflectiveLogsCache || []).forEach(l => {
+                const bonus = parseFloat(l.adminBonus) || 0;
+                if (bonus > 0) {
+                    reflectiveWithPointsCount++;
+                    totalReflectiveScore += bonus;
+                    if (l.timestamp && l.timestamp.toDate && l.timestamp.toDate().toDateString() === todayKey) {
+                        todayPoints += bonus;
+                    }
+                }
+            });
+            if (reflectiveMetrics.doneToday) {
+                todayPoints += 0.1; // Base submission point
+            }
 
-            const quizzesWithPoints = (usersWorksCache || []).filter(w => w.type === 'quiz' && (parseFloat(w.score) || 0) > 0).length;
-            const totalQuizScore = (usersWorksCache || []).filter(w => w.type === 'quiz').reduce((sum, w) => sum + (parseFloat(w.score) || 0), 0);
-            const formattedQuizScore = totalQuizScore % 1 === 0 ? totalQuizScore : totalQuizScore.toFixed(1);
-            const reflectiveWithPoints = (window.myReflectiveLogsCache || []).filter(l => (parseFloat(l.adminBonus) || 0) > 0).length;
-            const totalReflectiveScore = (window.myReflectiveLogsCache || []).reduce((sum, l) => sum + (parseFloat(l.adminBonus) || 0), 0);
-            const formattedReflectiveScore = totalReflectiveScore % 1 === 0 ? totalReflectiveScore : totalReflectiveScore.toFixed(1);
-            const casesWithPoints = (window.myCasesCache || []).filter(c => (parseFloat(c.adminBonus) || 0) > 0).length;
-            const allWithPoints = quizzesWithPoints + reflectiveWithPoints + casesWithPoints;
+            // 3. Cases KPI & Today Score
+            let casesWithPointsCount = 0;
+            let totalCaseScore = 0;
+            (window.myCasesCache || []).forEach(c => {
+                const bonus = parseFloat(c.adminBonus) || 0;
+                if (bonus > 0) {
+                    casesWithPointsCount++;
+                    totalCaseScore += bonus;
+                    if (c.timestamp && c.timestamp.toDate && c.timestamp.toDate().toDateString() === todayKey) {
+                        todayPoints += bonus;
+                    }
+                }
+            });
+
+            // 4. General Works & Quests Today Score
+            (usersWorksCache || []).forEach(w => {
+                const s = parseFloat(w.score) || 0;
+                if (s > 0 && w.timestamp && w.timestamp.toDate && w.timestamp.toDate().toDateString() === todayKey) {
+                    todayPoints += s;
+                }
+            });
+            Object.values(mySubmissionsCache || {}).forEach(sub => {
+                const quest = questsCache.find(x => x.id === sub.questId);
+                const s = quest ? (quest.points || 0) : 0;
+                if (s > 0 && sub.timestamp && sub.timestamp.toDate && sub.timestamp.toDate().toDateString() === todayKey) {
+                    todayPoints += s;
+                }
+            });
+
+            // Update KPI elements
+            if (todayEl) todayEl.textContent = `+${todayPoints.toFixed(2)}`;
+            if (streakEl) streakEl.textContent = `${reflectiveMetrics.currentStreak || 0} วัน`;
 
             const kpiWipEl = document.getElementById('lean-kpi-wip');
             const kpiQueueEl = document.getElementById('lean-kpi-queue');
             const kpiThroughputEl = document.getElementById('lean-kpi-throughput');
             const kpiFlowEl = document.getElementById('lean-kpi-flow');
             const flowBarEl = document.getElementById('lean-flow-bar');
+
             if (kpiWipEl) {
-                kpiWipEl.innerHTML = `${quizzesWithPoints} <span style="font-size:0.55em; font-weight:normal; opacity:0.8; margin-left:2px;">(${formattedQuizScore} pts)</span>`;
-                kpiWipEl.style.color = '#065f46';
+                const formattedQuiz = totalQuizScore % 1 === 0 ? totalQuizScore : totalQuizScore.toFixed(1);
+                kpiWipEl.innerHTML = `${quizzesWithPointsCount} <span style="font-size:0.55em; font-weight:normal; opacity:0.8; margin-left:2px;">(${formattedQuiz} pts)</span>`;
             }
             if (kpiQueueEl) {
-                kpiQueueEl.innerHTML = `${reflectiveWithPoints} <span style="font-size:0.55em; font-weight:normal; opacity:0.8; margin-left:2px;">(${formattedReflectiveScore} pts)</span>`;
+                const formattedRef = totalReflectiveScore % 1 === 0 ? totalReflectiveScore : totalReflectiveScore.toFixed(1);
+                kpiQueueEl.innerHTML = `${reflectiveWithPointsCount} <span style="font-size:0.55em; font-weight:normal; opacity:0.8; margin-left:2px;">(${formattedRef} pts)</span>`;
             }
-            if (kpiThroughputEl) kpiThroughputEl.textContent = `${casesWithPoints}`;
-            if (kpiFlowEl) kpiFlowEl.textContent = `${allWithPoints}`;
-            if (flowBarEl) flowBarEl.style.width = `${Math.max(6, allWithPoints * 5)}%`;
-            // Voyage Metrics is always visible in compact row 2.
-
+            if (kpiThroughputEl) kpiThroughputEl.textContent = `${casesWithPointsCount}`;
+            
+            const grandTotalItems = quizzesWithPointsCount + reflectiveWithPointsCount + casesWithPointsCount;
+            if (kpiFlowEl) kpiFlowEl.textContent = `${grandTotalItems}`;
+            if (flowBarEl) flowBarEl.style.width = `${Math.max(6, Math.min(100, grandTotalItems * 5))}%`;
         }
 
         function closeOtherGrandLineSections(activeContentId) {
@@ -6326,6 +6388,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             db.collection("works").where("userId", "==", userId).onSnapshot(s => {
                 usersWorksCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderHistory();
+                updateGrandLineDashboard();
             }, e => handleFirestoreListenerError('my works listener', e));
         }
 
@@ -6343,6 +6406,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 myReflectiveLogsUnsub = db.collection("reflective_logs").where("userId", "==", userId).onSnapshot(s => {
                     window.myReflectiveLogsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                     renderHistory();
+                    updateGrandLineDashboard();
                 }, e => {
                     console.error("Error loading my reflective logs:", e);
                     if (e && e.code === 'permission-denied') notifyMissingFirebaseAuth('my reflective logs');
@@ -6413,8 +6477,15 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     const qTitle = quiz ? quiz.title : (att.quizTitle || "แบบทดสอบ (Quiz)");
                     // Single source of truth: show persisted score from quiz_attempts.
                     // This avoids drift against users.score shown in profile.
-                    const persistedScore = Number(att.score);
-                    const score = Number.isFinite(persistedScore) ? persistedScore : 0;
+                    let score = Number(att.score);
+                    // V90.74: Fallback to calculation if score is missing but correctCount exists
+                    if (!Number.isFinite(score) || score === 0) {
+                        if (att.correctCount !== undefined && att.totalQuestions) {
+                            score = (att.correctCount / att.totalQuestions) * (quiz ? (quiz.totalPoints || 1.0) : 1.0);
+                        } else {
+                            score = 0;
+                        }
+                    }
 
                     let qTypePrefix = "";
                     if (quiz) {
@@ -6717,6 +6788,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 const cases = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 window.myCasesCache = cases;
                 renderCaseGrouped(cases);
+                updateGrandLineDashboard();
             });
         }
 
