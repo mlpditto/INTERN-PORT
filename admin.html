@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soul King Admin V90.99.3.2 (Turbo)</title>
-    <!-- V90.99.3.2: Laboon Layout Fixed & Podcast Studio Nesting -->
-    <!-- Release: 2026-04-21 12:00 UTC+7 -->
+    <title>Soul King Admin V90.99.3.3 (Turbo)</title>
+    <!-- V90.99.3.3: Debugging loadActiveQuests & Hub Global Export -->
+    <!-- Release: 2026-04-21 12:30 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -3685,7 +3685,7 @@
             }
 
             // V87.30: Unified AI Hub Mode Controller
-            function switchHubMode(mode) {
+            window.switchHubMode = function(mode) {
                 // Update Buttons
                 document.getElementById('btn-hub-design').classList.toggle('active', mode === 'design');
                 document.getElementById('btn-hub-research').classList.toggle('active', mode === 'research');
@@ -17572,7 +17572,23 @@ async function saveQuiz() {
             document.getElementById('q-tag').value = '';
             document.getElementById('taskModal').style.display = 'none';
         }
-        function loadActiveQuests() { db.collection("quests").orderBy("createdAt", "desc").limit(10).onSnapshot(s => { const t = document.getElementById("activeQuestGrid"); t.innerHTML = ""; let hasActive = false; s.forEach(d => { const q = d.data(); if (q.deadline?.toDate() > new Date()) { hasActive = true; t.innerHTML += `<tr><td>${q.question}</td><td><span class="quest-deadline" data-deadline="${q.deadline.toDate().getTime()}">Loading...</span></td><td>${q.durationMinutes || 30} min</td><td><button class="btn-sm btn-warning" onclick="editQ('${d.id}','${q.question.replace(/'/g, "")}')">✏️</button> <button class="btn-delete-icon" onclick="stopQ('${d.id}')">✕</button></td></tr>`; } }); document.getElementById("active-quest-section").style.display = hasActive ? "block" : "none"; }); }
+        function loadActiveQuests() { 
+            db.collection("quests").orderBy("createdAt", "desc").limit(10).onSnapshot(s => { 
+                const t = document.getElementById("activeQuestGrid"); 
+                if (!t) return;
+                t.innerHTML = ""; 
+                let hasActive = false; 
+                s.forEach(d => { 
+                    const q = d.data(); 
+                    if (q.deadline?.toDate() > new Date()) { 
+                        hasActive = true; 
+                        t.innerHTML += `<tr><td>${q.question}</td><td><span class="quest-deadline" data-deadline="${q.deadline.toDate().getTime()}">Loading...</span></td><td>${q.durationMinutes || 30} min</td><td><button class="btn-sm btn-warning" onclick="editQ('${d.id}','${q.question.replace(/'/g, "")}')">✏️</button> <button class="btn-delete-icon" onclick="stopQ('${d.id}')">✕</button></td></tr>`; 
+                    } 
+                }); 
+                const section = document.getElementById("active-quest-section");
+                if (section) section.style.display = hasActive ? "block" : "none"; 
+            }); 
+        }
         function loadQuestHistory() { db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(s => { const t = document.querySelector("#questHistoryTable tbody"); t.innerHTML = ""; s.forEach(d => { const q = d.data(); if (q.deadline && q.deadline.toDate() > new Date()) return; t.innerHTML += `<tr><td>${q.question}</td><td>${q.baseScore}</td><td><div style="display:flex;gap:5px;"><button class="btn-sm btn-success" onclick="recallQuest('${d.id}')">♻️ Recall</button><button class="btn-delete-icon" onclick="delQ('${d.id}')">✕</button></div></td></tr>`; }) }); }
         function updateQuestTimers() { document.querySelectorAll('.quest-deadline').forEach(el => { const d = parseInt(el.dataset.deadline); const now = Date.now(); if (d - now <= 0) el.innerText = "Expired"; else { const h = Math.floor((d - now) / 3600000); const m = Math.floor(((d - now) % 3600000) / 60000); el.innerText = `${h}h ${m}m left`; } }); }
         function recallQuest(id) {
