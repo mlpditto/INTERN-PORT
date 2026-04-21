@@ -3865,6 +3865,37 @@
                 return new Blob([wavBuffer], { type: 'audio/wav' });
             }
 
+            function detectAudioContainer(audioBytes) {
+                if (!audioBytes || audioBytes.length < 4) return '';
+                if (
+                    audioBytes.length >= 12 &&
+                    audioBytes[0] === 0x52 && audioBytes[1] === 0x49 &&
+                    audioBytes[2] === 0x46 && audioBytes[3] === 0x46 &&
+                    audioBytes[8] === 0x57 && audioBytes[9] === 0x41 &&
+                    audioBytes[10] === 0x56 && audioBytes[11] === 0x45
+                ) return 'wav';
+                if (
+                    (audioBytes[0] === 0x49 && audioBytes[1] === 0x44 && audioBytes[2] === 0x33) ||
+                    (audioBytes[0] === 0xff && (audioBytes[1] & 0xe0) === 0xe0)
+                ) return 'mp3';
+                return '';
+            }
+
+            function resolveTtsAudioPayload(audioBytes, mimeType) {
+                const normalizedMime = (mimeType || '').toLowerCase();
+                const detectedType = detectAudioContainer(audioBytes);
+
+                if (normalizedMime.includes('mpeg') || normalizedMime.includes('mp3') || detectedType === 'mp3') {
+                    return { blob: new Blob([audioBytes], { type: 'audio/mpeg' }), mimeType: 'audio/mpeg', ext: 'mp3' };
+                }
+                if (normalizedMime.includes('wav') || normalizedMime.includes('wave') || detectedType === 'wav') {
+                    return { blob: new Blob([audioBytes], { type: 'audio/wav' }), mimeType: 'audio/wav', ext: 'wav' };
+                }
+
+                // Gemini preview can return raw PCM/L16 inline audio. Wrap it as WAV for browser playback.
+                return { blob: pcmToWavBlob(audioBytes, 24000, 1, 16), mimeType: 'audio/wav', ext: 'wav' };
+            }
+
             function cleanupGeminiTTSUrl() {
                 if (window._geminiTtsObjectUrl) {
                     URL.revokeObjectURL(window._geminiTtsObjectUrl);
@@ -4485,6 +4516,7 @@
 
                 try {
                     let audioDataBase64;
+                    let returnedAudioMime = '';
                     if (selectedEngine === 'gemini') {
                         const geminiKey = window.GEMINI_API_KEY || localStorage.getItem('ai_gemini_key') || '';
                         if (!geminiKey) throw new Error('Gemini API Key is missing.');
@@ -4525,6 +4557,7 @@
                         const audioPart = data?.candidates?.[0]?.content?.parts?.find(part => part.inlineData?.data);
                         if (!audioPart || !audioPart.inlineData?.data) throw new Error('No audio data returned by Gemini.');
                         audioDataBase64 = audioPart.inlineData.data;
+                        returnedAudioMime = audioPart.inlineData?.mimeType || '';
 
                     } else {
                         // Qwen3-TTS logic
@@ -4552,7 +4585,8 @@
                         }
 
                         const arrayBuffer = await response.arrayBuffer();
-                        const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
+                        returnedAudioMime = response.headers.get('content-type') || '';
+                        const blob = new Blob([arrayBuffer], { type: returnedAudioMime || 'audio/wav' });
                         audioDataBase64 = await new Promise((resolve) => {
                             const reader = new FileReader();
                             reader.onloadend = () => resolve(reader.result.split(',')[1]);
@@ -4570,15 +4604,19 @@
                         if (!audioBytes || audioBytes.length < 100) {
                             throw new Error("Received invalid or too small audio data from AI.");
                         }
-                        const format = document.getElementById('tts-export-format')?.value || 'wav';
-                        const blob = new Blob([audioBytes], { type: 'audio/' + format });
+                        const requestedFormat = document.getElementById('tts-export-format')?.value || 'wav';
+                        const audioPayload = resolveTtsAudioPayload(audioBytes, returnedAudioMime);
+                        const blob = audioPayload.blob;
                         const url = URL.createObjectURL(blob);
                         audioEl.src = url;
                         document.getElementById('tts-output-area').style.display = 'block';
                         downloadEl.href = url;
-                        downloadEl.download = `ai-tts-${Date.now()}.${format}`;
+                        downloadEl.download = `ai-tts-${Date.now()}.${audioPayload.ext}`;
                         document.getElementById('btn-send-to-podcast').style.display = 'block';
                         window._latestTtsAudio = blob;
+                        if (requestedFormat === 'mp3' && audioPayload.ext !== 'mp3') {
+                            showToast('MP3 preview not available from this response. Exported as WAV instead.', 'warning');
+                        }
                         showToast('Audio produced successfully!', 'success');
                     }
 
@@ -4603,17 +4641,18 @@
                 cleanupGeminiTTSUrl();
                 
                 let audioBlob;
+                let fileExt = 'wav';
                 if (dataOrBlob instanceof Blob) {
                     audioBlob = dataOrBlob;
+                    const detectedFromBlob = resolveTtsAudioPayload(new Uint8Array(await dataOrBlob.arrayBuffer()), dataOrBlob.type || mimeType);
+                    audioBlob = detectedFromBlob.blob;
+                    fileExt = detectedFromBlob.ext;
                 } else {
                     const audioBytes = base64ToUint8Array(dataOrBlob);
-                    audioBlob = (mimeType || '').includes('wav')
-                        ? new Blob([audioBytes], { type: mimeType || 'audio/wav' })
-                        : pcmToWavBlob(audioBytes, 24000, 1, 16);
+                    const resolved = resolveTtsAudioPayload(audioBytes, mimeType);
+                    audioBlob = resolved.blob;
+                    fileExt = resolved.ext;
                 }
-
-                const format = document.getElementById('tts-export-format')?.value || 'wav';
-                const fileExt = format === 'mp3' ? 'mp3' : 'wav';
 
                 window._geminiTtsBlob = audioBlob;
                 window._geminiTtsObjectUrl = URL.createObjectURL(audioBlob);
