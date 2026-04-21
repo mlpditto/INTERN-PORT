@@ -4,12 +4,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V90.99.3.7</title>
-    <!-- V90.99.3.7: Fix renderKanban TypeError & Hub Load Order -->
-    <!-- Release: 2026-04-21 12:50 UTC+7 -->
+    <title>Nika V90.99.3.8</title>
+    <!-- V90.99.3.8: Fix selectTtsEngine Syntax & Force Cache Clear -->
+    <!-- Release: 2026-04-21 12:55 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+
+    <script>
+        // Force unregister service workers to fix persistent caching issues (V90.99.3.8)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) { registration.unregister(); }
+            });
+        }
+    </script>
 
     <script>
         // V89.02: Reconstructed helper with nested modal and parent visibility support
@@ -2598,7 +2607,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; background:linear-gradient(135deg, #f59e0b, #ef4444); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.6em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         ☀️ Nika
-                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V90.99.3.5</span>
+                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V90.99.3.8</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -4001,40 +4010,21 @@
             };
 
             window.selectTtsEngine = function(engine) {
-                const voiceSelect = document.getElementById('tts-voice-select');
-                const chipG = document.getElementById('chip-engine-gemini');
-                const chipQ = document.getElementById('chip-engine-qwen');
-                
-                if (chipG) chipG.classList.toggle('active', engine === 'gemini');
-                if (chipQ) chipQ.classList.toggle('active', engine === 'qwen');
-
-                // If dialogue mode, warn about Qwen support (currently limited)
-                if (window._ttsMode === 'dialogue' && engine === 'qwen') {
-                    if (typeof showToast === 'function') showToast('Dialogue mode works best with Gemini 3.1 Flash.', 'warning');
-                }
-
-                // Update voice chips
-                const chipContainer = document.getElementById('tts-voice-chips');
-                if (!chipContainer) return;
-                
-                chipContainer.innerHTML = '';
-                const voices = engine === 'gemini' 
-                    ? ['Kore', 'Puck', 'Charon', 'Achird', 'Sulafat', 'Zephyr']
-                    : ['qwen3-tts', 'qwen3-tts-custom'];
-                
-            window.selectTtsEngine = function(engine) {
                 const geminiChip = document.getElementById('chip-engine-gemini');
                 const qwenChip = document.getElementById('chip-engine-qwen');
                 
                 if (engine === 'gemini') {
-                    geminiChip.classList.add('active');
-                    qwenChip.classList.remove('active');
+                    if (geminiChip) geminiChip.classList.add('active');
+                    if (qwenChip) qwenChip.classList.remove('active');
                 } else {
-                    qwenChip.classList.add('active');
-                    geminiChip.classList.remove('active');
+                    if (qwenChip) qwenChip.classList.add('active');
+                    if (geminiChip) geminiChip.classList.remove('active');
+                    if (window._ttsMode === 'dialogue') {
+                        if (typeof showToast === 'function') showToast('Dialogue mode works best with Gemini 1.5 Flash.', 'warning');
+                    }
                 }
                 window._ttsEngine = engine;
-                syncTtsVoices();
+                if (typeof syncTtsVoices === 'function') syncTtsVoices();
             };
 
             window.syncTtsVoices = function() {
