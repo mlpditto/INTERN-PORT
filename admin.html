@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V90.99.3.6</title>
-    <!-- V90.99.3.6: Fix Global Firebase Scope (auth/db) -->
-    <!-- Release: 2026-04-21 12:45 UTC+7 -->
+    <title>Nika V90.99.3.7</title>
+    <!-- V90.99.3.7: Fix renderKanban TypeError & Hub Load Order -->
+    <!-- Release: 2026-04-21 12:50 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -3601,6 +3601,54 @@
         </div>
 
         <script>
+            // V87.30: Unified AI Hub Mode Controller (Moved up to ensure availability V90.99.3.7)
+            window.switchHubMode = function(mode) {
+                // Update Buttons
+                if (document.getElementById('btn-hub-design')) document.getElementById('btn-hub-design').classList.toggle('active', mode === 'design');
+                if (document.getElementById('btn-hub-research')) document.getElementById('btn-hub-research').classList.toggle('active', mode === 'research');
+                if (document.getElementById('btn-hub-laboon')) document.getElementById('btn-hub-laboon').classList.toggle('active', mode === 'laboon');
+
+                // Update Sidebar Parts
+                if (document.getElementById('hub-sidebar-design')) document.getElementById('hub-sidebar-design').style.display = mode === 'design' ? 'block' : 'none';
+                if (document.getElementById('hub-sidebar-research')) document.getElementById('hub-sidebar-research').style.display = mode === 'research' ? 'block' : 'none';
+
+                // Update Sidebar AI Selects
+                if (document.getElementById('hub-ctrl-design-engine')) document.getElementById('hub-ctrl-design-engine').style.display = mode === 'design' ? 'block' : 'none';
+                if (document.getElementById('hub-ctrl-research-engine')) document.getElementById('hub-ctrl-research-engine').style.display = mode === 'research' ? 'block' : 'none';
+
+                // Update View Parts
+                if (document.getElementById('hub-view-design')) document.getElementById('hub-view-design').style.display = mode === 'design' ? 'flex' : 'none';
+                if (document.getElementById('hub-view-research')) document.getElementById('hub-view-research').style.display = mode === 'research' ? 'flex' : 'none';
+                if (document.getElementById('hub-view-laboon')) document.getElementById('hub-view-laboon').style.display = mode === 'laboon' ? 'flex' : 'none';
+                if (document.getElementById('hub-tts-studio')) document.getElementById('hub-tts-studio').style.display = mode === 'laboon' ? 'block' : 'none';
+
+                // V90.99.3.5: Toggle Grid Layout & Sidebar Visibility
+                const hubGrid = document.getElementById('hub-grid-container');
+                const hubSidebar = document.getElementById('hub-sidebar-main');
+                if (hubGrid) {
+                    hubGrid.style.gridTemplateColumns = mode === 'laboon' ? '1fr' : '350px 1fr';
+                }
+                if (hubSidebar) {
+                    hubSidebar.style.display = mode === 'laboon' ? 'none' : 'block';
+                }
+
+                if (mode === 'research' && typeof loadResearchHistory === 'function') { loadResearchHistory(); }
+                if (mode === 'laboon') {
+                    if (typeof auth !== 'undefined' && auth.currentUser) {
+                        if (typeof loadPodcastEpisodes === 'function') loadPodcastEpisodes();
+                    } else {
+                        const podEl = document.getElementById('podcast-episode-list');
+                        if (podEl) {
+                            podEl.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#94a3b8;"><div style="font-size:2.2em;">🔒</div><p>Please sign in as admin to view Podcast Studio data.</p></div>';
+                        }
+                        if (typeof showToast === 'function') showToast('Please sign in to access Laboon data', 'warning');
+                    }
+                    if (typeof syncTtsChips === 'function') setTimeout(syncTtsChips, 50);
+                }
+                const _modeLabels = { design: 'Design Lab', research: 'Research Assistant', laboon: 'Laboon' };
+                if (typeof showToast === 'function') showToast('Switched to ' + (_modeLabels[mode] || mode));
+            };
+
             function selectTtsChip(selectId, btnEl, val) {
                 const selectEl = document.getElementById(selectId);
                 if (selectEl) {
@@ -3685,54 +3733,7 @@
                 }, 150);
             }
 
-            // V87.30: Unified AI Hub Mode Controller
-            window.switchHubMode = function(mode) {
-                // Update Buttons
-                document.getElementById('btn-hub-design').classList.toggle('active', mode === 'design');
-                document.getElementById('btn-hub-research').classList.toggle('active', mode === 'research');
-                document.getElementById('btn-hub-laboon').classList.toggle('active', mode === 'laboon');
 
-                // Update Sidebar Parts
-                document.getElementById('hub-sidebar-design').style.display = mode === 'design' ? 'block' : 'none';
-                document.getElementById('hub-sidebar-research').style.display = mode === 'research' ? 'block' : 'none';
-                // document.getElementById('hub-tts-studio').style.display = mode === 'laboon' ? 'block' : 'none'; // Moved to view-laboon
-
-                // Update Sidebar AI Selects
-                document.getElementById('hub-ctrl-design-engine').style.display = mode === 'design' ? 'block' : 'none';
-                document.getElementById('hub-ctrl-research-engine').style.display = mode === 'research' ? 'block' : 'none';
-
-                // Update View Parts
-                document.getElementById('hub-view-design').style.display = mode === 'design' ? 'flex' : 'none';
-                document.getElementById('hub-view-research').style.display = mode === 'research' ? 'flex' : 'none';
-                document.getElementById('hub-view-laboon').style.display = mode === 'laboon' ? 'flex' : 'none';
-                document.getElementById('hub-tts-studio').style.display = mode === 'laboon' ? 'block' : 'none';
-
-                // V90.99.3.5: Toggle Grid Layout & Sidebar Visibility
-                const hubGrid = document.getElementById('hub-grid-container');
-                const hubSidebar = document.getElementById('hub-sidebar-main');
-                if (hubGrid) {
-                    hubGrid.style.gridTemplateColumns = mode === 'laboon' ? '1fr' : '350px 1fr';
-                }
-                if (hubSidebar) {
-                    hubSidebar.style.display = mode === 'laboon' ? 'none' : 'block';
-                }
-
-                if (mode === 'research') { loadResearchHistory(); }
-                if (mode === 'laboon') {
-                    if (auth && auth.currentUser) {
-                        loadPodcastEpisodes();
-                    } else {
-                        const podEl = document.getElementById('podcast-episode-list');
-                        if (podEl) {
-                            podEl.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#94a3b8;"><div style="font-size:2.2em;">🔒</div><p>Please sign in as admin to view Podcast Studio data.</p></div>';
-                        }
-                        showToast('Please sign in to access Laboon data', 'warning');
-                    }
-                    setTimeout(syncTtsChips, 50);
-                }
-                const _modeLabels = { design: 'Design Lab', research: 'Research Assistant', laboon: 'Laboon' };
-                showToast('Switched to ' + (_modeLabels[mode] || mode));
-            }
 
             // Prompt Suggestions Functions
             window.openPromptSuggestions = function() {
@@ -16807,8 +16808,10 @@ async function saveQuiz() {
 
         // Maintain backward compatibility for onSnapshot calls
         function renderKanban(snap) {
-            sideQuestsCache = {};
-            snap.forEach(doc => sideQuestsCache[doc.id] = doc.data());
+            if (snap && typeof snap.forEach === 'function') {
+                sideQuestsCache = {};
+                snap.forEach(doc => sideQuestsCache[doc.id] = doc.data());
+            }
             drawKanban();
         }
 
