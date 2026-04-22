@@ -16127,7 +16127,12 @@ async function saveQuiz() {
                         <td>${safe(c.customer || '-')}</td>
                         <td style="max-width:260px; white-space:normal;">${safe(c.note || '-')}</td>
                         <td><span class="badge" style="background:${statusBg}; color:${statusColor}; border:1px solid ${statusColor}33;">${isArchived ? 'archived' : (isReviewed ? 'reviewed' : 'pending')}</span></td>
-                        <td>${actionBtn}</td>
+                        <td>
+                            <div style="display:flex; gap:5px;">
+                                ${actionBtn}
+                                <button class="btn-sm" style="background:#ef4444; color:white; border:none; border-radius:8px;" onclick="deleteCase('${c.id}')"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </td>
                     </tr>
                 `;
             }).join('');
@@ -16187,6 +16192,16 @@ async function saveQuiz() {
             } catch (e) {
                 console.error('Failed to update case status:', e);
                 alert('Failed to update case status: ' + e.message);
+            }
+        }
+        
+        async function deleteCase(id) {
+            if (!confirm("Are you sure you want to delete this case submission?")) return;
+            try {
+                await db.collection('cases').doc(id).delete();
+                if (typeof showToast === 'function') showToast("Case Deleted", 'success');
+            } catch (e) {
+                alert("Delete failed: " + e.message);
             }
         }
 
