@@ -3457,7 +3457,7 @@
                                         <!-- 1. Model Selection (Moved to Top [Version: V90.99.3.2]) -->
                                         <div class="laboon-section-shell" style="padding:15px; margin-bottom:15px; border:2px solid #6366f1; background:#f5f7ff;">
                                             <div class="laboon-section-title" style="margin-bottom:12px; color:#4f46e5;"><i class="fa-solid fa-brain"></i> 1. AI Model Selection</div>
-                                            <div style="font-size:0.76em; color:#64748b; margin-bottom:10px;">Sprint 1A foundation: choose the TTS backend and model now. Cloud TTS request routing will be wired in Sprint 1B.</div>
+                                            <div style="font-size:0.76em; color:#64748b; margin-bottom:10px;">Choose the TTS backend and model. Cloud TTS routing is now connected through the Laboon proxy.</div>
                                             <div class="tts-chip-group">
                                                 <button type="button" id="chip-engine-gemini" class="tts-chip active" onclick="selectTtsBackend('gemini_api')" style="flex:1; justify-content:center; gap:8px;">
                                                     <i class="fa-solid fa-sparkles"></i> Gemini TTS
@@ -3949,6 +3949,11 @@
                     (audioBytes[0] === 0x49 && audioBytes[1] === 0x44 && audioBytes[2] === 0x33) ||
                     (audioBytes[0] === 0xff && (audioBytes[1] & 0xe0) === 0xe0)
                 ) return 'mp3';
+                if (
+                    audioBytes.length >= 4 &&
+                    audioBytes[0] === 0x4f && audioBytes[1] === 0x67 &&
+                    audioBytes[2] === 0x67 && audioBytes[3] === 0x53
+                ) return 'ogg';
                 return '';
             }
 
@@ -3959,8 +3964,14 @@
                 if (normalizedMime.includes('mpeg') || normalizedMime.includes('mp3') || detectedType === 'mp3') {
                     return { blob: new Blob([audioBytes], { type: 'audio/mpeg' }), mimeType: 'audio/mpeg', ext: 'mp3' };
                 }
+                if (normalizedMime.includes('ogg') || normalizedMime.includes('opus') || detectedType === 'ogg') {
+                    return { blob: new Blob([audioBytes], { type: 'audio/ogg' }), mimeType: 'audio/ogg', ext: 'ogg' };
+                }
                 if (normalizedMime.includes('wav') || normalizedMime.includes('wave') || detectedType === 'wav') {
                     return { blob: new Blob([audioBytes], { type: 'audio/wav' }), mimeType: 'audio/wav', ext: 'wav' };
+                }
+                if (normalizedMime.includes('l16') || normalizedMime.includes('basic') || normalizedMime.includes('pcm')) {
+                    return { blob: pcmToWavBlob(audioBytes, 24000, 1, 16), mimeType: 'audio/wav', ext: 'wav' };
                 }
 
                 // Gemini preview can return raw PCM/L16 inline audio. Wrap it as WAV for browser playback.
@@ -4007,14 +4018,14 @@
                 cloud_tts: {
                     label: 'Cloud Text-to-Speech API',
                     engine: 'gemini',
-                    help: 'Cloud TTS routing UI is ready. Request execution will be enabled in the next implementation sprint.',
+                    help: 'Uses the Laboon proxy to call Google Cloud Text-to-Speech with explicit output encoding support.',
                     capabilities: {
                         encodings: ['linear16', 'mp3', 'ogg_opus', 'pcm', 'mulaw', 'alaw'],
                         sampleRates: [16000, 22050, 24000, 44100, 48000],
                         maxTextBytes: 4000,
                         maxCombinedBytes: 8000,
                         supportsDialogue: true,
-                        notes: 'Cloud TTS will become the preferred path for explicit output encoding in a later sprint.'
+                        notes: 'Best option when you need predictable output encoding such as MP3, OGG_OPUS, LINEAR16, or MULAW.'
                     },
                     models: [
                         { value: 'gemini-2.5-flash-tts', label: 'Gemini 2.5 Flash TTS', description: 'Recommended starting point for Cloud TTS.' },
@@ -4191,6 +4202,20 @@
                     return { ok: false, message: `Invalid dialogue line: "${invalidLine.slice(0, 50)}". Use Speaker 1:/Speaker 2:.` };
                 }
                 return { ok: true };
+            }
+
+            function buildCloudTtsDialogueMarkup(transcript) {
+                return String(transcript || '')
+                    .split('\n')
+                    .map(line => line.trim())
+                    .filter(Boolean)
+                    .map(line => {
+                        const match = line.match(/^(speaker\s*1|speaker\s*2)\s*:\s*(.+)$/i);
+                        if (!match) return null;
+                        const speaker = match[1].toLowerCase().includes('1') ? 'Speaker1' : 'Speaker2';
+                        return { speaker, text: match[2].trim() };
+                    })
+                    .filter(Boolean);
             }
 
             window.applyLaboonTtsPreset = function(preset) {
@@ -4444,6 +4469,10 @@
                     category = 'not_ready';
                     userMessage = 'Cloud TTS is visible in the Laboon UI, but live request routing is not connected yet. Please use Gemini TTS or Qwen3-TTS for now.';
                     statusMessage = 'Cloud TTS routing is not wired yet.';
+                } else if (lower.includes('cloud tts proxy error') || lower.includes('cloud_tts')) {
+                    category = 'provider';
+                    userMessage = `Cloud Text-to-Speech API could not complete this request. Please check the model, encoding, or project permissions and try again.`;
+                    statusMessage = 'Cloud Text-to-Speech API request failed.';
                 } else if (lower.includes('no audio data returned')) {
                     category = 'empty_audio';
                     userMessage = `${backendLabel} finished the request but returned no playable audio. Try a shorter script or another model.`;
@@ -4932,6 +4961,7 @@
                 const selectedBackend = typeof window.getSelectedTtsBackend === 'function' ? window.getSelectedTtsBackend() : 'gemini_api';
                 const selectedModel = typeof window.getSelectedTtsModel === 'function' ? window.getSelectedTtsModel() : 'gemini-3.1-flash-tts-preview';
                 const selectedEncoding = (document.getElementById('tts-audio-encoding')?.value || document.getElementById('tts-export-format')?.value || 'wav').toLowerCase();
+                const selectedSampleRate = Number(document.getElementById('tts-sample-rate')?.value || 24000);
                 
                 // Actual engine remains mapped from backend during Sprint 1A.
                 const selectedEngine = selectedBackend === 'qwen' ? 'qwen' : 'gemini';
@@ -4976,9 +5006,53 @@
                     let audioDataBase64;
                     let returnedAudioMime = '';
                     if (selectedBackend === 'cloud_tts') {
-                        throw new Error('Cloud Text-to-Speech API selection is ready in the UI, but live request routing is not wired yet. Please switch backend to Gemini TTS or Qwen3-TTS for now.');
+                        const cloudPrompt = String(styleEl?.value || '').trim() || 'Speak naturally and clearly while preserving the meaning of the script.';
+                        const cloudVoice = isDialogue
+                            ? {
+                                languageCode: languageElD?.value || 'th-TH',
+                                modelName: selectedModel,
+                                multiSpeakerVoiceConfig: {
+                                    speakerVoiceConfigs: [
+                                        { speakerAlias: 'Speaker1', speakerId: document.getElementById('tts-voice-s1')?.value || 'Kore' },
+                                        { speakerAlias: 'Speaker2', speakerId: document.getElementById('tts-voice-s2')?.value || 'Puck' }
+                                    ]
+                                }
+                            }
+                            : {
+                                languageCode: languageEl?.value || 'th-TH',
+                                name: voice,
+                                modelName: selectedModel
+                            };
+                        const cloudInput = isDialogue
+                            ? {
+                                prompt: cloudPrompt,
+                                multiSpeakerMarkup: {
+                                    turns: buildCloudTtsDialogueMarkup(transcript)
+                                }
+                            }
+                            : {
+                                prompt: cloudPrompt,
+                                text: transcript
+                            };
+                        const cloudResponse = await window.callTtsProxy({
+                            provider: 'cloud_tts',
+                            model: selectedModel,
+                            ttsConfig: {
+                                input: cloudInput,
+                                voice: cloudVoice,
+                                audioConfig: {
+                                    audioEncoding: selectedEncoding === 'wav' ? 'LINEAR16' : selectedEncoding.toUpperCase(),
+                                    sampleRateHertz: selectedSampleRate
+                                }
+                            }
+                        });
+                        if (!cloudResponse?.audioContent) {
+                            throw new Error('No audio data returned by Cloud Text-to-Speech API.');
+                        }
+                        audioDataBase64 = cloudResponse.audioContent;
+                        returnedAudioMime = cloudResponse.mimeType || '';
                     }
-                    if (selectedEngine === 'gemini') {
+                    else if (selectedEngine === 'gemini') {
                         const geminiKey = window.GEMINI_API_KEY || localStorage.getItem('ai_gemini_key') || '';
                         if (!geminiKey) throw new Error('Gemini API Key is missing.');
 
@@ -7142,6 +7216,40 @@
                 throw new Error("No provider active for " + modelName + ". Please check API keys or Proxy status.");
             } catch (err) {
                 throw err;
+            }
+        };
+
+        window.callTtsProxy = async function(payload) {
+            const PROXY_SECRET = "mlp-secret-8888";
+            const PROXY_URL = (window.location.hostname === 'mlp-int.work') ? '/api/ai' : 'https://mlp-int.work/api/ai';
+            const BACKUP_PROXY = 'https://intern-port-edfa7.web.app/api/ai';
+
+            const callEndpoint = async (url) => {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-mlp-secret': PROXY_SECRET },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    const err = new Error(data?.error || `${payload.provider || 'tts'} proxy failed with status ${response.status}`);
+                    err.details = data;
+                    err.status = response.status;
+                    throw err;
+                }
+                return data;
+            };
+
+            try {
+                return await callEndpoint(PROXY_URL);
+            } catch (primaryError) {
+                console.warn('[TTS Proxy] Primary endpoint failed, trying backup.', primaryError.message);
+                try {
+                    return await callEndpoint(BACKUP_PROXY);
+                } catch (backupError) {
+                    console.warn('[TTS Proxy] Backup endpoint also failed.', backupError.message);
+                    throw backupError;
+                }
             }
         };
 

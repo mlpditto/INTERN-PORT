@@ -10,6 +10,15 @@ const PROJECT_ID = "intern-port-edfa7";
 const REGION = "us-central1"; // Primary for Imagen
 const AUTH_SECRET = "mlp-secret-8888"; // Basic shared secret between admin.html and proxy
 
+function getAudioMimeType(audioEncoding) {
+    const normalized = String(audioEncoding || "").toUpperCase();
+    if (normalized === "MP3") return "audio/mpeg";
+    if (normalized === "OGG_OPUS") return "audio/ogg";
+    if (normalized === "PCM") return "audio/l16";
+    if (normalized === "MULAW" || normalized === "ALAW") return "audio/basic";
+    return "audio/wav";
+}
+
 /**
  * 🤖 AI Proxy Function (V89.19)
  * Handles: Gemini, OpenAI, and Vertex AI (Imagen 3)
@@ -23,7 +32,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "TH
         }
 
         const { provider, model, prompt, isJson, visionData } = req.body;
-        if (!provider || !prompt) {
+        if (!provider || (provider !== "cloud_tts" && !prompt)) {
             return res.status(400).json({ error: "Missing provider or prompt" });
         }
 
@@ -57,6 +66,35 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "TH
         }
 
         // --- 🟠 OpenAI (GPT / DALL-E) ---
+        // --- Google Cloud Text-to-Speech (Gemini TTS) ---
+        if (provider === "cloud_tts") {
+            const auth = new GoogleAuth({
+                scopes: "https://www.googleapis.com/auth/cloud-platform",
+            });
+            const client = await auth.getClient();
+            const token = await client.getAccessToken();
+
+            const { ttsConfig = {} } = req.body;
+            if (!ttsConfig.input || !ttsConfig.voice || !ttsConfig.audioConfig) {
+                return res.status(400).json({ error: "Missing input, voice, or audioConfig for cloud_tts" });
+            }
+
+            const response = await axios.post("https://texttospeech.googleapis.com/v1/text:synthesize", ttsConfig, {
+                headers: {
+                    "Authorization": `Bearer ${token.token}`,
+                    "x-goog-user-project": PROJECT_ID,
+                    "Content-Type": "application/json"
+                }
+            });
+
+            return res.json({
+                audioContent: response.data.audioContent,
+                mimeType: getAudioMimeType(ttsConfig.audioConfig.audioEncoding),
+                model: ttsConfig.voice.modelName || model || "cloud_tts",
+                provider: "cloud_tts"
+            });
+        }
+
         if (provider === "openai") {
             const apiKey = process.env.OPENAI_API_KEY;
             const endpoint = model === 'dalle' ? "https://api.openai.com/v1/images/generations" : "https://api.openai.com/v1/chat/completions";
