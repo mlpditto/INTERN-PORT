@@ -32,7 +32,7 @@
             
             // Hide other modals unless they are safe parents
             document.querySelectorAll('.modal').forEach(modal => {
-                </script>
+                if (modal.id !== id) {
                     const isSafeParent = (modal.id === 'quizManageModal' || modal.id === 'archiveModal' || modal.id === 'assignmentsManageModal');
                     if (!isNested || !isSafeParent) {
                         modal.classList.remove('force-show');
@@ -4371,7 +4371,7 @@
             }
 
             function setSelectValueIfExists(el, value) {
-                if (!el || value == null) return;
+                if (!el || value == null || !el.options || typeof el.options[Symbol.iterator] !== 'function') return;
                 if ([...el.options].some(opt => opt.value === value)) {
                     el.value = value;
                 }
@@ -7733,6 +7733,18 @@
                     throw new Error("ThaiLLM is currently unavailable because AI Proxy failed and no local fallback key is configured.");
                 }
             }
+
+            try {
+                if (modelName.includes('gemini') || modelName === 'multimodal') {
+                    const genAI = new GoogleGenerativeAI(quickApiKey || window.GEMINI_API_KEY);
+                    let mName = modelName;
+                    if (mName === 'multimodal' || mName === 'gemini-flash' || mName.includes('1.5-flash') || mName.includes('gemini-3')) mName = 'gemini-1.5-flash';
+                    else if (mName === 'gemini-pro' || mName.includes('1.5-pro') || mName.includes('gemini-3.1')) mName = 'gemini-1.5-pro';
+
+                    const model = genAI.getGenerativeModel({ model: mName });
+
+                    let result;
+                    if (visionData && visionData.base64) {
                         const parts = [
                             { text: prompt },
                             { inlineData: { data: visionData.base64, mimeType: visionData.mimeType || "image/jpeg" } }
@@ -7741,7 +7753,7 @@
                     } else {
                         result = await model.generateContent(prompt);
                     }
-                    
+
                     const response = await result.response;
                     return { text: response.text(), tokens: 0, model: mName };
                 } else if (modelName.includes('llama') && window.TOGETHER_API_KEY) {
