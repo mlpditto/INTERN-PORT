@@ -31,12 +31,12 @@
             const isNested = (id === 'quizParticipantsModal' || id === 'reflectiveReviewModal' || id === 'quizReviewModal' || id === 'exportQuizPdfModal');
             
             // Hide other modals unless they are safe parents
-            document.querySelectorAll('.modal').forEach(modal => {
-                </script>
+            document.querySelectorAll('.modal').forEach(function(modal) {
+                if (modal.id !== id) {
                     const isSafeParent = (modal.id === 'quizManageModal' || modal.id === 'archiveModal' || modal.id === 'assignmentsManageModal');
                     if (!isNested || !isSafeParent) {
                         modal.classList.remove('force-show');
-                        modal.style.display = 'none';
+                        modal.style.setProperty('display', 'none', 'important');
                         modal.setAttribute('style', 'display:none;');
                     }
                 }
@@ -4371,9 +4371,14 @@
             }
 
             function setSelectValueIfExists(el, value) {
-                if (!el || value == null) return;
-                if ([...el.options].some(opt => opt.value === value)) {
-                    el.value = value;
+                if (!el || value == null || !el.options) return;
+                try {
+                    const options = Array.from(el.options);
+                    if (options.some(opt => opt.value === value)) {
+                        el.value = value;
+                    }
+                } catch (e) {
+                    console.warn('[AI Config] setSelectValueIfExists failed:', e);
                 }
             }
 
@@ -5852,11 +5857,12 @@
                 if (bMp3) bMp3.classList.toggle('active', fmt === 'mp3');
 
                 const encodingEl = document.getElementById('tts-audio-encoding');
-                if (encodingEl) {
+                if (encodingEl && encodingEl.options) {
                     const desiredEncoding = fmt === 'mp3' ? 'mp3' : 'wav';
-                    if ([...encodingEl.options].some(opt => opt.value === desiredEncoding)) {
+                    const opts = Array.from(encodingEl.options);
+                    if (opts.some(opt => opt.value === desiredEncoding)) {
                         encodingEl.value = desiredEncoding;
-                    } else if ([...encodingEl.options].some(opt => opt.value === 'linear16')) {
+                    } else if (opts.some(opt => opt.value === 'linear16')) {
                         encodingEl.value = 'linear16';
                     }
                 }
@@ -7667,16 +7673,26 @@
             if (window.loadAIKeys) window.loadAIKeys();
 
             let proxyProvider = "";
+            if (modelName.toLowerCase().indexOf('claude') !== -1) {
+                proxyProvider = "anthropic";
+            } else if (modelName === 'imagen' || modelName === 'imagen-nano') {
+                proxyProvider = "imagen";
+            } else if (modelName === 'dalle') {
+                proxyProvider = "openai";
+            } else if (modelName.includes('gemini') || modelName === 'multimodal') {
+                proxyProvider = "gemini";
+            } else if (modelName.toLowerCase().includes('thaillm') || modelName.toLowerCase().includes('openthaigpt')) {
+                proxyProvider = "thaillm";
+            } else if (modelName.includes('gpt')) {
+                proxyProvider = "openai";
+            } else if (modelName.includes('typhoon')) {
+                proxyProvider = "typhoon";
+            } else if (modelName.includes('llama')) {
+                proxyProvider = "together";
+            } else if (modelName.includes('glm-5.1') || modelName.includes('ollama')) {
+                proxyProvider = "ollama";
+            }
             try {
-                if (modelName.toLowerCase().indexOf('claude') !== -1) proxyProvider = "anthropic";
-                else if (modelName === 'imagen' || modelName === 'imagen-nano') proxyProvider = "imagen";
-                else if (modelName === 'dalle') proxyProvider = "openai";
-                else if (modelName.includes('gemini') || modelName === 'multimodal') proxyProvider = "gemini";
-                else if (modelName.toLowerCase().includes('thaillm') || modelName.toLowerCase().includes('openthaigpt')) proxyProvider = "thaillm";
-                else if (modelName.includes('gpt')) proxyProvider = "openai";
-                else if (modelName.includes('typhoon')) proxyProvider = "typhoon";
-                else if (modelName.includes('llama')) proxyProvider = "together";
-                else if (modelName.includes('glm-5.1') || modelName.includes('ollama')) proxyProvider = "ollama";
 
                 if (proxyProvider !== "") {
                     const proxyResponse = await fetch(PROXY_URL, {
@@ -7733,18 +7749,29 @@
                     throw new Error("ThaiLLM is currently unavailable because AI Proxy failed and no local fallback key is configured.");
                 }
             }
-                        const parts = [
-                            { text: prompt },
-                            { inlineData: { data: visionData.base64, mimeType: visionData.mimeType || "image/jpeg" } }
-                        ];
-                        result = await model.generateContent(parts);
-                    } else {
-                        result = await model.generateContent(prompt);
-                    }
-                    
-                    const response = await result.response;
-                    return { text: response.text(), tokens: 0, model: mName };
-                } else if (modelName.includes('llama') && window.TOGETHER_API_KEY) {
+            // Gemini Direct Fallback ([Version: V91.01] Restoration)
+            if (modelName.toLowerCase().includes('gemini') || modelName === 'multimodal') {
+                const geminiKey = quickApiKey || window.GEMINI_API_KEY;
+                if (!geminiKey || geminiKey.includes('__')) throw new Error("Gemini API Key not found for local fallback.");
+                
+                const genAI = new GoogleGenerativeAI(geminiKey);
+                const mName = modelName === 'multimodal' ? 'gemini-1.5-flash-latest' : modelName;
+                const model = genAI.getGenerativeModel({ model: mName });
+
+                let result;
+                if (visionData && visionData.base64) {
+                    const parts = [
+                        { text: prompt },
+                        { inlineData: { data: visionData.base64, mimeType: visionData.mimeType || "image/jpeg" } }
+                    ];
+                    result = await model.generateContent(parts);
+                } else {
+                    result = await model.generateContent(prompt);
+                }
+                
+                const response = await result.response;
+                return { text: response.text(), tokens: 0, model: mName };
+            } else if (modelName.includes('llama') && window.TOGETHER_API_KEY) {
                     const resp = await fetch('https://api.together.xyz/v1/chat/completions', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.TOGETHER_API_KEY}` },
@@ -22102,7 +22129,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
         window.AI_CORE_READY = true;
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V90.71 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V90.99.3.9.1 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
 
         // --- [Version: V90.36] Quiz Feedback Panel ---
         let _qfpCurrentId = null;
