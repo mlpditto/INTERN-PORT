@@ -3412,19 +3412,21 @@
                                             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px;">
                                                 <div>
                                                     <label class="laboon-field-label" for="tts-polish-duration" style="margin-bottom:6px;">Target Length</label>
-                                                    <select id="tts-polish-duration" style="width:100%; font-size:0.82em; padding:9px 10px; border-radius:10px; border:1.5px solid #dbe4ff; background:white; color:#1e293b;">
+                                                    <select id="tts-polish-duration" style="display:none;">
                                                         <option value="1-2">1-2 min</option>
                                                         <option value="3-5" selected>3-5 min</option>
                                                         <option value="5-8">5-8 min</option>
                                                         <option value="8-12">8-12 min</option>
                                                     </select>
+                                                    <div id="tts-polish-duration-chips" class="tts-chip-group" style="margin-top:4px;"></div>
                                                 </div>
                                                 <div>
                                                     <label class="laboon-field-label" for="tts-polish-speakers" style="margin-bottom:6px;">Narration</label>
-                                                    <select id="tts-polish-speakers" style="width:100%; font-size:0.82em; padding:9px 10px; border-radius:10px; border:1.5px solid #dbe4ff; background:white; color:#1e293b;">
+                                                    <select id="tts-polish-speakers" style="display:none;">
                                                         <option value="single" selected>1 narrator</option>
                                                         <option value="dialogue">2 speakers</option>
                                                     </select>
+                                                    <div id="tts-polish-speakers-chips" class="tts-chip-group" style="margin-top:4px;"></div>
                                                 </div>
                                                 <div>
                                                     <label class="laboon-field-label" for="tts-polish-format" style="margin-bottom:6px;">Podcast Style</label>
@@ -3434,14 +3436,16 @@
                                                         <option value="english_podcast">English podcast</option>
                                                         <option value="interview">Interview style</option>
                                                     </select>
+                                                    <div id="tts-polish-format-hint" style="margin-top:6px; font-size:0.73em; line-height:1.45; color:#64748b;"></div>
                                                 </div>
                                                 <div>
                                                     <label class="laboon-field-label" for="tts-polish-summary-level" style="margin-bottom:6px;">Summary Level</label>
-                                                    <select id="tts-polish-summary-level" style="width:100%; font-size:0.82em; padding:9px 10px; border-radius:10px; border:1.5px solid #dbe4ff; background:white; color:#1e293b;">
+                                                    <select id="tts-polish-summary-level" style="display:none;">
                                                         <option value="light">Light</option>
                                                         <option value="balanced" selected>Balanced</option>
                                                         <option value="strong">Strong</option>
                                                     </select>
+                                                    <div id="tts-polish-summary-level-chips" class="tts-chip-group" style="margin-top:4px;"></div>
                                                 </div>
                                             </div>
                                             <div style="margin-top:10px; font-size:0.74em; line-height:1.45; color:#64748b;">
@@ -3588,11 +3592,13 @@
                                                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                                                         <div>
                                                             <label class="laboon-field-label" for="tts-audio-encoding" style="margin-bottom:6px;">Audio Encoding</label>
-                                                            <select id="tts-audio-encoding" style="width:100%; font-size:0.82em; padding:9px 10px; border-radius:10px; border:1.5px solid #dbeafe; background:white; color:#1e293b;"></select>
+                                                            <select id="tts-audio-encoding" style="display:none;"></select>
+                                                            <div id="tts-audio-encoding-chips" class="tts-chip-group" style="margin-top:4px;"></div>
                                                         </div>
                                                         <div>
                                                             <label class="laboon-field-label" for="tts-sample-rate" style="margin-bottom:6px;">Sample Rate</label>
-                                                            <select id="tts-sample-rate" style="width:100%; font-size:0.82em; padding:9px 10px; border-radius:10px; border:1.5px solid #dbeafe; background:white; color:#1e293b;"></select>
+                                                            <select id="tts-sample-rate" style="display:none;"></select>
+                                                            <div id="tts-sample-rate-chips" class="tts-chip-group" style="margin-top:4px;"></div>
                                                         </div>
                                                     </div>
                                                     <div id="tts-audio-settings-help" style="margin-top:8px; font-size:0.74em; color:#64748b; line-height:1.45;"></div>
@@ -3772,6 +3778,76 @@
                     }
                 });
             }
+
+            const TTS_POLISH_FORMAT_LANGUAGE_HINTS = {
+                thai_podcast: {
+                    recommendedLanguage: 'th-TH',
+                    hint: 'Best paired with Thai production language for the most natural delivery.',
+                    label: 'Thai'
+                },
+                thai_explainer: {
+                    recommendedLanguage: 'th-TH',
+                    hint: 'Recommended with Thai production language for clear explainer-style narration.',
+                    label: 'Thai'
+                },
+                english_podcast: {
+                    recommendedLanguage: 'en-US',
+                    hint: 'Best paired with English production language for a natural English podcast flow.',
+                    label: 'English'
+                },
+                interview: {
+                    recommendedLanguage: '',
+                    hint: 'Flexible style. Keep the production language aligned with your audience and chosen voices.',
+                    label: ''
+                }
+            };
+
+            window.setTtsProductionLanguage = function(languageCode, options = {}) {
+                const { silent = false } = options;
+                if (!languageCode) return;
+                const singleSelect = document.getElementById('tts-language-select');
+                const dialogueSelect = document.getElementById('tts-language-select-d');
+                if (singleSelect && [...singleSelect.options].some(opt => opt.value === languageCode)) {
+                    singleSelect.value = languageCode;
+                }
+                if (dialogueSelect && [...dialogueSelect.options].some(opt => opt.value === languageCode)) {
+                    dialogueSelect.value = languageCode;
+                }
+
+                const langChipGroup = document.getElementById('tts-lang-chips');
+                if (langChipGroup) {
+                    langChipGroup.querySelectorAll('.tts-chip').forEach((chip) => {
+                        const onclick = chip.getAttribute('onclick') || '';
+                        chip.classList.toggle('active', onclick.includes(`'${languageCode}'`));
+                    });
+                }
+
+                if (typeof window.syncTtsVoices === 'function') window.syncTtsVoices();
+                if (typeof persistLaboonTtsSettings === 'function') persistLaboonTtsSettings(true);
+                if (!silent && typeof showToast === 'function') {
+                    const labelMap = { 'th-TH': 'Thai', 'en-US': 'English', 'zh-CN': 'Chinese', 'ja-JP': 'Japanese', 'ko-KR': 'Korean' };
+                    showToast(`Production language suggested: ${labelMap[languageCode] || languageCode}`);
+                }
+            };
+
+            window.updateTtsPodcastStyleHint = function(options = {}) {
+                const { autoSyncLanguage = false, silent = true } = options;
+                const formatEl = document.getElementById('tts-polish-format');
+                const hintEl = document.getElementById('tts-polish-format-hint');
+                if (!formatEl || !hintEl) return;
+
+                const formatValue = formatEl.value || 'thai_podcast';
+                const meta = TTS_POLISH_FORMAT_LANGUAGE_HINTS[formatValue] || TTS_POLISH_FORMAT_LANGUAGE_HINTS.thai_podcast;
+                const currentLanguage = document.getElementById('tts-language-select')?.value || 'th-TH';
+
+                hintEl.innerHTML = meta.recommendedLanguage
+                    ? `Recommended pair: <b>${meta.label}</b> production language. ${meta.hint}`
+                    : meta.hint;
+
+                if (autoSyncLanguage && meta.recommendedLanguage && currentLanguage !== meta.recommendedLanguage) {
+                    window.setTtsProductionLanguage(meta.recommendedLanguage, { silent });
+                }
+            };
 
             // [Version: V87.62] Dynamic Model Descriptions
             function updateModelDescription(selectEl) {
@@ -4110,6 +4186,38 @@
                 }
             }
 
+            function renderSelectAsTtsChips(selectId, containerId, options = {}) {
+                const selectEl = document.getElementById(selectId);
+                const containerEl = document.getElementById(containerId);
+                if (!selectEl || !containerEl) return;
+
+                const {
+                    formatLabel,
+                    onChange,
+                    chipStyle = ''
+                } = options;
+
+                const currentValue = selectEl.value;
+                containerEl.innerHTML = '';
+
+                [...selectEl.options].forEach((option) => {
+                    const chip = document.createElement('button');
+                    chip.type = 'button';
+                    chip.className = 'tts-chip';
+                    chip.textContent = typeof formatLabel === 'function' ? formatLabel(option) : (option.textContent || option.value);
+                    chip.style.cssText = chipStyle;
+                    chip.classList.toggle('active', option.value === currentValue);
+                    chip.addEventListener('click', () => {
+                        if (selectEl.value === option.value) return;
+                        selectEl.value = option.value;
+                        containerEl.querySelectorAll('.tts-chip').forEach(el => el.classList.remove('active'));
+                        chip.classList.add('active');
+                        if (typeof onChange === 'function') onChange(option.value, selectEl);
+                    });
+                    containerEl.appendChild(chip);
+                });
+            }
+
             function persistLaboonTtsSettings(skipTranscript = false) {
                 const prev = getLaboonTtsSettings();
                 const transcriptEl = document.getElementById('tts-input');
@@ -4186,6 +4294,8 @@
                 if (preferredMode === 'dialogue' || preferredMode === 'single') {
                     window.setTtsMode(preferredMode);
                 }
+                if (typeof window.renderTtsPolishPresetChips === 'function') window.renderTtsPolishPresetChips();
+                if (typeof window.updateTtsPodcastStyleHint === 'function') window.updateTtsPodcastStyleHint({ autoSyncLanguage: false, silent: true });
                 if (typeof window.updateTtsPolishPresetPreview === 'function') window.updateTtsPolishPresetPreview();
             }
 
@@ -4213,6 +4323,9 @@
                         persistLaboonTtsSettings(true);
                         if (id === 'tts-polish-duration' || id === 'tts-polish-format' || id === 'tts-polish-summary-level') {
                             if (typeof window.updateTtsPolishPresetPreview === 'function') window.updateTtsPolishPresetPreview();
+                        }
+                        if (id === 'tts-polish-format' && typeof window.updateTtsPodcastStyleHint === 'function') {
+                            window.updateTtsPodcastStyleHint({ autoSyncLanguage: true, silent: false });
                         }
                     });
                     el.dataset.persistBound = '1';
@@ -4466,10 +4579,28 @@
                 const simpleFormat = resolvedEncoding === 'mp3' ? 'mp3' : 'wav';
                 const hiddenFormat = document.getElementById('tts-export-format');
                 if (hiddenFormat) hiddenFormat.value = simpleFormat;
-                const bWav = document.getElementById('tts-fmt-wav');
-                const bMp3 = document.getElementById('tts-fmt-mp3');
-                if (bWav) bWav.classList.toggle('active', simpleFormat === 'wav');
-                if (bMp3) bMp3.classList.toggle('active', simpleFormat === 'mp3');
+
+                renderSelectAsTtsChips('tts-audio-encoding', 'tts-audio-encoding-chips', {
+                    formatLabel: (option) => option.textContent || option.value.toUpperCase(),
+                    onChange: () => {
+                        const nextEncoding = (encodingEl.value || 'wav').toLowerCase();
+                        const nextSimpleFormat = nextEncoding === 'mp3' ? 'mp3' : 'wav';
+                        if (hiddenFormat) hiddenFormat.value = nextSimpleFormat;
+                        if (typeof persistLaboonTtsSettings === 'function') persistLaboonTtsSettings(true);
+                        if (typeof window.updateTtsPreflightEstimate === 'function') window.updateTtsPreflightEstimate();
+                    }
+                });
+
+                renderSelectAsTtsChips('tts-sample-rate', 'tts-sample-rate-chips', {
+                    formatLabel: (option) => {
+                        const numeric = Number(option.value || 0);
+                        return numeric >= 1000 ? `${(numeric / 1000).toFixed(numeric % 1000 === 0 ? 0 : 1)}k` : (option.textContent || option.value);
+                    },
+                    onChange: () => {
+                        if (typeof persistLaboonTtsSettings === 'function') persistLaboonTtsSettings(true);
+                        if (typeof window.updateTtsPreflightEstimate === 'function') window.updateTtsPreflightEstimate();
+                    }
+                });
 
                 if (helpEl) {
                     const notes = [
@@ -4778,6 +4909,31 @@
                     strong: 'Strong'
                 };
                 previewEl.textContent = `${preset.duration} min | ${preset.speakers === 'dialogue' ? '2 speakers' : '1 narrator'} | ${formatMap[preset.format] || 'Thai podcast'} | ${summaryMap[preset.summaryLevel] || 'Balanced'}`;
+                if (typeof window.updateTtsPodcastStyleHint === 'function') window.updateTtsPodcastStyleHint({ autoSyncLanguage: false, silent: true });
+            };
+
+            window.renderTtsPolishPresetChips = function() {
+                renderSelectAsTtsChips('tts-polish-duration', 'tts-polish-duration-chips', {
+                    onChange: () => {
+                        if (typeof window.updateTtsPolishPresetPreview === 'function') window.updateTtsPolishPresetPreview();
+                        if (typeof persistLaboonTtsSettings === 'function') persistLaboonTtsSettings(true);
+                    }
+                });
+
+                renderSelectAsTtsChips('tts-polish-speakers', 'tts-polish-speakers-chips', {
+                    onChange: () => {
+                        if (typeof window.syncTtsPolishPresetControls === 'function') {
+                            window.syncTtsPolishPresetControls({ syncMode: true });
+                        }
+                    }
+                });
+
+                renderSelectAsTtsChips('tts-polish-summary-level', 'tts-polish-summary-level-chips', {
+                    onChange: () => {
+                        if (typeof window.updateTtsPolishPresetPreview === 'function') window.updateTtsPolishPresetPreview();
+                        if (typeof persistLaboonTtsSettings === 'function') persistLaboonTtsSettings(true);
+                    }
+                });
             };
 
             window.syncTtsPolishPresetControls = function(options = {}) {
@@ -4789,6 +4945,7 @@
                         window.setTtsMode(targetMode);
                     }
                 }
+                if (typeof window.renderTtsPolishPresetChips === 'function') window.renderTtsPolishPresetChips();
                 if (typeof window.updateTtsPolishPresetPreview === 'function') window.updateTtsPolishPresetPreview();
                 if (typeof persistLaboonTtsSettings === 'function') persistLaboonTtsSettings(true);
             };
@@ -5385,6 +5542,7 @@
 
             bindLaboonTtsPersistenceHandlers();
             restoreLaboonTtsSettings();
+            if (typeof window.renderTtsPolishPresetChips === 'function') window.renderTtsPolishPresetChips();
             document.getElementById('tts-input')?.addEventListener('input', updateTtsTranscriptCounter);
             if (typeof window.updateTtsPolishPresetPreview === 'function') window.updateTtsPolishPresetPreview();
             if (typeof window.syncTtsAdvancedAudioSettings === 'function') window.syncTtsAdvancedAudioSettings();
