@@ -3457,14 +3457,24 @@
                                         <!-- 1. Model Selection (Moved to Top [Version: V90.99.3.2]) -->
                                         <div class="laboon-section-shell" style="padding:15px; margin-bottom:15px; border:2px solid #6366f1; background:#f5f7ff;">
                                             <div class="laboon-section-title" style="margin-bottom:12px; color:#4f46e5;"><i class="fa-solid fa-brain"></i> 1. AI Model Selection</div>
+                                            <div style="font-size:0.76em; color:#64748b; margin-bottom:10px;">Sprint 1A foundation: choose the TTS backend and model now. Cloud TTS request routing will be wired in Sprint 1B.</div>
                                             <div class="tts-chip-group">
-                                                <button type="button" id="chip-engine-gemini" class="tts-chip active" onclick="selectTtsEngine('gemini')" style="flex:1; justify-content:center; gap:8px;">
-                                                    <i class="fa-solid fa-sparkles"></i> Gemini 3.1 Flash
+                                                <button type="button" id="chip-engine-gemini" class="tts-chip active" onclick="selectTtsBackend('gemini_api')" style="flex:1; justify-content:center; gap:8px;">
+                                                    <i class="fa-solid fa-sparkles"></i> Gemini TTS
                                                 </button>
-                                                <button type="button" id="chip-engine-qwen" class="tts-chip" onclick="selectTtsEngine('qwen')" style="flex:1; justify-content:center; gap:8px;">
+                                                <button type="button" id="chip-engine-cloud" class="tts-chip" onclick="selectTtsBackend('cloud_tts')" style="flex:1; justify-content:center; gap:8px;">
+                                                    <i class="fa-solid fa-cloud"></i> Cloud TTS API
+                                                </button>
+                                                <button type="button" id="chip-engine-qwen" class="tts-chip" onclick="selectTtsBackend('qwen')" style="flex:1; justify-content:center; gap:8px;">
                                                     <i class="fa-solid fa-robot"></i> Qwen3-TTS
                                                 </button>
                                             </div>
+                                            <input type="hidden" id="tts-backend-select" value="gemini_api">
+                                            <div style="margin-top:12px;">
+                                                <label class="laboon-field-label" for="tts-model-select" style="margin-bottom:6px;">Backend Model</label>
+                                                <select id="tts-model-select" style="width:100%; font-size:0.88em; padding:10px 12px; border-radius:12px; border:1.5px solid #c7d2fe; background:white; color:#1e293b;"></select>
+                                            </div>
+                                            <div id="tts-model-help" style="margin-top:8px; font-size:0.75em; color:#64748b; line-height:1.45;"></div>
                                         </div>
 
                                         <!-- 2. Production Language (Moved to Second [Version: V90.99.3.2]) -->
@@ -3573,6 +3583,31 @@
                                                     </div>
                                                     <input type="hidden" id="tts-export-format" value="wav">
                                                 </div>
+
+                                                <div class="laboon-section-shell" style="padding:12px; margin-bottom:14px; border:1.5px solid #dbeafe; background:#f8fbff;">
+                                                    <div class="laboon-section-title" style="margin-bottom:10px; font-size:0.82em; color:#1d4ed8;">Advanced Audio Settings</div>
+                                                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                                                        <div>
+                                                            <label class="laboon-field-label" for="tts-audio-encoding" style="margin-bottom:6px;">Audio Encoding</label>
+                                                            <select id="tts-audio-encoding" style="width:100%; font-size:0.82em; padding:9px 10px; border-radius:10px; border:1.5px solid #dbeafe; background:white; color:#1e293b;"></select>
+                                                        </div>
+                                                        <div>
+                                                            <label class="laboon-field-label" for="tts-sample-rate" style="margin-bottom:6px;">Sample Rate</label>
+                                                            <select id="tts-sample-rate" style="width:100%; font-size:0.82em; padding:9px 10px; border-radius:10px; border:1.5px solid #dbeafe; background:white; color:#1e293b;"></select>
+                                                        </div>
+                                                    </div>
+                                                    <div id="tts-audio-settings-help" style="margin-top:8px; font-size:0.74em; color:#64748b; line-height:1.45;"></div>
+                                                </div>
+
+                                                <div class="laboon-section-shell" id="tts-preflight-panel" style="padding:12px; margin-bottom:12px; border:1.5px solid #e2e8f0; background:#ffffff;">
+                                                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;">
+                                                        <div class="laboon-section-title" style="margin:0; font-size:0.82em;">Generate Readiness</div>
+                                                        <span id="tts-readiness-chip" style="font-size:0.72em; font-weight:900; padding:5px 10px; border-radius:999px; background:#dcfce7; color:#166534;">Safe</span>
+                                                    </div>
+                                                    <div id="tts-preflight-summary" style="font-size:0.76em; color:#334155; line-height:1.5;">
+                                                        Ready to estimate transcript length and audio settings.
+                                                    </div>
+                                                </div>
                                                 
                                                 <div id="tts-progress-container" style="display:none; margin-bottom:12px;">
                                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
@@ -3596,6 +3631,7 @@
                                         <div class="laboon-section-shell" id="tts-output-area" style="display:none; padding:15px;">
                                             <div class="laboon-section-title" style="margin-bottom:10px; font-size:0.85em;">Generated Preview</div>
                                             <audio id="tts-audio-player" controls style="width:100%; height:32px; margin-bottom:12px;"></audio>
+                                            <div id="tts-debug-meta" style="display:none; margin-bottom:12px; padding:10px 12px; border-radius:12px; border:1px solid #dbeafe; background:#f8fbff; font-size:0.74em; color:#334155; line-height:1.5;"></div>
                                             <div style="display:flex; flex-direction:column; gap:8px;">
                                                 <a id="tts-download-link" download="ai-tts-preview.wav" style="font-size:0.85em; font-weight:800; color:#b45309; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:6px; background:#fff; padding:8px; border-radius:10px; border:1.5px solid #fde68a;">
                                                     <i class="fa-solid fa-download"></i> Download Audio
@@ -3822,12 +3858,47 @@
                 if (chipEl) chipEl.textContent = isError ? 'Needs Attention' : 'Studio Ready';
             }
 
+            function formatTtsDurationLabel(totalSeconds) {
+                const mins = Math.floor((totalSeconds || 0) / 60);
+                const secs = Math.max(0, (totalSeconds || 0) % 60);
+                return `${mins}:${String(secs).padStart(2, '0')}`;
+            }
+
+            function clearTtsDebugMeta() {
+                const metaEl = document.getElementById('tts-debug-meta');
+                if (!metaEl) return;
+                metaEl.style.display = 'none';
+                metaEl.innerHTML = '';
+                window._latestTtsDebugMeta = null;
+            }
+
+            function renderTtsDebugMeta(meta = {}) {
+                const metaEl = document.getElementById('tts-debug-meta');
+                if (!metaEl) return;
+                const rows = [
+                    ['Backend', meta.backendLabel || meta.backend || '-'],
+                    ['Model', meta.model || '-'],
+                    ['Mode', meta.mode || '-'],
+                    ['Requested', [meta.requestedEncoding && meta.requestedEncoding.toUpperCase(), meta.requestedSampleRate ? `${meta.requestedSampleRate} Hz` : ''].filter(Boolean).join(' / ') || '-'],
+                    ['Resolved', [meta.resolvedMimeType || meta.mimeType || '-', meta.resolvedExt ? `.${meta.resolvedExt}` : ''].filter(Boolean).join(' / ')],
+                    ['Size', typeof meta.byteLength === 'number' ? `${meta.byteLength.toLocaleString()} bytes` : '-'],
+                    ['Transcript', typeof meta.transcriptBytes === 'number' ? `${meta.transcriptBytes.toLocaleString()} bytes` : '-']
+                ];
+                const warningHtml = (meta.warnings || []).length
+                    ? `<div style="margin-top:8px; color:#92400e;"><b>Warnings:</b> ${(meta.warnings || []).join(' ')}</div>`
+                    : '';
+                metaEl.innerHTML = rows.map(([label, value]) => `<div><b>${label}:</b> ${value}</div>`).join('') + warningHtml;
+                metaEl.style.display = 'block';
+                window._latestTtsDebugMeta = meta;
+            }
+
             function updateTtsTranscriptCounter() {
                 const inputEl = document.getElementById('tts-input');
                 const counterEl = document.getElementById('tts-transcript-counter');
                 if (!inputEl || !counterEl) return;
                 const len = String(inputEl.value || '').trim().length;
                 counterEl.textContent = `${len.toLocaleString()} chars`;
+                if (typeof window.updateTtsPreflightEstimate === 'function') window.updateTtsPreflightEstimate();
             }
 
             function base64ToUint8Array(base64) {
@@ -3913,6 +3984,62 @@
                 ].filter(Boolean).join('\n\n');
             }
 
+            const LABOON_TTS_BACKEND_MODELS = {
+                gemini_api: {
+                    label: 'Gemini TTS',
+                    engine: 'gemini',
+                    help: 'Uses the current Gemini TTS integration in Laboon. Best for the existing single-narrator and dialogue flow.',
+                    capabilities: {
+                        encodings: ['wav', 'mp3'],
+                        sampleRates: [24000],
+                        maxTextBytes: 4000,
+                        maxCombinedBytes: 8000,
+                        supportsDialogue: true,
+                        notes: 'Current Gemini preview flow may still return PCM/WAV even if MP3 is requested.'
+                    },
+                    models: [
+                        { value: 'gemini-3.1-flash-tts-preview', label: 'Gemini 3.1 Flash TTS Preview', description: 'Fastest current Gemini path in Laboon.' },
+                        { value: 'gemini-2.5-flash-tts', label: 'Gemini 2.5 Flash TTS', description: 'Balanced quality and speed.' },
+                        { value: 'gemini-2.5-flash-lite-preview-tts', label: 'Gemini 2.5 Flash Lite Preview TTS', description: 'Lower-cost lightweight preview option.' },
+                        { value: 'gemini-2.5-pro-tts', label: 'Gemini 2.5 Pro TTS', description: 'Higher-quality long-form narration and podcast option.' }
+                    ]
+                },
+                cloud_tts: {
+                    label: 'Cloud Text-to-Speech API',
+                    engine: 'gemini',
+                    help: 'Cloud TTS routing UI is ready. Request execution will be enabled in the next implementation sprint.',
+                    capabilities: {
+                        encodings: ['linear16', 'mp3', 'ogg_opus', 'pcm', 'mulaw', 'alaw'],
+                        sampleRates: [16000, 22050, 24000, 44100, 48000],
+                        maxTextBytes: 4000,
+                        maxCombinedBytes: 8000,
+                        supportsDialogue: true,
+                        notes: 'Cloud TTS will become the preferred path for explicit output encoding in a later sprint.'
+                    },
+                    models: [
+                        { value: 'gemini-2.5-flash-tts', label: 'Gemini 2.5 Flash TTS', description: 'Recommended starting point for Cloud TTS.' },
+                        { value: 'gemini-2.5-flash-lite-preview-tts', label: 'Gemini 2.5 Flash Lite Preview TTS', description: 'Lower-latency and lower-cost Cloud option.' },
+                        { value: 'gemini-2.5-pro-tts', label: 'Gemini 2.5 Pro TTS', description: 'Best fit for podcasts, audiobooks, and premium narration.' }
+                    ]
+                },
+                qwen: {
+                    label: 'Qwen3-TTS',
+                    engine: 'qwen',
+                    help: 'Uses the local or custom OpenAI-compatible Qwen3-TTS endpoint configured in AI Config.',
+                    capabilities: {
+                        encodings: ['wav', 'mp3', 'pcm'],
+                        sampleRates: [24000],
+                        maxTextBytes: 6000,
+                        maxCombinedBytes: 6000,
+                        supportsDialogue: false,
+                        notes: 'Qwen path currently focuses on single-speaker local generation.'
+                    },
+                    models: [
+                        { value: 'qwen3-tts', label: 'Qwen3-TTS', description: 'Current local OpenAI-compatible speech model.' }
+                    ]
+                }
+            };
+
             const LABOON_TTS_SETTINGS_KEY = 'laboon_tts_settings_v1';
 
             function getLaboonTtsSettings() {
@@ -3936,6 +4063,11 @@
                 const transcriptEl = document.getElementById('tts-input');
                 const next = {
                     mode: window._ttsMode || 'single',
+                    backend: document.getElementById('tts-backend-select')?.value || window._ttsBackend || 'gemini_api',
+                    model: document.getElementById('tts-model-select')?.value || 'gemini-3.1-flash-tts-preview',
+                    exportFormat: document.getElementById('tts-export-format')?.value || 'wav',
+                    audioEncoding: document.getElementById('tts-audio-encoding')?.value || 'wav',
+                    sampleRate: document.getElementById('tts-sample-rate')?.value || '24000',
                     preset: document.getElementById('tts-preset-select')?.value || 'custom',
                     voice: document.getElementById('tts-voice-select')?.value || 'gemini:Kore',
                     language: document.getElementById('tts-language-select')?.value || 'th-TH',
@@ -3963,9 +4095,24 @@
                 // Handle legacy voice values
                 let voiceVal = saved.voice || 'gemini:Kore';
                 if (!voiceVal.includes(':')) voiceVal = 'gemini:' + voiceVal;
-                
+
+                if (typeof window.selectTtsBackend === 'function') {
+                    window.selectTtsBackend(saved.backend || (voiceVal.startsWith('qwen:') ? 'qwen' : 'gemini_api'), {
+                        preferredModel: saved.model,
+                        silent: true
+                    });
+                }
+
                 setSelectValueIfExists(document.getElementById('tts-voice-select'), voiceVal);
                 if (window.onTtsEngineChanged) window.onTtsEngineChanged(voiceVal);
+                setSelectValueIfExists(document.getElementById('tts-model-select'), saved.model || 'gemini-3.1-flash-tts-preview');
+                if (typeof window.syncTtsModelOptions === 'function') window.syncTtsModelOptions(saved.model || 'gemini-3.1-flash-tts-preview');
+                if (typeof window.syncTtsAdvancedAudioSettings === 'function') {
+                    window.syncTtsAdvancedAudioSettings({
+                        preferredEncoding: saved.audioEncoding || saved.exportFormat || 'wav',
+                        preferredSampleRate: saved.sampleRate || '24000'
+                    });
+                }
 
                 setSelectValueIfExists(document.getElementById('tts-language-select'), saved.language);
                 setSelectValueIfExists(document.getElementById('tts-voice-s1'), saved.voiceS1);
@@ -3992,6 +4139,7 @@
 
             function bindLaboonTtsPersistenceHandlers() {
                 const changeIds = [
+                    'tts-model-select', 'tts-audio-encoding', 'tts-sample-rate',
                     'tts-voice-select', 'tts-language-select', 'tts-voice-s1', 'tts-voice-s2',
                     'tts-language-select-d', 'tts-style-input', 'tts-preset-select',
                     'tts-polish-duration', 'tts-polish-speakers', 'tts-polish-format', 'tts-polish-summary-level'
@@ -4003,6 +4151,12 @@
                         if (id === 'tts-polish-speakers' && typeof window.syncTtsPolishPresetControls === 'function') {
                             window.syncTtsPolishPresetControls({ syncMode: true });
                             return;
+                        }
+                        if (id === 'tts-model-select' && typeof window.syncTtsModelOptions === 'function') {
+                            window.syncTtsModelOptions(el.value);
+                        }
+                        if ((id === 'tts-model-select' || id === 'tts-audio-encoding' || id === 'tts-sample-rate') && typeof window.updateTtsPreflightEstimate === 'function') {
+                            window.updateTtsPreflightEstimate();
                         }
                         persistLaboonTtsSettings(true);
                         if (id === 'tts-polish-duration' || id === 'tts-polish-format' || id === 'tts-polish-summary-level') {
@@ -4106,26 +4260,310 @@
                 if (activeChip) activeChip.classList.add('active');
             };
 
-            window.selectTtsEngine = function(engine) {
-                const geminiChip = document.getElementById('chip-engine-gemini');
-                const qwenChip = document.getElementById('chip-engine-qwen');
-                
-                if (engine === 'gemini') {
-                    if (geminiChip) geminiChip.classList.add('active');
-                    if (qwenChip) qwenChip.classList.remove('active');
-                } else {
-                    if (qwenChip) qwenChip.classList.add('active');
-                    if (geminiChip) geminiChip.classList.remove('active');
-                    if (window._ttsMode === 'dialogue') {
-                        if (typeof showToast === 'function') showToast('Dialogue mode works best with Gemini 1.5 Flash.', 'warning');
-                    }
+            window.getSelectedTtsBackend = function() {
+                return document.getElementById('tts-backend-select')?.value || window._ttsBackend || 'gemini_api';
+            };
+
+            window.getSelectedTtsModel = function() {
+                return document.getElementById('tts-model-select')?.value || 'gemini-3.1-flash-tts-preview';
+            };
+
+            window.getAvailableTtsModels = function(backend) {
+                return LABOON_TTS_BACKEND_MODELS[backend || window.getSelectedTtsBackend()]?.models || LABOON_TTS_BACKEND_MODELS.gemini_api.models;
+            };
+
+            window.getTtsBackendCapabilities = function(backend, model) {
+                const resolvedBackend = backend || window.getSelectedTtsBackend();
+                const config = LABOON_TTS_BACKEND_MODELS[resolvedBackend] || LABOON_TTS_BACKEND_MODELS.gemini_api;
+                const caps = Object.assign({
+                    encodings: ['wav'],
+                    sampleRates: [24000],
+                    maxTextBytes: 4000,
+                    maxCombinedBytes: 8000,
+                    supportsDialogue: true,
+                    notes: ''
+                }, config.capabilities || {});
+                caps.backend = resolvedBackend;
+                caps.model = model || window.getSelectedTtsModel();
+                return caps;
+            };
+
+            window.syncTtsModelOptions = function(preferredModel) {
+                const backend = window.getSelectedTtsBackend();
+                const config = LABOON_TTS_BACKEND_MODELS[backend] || LABOON_TTS_BACKEND_MODELS.gemini_api;
+                const modelSelect = document.getElementById('tts-model-select');
+                const modelHelp = document.getElementById('tts-model-help');
+                if (!modelSelect) return;
+
+                const models = config.models || [];
+                const currentValue = preferredModel || modelSelect.value;
+                modelSelect.innerHTML = '';
+                models.forEach((model) => {
+                    const option = document.createElement('option');
+                    option.value = model.value;
+                    option.textContent = model.label;
+                    modelSelect.appendChild(option);
+                });
+
+                const fallbackModel = models[0]?.value || '';
+                const resolvedModel = models.some(model => model.value === currentValue) ? currentValue : fallbackModel;
+                if (resolvedModel) modelSelect.value = resolvedModel;
+
+                const selectedMeta = models.find(model => model.value === modelSelect.value) || models[0];
+                if (modelHelp) {
+                    const bits = [config.help, selectedMeta?.description].filter(Boolean);
+                    modelHelp.textContent = bits.join(' ');
                 }
-                window._ttsEngine = engine;
+                if (typeof window.syncTtsAdvancedAudioSettings === 'function') {
+                    window.syncTtsAdvancedAudioSettings();
+                }
+            };
+
+            window.syncTtsAdvancedAudioSettings = function(options = {}) {
+                const caps = window.getTtsBackendCapabilities();
+                const encodingEl = document.getElementById('tts-audio-encoding');
+                const sampleRateEl = document.getElementById('tts-sample-rate');
+                const helpEl = document.getElementById('tts-audio-settings-help');
+                if (!encodingEl || !sampleRateEl) return;
+
+                const preferredEncoding = (options.preferredEncoding || encodingEl.value || document.getElementById('tts-export-format')?.value || caps.encodings[0] || 'wav').toLowerCase();
+                const preferredSampleRate = String(options.preferredSampleRate || sampleRateEl.value || caps.sampleRates[0] || 24000);
+
+                encodingEl.innerHTML = '';
+                (caps.encodings || []).forEach((encoding) => {
+                    const option = document.createElement('option');
+                    option.value = encoding;
+                    option.textContent = encoding.toUpperCase();
+                    encodingEl.appendChild(option);
+                });
+
+                sampleRateEl.innerHTML = '';
+                (caps.sampleRates || []).forEach((rate) => {
+                    const option = document.createElement('option');
+                    option.value = String(rate);
+                    option.textContent = `${rate.toLocaleString()} Hz`;
+                    sampleRateEl.appendChild(option);
+                });
+
+                const resolvedEncoding = (caps.encodings || []).includes(preferredEncoding) ? preferredEncoding : (caps.encodings?.[0] || 'wav');
+                const resolvedSampleRate = (caps.sampleRates || []).map(String).includes(preferredSampleRate) ? preferredSampleRate : String(caps.sampleRates?.[0] || 24000);
+
+                encodingEl.value = resolvedEncoding;
+                sampleRateEl.value = resolvedSampleRate;
+
+                const simpleFormat = resolvedEncoding === 'mp3' ? 'mp3' : 'wav';
+                const hiddenFormat = document.getElementById('tts-export-format');
+                if (hiddenFormat) hiddenFormat.value = simpleFormat;
+                const bWav = document.getElementById('tts-fmt-wav');
+                const bMp3 = document.getElementById('tts-fmt-mp3');
+                if (bWav) bWav.classList.toggle('active', simpleFormat === 'wav');
+                if (bMp3) bMp3.classList.toggle('active', simpleFormat === 'mp3');
+
+                if (helpEl) {
+                    const notes = [
+                        `${LABOON_TTS_BACKEND_MODELS[caps.backend]?.label || 'Backend'} supports ${caps.encodings.map(e => e.toUpperCase()).join(', ')} at ${caps.sampleRates.map(r => `${r / 1000}k`).join(', ')}.`,
+                        caps.notes
+                    ].filter(Boolean);
+                    helpEl.textContent = notes.join(' ');
+                }
+                if (typeof window.updateTtsPreflightEstimate === 'function') window.updateTtsPreflightEstimate();
+            };
+
+            window.estimateTtsLimits = function() {
+                const transcript = document.getElementById('tts-input')?.value || '';
+                const styleNotes = document.getElementById('tts-style-input')?.value || '';
+                const transcriptBytes = new TextEncoder().encode(transcript).length;
+                const styleBytes = new TextEncoder().encode(styleNotes).length;
+                const combinedBytes = transcriptBytes + styleBytes;
+                const wordCount = String(transcript).trim() ? String(transcript).trim().split(/\s+/).length : 0;
+                const estimatedSeconds = Math.max(0, Math.round(wordCount / 2.6));
+                const caps = window.getTtsBackendCapabilities();
+                const isDialogue = window._ttsMode === 'dialogue';
+                const encoding = document.getElementById('tts-audio-encoding')?.value || 'wav';
+                const sampleRate = document.getElementById('tts-sample-rate')?.value || '24000';
+                const issues = [];
+                const warnings = [];
+
+                if (isDialogue && !caps.supportsDialogue) {
+                    issues.push(`${LABOON_TTS_BACKEND_MODELS[caps.backend]?.label || 'This backend'} does not support dialogue mode yet.`);
+                }
+                if (!(caps.encodings || []).includes(encoding)) {
+                    issues.push(`Encoding ${encoding.toUpperCase()} is not supported by the selected backend/model.`);
+                }
+                if (!(caps.sampleRates || []).map(String).includes(String(sampleRate))) {
+                    issues.push(`Sample rate ${sampleRate} Hz is not supported by the selected backend/model.`);
+                }
+                if (transcriptBytes > caps.maxTextBytes) {
+                    issues.push(`Transcript is ${transcriptBytes.toLocaleString()} bytes, over the ${caps.maxTextBytes.toLocaleString()} byte limit.`);
+                } else if (transcriptBytes > Math.round(caps.maxTextBytes * 0.85)) {
+                    warnings.push(`Transcript is close to the ${caps.maxTextBytes.toLocaleString()} byte limit.`);
+                }
+                if (combinedBytes > caps.maxCombinedBytes) {
+                    issues.push(`Transcript + style notes total ${combinedBytes.toLocaleString()} bytes, over the ${caps.maxCombinedBytes.toLocaleString()} byte combined limit.`);
+                } else if (combinedBytes > Math.round(caps.maxCombinedBytes * 0.85)) {
+                    warnings.push(`Combined transcript + style notes are nearing the ${caps.maxCombinedBytes.toLocaleString()} byte limit.`);
+                }
+                if (estimatedSeconds > 655) {
+                    warnings.push('Estimated audio length may exceed Gemini TTS output duration guidance and could be truncated.');
+                } else if (estimatedSeconds > 300) {
+                    warnings.push('Long-form generation detected. Consider splitting into segments for safer retries.');
+                }
+
+                const status = issues.length ? 'blocked' : warnings.length ? 'warning' : 'safe';
+                return {
+                    status,
+                    transcriptBytes,
+                    styleBytes,
+                    combinedBytes,
+                    estimatedSeconds,
+                    wordCount,
+                    issues,
+                    warnings,
+                    caps
+                };
+            };
+
+            window.mapTtsErrorToUserMessage = function(error, context = {}) {
+                const rawMessage = String(error?.message || error || 'Unknown TTS error');
+                const backendLabel = LABOON_TTS_BACKEND_MODELS[context.backend]?.label || 'Selected backend';
+                const lower = rawMessage.toLowerCase();
+
+                let userMessage = rawMessage;
+                let statusMessage = rawMessage;
+                let category = 'general';
+
+                if (lower.includes('api key is missing') || lower.includes('unauthorized') || lower.includes('permission denied') || lower.includes('401')) {
+                    category = 'auth';
+                    userMessage = `${backendLabel} is not authorized yet. Please check the API key in AI Config.`;
+                    statusMessage = `Authorization issue for ${backendLabel}.`;
+                } else if (lower.includes('quota') || lower.includes('rate limit') || lower.includes('429')) {
+                    category = 'quota';
+                    userMessage = `${backendLabel} is temporarily rate-limited or out of quota. Please retry in a moment or switch models.`;
+                    statusMessage = `${backendLabel} quota or rate limit reached.`;
+                } else if (lower.includes('cloud text-to-speech api selection is ready') || lower.includes('not wired yet')) {
+                    category = 'not_ready';
+                    userMessage = 'Cloud TTS is visible in the Laboon UI, but live request routing is not connected yet. Please use Gemini TTS or Qwen3-TTS for now.';
+                    statusMessage = 'Cloud TTS routing is not wired yet.';
+                } else if (lower.includes('no audio data returned')) {
+                    category = 'empty_audio';
+                    userMessage = `${backendLabel} finished the request but returned no playable audio. Try a shorter script or another model.`;
+                    statusMessage = `No audio payload returned from ${backendLabel}.`;
+                } else if (lower.includes('invalid or too small audio data')) {
+                    category = 'decode';
+                    userMessage = 'The response audio payload was too small or incomplete to preview. Please retry or switch encoding/model.';
+                    statusMessage = 'Audio payload was incomplete.';
+                } else if (lower.includes('networkerror') || lower.includes('failed to fetch') || lower.includes('load failed') || lower.includes('fetch')) {
+                    category = 'network';
+                    userMessage = context.backend === 'qwen'
+                        ? `Could not connect to the local Qwen-TTS server at ${localStorage.getItem('ai_qwen_url') || 'http://localhost:8880/v1'}.`
+                        : `Could not reach ${backendLabel}. Please check your internet connection, proxy, or API endpoint.`;
+                    statusMessage = `Connection problem while reaching ${backendLabel}.`;
+                } else if (lower.includes('does not support dialogue')) {
+                    category = 'capability';
+                    userMessage = rawMessage;
+                    statusMessage = 'Selected backend/model does not support the current dialogue setup.';
+                } else if (lower.includes('not supported by the selected backend/model')) {
+                    category = 'capability';
+                    userMessage = rawMessage;
+                    statusMessage = 'Current encoding or sample rate is not supported.';
+                } else if (lower.includes('byte limit') || lower.includes('combined limit') || lower.includes('transcript is')) {
+                    category = 'limits';
+                    userMessage = rawMessage;
+                    statusMessage = 'Transcript is over the current model limits.';
+                } else if (lower.includes('gemini error')) {
+                    category = 'provider';
+                    userMessage = `Gemini TTS could not complete this request. Try a shorter script, another model, or recheck your API key.`;
+                    statusMessage = 'Gemini TTS request failed.';
+                } else if (lower.includes('qwen api error')) {
+                    category = 'provider';
+                    userMessage = `Qwen3-TTS returned an API error. Please check the local server logs and selected response format.`;
+                    statusMessage = 'Qwen3-TTS request failed.';
+                }
+
+                return {
+                    category,
+                    userMessage,
+                    statusMessage,
+                    debugMessage: rawMessage
+                };
+            };
+
+            window.updateTtsPreflightEstimate = function() {
+                const summaryEl = document.getElementById('tts-preflight-summary');
+                const chipEl = document.getElementById('tts-readiness-chip');
+                const generateBtn = document.getElementById('btn-generate-tts');
+                const estimate = window.estimateTtsLimits();
+                if (!summaryEl || !chipEl) return estimate;
+
+                if (estimate.status === 'blocked') {
+                    chipEl.textContent = 'Blocked';
+                    chipEl.style.background = '#fee2e2';
+                    chipEl.style.color = '#991b1b';
+                } else if (estimate.status === 'warning') {
+                    chipEl.textContent = 'Review';
+                    chipEl.style.background = '#fef3c7';
+                    chipEl.style.color = '#92400e';
+                } else {
+                    chipEl.textContent = 'Safe';
+                    chipEl.style.background = '#dcfce7';
+                    chipEl.style.color = '#166534';
+                }
+
+                const headline = estimate.status === 'blocked'
+                    ? 'Generate is blocked until the configuration issues below are fixed.'
+                    : estimate.status === 'warning'
+                        ? 'Generate should work, but this setup deserves a quick review first.'
+                        : 'Configuration looks ready for generation.';
+                const detailItems = [
+                    `Transcript: ${estimate.wordCount.toLocaleString()} words, ${estimate.transcriptBytes.toLocaleString()} bytes`,
+                    `Style notes: ${estimate.styleBytes.toLocaleString()} bytes`,
+                    `Estimated audio length: ${formatTtsDurationLabel(estimate.estimatedSeconds)}`,
+                    `Encoding / Rate: ${(document.getElementById('tts-audio-encoding')?.value || 'wav').toUpperCase()} / ${(document.getElementById('tts-sample-rate')?.value || '24000')} Hz`
+                ];
+                const notices = estimate.issues.length ? estimate.issues : estimate.warnings;
+                summaryEl.innerHTML = `<div><b>${headline}</b></div><div style="margin-top:4px;">${detailItems.join(' | ')}</div>${notices.length ? `<div style="margin-top:6px; color:${estimate.issues.length ? '#991b1b' : '#92400e'};">${notices.join(' ')}</div>` : ''}`;
+                if (generateBtn) generateBtn.disabled = estimate.status === 'blocked';
+                return estimate;
+            };
+
+            window.validateTtsRequest = function() {
+                const estimate = window.updateTtsPreflightEstimate();
+                if (estimate.issues.length) {
+                    return { ok: false, message: estimate.issues[0], estimate };
+                }
+                return { ok: true, estimate };
+            };
+
+            window.selectTtsBackend = function(backend, options = {}) {
+                const resolvedBackend = LABOON_TTS_BACKEND_MODELS[backend] ? backend : 'gemini_api';
+                const hiddenBackend = document.getElementById('tts-backend-select');
+                const geminiChip = document.getElementById('chip-engine-gemini');
+                const cloudChip = document.getElementById('chip-engine-cloud');
+                const qwenChip = document.getElementById('chip-engine-qwen');
+
+                if (hiddenBackend) hiddenBackend.value = resolvedBackend;
+                window._ttsBackend = resolvedBackend;
+                window._ttsEngine = LABOON_TTS_BACKEND_MODELS[resolvedBackend]?.engine || 'gemini';
+
+                if (geminiChip) geminiChip.classList.toggle('active', resolvedBackend === 'gemini_api');
+                if (cloudChip) cloudChip.classList.toggle('active', resolvedBackend === 'cloud_tts');
+                if (qwenChip) qwenChip.classList.toggle('active', resolvedBackend === 'qwen');
+
+                if (resolvedBackend === 'qwen' && window._ttsMode === 'dialogue' && typeof showToast === 'function' && !options.silent) {
+                    showToast('Dialogue mode works best with Gemini TTS right now.', 'warning');
+                }
+
+                window.syncTtsModelOptions(options.preferredModel);
                 if (typeof syncTtsVoices === 'function') syncTtsVoices();
+                if (typeof persistLaboonTtsSettings === 'function') persistLaboonTtsSettings(true);
+            };
+
+            window.selectTtsEngine = function(engine) {
+                return window.selectTtsBackend(engine === 'qwen' ? 'qwen' : 'gemini_api');
             };
 
             window.syncTtsVoices = function() {
-                const engine = window._ttsEngine || 'gemini';
+                const engine = (LABOON_TTS_BACKEND_MODELS[window.getSelectedTtsBackend()]?.engine) || window._ttsEngine || 'gemini';
                 const lang = window._ttsMode === 'dialogue' 
                     ? document.getElementById('tts-language-select-d').value 
                     : document.getElementById('tts-language-select').value;
@@ -4329,12 +4767,19 @@
                 const presetSpeakersEl = document.getElementById('tts-polish-speakers');
                 if (presetSpeakersEl) presetSpeakersEl.value = mode === 'dialogue' ? 'dialogue' : 'single';
                 if (typeof window.updateTtsPolishPresetPreview === 'function') window.updateTtsPolishPresetPreview();
+                if (typeof window.updateTtsPreflightEstimate === 'function') window.updateTtsPreflightEstimate();
                 if (typeof persistLaboonTtsSettings === 'function') persistLaboonTtsSettings(true);
             };
 
             // Initialize on Load
             setTimeout(() => {
-                if (typeof selectTtsEngine === 'function') selectTtsEngine('gemini');
+                if (typeof selectTtsBackend === 'function') {
+                    const savedBackend = getLaboonTtsSettings()?.backend || 'gemini_api';
+                    selectTtsBackend(savedBackend, {
+                        preferredModel: getLaboonTtsSettings()?.model,
+                        silent: true
+                    });
+                }
             }, 800);
 
             window.insertTtsDialogueTemplate = function() {
@@ -4426,6 +4871,7 @@
                 const inputEl = document.getElementById('tts-input');
                 const audioEl = document.getElementById('tts-audio-player');
                 const downloadEl = document.getElementById('tts-download-link');
+                const outputArea = document.getElementById('tts-output-area');
                 if (inputEl) inputEl.value = '';
                 updateTtsTranscriptCounter();
                 if (audioEl) {
@@ -4440,6 +4886,8 @@
                 }
                 cleanupGeminiTTSUrl();
                 window._geminiTtsBlob = null;
+                if (outputArea) outputArea.style.display = 'none';
+                clearTtsDebugMeta();
                 setTtsStatus('Cleared. Ready for a new TTS request.');
             };
 
@@ -4481,17 +4929,27 @@
                 const fullVoiceVal = voiceSelectEl?.value || 'gemini:Kore';
                 const engine = fullVoiceVal.includes(':') ? fullVoiceVal.split(':')[0] : 'gemini';
                 const voice = fullVoiceVal.includes(':') ? fullVoiceVal.split(':')[1] : fullVoiceVal;
+                const selectedBackend = typeof window.getSelectedTtsBackend === 'function' ? window.getSelectedTtsBackend() : 'gemini_api';
+                const selectedModel = typeof window.getSelectedTtsModel === 'function' ? window.getSelectedTtsModel() : 'gemini-3.1-flash-tts-preview';
+                const selectedEncoding = (document.getElementById('tts-audio-encoding')?.value || document.getElementById('tts-export-format')?.value || 'wav').toLowerCase();
                 
-                // Actual Engine from Step 2
-                const activeEngineChip = document.querySelector('#tts-step-2 .tts-chip.active');
-                const selectedEngine = (activeEngineChip && activeEngineChip.id === 'chip-engine-qwen') ? 'qwen' : 'gemini';
+                // Actual engine remains mapped from backend during Sprint 1A.
+                const selectedEngine = selectedBackend === 'qwen' ? 'qwen' : 'gemini';
 
                 if (isDialogue && selectedEngine !== 'gemini') {
                     showToast('Dialogue mode only supported by Gemini 3.1 Flash currently', 'warning');
                     return;
                 }
 
+                const preflight = typeof window.validateTtsRequest === 'function' ? window.validateTtsRequest() : { ok: true };
+                if (!preflight.ok) {
+                    showToast(preflight.message, 'warning');
+                    setTtsStatus(preflight.message, true);
+                    return;
+                }
+
                 btnEl.disabled = true;
+                clearTtsDebugMeta();
                 if (btnText) btnText.textContent = "🎙️ Producing...";
                 if (progressContainer) progressContainer.style.display = 'block';
 
@@ -4517,6 +4975,9 @@
                 try {
                     let audioDataBase64;
                     let returnedAudioMime = '';
+                    if (selectedBackend === 'cloud_tts') {
+                        throw new Error('Cloud Text-to-Speech API selection is ready in the UI, but live request routing is not wired yet. Please switch backend to Gemini TTS or Qwen3-TTS for now.');
+                    }
                     if (selectedEngine === 'gemini') {
                         const geminiKey = window.GEMINI_API_KEY || localStorage.getItem('ai_gemini_key') || '';
                         if (!geminiKey) throw new Error('Gemini API Key is missing.');
@@ -4542,7 +5003,7 @@
                             };
                         }
 
-                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent?key=${encodeURIComponent(geminiKey)}`, {
+                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(selectedModel)}:generateContent?key=${encodeURIComponent(geminiKey)}`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -4563,7 +5024,8 @@
                         // Qwen3-TTS logic
                         const qwenUrl = localStorage.getItem('ai_qwen_url') || 'http://localhost:8880/v1';
                         const qwenKey = localStorage.getItem('ai_qwen_key') || '';
-                        const qwenModel = "qwen3-tts"; // Default model name
+                        const qwenModel = selectedModel || "qwen3-tts";
+                        const qwenResponseFormat = selectedEncoding === 'linear16' ? 'wav' : selectedEncoding;
 
                         const response = await fetch(`${qwenUrl}/audio/speech`, {
                             method: 'POST',
@@ -4575,7 +5037,7 @@
                                 model: qwenModel,
                                 input: transcript,
                                 voice: voice.toLowerCase(),
-                                response_format: document.getElementById('tts-export-format')?.value || 'wav'
+                                response_format: qwenResponseFormat
                             })
                         });
 
@@ -4614,16 +5076,49 @@
                         downloadEl.download = `ai-tts-${Date.now()}.${audioPayload.ext}`;
                         document.getElementById('btn-send-to-podcast').style.display = 'block';
                         window._latestTtsAudio = blob;
+                        renderTtsDebugMeta({
+                            backend: selectedBackend,
+                            backendLabel: LABOON_TTS_BACKEND_MODELS[selectedBackend]?.label,
+                            model: selectedModel,
+                            mode: isDialogue ? 'Dialogue Duo' : 'Single Narrator',
+                            requestedEncoding: selectedEncoding,
+                            requestedSampleRate: document.getElementById('tts-sample-rate')?.value || '24000',
+                            resolvedMimeType: audioPayload.mimeType,
+                            resolvedExt: audioPayload.ext,
+                            byteLength: audioBytes.length,
+                            transcriptBytes: preflight.estimate?.transcriptBytes,
+                            warnings: requestedFormat === 'mp3' && audioPayload.ext !== 'mp3'
+                                ? ['Requested MP3, but the provider returned audio that was normalized to WAV for reliable playback.']
+                                : []
+                        });
                         if (requestedFormat === 'mp3' && audioPayload.ext !== 'mp3') {
                             showToast('MP3 preview not available from this response. Exported as WAV instead.', 'warning');
                         }
+                        setTtsStatus(`Audio ready via ${LABOON_TTS_BACKEND_MODELS[selectedBackend]?.label || selectedBackend}.`);
                         showToast('Audio produced successfully!', 'success');
                     }
 
                 } catch (e) {
                     clearInterval(progressInterval);
-                    showToast(e.message, 'error');
-                    console.error(e);
+                    const mappedError = typeof window.mapTtsErrorToUserMessage === 'function'
+                        ? window.mapTtsErrorToUserMessage(e, { backend: selectedBackend, model: selectedModel, encoding: selectedEncoding })
+                        : { userMessage: e.message, statusMessage: e.message, debugMessage: e.message };
+                    document.getElementById('tts-output-area').style.display = 'block';
+                    showToast(mappedError.userMessage, 'error');
+                    setTtsStatus(mappedError.statusMessage, true);
+                    renderTtsDebugMeta({
+                        backend: selectedBackend,
+                        backendLabel: LABOON_TTS_BACKEND_MODELS[selectedBackend]?.label,
+                        model: selectedModel,
+                        mode: isDialogue ? 'Dialogue Duo' : 'Single Narrator',
+                        requestedEncoding: selectedEncoding,
+                        requestedSampleRate: document.getElementById('tts-sample-rate')?.value || '24000',
+                        resolvedMimeType: '-',
+                        resolvedExt: '-',
+                        transcriptBytes: preflight.estimate?.transcriptBytes,
+                        warnings: [mappedError.debugMessage]
+                    });
+                    console.error('[Laboon TTS]', mappedError.debugMessage, e);
                 } finally {
                     btnEl.disabled = false;
                     if (btnText) btnText.textContent = "🔊 Generate Audio";
@@ -4668,6 +5163,19 @@
                 if (tokenCount > 0 && typeof updateAIUsage === 'function') {
                     updateAIUsage('gemini-tts', tokenCount);
                 }
+                renderTtsDebugMeta({
+                    backend: window.getSelectedTtsBackend ? window.getSelectedTtsBackend() : 'gemini_api',
+                    backendLabel: LABOON_TTS_BACKEND_MODELS[window.getSelectedTtsBackend ? window.getSelectedTtsBackend() : 'gemini_api']?.label,
+                    model: window.getSelectedTtsModel ? window.getSelectedTtsModel() : 'gemini-3.1-flash-tts-preview',
+                    mode: window._ttsMode === 'dialogue' ? 'Dialogue Duo' : 'Single Narrator',
+                    requestedEncoding: document.getElementById('tts-audio-encoding')?.value || fileExt,
+                    requestedSampleRate: document.getElementById('tts-sample-rate')?.value || '24000',
+                    resolvedMimeType: audioBlob.type || mimeType || '-',
+                    resolvedExt: fileExt,
+                    byteLength: audioBlob.size,
+                    transcriptBytes: new TextEncoder().encode(document.getElementById('tts-input')?.value || '').length,
+                    warnings: []
+                });
                 
                 setTtsStatus(`Audio ready. Engine: ${document.getElementById('tts-voice-select')?.value.split(':')[0]}`);
                 showToast('Studio: Audio generation complete');
@@ -4699,7 +5207,19 @@
                 const bMp3 = document.getElementById('tts-fmt-mp3');
                 if (bWav) bWav.classList.toggle('active', fmt === 'wav');
                 if (bMp3) bMp3.classList.toggle('active', fmt === 'mp3');
+
+                const encodingEl = document.getElementById('tts-audio-encoding');
+                if (encodingEl) {
+                    const desiredEncoding = fmt === 'mp3' ? 'mp3' : 'wav';
+                    if ([...encodingEl.options].some(opt => opt.value === desiredEncoding)) {
+                        encodingEl.value = desiredEncoding;
+                    } else if ([...encodingEl.options].some(opt => opt.value === 'linear16')) {
+                        encodingEl.value = 'linear16';
+                    }
+                }
                 
+                if (typeof persistLaboonTtsSettings === 'function') persistLaboonTtsSettings(true);
+                if (typeof window.updateTtsPreflightEstimate === 'function') window.updateTtsPreflightEstimate();
                 if (typeof showToast === 'function') showToast('Format set to ' + fmt.toUpperCase());
             }
 
@@ -4707,6 +5227,8 @@
             restoreLaboonTtsSettings();
             document.getElementById('tts-input')?.addEventListener('input', updateTtsTranscriptCounter);
             if (typeof window.updateTtsPolishPresetPreview === 'function') window.updateTtsPolishPresetPreview();
+            if (typeof window.syncTtsAdvancedAudioSettings === 'function') window.syncTtsAdvancedAudioSettings();
+            if (typeof window.updateTtsPreflightEstimate === 'function') window.updateTtsPreflightEstimate();
             updateTtsTranscriptCounter();
             
             // Default back to step 1 on reload
