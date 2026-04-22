@@ -17193,6 +17193,28 @@ Do not include any explanation other than the feedback body.`;
                             return 'LV.1 Rookie Navigator';
                         }
 
+                        function buildHubCertificateAction(u) {
+                            const score = parseFloat(u.score || 0);
+                            const certRequested = !!u.certRequested;
+                            const certApproved = !!u.certApproved;
+                            const canRequest = score > 30;
+                            const baseStyle = 'display:inline-flex; align-items:center; gap:6px; margin-left:10px; padding:5px 12px; border-radius:999px; font-size:0.78em; font-weight:900; border:none; white-space:nowrap;';
+
+                            if (certApproved) {
+                                return `<span style="${baseStyle} background:#dcfce7; color:#166534; border:1px solid #86efac;"><i class="fa-solid fa-certificate"></i> Certificate Approved</span>`;
+                            }
+
+                            if (certRequested) {
+                                return `<button onclick="openCertModal('${u.id}')" style="${baseStyle} background:#fff7ed; color:#c2410c; border:1px solid #fdba74; cursor:pointer;" title="Open certificate issuer"><i class="fa-solid fa-clock"></i> Request Pending</button>`;
+                            }
+
+                            if (canRequest) {
+                                return `<button onclick="requestCertificate('${u.id}')" style="${baseStyle} background:linear-gradient(135deg, #4361ee, #3b82f6); color:white; cursor:pointer; box-shadow:0 6px 14px rgba(67,97,238,0.2);"><i class="fa-solid fa-award"></i> Request Certificate</button>`;
+                            }
+
+                            return '';
+                        }
+
                         function renderHubHeader(u) {
                             const crewRank = getCrewRankByScore(u.score || 0);
                             document.getElementById('lb-popup-header').innerHTML = `
@@ -17208,7 +17230,7 @@ Do not include any explanation other than the feedback body.`;
                     <div style="font-size:0.85em; color:#64748b; margin-top:4px;">
                         <i class="fa-regular fa-calendar" style="margin-right:4px;"></i> ${u.startDate || '?'} — ${u.endDate || '?'} 
                         <span style="margin:0 10px; color:#cbd5e1;">|</span> 
-                        <i class="fa-solid fa-star" style="color:#f59e0b; margin-right:4px;"></i> Total Score: <b style="color:#4361ee; font-size:1.1em;">${(u.score || 0).toFixed(2)}</b>
+                        <i class="fa-solid fa-star" style="color:#f59e0b; margin-right:4px;"></i> Total Score: <b style="color:#4361ee; font-size:1.1em;">${(u.score || 0).toFixed(2)}</b>${buildHubCertificateAction(u)}
                     </div>
                 </div>
             `;
@@ -17457,12 +17479,7 @@ Do not include any explanation other than the feedback body.`;
                 <div style="text-align:center;"><span style="font-size:0.8em; color:#999;">Active Days</span><br><b>${activeDays}/${elapsed}</b> <small>(${activePct}%)</small></div>
             `;
 
-                            // Footer with Cert (Compact)
-                            const hasCert = u.startDate && u.endDate && (u.score || 0) > 0;
-                            const certRequested = u.certRequested || false;
-                            document.getElementById('lb-popup-footer').innerHTML = (!certRequested && hasCert)
-                                ? `<button class="btn btn-primary" onclick="requestCertificate('${u.id}')" style="width:100%; border-radius:15px; font-weight:900;"><i class="fa-solid fa-award"></i> Request Certificate</button>`
-                                : '';
+                            document.getElementById('lb-popup-footer').innerHTML = '';
                         }
 
                         // --- Compatibility Wrappers ---
@@ -17751,35 +17768,8 @@ Do not include any explanation other than the feedback body.`;
                 </div>
             `;
 
-                            // Add Request Certificate button
-                            let certBtnEl = document.getElementById('lb-popup-cert-request');
-                            if (!certBtnEl) {
-                                certBtnEl = document.createElement('div');
-                                certBtnEl.id = 'lb-popup-cert-request';
-                                certBtnEl.style.cssText = 'margin-top:15px; text-align:center;';
-                                breakdownEl.parentNode.appendChild(certBtnEl);
-                            }
-
-                            // Check if user already has certificate data
-                            const hasCert = u.startDate && u.endDate && (u.score || 0) > 0;
-                            const certRequested = u.certRequested || false;
-                            const certApproved = u.certApproved || false;
-
-                            if (certApproved) {
-                                certBtnEl.innerHTML = `<button class="btn-sm btn-success" disabled style="width:100%;"><i class="fa-solid fa-certificate"></i> Certificate Approved</button>`;
-                            } else if (certRequested) {
-                                certBtnEl.innerHTML = `
-                    <button class="btn-sm btn-warning" disabled style="width:100%; margin-bottom:5px;"><i class="fa-solid fa-clock"></i> Request Pending</button>
-                    <div style="font-size:0.75em; color:#e67e22; font-style:italic;"><i class="fa-solid fa-info-circle"></i> Waiting for Admin to issue the certificate.</div>
-                `;
-                            } else if (hasCert) {
-                                certBtnEl.innerHTML = `
-                    <button class="btn-sm btn-primary" onclick="requestCertificate('${u.id}')" style="width:100%; background:linear-gradient(135deg, #667eea, #764ba2); border:none;"><i class="fa-solid fa-certificate"></i> Request Certificate</button>
-                    <div style="font-size:0.75em; color:#666; margin-top:5px;">Send a final request for certificate issuance.</div>
-                `;
-                            } else {
-                                certBtnEl.innerHTML = `<button class="btn-sm" disabled style="width:100%;" title="Complete more tasks to unlock certificate"><i class="fa-solid fa-lock"></i> Request Certificate (Score: ${(u.score || 0).toFixed(2)})</button>`;
-                            }
+                            const staleCertBtnEl = document.getElementById('lb-popup-cert-request');
+                            if (staleCertBtnEl) staleCertBtnEl.remove();
                         }
 
                         // Request Certificate function
