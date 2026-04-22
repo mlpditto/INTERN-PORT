@@ -6830,9 +6830,15 @@
 
                 <div style="margin-bottom:20px;">
                     <label style="display:block; font-size:0.85em; font-weight:bold; color:#555; margin-bottom:5px;">💬 Admin Feedback / Comment:</label>
-                    <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-bottom:5px;">
+                    <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-bottom:5px; flex-wrap:wrap;">
                         <!-- AI Controls consolidated to Header -->
-                        <select id="ai-model-review" style="padding:4px 8px; font-size:0.8em; border-radius:10px; border:1px solid #e0e6ed; background:#f8fafc; color:#1a2a3a; font-weight:600;">
+                        <div style="display:flex; align-items:center; gap:4px; padding:4px; border:1px solid #e2e8f0; border-radius:16px; background:#f8fafc;">
+                            <button type="button" class="reflective-review-model-chip active" data-value="gpt-4o" onclick="selectReflectiveReviewModel(this)" title="GPT-4o" style="border:none; background:linear-gradient(135deg,#10b981,#34d399); color:white; padding:5px 9px; border-radius:12px; font-size:0.72em; font-weight:800; cursor:pointer;">GPT</button>
+                            <button type="button" class="reflective-review-model-chip" data-value="gpt-4o-mini" onclick="selectReflectiveReviewModel(this)" title="GPT-4o Mini" style="border:none; background:transparent; color:#64748b; padding:5px 9px; border-radius:12px; font-size:0.72em; font-weight:800; cursor:pointer;">Mini</button>
+                            <button type="button" class="reflective-review-model-chip" data-value="gemini-1.5-flash" onclick="selectReflectiveReviewModel(this)" title="Gemini Flash" style="border:none; background:transparent; color:#64748b; padding:5px 9px; border-radius:12px; font-size:0.72em; font-weight:800; cursor:pointer;">Flash</button>
+                            <button type="button" class="reflective-review-model-chip" data-value="claude-4-sonnet-latest" onclick="selectReflectiveReviewModel(this)" title="Claude Sonnet" style="border:none; background:transparent; color:#64748b; padding:5px 9px; border-radius:12px; font-size:0.72em; font-weight:800; cursor:pointer;">Claude</button>
+                        </div>
+                        <select id="ai-model-review" style="display:none; padding:4px 8px; font-size:0.8em; border-radius:10px; border:1px solid #e0e6ed; background:#f8fafc; color:#1a2a3a; font-weight:600;">
                             <option value="gpt-4o" selected>🟢 GPT-4o (Frontier)</option>
                             <option value="gpt-4o-mini">Mini</option>
                             <option value="gemini-1.5-flash">Flash</option>
@@ -6848,11 +6854,19 @@
                             <option value="Korean">🇰🇷 KO</option>
                             <option value="Japanese">🇯🇵 JP</option>
                         </select>
+                        <select id="ai-preset-review" style="padding:4px 8px; font-size:0.78em; border-radius:12px; border:1px solid #e0e6ed; background:#f8fafc; color:#1a2a3a; font-weight:700;" title="AI preset">
+                            <option value="encourage" selected>✨ Encourage</option>
+                            <option value="coach_next_step">🧭 Coach</option>
+                            <option value="confidence_boost">🌈 Confidence</option>
+                            <option value="professional_polish">🪄 Polish</option>
+                            <option value="accountability">🎯 Accountability</option>
+                            <option value="celebrate_win">🎉 Celebrate</option>
+                        </select>
                         <button class="btn-sm" id="btn-ai-suggest" onclick="getAISuggestion(this)" style="background:#8e44ad; color:white; border:none; border-radius:15px; padding:4px 12px; font-size:0.75em; cursor:pointer; display:flex; align-items:center; gap:5px;">
                             <i class="fa-solid fa-robot"></i> <span class="btn-text">AI Suggest</span>
                         </button>
-                        <button class="btn-sm" onclick="openAIKeysModal()" style="background:#f0efff; color:#6b5cea; border:1px solid #dcd4ff; border-radius:15px; padding:4px 12px; font-size:0.75em; cursor:pointer; display:flex; align-items:center; gap:5px;">
-                            <i class="fa-solid fa-key"></i> <span class="btn-text">Settings</span>
+                        <button class="btn-sm" onclick="openAIKeysModal()" title="AI Settings" style="background:#f0efff; color:#6b5cea; border:1px solid #dcd4ff; border-radius:999px; width:34px; height:34px; padding:0; font-size:0.9em; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                            <i class="fa-solid fa-key"></i>
                         </button>
                     </div>
                     <textarea id="reflective-review-comment" placeholder="พิมพ์ภาษาไทยแล้วกด AI Suggest → แปลเป็นภาษาที่เลือก ✨ หรือเว้นว่างให้ AI สร้างให้อัตโนมัติ" 
@@ -8999,14 +9013,42 @@
         };
 
         // --- 🤖 Web AI Integration ([Version: V86.14] Updated for Multi-Model) ---
+        window.selectReflectiveReviewModel = function(btn) {
+            const hiddenInput = document.getElementById('ai-model-review');
+            document.querySelectorAll('.reflective-review-model-chip').forEach(chip => {
+                chip.classList.remove('active');
+                chip.style.background = 'transparent';
+                chip.style.color = '#64748b';
+            });
+            if (!btn) return;
+            btn.classList.add('active');
+            btn.style.background = 'linear-gradient(135deg,#10b981,#34d399)';
+            btn.style.color = 'white';
+            if (hiddenInput) hiddenInput.value = btn.dataset.value || 'gpt-4o';
+        };
+
+        function getReflectiveReviewPresetInstruction(preset) {
+            const presetMap = {
+                encourage: 'Write a warm, encouraging mentor reply that highlights effort and progress.',
+                coach_next_step: 'Write a supportive coaching reply with one clear next step the learner should focus on next.',
+                confidence_boost: 'Write a confidence-building reply that reduces anxiety and reassures the learner they are improving.',
+                professional_polish: 'Write a polished, concise, professional mentor reply suitable for official admin feedback.',
+                accountability: 'Write a kind but accountable reply that recognizes the effort and gently reinforces discipline and consistency.',
+                celebrate_win: 'Write an upbeat reply that celebrates the learner win first, then adds a short growth-minded encouragement.'
+            };
+            return presetMap[preset] || presetMap.encourage;
+        }
+
         window.getAISuggestion = async function(btn) {
             const logContent = document.getElementById('reflective-review-user-info').innerText;
             if (!btn) btn = document.getElementById('btn-ai-suggest');
             const textarea = document.getElementById('reflective-review-comment');
             const modelSelect = document.getElementById('ai-model-review');
             const langSelect = document.getElementById('ai-lang-review');
+            const presetSelect = document.getElementById('ai-preset-review');
             const selectedModelName = modelSelect ? modelSelect.value : (document.getElementById("ai-analyzer-model-val") ? document.getElementById("ai-analyzer-model-val").value : "gemini-1.5-flash");
             const targetLang = langSelect ? langSelect.value : (document.getElementById("toolbar-ai-lang") ? document.getElementById("toolbar-ai-lang").value : "English");
+            const presetInstruction = getReflectiveReviewPresetInstruction(presetSelect ? presetSelect.value : 'encourage');
             
             if (!logContent || logContent.length < 5) return alert("No reflective log content found to analyze");
             
@@ -9031,14 +9073,17 @@ Your task:
 1. Understand the admin's intent from the Thai draft above.
 2. Refine, polish, and expand it into a warm, professional feedback message.
 3. The final output MUST be in "${targetLang}" only.
-4. Keep it 2-3 sentences max. Show empathy and encouragement.
-5. Do not include any explanation — output ONLY the refined feedback text.`;
+                    4. Keep it 2-3 sentences max. Show empathy and encouragement.
+                    5. Follow this style preset: ${presetInstruction}
+                    6. Do not include any explanation other than the refined feedback text.`;
                 } else {
                     // Original: Generate from scratch
                     prompt = `You are a kind and expert Mentor. 
 Here is a Reflective Log from an intern:
 "${logContent}"
 
+${presetInstruction}
+ 
 Please write a short praise and feedback (max 2-3 sentences) showing empathy and encouragement. 
 Keep it friendly but professional. Response must be in "${targetLang}" only. 
 Do not include any explanation other than the feedback body.`;
