@@ -3459,22 +3459,24 @@
                                             <div class="laboon-section-title" style="margin-bottom:12px; color:#4f46e5;"><i class="fa-solid fa-brain"></i> 1. AI Model Selection</div>
                                             <div style="font-size:0.76em; color:#64748b; margin-bottom:10px;">Choose the TTS backend and model. Cloud TTS routing is now connected through the Laboon proxy.</div>
                                             <div class="tts-chip-group">
-                                                <button type="button" id="chip-engine-gemini" class="tts-chip active" onclick="selectTtsBackend('gemini_api')" style="flex:1; justify-content:center; gap:8px;">
+                                                <button type="button" id="chip-engine-qwen" class="tts-chip active" onclick="selectTtsBackend('qwen')" style="flex:1; justify-content:center; gap:8px;">
+                                                    <i class="fa-solid fa-robot"></i> Qwen3-TTS
+                                                </button>
+                                                <button type="button" id="chip-engine-gemini" class="tts-chip" onclick="selectTtsBackend('gemini_api')" style="flex:1; justify-content:center; gap:8px;">
                                                     <i class="fa-solid fa-sparkles"></i> Gemini TTS
                                                 </button>
                                                 <button type="button" id="chip-engine-cloud" class="tts-chip" onclick="selectTtsBackend('cloud_tts')" style="flex:1; justify-content:center; gap:8px;">
                                                     <i class="fa-solid fa-cloud"></i> Cloud TTS API
                                                 </button>
-                                                <button type="button" id="chip-engine-qwen" class="tts-chip" onclick="selectTtsBackend('qwen')" style="flex:1; justify-content:center; gap:8px;">
-                                                    <i class="fa-solid fa-robot"></i> Qwen3-TTS
-                                                </button>
                                             </div>
-                                            <input type="hidden" id="tts-backend-select" value="gemini_api">
+                                            <input type="hidden" id="tts-backend-select" value="qwen">
                                             <div style="margin-top:12px;">
                                                 <label class="laboon-field-label" for="tts-model-select" style="margin-bottom:6px;">Backend Model</label>
                                                 <select id="tts-model-select" style="width:100%; font-size:0.88em; padding:10px 12px; border-radius:12px; border:1.5px solid #c7d2fe; background:white; color:#1e293b;"></select>
                                             </div>
                                             <div id="tts-model-help" style="margin-top:8px; font-size:0.75em; color:#64748b; line-height:1.45;"></div>
+                                            <div id="tts-cost-strip" style="display:none; margin-top:10px; flex-wrap:wrap; gap:8px; align-items:center;"></div>
+                                            <div id="tts-cost-warning" style="display:none; margin-top:8px; font-size:0.75em; line-height:1.45; padding:10px 12px; border-radius:12px; border:1px solid #dbeafe; background:#f8fbff; color:#475569;"></div>
                                         </div>
 
                                         <!-- 2. Production Language (Moved to Second [Version: V90.99.3.2]) -->
@@ -4000,6 +4002,13 @@
                     label: 'Gemini TTS',
                     engine: 'gemini',
                     help: 'Uses the current Gemini TTS integration in Laboon. Best for the existing single-narrator and dialogue flow.',
+                    cost: {
+                        tier: 'quota',
+                        badge: 'Check quota',
+                        badgeTone: 'amber',
+                        warning: 'Gemini TTS may use paid quota depending on the key and account connected to AI Config. Use Qwen first when you want the safest free-first path.',
+                        detail: 'Good balance when you want hosted quality without turning on Google Cloud TTS billing.'
+                    },
                     capabilities: {
                         encodings: ['wav', 'mp3'],
                         sampleRates: [24000],
@@ -4009,16 +4018,23 @@
                         notes: 'Current Gemini preview flow may still return PCM/WAV even if MP3 is requested.'
                     },
                     models: [
-                        { value: 'gemini-3.1-flash-tts-preview', label: 'Gemini 3.1 Flash TTS Preview', description: 'Fastest current Gemini path in Laboon.' },
-                        { value: 'gemini-2.5-flash-tts', label: 'Gemini 2.5 Flash TTS', description: 'Balanced quality and speed.' },
-                        { value: 'gemini-2.5-flash-lite-preview-tts', label: 'Gemini 2.5 Flash Lite Preview TTS', description: 'Lower-cost lightweight preview option.' },
-                        { value: 'gemini-2.5-pro-tts', label: 'Gemini 2.5 Pro TTS', description: 'Higher-quality long-form narration and podcast option.' }
+                        { value: 'gemini-3.1-flash-tts-preview', label: 'Gemini 3.1 Flash TTS Preview', description: 'Fastest current Gemini path in Laboon.', costBadge: 'Higher cost', costTone: 'rose', costHint: 'Preview model with stronger quality and typically higher hosted cost than Flash tiers.' },
+                        { value: 'gemini-2.5-flash-tts', label: 'Gemini 2.5 Flash TTS', description: 'Balanced quality and speed.', costBadge: 'Balanced cost', costTone: 'amber', costHint: 'Good default hosted choice when you need speed and stable quality.' },
+                        { value: 'gemini-2.5-flash-lite-preview-tts', label: 'Gemini 2.5 Flash Lite Preview TTS', description: 'Lower-cost lightweight preview option.', costBadge: 'Lowest hosted cost', costTone: 'emerald', costHint: 'Best hosted cost-saving option when single-speaker quality is enough.' },
+                        { value: 'gemini-2.5-pro-tts', label: 'Gemini 2.5 Pro TTS', description: 'Higher-quality long-form narration and podcast option.', costBadge: 'Premium cost', costTone: 'rose', costHint: 'Use for premium podcast quality, not for free-first defaults.' }
                     ]
                 },
                 cloud_tts: {
                     label: 'Cloud Text-to-Speech API',
                     engine: 'gemini',
                     help: 'Uses the Laboon proxy to call Google Cloud Text-to-Speech with explicit output encoding support.',
+                    cost: {
+                        tier: 'paid',
+                        badge: 'Paid Cloud',
+                        badgeTone: 'rose',
+                        warning: 'Cloud TTS requires Google Cloud billing and Google pricing currently lists no free usage tier for Gemini-TTS. Prefer Qwen for free-first and move here only when you need exact encoding or production export quality.',
+                        detail: 'Best for explicit MP3, OGG_OPUS, LINEAR16, MULAW, and predictable output contracts.'
+                    },
                     capabilities: {
                         encodings: ['linear16', 'mp3', 'ogg_opus', 'pcm', 'mulaw', 'alaw'],
                         sampleRates: [16000, 22050, 24000, 44100, 48000],
@@ -4028,15 +4044,22 @@
                         notes: 'Best option when you need predictable output encoding such as MP3, OGG_OPUS, LINEAR16, or MULAW.'
                     },
                     models: [
-                        { value: 'gemini-2.5-flash-tts', label: 'Gemini 2.5 Flash TTS', description: 'Recommended starting point for Cloud TTS.' },
-                        { value: 'gemini-2.5-flash-lite-preview-tts', label: 'Gemini 2.5 Flash Lite Preview TTS', description: 'Lower-latency and lower-cost Cloud option.' },
-                        { value: 'gemini-2.5-pro-tts', label: 'Gemini 2.5 Pro TTS', description: 'Best fit for podcasts, audiobooks, and premium narration.' }
+                        { value: 'gemini-2.5-flash-tts', label: 'Gemini 2.5 Flash TTS', description: 'Recommended starting point for Cloud TTS.', costBadge: 'Paid starter', costTone: 'amber', costHint: 'Recommended paid default when you need Cloud TTS output encoding support.' },
+                        { value: 'gemini-2.5-flash-lite-preview-tts', label: 'Gemini 2.5 Flash Lite Preview TTS', description: 'Lower-latency and lower-cost Cloud option.', costBadge: 'Lowest cloud cost', costTone: 'emerald', costHint: 'Cheapest Cloud TTS model, but less ideal for richer dialogue and premium podcast output.' },
+                        { value: 'gemini-2.5-pro-tts', label: 'Gemini 2.5 Pro TTS', description: 'Best fit for podcasts, audiobooks, and premium narration.', costBadge: 'Premium cloud', costTone: 'rose', costHint: 'Highest-cost Cloud TTS option for long-form and premium narration.' }
                     ]
                 },
                 qwen: {
                     label: 'Qwen3-TTS',
                     engine: 'qwen',
                     help: 'Uses the local or custom OpenAI-compatible Qwen3-TTS endpoint configured in AI Config.',
+                    cost: {
+                        tier: 'free_first',
+                        badge: 'Free-first',
+                        badgeTone: 'emerald',
+                        warning: 'Best default when you want to avoid cloud TTS charges. Actual cost stays near-free when you run the model locally or through your own low-cost endpoint.',
+                        detail: 'Recommended Laboon default for experimentation, drafts, and internal previews.'
+                    },
                     capabilities: {
                         encodings: ['wav', 'mp3', 'pcm'],
                         sampleRates: [24000],
@@ -4046,12 +4069,33 @@
                         notes: 'Qwen path currently focuses on single-speaker local generation.'
                     },
                     models: [
-                        { value: 'qwen3-tts', label: 'Qwen3-TTS', description: 'Current local OpenAI-compatible speech model.' }
+                        { value: 'qwen3-tts', label: 'Qwen3-TTS', description: 'Current local OpenAI-compatible speech model.', costBadge: 'Free-first local', costTone: 'emerald', costHint: 'Use this first when cost matters more than managed-cloud polish.' }
                     ]
                 }
             };
 
             const LABOON_TTS_SETTINGS_KEY = 'laboon_tts_settings_v1';
+
+            function getTtsCostToneStyles(tone) {
+                switch (tone) {
+                    case 'emerald':
+                        return {
+                            chip: 'background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;',
+                            panel: 'display:block; border-color:#a7f3d0; background:#f0fdf4; color:#065f46;'
+                        };
+                    case 'rose':
+                        return {
+                            chip: 'background:#fff1f2; color:#be123c; border:1px solid #fecdd3;',
+                            panel: 'display:block; border-color:#fecdd3; background:#fff1f2; color:#9f1239;'
+                        };
+                    case 'amber':
+                    default:
+                        return {
+                            chip: 'background:#fffbeb; color:#b45309; border:1px solid #fcd34d;',
+                            panel: 'display:block; border-color:#fde68a; background:#fffbeb; color:#92400e;'
+                        };
+                }
+            }
 
             function getLaboonTtsSettings() {
                 try {
@@ -4074,8 +4118,8 @@
                 const transcriptEl = document.getElementById('tts-input');
                 const next = {
                     mode: window._ttsMode || 'single',
-                    backend: document.getElementById('tts-backend-select')?.value || window._ttsBackend || 'gemini_api',
-                    model: document.getElementById('tts-model-select')?.value || 'gemini-3.1-flash-tts-preview',
+                    backend: document.getElementById('tts-backend-select')?.value || window._ttsBackend || 'qwen',
+                    model: document.getElementById('tts-model-select')?.value || 'qwen3-tts',
                     exportFormat: document.getElementById('tts-export-format')?.value || 'wav',
                     audioEncoding: document.getElementById('tts-audio-encoding')?.value || 'wav',
                     sampleRate: document.getElementById('tts-sample-rate')?.value || '24000',
@@ -4108,7 +4152,7 @@
                 if (!voiceVal.includes(':')) voiceVal = 'gemini:' + voiceVal;
 
                 if (typeof window.selectTtsBackend === 'function') {
-                    window.selectTtsBackend(saved.backend || (voiceVal.startsWith('qwen:') ? 'qwen' : 'gemini_api'), {
+                    window.selectTtsBackend(saved.backend || 'qwen', {
                         preferredModel: saved.model,
                         silent: true
                     });
@@ -4116,8 +4160,8 @@
 
                 setSelectValueIfExists(document.getElementById('tts-voice-select'), voiceVal);
                 if (window.onTtsEngineChanged) window.onTtsEngineChanged(voiceVal);
-                setSelectValueIfExists(document.getElementById('tts-model-select'), saved.model || 'gemini-3.1-flash-tts-preview');
-                if (typeof window.syncTtsModelOptions === 'function') window.syncTtsModelOptions(saved.model || 'gemini-3.1-flash-tts-preview');
+                setSelectValueIfExists(document.getElementById('tts-model-select'), saved.model || 'qwen3-tts');
+                if (typeof window.syncTtsModelOptions === 'function') window.syncTtsModelOptions(saved.model || 'qwen3-tts');
                 if (typeof window.syncTtsAdvancedAudioSettings === 'function') {
                     window.syncTtsAdvancedAudioSettings({
                         preferredEncoding: saved.audioEncoding || saved.exportFormat || 'wav',
@@ -4286,20 +4330,20 @@
             };
 
             window.getSelectedTtsBackend = function() {
-                return document.getElementById('tts-backend-select')?.value || window._ttsBackend || 'gemini_api';
+                return document.getElementById('tts-backend-select')?.value || window._ttsBackend || 'qwen';
             };
 
             window.getSelectedTtsModel = function() {
-                return document.getElementById('tts-model-select')?.value || 'gemini-3.1-flash-tts-preview';
+                return document.getElementById('tts-model-select')?.value || 'qwen3-tts';
             };
 
             window.getAvailableTtsModels = function(backend) {
-                return LABOON_TTS_BACKEND_MODELS[backend || window.getSelectedTtsBackend()]?.models || LABOON_TTS_BACKEND_MODELS.gemini_api.models;
+                return LABOON_TTS_BACKEND_MODELS[backend || window.getSelectedTtsBackend()]?.models || LABOON_TTS_BACKEND_MODELS.qwen.models;
             };
 
             window.getTtsBackendCapabilities = function(backend, model) {
                 const resolvedBackend = backend || window.getSelectedTtsBackend();
-                const config = LABOON_TTS_BACKEND_MODELS[resolvedBackend] || LABOON_TTS_BACKEND_MODELS.gemini_api;
+                const config = LABOON_TTS_BACKEND_MODELS[resolvedBackend] || LABOON_TTS_BACKEND_MODELS.qwen;
                 const caps = Object.assign({
                     encodings: ['wav'],
                     sampleRates: [24000],
@@ -4313,9 +4357,36 @@
                 return caps;
             };
 
+            window.renderTtsCostInfo = function() {
+                const backend = window.getSelectedTtsBackend();
+                const config = LABOON_TTS_BACKEND_MODELS[backend] || LABOON_TTS_BACKEND_MODELS.qwen;
+                const selectedModel = window.getSelectedTtsModel();
+                const selectedMeta = (config.models || []).find(model => model.value === selectedModel) || config.models?.[0] || {};
+                const stripEl = document.getElementById('tts-cost-strip');
+                const warningEl = document.getElementById('tts-cost-warning');
+                if (!stripEl || !warningEl) return;
+
+                const backendCost = config.cost || {};
+                const backendTone = getTtsCostToneStyles(backendCost.badgeTone || 'amber');
+                const modelTone = getTtsCostToneStyles(selectedMeta.costTone || backendCost.badgeTone || 'amber');
+                const backendBadge = backendCost.badge || 'Check cost';
+                const modelBadge = selectedMeta.costBadge || 'Selected model';
+                const backendLabel = config.label || 'Backend';
+
+                stripEl.style.display = 'flex';
+                stripEl.innerHTML = [
+                    `<span style="display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; font-size:0.73em; font-weight:800; ${backendTone.chip}"><i class="fa-solid fa-wallet"></i> ${backendBadge}</span>`,
+                    `<span style="display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; font-size:0.73em; font-weight:800; ${modelTone.chip}"><i class="fa-solid fa-tag"></i> ${modelBadge}</span>`,
+                    `<span style="display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; font-size:0.73em; font-weight:700; background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe;"><i class="fa-solid fa-layer-group"></i> ${backendLabel}</span>`
+                ].join('');
+
+                warningEl.style.cssText = `margin-top:8px; font-size:0.75em; line-height:1.45; padding:10px 12px; border-radius:12px; ${backendTone.panel}`;
+                warningEl.innerHTML = `<div><b>${backendBadge}</b> ${backendCost.detail || ''}</div><div style="margin-top:4px;">${selectedMeta.costHint || selectedMeta.description || ''}</div><div style="margin-top:4px;">${backendCost.warning || ''}</div>`;
+            };
+
             window.syncTtsModelOptions = function(preferredModel) {
                 const backend = window.getSelectedTtsBackend();
-                const config = LABOON_TTS_BACKEND_MODELS[backend] || LABOON_TTS_BACKEND_MODELS.gemini_api;
+                const config = LABOON_TTS_BACKEND_MODELS[backend] || LABOON_TTS_BACKEND_MODELS.qwen;
                 const modelSelect = document.getElementById('tts-model-select');
                 const modelHelp = document.getElementById('tts-model-help');
                 if (!modelSelect) return;
@@ -4338,6 +4409,9 @@
                 if (modelHelp) {
                     const bits = [config.help, selectedMeta?.description].filter(Boolean);
                     modelHelp.textContent = bits.join(' ');
+                }
+                if (typeof window.renderTtsCostInfo === 'function') {
+                    window.renderTtsCostInfo();
                 }
                 if (typeof window.syncTtsAdvancedAudioSettings === 'function') {
                     window.syncTtsAdvancedAudioSettings();
@@ -4564,7 +4638,7 @@
             };
 
             window.selectTtsBackend = function(backend, options = {}) {
-                const resolvedBackend = LABOON_TTS_BACKEND_MODELS[backend] ? backend : 'gemini_api';
+                const resolvedBackend = LABOON_TTS_BACKEND_MODELS[backend] ? backend : 'qwen';
                 const hiddenBackend = document.getElementById('tts-backend-select');
                 const geminiChip = document.getElementById('chip-engine-gemini');
                 const cloudChip = document.getElementById('chip-engine-cloud');
@@ -4803,7 +4877,7 @@
             // Initialize on Load
             setTimeout(() => {
                 if (typeof selectTtsBackend === 'function') {
-                    const savedBackend = getLaboonTtsSettings()?.backend || 'gemini_api';
+                    const savedBackend = getLaboonTtsSettings()?.backend || 'qwen';
                     selectTtsBackend(savedBackend, {
                         preferredModel: getLaboonTtsSettings()?.model,
                         silent: true
@@ -4958,8 +5032,8 @@
                 const fullVoiceVal = voiceSelectEl?.value || 'gemini:Kore';
                 const engine = fullVoiceVal.includes(':') ? fullVoiceVal.split(':')[0] : 'gemini';
                 const voice = fullVoiceVal.includes(':') ? fullVoiceVal.split(':')[1] : fullVoiceVal;
-                const selectedBackend = typeof window.getSelectedTtsBackend === 'function' ? window.getSelectedTtsBackend() : 'gemini_api';
-                const selectedModel = typeof window.getSelectedTtsModel === 'function' ? window.getSelectedTtsModel() : 'gemini-3.1-flash-tts-preview';
+                const selectedBackend = typeof window.getSelectedTtsBackend === 'function' ? window.getSelectedTtsBackend() : 'qwen';
+                const selectedModel = typeof window.getSelectedTtsModel === 'function' ? window.getSelectedTtsModel() : 'qwen3-tts';
                 const selectedEncoding = (document.getElementById('tts-audio-encoding')?.value || document.getElementById('tts-export-format')?.value || 'wav').toLowerCase();
                 const selectedSampleRate = Number(document.getElementById('tts-sample-rate')?.value || 24000);
                 
@@ -5238,9 +5312,9 @@
                     updateAIUsage('gemini-tts', tokenCount);
                 }
                 renderTtsDebugMeta({
-                    backend: window.getSelectedTtsBackend ? window.getSelectedTtsBackend() : 'gemini_api',
-                    backendLabel: LABOON_TTS_BACKEND_MODELS[window.getSelectedTtsBackend ? window.getSelectedTtsBackend() : 'gemini_api']?.label,
-                    model: window.getSelectedTtsModel ? window.getSelectedTtsModel() : 'gemini-3.1-flash-tts-preview',
+                    backend: window.getSelectedTtsBackend ? window.getSelectedTtsBackend() : 'qwen',
+                    backendLabel: LABOON_TTS_BACKEND_MODELS[window.getSelectedTtsBackend ? window.getSelectedTtsBackend() : 'qwen']?.label,
+                    model: window.getSelectedTtsModel ? window.getSelectedTtsModel() : 'qwen3-tts',
                     mode: window._ttsMode === 'dialogue' ? 'Dialogue Duo' : 'Single Narrator',
                     requestedEncoding: document.getElementById('tts-audio-encoding')?.value || fileExt,
                     requestedSampleRate: document.getElementById('tts-sample-rate')?.value || '24000',
