@@ -3486,23 +3486,46 @@
                                             <div id="tts-cost-strip" style="display:none; margin-top:10px; flex-wrap:wrap; gap:8px; align-items:center;"></div>
                                             <div id="tts-cost-warning" style="display:none; margin-top:8px; font-size:0.75em; line-height:1.45; padding:10px 12px; border-radius:12px; border:1px solid #dbeafe; background:#f8fbff; color:#475569;"></div>
                                             <div id="tts-runtime-hint" style="display:none; margin-top:8px; font-size:0.75em; line-height:1.45; padding:10px 12px; border-radius:12px; border:1px solid #fde68a; background:#fffbeb; color:#92400e;"></div>
+                                            <div style="margin-top:8px; display:flex; justify-content:flex-start;">
+                                                <button type="button" id="btn-qwen-setup-guide" onclick="toggleQwenSetupGuide()" style="display:none; background:none; border:none; color:#4f46e5; font-size:0.76em; font-weight:800; cursor:pointer; padding:0;">
+                                                    <i class="fa-solid fa-circle-info"></i> Qwen Runtime Setup Guide
+                                                </button>
+                                            </div>
+                                            <div id="tts-qwen-setup-guide" style="display:none; margin-top:10px; padding:12px; border-radius:14px; border:1px solid #c7d2fe; background:#eef2ff; color:#334155; font-size:0.75em; line-height:1.5;">
+                                                <div style="font-weight:900; color:#4338ca; margin-bottom:6px;">Qwen Runtime Setup Guide</div>
+                                                <div><b>1. Run a reachable Qwen endpoint.</b> The default local URL is <code>http://localhost:8880/v1</code>.</div>
+                                                <div style="margin-top:4px;"><b>2. If you open Laboon from GitHub Pages, your local runtime must allow browser CORS.</b> Without CORS, the browser will fail before the request reaches Qwen.</div>
+                                                <div style="margin-top:4px;"><b>3. Preset Voice mode</b> uses a speaker catalog. You can keep the built-in voices or paste your own JSON catalog in AI Config.</div>
+                                                <div style="margin-top:4px;"><b>4. Voice Design mode</b> uses a natural-language voice prompt. For hosted Alibaba-style voice design flows, a separate create-voice step may still be required by your runtime.</div>
+                                                <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:8px;">
+                                                    <button type="button" onclick="openAIKeysModal()" style="border:none; border-radius:999px; padding:7px 12px; background:#4f46e5; color:white; font-size:0.78em; font-weight:800; cursor:pointer;">
+                                                        <i class="fa-solid fa-sliders"></i> Open AI Config
+                                                    </button>
+                                                    <button type="button" onclick="toggleQwenSetupGuide(false)" style="border:none; border-radius:999px; padding:7px 12px; background:white; color:#4f46e5; font-size:0.78em; font-weight:800; cursor:pointer; border:1px solid #c7d2fe;">
+                                                        Close Guide
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
 
                                         <!-- 2. Production Language (Moved to Second [Version: V90.99.3.2]) -->
                                         <div class="laboon-section-shell" style="padding:15px; margin-bottom:15px;">
                                             <div class="laboon-section-title" style="margin-bottom:12px;">2. Production Language</div>
                                             <select id="tts-language-select" style="display:none;" onchange="syncTtsVoices()">
+                                                <option value="auto">Auto</option>
                                                 <option value="th-TH">Thai</option><option value="en-US">English</option><option value="ja-JP">Japanese</option><option value="zh-CN">Chinese</option><option value="ko-KR">Korean</option>
                                             </select>
                                             <select id="tts-language-select-d" style="display:none;" onchange="syncTtsVoices()">
+                                                <option value="auto">Auto</option>
                                                 <option value="th-TH">Thai</option><option value="en-US">English</option><option value="ja-JP">Japanese</option><option value="zh-CN">Chinese</option><option value="ko-KR">Korean</option>
                                             </select>
                                             <div class="tts-chip-group" id="tts-lang-chips">
-                                                <button type="button" class="tts-chip active" onclick="selectTtsChip('tts-language-select', this, 'th-TH'); syncTtsVoices();">Thai</button>
-                                                <button type="button" class="tts-chip" onclick="selectTtsChip('tts-language-select', this, 'en-US'); syncTtsVoices();">English</button>
-                                                <button type="button" class="tts-chip" onclick="selectTtsChip('tts-language-select', this, 'zh-CN'); syncTtsVoices();">Chinese</button>
-                                                <button type="button" class="tts-chip" onclick="selectTtsChip('tts-language-select', this, 'ja-JP'); syncTtsVoices();">Japanese</button>
-                                                <button type="button" class="tts-chip" onclick="selectTtsChip('tts-language-select', this, 'ko-KR'); syncTtsVoices();">Korean</button>
+                                                <button type="button" id="tts-lang-chip-auto" class="tts-chip" onclick="setTtsProductionLanguage('auto', { silent: true });" style="display:none;">Auto</button>
+                                                <button type="button" class="tts-chip active" onclick="setTtsProductionLanguage('th-TH', { silent: true });">Thai</button>
+                                                <button type="button" class="tts-chip" onclick="setTtsProductionLanguage('en-US', { silent: true });">English</button>
+                                                <button type="button" class="tts-chip" onclick="setTtsProductionLanguage('zh-CN', { silent: true });">Chinese</button>
+                                                <button type="button" class="tts-chip" onclick="setTtsProductionLanguage('ja-JP', { silent: true });">Japanese</button>
+                                                <button type="button" class="tts-chip" onclick="setTtsProductionLanguage('ko-KR', { silent: true });">Korean</button>
                                             </div>
                                         </div>
 
@@ -3519,9 +3542,35 @@
                                             </div>
 
                                             <div id="tts-single-voice-box">
+                                                <div id="tts-qwen-mode-panel" style="display:none; margin-bottom:14px;">
+                                                    <label class="laboon-field-label">Qwen Voice Mode</label>
+                                                    <select id="tts-qwen-mode" style="display:none;">
+                                                        <option value="preset">Preset Voice</option>
+                                                        <option value="voice_design">Voice Design</option>
+                                                    </select>
+                                                    <div class="tts-chip-group" id="tts-qwen-mode-chips"></div>
+                                                    <div id="tts-qwen-mode-hint" style="margin-top:6px; font-size:0.74em; line-height:1.45; color:#64748b;"></div>
+                                                </div>
+                                                <div id="tts-single-voice-select-wrap">
                                                 <label class="laboon-field-label">Primary Voice Selection</label>
                                                 <select id="tts-voice-select" style="display:none;"></select>
                                                 <div class="tts-chip-group" id="tts-voice-chips"></div>
+                                                </div>
+                                                <div id="tts-qwen-voice-design-box" style="display:none; margin-top:10px; padding:12px; border-radius:12px; border:1px solid #c7d2fe; background:#f8fbff;">
+                                                    <label class="laboon-field-label" for="tts-qwen-voice-prompt">Voice Design Prompt</label>
+                                                    <textarea id="tts-qwen-voice-prompt" rows="4" placeholder="Example: Warm Thai female narrator with calm pacing, clear articulation, and a gentle documentary tone." style="width:100%; font-size:0.82em; padding:10px 12px; border-radius:12px; border:1.5px solid #dbe4ff; background:white; color:#1e293b; resize:vertical;"></textarea>
+                                                    <div style="margin-top:6px; font-size:0.73em; line-height:1.45; color:#64748b;">Use a concrete, multi-dimensional voice description. Qwen open-source voice design works best with specific traits such as age, pace, tone, emotion, and use case. Alibaba Cloud voice design docs limit the prompt to 2,048 characters and recommend Chinese or English descriptions.</div>
+                                                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
+                                                        <div>
+                                                            <label class="laboon-field-label" for="tts-qwen-voice-name" style="margin-bottom:6px;">Preferred Voice Name</label>
+                                                            <input type="text" id="tts-qwen-voice-name" placeholder="optional-character-name" style="width:100%; font-size:0.82em; padding:9px 10px; border-radius:10px; border:1.5px solid #dbe4ff; background:white; color:#1e293b;">
+                                                        </div>
+                                                        <div>
+                                                            <label class="laboon-field-label" for="tts-qwen-vd-target-model" style="margin-bottom:6px;">Voice Design Model Override</label>
+                                                            <input type="text" id="tts-qwen-vd-target-model" placeholder="optional runtime model id" style="width:100%; font-size:0.82em; padding:9px 10px; border-radius:10px; border:1.5px solid #dbe4ff; background:white; color:#1e293b;">
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
 
                                             <div id="tts-dialogue-voice-box" style="display:none;">
@@ -3824,11 +3873,102 @@
                 }
 
                 if (typeof window.syncTtsVoices === 'function') window.syncTtsVoices();
+                if (typeof window.updateTtsLanguageUi === 'function') window.updateTtsLanguageUi();
                 if (typeof persistLaboonTtsSettings === 'function') persistLaboonTtsSettings(true);
                 if (!silent && typeof showToast === 'function') {
-                    const labelMap = { 'th-TH': 'Thai', 'en-US': 'English', 'zh-CN': 'Chinese', 'ja-JP': 'Japanese', 'ko-KR': 'Korean' };
+                    const labelMap = { auto: 'Auto', 'th-TH': 'Thai', 'en-US': 'English', 'zh-CN': 'Chinese', 'ja-JP': 'Japanese', 'ko-KR': 'Korean' };
                     showToast(`Production language suggested: ${labelMap[languageCode] || languageCode}`);
                 }
+            };
+
+            function getQwenConfiguredSpeakerCatalog() {
+                const raw = localStorage.getItem('ai_qwen_speaker_catalog') || '';
+                if (!raw.trim()) return DEFAULT_QWEN_SPEAKER_CATALOG;
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (!Array.isArray(parsed)) return DEFAULT_QWEN_SPEAKER_CATALOG;
+                    const normalized = parsed
+                        .filter(item => item && (item.id || item.voice || item.name))
+                        .map((item) => ({
+                            id: String(item.id || item.voice || item.name).trim(),
+                            label: String(item.label || item.name || item.id || item.voice).trim(),
+                            lang: Array.isArray(item.lang || item.languages)
+                                ? (item.lang || item.languages).map(String)
+                                : ['auto', 'th-TH', 'en-US', 'zh-CN', 'ja-JP', 'ko-KR'],
+                            desc: String(item.desc || item.description || '').trim()
+                        }))
+                        .filter(item => item.id);
+                    return normalized.length ? normalized : DEFAULT_QWEN_SPEAKER_CATALOG;
+                } catch (_) {
+                    return DEFAULT_QWEN_SPEAKER_CATALOG;
+                }
+            }
+
+            function getQwenLanguageForPayload(languageCode) {
+                if (!languageCode || languageCode === 'auto') return 'auto';
+                const mapping = {
+                    'th-TH': 'Thai',
+                    'en-US': 'English',
+                    'zh-CN': 'Chinese',
+                    'ja-JP': 'Japanese',
+                    'ko-KR': 'Korean'
+                };
+                return mapping[languageCode] || languageCode;
+            }
+
+            function getQwenVoiceMode() {
+                return document.getElementById('tts-qwen-mode')?.value || 'preset';
+            }
+
+            window.toggleQwenSetupGuide = function(forceState) {
+                const guideEl = document.getElementById('tts-qwen-setup-guide');
+                if (!guideEl) return;
+                const shouldOpen = typeof forceState === 'boolean' ? forceState : guideEl.style.display === 'none';
+                guideEl.style.display = shouldOpen ? 'block' : 'none';
+            };
+
+            window.updateTtsLanguageUi = function() {
+                const backend = window.getSelectedTtsBackend ? window.getSelectedTtsBackend() : 'gemini_api';
+                const autoChip = document.getElementById('tts-lang-chip-auto');
+                const singleSelect = document.getElementById('tts-language-select');
+                const dialogueSelect = document.getElementById('tts-language-select-d');
+                const allowAuto = backend === 'qwen';
+
+                if (autoChip) autoChip.style.display = allowAuto ? 'inline-flex' : 'none';
+                if (!allowAuto) {
+                    if (singleSelect?.value === 'auto' || dialogueSelect?.value === 'auto') {
+                        window.setTtsProductionLanguage('th-TH', { silent: true });
+                        return;
+                    }
+                }
+                if (typeof persistLaboonTtsSettings === 'function') persistLaboonTtsSettings(true);
+            };
+
+            window.updateQwenModeUi = function() {
+                const backend = window.getSelectedTtsBackend ? window.getSelectedTtsBackend() : 'gemini_api';
+                const panel = document.getElementById('tts-qwen-mode-panel');
+                const hintEl = document.getElementById('tts-qwen-mode-hint');
+                const voiceWrap = document.getElementById('tts-single-voice-select-wrap');
+                const designBox = document.getElementById('tts-qwen-voice-design-box');
+                const mode = getQwenVoiceMode();
+                const isQwen = backend === 'qwen' && window._ttsMode === 'single';
+
+                if (panel) panel.style.display = isQwen ? 'block' : 'none';
+                if (voiceWrap) voiceWrap.style.display = (!isQwen || mode === 'preset') ? 'block' : 'none';
+                if (designBox) designBox.style.display = isQwen && mode === 'voice_design' ? 'block' : 'none';
+                if (hintEl) {
+                    hintEl.textContent = mode === 'voice_design'
+                        ? 'Voice Design uses a free-form prompt instead of a preset speaker chip. Use this with runtimes that understand instruct/voice_prompt style payloads.'
+                        : 'Preset Voice uses the active Qwen speaker catalog. You can replace the built-in list from AI Config.';
+                }
+
+                renderSelectAsTtsChips('tts-qwen-mode', 'tts-qwen-mode-chips', {
+                    onChange: () => {
+                        window.updateQwenModeUi();
+                        if (typeof window.syncTtsVoices === 'function') window.syncTtsVoices();
+                        if (typeof persistLaboonTtsSettings === 'function') persistLaboonTtsSettings(true);
+                    }
+                });
             };
 
             window.updateTtsPodcastStyleHint = function(options = {}) {
@@ -4145,12 +4285,34 @@
                         maxTextBytes: 6000,
                         maxCombinedBytes: 6000,
                         supportsDialogue: false,
-                        notes: 'Qwen path currently focuses on single-speaker local generation.'
+                        supportsLanguageAuto: true,
+                        supportsVoiceDesign: true,
+                        notes: 'Qwen path currently focuses on single-speaker local generation, but can be upgraded with custom speaker catalogs and voice-design-aware runtimes.'
                     },
                     models: [
                         { value: 'qwen3-tts', label: 'Qwen3-TTS', description: 'Current local OpenAI-compatible speech model.', costBadge: 'Free-first local', costTone: 'emerald', costHint: 'Use this first when cost matters more than managed-cloud polish.' }
                     ]
                 }
+            };
+
+            const DEFAULT_QWEN_SPEAKER_CATALOG = [
+                { id: 'Vivian', label: 'Vivian', lang: ['zh-CN', 'en-US'], desc: 'Bright, slightly edgy young female voice.' },
+                { id: 'Serena', label: 'Serena', lang: ['zh-CN', 'en-US'], desc: 'Warm, gentle young female voice.' },
+                { id: 'Uncle_Fu', label: 'Uncle Fu', lang: ['zh-CN'], desc: 'Seasoned male voice with a low, mellow timbre.' },
+                { id: 'Dylan', label: 'Dylan', lang: ['zh-CN'], desc: 'Youthful Beijing male voice with a clear, natural timbre.' },
+                { id: 'Eric', label: 'Eric', lang: ['zh-CN'], desc: 'Lively Chengdu male voice with a slightly husky brightness.' },
+                { id: 'Ryan', label: 'Ryan', lang: ['en-US'], desc: 'Dynamic male voice with strong rhythmic drive.' },
+                { id: 'Aiden', label: 'Aiden', lang: ['en-US'], desc: 'Sunny American male voice with a clear midrange.' },
+                { id: 'Ono_Anna', label: 'Ono Anna', lang: ['ja-JP'], desc: 'Playful Japanese female voice with a light, nimble timbre.' },
+                { id: 'Sohee', label: 'Sohee', lang: ['ko-KR'], desc: 'Warm Korean female voice with rich emotion.' }
+            ];
+            const QWEN_LANGUAGE_NAME_MAP = {
+                auto: 'Auto',
+                'th-TH': 'Thai',
+                'en-US': 'English',
+                'zh-CN': 'Chinese',
+                'ja-JP': 'Japanese',
+                'ko-KR': 'Korean'
             };
 
             const LABOON_TTS_SETTINGS_KEY = 'laboon_tts_settings_v1';
@@ -4273,6 +4435,10 @@
                     voiceS1: document.getElementById('tts-voice-s1')?.value || 'Kore',
                     voiceS2: document.getElementById('tts-voice-s2')?.value || 'Puck',
                     languageD: document.getElementById('tts-language-select-d')?.value || 'th-TH',
+                    qwenMode: document.getElementById('tts-qwen-mode')?.value || 'preset',
+                    qwenVoicePrompt: document.getElementById('tts-qwen-voice-prompt')?.value || '',
+                    qwenVoiceName: document.getElementById('tts-qwen-voice-name')?.value || '',
+                    qwenVoiceDesignModel: document.getElementById('tts-qwen-vd-target-model')?.value || '',
                     styleText: document.getElementById('tts-style-input')?.value || '',
                     polishDuration: document.getElementById('tts-polish-duration')?.value || '3-5',
                     polishSpeakers: document.getElementById('tts-polish-speakers')?.value || 'single',
@@ -4319,6 +4485,10 @@
                 setSelectValueIfExists(document.getElementById('tts-voice-s1'), saved.voiceS1);
                 setSelectValueIfExists(document.getElementById('tts-voice-s2'), saved.voiceS2);
                 setSelectValueIfExists(document.getElementById('tts-language-select-d'), saved.languageD);
+                if (saved.language && typeof window.setTtsProductionLanguage === 'function') {
+                    window.setTtsProductionLanguage(saved.language, { silent: true });
+                }
+                setSelectValueIfExists(document.getElementById('tts-qwen-mode'), saved.qwenMode || 'preset');
                 setSelectValueIfExists(document.getElementById('tts-preset-select'), saved.preset || 'custom');
                 setSelectValueIfExists(document.getElementById('tts-polish-duration'), saved.polishDuration || '3-5');
                 setSelectValueIfExists(document.getElementById('tts-polish-speakers'), saved.polishSpeakers || saved.mode || 'single');
@@ -4327,6 +4497,12 @@
 
                 const styleEl = document.getElementById('tts-style-input');
                 if (styleEl && saved.styleText) styleEl.value = saved.styleText;
+                const qwenVoicePromptEl = document.getElementById('tts-qwen-voice-prompt');
+                if (qwenVoicePromptEl && saved.qwenVoicePrompt) qwenVoicePromptEl.value = saved.qwenVoicePrompt;
+                const qwenVoiceNameEl = document.getElementById('tts-qwen-voice-name');
+                if (qwenVoiceNameEl && saved.qwenVoiceName) qwenVoiceNameEl.value = saved.qwenVoiceName;
+                const qwenVoiceDesignModelEl = document.getElementById('tts-qwen-vd-target-model');
+                if (qwenVoiceDesignModelEl && saved.qwenVoiceDesignModel) qwenVoiceDesignModelEl.value = saved.qwenVoiceDesignModel;
 
                 const inputEl = document.getElementById('tts-input');
                 if (inputEl && !inputEl.value.trim() && saved.transcript) inputEl.value = saved.transcript;
@@ -4335,6 +4511,8 @@
                 if (preferredMode === 'dialogue' || preferredMode === 'single') {
                     window.setTtsMode(preferredMode);
                 }
+                if (typeof window.updateTtsLanguageUi === 'function') window.updateTtsLanguageUi();
+                if (typeof window.updateQwenModeUi === 'function') window.updateQwenModeUi();
                 if (typeof window.renderTtsPolishPresetChips === 'function') window.renderTtsPolishPresetChips();
                 if (typeof window.updateTtsPodcastStyleHint === 'function') window.updateTtsPodcastStyleHint({ autoSyncLanguage: false, silent: true });
                 if (typeof window.updateTtsPolishPresetPreview === 'function') window.updateTtsPolishPresetPreview();
@@ -4345,6 +4523,7 @@
                     'tts-model-select', 'tts-audio-encoding', 'tts-sample-rate',
                     'tts-voice-select', 'tts-language-select', 'tts-voice-s1', 'tts-voice-s2',
                     'tts-language-select-d', 'tts-style-input', 'tts-preset-select',
+                    'tts-qwen-mode',
                     'tts-polish-duration', 'tts-polish-speakers', 'tts-polish-format', 'tts-polish-summary-level'
                 ];
                 changeIds.forEach(id => {
@@ -4357,6 +4536,12 @@
                         }
                         if (id === 'tts-model-select' && typeof window.syncTtsModelOptions === 'function') {
                             window.syncTtsModelOptions(el.value);
+                        }
+                        if ((id === 'tts-language-select' || id === 'tts-language-select-d') && typeof window.updateTtsLanguageUi === 'function') {
+                            window.updateTtsLanguageUi();
+                        }
+                        if (id === 'tts-qwen-mode' && typeof window.updateQwenModeUi === 'function') {
+                            window.updateQwenModeUi();
                         }
                         if ((id === 'tts-model-select' || id === 'tts-audio-encoding' || id === 'tts-sample-rate') && typeof window.updateTtsPreflightEstimate === 'function') {
                             window.updateTtsPreflightEstimate();
@@ -4372,11 +4557,16 @@
                     el.dataset.persistBound = '1';
                 });
 
-                const inputIds = ['tts-style-input', 'tts-input'];
+                const inputIds = ['tts-style-input', 'tts-input', 'tts-qwen-voice-prompt', 'tts-qwen-voice-name', 'tts-qwen-vd-target-model'];
                 inputIds.forEach(id => {
                     const el = document.getElementById(id);
                     if (!el || el.dataset.persistInputBound === '1') return;
-                    el.addEventListener('input', () => persistLaboonTtsSettings(id !== 'tts-input'));
+                    el.addEventListener('input', () => {
+                        persistLaboonTtsSettings(id !== 'tts-input');
+                        if ((id === 'tts-qwen-voice-prompt' || id === 'tts-qwen-vd-target-model') && typeof window.updateTtsPreflightEstimate === 'function') {
+                            window.updateTtsPreflightEstimate();
+                        }
+                    });
                     el.dataset.persistInputBound = '1';
                 });
             }
@@ -4542,9 +4732,13 @@
 
             window.renderTtsRuntimeHint = function() {
                 const hintEl = document.getElementById('tts-runtime-hint');
+                const guideBtn = document.getElementById('btn-qwen-setup-guide');
+                const guideEl = document.getElementById('tts-qwen-setup-guide');
                 if (!hintEl) return;
                 const backend = window.getSelectedTtsBackend();
                 const qwenUrl = localStorage.getItem('ai_qwen_url') || 'http://localhost:8880/v1';
+                if (guideBtn) guideBtn.style.display = backend === 'qwen' ? 'inline-flex' : 'none';
+                if (backend !== 'qwen' && guideEl) guideEl.style.display = 'none';
 
                 if (backend === 'qwen' && !isLaboonLocalRuntime()) {
                     hintEl.style.display = 'block';
@@ -4611,6 +4805,8 @@
                 if (typeof window.syncTtsAdvancedAudioSettings === 'function') {
                     window.syncTtsAdvancedAudioSettings();
                 }
+                if (typeof window.updateQwenModeUi === 'function') window.updateQwenModeUi();
+                if (typeof window.updateTtsLanguageUi === 'function') window.updateTtsLanguageUi();
             };
 
             window.syncTtsAdvancedAudioSettings = function(options = {}) {
@@ -4717,8 +4913,15 @@
                 }
                 if (caps.backend === 'qwen') {
                     const qwenUrl = localStorage.getItem('ai_qwen_url') || 'http://localhost:8880/v1';
+                    const qwenMode = getQwenVoiceMode();
+                    const voicePrompt = (document.getElementById('tts-qwen-voice-prompt')?.value || '').trim();
                     if (/^http:\/\/localhost(?::\d+)?\/?/i.test(qwenUrl)) {
                         warnings.push('Qwen local server requires a reachable localhost endpoint with browser CORS enabled. If this page is opened from GitHub Pages, local fetch may fail until your local server allows it.');
+                    }
+                    if (qwenMode === 'voice_design' && !voicePrompt) {
+                        issues.push('Voice Design mode requires a voice design prompt before generating.');
+                    } else if (qwenMode === 'voice_design' && voicePrompt.length > 2048) {
+                        issues.push('Voice Design prompt is over 2,048 characters. Shorten it before generating.');
                     }
                 }
                 if (estimatedSeconds > 655) {
@@ -4798,8 +5001,10 @@
                     statusMessage = 'Gemini TTS request failed.';
                 } else if (lower.includes('qwen api error')) {
                     category = 'provider';
-                    userMessage = `Qwen3-TTS returned an API error. Please check the local server logs and selected response format.`;
-                    statusMessage = 'Qwen3-TTS request failed.';
+                    userMessage = context.qwenMode === 'voice_design'
+                        ? 'Qwen Voice Design returned an API error. Your local runtime may not support voice_prompt/instruct payloads yet.'
+                        : `Qwen3-TTS returned an API error. Please check the local server logs and selected response format.`;
+                    statusMessage = context.qwenMode === 'voice_design' ? 'Qwen Voice Design request failed.' : 'Qwen3-TTS request failed.';
                 }
 
                 return {
@@ -4877,6 +5082,8 @@
 
                 window.syncTtsModelOptions(options.preferredModel);
                 if (typeof window.renderTtsRuntimeHint === 'function') window.renderTtsRuntimeHint();
+                if (typeof window.updateTtsLanguageUi === 'function') window.updateTtsLanguageUi();
+                if (typeof window.updateQwenModeUi === 'function') window.updateQwenModeUi();
                 if (typeof syncTtsVoices === 'function') syncTtsVoices();
                 if (typeof persistLaboonTtsSettings === 'function') persistLaboonTtsSettings(true);
             };
@@ -4890,6 +5097,7 @@
                 const lang = window._ttsMode === 'dialogue' 
                     ? document.getElementById('tts-language-select-d').value 
                     : document.getElementById('tts-language-select').value;
+                const qwenMode = getQwenVoiceMode();
                 
                 const chipContainer = document.getElementById('tts-voice-chips');
                 const s1Container = document.getElementById('tts-voice-chips-s1');
@@ -4904,34 +5112,33 @@
                 let voices = [];
                 if (engine === 'gemini') {
                     voices = [
-                        { id: 'Kore', label: 'Kore', lang: ['th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'] },
-                        { id: 'Puck', label: 'Puck', lang: ['th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'] },
-                        { id: 'Charon', label: 'Charon', lang: ['th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'] },
-                        { id: 'Achird', label: 'Achird', lang: ['th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'] },
-                        { id: 'Sulafat', label: 'Sulafat', lang: ['th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'] },
-                        { id: 'Zephyr', label: 'Zephyr', lang: ['th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'] }
+                        { id: 'Kore', label: 'Kore', lang: ['auto', 'th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'] },
+                        { id: 'Puck', label: 'Puck', lang: ['auto', 'th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'] },
+                        { id: 'Charon', label: 'Charon', lang: ['auto', 'th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'] },
+                        { id: 'Achird', label: 'Achird', lang: ['auto', 'th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'] },
+                        { id: 'Sulafat', label: 'Sulafat', lang: ['auto', 'th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'] },
+                        { id: 'Zephyr', label: 'Zephyr', lang: ['auto', 'th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'] }
                     ];
                 } else {
-                    // Qwen3-TTS Voices from provided image
-                    voices = [
-                        { id: 'Vivian', label: 'Vivian', lang: ['zh-CN', 'en-US'], desc: 'Bright female' },
-                        { id: 'Serena', label: 'Serena', lang: ['zh-CN', 'en-US'], desc: 'Warm female' },
-                        { id: 'Uncle_Fu', label: 'Uncle Fu', lang: ['zh-CN'], desc: 'Seasoned male' },
-                        { id: 'Dylan', label: 'Dylan', lang: ['zh-CN'], desc: 'Youthful male' },
-                        { id: 'Eric', label: 'Eric', lang: ['zh-CN'], desc: 'Lively male' },
-                        { id: 'Ryan', label: 'Ryan', lang: ['en-US'], desc: 'Dynamic male' },
-                        { id: 'Aiden', label: 'Aiden', lang: ['en-US'], desc: 'Sunny male' },
-                        { id: 'Ono_Anna', label: 'Ono Anna', lang: ['ja-JP'], desc: 'Playful female' },
-                        { id: 'Sohee', label: 'Sohee', lang: ['ko-KR'], desc: 'Warm female' }
-                    ];
+                    voices = getQwenConfiguredSpeakerCatalog();
                 }
 
                 // Filter by language
-                const filtered = voices.filter(v => v.lang.includes(lang));
+                const filtered = lang === 'auto'
+                    ? voices.slice()
+                    : voices.filter(v => (v.lang || []).includes(lang) || (v.lang || []).includes('auto'));
+
+                if (engine === 'qwen' && qwenMode === 'voice_design') {
+                    if (voiceSelect) voiceSelect.value = 'qwen:voice_design';
+                    if (typeof window.updateQwenModeUi === 'function') window.updateQwenModeUi();
+                    if (typeof persistLaboonTtsSettings === 'function') persistLaboonTtsSettings(true);
+                    return;
+                }
                 
                 const renderTo = (container, inputId, currentVal) => {
                     if (!container) return;
-                    filtered.forEach((v, i) => {
+                    const source = filtered.length ? filtered : voices;
+                    source.forEach((v) => {
                         const btn = document.createElement('button');
                         btn.type = 'button';
                         btn.className = 'tts-chip' + (v.id === currentVal ? ' active' : '');
@@ -4945,19 +5152,26 @@
                                 input.value = engine === 'gemini' ? `gemini:${v.id}` : `qwen:${v.id}`;
                                 if (inputId === 'tts-voice-select') window.onTtsEngineChanged(input.value);
                             }
+                            if (typeof persistLaboonTtsSettings === 'function') persistLaboonTtsSettings(true);
                         };
                         container.appendChild(btn);
                     });
                 };
 
-                const currentSingle = voiceSelect.value.split(':')[1] || filtered[0]?.id;
+                const source = filtered.length ? filtered : voices;
+                const currentSingleRaw = voiceSelect.value.split(':')[1] || source[0]?.id;
+                const currentSingle = source.some(v => v.id === currentSingleRaw) ? currentSingleRaw : source[0]?.id;
+                if (voiceSelect && currentSingle) voiceSelect.value = `${engine === 'gemini' ? 'gemini' : 'qwen'}:${currentSingle}`;
                 renderTo(chipContainer, 'tts-voice-select', currentSingle);
                 
-                const currentS1 = document.getElementById('tts-voice-s1').value || filtered[0]?.id;
+                const currentS1Raw = document.getElementById('tts-voice-s1').value || source[0]?.id;
+                const currentS1 = source.some(v => v.id === currentS1Raw) ? currentS1Raw : source[0]?.id;
                 renderTo(s1Container, 'tts-voice-s1', currentS1);
                 
-                const currentS2 = document.getElementById('tts-voice-s2').value || filtered[1]?.id || filtered[0]?.id;
+                const currentS2Raw = document.getElementById('tts-voice-s2').value || source[1]?.id || source[0]?.id;
+                const currentS2 = source.some(v => v.id === currentS2Raw) ? currentS2Raw : (source[1]?.id || source[0]?.id);
                 renderTo(s2Container, 'tts-voice-s2', currentS2);
+                if (typeof window.updateQwenModeUi === 'function') window.updateQwenModeUi();
             };
 
             window._ttsMode = 'single';
@@ -5113,6 +5327,7 @@
                     setCardActive(btnD, true);
                 }
                 syncTtsVoices();
+                if (typeof window.updateQwenModeUi === 'function') window.updateQwenModeUi();
                 const presetSpeakersEl = document.getElementById('tts-polish-speakers');
                 if (presetSpeakersEl) presetSpeakersEl.value = mode === 'dialogue' ? 'dialogue' : 'single';
                 if (typeof window.updateTtsPolishPresetPreview === 'function') window.updateTtsPolishPresetPreview();
@@ -5121,6 +5336,9 @@
             };
 
             // Initialize on Load
+            if (typeof window.syncTtsVoices === 'function') window.syncTtsVoices();
+            if (typeof window.renderTtsRuntimeHint === 'function') window.renderTtsRuntimeHint();
+            if (typeof window.updateQwenModeUi === 'function') window.updateQwenModeUi();
             setTimeout(() => {
                 if (typeof selectTtsBackend === 'function') {
                     const savedSettings = getLaboonTtsSettings();
@@ -5245,6 +5463,7 @@
             window.onTtsEngineChanged = function(val) {
                 const qwenBox = document.getElementById('tts-qwen-custom-box');
                 if (qwenBox) qwenBox.style.display = val.startsWith('qwen:') ? 'block' : 'none';
+                if (typeof window.updateQwenModeUi === 'function') window.updateQwenModeUi();
             };
 
             window.generateGeminiTTS = async function(retryCount = 0) {
@@ -5284,6 +5503,10 @@
                 const selectedModel = typeof window.getSelectedTtsModel === 'function' ? window.getSelectedTtsModel() : 'qwen3-tts';
                 const selectedEncoding = (document.getElementById('tts-audio-encoding')?.value || document.getElementById('tts-export-format')?.value || 'wav').toLowerCase();
                 const selectedSampleRate = Number(document.getElementById('tts-sample-rate')?.value || 24000);
+                const selectedLanguageCode = isDialogue
+                    ? (languageElD?.value || 'th-TH')
+                    : (languageEl?.value || 'th-TH');
+                const selectedQwenMode = getQwenVoiceMode();
                 
                 // Actual engine remains mapped from backend during Sprint 1A.
                 const selectedEngine = selectedBackend === 'qwen' ? 'qwen' : 'gemini';
@@ -5327,6 +5550,7 @@
                 try {
                     let audioDataBase64;
                     let returnedAudioMime = '';
+                    let resolvedBackendModel = selectedModel;
                     if (selectedBackend === 'cloud_tts') {
                         const cloudPrompt = String(styleEl?.value || '').trim() || 'Speak naturally and clearly while preserving the meaning of the script.';
                         const cloudVoice = isDialogue
@@ -5420,8 +5644,32 @@
                         // Qwen3-TTS logic
                         const qwenUrl = localStorage.getItem('ai_qwen_url') || 'http://localhost:8880/v1';
                         const qwenKey = localStorage.getItem('ai_qwen_key') || '';
-                        const qwenModel = selectedModel || "qwen3-tts";
+                        const qwenVoiceDesignModel = (document.getElementById('tts-qwen-vd-target-model')?.value || localStorage.getItem('ai_qwen_voice_design_model') || '').trim();
+                        const qwenModel = (selectedQwenMode === 'voice_design' && qwenVoiceDesignModel) ? qwenVoiceDesignModel : (selectedModel || "qwen3-tts");
+                        resolvedBackendModel = qwenModel;
                         const qwenResponseFormat = selectedEncoding === 'linear16' ? 'wav' : selectedEncoding;
+                        const qwenVoicePrompt = (document.getElementById('tts-qwen-voice-prompt')?.value || '').trim();
+                        const qwenPreferredName = (document.getElementById('tts-qwen-voice-name')?.value || '').trim();
+                        const qwenLanguage = getQwenLanguageForPayload(selectedLanguageCode);
+                        const qwenPayload = {
+                            model: qwenModel,
+                            input: transcript,
+                            response_format: qwenResponseFormat,
+                            sample_rate: selectedSampleRate,
+                            language: qwenLanguage,
+                            language_code: selectedLanguageCode
+                        };
+
+                        if (selectedQwenMode === 'voice_design') {
+                            qwenPayload.mode = 'voice_design';
+                            qwenPayload.voice_mode = 'voice_design';
+                            qwenPayload.instruct = qwenVoicePrompt;
+                            qwenPayload.voice_prompt = qwenVoicePrompt;
+                            if (qwenPreferredName) qwenPayload.preferred_name = qwenPreferredName;
+                        } else {
+                            qwenPayload.voice = voice.toLowerCase();
+                            qwenPayload.speaker = voice;
+                        }
 
                         const response = await fetch(`${qwenUrl}/audio/speech`, {
                             method: 'POST',
@@ -5429,12 +5677,7 @@
                                 'Content-Type': 'application/json',
                                 'Authorization': `Bearer ${qwenKey}`
                             },
-                            body: JSON.stringify({
-                                model: qwenModel,
-                                input: transcript,
-                                voice: voice.toLowerCase(),
-                                response_format: qwenResponseFormat
-                            })
+                            body: JSON.stringify(qwenPayload)
                         });
 
                         if (!response.ok) {
@@ -5475,8 +5718,10 @@
                         renderTtsDebugMeta({
                             backend: selectedBackend,
                             backendLabel: LABOON_TTS_BACKEND_MODELS[selectedBackend]?.label,
-                            model: selectedModel,
-                            mode: isDialogue ? 'Dialogue Duo' : 'Single Narrator',
+                            model: resolvedBackendModel,
+                            mode: selectedBackend === 'qwen' && !isDialogue
+                                ? (selectedQwenMode === 'voice_design' ? 'Qwen Voice Design' : 'Qwen Preset Voice')
+                                : (isDialogue ? 'Dialogue Duo' : 'Single Narrator'),
                             requestedEncoding: selectedEncoding,
                             requestedSampleRate: document.getElementById('tts-sample-rate')?.value || '24000',
                             resolvedMimeType: audioPayload.mimeType,
@@ -5497,7 +5742,7 @@
                 } catch (e) {
                     clearInterval(progressInterval);
                     const mappedError = typeof window.mapTtsErrorToUserMessage === 'function'
-                        ? window.mapTtsErrorToUserMessage(e, { backend: selectedBackend, model: selectedModel, encoding: selectedEncoding })
+                        ? window.mapTtsErrorToUserMessage(e, { backend: selectedBackend, model: selectedModel, encoding: selectedEncoding, qwenMode: selectedQwenMode })
                         : { userMessage: e.message, statusMessage: e.message, debugMessage: e.message };
                     document.getElementById('tts-output-area').style.display = 'block';
                     showToast(mappedError.userMessage, 'error');
@@ -5506,7 +5751,9 @@
                         backend: selectedBackend,
                         backendLabel: LABOON_TTS_BACKEND_MODELS[selectedBackend]?.label,
                         model: selectedModel,
-                        mode: isDialogue ? 'Dialogue Duo' : 'Single Narrator',
+                        mode: selectedBackend === 'qwen' && !isDialogue
+                            ? (selectedQwenMode === 'voice_design' ? 'Qwen Voice Design' : 'Qwen Preset Voice')
+                            : (isDialogue ? 'Dialogue Duo' : 'Single Narrator'),
                         requestedEncoding: selectedEncoding,
                         requestedSampleRate: document.getElementById('tts-sample-rate')?.value || '24000',
                         resolvedMimeType: '-',
@@ -7238,6 +7485,19 @@
                                 <input type="password" id="local-qwen-key" placeholder="key-if-needed" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em;">
                             </div>
                         </div>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px;">
+                            <div>
+                                <label style="font-size:0.65em; display:block; margin-bottom:2px; color:#666;">Voice Design Model Override (Optional)</label>
+                                <input type="text" id="local-qwen-vd-model" placeholder="qwen3-tts-vd or custom runtime model id" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em;">
+                            </div>
+                            <div style="font-size:0.68em; color:#64748b; line-height:1.45; background:#f8fbff; border:1px solid #dbeafe; border-radius:8px; padding:8px;">
+                                Optional speaker catalog JSON lets Laboon render runtime-specific Qwen speakers dynamically. Leave empty to use the built-in Qwen speaker list.
+                            </div>
+                        </div>
+                        <div style="margin-top:8px;">
+                            <label style="font-size:0.65em; display:block; margin-bottom:2px; color:#666;">Speaker Catalog JSON (Optional)</label>
+                            <textarea id="local-qwen-speaker-catalog" rows="4" placeholder='[{"id":"Vivian","label":"Vivian","lang":["zh-CN","en-US"],"desc":"Bright female"}]' style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.78em; resize:vertical;"></textarea>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -7770,7 +8030,7 @@
                 const allFields = [
                     'local-gemini-key', 'local-openai-key', 'local-typhoon-key', 
                     'local-anthropic-key', 'local-llama-key', 
-                    'local-qwen-url', 'local-qwen-key',
+                    'local-qwen-url', 'local-qwen-key', 'local-qwen-vd-model', 'local-qwen-speaker-catalog',
                     'local-gcp-mode',
                     'local-gcp-project', 'local-gcp-location', 'local-gcp-token'
                 ];
@@ -7791,6 +8051,8 @@
                 document.getElementById('local-llama-key').value = localStorage.getItem('ai_llama_key') || '';
                 document.getElementById('local-qwen-url').value = localStorage.getItem('ai_qwen_url') || 'http://localhost:8880/v1';
                 document.getElementById('local-qwen-key').value = localStorage.getItem('ai_qwen_key') || '';
+                document.getElementById('local-qwen-vd-model').value = localStorage.getItem('ai_qwen_voice_design_model') || '';
+                document.getElementById('local-qwen-speaker-catalog').value = localStorage.getItem('ai_qwen_speaker_catalog') || '';
                 
                 document.getElementById('local-gcp-mode').value = window.GCP_MODE || "auto";
                 document.getElementById('local-gcp-project').value = window.GCP_PROJECT_ID || "intern-port-edfa7";
@@ -7907,6 +8169,10 @@
                 typhoon: localStorage.getItem('ai_typhoon_key') || '',
                 anthropic: localStorage.getItem('ai_anthropic_key') || '',
                 llama: localStorage.getItem('ai_llama_key') || '',
+                qwen_url: localStorage.getItem('ai_qwen_url') || '',
+                qwen_key: localStorage.getItem('ai_qwen_key') || '',
+                qwen_voice_design_model: localStorage.getItem('ai_qwen_voice_design_model') || '',
+                qwen_speaker_catalog: localStorage.getItem('ai_qwen_speaker_catalog') || '',
                 gcp_mode: localStorage.getItem('gcp_mode') || 'auto',
                 gcp_project_id: localStorage.getItem('gcp_project_id') || '',
                 gcp_location: localStorage.getItem('gcp_location') || '',
@@ -7948,6 +8214,10 @@
                     if (keys.typhoon) localStorage.setItem('ai_typhoon_key', keys.typhoon);
                     if (keys.anthropic) localStorage.setItem('ai_anthropic_key', keys.anthropic);
                     if (keys.llama) localStorage.setItem('ai_llama_key', keys.llama);
+                    if (keys.qwen_url) localStorage.setItem('ai_qwen_url', keys.qwen_url);
+                    if (keys.qwen_key) localStorage.setItem('ai_qwen_key', keys.qwen_key);
+                    if (keys.qwen_voice_design_model) localStorage.setItem('ai_qwen_voice_design_model', keys.qwen_voice_design_model);
+                    if (keys.qwen_speaker_catalog) localStorage.setItem('ai_qwen_speaker_catalog', keys.qwen_speaker_catalog);
                     
                     if (keys.gcp_mode) localStorage.setItem('gcp_mode', keys.gcp_mode);
                     if (keys.gcp_project_id) localStorage.setItem('gcp_project_id', keys.gcp_project_id);
@@ -7957,12 +8227,18 @@
                     loadAIKeys();
                     
                     setTimeout(() => {
-                        const fields = ['local-gemini-key', 'local-openai-key', 'local-typhoon-key', 'local-anthropic-key', 'local-llama-key'];
+                        const fields = ['local-gemini-key', 'local-openai-key', 'local-typhoon-key', 'local-anthropic-key', 'local-llama-key', 'local-qwen-url', 'local-qwen-key', 'local-qwen-vd-model', 'local-qwen-speaker-catalog'];
                         fields.forEach(id => {
                             const f = document.getElementById(id);
                             if (f) {
-                                f.value = localStorage.getItem(id.replace('local-', 'ai_').replace('-key', '_key')) || '';
-                                f.type = 'text';
+                                const storageKey = {
+                                    'local-qwen-url': 'ai_qwen_url',
+                                    'local-qwen-key': 'ai_qwen_key',
+                                    'local-qwen-vd-model': 'ai_qwen_voice_design_model',
+                                    'local-qwen-speaker-catalog': 'ai_qwen_speaker_catalog'
+                                }[id] || id.replace('local-', 'ai_').replace('-key', '_key');
+                                f.value = localStorage.getItem(storageKey) || '';
+                                if (f.tagName === 'INPUT') f.type = 'text';
                             }
                         });
                     }, 100);
@@ -7990,6 +8266,8 @@
             
             localStorage.setItem('ai_qwen_url', document.getElementById('local-qwen-url').value.trim());
             localStorage.setItem('ai_qwen_key', document.getElementById('local-qwen-key').value.trim());
+            localStorage.setItem('ai_qwen_voice_design_model', document.getElementById('local-qwen-vd-model').value.trim());
+            localStorage.setItem('ai_qwen_speaker_catalog', document.getElementById('local-qwen-speaker-catalog').value.trim());
             
             localStorage.setItem('gcp_mode', document.getElementById('local-gcp-mode').value);
             localStorage.setItem('gcp_project_id', document.getElementById('local-gcp-project').value.trim());
@@ -8000,12 +8278,18 @@
             showToast("✅ Keys saved locally!");
             
             setTimeout(() => {
-                const fields = ['local-gemini-key', 'local-openai-key', 'local-typhoon-key', 'local-anthropic-key', 'local-llama-key'];
+                const fields = ['local-gemini-key', 'local-openai-key', 'local-typhoon-key', 'local-anthropic-key', 'local-llama-key', 'local-qwen-url', 'local-qwen-key', 'local-qwen-vd-model', 'local-qwen-speaker-catalog'];
                 fields.forEach(id => {
                     const f = document.getElementById(id);
                     if (f) {
-                        f.value = localStorage.getItem(id.replace('local-', 'ai_').replace('-key', '_key')) || '';
-                        f.type = 'text';
+                        const storageKey = {
+                            'local-qwen-url': 'ai_qwen_url',
+                            'local-qwen-key': 'ai_qwen_key',
+                            'local-qwen-vd-model': 'ai_qwen_voice_design_model',
+                            'local-qwen-speaker-catalog': 'ai_qwen_speaker_catalog'
+                        }[id] || id.replace('local-', 'ai_').replace('-key', '_key');
+                        f.value = localStorage.getItem(storageKey) || '';
+                        if (f.tagName === 'INPUT') f.type = 'text';
                     }
                 });
             }, 50);
