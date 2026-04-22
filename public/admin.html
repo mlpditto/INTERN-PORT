@@ -17205,7 +17205,7 @@ Do not include any explanation other than the feedback body.`;
                             }
 
                             if (certRequested) {
-                                return `<button onclick="openCertModal('${u.id}')" style="${baseStyle} background:#fff7ed; color:#c2410c; border:1px solid #fdba74; cursor:pointer;" title="Open certificate issuer"><i class="fa-solid fa-clock"></i> Request Pending</button>`;
+                                return `<button onclick="openCertModal('${u.id}')" style="display:inline-flex; align-items:center; justify-content:center; margin-left:10px; width:28px; height:28px; background:linear-gradient(135deg, #f59e0b, #d97706); border-radius:50%; border:none; box-shadow:0 0 12px rgba(245,158,11,0.45); cursor:pointer;" title="Certificate request pending - open issuer"><i class="fa-solid fa-award" style="color:white; font-size:0.9em;"></i></button>`;
                             }
 
                             if (canRequest) {
@@ -17223,9 +17223,6 @@ Do not include any explanation other than the feedback body.`;
                     <div style="font-size:1.4em; font-weight:900; color:#1e293b; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                         ${u.displayName} 
                         <span style="font-size:11px; background:linear-gradient(135deg, #4361ee, #7209b7); color:white; padding:4px 12px; border-radius:30px; letter-spacing:1px; font-weight:900;">${crewRank}</span>
-                        ${u.certRequested ? `
-                            <div onclick="openCertModal('${u.id}')" title="Certificate Requested - Click to Issue" style="cursor:pointer; display:flex; align-items:center; justify-content:center; width:34px; height:34px; background:linear-gradient(135deg, #f59e0b, #d97706); border-radius:50%; box-shadow:0 0 15px rgba(245,158,11,0.5); animation: pulse-gold 2s infinite; font-size:1.1em;">🎓</div>
-                        ` : ''}
                     </div>
                     <div style="font-size:0.85em; color:#64748b; margin-top:4px;">
                         <i class="fa-regular fa-calendar" style="margin-right:4px;"></i> ${u.startDate || '?'} — ${u.endDate || '?'} 
@@ -21779,6 +21776,43 @@ ${stories.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
                             const fallbackModel = document.getElementById('ai-analyzer-model-val');
                             return (modelToggle ? modelToggle.value : null) || (fallbackModel ? fallbackModel.value : 'gemini-1.5-flash');
                         };
+                        function normalizeAiCompareText(value) {
+                            return String(value || "").replace(/\s+/g, ' ').trim();
+                        }
+
+                        function normalizeAiCompareOptions(options) {
+                            return (Array.isArray(options) ? options : []).map(opt => normalizeAiCompareText(opt));
+                        }
+
+                        function normalizeAiCompareCorrect(correct) {
+                            return (Array.isArray(correct) ? correct : [])
+                                .map(v => Number(v))
+                                .filter(v => Number.isFinite(v))
+                                .sort((a, b) => a - b);
+                        }
+
+                        window.getAiImprovementDiffState = function (currentQ, improvedQ) {
+                            const diffs = [];
+                            const currentText = normalizeAiCompareText(currentQ && currentQ.q);
+                            const improvedText = normalizeAiCompareText(improvedQ && improvedQ.q);
+                            const currentOptions = normalizeAiCompareOptions(currentQ && currentQ.options);
+                            const improvedOptions = normalizeAiCompareOptions(improvedQ && improvedQ.options);
+                            const currentCorrect = normalizeAiCompareCorrect(currentQ && currentQ.correct);
+                            const improvedCorrect = normalizeAiCompareCorrect(improvedQ && improvedQ.correct);
+                            const currentType = normalizeAiCompareText(currentQ && currentQ.type);
+                            const improvedType = normalizeAiCompareText(improvedQ && improvedQ.type);
+                            const currentTimer = Number(currentQ && currentQ.timer) || 60;
+                            const improvedTimer = Number(improvedQ && improvedQ.timer) || 60;
+
+                            if (currentText !== improvedText) diffs.push('Text Reworded');
+                            if (JSON.stringify(currentOptions) !== JSON.stringify(improvedOptions)) diffs.push('Options Balanced');
+                            if (JSON.stringify(currentCorrect) !== JSON.stringify(improvedCorrect)) diffs.push('Logical Fix');
+                            if (currentType !== improvedType) diffs.push('Type Changed');
+                            if (currentTimer !== improvedTimer) diffs.push('Timer Adjusted');
+
+                            return { diffs, hasMeaningfulDiff: diffs.length > 0 };
+                        };
+
                         window.previewAiFix = function (index, arrIdx) {
                             try {
                                 const item = window._aiAnalysisItems[arrIdx];
@@ -21815,18 +21849,23 @@ ${stories.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
                     `;
                                 };
 
-                                // Detect Diffs
-                                const diffs = [];
-                                if ((currentQ.q || "").trim() !== (improvedQ.q || "").trim()) diffs.push('✨ Text Reworded');
-                                if (JSON.stringify(currentQ.options) !== JSON.stringify(improvedQ.options)) diffs.push('🔢 Options Balanced');
-                                if (JSON.stringify(currentQ.correct) !== JSON.stringify(improvedQ.correct)) diffs.push('🎯 Logical Fix');
-                                if (currentQ.type !== improvedQ.type) diffs.push('🔀 Type Changed');
-
+                                const diffState = window.getAiImprovementDiffState(currentQ, improvedQ);
+                                const diffs = diffState.diffs;
+                                const canApplyImprovement = diffState.hasMeaningfulDiff;
                                 const diffHtml = diffs.map(d => `<span style="background:rgba(99,102,241,0.1); color:#4338ca; padding:4px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid rgba(99,102,241,0.2);">${d}</span>`).join('');
+                                const statusHtml = canApplyImprovement
+                                    ? diffHtml
+                                    : '<span style="background:rgba(239,68,68,0.10); color:#b91c1c; padding:6px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid rgba(239,68,68,0.22);">No meaningful difference detected</span><span style="color:#64748b; font-size:0.75em;">Please regenerate before applying this fix.</span>';
                                 const improvedJson = JSON.stringify(improvedQ || {})
                                     .replace(/\\/g, '\\\\')
                                     .replace(/'/g, "\\'")
                                     .replace(/"/g, '&quot;');
+                                const addButtonHtml = canApplyImprovement
+                                    ? `<button class="btn" onclick="addSingleAiAsNewQuestion(${index}, '${improvedJson}'); document.getElementById('ai-compare-overlay').remove();" style="padding:10px 22px; border-radius:12px; font-weight:700; background:#0ea5e9; color:white; border:none; box-shadow:0 4px 15px rgba(14,165,233,0.28);">➕ Add as New Question</button>`
+                                    : `<button class="btn" disabled title="Regenerate until the improved version is meaningfully different." style="padding:10px 22px; border-radius:12px; font-weight:700; background:#e2e8f0; color:#64748b; border:none; cursor:not-allowed; box-shadow:none; opacity:0.95;">➕ Add as New Question</button>`;
+                                const applyButtonHtml = canApplyImprovement
+                                    ? `<button class="btn btn-primary" onclick="applySingleAiFix(${index}, '${improvedJson}', ${arrIdx}); document.getElementById('ai-compare-overlay').remove();" style="padding:10px 30px; border-radius:12px; font-weight:700; background:#22c55e; border:none; box-shadow:0 4px 15px rgba(34,197,94,0.3);">✅ Apply This Fix</button>`
+                                    : `<button class="btn btn-primary" disabled title="Regenerate until the improved version is meaningfully different." style="padding:10px 30px; border-radius:12px; font-weight:700; background:#cbd5e1; color:#64748b; border:none; cursor:not-allowed; box-shadow:none; opacity:0.95;">✅ Apply This Fix</button>`;
 
                                 const overlay = document.createElement('div');
                                 overlay.id = "ai-compare-overlay";
@@ -21837,7 +21876,7 @@ ${stories.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
                         <div style="padding:20px 30px; background:white; border-bottom:1.5px solid #edf2f7; display:flex; justify-content:space-between; align-items:center;">
                             <div>
                                 <h3 style="margin:0; font-size:1.3em; color:#1e293b;">🛠️ Quality Improvement Comparison</h3>
-                                <div style="display:flex; gap:8px; margin-top:8px;">${diffHtml || '<span style="color:#94a3b8; font-size:0.75em;">Verified consistent content</span>'}</div>
+                                <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">${statusHtml}</div>
                             </div>
                             <button onclick="document.getElementById('ai-compare-overlay').remove()" style="width:40px; height:40px; border-radius:50%; border:none; background:#f1f5f9; color:#64748b; cursor:pointer; font-size:1.3em; display:flex; align-items:center; justify-content:center; transition:0.2s;" onmouseover="this.style.background='#e2e8f0'; this.style.color='#0f172a'">✕</button>
                         </div>
@@ -21851,8 +21890,8 @@ ${stories.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
                         <div style="padding:20px 30px; background:#fff; border-top:1.5px solid #edf2f7; display:flex; justify-content:flex-end; gap:12px;">
                             <button class="btn btn-secondary" onclick="document.getElementById('ai-compare-overlay').remove()" style="padding:10px 25px; border-radius:12px; font-weight:700;">Keep Original</button>
                             <button class="btn" style="padding:10px 22px; border-radius:12px; font-weight:700; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; display:flex; align-items:center; gap:8px;" onclick="regenerateSingleAiSuggestion(${index}, ${arrIdx}, true, this)">🔄 Regenerate</button>
-                            <button class="btn" onclick="addSingleAiAsNewQuestion(${index}, '${improvedJson}'); document.getElementById('ai-compare-overlay').remove();" style="padding:10px 22px; border-radius:12px; font-weight:700; background:#0ea5e9; color:white; border:none; box-shadow:0 4px 15px rgba(14,165,233,0.28);">➕ Add as New Question</button>
-                            <button class="btn btn-primary" onclick="applySingleAiFix(${index}, '${improvedJson}', ${arrIdx}); document.getElementById('ai-compare-overlay').remove();" style="padding:10px 30px; border-radius:12px; font-weight:700; background:#22c55e; border:none; box-shadow:0 4px 15px rgba(34,197,94,0.3);">✅ Apply This Fix</button>
+                            ${addButtonHtml}
+                            ${applyButtonHtml}
                         </div>
                     </div>
                 `;
@@ -21897,7 +21936,30 @@ ${stories.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
                                 throw new Error('Question index out of sync. Please refresh and try again.');
                             }
 
-                            return { improvedQ, allQs };
+                            const currentQ = allQs[index] || {};
+                            const baseType = currentQ.type || 'choice';
+                            const improvedType = (typeof improvedQ.type === 'string' && improvedQ.type.trim()) ? improvedQ.type.trim() : baseType;
+                            const improvedOptions = Array.isArray(improvedQ.options)
+                                ? improvedQ.options.map(opt => String(opt == null ? '' : opt))
+                                : (Array.isArray(currentQ.options) ? currentQ.options.map(opt => String(opt == null ? '' : opt)) : []);
+                            const improvedCorrectRaw = Array.isArray(improvedQ.correct)
+                                ? improvedQ.correct
+                                : (improvedQ.correct !== undefined && improvedQ.correct !== null ? [improvedQ.correct] : currentQ.correct);
+                            const improvedCorrect = (Array.isArray(improvedCorrectRaw) ? improvedCorrectRaw : [])
+                                .map(v => Number(v))
+                                .filter(v => Number.isFinite(v) && v >= 0);
+                            const normalizedImprovedQ = {
+                                ...currentQ,
+                                ...improvedQ,
+                                type: improvedType,
+                                options: improvedType === 'choice' ? improvedOptions : (Array.isArray(improvedQ.options) ? improvedOptions : []),
+                                correct: improvedType === 'choice'
+                                    ? (improvedCorrect.length ? improvedCorrect : normalizeAiCompareCorrect(currentQ.correct))
+                                    : [],
+                                timer: Number(improvedQ.timer) || Number(currentQ.timer) || 60
+                            };
+
+                            return { improvedQ: normalizedImprovedQ, allQs };
                         }
 
                         function pickAiInsertMode() {
@@ -21925,6 +21987,10 @@ ${stories.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
                         window.applySingleAiFix = function (index, improvedArg, arrIdx) {
                             try {
                                 const { improvedQ, allQs } = getImprovedQuestionPayload(index, improvedArg);
+                                const diffState = window.getAiImprovementDiffState(allQs[index], improvedQ);
+                                if (!diffState.hasMeaningfulDiff) {
+                                    return alert("This improved version is still too similar to the original. Please regenerate a different fix first.");
+                                }
                                 if (!confirm(`Apply improved version to Question ${index + 1}?`)) return;
 
                                 allQs[index] = improvedQ;
@@ -21961,6 +22027,10 @@ ${stories.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
                         window.addSingleAiAsNewQuestion = function (index, improvedArg) {
                             try {
                                 const { improvedQ, allQs } = getImprovedQuestionPayload(index, improvedArg);
+                                const diffState = window.getAiImprovementDiffState(allQs[index], improvedQ);
+                                if (!diffState.hasMeaningfulDiff) {
+                                    return alert("This improved version is still too similar to the original. Please regenerate a different fix first.");
+                                }
                                 const mode = pickAiInsertMode();
                                 if (!mode) return;
 
@@ -22132,6 +22202,10 @@ ${stories.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
                                 const { text: resultJson } = await callUniversalAI(selectedModel, prompt, true);
                                 const cleanJson = resultJson.replace(/```json/g, "").replace(/```/g, "").trim();
                                 const newSuggestion = JSON.parse(cleanJson);
+                                const diffState = window.getAiImprovementDiffState(originalQ, newSuggestion);
+                                if (!diffState.hasMeaningfulDiff) {
+                                    throw new Error("AI returned an almost identical version. Please regenerate again.");
+                                }
 
                                 if (newSuggestion) {
                                     window._aiAnalysisItems[arrIdx].improvedQuestion = newSuggestion;
