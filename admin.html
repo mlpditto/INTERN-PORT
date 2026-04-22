@@ -7737,41 +7737,39 @@
                 }
             }
 
-            // ThaiLLM is proxy-first. If proxy fails, fall back to an available local provider.
-            if (modelName.toLowerCase().includes('thaillm') || modelName.toLowerCase().includes('openthaigpt')) {
-                if (window.TYPHOON_API_KEY) {
-                    console.warn("[AI Fallback] ThaiLLM proxy unavailable. Falling back to Typhoon local API.");
-                    modelName = 'typhoon-v2.5-30b-a3b-instruct';
-                } else if (quickApiKey || window.GEMINI_API_KEY) {
-                    console.warn("[AI Fallback] ThaiLLM proxy unavailable. Falling back to Gemini Flash local SDK.");
-                    modelName = 'gemini-1.5-flash-latest';
-                } else {
-                    throw new Error("ThaiLLM is currently unavailable because AI Proxy failed and no local fallback key is configured.");
+            try {
+                // ThaiLLM is proxy-first. If proxy fails, fall back to an available local provider.
+                if (modelName.toLowerCase().includes('thaillm') || modelName.toLowerCase().includes('openthaigpt')) {
+                    if (window.TYPHOON_API_KEY) {
+                        console.warn("[AI Fallback] ThaiLLM proxy unavailable. Falling back to Typhoon local API.");
+                        modelName = 'typhoon-v2.5-30b-a3b-instruct';
+                    } else if (quickApiKey || window.GEMINI_API_KEY) {
+                        console.warn("[AI Fallback] ThaiLLM proxy unavailable. Falling back to Gemini Flash local SDK.");
+                        modelName = 'gemini-1.5-flash-latest';
+                    } else {
+                        throw new Error("ThaiLLM is currently unavailable because AI Proxy failed and no local fallback key is configured.");
+                    }
                 }
-            }
-            // Gemini Direct Fallback ([Version: V91.01] Restoration)
-            if (modelName.toLowerCase().includes('gemini') || modelName === 'multimodal') {
-                const geminiKey = quickApiKey || window.GEMINI_API_KEY;
-                if (!geminiKey || geminiKey.includes('__')) throw new Error("Gemini API Key not found for local fallback.");
-                
-                const genAI = new GoogleGenerativeAI(geminiKey);
-                const mName = modelName === 'multimodal' ? 'gemini-1.5-flash-latest' : modelName;
-                const model = genAI.getGenerativeModel({ model: mName });
-
-                let result;
-                if (visionData && visionData.base64) {
-                    const parts = [
-                        { text: prompt },
-                        { inlineData: { data: visionData.base64, mimeType: visionData.mimeType || "image/jpeg" } }
-                    ];
-                    result = await model.generateContent(parts);
-                } else {
-                    result = await model.generateContent(prompt);
-                }
-                
-                const response = await result.response;
-                return { text: response.text(), tokens: 0, model: mName };
-            } else if (modelName.includes('llama') && window.TOGETHER_API_KEY) {
+                // Gemini Direct Fallback ([Version: V91.01] Restoration)
+                if (modelName.toLowerCase().includes('gemini') || modelName === 'multimodal') {
+                    const geminiKey = quickApiKey || window.GEMINI_API_KEY;
+                    if (!geminiKey || geminiKey.includes('__')) throw new Error("Gemini API Key not found for local fallback.");
+                    const genAI = new GoogleGenerativeAI(geminiKey);
+                    const mName = modelName === 'multimodal' ? 'gemini-1.5-flash-latest' : modelName;
+                    const model = genAI.getGenerativeModel({ model: mName });
+                    let result;
+                    if (visionData && visionData.base64) {
+                        const parts = [
+                            { text: prompt },
+                            { inlineData: { data: visionData.base64, mimeType: visionData.mimeType || "image/jpeg" } }
+                        ];
+                        result = await model.generateContent(parts);
+                    } else {
+                        result = await model.generateContent(prompt);
+                    }
+                    const response = await result.response;
+                    return { text: response.text(), tokens: 0, model: mName };
+                } else if (modelName.includes('llama') && window.TOGETHER_API_KEY) {
                     const resp = await fetch('https://api.together.xyz/v1/chat/completions', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.TOGETHER_API_KEY}` },
@@ -7790,9 +7788,9 @@
                 } else if ((modelName.includes('glm-5.1') || modelName.includes('ollama')) && (window.OLLAMA_API_KEY || window.OLLAMA_ENDPOINT)) {
                     const resp = await fetch(`${window.OLLAMA_ENDPOINT}/chat/completions`, {
                         method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json', 
-                            'Authorization': window.OLLAMA_API_KEY ? `Bearer ${window.OLLAMA_API_KEY}` : 'Bearer ollama' 
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': window.OLLAMA_API_KEY ? `Bearer ${window.OLLAMA_API_KEY}` : 'Bearer ollama'
                         },
                         body: JSON.stringify({ model: modelName, messages: [{role: 'user', content: prompt}], temperature: 0.6 })
                     });
@@ -7804,16 +7802,16 @@
                     if (!apiKey || apiKey.startsWith("__")) throw new Error("Anthropic API Key not found for local fallback.");
                     const resp = await fetch('https://api.anthropic.com/v1/messages', {
                         method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json', 
+                        headers: {
+                            'Content-Type': 'application/json',
                             'x-api-key': apiKey,
                             'anthropic-version': '2023-06-01'
                         },
-                        body: JSON.stringify({ 
-                            model: modelName.replace('claude-4', 'claude-3-5'), 
-                            messages: [{role: 'user', content: prompt}], 
+                        body: JSON.stringify({
+                            model: modelName.replace('claude-4', 'claude-3-5'),
+                            messages: [{role: 'user', content: prompt}],
                             max_tokens: 4096,
-                            temperature: 0.7 
+                            temperature: 0.7
                         })
                     });
                     const d = await resp.json();
