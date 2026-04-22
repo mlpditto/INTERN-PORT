@@ -31,12 +31,12 @@
             const isNested = (id === 'quizParticipantsModal' || id === 'reflectiveReviewModal' || id === 'quizReviewModal' || id === 'exportQuizPdfModal');
 
             // Hide other modals unless they are safe parents
-            document.querySelectorAll('.modal').forEach(modal => {
+            document.querySelectorAll('.modal').forEach(function(modal) {
                 if (modal.id !== id) {
                     const isSafeParent = (modal.id === 'quizManageModal' || modal.id === 'archiveModal' || modal.id === 'assignmentsManageModal');
                     if (!isNested || !isSafeParent) {
                         modal.classList.remove('force-show');
-                        modal.style.display = 'none';
+                        modal.style.setProperty('display', 'none', 'important');
                         modal.setAttribute('style', 'display:none;');
                     }
                 }
@@ -4563,8 +4563,9 @@
             }
 
             function setSelectValueIfExists(el, value) {
-                if (!el || value == null) return;
-                if ([...el.options].some(opt => opt.value === value)) {
+                if (!el || value == null || !el.options) return;
+                const options = Array.from(el.options);
+                if (options.some(opt => opt.value === value)) {
                     el.value = value;
                 }
             }
@@ -7749,15 +7750,25 @@
                             if (window.loadAIKeys) window.loadAIKeys();
 
                             let proxyProvider = "";
-                            if (modelName.toLowerCase().indexOf('claude') !== -1) proxyProvider = "anthropic";
-                                else if (modelName === 'imagen' || modelName === 'imagen-nano') proxyProvider = "imagen";
-                                else if (modelName === 'dalle') proxyProvider = "openai";
-                                else if (modelName.includes('gemini') || modelName === 'multimodal') proxyProvider = "gemini";
-                                else if (modelName.toLowerCase().includes('thaillm') || modelName.toLowerCase().includes('openthaigpt')) proxyProvider = "thaillm";
-                                else if (modelName.includes('gpt')) proxyProvider = "openai";
-                                else if (modelName.includes('typhoon')) proxyProvider = "typhoon";
-                                else if (modelName.includes('llama')) proxyProvider = "together";
-                                else if (modelName.includes('glm-5.1') || modelName.includes('ollama')) proxyProvider = "ollama";
+                            if (modelName.toLowerCase().indexOf('claude') !== -1) {
+                                proxyProvider = "anthropic";
+                            } else if (modelName === 'imagen' || modelName === 'imagen-nano') {
+                                proxyProvider = "imagen";
+                            } else if (modelName === 'dalle') {
+                                proxyProvider = "openai";
+                            } else if (modelName.includes('gemini') || modelName === 'multimodal') {
+                                proxyProvider = "gemini";
+                            } else if (modelName.toLowerCase().includes('thaillm') || modelName.toLowerCase().includes('openthaigpt')) {
+                                proxyProvider = "thaillm";
+                            } else if (modelName.includes('gpt')) {
+                                proxyProvider = "openai";
+                            } else if (modelName.includes('typhoon')) {
+                                proxyProvider = "typhoon";
+                            } else if (modelName.includes('llama')) {
+                                proxyProvider = "together";
+                            } else if (modelName.includes('glm-5.1') || modelName.includes('ollama')) {
+                                proxyProvider = "ollama";
+                            }
 
                             try {
                                 if (proxyProvider !== "") {
@@ -7910,7 +7921,7 @@
 
 
                         window.AI_CORE_READY = true;
-                        console.log("🤖 [AI Engine] Global Core V90.20 Ready");
+                        console.log("🤖 [AI Engine] Global Core V90.99.3.9.1 Ready");
 
                         // --- AI Diagnostic Tool (V88.55 Handle 403) ---
                         window.checkGeminiModels = async function () {
@@ -15610,22 +15621,22 @@ Do not include any explanation other than the feedback body.`;
                             // 🔥 Load Group Settings (V69.0)
                             db.collection("quizzes").doc("--group-settings--").onSnapshot(doc => {
                                 if (doc.exists) groupSettings = doc.data();
-                            });
+                            }, err => console.error("🔥 [Firebase] Group Settings listener failed:", err));
 
                             db.collection("quizzes").doc(QUIZ_TIMING_CONFIG_DOC_ID).onSnapshot(doc => {
                                 if (doc.exists) applyTimingRiskConfig(doc.data());
                                 else applyTimingRiskConfig({ activeProfile: 'exam', profiles: getDefaultTimingProfiles() });
-                            });
+                            }, err => console.error("🔥 [Firebase] Quiz Timing listener failed:", err));
 
                             db.collection("works").orderBy("timestamp", "desc").limit(100).onSnapshot(s => {
                                 worksData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                                 renderTable('works');
                                 drawKanban();
-                            });
+                            }, err => console.error("🔥 [Firebase] Works listener failed:", err));
                             db.collection("cases").orderBy("timestamp", "desc").limit(200).onSnapshot(s => {
                                 casesData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                                 renderAlabastaCases();
-                            });
+                            }, err => console.error("🔥 [Firebase] Cases listener failed:", err));
                             db.collection("users").orderBy("score", "desc").onSnapshot(s => {
                                 usersData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                                 renderUserGroupTabs();
@@ -15634,57 +15645,49 @@ Do not include any explanation other than the feedback body.`;
                                 renderLeaderboard();
                                 updateAssigneeList();
                                 renderCertTable();
-                                drawKanban(); // Update board cards (e.g. if filtering by group)
+                                drawKanban(); 
                                 renderAlabastaCases();
-                            });
-                            db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban);
+                            }, err => console.error("🔥 [Firebase] Users listener failed:", err));
+                            db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban, err => console.error("🔥 [Firebase] Side Quests listener failed:", err));
                             db.collection("quests").onSnapshot(s => {
                                 questsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                                 loadQuestHistory();
                                 loadReflectiveLogsAdmin();
-                                filterBoard(); // Update Kanban too
-                            });
+                                filterBoard(); 
+                            }, err => console.error("🔥 [Firebase] Quests listener failed:", err));
                             db.collection("knowledge_base").orderBy("createdAt", "desc").onSnapshot(s => {
                                 knowledgeBaseCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                                 renderKnowledgeBase();
-                            });
+                            }, err => console.error("🔥 [Firebase] Knowledge Base listener failed:", err));
                             db.collection("quizzes").onSnapshot(s => {
                                 quizzesData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                                 console.log("🔍 Firebase quizzes updated, count:", quizzesData.length);
-                                console.log("🔍 Firebase raw docs:", s.docs);
-                                console.log("🔍 Firebase quizzesData sample:", quizzesData.slice(0, 2));
                                 renderQuizzes();
-                            });
+                            }, err => console.error("🔥 [Firebase] Quizzes listener failed:", err));
                             // 🔥 Refined V77.6: Listen only for actionable items (Pending Review or New Request)
                             db.collection("quiz_attempts").where("status", "in", ["pending", "requesting"]).onSnapshot(s => {
                                 renderPendingQuizzes(s.docs.map(d => ({ id: d.id, ...d.data() })));
-                            });
+                            }, err => console.error("🔥 [Firebase] Pending Quiz Attempts listener failed:", err));
                             // 🔥 V77.16: Load ALL quiz attempts for counting and full history (Authorized for Admin)
                             db.collection("quiz_attempts").orderBy("timestamp", "desc").onSnapshot(s => {
                                 const allAttempts = s.docs.map(d => ({ id: d.id, ...d.data(), isQuiz: true, collection: 'quiz_attempts' }));
-
-                                // 1. Update Approved Data for Works Table
                                 quizApprovedData = allAttempts.filter(d => d.status === 'approved');
-
-                                // 2. Count Participants per Quiz
                                 const counts = {};
                                 allAttempts.forEach(att => {
                                     const qId = att.quizId;
                                     if (qId) counts[qId] = (counts[qId] || 0) + 1;
                                 });
                                 window.quizCounts = counts;
-                                quizAttemptsAllCache = allAttempts; // 🔥 V88.50: Sync with Global Cache for immediate Participant Modal loading
-
-                                // 3. Refresh UI
+                                quizAttemptsAllCache = allAttempts; 
                                 renderQuizzes();
                                 if (!hideCompletedWorks) renderTable('works');
-                            });
+                            }, err => console.error("🔥 [Firebase] All Quiz Attempts listener failed:", err));
                             // 🔥 Feature: Load Poll Responses for Works Table
                             db.collection("poll_responses").orderBy("timestamp", "desc").limit(50).onSnapshot(s => {
                                 const polls = s.docs.map(d => ({ id: d.id, ...d.data(), isQuiz: true, isPollResponse: true, status: 'approved', collection: 'poll_responses' }));
                                 window.pollData = polls;
                                 if (!hideCompletedWorks) renderTable('works');
-                            });
+                            }, err => console.error("🔥 [Firebase] Poll Responses listener failed:", err));
                             db.collection("quest_submissions").onSnapshot(s => {
                                 questsSubCache = {};
                                 questsSubList = s.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -20033,7 +20036,7 @@ Do not include any explanation other than the feedback body.`;
                         }
 
                         // ===================================================================
-                        // 🪨 PONEGLYPH — V90.71 (Hardened)
+                        // 🪨 PONEGLYPH — V90.99.3.9.1 (Hardened)
                         // ===================================================================
                         let poneglyphNotesCache = [];
                         let poneglyphActiveNoteId = null;
@@ -22177,7 +22180,7 @@ ${stories.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
 
                         window.AI_CORE_READY = true;
                         if (window.loadAIKeys) window.loadAIKeys();
-                        console.log('%c V90.71 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+                        console.log('%c V90.99.3.9.1 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
 
                         // --- V90.36: Quiz Feedback Panel ---
                         let _qfpCurrentId = null;
