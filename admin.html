@@ -3470,9 +3470,13 @@
                                                 </button>
                                             </div>
                                             <input type="hidden" id="tts-backend-select" value="qwen">
-                                            <div style="margin-top:12px;">
+                                            <div id="tts-model-select-wrap" style="margin-top:12px;">
                                                 <label class="laboon-field-label" for="tts-model-select" style="margin-bottom:6px;">Backend Model</label>
                                                 <select id="tts-model-select" style="width:100%; font-size:0.88em; padding:10px 12px; border-radius:12px; border:1.5px solid #c7d2fe; background:white; color:#1e293b;"></select>
+                                            </div>
+                                            <div id="tts-model-single-view" style="display:none; margin-top:12px;">
+                                                <div class="laboon-field-label" style="margin-bottom:6px;">Backend Model</div>
+                                                <div id="tts-model-single-chip" style="display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; border:1px solid #c7d2fe; background:#eef2ff; color:#4338ca; font-size:0.83em; font-weight:800;"></div>
                                             </div>
                                             <div id="tts-model-help" style="margin-top:8px; font-size:0.75em; color:#64748b; line-height:1.45;"></div>
                                             <div id="tts-cost-strip" style="display:none; margin-top:10px; flex-wrap:wrap; gap:8px; align-items:center;"></div>
@@ -3577,17 +3581,10 @@
                                             <div class="tts-step-badge">3. Produce</div>
 
                                             <div class="laboon-section-shell" style="padding:15px; margin-bottom:15px;">
-                                                <div style="margin-bottom:15px;">
-                                                    <label class="laboon-field-label" style="margin:0;">Output Format</label>
-                                                    <div class="tts-chip-group" style="margin-top:5px;">
-                                                        <button type="button" class="tts-chip active" id="tts-fmt-wav" onclick="selectTtsFormat('wav')">WAV</button>
-                                                        <button type="button" class="tts-chip" id="tts-fmt-mp3" onclick="selectTtsFormat('mp3')">MP3</button>
-                                                    </div>
-                                                    <input type="hidden" id="tts-export-format" value="wav">
-                                                </div>
+                                                <input type="hidden" id="tts-export-format" value="wav">
 
                                                 <div class="laboon-section-shell" style="padding:12px; margin-bottom:14px; border:1.5px solid #dbeafe; background:#f8fbff;">
-                                                    <div class="laboon-section-title" style="margin-bottom:10px; font-size:0.82em; color:#1d4ed8;">Advanced Audio Settings</div>
+                                                    <div class="laboon-section-title" style="margin-bottom:10px; font-size:0.82em; color:#1d4ed8;">Audio Settings</div>
                                                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                                                         <div>
                                                             <label class="laboon-field-label" for="tts-audio-encoding" style="margin-bottom:6px;">Audio Encoding</label>
@@ -4380,6 +4377,11 @@
                     `<span style="display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; font-size:0.73em; font-weight:700; background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe;"><i class="fa-solid fa-layer-group"></i> ${backendLabel}</span>`
                 ].join('');
 
+                if (backendCost.tier === 'free_first') {
+                    warningEl.style.display = 'none';
+                    warningEl.innerHTML = '';
+                    return;
+                }
                 warningEl.style.cssText = `margin-top:8px; font-size:0.75em; line-height:1.45; padding:10px 12px; border-radius:12px; ${backendTone.panel}`;
                 warningEl.innerHTML = `<div><b>${backendBadge}</b> ${backendCost.detail || ''}</div><div style="margin-top:4px;">${selectedMeta.costHint || selectedMeta.description || ''}</div><div style="margin-top:4px;">${backendCost.warning || ''}</div>`;
             };
@@ -4389,6 +4391,9 @@
                 const config = LABOON_TTS_BACKEND_MODELS[backend] || LABOON_TTS_BACKEND_MODELS.qwen;
                 const modelSelect = document.getElementById('tts-model-select');
                 const modelHelp = document.getElementById('tts-model-help');
+                const modelWrap = document.getElementById('tts-model-select-wrap');
+                const singleWrap = document.getElementById('tts-model-single-view');
+                const singleChip = document.getElementById('tts-model-single-chip');
                 if (!modelSelect) return;
 
                 const models = config.models || [];
@@ -4406,6 +4411,14 @@
                 if (resolvedModel) modelSelect.value = resolvedModel;
 
                 const selectedMeta = models.find(model => model.value === modelSelect.value) || models[0];
+                if (models.length <= 1) {
+                    if (modelWrap) modelWrap.style.display = 'none';
+                    if (singleWrap) singleWrap.style.display = 'block';
+                    if (singleChip) singleChip.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${selectedMeta?.label || config.label || 'Default model'}`;
+                } else {
+                    if (modelWrap) modelWrap.style.display = 'block';
+                    if (singleWrap) singleWrap.style.display = 'none';
+                }
                 if (modelHelp) {
                     const bits = [config.help, selectedMeta?.description].filter(Boolean);
                     modelHelp.textContent = bits.join(' ');
@@ -4613,18 +4626,17 @@
                 }
 
                 const headline = estimate.status === 'blocked'
-                    ? 'Generate is blocked until the configuration issues below are fixed.'
+                    ? 'Fix the blocking issue below before generating.'
                     : estimate.status === 'warning'
-                        ? 'Generate should work, but this setup deserves a quick review first.'
-                        : 'Configuration looks ready for generation.';
+                        ? 'Quick review recommended before generating.'
+                        : 'Ready to generate.';
                 const detailItems = [
-                    `Transcript: ${estimate.wordCount.toLocaleString()} words, ${estimate.transcriptBytes.toLocaleString()} bytes`,
-                    `Style notes: ${estimate.styleBytes.toLocaleString()} bytes`,
-                    `Estimated audio length: ${formatTtsDurationLabel(estimate.estimatedSeconds)}`,
-                    `Encoding / Rate: ${(document.getElementById('tts-audio-encoding')?.value || 'wav').toUpperCase()} / ${(document.getElementById('tts-sample-rate')?.value || '24000')} Hz`
+                    `${estimate.wordCount.toLocaleString()} words`,
+                    `${formatTtsDurationLabel(estimate.estimatedSeconds)}`,
+                    `${(document.getElementById('tts-audio-encoding')?.value || 'wav').toUpperCase()} / ${(document.getElementById('tts-sample-rate')?.value || '24000')} Hz`
                 ];
                 const notices = estimate.issues.length ? estimate.issues : estimate.warnings;
-                summaryEl.innerHTML = `<div><b>${headline}</b></div><div style="margin-top:4px;">${detailItems.join(' | ')}</div>${notices.length ? `<div style="margin-top:6px; color:${estimate.issues.length ? '#991b1b' : '#92400e'};">${notices.join(' ')}</div>` : ''}`;
+                summaryEl.innerHTML = `<div><b>${headline}</b></div><div style="margin-top:4px;">${detailItems.join(' | ')}</div>${notices.length ? `<div style="margin-top:6px; color:${estimate.issues.length ? '#991b1b' : '#92400e'};">${notices[0]}</div>` : ''}`;
                 if (generateBtn) generateBtn.disabled = estimate.status === 'blocked';
                 return estimate;
             };
