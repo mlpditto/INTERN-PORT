@@ -2049,6 +2049,23 @@
             }
         }
 
+        async function upsertUserAuthLink(authUser, effectiveUserId, profile, rawLiffUserId) {
+            if (!authUser || !authUser.uid || !effectiveUserId) return;
+            try {
+                await db.collection("user_auth_links").doc(authUser.uid).set({
+                    authUid: authUser.uid,
+                    effectiveUserId: effectiveUserId,
+                    rawLiffUserId: rawLiffUserId || effectiveUserId,
+                    displayName: (profile && profile.displayName) ? profile.displayName : "",
+                    pictureUrl: (profile && profile.pictureUrl) ? profile.pictureUrl : "",
+                    providerId: authUser.isAnonymous ? "anonymous" : ((authUser.providerData && authUser.providerData[0] && authUser.providerData[0].providerId) || "firebase"),
+                    lastSeenAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            } catch (err) {
+                console.warn("user_auth_links upsert failed:", err);
+            }
+        }
+
         async function main() {
             try {
                 const urlParams = new URLSearchParams(window.location.search);
@@ -2169,7 +2186,8 @@
 
                 updateStatus("Getting User Profile...");
                 userProfile = await liff.getProfile();
-                userId = userProfile.userId;
+                const rawLiffUserId = userProfile.userId;
+                userId = rawLiffUserId;
 
                 const resolvedUser = await resolveEffectiveUserId(userId, userProfile);
                 if (resolvedUser && resolvedUser.userId) {
@@ -2188,6 +2206,8 @@
                     }
                     userId = resolvedUser.userId;
                 }
+
+                await upsertUserAuthLink(runtimeAuthUser, userId, userProfile, rawLiffUserId);
 
                 updateStatus("Checking Admin Access...");
 
@@ -2710,6 +2730,7 @@
                     actionUrl: `#certificate-${userId}`
                 };
                 
+                await ensureFirebaseAuthReady(10000);
                 await db.collection("admin_notifications").add(notification);
                 
                 // Also create a task in kanban for admin to review
@@ -5174,6 +5195,7 @@
                     actionUrl: `#analytics-${userId}`
                 };
                 
+                await ensureFirebaseAuthReady(10000);
                 await db.collection("admin_notifications").add(notification);
                 
                 // Create task in kanban for admin to review
@@ -6817,8 +6839,10 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             if (btn) { btn.disabled = true; btn.innerText = "Saving..."; }
 
             try {
-                await ensureFirebaseAuth();
+                const authUser = await ensureFirebaseAuthReady(10000);
+                if (!authUser) throw new Error("Firebase auth is required");
                 await db.collection("cases").add({
+                    authUid: authUser.uid,
                     userId,
                     displayName: userProfile.displayName,
                     pictureUrl: userProfile.pictureUrl || "",
@@ -6849,8 +6873,10 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             } catch (e) {
                 if (e && e.code === 'permission-denied') {
                     try {
-                        await ensureFirebaseAuth();
+                        const authUser = await ensureFirebaseAuthReady(10000);
+                        if (!authUser) throw new Error("Firebase auth is required");
                         await db.collection("cases").add({
+                            authUid: authUser.uid,
                             userId,
                             displayName: userProfile.displayName,
                             pictureUrl: userProfile.pictureUrl || "",
@@ -6882,11 +6908,33 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
 
         function loadMyCases() {
             if (!userId) return;
-            db.collection("cases").where("userId", "==", userId).orderBy("timestamp", "desc").get().then(snap => {
-                const cases = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            ensureFirebaseAuthReady(10000).then((authUser) => {
+                if (!authUser) throw new Error("Firebase auth is required");
+                return Promise.all([
+                    db.collection("cases").where("authUid", "==", authUser.uid).orderBy("timestamp", "desc").get(),
+                    db.collection("cases").where("userId", "==", userId).orderBy("timestamp", "desc").get()
+                ]);
+            }).then(([authSnap, legacySnap]) => {
+                const merged = new Map();
+                [authSnap, legacySnap].forEach((snap) => {
+                    snap.docs.forEach(doc => {
+                        if (!merged.has(doc.id)) {
+                            merged.set(doc.id, { id: doc.id, ...doc.data() });
+                        }
+                    });
+                });
+                const cases = Array.from(merged.values()).sort((a, b) => {
+                    const aTs = a.timestamp && typeof a.timestamp.toMillis === 'function' ? a.timestamp.toMillis() : 0;
+                    const bTs = b.timestamp && typeof b.timestamp.toMillis === 'function' ? b.timestamp.toMillis() : 0;
+                    return bTs - aTs;
+                });
                 window.myCasesCache = cases;
                 renderCaseGrouped(cases);
                 updateGrandLineDashboard();
+            }).catch(err => {
+                console.error("Failed to load cases:", err);
+                window.myCasesCache = [];
+                renderCaseGrouped([]);
             });
         }
 
@@ -7010,32 +7058,45 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
 
             if (discussionUnsubscribe) discussionUnsubscribe();
 
-            discussionUnsubscribe = db.collection("quiz_discussions").doc(discussionId)
-                .collection("comments").orderBy("createdAt", "asc")
-                .onSnapshot(snap => {
-                    box.innerHTML = snap.empty ? '<div style="text-align:center; padding:30px; color:#999; font-size:0.9em;">ยังไม่มีใครเริ่มคุย มาเป็นคนแรกกัน!</div>' : "";
-                    snap.forEach(doc => {
-                        const c = doc.data();
-                        const isMe = c.userId === userId;
-                        const time = c.createdAt ? c.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "...";
+            ensureFirebaseAuthReady(10000).then((authUser) => {
+                if (!authUser) {
+                    box.innerHTML = '<div style="text-align:center; padding:30px; color:#ef4444; font-size:0.9em;">Firebase auth is required to load discussion comments.</div>';
+                    return;
+                }
 
-                        const div = document.createElement('div');
-                        div.style.alignSelf = isMe ? 'flex-end' : 'flex-start';
-                        div.style.maxWidth = '85%';
-                        div.innerHTML = `
-                            <div style="display:flex; flex-direction:${isMe ? 'row-reverse' : 'row'}; gap:8px; align-items:flex-end;">
-                                <img src="${c.pictureUrl}" style="width:28px; height:28px; border-radius:50%; border:1px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                                <div style="background:${isMe ? 'var(--primary)' : '#fff'}; color:${isMe ? 'white' : '#333'}; padding:8px 12px; border-radius:${isMe ? '15px 15px 2px 15px' : '15px 15px 15px 2px'}; box-shadow:0 1px 3px rgba(0,0,0,0.05); font-size:0.9em; position:relative;">
-                                    <div style="font-size:0.7em; opacity:0.8; margin-bottom:2px; font-weight:bold;">${isMe ? 'You' : c.displayName}</div>
-                                    ${c.text}
-                                    <div style="font-size:0.6em; margin-top:4px; text-align:right; opacity:0.7;">${time}</div>
+                discussionUnsubscribe = db.collection("quiz_discussions").doc(discussionId)
+                    .collection("comments").orderBy("createdAt", "asc")
+                    .onSnapshot(snap => {
+                        box.innerHTML = snap.empty ? '<div style="text-align:center; padding:30px; color:#999; font-size:0.9em;">ยังไม่มีใครเริ่มคุย มาเป็นคนแรกกัน!</div>' : "";
+                        snap.forEach(doc => {
+                            const c = doc.data();
+                            const isMe = c.userId === userId;
+                            const time = c.createdAt ? c.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "...";
+
+                            const div = document.createElement('div');
+                            div.style.alignSelf = isMe ? 'flex-end' : 'flex-start';
+                            div.style.maxWidth = '85%';
+                            div.innerHTML = `
+                                <div style="display:flex; flex-direction:${isMe ? 'row-reverse' : 'row'}; gap:8px; align-items:flex-end;">
+                                    <img src="${c.pictureUrl}" style="width:28px; height:28px; border-radius:50%; border:1px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                                    <div style="background:${isMe ? 'var(--primary)' : '#fff'}; color:${isMe ? 'white' : '#333'}; padding:8px 12px; border-radius:${isMe ? '15px 15px 2px 15px' : '15px 15px 15px 2px'}; box-shadow:0 1px 3px rgba(0,0,0,0.05); font-size:0.9em; position:relative;">
+                                        <div style="font-size:0.7em; opacity:0.8; margin-bottom:2px; font-weight:bold;">${isMe ? 'You' : c.displayName}</div>
+                                        ${c.text}
+                                        <div style="font-size:0.6em; margin-top:4px; text-align:right; opacity:0.7;">${time}</div>
+                                    </div>
                                 </div>
-                            </div>
-                        `;
-                        box.appendChild(div);
+                            `;
+                            box.appendChild(div);
+                        });
+                        box.scrollTop = box.scrollHeight;
+                    }, err => {
+                        console.error("Discussion load error:", err);
+                        box.innerHTML = `<div style="text-align:center; padding:30px; color:#ef4444; font-size:0.9em;">Cannot load comments: ${err.message}</div>`;
                     });
-                    box.scrollTop = box.scrollHeight;
-                });
+            }).catch(err => {
+                console.error("Discussion auth error:", err);
+                box.innerHTML = `<div style="text-align:center; padding:30px; color:#ef4444; font-size:0.9em;">Cannot initialize discussion auth: ${err.message}</div>`;
+            });
         }
 
         async function sendDiscussionComment() {
@@ -7045,6 +7106,8 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
 
             input.value = "";
             try {
+                const authUser = await ensureFirebaseAuthReady(10000);
+                if (!authUser) throw new Error("Firebase auth is required");
                 await db.collection("quiz_discussions").doc(activeDiscussionId)
                     .collection("comments").add({
                         userId,
