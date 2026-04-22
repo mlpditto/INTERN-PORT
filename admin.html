@@ -3463,17 +3463,17 @@
                                             <div class="laboon-section-title" style="margin-bottom:12px; color:#4f46e5;"><i class="fa-solid fa-brain"></i> 1. AI Model Selection</div>
                                             <div style="font-size:0.76em; color:#64748b; margin-bottom:10px;">Choose the TTS backend and model. Cloud TTS routing is now connected through the Laboon proxy.</div>
                                             <div class="tts-chip-group">
-                                                <button type="button" id="chip-engine-qwen" class="tts-chip active" onclick="selectTtsBackend('qwen')" style="flex:1; justify-content:center; gap:8px;">
+                                                <button type="button" id="chip-engine-qwen" class="tts-chip" onclick="selectTtsBackend('qwen')" style="flex:1; justify-content:center; gap:8px;">
                                                     <i class="fa-solid fa-robot"></i> Qwen3-TTS
                                                 </button>
-                                                <button type="button" id="chip-engine-gemini" class="tts-chip" onclick="selectTtsBackend('gemini_api')" style="flex:1; justify-content:center; gap:8px;">
+                                                <button type="button" id="chip-engine-gemini" class="tts-chip active" onclick="selectTtsBackend('gemini_api')" style="flex:1; justify-content:center; gap:8px;">
                                                     <i class="fa-solid fa-sparkles"></i> Gemini TTS
                                                 </button>
                                                 <button type="button" id="chip-engine-cloud" class="tts-chip" onclick="selectTtsBackend('cloud_tts')" style="flex:1; justify-content:center; gap:8px;">
                                                     <i class="fa-solid fa-cloud"></i> Cloud TTS API
                                                 </button>
                                             </div>
-                                            <input type="hidden" id="tts-backend-select" value="qwen">
+                                            <input type="hidden" id="tts-backend-select" value="gemini_api">
                                             <div id="tts-model-select-wrap" style="margin-top:12px;">
                                                 <label class="laboon-field-label" for="tts-model-select" style="margin-bottom:6px;">Backend Model</label>
                                                 <select id="tts-model-select" style="width:100%; font-size:0.88em; padding:10px 12px; border-radius:12px; border:1.5px solid #c7d2fe; background:white; color:#1e293b;"></select>
@@ -3485,6 +3485,7 @@
                                             <div id="tts-model-help" style="margin-top:8px; font-size:0.75em; color:#64748b; line-height:1.45;"></div>
                                             <div id="tts-cost-strip" style="display:none; margin-top:10px; flex-wrap:wrap; gap:8px; align-items:center;"></div>
                                             <div id="tts-cost-warning" style="display:none; margin-top:8px; font-size:0.75em; line-height:1.45; padding:10px 12px; border-radius:12px; border:1px solid #dbeafe; background:#f8fbff; color:#475569;"></div>
+                                            <div id="tts-runtime-hint" style="display:none; margin-top:8px; font-size:0.75em; line-height:1.45; padding:10px 12px; border-radius:12px; border:1px solid #fde68a; background:#fffbeb; color:#92400e;"></div>
                                         </div>
 
                                         <!-- 2. Production Language (Moved to Second [Version: V90.99.3.2]) -->
@@ -4184,6 +4185,29 @@
                 }
             }
 
+            function isLaboonLocalRuntime() {
+                const host = String(window.location.hostname || '').toLowerCase();
+                return window.location.protocol === 'file:' ||
+                    host === 'localhost' ||
+                    host === '127.0.0.1' ||
+                    host.endsWith('.local');
+            }
+
+            function getDefaultLaboonTtsBackend(saved = getLaboonTtsSettings()) {
+                const runtimeDefault = isLaboonLocalRuntime() ? 'qwen' : 'gemini_api';
+                if (!saved || typeof saved !== 'object') return runtimeDefault;
+                if (saved.backend === 'qwen' && !isLaboonLocalRuntime() && saved.backendExplicit !== true) {
+                    return 'gemini_api';
+                }
+                return saved.backend || runtimeDefault;
+            }
+
+            function getDefaultLaboonTtsModel(backend) {
+                if (backend === 'qwen') return 'qwen3-tts';
+                if (backend === 'cloud_tts') return 'gemini-2.5-flash-tts';
+                return 'gemini-2.5-flash-tts';
+            }
+
             function setSelectValueIfExists(el, value) {
                 if (!el || value == null) return;
                 if ([...el.options].some(opt => opt.value === value)) {
@@ -4234,10 +4258,12 @@
             function persistLaboonTtsSettings(skipTranscript = false) {
                 const prev = getLaboonTtsSettings();
                 const transcriptEl = document.getElementById('tts-input');
+                const resolvedBackend = document.getElementById('tts-backend-select')?.value || window._ttsBackend || getDefaultLaboonTtsBackend(prev);
                 const next = {
                     mode: window._ttsMode || 'single',
-                    backend: document.getElementById('tts-backend-select')?.value || window._ttsBackend || 'qwen',
-                    model: document.getElementById('tts-model-select')?.value || 'qwen3-tts',
+                    backend: resolvedBackend,
+                    backendExplicit: window._ttsBackendExplicit === true,
+                    model: document.getElementById('tts-model-select')?.value || getDefaultLaboonTtsModel(resolvedBackend),
                     exportFormat: document.getElementById('tts-export-format')?.value || 'wav',
                     audioEncoding: document.getElementById('tts-audio-encoding')?.value || 'wav',
                     sampleRate: document.getElementById('tts-sample-rate')?.value || '24000',
@@ -4268,18 +4294,20 @@
                 // Handle legacy voice values
                 let voiceVal = saved.voice || 'gemini:Kore';
                 if (!voiceVal.includes(':')) voiceVal = 'gemini:' + voiceVal;
+                const defaultBackend = getDefaultLaboonTtsBackend(saved);
 
                 if (typeof window.selectTtsBackend === 'function') {
-                    window.selectTtsBackend(saved.backend || 'qwen', {
-                        preferredModel: saved.model,
-                        silent: true
+                    window.selectTtsBackend(defaultBackend, {
+                        preferredModel: saved.model || getDefaultLaboonTtsModel(defaultBackend),
+                        silent: true,
+                        explicit: saved.backendExplicit === true
                     });
                 }
 
                 setSelectValueIfExists(document.getElementById('tts-voice-select'), voiceVal);
                 if (window.onTtsEngineChanged) window.onTtsEngineChanged(voiceVal);
-                setSelectValueIfExists(document.getElementById('tts-model-select'), saved.model || 'qwen3-tts');
-                if (typeof window.syncTtsModelOptions === 'function') window.syncTtsModelOptions(saved.model || 'qwen3-tts');
+                setSelectValueIfExists(document.getElementById('tts-model-select'), saved.model || getDefaultLaboonTtsModel(defaultBackend));
+                if (typeof window.syncTtsModelOptions === 'function') window.syncTtsModelOptions(saved.model || getDefaultLaboonTtsModel(defaultBackend));
                 if (typeof window.syncTtsAdvancedAudioSettings === 'function') {
                     window.syncTtsAdvancedAudioSettings({
                         preferredEncoding: saved.audioEncoding || saved.exportFormat || 'wav',
@@ -4453,11 +4481,11 @@
             };
 
             window.getSelectedTtsBackend = function() {
-                return document.getElementById('tts-backend-select')?.value || window._ttsBackend || 'qwen';
+                return document.getElementById('tts-backend-select')?.value || window._ttsBackend || getDefaultLaboonTtsBackend();
             };
 
             window.getSelectedTtsModel = function() {
-                return document.getElementById('tts-model-select')?.value || 'qwen3-tts';
+                return document.getElementById('tts-model-select')?.value || getDefaultLaboonTtsModel(window.getSelectedTtsBackend());
             };
 
             window.getAvailableTtsModels = function(backend) {
@@ -4510,6 +4538,34 @@
                 }
                 warningEl.style.cssText = `margin-top:8px; font-size:0.75em; line-height:1.45; padding:10px 12px; border-radius:12px; ${backendTone.panel}`;
                 warningEl.innerHTML = `<div><b>${backendBadge}</b> ${backendCost.detail || ''}</div><div style="margin-top:4px;">${selectedMeta.costHint || selectedMeta.description || ''}</div><div style="margin-top:4px;">${backendCost.warning || ''}</div>`;
+            };
+
+            window.renderTtsRuntimeHint = function() {
+                const hintEl = document.getElementById('tts-runtime-hint');
+                if (!hintEl) return;
+                const backend = window.getSelectedTtsBackend();
+                const qwenUrl = localStorage.getItem('ai_qwen_url') || 'http://localhost:8880/v1';
+
+                if (backend === 'qwen' && !isLaboonLocalRuntime()) {
+                    hintEl.style.display = 'block';
+                    hintEl.style.borderColor = '#fed7aa';
+                    hintEl.style.background = '#fff7ed';
+                    hintEl.style.color = '#9a3412';
+                    hintEl.innerHTML = `<b>Qwen local setup required.</b> This live page needs a reachable local server such as <code>${qwenUrl}</code> and browser CORS enabled. If you just want the hosted path, switch to <b>Gemini TTS</b>.`;
+                    return;
+                }
+
+                if (backend === 'qwen' && isLaboonLocalRuntime()) {
+                    hintEl.style.display = 'block';
+                    hintEl.style.borderColor = '#a7f3d0';
+                    hintEl.style.background = '#f0fdf4';
+                    hintEl.style.color = '#065f46';
+                    hintEl.innerHTML = `<b>Local/dev mode active.</b> Qwen3-TTS is the free-first default here. Make sure your local endpoint is running at <code>${qwenUrl}</code>.`;
+                    return;
+                }
+
+                hintEl.style.display = 'none';
+                hintEl.innerHTML = '';
             };
 
             window.syncTtsModelOptions = function(preferredModel) {
@@ -4800,7 +4856,7 @@
             };
 
             window.selectTtsBackend = function(backend, options = {}) {
-                const resolvedBackend = LABOON_TTS_BACKEND_MODELS[backend] ? backend : 'qwen';
+                const resolvedBackend = LABOON_TTS_BACKEND_MODELS[backend] ? backend : getDefaultLaboonTtsBackend();
                 const hiddenBackend = document.getElementById('tts-backend-select');
                 const geminiChip = document.getElementById('chip-engine-gemini');
                 const cloudChip = document.getElementById('chip-engine-cloud');
@@ -4808,6 +4864,7 @@
 
                 if (hiddenBackend) hiddenBackend.value = resolvedBackend;
                 window._ttsBackend = resolvedBackend;
+                window._ttsBackendExplicit = options.explicit === false ? false : true;
                 window._ttsEngine = LABOON_TTS_BACKEND_MODELS[resolvedBackend]?.engine || 'gemini';
 
                 if (geminiChip) geminiChip.classList.toggle('active', resolvedBackend === 'gemini_api');
@@ -4819,6 +4876,7 @@
                 }
 
                 window.syncTtsModelOptions(options.preferredModel);
+                if (typeof window.renderTtsRuntimeHint === 'function') window.renderTtsRuntimeHint();
                 if (typeof syncTtsVoices === 'function') syncTtsVoices();
                 if (typeof persistLaboonTtsSettings === 'function') persistLaboonTtsSettings(true);
             };
@@ -5065,13 +5123,15 @@
             // Initialize on Load
             setTimeout(() => {
                 if (typeof selectTtsBackend === 'function') {
-                    const savedBackend = getLaboonTtsSettings()?.backend || 'qwen';
-                    selectTtsBackend(savedBackend, {
-                        preferredModel: getLaboonTtsSettings()?.model,
-                        silent: true
+                    const savedSettings = getLaboonTtsSettings();
+                    const defaultBackend = getDefaultLaboonTtsBackend(savedSettings);
+                    selectTtsBackend(defaultBackend, {
+                        preferredModel: savedSettings?.model || getDefaultLaboonTtsModel(defaultBackend),
+                        silent: true,
+                        explicit: false
                     });
                 }
-            }, 800);
+            }, 50);
 
             window.insertTtsDialogueTemplate = function() {
                 const inputArea = document.getElementById('tts-input');
