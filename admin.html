@@ -3398,7 +3398,7 @@
                                                 </div>
                                             </div>
                                             <div id="tts-transcript-counter" style="background:#f8fafc; color:#64748b; padding:4px 10px; border-radius:10px; font-size:0.7em; font-weight:800; border:1.5px solid #f1f5f9; display:flex; align-items:center; gap:4px;">
-                                                <i class="fa-solid fa-font"></i> <span>0 chars</span>
+                                                <i class="fa-solid fa-font"></i> <span id="tts-transcript-counter-text">0 chars</span>
                                             </div>
                                         </div>
                                         <textarea id="tts-input" placeholder="Enter script here..." style="min-height: 380px; width:100%; border:2px solid #f1f5f9; border-radius:16px; padding:18px; font-family:inherit; font-size:1em; line-height:1.5; resize:vertical; background:#fff; outline:none; transition:0.3s; box-sizing:border-box; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); color:#1e293b;"></textarea>
@@ -3970,9 +3970,14 @@
             function updateTtsTranscriptCounter() {
                 const inputEl = document.getElementById('tts-input');
                 const counterEl = document.getElementById('tts-transcript-counter');
+                const counterTextEl = document.getElementById('tts-transcript-counter-text');
                 if (!inputEl || !counterEl) return;
                 const len = String(inputEl.value || '').trim().length;
-                counterEl.textContent = `${len.toLocaleString()} chars`;
+                if (counterTextEl) {
+                    counterTextEl.textContent = `${len.toLocaleString()} chars`;
+                } else {
+                    counterEl.textContent = `${len.toLocaleString()} chars`;
+                }
                 if (typeof window.updateTtsPreflightEstimate === 'function') window.updateTtsPreflightEstimate();
             }
 
@@ -4653,6 +4658,12 @@
                     issues.push(`Transcript + style notes total ${combinedBytes.toLocaleString()} bytes, over the ${caps.maxCombinedBytes.toLocaleString()} byte combined limit.`);
                 } else if (combinedBytes > Math.round(caps.maxCombinedBytes * 0.85)) {
                     warnings.push(`Combined transcript + style notes are nearing the ${caps.maxCombinedBytes.toLocaleString()} byte limit.`);
+                }
+                if (caps.backend === 'qwen') {
+                    const qwenUrl = localStorage.getItem('ai_qwen_url') || 'http://localhost:8880/v1';
+                    if (/^http:\/\/localhost(?::\d+)?\/?/i.test(qwenUrl)) {
+                        warnings.push('Qwen local server requires a reachable localhost endpoint with browser CORS enabled. If this page is opened from GitHub Pages, local fetch may fail until your local server allows it.');
+                    }
                 }
                 if (estimatedSeconds > 655) {
                     warnings.push('Estimated audio length may exceed Gemini TTS output duration guidance and could be truncated.');
@@ -5551,7 +5562,16 @@
             bindLaboonTtsPersistenceHandlers();
             restoreLaboonTtsSettings();
             if (typeof window.renderTtsPolishPresetChips === 'function') window.renderTtsPolishPresetChips();
-            document.getElementById('tts-input')?.addEventListener('input', updateTtsTranscriptCounter);
+            const ttsInputEl = document.getElementById('tts-input');
+            ['input', 'change', 'keyup', 'paste'].forEach((eventName) => {
+                ttsInputEl?.addEventListener(eventName, () => {
+                    if (eventName === 'paste') {
+                        setTimeout(updateTtsTranscriptCounter, 0);
+                    } else {
+                        updateTtsTranscriptCounter();
+                    }
+                });
+            });
             if (typeof window.updateTtsPolishPresetPreview === 'function') window.updateTtsPolishPresetPreview();
             if (typeof window.syncTtsAdvancedAudioSettings === 'function') window.syncTtsAdvancedAudioSettings();
             if (typeof window.updateTtsPreflightEstimate === 'function') window.updateTtsPreflightEstimate();
