@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.20</title>
-    <!-- [Version: V91.20] AI Proxy & Version Sync -->
-    <!-- Release: 2026-04-24 00:00 UTC+7 -->
+    <title>Nika V91.21</title>
+    <!-- [Version: V91.21] Permission Diagnostics -->
+    <!-- Release: 2026-04-24 01:00 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -17066,22 +17066,29 @@ async function saveQuiz() {
             // 🔥 Load Group Settings ([Version: V69.0])
             db.collection("quizzes").doc("--group-settings--").onSnapshot(doc => {
                 if (doc.exists) groupSettings = doc.data();
-            });
+            }, e => console.error("🔥 [Firestore Error] quizzes/--group-settings--:", e));
 
             db.collection("quizzes").doc(QUIZ_TIMING_CONFIG_DOC_ID).onSnapshot(doc => {
                 if (doc.exists) applyTimingRiskConfig(doc.data());
                 else applyTimingRiskConfig({ activeProfile: 'exam', profiles: getDefaultTimingProfiles() });
-            });
+            }, e => console.error("🔥 [Firestore Error] quizzes/timing_config:", e));
 
             db.collection("works").orderBy("timestamp", "desc").limit(100).onSnapshot(s => { 
                 worksData = s.docs.map(d => ({ id: d.id, ...d.data() })); 
                 renderTable('works'); 
                 drawKanban(); 
-            });
+            }, e => console.error("🔥 [Firestore Error] works:", e));
+
             db.collection("cases").orderBy("timestamp", "desc").limit(200).onSnapshot(s => {
                 casesData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderAlabastaCases();
+            }, e => {
+                console.error("🔥 [Firestore Error] cases:", e);
+                if (e.code === 'permission-denied') {
+                    showToast("⚠️ Permission denied for Alabasta Cases", "error");
+                }
             });
+
             db.collection("users").orderBy("score", "desc").onSnapshot(s => { 
                 usersData = s.docs.map(d => ({ id: d.id, ...d.data() })); 
                 renderUserGroupTabs();
@@ -17090,27 +17097,29 @@ async function saveQuiz() {
                 renderLeaderboard(); 
                 updateAssigneeList(); 
                 renderCertTable(); 
-                drawKanban(); // Update board cards (e.g. if filtering by group)
+                drawKanban(); 
                 renderAlabastaCases();
-            });
-            db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban);
+            }, e => console.error("🔥 [Firestore Error] users:", e));
+
+            db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban, e => console.error("🔥 [Firestore Error] side_quests:", e));
+
             db.collection("quests").onSnapshot(s => { 
                 questsCache = s.docs.map(d => ({ id: d.id, ...d.data() })); 
                 loadQuestHistory(); 
                 loadReflectiveLogsAdmin(); 
-                filterBoard(); // Update Kanban too
-            });
+                filterBoard(); 
+            }, e => console.error("🔥 [Firestore Error] quests:", e));
+
             db.collection("knowledge_base").orderBy("createdAt", "desc").onSnapshot(s => {
                 knowledgeBaseCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderKnowledgeBase();
-            });
+            }, e => console.error("🔥 [Firestore Error] knowledge_base:", e));
+
             db.collection("quizzes").onSnapshot(s => { 
                 quizzesData = s.docs.map(d => ({ id: d.id, ...d.data() })); 
                 console.log("🔍 Firebase quizzes updated, count:", quizzesData.length);
-                console.log("🔍 Firebase raw docs:", s.docs);
-                console.log("🔍 Firebase quizzesData sample:", quizzesData.slice(0, 2));
                 renderQuizzes(); 
-            });
+            }, e => console.error("🔥 [Firestore Error] quizzes:", e));
             // 🔥 Refined [Version: V77.6] Listen only for actionable items (Pending Review or New Request)
             db.collection("quiz_attempts").where("status", "in", ["pending", "requesting"]).onSnapshot(s => {
                 renderPendingQuizzes(s.docs.map(d => ({ id: d.id, ...d.data() })));
