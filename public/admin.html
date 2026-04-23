@@ -256,20 +256,23 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
-            min-height: 32px;
-            padding: 6px 10px;
+            gap: 0;
+            min-height: 34px;
+            width: 34px;
+            padding: 0;
             border: none;
             border-radius: 9px;
             color: #fff;
-            font-size: 0.74em;
+            font-size: 0.95em;
             font-weight: 800;
             white-space: nowrap;
             line-height: 1;
         }
 
-        .alabasta-action-btn i {
+        .alabasta-action-btn i,
+        .alabasta-action-btn .alabasta-emoji {
             font-size: 0.95em;
+            line-height: 1;
         }
 
         .alabasta-action-btn.is-edit { background: #f59e0b; }
@@ -279,8 +282,6 @@
         .alabasta-action-btn.is-reopen { background: #334155; }
         .alabasta-action-btn.is-delete {
             background: #ef4444;
-            min-width: 34px;
-            padding-inline: 9px;
         }
 
         .edit-case-note-modal-content {
@@ -16445,15 +16446,15 @@ Do not include any explanation other than the feedback body.`;
                                 const scoreHtml = isReviewed
                                     ? `<span class="badge" style="background:#ecfdf5; color:#166534; border:1px solid rgba(22,101,52,0.18); font-weight:800;">${bonus.toFixed(2)} pts</span>`
                                     : `<span style="color:#94a3b8; font-size:0.82em;">-</span>`;
-                                const statusBtn = isReviewed
-                                    ? `<button class="btn-sm alabasta-action-btn is-reopen" title="Reopen case" onclick="updateCaseStatus('${c.id}', 'pending')"><i class="fa-solid fa-rotate-left"></i><span class="alabasta-action-label">Reopen</span></button>`
-                                    : `<button class="btn-sm alabasta-action-btn is-review" title="Mark reviewed" onclick="updateCaseStatus('${c.id}', 'reviewed')"><i class="fa-solid fa-check"></i><span class="alabasta-action-label">Review</span></button>`;
-                                const editBtn = `<button class="btn-sm alabasta-action-btn is-edit" title="Edit case note" onclick="editCaseNote('${c.id}')"><i class="fa-solid fa-pen"></i><span class="alabasta-action-label">Edit</span></button>`;
-                                const laboonBtn = `<button class="btn-sm alabasta-action-btn is-laboon" title="Ask Laboon" onclick="openAlabastaLaboon('${c.id}')"><i class="fa-solid fa-wand-magic-sparkles"></i><span class="alabasta-action-label">Laboon</span></button>`;
-                                const hasPoneglyphLink = !!c.poneglyphNoteId;
-                                const poneglyphBtn = `<button class="btn-sm alabasta-action-btn is-poneglyph" title="${hasPoneglyphLink ? 'Open linked Poneglyph draft' : 'Promote to Poneglyph'}" onclick="openAlabastaPoneglyph('${c.id}')"><i class="fa-solid fa-book-bookmark"></i><span class="alabasta-action-label">${hasPoneglyphLink ? 'PGL *' : 'PGL'}</span></button>`;
-                                const deleteBtn = `<button class="btn-sm alabasta-action-btn is-delete" title="Delete case" onclick="deleteCaseSubmission('${c.id}')"><i class="fa-solid fa-trash-can"></i><span class="alabasta-action-label">Delete</span></button>`;
-                                const actionBtn = `<div class="alabasta-action-row">${editBtn}${laboonBtn}${poneglyphBtn}${statusBtn}${deleteBtn}</div>`;
+                const statusBtn = isReviewed
+                    ? `<button class="btn-sm alabasta-action-btn is-reopen" title="Reopen case" onclick="updateCaseStatus('${c.id}', 'pending')"><span class="alabasta-emoji">↩️</span></button>`
+                    : `<button class="btn-sm alabasta-action-btn is-review" title="Mark reviewed" onclick="updateCaseStatus('${c.id}', 'reviewed')"><span class="alabasta-emoji">✅</span></button>`;
+                const editBtn = `<button class="btn-sm alabasta-action-btn is-edit" title="Edit case note" onclick="editCaseNote('${c.id}')"><span class="alabasta-emoji">✏️</span></button>`;
+                const laboonBtn = `<button class="btn-sm alabasta-action-btn is-laboon" title="Ask Laboon" onclick="openAlabastaLaboon('${c.id}')"><span class="alabasta-emoji">🐳</span></button>`;
+                const hasPoneglyphLink = !!c.poneglyphNoteId;
+                const poneglyphBtn = `<button class="btn-sm alabasta-action-btn is-poneglyph" title="${hasPoneglyphLink ? 'Open linked Poneglyph draft' : 'Promote to Poneglyph'}" onclick="openAlabastaPoneglyph('${c.id}')"><span class="alabasta-emoji">🪨</span></button>`;
+                const deleteBtn = `<button class="btn-sm alabasta-action-btn is-delete" title="Delete case" onclick="deleteCaseSubmission('${c.id}')"><span class="alabasta-emoji">🗑️</span></button>`;
+                const actionBtn = `<div class="alabasta-action-row">${editBtn}${laboonBtn}${poneglyphBtn}${statusBtn}${deleteBtn}</div>`;
 
                                 return `
                     <tr>
@@ -16470,12 +16471,7 @@ Do not include any explanation other than the feedback body.`;
                         <td style="max-width:260px; white-space:normal;">${safe(c.note || '-')}</td>
                         <td>${scoreHtml}</td>
                         <td><span class="badge" style="background:${statusBg}; color:${statusColor}; border:1px solid ${statusColor}33;">${isArchived ? 'archived' : (isReviewed ? 'reviewed' : 'pending')}</span></td>
-                        <td>
-                            <div style="display:flex; gap:5px;">
-                                ${actionBtn}
-                                <button class="btn-sm" style="background:#ef4444; color:white; border:none; border-radius:8px;" onclick="deleteCase('${c.id}')"><i class="fa-solid fa-trash"></i></button>
-                            </div>
-                        </td>
+                        <td>${actionBtn}</td>
                     </tr>
                 `;
                             }).join('');
@@ -16860,13 +16856,54 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         }
 
                         async function deleteCaseSubmission(caseDocId) {
-                            if (!confirm('Delete this case submission? This cannot be undone.')) return;
+                            const caseItem = casesData.find(c => c.id === caseDocId);
+                            if (!caseItem) {
+                                alert('Case not found');
+                                return;
+                            }
+                            const bonus = Number(caseItem.adminBonus || 0);
+                            const confirmText = bonus > 0
+                                ? `Delete this case submission and revert ${bonus.toFixed(2)} pts? This cannot be undone.`
+                                : 'Delete this case submission? This cannot be undone.';
+                            if (!confirm(confirmText)) return;
 
                             try {
-                                await db.collection('cases').doc(caseDocId).delete();
+                                const batch = db.batch();
+                                batch.delete(db.collection('cases').doc(caseDocId));
+
+                                if (bonus > 0 && caseItem.userId) {
+                                    batch.update(db.collection('users').doc(caseItem.userId), {
+                                        score: firebase.firestore.FieldValue.increment(-bonus)
+                                    });
+                                }
+
+                                const logIdsToDelete = [];
+                                if (caseItem.reviewLogId) logIdsToDelete.push(caseItem.reviewLogId);
+
+                                const reviewLogSnap = await db.collection('checkin_logs')
+                                    .where('userId', '==', caseItem.userId || '__none__')
+                                    .where('type', '==', 'case_review_bonus')
+                                    .get();
+
+                                reviewLogSnap.forEach(doc => {
+                                    const data = doc.data() || {};
+                                    const sameDoc = data.sourceCaseDocId === caseDocId;
+                                    const sameRef = !!caseItem.caseId && data.sourceCaseRef === caseItem.caseId;
+                                    const legacyRef = !!caseItem.caseId && data.note === `Alabasta reviewed: ${caseItem.caseId}`;
+                                    const sameAmount = Number(data.amount || 0) === bonus;
+                                    if (sameDoc || ((sameRef || legacyRef) && sameAmount)) {
+                                        logIdsToDelete.push(doc.id);
+                                    }
+                                });
+
+                                Array.from(new Set(logIdsToDelete)).forEach(logId => {
+                                    batch.delete(db.collection('checkin_logs').doc(logId));
+                                });
+
+                                await batch.commit();
                                 casesData = casesData.filter(c => c.id !== caseDocId);
                                 renderAlabastaCases();
-                                if (typeof showToast === 'function') showToast('Case deleted', 'success');
+                                if (typeof showToast === 'function') showToast(bonus > 0 ? `Case deleted and reverted ${bonus.toFixed(2)} pts` : 'Case deleted', 'success');
                             } catch (e) {
                                 console.error('Failed to delete case:', e);
                                 alert('Failed to delete case: ' + e.message);
@@ -16903,14 +16940,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                         batch.update(db.collection('users').doc(caseItem.userId), {
                                             score: firebase.firestore.FieldValue.increment(bonus)
                                         });
-                                        batch.set(db.collection('checkin_logs').doc(), {
-                                            userId: caseItem.userId,
-                                            type: 'case_review_bonus',
-                                            amount: bonus,
-                                            note: `Alabasta reviewed: ${caseItem.caseId || caseDocId}`,
-                                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                                        });
-                                    }
+                        const reviewLogRef = db.collection('checkin_logs').doc();
+                        batch.set(reviewLogRef, {
+                            userId: caseItem.userId,
+                            type: 'case_review_bonus',
+                            amount: bonus,
+                            note: `Alabasta reviewed: ${caseItem.caseId || caseDocId}`,
+                            sourceCaseDocId: caseDocId,
+                            sourceCaseRef: caseItem.caseId || '',
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        batch.update(caseRef, {
+                            reviewLogId: reviewLogRef.id
+                        });
+                    }
 
                                     await batch.commit();
                                     if (typeof showToast === 'function') showToast(`Archived +${bonus.toFixed(2)} pts`, 'success');
