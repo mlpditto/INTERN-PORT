@@ -31,12 +31,12 @@
             const isNested = (id === 'quizParticipantsModal' || id === 'reflectiveReviewModal' || id === 'quizReviewModal' || id === 'exportQuizPdfModal');
 
             // Hide other modals unless they are safe parents
-            document.querySelectorAll('.modal').forEach(modal => {
+            document.querySelectorAll('.modal').forEach(function(modal) {
                 if (modal.id !== id) {
                     const isSafeParent = (modal.id === 'quizManageModal' || modal.id === 'archiveModal' || modal.id === 'assignmentsManageModal');
                     if (!isNested || !isSafeParent) {
                         modal.classList.remove('force-show');
-                        modal.style.display = 'none';
+                        modal.style.setProperty('display', 'none', 'important');
                         modal.setAttribute('style', 'display:none;');
                     }
                 }
@@ -4618,8 +4618,9 @@
             }
 
             function setSelectValueIfExists(el, value) {
-                if (!el || value == null || !el.options || typeof el.options[Symbol.iterator] !== 'function') return;
-                if ([...el.options].some(opt => opt.value === value)) {
+                if (!el || value == null || !el.options) return;
+                const options = Array.from(el.options);
+                if (options.some(opt => opt.value === value)) {
                     el.value = value;
                 }
             }
@@ -7941,15 +7942,25 @@
                             if (window.loadAIKeys) window.loadAIKeys();
 
                             let proxyProvider = "";
-                            if (modelName.toLowerCase().indexOf('claude') !== -1) proxyProvider = "anthropic";
-                                else if (modelName === 'imagen' || modelName === 'imagen-nano') proxyProvider = "imagen";
-                                else if (modelName === 'dalle') proxyProvider = "openai";
-                                else if (modelName.includes('gemini') || modelName === 'multimodal') proxyProvider = "gemini";
-                                else if (modelName.toLowerCase().includes('thaillm') || modelName.toLowerCase().includes('openthaigpt')) proxyProvider = "thaillm";
-                                else if (modelName.includes('gpt')) proxyProvider = "openai";
-                                else if (modelName.includes('typhoon')) proxyProvider = "typhoon";
-                                else if (modelName.includes('llama')) proxyProvider = "together";
-                                else if (modelName.includes('glm-5.1') || modelName.includes('ollama')) proxyProvider = "ollama";
+                            if (modelName.toLowerCase().indexOf('claude') !== -1) {
+                                proxyProvider = "anthropic";
+                            } else if (modelName === 'imagen' || modelName === 'imagen-nano') {
+                                proxyProvider = "imagen";
+                            } else if (modelName === 'dalle') {
+                                proxyProvider = "openai";
+                            } else if (modelName.includes('gemini') || modelName === 'multimodal') {
+                                proxyProvider = "gemini";
+                            } else if (modelName.toLowerCase().includes('thaillm') || modelName.toLowerCase().includes('openthaigpt')) {
+                                proxyProvider = "thaillm";
+                            } else if (modelName.includes('gpt')) {
+                                proxyProvider = "openai";
+                            } else if (modelName.includes('typhoon')) {
+                                proxyProvider = "typhoon";
+                            } else if (modelName.includes('llama')) {
+                                proxyProvider = "together";
+                            } else if (modelName.includes('glm-5.1') || modelName.includes('ollama')) {
+                                proxyProvider = "ollama";
+                            }
 
                             try {
                                 if (proxyProvider !== "") {
@@ -8102,7 +8113,7 @@
 
 
                         window.AI_CORE_READY = true;
-                        console.log("🤖 [AI Engine] Global Core V90.20 Ready");
+                        console.log("🤖 [AI Engine] Global Core V90.99.3.9.1 Ready");
 
                         // --- AI Diagnostic Tool (V88.55 Handle 403) ---
                         window.checkGeminiModels = async function () {
@@ -15869,22 +15880,22 @@ Do not include any explanation other than the feedback body.`;
                             // 🔥 Load Group Settings (V69.0)
                             db.collection("quizzes").doc("--group-settings--").onSnapshot(doc => {
                                 if (doc.exists) groupSettings = doc.data();
-                            });
+                            }, err => console.error("🔥 [Firebase] Group Settings listener failed:", err));
 
                             db.collection("quizzes").doc(QUIZ_TIMING_CONFIG_DOC_ID).onSnapshot(doc => {
                                 if (doc.exists) applyTimingRiskConfig(doc.data());
                                 else applyTimingRiskConfig({ activeProfile: 'exam', profiles: getDefaultTimingProfiles() });
-                            });
+                            }, err => console.error("🔥 [Firebase] Quiz Timing listener failed:", err));
 
                             db.collection("works").orderBy("timestamp", "desc").limit(100).onSnapshot(s => {
                                 worksData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                                 renderTable('works');
                                 drawKanban();
-                            });
+                            }, err => console.error("🔥 [Firebase] Works listener failed:", err));
                             db.collection("cases").orderBy("timestamp", "desc").limit(200).onSnapshot(s => {
                                 casesData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                                 renderAlabastaCases();
-                            });
+                            }, err => console.error("🔥 [Firebase] Cases listener failed:", err));
                             db.collection("users").orderBy("score", "desc").onSnapshot(s => {
                                 usersData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                                 renderUserGroupTabs();
@@ -15893,57 +15904,49 @@ Do not include any explanation other than the feedback body.`;
                                 renderLeaderboard();
                                 updateAssigneeList();
                                 renderCertTable();
-                                drawKanban(); // Update board cards (e.g. if filtering by group)
+                                drawKanban(); 
                                 renderAlabastaCases();
-                            });
-                            db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban);
+                            }, err => console.error("🔥 [Firebase] Users listener failed:", err));
+                            db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban, err => console.error("🔥 [Firebase] Side Quests listener failed:", err));
                             db.collection("quests").onSnapshot(s => {
                                 questsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                                 loadQuestHistory();
                                 loadReflectiveLogsAdmin();
-                                filterBoard(); // Update Kanban too
-                            });
+                                filterBoard(); 
+                            }, err => console.error("🔥 [Firebase] Quests listener failed:", err));
                             db.collection("knowledge_base").orderBy("createdAt", "desc").onSnapshot(s => {
                                 knowledgeBaseCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                                 renderKnowledgeBase();
-                            });
+                            }, err => console.error("🔥 [Firebase] Knowledge Base listener failed:", err));
                             db.collection("quizzes").onSnapshot(s => {
                                 quizzesData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                                 console.log("🔍 Firebase quizzes updated, count:", quizzesData.length);
-                                console.log("🔍 Firebase raw docs:", s.docs);
-                                console.log("🔍 Firebase quizzesData sample:", quizzesData.slice(0, 2));
                                 renderQuizzes();
-                            });
+                            }, err => console.error("🔥 [Firebase] Quizzes listener failed:", err));
                             // 🔥 Refined V77.6: Listen only for actionable items (Pending Review or New Request)
                             db.collection("quiz_attempts").where("status", "in", ["pending", "requesting"]).onSnapshot(s => {
                                 renderPendingQuizzes(s.docs.map(d => ({ id: d.id, ...d.data() })));
-                            });
+                            }, err => console.error("🔥 [Firebase] Pending Quiz Attempts listener failed:", err));
                             // 🔥 V77.16: Load ALL quiz attempts for counting and full history (Authorized for Admin)
                             db.collection("quiz_attempts").orderBy("timestamp", "desc").onSnapshot(s => {
                                 const allAttempts = s.docs.map(d => ({ id: d.id, ...d.data(), isQuiz: true, collection: 'quiz_attempts' }));
-
-                                // 1. Update Approved Data for Works Table
                                 quizApprovedData = allAttempts.filter(d => d.status === 'approved');
-
-                                // 2. Count Participants per Quiz
                                 const counts = {};
                                 allAttempts.forEach(att => {
                                     const qId = att.quizId;
                                     if (qId) counts[qId] = (counts[qId] || 0) + 1;
                                 });
                                 window.quizCounts = counts;
-                                quizAttemptsAllCache = allAttempts; // 🔥 V88.50: Sync with Global Cache for immediate Participant Modal loading
-
-                                // 3. Refresh UI
+                                quizAttemptsAllCache = allAttempts; 
                                 renderQuizzes();
                                 if (!hideCompletedWorks) renderTable('works');
-                            });
+                            }, err => console.error("🔥 [Firebase] All Quiz Attempts listener failed:", err));
                             // 🔥 Feature: Load Poll Responses for Works Table
                             db.collection("poll_responses").orderBy("timestamp", "desc").limit(50).onSnapshot(s => {
                                 const polls = s.docs.map(d => ({ id: d.id, ...d.data(), isQuiz: true, isPollResponse: true, status: 'approved', collection: 'poll_responses' }));
                                 window.pollData = polls;
                                 if (!hideCompletedWorks) renderTable('works');
-                            });
+                            }, err => console.error("🔥 [Firebase] Poll Responses listener failed:", err));
                             db.collection("quest_submissions").onSnapshot(s => {
                                 questsSubCache = {};
                                 questsSubList = s.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -16409,7 +16412,12 @@ Do not include any explanation other than the feedback body.`;
                         <td style="max-width:260px; white-space:normal;">${safe(c.note || '-')}</td>
                         <td>${scoreHtml}</td>
                         <td><span class="badge" style="background:${statusBg}; color:${statusColor}; border:1px solid ${statusColor}33;">${isArchived ? 'archived' : (isReviewed ? 'reviewed' : 'pending')}</span></td>
-                        <td>${actionBtn}</td>
+                        <td>
+                            <div style="display:flex; gap:5px;">
+                                ${actionBtn}
+                                <button class="btn-sm" style="background:#ef4444; color:white; border:none; border-radius:8px;" onclick="deleteCase('${c.id}')"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </td>
                     </tr>
                 `;
                             }).join('');
@@ -17281,6 +17289,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     } else if (x.type === 'manual_adjust' || x.type === 'manual') {
                                         all.push({ t: x.timestamp?.toDate(), type: 'manual', text: `🛠️ ${x.note}`, score: score, docId: d.id, source: 'checkin_logs' });
                                         dash.manual += score;
+                                    } else if (x.type === 'case_review_bonus') {
+                                        all.push({ t: x.timestamp?.toDate(), type: 'work', text: `📁 ${x.note || 'Alabasta Case Review'}`, score: score, docId: d.id, source: 'checkin_logs' });
+                                        dash.works += score;
                                     } else if (x.type === 'reflective_log') {
                                         all.push({ t: x.timestamp?.toDate(), type: 'bonus', text: `📝 ${x.note || 'Reflective Log'}`, score: score, docId: d.id, source: 'checkin_logs' });
                                         dash.logs += score;
@@ -17782,9 +17793,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 logsSnap.forEach(doc => {
                                     const d = doc.data();
                                     const s = parseFloat(d.amount) || 0;
-                                    addP(d.timestamp, s, d.type || 'log', d.note || '-', { docId: doc.id, source: 'checkin_logs' });
+                                    const hubType = d.type === 'case_review_bonus' ? 'work' : (d.type || 'log');
+                                    const hubText = d.type === 'case_review_bonus' ? `📁 ${d.note || 'Alabasta Case Review'}` : (d.note || '-');
+                                    addP(d.timestamp, s, hubType, hubText, { docId: doc.id, source: 'checkin_logs' });
                                     if (d.type === 'streak') { dash.bonus += s; dash.bc++; }
                                     else if (d.type === 'manual' || d.type === 'manual_adjust') { dash.manual += s; dash.mc++; }
+                                    else if (d.type === 'case_review_bonus') { dash.works += s; dash.wc++; }
                                     else if (d.type === 'reflective_log' || d.type === 'reflective_bonus') { dash.logs += s; dash.lc++; }
                                 });
 
@@ -17859,7 +17873,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             }
 
                             if (certRequested) {
-                                return `<button onclick="openCertModal('${u.id}')" style="display:inline-flex; align-items:center; justify-content:center; margin-left:10px; width:28px; height:28px; background:linear-gradient(135deg, #f59e0b, #d97706); border-radius:50%; border:none; box-shadow:0 0 12px rgba(245,158,11,0.45); cursor:pointer;" title="Certificate request pending - open issuer"><i class="fa-solid fa-award" style="color:white; font-size:0.9em;"></i></button>`;
+                                return `<button onclick="openCertModal('${u.id}')" style="${baseStyle} background:#fff7ed; color:#c2410c; border:1px solid #fdba74; cursor:pointer;" title="Open certificate issuer"><i class="fa-solid fa-clock"></i> Request Pending</button>`;
                             }
 
                             if (canRequest) {
@@ -18032,6 +18046,36 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
                                 // Next Icon
                                 if (historyPage < totalPages) addBtn("➡️", historyPage + 1);
+                            }
+                        }
+
+                        window.deleteHubHistoryLog = async function (logId, amount) {
+                            const uid = window._currentPopupUser;
+                            if (!uid || !logId) return;
+                            const numericAmount = Number(amount || 0);
+                            const revertText = `${numericAmount >= 0 ? '-' : '+'}${Math.abs(numericAmount).toFixed(2)}`;
+                            if (!confirm(`Delete this history log and adjust score ${revertText} pts?`)) return;
+
+                            try {
+                                const batch = db.batch();
+                                batch.delete(db.collection("checkin_logs").doc(logId));
+                                if (numericAmount !== 0) {
+                                    batch.update(db.collection("users").doc(uid), {
+                                        score: firebase.firestore.FieldValue.increment(-numericAmount)
+                                    });
+                                }
+                                await batch.commit();
+
+                                const localUser = (usersData || []).find(u => u.id === uid);
+                                if (localUser) {
+                                    localUser.score = Number(localUser.score || 0) - numericAmount;
+                                }
+
+                                showToast("History log deleted", "success");
+                                await openUserHub(uid, 'history');
+                            } catch (e) {
+                                console.error("Failed to delete hub history log:", e);
+                                alert("Failed to delete history log: " + e.message);
                             }
                         }
 
@@ -20674,7 +20718,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         }
 
                         // ===================================================================
-                        // 🪨 PONEGLYPH — V90.71 (Hardened)
+                        // 🪨 PONEGLYPH — V90.99.3.9.1 (Hardened)
                         // ===================================================================
                         let poneglyphNotesCache = [];
                         let poneglyphActiveNoteId = null;
@@ -22895,7 +22939,7 @@ ${stories.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
 
                         window.AI_CORE_READY = true;
                         if (window.loadAIKeys) window.loadAIKeys();
-                        console.log('%c V90.71 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+                        console.log('%c V90.99.3.9.1 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
 
                         // --- V90.36: Quiz Feedback Panel ---
                         let _qfpCurrentId = null;
