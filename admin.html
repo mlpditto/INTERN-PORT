@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.21</title>
-    <!-- [Version: V91.21] Permission Diagnostics -->
+    <title>Nika V91.22</title>
+    <!-- [Version: V91.22] Permission Diagnostics & Log Deduplication -->
     <!-- Release: 2026-04-24 01:00 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -135,15 +135,14 @@
             overflow: hidden;
         }
 
-        .reflective-liquid-header { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:16px; }
-        .reflective-liquid-kicker { display:inline-flex; align-items:center; gap:8px; padding:6px 12px; border-radius:999px; background:rgba(255,255,255,0.55); border:1px solid rgba(245,158,11,0.22); color:#b45309; font-size:0.76em; font-weight:900; letter-spacing:0.04em; text-transform:uppercase; }
-        .reflective-liquid-title { margin:8px 0 0; color:#7c2d12; font-size:1.26em; font-weight:900; letter-spacing:-0.02em; }
-        .reflective-liquid-subtitle { margin:4px 0 0; color:#7c6f67; font-size:0.84em; line-height:1.5; }
-        .reflective-close-btn { width:38px; height:38px; border:1px solid rgba(148,163,184,0.24); border-radius:14px; background:rgba(255,255,255,0.58); color:#475569; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:0.2s ease; }
+        .reflective-liquid-header { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:12px; }
+        .reflective-liquid-title { margin:0; color:#7c2d12; font-size:1.15em; font-weight:900; letter-spacing:-0.01em; display:flex; align-items:center; gap:8px; }
+        .reflective-close-btn { width:34px; height:34px; border:1px solid rgba(148,163,184,0.2); border-radius:12px; background:rgba(255,255,255,0.5); color:#475569; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:0.2s ease; }
         .reflective-close-btn:hover { transform:translateY(-1px); background:rgba(255,255,255,0.82); color:#0f172a; }
-        .reflective-review-shell { display:grid; gap:14px; }
-        .reflective-review-card { border-radius:22px; border:1px solid rgba(255,255,255,0.65); background:linear-gradient(180deg, rgba(255,255,255,0.74) 0%, rgba(255,255,255,0.58) 100%); box-shadow:inset 0 1px 0 rgba(255,255,255,0.65), 0 14px 30px rgba(148,163,184,0.12); }
-        .reflective-review-user-card, .reflective-review-field { padding:14px; }
+        .reflective-review-shell { display:grid; gap:10px; }
+        .reflective-review-card { border-radius:18px; border:1px solid rgba(255,255,255,0.65); background:linear-gradient(180deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.7) 100%); box-shadow:inset 0 1px 0 rgba(255,255,255,0.65), 0 8px 20px rgba(148,163,184,0.08); }
+        .reflective-review-user-card { padding:12px 14px; }
+        .reflective-review-field { padding:10px 14px; }
         .reflective-review-label-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
         .reflective-review-label { color:#475569; font-size:0.78em; font-weight:900; text-transform:uppercase; letter-spacing:0.07em; }
         .reflective-review-inline-hint { color:#94a3b8; font-size:0.75em; font-weight:700; }
@@ -7676,14 +7675,10 @@
         <!-- 🔥 Reflective Review Modal -->
         <div id="reflectiveReviewModal" class="modal" style="z-index: 2501;">
             <div class="modal-content reflective-liquid-modal">
-                <div class="reflective-liquid-header">
-                    <div>
-                        <div class="reflective-liquid-kicker"><i class="fa-solid fa-sparkles"></i> Reflective Review</div>
-                        <h3 class="reflective-liquid-title">Reflective Log Review</h3>
-                        <p class="reflective-liquid-subtitle">Lean review flow with fast AI feedback and lighter visual noise.</p>
-                    </div>
-                    <button type="button" class="reflective-close-btn" onclick="forceHideModal('reflectiveReviewModal')" aria-label="Close review modal">
-                        <i class="fa-solid fa-xmark"></i>
+                <div class="reflective-liquid-header" style="margin-bottom:10px;">
+                    <h3 class="reflective-liquid-title">Reflective Review</h3>
+                    <button type="button" class="reflective-close-btn" onclick="forceHideModal('reflectiveReviewModal')" aria-label="Close review modal" style="width:28px; height:28px; border-radius:8px;">
+                        <i class="fa-solid fa-xmark" style="font-size:0.8em;"></i>
                     </button>
                 </div>
 
@@ -7696,51 +7691,22 @@
                 <input type="hidden" id="reflective-review-uid">
                 <input type="hidden" id="reflective-review-uname">
 
-                <div class="reflective-review-card reflective-review-field">
-                    <div class="reflective-review-label-row">
-                        <label class="reflective-review-label" for="reflective-review-bonus">Bonus Points</label>
-                        <span class="reflective-review-inline-hint">0.1 - 2.0 recommended</span>
-                    </div>
-                    <div class="reflective-bonus-row">
-                        <input type="number" id="reflective-review-bonus" class="reflective-bonus-input" value="0.5" step="0.1" min="0">
-                        <span class="reflective-bonus-unit">Pts</span>
-                    </div>
-                </div>
-
-                <div class="reflective-review-card reflective-review-field">
-                    <div class="reflective-review-label-row">
-                        <label class="reflective-review-label" for="reflective-review-comment">Admin Feedback</label>
-                        <span class="reflective-review-inline-hint">Scrollable liquid tabs + faster AI assist</span>
-                    </div>
-                    <div class="reflective-review-toolbar">
-                        <!-- AI Controls consolidated to Header -->
-                        <div class="reflective-review-tabs" aria-label="AI model tabs">
-                            <button type="button" class="reflective-review-model-chip active" data-value="gpt-4o" onclick="selectReflectiveReviewModel(this)" title="GPT-4o">GPT Frontier</button>
-                            <button type="button" class="reflective-review-model-chip" data-value="gpt-4o-mini" onclick="selectReflectiveReviewModel(this)" title="GPT-4o Mini">Mini</button>
-                            <button type="button" class="reflective-review-model-chip" data-value="gemini-1.5-flash" onclick="selectReflectiveReviewModel(this)" title="Gemini Flash">Flash</button>
-                            <button type="button" class="reflective-review-model-chip" data-value="claude-4-sonnet-latest" onclick="selectReflectiveReviewModel(this)" title="Claude Sonnet">Claude</button>
-                            <button type="button" class="reflective-review-model-chip" data-value="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo" onclick="selectReflectiveReviewModel(this)" title="Llama 3.1 8B">Llama 8B</button>
-                            <button type="button" class="reflective-review-model-chip" data-value="meta-llama/Llama-3.2-3B-Instruct-Turbo" onclick="selectReflectiveReviewModel(this)" title="Llama 3.2 3B">Llama 3B</button>
-                            <button type="button" class="reflective-review-model-chip" data-value="meta-llama/Llama-3.3-70B-Instruct-Turbo" onclick="selectReflectiveReviewModel(this)" title="Llama 3.3 70B">Llama 70B</button>
+                <div style="display:grid; grid-template-columns: 1fr 1.2fr; gap:12px; margin-bottom:12px;">
+                    <div class="reflective-review-card reflective-review-field">
+                        <div class="reflective-review-label-row" style="margin-bottom:6px;">
+                            <label class="reflective-review-label">Bonus Points</label>
                         </div>
-                        <select id="ai-model-review" style="display:none; padding:4px 8px; font-size:0.8em; border-radius:10px; border:1px solid #e0e6ed; background:#f8fafc; color:#1a2a3a; font-weight:600;">
-                            <option value="gpt-4o" selected>🟢 GPT-4o (Frontier)</option>
-                            <option value="gpt-4o-mini">Mini</option>
-                            <option value="gemini-1.5-flash">Flash</option>
-                            <option value="claude-4-sonnet-latest">🎭 Claude Sonnet 4.6</option>
-                            <option value="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo">🦙 Llama 3.1 8B</option>
-                            <option value="meta-llama/Llama-3.2-3B-Instruct-Turbo">🦙 Llama 3.2 3B</option>
-                            <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">🦙 Llama 3.3 70B</option>
-                        </select>
-                        <div class="reflective-review-secondary-controls">
-                        <select id="ai-lang-review" class="reflective-review-select lang" title="Target Language">
-                            <option value="Thai" selected>🇹🇭 TH</option>
-                            <option value="English">🇺🇸 EN</option>
-                            <option value="Chinese">🇨🇳 CN</option>
-                            <option value="Korean">🇰🇷 KO</option>
-                            <option value="Japanese">🇯🇵 JP</option>
-                        </select>
-                        <select id="ai-preset-review" class="reflective-review-select preset" title="AI preset">
+                        <div class="reflective-bonus-row">
+                            <input type="number" id="reflective-review-bonus" class="reflective-bonus-input" value="0.5" step="0.1" min="0" style="padding:6px 12px; font-size:1em; border-radius:12px;">
+                            <span class="reflective-bonus-unit" style="padding:6px 10px; min-width:40px; border-radius:12px; font-size:0.7em;">PTS</span>
+                        </div>
+                    </div>
+
+                    <div class="reflective-review-card reflective-review-field">
+                        <div class="reflective-review-label-row" style="margin-bottom:6px;">
+                            <label class="reflective-review-label">AI Focus</label>
+                        </div>
+                        <select id="ai-preset-review" class="reflective-review-select preset" style="padding:6px 10px; border-radius:12px;">
                             <option value="encourage" selected>✨ Encourage</option>
                             <option value="coach_next_step">🧭 Coach</option>
                             <option value="confidence_boost">🌈 Confidence</option>
@@ -7748,15 +7714,40 @@
                             <option value="accountability">🎯 Accountability</option>
                             <option value="celebrate_win">🎉 Celebrate</option>
                         </select>
-                        <button class="btn-sm reflective-review-ai-btn" id="btn-ai-suggest" onclick="getAISuggestion(this)">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> <span class="btn-text">AI Suggest</span>
-                        </button>
-                        <button class="btn-sm reflective-review-settings-btn" onclick="openAIKeysModal()" title="AI Settings">
-                            <i class="fa-solid fa-key"></i>
-                        </button>
+                    </div>
+                </div>
+
+                <div class="reflective-review-card reflective-review-field">
+                    <div class="reflective-review-label-row" style="margin-bottom:8px;">
+                        <label class="reflective-review-label">Admin Feedback</label>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <select id="ai-lang-review" class="reflective-review-select lang" style="padding:4px 8px; width:auto; border-radius:10px; font-size:0.7em;">
+                                <option value="Thai" selected>🇹🇭 TH</option>
+                                <option value="English">🇺🇸 EN</option>
+                            </select>
+                            <button type="button" id="btn-ai-suggest" class="reflective-review-ai-btn" onclick="getAISuggestion(this)" style="padding:6px 12px; border-radius:12px; font-size:0.75em;">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggest
+                            </button>
                         </div>
                     </div>
-                    <textarea id="reflective-review-comment" class="reflective-review-textarea" placeholder="พิมพ์ draft ไทยไว้ก่อน แล้วกด AI Suggest ให้ช่วย refine หรือปล่อยว่างเพื่อให้ AI เขียนให้อัตโนมัติ"></textarea>
+                    
+                    <div class="reflective-review-tabs" style="margin-bottom:10px; padding:4px;">
+                        <button type="button" class="reflective-review-model-chip active" data-value="gpt-4o" onclick="selectReflectiveReviewModel(this)" style="padding:6px 10px; font-size:0.7em;">GPT Frontier</button>
+                        <button type="button" class="reflective-review-model-chip" data-value="gpt-4o-mini" onclick="selectReflectiveReviewModel(this)" style="padding:6px 10px; font-size:0.7em;">Mini</button>
+                        <button type="button" class="reflective-review-model-chip" data-value="gemini-1.5-flash" onclick="selectReflectiveReviewModel(this)" style="padding:6px 10px; font-size:0.7em;">Flash</button>
+                        <button type="button" class="reflective-review-model-chip" data-value="claude-3-5-sonnet-latest" onclick="selectReflectiveReviewModel(this)" style="padding:6px 10px; font-size:0.7em;">Claude 3.5</button>
+                        <button type="button" class="reflective-review-model-chip" data-value="meta-llama/Llama-3.3-70B-Instruct-Turbo" onclick="selectReflectiveReviewModel(this)" style="padding:6px 10px; font-size:0.7em;">Llama 70B</button>
+                    </div>
+                    
+                    <select id="ai-model-review" style="display:none;">
+                        <option value="gpt-4o" selected>GPT-4o</option>
+                        <option value="gpt-4o-mini">Mini</option>
+                        <option value="gemini-1.5-flash">Flash</option>
+                        <option value="claude-3-5-sonnet-latest">Claude 3.5</option>
+                        <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">Llama 70B</option>
+                    </select>
+
+                    <textarea id="reflective-review-comment" class="reflective-review-textarea" placeholder="พิมพ์ draft ไทยไว้ก่อน แล้วกด AI Suggest หรือปล่อยว่างให้ AI เขียนอัตโนมัติ" style="min-height:85px; font-size:0.9em;"></textarea>
                     <div id="reflective-review-ai-status" class="reflective-review-status" aria-live="polite"></div>
                 </div>
 
@@ -7942,7 +7933,7 @@
             </div>
         </div>
 
-        <div id="quizParticipantsModal" class="modal" style="z-index:20000;">
+        <div id="quizParticipantsModal" class="modal" style="z-index:30000;">
             <div class="modal-content" style="max-width: 1000px;">
                 <span class="close-modal"
                     onclick="forceHideModal('quizParticipantsModal')">&times;</span>
@@ -10340,7 +10331,7 @@ Do not include any explanation other than the feedback body.`;
                 showToast(friendlyMessage);
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-robot"></i> <span class="btn-text">AI Suggest</span>';
+                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <span class="btn-text">AI Suggest</span>';
             }
         };
 
@@ -19701,7 +19692,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const qData = quizzesData.find(x => x.id === att.quizId) || {};
                     const qTitle = qData.shortTitle || qData.title || "Quiz";
                     const score = (att.correctCount / att.totalQuestions) * (qData.totalPoints || 1.0);
-                    addP(att.timestamp, score, 'quiz', `📝 Quiz: ${qTitle}`);
+                    
+                    // 🔥 UI Fix (V91.22): Don't add to allLogs list here if approved, 
+                    // because it's already added via logsSnap (checkin_logs) to avoid visual duplication.
+                    // However, we still update the dash counters for the summary cards.
                     dash.quizzes += score;
                     dash.qc++;
                 });
@@ -23849,14 +23843,16 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             
             const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
             document.getElementById('reflective-review-user-info').innerHTML = `
-                <div class="reflective-log-meta">
-                    <img class="lt-avatar reflective-log-avatar" src="${log.pictureUrl || ''}">
-                    <div>
-                        <div class="reflective-log-name">${name}</div>
-                        <div class="reflective-log-date">${log.timestamp ? log.timestamp.toDate().toLocaleString('en-US') : 'Pending sync...'}</div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <img class="lt-avatar reflective-log-avatar" src="${log.pictureUrl || ''}" style="width:34px; height:34px; border:1px solid rgba(245,158,11,0.4);">
+                    <div style="flex:1; overflow:hidden;">
+                        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                            <div class="reflective-log-name" style="font-size:0.85em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${name}</div>
+                            <div class="reflective-log-date" style="font-size:0.65em; opacity:0.7;">${log.timestamp ? log.timestamp.toDate().toLocaleString('en-US', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) : '...'}</div>
+                        </div>
+                        <div class="reflective-log-content" style="font-size:0.8em; margin-top:2px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${moodEmoji} ${log.content}</div>
                     </div>
                 </div>
-                <div class="reflective-log-content">${moodEmoji} ${log.content}</div>
                 ${(() => {
                     const neg = detectNegativeWording(log.content);
                     if (!neg.found) return '';
