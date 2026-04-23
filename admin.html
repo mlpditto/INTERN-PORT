@@ -2857,7 +2857,7 @@
 
             <div id="alabasta-case-section" class="review-card" style="margin-top:18px; border-color:#fcd34d; background:linear-gradient(180deg, #fffbeb 0%, #fff 100%); border-radius:14px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; border-bottom:1px solid #fde68a; padding-bottom:10px; margin-bottom:12px;">
-                    <h4 style="margin:0; color:#92400e;"><i class="fa-solid fa-dungeon"></i> Alabasta Case Inbox</h4>
+                    <h4 style="margin:0; color:#92400e;"><i class="fa-solid fa-dungeon"></i> Alabasta</h4>
                     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                         <input type="text" id="alabasta-case-search" placeholder="🔎 Search case, user, disease..." onkeyup="renderAlabastaCases()" style="margin:0; width:230px; max-width:100%; padding:5px 12px; font-size:0.8em; border-radius:20px; border:1px solid #fcd34d;">
                         <label style="display:flex; align-items:center; gap:6px; font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:4px 10px; cursor:pointer;">
@@ -2879,6 +2879,7 @@
                                 <th>Disease</th>
                                 <th>Customer</th>
                                 <th>Note</th>
+                                <th>Score</th>
                                 <th>Status</th>
                                 <th>Action</th>
                             </tr>
@@ -9349,6 +9350,44 @@ Do not include any explanation other than the feedback body.`;
 
         // selectAiToolbarToggle moved to head for reliability
 
+        window.getQuizMagicButtons = function(item) {
+            const buttons = new Set();
+            if (item) {
+                item.querySelectorAll('button[onclick*="aiEnhanceQuestion"]').forEach(button => buttons.add(button));
+            }
+            const visibleItems = document.querySelectorAll('.quiz-q-item');
+            visibleItems.forEach(quizItem => {
+                if (quizItem === item && quizItem.style.display !== 'none') {
+                    const toolbarBtn = document.querySelector('button[onclick*="aiEnhanceCurrentQuestion"]');
+                    if (toolbarBtn) buttons.add(toolbarBtn);
+                }
+            });
+            return Array.from(buttons);
+        };
+
+        window.setQuizMagicState = function(item, state) {
+            const config = {
+                idle: { icon: 'fa-wand-magic-sparkles', label: 'Magic', disabled: false },
+                translating: { icon: 'fa-spinner fa-spin', label: 'Translating...', disabled: true },
+                enhancing: { icon: 'fa-spinner fa-spin', label: 'Enhancing...', disabled: true },
+                applied: { icon: 'fa-check', label: 'Applied', disabled: true }
+            };
+            const current = config[state] || config.idle;
+            window.getQuizMagicButtons(item).forEach(button => {
+                button.disabled = current.disabled;
+                button.innerHTML = `<i class="fa-solid ${current.icon}"></i> ${current.label}`;
+            });
+        };
+
+        window.restoreQuizMagicState = function(item, delay = 0) {
+            const restore = () => window.setQuizMagicState(item, 'idle');
+            if (delay > 0) {
+                setTimeout(restore, delay);
+            } else {
+                restore();
+            }
+        };
+
         window.aiEnhanceCurrentQuestion = async function(btn) {
             const items = document.querySelectorAll('.quiz-q-item');
             if (!items.length) return alert('No questions available.');
@@ -9404,9 +9443,7 @@ Do not include any explanation other than the feedback body.`;
             if (!questionText) return alert("Please enter the question text first.");
             
             try {
-                const originalHtml = btn.innerHTML;
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>' + (btn.offsetWidth > 60 ? ' Processing...' : '');
+                window.setQuizMagicState(item, 'translating');
                 
                 let taskPrompt = `Translate the following multiple-choice question and its options from Thai to professional, high-quality ${targetLang}.`;
                 if (targetLang === 'Typhoon') {
@@ -9434,6 +9471,7 @@ Do not include any explanation other than the feedback body.`;
                 
                 // Use quick API key if provided, otherwise use stored keys
                 const { text: aiResponse, model: actualModel } = await window.callUniversalAI(selectedModelName, prompt, true, null, quickApiKey);
+                window.setQuizMagicState(item, 'enhancing');
                 
                 console.log(`🤖 AI Response from model: ${actualModel} (requested: ${selectedModelName})`);
                 console.log(`📝 AI Response preview: ${aiResponse.substring(0, 200)}${aiResponse.length > 200 ? '...' : ''}`);
@@ -9462,8 +9500,7 @@ Do not include any explanation other than the feedback body.`;
 
                 if (!confirm(confirmMsg)) {
                     showToast("AI enhancement cancelled");
-                    btn.disabled = false;
-                    btn.innerHTML = originalHtml;
+                    window.restoreQuizMagicState(item);
                     return;
                 }
                 
@@ -9493,14 +9530,14 @@ Do not include any explanation other than the feedback body.`;
                 });
                 
                 updateOptionNumbers(item);
+                window.setQuizMagicState(item, 'applied');
                 showToast("✨ Question translated and enhanced!");
                 
             } catch (error) {
                 console.error("AI Enhance Error:", error);
                 alert("AI Error: " + error.message);
             } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-brain"></i> AI English';
+                window.restoreQuizMagicState(item, 1400);
             }
         };
     </script>
@@ -16131,7 +16168,7 @@ async function saveQuiz() {
             if (reviewedEl) reviewedEl.textContent = reviewedCount;
 
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#94a3b8; padding:14px;">No case submissions found</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:#94a3b8; padding:14px;">No case submissions found</td></tr>`;
                 return;
             }
 
@@ -16141,9 +16178,15 @@ async function saveQuiz() {
                 const ts = c.timestamp && c.timestamp.toDate ? c.timestamp.toDate().toLocaleString('th-TH') : '-';
                 const statusColor = isArchived ? '#334155' : (isReviewed ? '#16a34a' : '#d97706');
                 const statusBg = isArchived ? '#f1f5f9' : (isReviewed ? '#ecfdf5' : '#fffbeb');
-                const actionBtn = isReviewed
+                const bonus = Number(c.adminBonus || 0);
+                const scoreHtml = isReviewed
+                    ? `<span class="badge" style="background:#ecfdf5; color:#166534; border:1px solid rgba(22,101,52,0.18); font-weight:800;">${bonus.toFixed(2)} pts</span>`
+                    : `<span style="color:#94a3b8; font-size:0.82em;">-</span>`;
+                const statusBtn = isReviewed
                     ? `<button class="btn-sm" style="background:#334155; color:white; border:none; border-radius:8px;" onclick="updateCaseStatus('${c.id}', 'pending')">Reopen</button>`
                     : `<button class="btn-sm" style="background:#16a34a; color:white; border:none; border-radius:8px;" onclick="updateCaseStatus('${c.id}', 'reviewed')">Mark Reviewed</button>`;
+                const editBtn = `<button class="btn-sm" style="background:#f59e0b; color:white; border:none; border-radius:8px;" onclick="editCaseNote('${c.id}')">EDIT</button>`;
+                const actionBtn = `<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">${editBtn}${statusBtn}</div>`;
 
                 return `
                     <tr>
@@ -16158,11 +16201,31 @@ async function saveQuiz() {
                         <td>${safe(c.disease || '-')}</td>
                         <td>${safe(c.customer || '-')}</td>
                         <td style="max-width:260px; white-space:normal;">${safe(c.note || '-')}</td>
+                        <td>${scoreHtml}</td>
                         <td><span class="badge" style="background:${statusBg}; color:${statusColor}; border:1px solid ${statusColor}33;">${isArchived ? 'archived' : (isReviewed ? 'reviewed' : 'pending')}</span></td>
                         <td>${actionBtn}</td>
                     </tr>
                 `;
             }).join('');
+        }
+
+        async function editCaseNote(caseDocId) {
+            try {
+                const caseItem = casesData.find(c => c.id === caseDocId) || {};
+                const currentNote = String(caseItem.note || '');
+                const nextNote = prompt('Edit case note:', currentNote);
+                if (nextNote === null) return;
+
+                await db.collection('cases').doc(caseDocId).update({
+                    note: String(nextNote).trim(),
+                    adminUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    adminReviewedBy: ALLOWED_EMAIL || 'admin'
+                });
+                if (typeof showToast === 'function') showToast('Case note updated', 'success');
+            } catch (e) {
+                console.error('Failed to update case note:', e);
+                alert('Failed to update case note: ' + e.message);
+            }
         }
 
         async function updateCaseStatus(caseDocId, status) {
