@@ -16817,6 +16817,26 @@ async function saveQuiz() {
             return 'other';
         }
 
+        function getAlabastaPrimarySystemLabel(caseItem = {}, logData = {}) {
+            const directLabel = logData.primarySystemLabel || caseItem.diseaseSystemLabel || caseItem.primarySystemLabel;
+            if (directLabel) return directLabel;
+            const key = logData.primarySystemKey || caseItem.diseaseSystemKey || inferAlabastaTaxonomyKey(caseItem);
+            const entry = getAlabastaTaxonomyEntry(key) || getAlabastaTaxonomyEntry('other');
+            return entry ? `${entry.thaiLabel} (${entry.label})` : 'Other';
+        }
+
+        function findAlabastaCaseForLog(logData = {}) {
+            const caseDocId = logData.sourceCaseDocId || '';
+            const caseRef = logData.sourceCaseRef || '';
+            return (casesData || []).find(c => c.id === caseDocId || (!!caseRef && c.caseId === caseRef)) || {};
+        }
+
+        function buildAlabastaReviewLogNote(caseItem = {}, logData = {}) {
+            const caseRef = logData.sourceCaseRef || caseItem.caseId || caseItem.id || logData.sourceCaseDocId || '';
+            const primarySystemLabel = getAlabastaPrimarySystemLabel(caseItem, logData);
+            return `Alabasta reviewed: ${primarySystemLabel}${caseRef ? ` - ${caseRef}` : ''}`;
+        }
+
         function initEditCaseTaxonomyOptions() {
             const selectEl = document.getElementById('edit-case-taxonomy-system');
             if (!selectEl || selectEl.options.length > 1) return;
@@ -17739,6 +17759,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     });
 
                     if (bonus > 0 && caseItem.userId) {
+                        const primarySystemKey = caseItem.diseaseSystemKey || inferAlabastaTaxonomyKey(caseItem);
+                        const primarySystemLabel = getAlabastaPrimarySystemLabel(caseItem, { primarySystemKey });
                         batch.update(db.collection('users').doc(caseItem.userId), {
                             score: firebase.firestore.FieldValue.increment(bonus)
                         });
@@ -17747,7 +17769,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             userId: caseItem.userId,
                             type: 'case_review_bonus',
                             amount: bonus,
-                            note: `Alabasta reviewed: ${caseItem.caseId || caseDocId}`,
+                            note: buildAlabastaReviewLogNote(caseItem, { sourceCaseDocId: caseDocId, sourceCaseRef: caseItem.caseId || '', primarySystemKey, primarySystemLabel }),
+                            primarySystemKey,
+                            primarySystemLabel,
+                            taxonomySummary: caseItem.taxonomySummary || primarySystemLabel,
                             sourceCaseDocId: caseDocId,
                             sourceCaseRef: caseItem.caseId || '',
                             timestamp: firebase.firestore.FieldValue.serverTimestamp()
@@ -18190,9 +18215,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     dash.logs += score;
                 });
 
+                const caseReviewLogTextByDocId = {};
                 l.forEach(d => {
                     const x = d.data();
                     const score = parseFloat(x.amount) || 0;
+                    if (x.type === 'case_review_bonus') {
+                        const caseItem = findAlabastaCaseForLog(x);
+                        caseReviewLogTextByDocId[d.id] = `📁 ${buildAlabastaReviewLogNote(caseItem, x)}`;
+                    }
                     if (x.type === 'streak') {
                         all.push({ t: x.timestamp?.toDate(), type: 'bonus', text: `🔥 Streak`, score: score, docId: d.id, source: 'checkin_logs' });
                         dash.bonus += score;
@@ -18211,6 +18241,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     }
                 });
                 
+                all.forEach(item => {
+                    if (item.type === 'work' && item.docId && caseReviewLogTextByDocId[item.docId]) {
+                        item.text = caseReviewLogTextByDocId[item.docId];
+                    }
+                });
+
                 all.sort((a, b) => (b.t || 0) - (a.t || 0));
                 historyCache = all;
                 historyPage = 1;
@@ -18700,9 +18736,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     }
                 });
 
+                const hubCaseReviewLogTextByDocId = {};
                 logsSnap.forEach(doc => { 
                     const d = doc.data();
                     const s = parseFloat(d.amount) || 0;
+                    if (d.type === 'case_review_bonus') {
+                        const caseItem = findAlabastaCaseForLog(d);
+                        hubCaseReviewLogTextByDocId[doc.id] = `📁 ${buildAlabastaReviewLogNote(caseItem, d)}`;
+                    }
                     const hubType = d.type === 'case_review_bonus' ? 'work' : (d.type || 'log');
                     const hubText = d.type === 'case_review_bonus' ? `📁 ${d.note || 'Alabasta Case Review'}` : (d.note || '-');
                     addP(d.timestamp, s, hubType, hubText, { docId: doc.id, source: 'checkin_logs' });
@@ -18737,6 +18778,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     });
                     dash.logs += score;
                     dash.lc++;
+                });
+
+                allLogs.forEach(item => {
+                    if (item.type === 'work' && item.docId && hubCaseReviewLogTextByDocId[item.docId]) {
+                        item.text = hubCaseReviewLogTextByDocId[item.docId];
+                    }
                 });
 
                 allLogs.sort((a,b) => (b.t || 0) - (a.t || 0));
