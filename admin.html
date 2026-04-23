@@ -7666,6 +7666,7 @@
                 </div>
                 <div style="margin-top: 15px; text-align: right; position: sticky; bottom: 0; background: white; padding: 10px 0; border-top: 1px solid #eee;">
                     <button class="btn-sm" style="background:#0ea5e9; color:white; border:none;" onclick="openTimingRiskConfigModal()">Timing Config</button>
+                    <button class="btn-sm" style="background:#ef4444; color:white; border:none;" onclick="exportIncorrectToPDF()"><i class="fa-solid fa-file-pdf"></i> Export Incorrect</button>
                     <button class="btn-sm btn-dark"
                         onclick="document.getElementById('quizReviewModal').style.display='none'">Close</button>
                 </div>
@@ -13777,6 +13778,160 @@ async function saveQuiz() {
         }
 
         const GDRIVE_CLIENT_ID  = getStoredConfig('GDRIVE_CLIENT_ID');
+        async function exportIncorrectToPDF() {
+            const attemptId = document.getElementById('review-attempt-id')?.value;
+            if (!attemptId) return alert("Attempt ID missing");
+
+            try {
+                if (typeof showToast === 'function') showToast("Generating PDF...");
+                
+                const attemptDoc = await db.collection("quiz_attempts").doc(attemptId).get();
+                if (!attemptDoc.exists) return alert("Data not found");
+                const att = attemptDoc.data();
+                const quiz = quizzesData.find(x => x.id === att.quizId);
+                if (!quiz) return alert("Quiz Reference missing");
+
+                const jsPdfCtor = window.jspdf && window.jspdf.jsPDF;
+                if (!jsPdfCtor) return alert('PDF engine is not ready.');
+
+                const doc = new jsPdfCtor('p', 'mm', 'a4');
+                let y = 20;
+                const margin = 15;
+                const pageW = doc.internal.pageSize.getWidth();
+                const pageH = doc.internal.pageSize.getHeight();
+                const maxW = pageW - (margin * 2);
+
+                const ensureSpace = (h) => {
+                    if (y + h > pageH - margin) {
+                        doc.addPage();
+                        y = 20;
+                        return true;
+                    }
+                    return false;
+                };
+
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(18);
+                doc.setTextColor(220, 53, 69);
+                doc.text("Incorrect Questions Review", margin, y);
+                y += 12;
+
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(80);
+                doc.text(`Quiz: ${quiz.title || 'Untitled'}`, margin, y); y += 6;
+                doc.text(`Student: ${att.displayName || 'Anonymous'}`, margin, y); y += 6;
+                doc.text(`Date: ${att.timestamp ? new Date(att.timestamp).toLocaleString() : 'N/A'}`, margin, y); y += 10;
+
+                doc.setDrawColor(220);
+                doc.line(margin, y, pageW - margin, y);
+                y += 12;
+
+                let incorrectCount = 0;
+                (quiz.questions || []).forEach((q, i) => {
+                    const studentAns = (att.answers || att.practiceAnswers || [])[i];
+                    const isChoice = (q.type || 'choice') === 'choice';
+                    const isManuallyCorrect = !!(att.manualCorrect && att.manualCorrect[i] === true);
+                    
+                    let isCorrect = false;
+                    if (isChoice) {
+                        const target = q.correct;
+                        const sAns = Array.isArray(studentAns) ? studentAns : (studentAns !== undefined && studentAns !== null ? [studentAns] : []);
+                        const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
+                        if (tAns.length > 0) {
+                            if (tAns.length === 1 && sAns.length === 1) isCorrect = (String(sAns[0]).trim() === String(tAns[0]).trim());
+                            else isCorrect = (sAns.length === tAns.length && tAns.every(v => sAns.map(String).includes(String(v))));
+                        }
+                    } else {
+                        isCorrect = !!((att.gradedAnswers && att.gradedAnswers[i]) || isManuallyCorrect);
+                    }
+                    isCorrect = isCorrect || isManuallyCorrect;
+
+                    if (!isCorrect) {
+                        incorrectCount++;
+                        ensureSpace(30);
+
+                        doc.setFont('helvetica', 'bold');
+                        doc.setTextColor(30);
+                        const qLines = doc.splitTextToSize(`Q${i + 1}: ${q.q}`, maxW);
+                        qLines.forEach(line => {
+                            ensureSpace(6);
+                            doc.text(line, margin, y);
+                            y += 6;
+                        });
+
+                        y += 2;
+                        doc.setFont('helvetica', 'normal');
+                        doc.setTextColor(220, 53, 69); // Red
+                        
+                        let studentText = "Student Answer: ";
+                        if (isChoice) {
+                            const idx = parseInt(studentAns);
+                            studentText += isNaN(idx) ? "None" : (q.options[idx] || "None");
+                            if (!isNaN(idx)) studentText += ` (Choice ${idx + 1})`;
+                        } else {
+                            const ans = Array.isArray(studentAns) ? studentAns.join(", ") : studentAns;
+                            studentText += ans || "None";
+                        }
+                        
+                        const sLines = doc.splitTextToSize(studentText, maxW);
+                        sLines.forEach(line => {
+                            ensureSpace(5);
+                            doc.text(line, margin, y);
+                            y += 5;
+                        });
+
+                        doc.setTextColor(40, 167, 69); // Green
+                        let correctText = "Correct Answer: ";
+                        if (isChoice) {
+                            const idx = parseInt(q.correct);
+                            correctText += isNaN(idx) ? "N/A" : (q.options[idx] || "N/A");
+                            if (!isNaN(idx)) correctText += ` (Choice ${idx + 1})`;
+                        } else {
+                            correctText += "(Refer to answer key)";
+                        }
+                        
+                        const cLines = doc.splitTextToSize(correctText, maxW);
+                        cLines.forEach(line => {
+                            ensureSpace(5);
+                            doc.text(line, margin, y);
+                            y += 5;
+                        });
+
+                        if (q.explanation) {
+                            y += 2;
+                            doc.setTextColor(100);
+                            doc.setFont('helvetica', 'italic');
+                            const eLines = doc.splitTextToSize(`Explanation: ${q.explanation}`, maxW);
+                            eLines.forEach(line => {
+                                ensureSpace(5);
+                                doc.text(line, margin, y);
+                                y += 5;
+                            });
+                        }
+
+                        doc.setTextColor(0);
+                        y += 10;
+                        doc.setDrawColor(240);
+                        doc.line(margin, y - 5, pageW - margin, y - 5);
+                    }
+                });
+
+                if (incorrectCount === 0) {
+                    alert("No incorrect questions found in this attempt!");
+                    return;
+                }
+
+                const filename = `Review_Incorrect_${(att.displayName || 'Attempt').replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
+                doc.save(filename);
+                if (typeof showToast === 'function') showToast("PDF Exported Successfully", "success");
+
+            } catch (e) {
+                console.error(e);
+                alert("Export failed: " + e.message);
+            }
+        }
+
         const GDRIVE_API_KEY    = getStoredConfig('GDRIVE_API_KEY');
         const GDRIVE_APP_ID     = getStoredConfig('GDRIVE_APP_ID', 'intern-port-edfa7');
 
