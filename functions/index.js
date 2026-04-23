@@ -120,7 +120,6 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                         size: generationOptions.size || "1024x1024",
                         quality: generationOptions.quality || "medium",
                         background: generationOptions.background || "opaque",
-                        response_format: "b64_json",
                         output_format: generationOptions.output_format || "png"
                     }
                     : {
@@ -146,7 +145,15 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 if (!b64) {
                     return res.status(500).json({ error: "No image payload returned from gpt-image-1" });
                 }
-                return res.json({ text: `data:image/png;base64,${b64}`, model: "gpt-image-1" });
+                const mime = `image/${response?.data?.output_format || generationOptions.output_format || "png"}`;
+                const imageDataUrl = `data:${mime};base64,${b64}`;
+                return res.json({
+                    text: imageDataUrl,
+                    imageDataUrl,
+                    model: "gpt-image-1",
+                    tokens: response?.data?.usage?.total_tokens || 0,
+                    usage: response?.data?.usage || null
+                });
             }
             if (model === 'dalle') {
                 return res.json({ text: response.data.data[0].url, model: "dall-e-3" });

@@ -8246,9 +8246,11 @@
                     });
                     if (proxyResponse.ok) {
                         const proxyData = await proxyResponse.json();
+                        if (proxyData.error) throw new Error(proxyData.error);
                         updateAIUsage(proxyProvider, proxyData.tokens || 0);
-                        return { text: proxyData.text, tokens: proxyData.tokens || 0, model: proxyData.model || modelName };
+                        return { text: proxyData.text || proxyData.imageDataUrl || proxyData.dataUrl || '', tokens: proxyData.tokens || 0, model: proxyData.model || modelName, raw: proxyData };
                     } else {
+                        const primaryError = await proxyResponse.json().catch(() => ({}));
                         console.warn(`[AI Proxy] Primary endpoint returned status ${proxyResponse.status}. Trying backup...`);
                         const backupResponse = await fetch(BACKUP_PROXY, {
                             method: 'POST',
@@ -8257,8 +8259,12 @@
                         }).catch(() => null);
                         if (backupResponse && backupResponse.ok) {
                             const proxyData = await backupResponse.json();
+                            if (proxyData.error) throw new Error(proxyData.error);
                             updateAIUsage(proxyProvider, proxyData.tokens || 0);
-                            return { text: proxyData.text, tokens: proxyData.tokens || 0, model: proxyData.model || modelName };
+                            return { text: proxyData.text || proxyData.imageDataUrl || proxyData.dataUrl || '', tokens: proxyData.tokens || 0, model: proxyData.model || modelName, raw: proxyData };
+                        }
+                        if (modelName === 'gpt-image-1') {
+                            throw new Error(primaryError?.error || `Images proxy failed with status ${proxyResponse.status}`);
                         }
                         console.warn('[AI Proxy] Backup failed. Attempting local fallback...');
                     }
@@ -8273,10 +8279,16 @@
                     });
                     if (backupResponse.ok) {
                         const proxyData = await backupResponse.json();
+                        if (proxyData.error) throw new Error(proxyData.error);
                         updateAIUsage(proxyProvider, proxyData.tokens || 0);
-                        return { text: proxyData.text, tokens: proxyData.tokens || 0, model: proxyData.model || modelName };
+                        return { text: proxyData.text || proxyData.imageDataUrl || proxyData.dataUrl || '', tokens: proxyData.tokens || 0, model: proxyData.model || modelName, raw: proxyData };
+                    }
+                    if (modelName === 'gpt-image-1') {
+                        const backupError = await backupResponse.json().catch(() => ({}));
+                        throw new Error(backupError?.error || `Images proxy failed with status ${backupResponse.status}`);
                     }
                 } catch (be) {
+                    if (modelName === 'gpt-image-1') throw be;
                     console.warn('[AI Proxy] Backup also failed. Using local SDK.');
                 }
             }
@@ -8363,6 +8375,8 @@
                     const d = await resp.json();
                     if (d.error) throw new Error(`Anthropic Local Error: ${d.error.message}`);
                     return { text: d.content[0].text, tokens: d.usage?.total_tokens || 0, model: modelName };
+                } else if (modelName === 'gpt-image-1') {
+                    throw new Error("Images 2.0 requires the server proxy. Please check Firebase Functions deployment.");
                 } else if (modelName.includes('gpt')) {
                     const apiKey = quickApiKey || window.OPENAI_API_KEY;
                     if (!apiKey) throw new Error("OpenAI API Key not found for local fallback.");
@@ -17212,7 +17226,7 @@ async function saveQuiz() {
                 }
                 if (metaEl) metaEl.textContent = 'Generating real image via OpenAI Images 2.0 (gpt-image-1)...';
 
-                const { text, model } = await window.callUniversalAI(
+                const imageResponse = await window.callUniversalAI(
                     'gpt-image-1',
                     prompt,
                     false,
@@ -17220,13 +17234,26 @@ async function saveQuiz() {
                     '',
                     { size: '1024x1024', quality: 'medium', background: 'opaque', output_format: 'png' }
                 );
+                const { model } = imageResponse || {};
+                const rawImage = imageResponse?.text
+                    || imageResponse?.imageDataUrl
+                    || imageResponse?.dataUrl
+                    || imageResponse?.raw?.imageDataUrl
+                    || imageResponse?.raw?.dataUrl
+                    || imageResponse?.raw?.text
+                    || imageResponse?.raw?.data?.[0]?.url
+                    || imageResponse?.raw?.data?.[0]?.b64_json
+                    || '';
+                const imageDataUrl = String(rawImage).startsWith('data:image/')
+                    ? String(rawImage)
+                    : (String(rawImage).length > 100 ? `data:image/png;base64,${rawImage}` : '');
 
-                if (!text || !String(text).startsWith('data:image/')) {
+                if (!imageDataUrl) {
                     throw new Error('Image response not returned as a valid data URL');
                 }
 
-                if (imageEl) imageEl.src = text;
-                if (dlEl) dlEl.href = text;
+                if (imageEl) imageEl.src = imageDataUrl;
+                if (dlEl) dlEl.href = imageDataUrl;
                 if (imageWrap) imageWrap.style.display = 'block';
                 if (metaEl) metaEl.textContent = `Image generated (${model || 'gpt-image-1'}). You can download now.`;
 
