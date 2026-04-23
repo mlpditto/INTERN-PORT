@@ -283,6 +283,34 @@
             padding-inline: 9px;
         }
 
+        .edit-case-note-modal-content {
+            max-width: 680px;
+            width: 94%;
+            text-align: left;
+            border-radius: 24px;
+            border: 1px solid rgba(245,158,11,0.28);
+            background: linear-gradient(180deg,#fffdf7 0%,#ffffff 100%);
+            box-shadow: 0 24px 60px rgba(15,23,42,0.22);
+            padding: 26px 26px 22px;
+        }
+
+        .edit-case-note-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid #fde68a;
+        }
+
+        .edit-case-note-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
         @media (max-width: 980px) {
             .alabasta-action-btn {
                 min-height: 30px;
@@ -296,6 +324,28 @@
 
             #alabastaCaseTable td:last-child {
                 min-width: 176px;
+            }
+
+            .edit-case-note-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 640px) {
+            .edit-case-note-modal-content {
+                width: calc(100% - 20px);
+                padding: 20px 16px 18px;
+                border-radius: 20px;
+            }
+
+            .edit-case-note-header {
+                flex-direction: column;
+                align-items: flex-start;
+                padding-right: 28px;
+            }
+
+            .edit-case-note-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
 
@@ -7369,9 +7419,9 @@
     </div>
 
     <div id="editCaseNoteModal" class="modal" style="z-index:4300;">
-        <div class="modal-content" style="max-width:680px; width:94%; text-align:left; border-radius:24px; border:1px solid rgba(245,158,11,0.28); background:linear-gradient(180deg,#fffdf7 0%,#ffffff 100%); box-shadow:0 24px 60px rgba(15,23,42,0.22); padding:26px 26px 22px;">
+        <div class="modal-content edit-case-note-modal-content">
             <span class="close-modal" onclick="closeEditCaseNoteModal()" style="top:14px; right:16px;">&times;</span>
-            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid #fde68a;">
+            <div class="edit-case-note-header">
                 <div>
                     <h3 style="margin:0; color:#92400e; font-size:1.45em; font-weight:900; display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-pen-to-square"></i> Edit Case Note</h3>
                     <div style="margin-top:6px; font-size:0.88em; color:#78716c;">Adjust the submitted note while keeping the case context visible for admin review.</div>
@@ -7381,7 +7431,7 @@
 
             <input type="hidden" id="edit-case-note-id">
 
-            <div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; margin-bottom:14px;">
+            <div class="edit-case-note-grid">
                 <div style="background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px;">
                     <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">User</div>
                     <div id="edit-case-note-user" style="margin-top:4px; color:#1f2937; font-weight:800; word-break:break-word;">-</div>
@@ -7393,6 +7443,14 @@
                 <div style="background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px;">
                     <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Disease</div>
                     <div id="edit-case-note-disease" style="margin-top:4px; color:#1f2937; font-weight:800; word-break:break-word;">-</div>
+                </div>
+                <div style="background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px;">
+                    <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Customer</div>
+                    <div id="edit-case-note-customer" style="margin-top:4px; color:#1f2937; font-weight:800; word-break:break-word;">-</div>
+                </div>
+                <div style="background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px;">
+                    <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Score</div>
+                    <div id="edit-case-note-score" style="margin-top:4px; color:#166534; font-weight:900; word-break:break-word;">0.00 pts</div>
                 </div>
             </div>
 
@@ -16429,8 +16487,12 @@ Do not include any explanation other than the feedback body.`;
                             const idEl = document.getElementById('edit-case-note-id');
                             const saveBtn = document.getElementById('edit-case-note-save-btn');
                             const metaEl = document.getElementById('edit-case-note-meta');
+                            const customerEl = document.getElementById('edit-case-note-customer');
+                            const scoreEl = document.getElementById('edit-case-note-score');
                             if (noteEl) noteEl.value = '';
                             if (idEl) idEl.value = '';
+                            if (customerEl) customerEl.textContent = '-';
+                            if (scoreEl) scoreEl.textContent = '0.00 pts';
                             if (metaEl) metaEl.textContent = 'Changes will be saved with admin audit fields.';
                             if (saveBtn) {
                                 saveBtn.disabled = false;
@@ -16449,6 +16511,8 @@ Do not include any explanation other than the feedback body.`;
                             const userEl = document.getElementById('edit-case-note-user');
                             const refEl = document.getElementById('edit-case-note-ref');
                             const diseaseEl = document.getElementById('edit-case-note-disease');
+                            const customerEl = document.getElementById('edit-case-note-customer');
+                            const scoreEl = document.getElementById('edit-case-note-score');
                             const noteEl = document.getElementById('edit-case-note-text');
                             const metaEl = document.getElementById('edit-case-note-meta');
 
@@ -16456,6 +16520,8 @@ Do not include any explanation other than the feedback body.`;
                             if (userEl) userEl.textContent = caseItem.displayName || caseItem.userId || '-';
                             if (refEl) refEl.textContent = caseItem.caseId || '-';
                             if (diseaseEl) diseaseEl.textContent = caseItem.disease || '-';
+                            if (customerEl) customerEl.textContent = caseItem.customer || '-';
+                            if (scoreEl) scoreEl.textContent = `${Number(caseItem.adminBonus || 0).toFixed(2)} pts`;
                             if (noteEl) {
                                 noteEl.value = String(caseItem.note || '');
                                 setTimeout(() => noteEl.focus(), 40);
