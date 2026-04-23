@@ -31,7 +31,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"], ti
             return res.status(401).json({ error: "Unauthorized access to AI Proxy" });
         }
 
-        const { provider, model, prompt, isJson, visionData } = req.body;
+        const { provider, model, prompt, isJson, visionData, generationOptions = {} } = req.body;
         if (!provider || (provider !== "cloud_tts" && !prompt)) {
             return res.status(400).json({ error: "Missing provider or prompt" });
         }
@@ -97,7 +97,12 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"], ti
 
         if (provider === "openai") {
             const apiKey = process.env.OPENAI_API_KEY;
-            const endpoint = model === 'dalle' ? "https://api.openai.com/v1/images/generations" : "https://api.openai.com/v1/chat/completions";
+            if (!apiKey) {
+                return res.status(500).json({ error: "OPENAI_API_KEY is not configured on server." });
+            }
+
+            const imageModelRequested = model === "dalle" || model === "gpt-image-1";
+            const endpoint = imageModelRequested ? "https://api.openai.com/v1/images/generations" : "https://api.openai.com/v1/chat/completions";
             
             const actualModel = model.includes('gpt-5') ? model : (model.includes('gpt-4') ? 'gpt-5.4-mini' : model);
             
@@ -107,12 +112,24 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"], ti
                 tailoredPrompt += "\n\n(Respond in strictly valid JSON format)";
             }
 
-            const body = model === 'dalle' ? {
-                model: "dall-e-3",
-                prompt: prompt,
-                n: 1,
-                size: "1024x1024"
-            } : {
+            const body = imageModelRequested ? (
+                model === "gpt-image-1"
+                    ? {
+                        model: "gpt-image-1",
+                        prompt: prompt,
+                        size: generationOptions.size || "1024x1024",
+                        quality: generationOptions.quality || "medium",
+                        background: generationOptions.background || "opaque",
+                        response_format: "b64_json",
+                        output_format: generationOptions.output_format || "png"
+                    }
+                    : {
+                        model: "dall-e-3",
+                        prompt: prompt,
+                        n: 1,
+                        size: generationOptions.size || "1024x1024"
+                    }
+            ) : {
                 model: actualModel,
                 messages: [{ role: "user", content: tailoredPrompt }],
                 response_format: (isJson && !actualModel.includes('o1')) ? { type: "json_object" } : undefined,
@@ -124,6 +141,13 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY"], ti
                 headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" }
             });
 
+            if (model === "gpt-image-1") {
+                const b64 = response?.data?.data?.[0]?.b64_json;
+                if (!b64) {
+                    return res.status(500).json({ error: "No image payload returned from gpt-image-1" });
+                }
+                return res.json({ text: `data:image/png;base64,${b64}`, model: "gpt-image-1" });
+            }
             if (model === 'dalle') {
                 return res.json({ text: response.data.data[0].url, model: "dall-e-3" });
             } else {

@@ -7618,6 +7618,15 @@
                 </div>
 
                 <div id="edit-case-taxonomy-preview" class="edit-case-taxonomy-preview">Choose a primary system to generate a canonical taxonomy summary.</div>
+                <details style="margin-top:10px; background:#fff; border:1px solid #fcd34d; border-radius:12px; padding:8px 10px;">
+                    <summary style="cursor:pointer; font-size:0.8em; font-weight:800; color:#92400e;">Mini Help (Admin)</summary>
+                    <div style="margin-top:8px; font-size:0.78em; line-height:1.55; color:#475569;">
+                        1. Set one <b>Primary System</b> as the main classification.<br>
+                        2. Pick from <b>Suggested Tags</b> first to keep data consistent.<br>
+                        3. Use <b>Custom Tag</b> only when needed for rare or specific terms.<br>
+                        4. Confirm <b>Selected Tags</b> and Canonical Summary before saving.
+                    </div>
+                </details>
             </div>
 
             <label for="edit-case-note-text" style="display:block; margin-bottom:8px; font-weight:800; color:#374151;">Case Note</label>
@@ -8185,7 +8194,7 @@
                             if (typeof initAIUsageDisplay === 'function') initAIUsageDisplay();
                         };
 
-                        window.callUniversalAI = async function (modelName, prompt, isJson = false, visionData = null, quickApiKey = '') {
+                        window.callUniversalAI = async function (modelName, prompt, isJson = false, visionData = null, quickApiKey = '', generationOptions = null) {
                             const PROXY_SECRET = "mlp-secret-8888";
                             let PROXY_URL = (window.location.hostname === 'mlp-int.work') ? '/api/ai' : 'https://mlp-int.work/api/ai';
                             const BACKUP_PROXY = 'https://intern-port-edfa7.web.app/api/ai';
@@ -8217,8 +8226,8 @@
                                     const proxyResponse = await fetch(PROXY_URL, {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json', 'x-mlp-secret': PROXY_SECRET },
-                                        body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData })
-                                    });
+                                    body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData, generationOptions: generationOptions || undefined })
+                                });
                                     if (proxyResponse.ok) {
                                         const proxyData = await proxyResponse.json();
                                         updateAIUsage(proxyProvider, proxyData.tokens || 0);
@@ -8228,8 +8237,8 @@
                                         const backupResponse = await fetch(BACKUP_PROXY, {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json', 'x-mlp-secret': PROXY_SECRET },
-                                            body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData })
-                                        }).catch(() => null);
+                                        body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData, generationOptions: generationOptions || undefined })
+                                    }).catch(() => null);
                                         
                                         if (backupResponse && backupResponse.ok) {
                                             const proxyData = await backupResponse.json();
@@ -8245,8 +8254,8 @@
                                     const backupResponse = await fetch(BACKUP_PROXY, {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json', 'x-mlp-secret': PROXY_SECRET },
-                                        body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData })
-                                    });
+                                    body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData, generationOptions: generationOptions || undefined })
+                                });
                                     if (backupResponse.ok) {
                                         const proxyData = await backupResponse.json();
                                         updateAIUsage(proxyProvider, proxyData.tokens || 0);
