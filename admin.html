@@ -3387,7 +3387,7 @@
 
                     <div class="hub-mode-toggle" style="margin:0; background:linear-gradient(135deg, #f8fafc, #fefce8); padding:8px; border-radius:18px; border:1.5px solid #dbeafe;">
                         <button class="hub-mode-btn active" id="btn-hub-design" onclick="switchHubMode('design')">
-                            🏴 Design Deck
+                            🏴 Miss Goldenweek
                         </button>
                         <button class="hub-mode-btn" id="btn-hub-research" onclick="switchHubMode('research')">
                             🧭 Research Log
@@ -4053,7 +4053,7 @@
                     }
                     if (typeof syncTtsChips === 'function') setTimeout(syncTtsChips, 50);
                 }
-                const _modeLabels = { design: 'Design Lab', research: 'Research Assistant', laboon: 'Laboon' };
+                const _modeLabels = { design: 'Miss Goldenweek', research: 'Research Assistant', laboon: 'Laboon' };
                 if (typeof showToast === 'function') showToast('Switched to ' + (_modeLabels[mode] || mode));
             };
 
@@ -7813,11 +7813,23 @@
                         <textarea id="alabasta-case-card-original" readonly style="width:100%; min-height:130px; resize:vertical; padding:12px 14px; border-radius:14px; border:1.5px solid #e5e7eb; background:#fff; color:#111827; font-size:0.92em; line-height:1.6;"></textarea>
                     </div>
                     <div class="alabasta-visual-card">
-                        <label class="alabasta-visual-label" for="alabasta-case-card-prompt">Images 2.0 Prompt</label>
+                        <label class="alabasta-visual-label" for="alabasta-case-card-prompt">GenMage Prompt</label>
                         <textarea id="alabasta-case-card-prompt" style="width:100%; min-height:130px; resize:vertical; padding:12px 14px; border-radius:14px; border:1.5px solid #c4b5fd; background:#fff; color:#111827; font-size:0.92em; line-height:1.6;"></textarea>
                     </div>
                 </div>
             </details>
+
+            <div class="alabasta-visual-card" style="margin-bottom:12px; padding:12px 14px;">
+                <label class="alabasta-visual-label" for="alabasta-case-card-model">GenMage AI Model</label>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                    <select id="alabasta-case-card-model" style="min-width:260px; max-width:100%; border:1.5px solid #ddd6fe; border-radius:12px; padding:10px 12px; background:#fff; color:#312e81; font-weight:800;">
+                        <option value="gpt-image-1">OpenAI Images (gpt-image-1)</option>
+                        <option value="imagen">Google Vertex Imagen 3</option>
+                        <option value="imagen-nano">Google Imagen 3 Nano</option>
+                    </select>
+                    <span style="font-size:0.78em; color:#64748b;">If OpenAI key is rejected, try Imagen 3 fallback.</span>
+                </div>
+            </div>
 
             <div id="alabasta-case-card-image-wrap" class="alabasta-visual-card" style="margin-bottom:12px; display:none;">
                 <label class="alabasta-visual-label">Generated Image</label>
@@ -7831,7 +7843,7 @@
                 <div id="alabasta-case-card-meta" style="font-size:0.8em; color:#64748b;">No identifiers should appear in the safe summary or image prompt.</div>
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
                     <button type="button" class="btn-sm" onclick="refreshAlabastaCaseCardDraft()" style="background:#7c3aed; color:#fff; border:none; border-radius:12px; padding:10px 16px; font-weight:900;"><i class="fa-solid fa-wand-magic-sparkles"></i> Refresh Scaffold</button>
-                    <button type="button" class="btn-sm" onclick="generateAlabastaCaseCardImage()" id="alabasta-case-card-generate-btn" style="background:linear-gradient(135deg,#7c3aed,#4c1d95); color:#fff; border:none; border-radius:12px; padding:10px 16px; font-weight:900;"><i class="fa-solid fa-image"></i> Generate Image 2.0</button>
+                    <button type="button" class="btn-sm" onclick="generateAlabastaCaseCardImage()" id="alabasta-case-card-generate-btn" style="background:linear-gradient(135deg,#7c3aed,#4c1d95); color:#fff; border:none; border-radius:12px; padding:10px 16px; font-weight:900;"><i class="fa-solid fa-image"></i> GenMage</button>
                     <button type="button" class="btn-sm" onclick="copyAlabastaCaseCardPrompt()" style="background:#0f172a; color:#fff; border:none; border-radius:12px; padding:10px 16px; font-weight:800;"><i class="fa-solid fa-copy"></i> Copy Prompt</button>
                     <button type="button" class="btn-sm" onclick="saveAlabastaCaseCardScaffold()" id="alabasta-case-card-save-btn" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed); color:white; border:none; border-radius:12px; padding:10px 16px; font-weight:900;"><i class="fa-solid fa-floppy-disk"></i> Save Scaffold</button>
                     <button type="button" class="btn-sm" onclick="closeAlabastaCaseCardModal()" style="background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Close</button>
@@ -17113,7 +17125,7 @@ async function saveQuiz() {
             if (dlEl) dlEl.href = '#';
             if (genBtn) {
                 genBtn.disabled = false;
-                genBtn.innerHTML = '<i class="fa-solid fa-image"></i> Generate Image 2.0';
+                genBtn.innerHTML = '<i class="fa-solid fa-image"></i> GenMage';
             }
             if (saveBtn) {
                 saveBtn.disabled = false;
@@ -17214,6 +17226,7 @@ async function saveQuiz() {
             const imageEl = document.getElementById('alabasta-case-card-image-preview');
             const dlEl = document.getElementById('alabasta-case-card-image-download');
             const genBtn = document.getElementById('alabasta-case-card-generate-btn');
+            const selectedModel = document.getElementById('alabasta-case-card-model')?.value || 'gpt-image-1';
             const caseItem = getAlabastaCaseById(caseDocId);
             if (!caseItem || !caseDocId) return alert('Case not found');
             if (!prompt) return alert('Prompt is empty');
@@ -17224,15 +17237,22 @@ async function saveQuiz() {
                     genBtn.disabled = true;
                     genBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
                 }
-                if (metaEl) metaEl.textContent = 'Generating real image via OpenAI Images 2.0 (gpt-image-1)...';
+                const modelLabelMap = {
+                    'gpt-image-1': 'OpenAI Images (gpt-image-1)',
+                    imagen: 'Google Vertex Imagen 3',
+                    'imagen-nano': 'Google Imagen 3 Nano'
+                };
+                if (metaEl) metaEl.textContent = `GenMage is generating via ${modelLabelMap[selectedModel] || selectedModel}...`;
 
                 const imageResponse = await window.callUniversalAI(
-                    'gpt-image-1',
+                    selectedModel,
                     prompt,
                     false,
                     null,
                     '',
-                    { size: '1024x1024', quality: 'medium', background: 'opaque', output_format: 'png' }
+                    selectedModel === 'gpt-image-1'
+                        ? { size: '1024x1024', quality: 'medium', background: 'opaque', output_format: 'png' }
+                        : { size: '1024x1024' }
                 );
                 const { model } = imageResponse || {};
                 const rawImage = imageResponse?.text
@@ -17255,16 +17275,16 @@ async function saveQuiz() {
                 if (imageEl) imageEl.src = imageDataUrl;
                 if (dlEl) dlEl.href = imageDataUrl;
                 if (imageWrap) imageWrap.style.display = 'block';
-                if (metaEl) metaEl.textContent = `Image generated (${model || 'gpt-image-1'}). You can download now.`;
+                if (metaEl) metaEl.textContent = `GenMage image generated (${model || selectedModel}). You can download now.`;
 
                 await db.collection('cases').doc(caseDocId).update({
                     caseVisualGeneratedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    caseVisualImageModel: model || 'gpt-image-1',
+                    caseVisualImageModel: model || selectedModel,
                     caseVisualGenerationStatus: 'generated',
                     caseVisualGeneratedBy: ALLOWED_EMAIL || 'admin'
                 });
                 syncAlabastaCaseBridgeMarker(caseDocId, {
-                    caseVisualImageModel: model || 'gpt-image-1',
+                    caseVisualImageModel: model || selectedModel,
                     caseVisualGenerationStatus: 'generated',
                     caseVisualGeneratedBy: ALLOWED_EMAIL || 'admin'
                 });
@@ -17275,7 +17295,7 @@ async function saveQuiz() {
             } finally {
                 if (genBtn) {
                     genBtn.disabled = false;
-                    genBtn.innerHTML = originalHtml || '<i class="fa-solid fa-image"></i> Generate Image 2.0';
+                    genBtn.innerHTML = originalHtml || '<i class="fa-solid fa-image"></i> GenMage';
                 }
             }
         }
