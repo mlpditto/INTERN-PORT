@@ -19,6 +19,28 @@ function getAudioMimeType(audioEncoding) {
     return "audio/wav";
 }
 
+function sanitizeProxyErrorMessage(err) {
+    const status = err?.response?.status;
+    const providerError = err?.response?.data?.error;
+    const rawMessage = providerError?.message || err?.message || "AI proxy request failed.";
+
+    if (status === 401 && /api key|incorrect|invalid|unauthorized/i.test(rawMessage)) {
+        return "OpenAI API key was rejected. Please rotate and redeploy the OPENAI_API_KEY Firebase secret.";
+    }
+
+    return String(rawMessage)
+        .replace(/sk-[A-Za-z0-9_-]+/g, "sk-REDACTED")
+        .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer REDACTED");
+}
+
+function getSafeProviderError(err) {
+    return {
+        status: err?.response?.status || 500,
+        type: err?.response?.data?.error?.type || undefined,
+        code: err?.response?.data?.error?.code || undefined
+    };
+}
+
 /**
  * 🤖 AI Proxy Function (V89.19)
  * Handles: Gemini, OpenAI, and Vertex AI (Imagen 3)
@@ -312,10 +334,10 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
         return res.status(400).json({ error: "Unsupported provider" });
 
     } catch (err) {
-        console.error("🔥 Proxy Error:", err.response ? err.response.data : err.message);
+        console.error("AI Proxy Error:", { message: sanitizeProxyErrorMessage(err), ...getSafeProviderError(err) });
         return res.status(500).json({ 
-            error: err.response?.data?.error?.message || err.message,
-            details: err.response?.data 
+            error: sanitizeProxyErrorMessage(err),
+            details: getSafeProviderError(err)
         });
     }
 });
