@@ -3416,7 +3416,7 @@
                             <div id="hub-ctrl-design-engine">
                                 <select id="design-engine" style="width:100%; padding:12px; border:1.5px solid #eee; border-radius:14px; font-size:0.95em; color:var(--primary); font-weight:bold; cursor:pointer; outline:none; background:#f9fbff;" onchange="if(document.getElementById('design-engine-inline')) document.getElementById('design-engine-inline').value = this.value;">
                                     <option value="imagen">Google Vertex AI (Imagen 3)</option>
-                                    <option value="imagen-nano">Google Imagen 3 (Nano - Fast)</option>
+                                    <option value="imagen-nano">Google Imagen 3 Fast</option>
                                     <option value="dalle">OpenAI DALL-E 3</option>
                                 </select>
                             </div>
@@ -3533,7 +3533,7 @@
                                             <i class="fa-solid fa-microchip" style="color:#94a3b8;"></i>
                                             <select id="design-engine-inline" style="padding:10px 15px; border-radius:14px; border:1.5px solid #e2e8f0; background:white; font-size:0.9em; font-weight:700; color:#1e293b; outline:none; cursor:pointer;" onchange="document.getElementById('design-engine').value = this.value">
                                                 <option value="imagen">🚀 Google Vertex (Imagen 3)</option>
-                                                <option value="imagen-nano">⚡ Vertex (Imagen Nano)</option>
+                                                <option value="imagen-nano">⚡ Vertex (Imagen Fast)</option>
                                                 <option value="dalle">🎨 OpenAI (DALL-E 3)</option>
                                             </select>
                                         </div>
@@ -7825,7 +7825,7 @@
                     <select id="alabasta-case-card-model" style="min-width:260px; max-width:100%; border:1.5px solid #ddd6fe; border-radius:12px; padding:10px 12px; background:#fff; color:#312e81; font-weight:800;">
                         <option value="gpt-image-1">OpenAI Images (gpt-image-1)</option>
                         <option value="imagen">Google Vertex Imagen 3</option>
-                        <option value="imagen-nano">Google Imagen 3 Nano</option>
+                        <option value="imagen-nano">Google Imagen 3 Fast</option>
                     </select>
                     <span style="font-size:0.78em; color:#64748b;">If OpenAI key is rejected, try Imagen 3 fallback.</span>
                 </div>
@@ -8248,6 +8248,7 @@
             } else if (modelName.includes('glm-5.1') || modelName.includes('ollama')) {
                 proxyProvider = "ollama";
             }
+            const isProxyOnlyImageModel = ['gpt-image-1', 'imagen', 'imagen-nano'].includes(modelName);
             try {
 
                 if (proxyProvider !== "") {
@@ -8275,7 +8276,7 @@
                             updateAIUsage(proxyProvider, proxyData.tokens || 0);
                             return { text: proxyData.text || proxyData.imageDataUrl || proxyData.dataUrl || '', tokens: proxyData.tokens || 0, model: proxyData.model || modelName, raw: proxyData };
                         }
-                        if (modelName === 'gpt-image-1') {
+                        if (isProxyOnlyImageModel) {
                             throw new Error(primaryError?.error || `Images proxy failed with status ${proxyResponse.status}`);
                         }
                         console.warn('[AI Proxy] Backup failed. Attempting local fallback...');
@@ -8295,12 +8296,12 @@
                         updateAIUsage(proxyProvider, proxyData.tokens || 0);
                         return { text: proxyData.text || proxyData.imageDataUrl || proxyData.dataUrl || '', tokens: proxyData.tokens || 0, model: proxyData.model || modelName, raw: proxyData };
                     }
-                    if (modelName === 'gpt-image-1') {
+                    if (isProxyOnlyImageModel) {
                         const backupError = await backupResponse.json().catch(() => ({}));
                         throw new Error(backupError?.error || `Images proxy failed with status ${backupResponse.status}`);
                     }
                 } catch (be) {
-                    if (modelName === 'gpt-image-1') throw be;
+                    if (isProxyOnlyImageModel) throw be;
                     console.warn('[AI Proxy] Backup also failed. Using local SDK.');
                 }
             }
@@ -8387,8 +8388,8 @@
                     const d = await resp.json();
                     if (d.error) throw new Error(`Anthropic Local Error: ${d.error.message}`);
                     return { text: d.content[0].text, tokens: d.usage?.total_tokens || 0, model: modelName };
-                } else if (modelName === 'gpt-image-1') {
-                    throw new Error("Images 2.0 requires the server proxy. Please check Firebase Functions deployment.");
+                } else if (isProxyOnlyImageModel) {
+                    throw new Error("GenMage image models require the server proxy. Please check Firebase Functions deployment.");
                 } else if (modelName.includes('gpt')) {
                     const apiKey = quickApiKey || window.OPENAI_API_KEY;
                     if (!apiKey) throw new Error("OpenAI API Key not found for local fallback.");
@@ -17240,7 +17241,7 @@ async function saveQuiz() {
                 const modelLabelMap = {
                     'gpt-image-1': 'OpenAI Images (gpt-image-1)',
                     imagen: 'Google Vertex Imagen 3',
-                    'imagen-nano': 'Google Imagen 3 Nano'
+                    'imagen-nano': 'Google Imagen 3 Fast'
                 };
                 if (metaEl) metaEl.textContent = `GenMage is generating via ${modelLabelMap[selectedModel] || selectedModel}...`;
 

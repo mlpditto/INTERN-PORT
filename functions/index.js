@@ -66,7 +66,9 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             const client = await auth.getClient();
             const token = await client.getAccessToken();
 
-            const actualModelName = (model === "imagen-nano") ? "imagen-3.0-nano-001" : "imagen-3.0-generate-001";
+            const actualModelName = (model === "imagen-nano")
+                ? "imagen-3.0-fast-generate-001"
+                : "imagen-3.0-generate-002";
             const endpoint = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/publishers/google/models/${actualModelName}:predict`;
 
             const response = await axios.post(endpoint, {
