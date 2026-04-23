@@ -4,15 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V90.99.3.9.1</title>
-    <!-- [Version: V90.99.3.9.1] Audio Player Visibility Fix -->
-    <!-- Release: 2026-04-21 13:00 UTC+7 -->
+    <title>Nika V91.22</title>
+    <!-- [Version: V91.22] Permission Diagnostics & Log Deduplication -->
+    <!-- Release: 2026-04-24 01:00 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
     <script>
-        // Force unregister service workers to fix persistent caching issues ([Version: V90.99.3.9.1])
+        // Force unregister service workers to fix persistent caching issues ([Version: V91.20])
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for(let registration of registrations) { registration.unregister(); }
@@ -88,7 +88,7 @@
                 if (typeof showToast === 'function') showToast(`🤖 Model set to: ${el.innerText}`);
             }
         };
-        // [Version: V90.99.3.4] Early definition to prevent ReferenceError
+        // [Version: V91.20] Early definition to prevent ReferenceError
         window.switchHubMode = window.switchHubMode || function(mode) { console.warn('switchHubMode not yet fully loaded:', mode); };
 
     </script>
@@ -121,6 +121,335 @@
             display: block !important;
             opacity: 1 !important;
             visibility: visible !important;
+        }
+
+        .reflective-liquid-modal {
+            max-width: 560px;
+            border-radius: 28px !important;
+            border: 1px solid rgba(255,255,255,0.55);
+            background: radial-gradient(120% 120% at 0% 0%, rgba(251,191,36,0.22) 0%, rgba(251,191,36,0) 48%), radial-gradient(120% 120% at 100% 0%, rgba(14,165,233,0.16) 0%, rgba(14,165,233,0) 45%), linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(255,250,245,0.94) 100%);
+            box-shadow: 0 30px 80px rgba(15,23,42,0.24);
+            backdrop-filter: blur(22px);
+            -webkit-backdrop-filter: blur(22px);
+            padding: 22px 22px 18px;
+            overflow: hidden;
+        }
+
+        .reflective-liquid-header { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:12px; }
+        .reflective-liquid-title { margin:0; color:#7c2d12; font-size:1.15em; font-weight:900; letter-spacing:-0.01em; display:flex; align-items:center; gap:8px; }
+        .reflective-close-btn { width:34px; height:34px; border:1px solid rgba(148,163,184,0.2); border-radius:12px; background:rgba(255,255,255,0.5); color:#475569; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:0.2s ease; }
+        .reflective-close-btn:hover { transform:translateY(-1px); background:rgba(255,255,255,0.82); color:#0f172a; }
+        .reflective-review-shell { display:grid; gap:10px; }
+        .reflective-review-card { border-radius:18px; border:1px solid rgba(255,255,255,0.65); background:linear-gradient(180deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.7) 100%); box-shadow:inset 0 1px 0 rgba(255,255,255,0.65), 0 8px 20px rgba(148,163,184,0.08); }
+        .reflective-review-user-card { padding:12px 14px; }
+        .reflective-review-field { padding:10px 14px; }
+        .reflective-review-label-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+        .reflective-review-label { color:#475569; font-size:0.78em; font-weight:900; text-transform:uppercase; letter-spacing:0.07em; }
+        .reflective-review-inline-hint { color:#94a3b8; font-size:0.75em; font-weight:700; }
+        .reflective-bonus-row { display:flex; align-items:center; gap:10px; }
+        .reflective-bonus-input, .reflective-review-select, .reflective-review-textarea { width:100%; border:1px solid rgba(203,213,225,0.9); background:rgba(255,255,255,0.76); color:#0f172a; outline:none; transition:border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease; }
+        .reflective-bonus-input:focus, .reflective-review-select:focus, .reflective-review-textarea:focus { border-color:rgba(245,158,11,0.7); box-shadow:0 0 0 4px rgba(245,158,11,0.12); background:rgba(255,255,255,0.94); }
+        .reflective-bonus-input { flex:1; padding:12px 14px; border-radius:16px; font-size:1.15em; font-weight:900; color:#c2410c; }
+        .reflective-bonus-unit { display:inline-flex; align-items:center; justify-content:center; min-width:56px; padding:12px 14px; border-radius:16px; background:rgba(255,255,255,0.66); border:1px solid rgba(226,232,240,0.95); color:#64748b; font-size:0.8em; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; }
+        .reflective-review-toolbar { display:grid; gap:10px; margin-bottom:10px; }
+        .reflective-review-tabs { display:flex; align-items:center; gap:8px; overflow-x:auto; padding:6px; border-radius:18px; background:linear-gradient(180deg, rgba(255,255,255,0.68) 0%, rgba(241,245,249,0.55) 100%); border:1px solid rgba(226,232,240,0.92); box-shadow:inset 0 1px 0 rgba(255,255,255,0.7); scrollbar-width:none; }
+        .reflective-review-tabs::-webkit-scrollbar { display:none; }
+        .reflective-review-model-chip { border:0; background:transparent; color:#64748b; padding:10px 14px; min-width:max-content; border-radius:14px; font-size:0.76em; font-weight:900; letter-spacing:0.02em; cursor:pointer; transition:transform 0.18s ease, background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease; }
+        .reflective-review-model-chip:hover { color:#1e293b; transform:translateY(-1px); }
+        .reflective-review-model-chip.active { background:linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,247,237,0.9) 100%); color:#9a3412; box-shadow:0 10px 24px rgba(245,158,11,0.18), inset 0 1px 0 rgba(255,255,255,0.85); }
+        .reflective-review-secondary-controls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+        .reflective-review-select { padding:9px 12px; border-radius:14px; font-size:0.78em; font-weight:800; cursor:pointer; }
+        .reflective-review-select.lang { min-width:86px; flex:0 0 auto; }
+        .reflective-review-select.preset { flex:1 1 180px; }
+        .reflective-review-ai-btn { border:0; border-radius:16px; background:linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); color:white; padding:10px 14px; font-size:0.78em; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:7px; box-shadow:0 12px 30px rgba(99,102,241,0.28); }
+        .reflective-review-ai-btn:disabled { opacity:0.7; cursor:progress; }
+        .reflective-review-settings-btn { width:40px; height:40px; border:1px solid rgba(196,181,253,0.8); border-radius:14px; background:rgba(245,243,255,0.92); color:#6d28d9; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+        .reflective-review-textarea { min-height:112px; padding:14px 15px; border-radius:18px; font-size:0.95em; line-height:1.6; resize:vertical; }
+        .reflective-review-status { display:none; align-items:center; gap:8px; padding:10px 12px; border-radius:14px; margin-top:10px; font-size:0.8em; font-weight:700; }
+        .reflective-review-status.show { display:flex; }
+        .reflective-review-status.error { background:rgba(254,242,242,0.95); border:1px solid rgba(248,113,113,0.22); color:#b91c1c; }
+        .reflective-review-status.success { background:rgba(240,253,244,0.96); border:1px solid rgba(74,222,128,0.22); color:#15803d; }
+        .reflective-review-actions { display:flex; gap:10px; }
+        .reflective-review-save-btn { flex:1.5; min-height:48px; border-radius:18px; border:0; background:linear-gradient(135deg, #ea580c 0%, #f59e0b 100%); color:white; font-size:0.92em; font-weight:900; box-shadow:0 16px 32px rgba(234,88,12,0.25); }
+        .reflective-review-cancel-btn { flex:1; min-height:48px; border-radius:18px !important; background:rgba(15,23,42,0.92) !important; }
+        .reflective-log-meta { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+        .reflective-log-avatar { width:42px; height:42px; border-radius:50%; border:2px solid rgba(245,158,11,0.7); object-fit:cover; background:linear-gradient(135deg, #fff7ed 0%, #fde68a 100%); }
+        .reflective-log-name { font-weight:900; color:#9a3412; }
+        .reflective-log-date { font-size:0.76em; color:#94a3b8; }
+        .reflective-log-content { font-size:0.98em; color:#334155; line-height:1.55; }
+
+        .alabasta-genmage-model-rail {
+            display:flex;
+            align-items:center;
+            gap:8px;
+            overflow-x:auto;
+            padding:6px;
+            border-radius:18px;
+            border:1px solid rgba(196,181,253,0.65);
+            background:linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(245,243,255,0.88) 100%);
+            box-shadow:inset 0 1px 0 rgba(255,255,255,0.92), 0 10px 24px rgba(124,58,237,0.08);
+            scrollbar-width:none;
+        }
+
+        .alabasta-genmage-model-rail::-webkit-scrollbar { display:none; }
+
+        .alabasta-genmage-model-chip {
+            border:none;
+            background:transparent;
+            color:#6d28d9;
+            padding:10px 14px;
+            border-radius:14px;
+            min-width:max-content;
+            font-size:0.82em;
+            font-weight:900;
+            cursor:pointer;
+            transition:0.18s ease;
+        }
+
+        .alabasta-genmage-model-chip:hover {
+            color:#4c1d95;
+            transform:translateY(-1px);
+        }
+
+        .alabasta-genmage-model-chip.active {
+            background:linear-gradient(135deg, rgba(124,58,237,0.98) 0%, rgba(168,85,247,0.94) 100%);
+            color:#fff;
+            box-shadow:0 14px 28px rgba(124,58,237,0.22);
+        }
+
+        .alabasta-genmage-image-actions {
+            display:flex;
+            align-items:center;
+            gap:12px;
+            flex-wrap:wrap;
+        }
+
+        .alabasta-genmage-image-meta {
+            font-size:0.8em;
+            color:#64748b;
+            font-weight:700;
+        }
+
+        .alabasta-genmage-gallery {
+            position:relative;
+            border-radius:24px;
+            padding:18px;
+            background:
+                radial-gradient(120% 120% at 0% 0%, rgba(196,181,253,0.18) 0%, rgba(196,181,253,0) 40%),
+                radial-gradient(120% 120% at 100% 100%, rgba(251,191,36,0.12) 0%, rgba(251,191,36,0) 34%),
+                linear-gradient(180deg, rgba(250,245,255,0.96) 0%, rgba(255,255,255,0.96) 100%);
+            border:1px solid rgba(221,214,254,0.92);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.88), 0 18px 36px rgba(124,58,237,0.08);
+            overflow:hidden;
+        }
+
+        .alabasta-genmage-gallery::before {
+            content:'';
+            position:absolute;
+            inset:0;
+            background:linear-gradient(120deg, rgba(255,255,255,0) 20%, rgba(255,255,255,0.38) 50%, rgba(255,255,255,0) 80%);
+            transform:translateX(-120%);
+            transition:transform 0.9s ease;
+            pointer-events:none;
+        }
+
+        .alabasta-genmage-gallery:hover::before {
+            transform:translateX(120%);
+        }
+
+        .alabasta-genmage-stage {
+            position:relative;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            min-height:420px;
+            border-radius:20px;
+            padding:18px;
+            background:
+                radial-gradient(circle at top, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.75) 28%, rgba(245,243,255,0.88) 100%);
+            border:1px solid rgba(221,214,254,0.88);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+            overflow:hidden;
+        }
+
+        .alabasta-genmage-stage::after {
+            content:'';
+            position:absolute;
+            inset:18px;
+            border-radius:18px;
+            border:1px dashed rgba(196,181,253,0.55);
+            pointer-events:none;
+        }
+
+        .alabasta-genmage-stage.is-loading {
+            background:
+                radial-gradient(circle at top, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.84) 26%, rgba(245,243,255,0.94) 100%);
+        }
+
+        .alabasta-genmage-skeleton {
+            display:none;
+            width:min(100%, 760px);
+            aspect-ratio: 4 / 5;
+            border-radius:22px;
+            position:relative;
+            overflow:hidden;
+            background:linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(250,245,255,0.92) 100%);
+            border:1px solid rgba(221,214,254,0.92);
+            box-shadow:0 24px 48px rgba(15,23,42,0.08);
+        }
+
+        .alabasta-genmage-stage.is-loading .alabasta-genmage-skeleton {
+            display:block;
+        }
+
+        .alabasta-genmage-stage.is-loading #alabasta-case-card-image-preview {
+            opacity:0;
+            transform:scale(0.985);
+            pointer-events:none;
+        }
+
+        .alabasta-genmage-skeleton::before {
+            content:'';
+            position:absolute;
+            inset:0;
+            background:linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.75) 50%, rgba(255,255,255,0) 100%);
+            transform:translateX(-100%);
+            animation: alabastaSkeletonSweep 1.7s ease-in-out infinite;
+        }
+
+        .alabasta-genmage-skeleton-topbar,
+        .alabasta-genmage-skeleton-line,
+        .alabasta-genmage-skeleton-avatar,
+        .alabasta-genmage-skeleton-badge,
+        .alabasta-genmage-skeleton-footer {
+            position:absolute;
+            background:linear-gradient(180deg, rgba(221,214,254,0.62) 0%, rgba(196,181,253,0.4) 100%);
+            border-radius:999px;
+        }
+
+        .alabasta-genmage-skeleton-topbar {
+            top:26px;
+            left:26px;
+            width:52%;
+            height:18px;
+        }
+
+        .alabasta-genmage-skeleton-line.one { top:72px; left:26px; width:36%; height:12px; }
+        .alabasta-genmage-skeleton-line.two { top:96px; left:26px; width:28%; height:12px; }
+        .alabasta-genmage-skeleton-line.three { top:120px; left:26px; width:42%; height:12px; }
+        .alabasta-genmage-skeleton-line.four { top:154px; left:26px; width:30%; height:12px; }
+        .alabasta-genmage-skeleton-line.five { top:178px; left:26px; width:34%; height:12px; }
+        .alabasta-genmage-skeleton-line.six { bottom:72px; left:26px; width:48%; height:12px; }
+        .alabasta-genmage-skeleton-line.seven { bottom:48px; left:26px; width:40%; height:12px; }
+
+        .alabasta-genmage-skeleton-avatar {
+            top:88px;
+            right:58px;
+            width:38%;
+            aspect-ratio:1 / 1.18;
+            border-radius:28px;
+        }
+
+        .alabasta-genmage-skeleton-badge {
+            bottom:92px;
+            left:26px;
+            width:84px;
+            height:28px;
+        }
+
+        .alabasta-genmage-skeleton-footer {
+            left:26px;
+            right:26px;
+            bottom:24px;
+            height:18px;
+            border-radius:12px;
+        }
+
+        .alabasta-genmage-toolbar {
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px;
+            flex-wrap:wrap;
+            padding:10px 12px;
+            border-radius:18px;
+            border:1px solid rgba(221,214,254,0.9);
+            background:linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(248,245,255,0.88) 100%);
+            box-shadow:0 14px 28px rgba(15,23,42,0.06), inset 0 1px 0 rgba(255,255,255,0.9);
+            backdrop-filter:blur(14px);
+        }
+
+        .alabasta-genmage-toolbar-meta {
+            display:flex;
+            align-items:center;
+            gap:10px;
+            flex-wrap:wrap;
+            min-width:0;
+            flex:1 1 320px;
+        }
+
+        .alabasta-genmage-status-pill {
+            display:inline-flex;
+            align-items:center;
+            gap:7px;
+            padding:7px 10px;
+            border-radius:999px;
+            background:rgba(245,243,255,0.96);
+            border:1px solid rgba(196,181,253,0.9);
+            color:#5b21b6;
+            font-size:0.75em;
+            font-weight:900;
+            letter-spacing:0.03em;
+            text-transform:uppercase;
+        }
+
+        .alabasta-genmage-status-pill.is-loading {
+            background:rgba(237,233,254,0.96);
+            color:#6d28d9;
+        }
+
+        .alabasta-genmage-status-pill.is-ready {
+            background:rgba(236,253,245,0.96);
+            border-color:rgba(134,239,172,0.9);
+            color:#15803d;
+        }
+
+        .alabasta-genmage-image-meta {
+            display:inline-flex;
+            align-items:center;
+            min-height:34px;
+            padding-left:12px;
+            border-left:1px solid rgba(221,214,254,0.95);
+            font-size:0.79em;
+            color:#5f6b84;
+            font-weight:800;
+            letter-spacing:0.01em;
+            max-width:420px;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
+        }
+
+        .alabasta-genmage-toolbar .alabasta-casecard-btn.utility {
+            min-height:38px;
+            padding:0 14px;
+            border-radius:14px;
+            box-shadow:0 10px 20px rgba(15,23,42,0.06);
+        }
+
+        @keyframes alabastaSkeletonSweep {
+            0% { transform:translateX(-100%); }
+            100% { transform:translateX(100%); }
+        }
+
+        @media (max-width: 640px) {
+            .reflective-liquid-modal { max-width:calc(100vw - 20px); padding:18px 14px 14px; border-radius:24px !important; }
+            .reflective-review-secondary-controls, .reflective-review-actions { flex-direction:column; }
+            .reflective-review-ai-btn, .reflective-review-settings-btn, .reflective-review-select.lang, .reflective-review-select.preset { width:100%; }
+            .alabasta-genmage-toolbar { align-items:stretch; }
+            .alabasta-genmage-toolbar-meta { flex-direction:column; align-items:flex-start; }
+            .alabasta-genmage-image-meta { max-width:100%; padding-left:0; border-left:0; }
+            .alabasta-genmage-toolbar .alabasta-casecard-btn.utility { width:100%; justify-content:center; }
         }
         
         /* Hide Spinners/Controllers for q-timer */
@@ -241,31 +570,469 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
-            min-height: 32px;
-            padding: 6px 10px;
+            gap: 0;
+            min-height: 34px;
+            width: 34px;
+            padding: 0;
             border: none;
             border-radius: 9px;
             color: #fff;
-            font-size: 0.74em;
+            font-size: 0.95em;
             font-weight: 800;
             white-space: nowrap;
             line-height: 1;
         }
 
-        .alabasta-action-btn i {
+        .alabasta-action-btn i,
+        .alabasta-action-btn .alabasta-emoji {
             font-size: 0.95em;
+            line-height: 1;
         }
 
         .alabasta-action-btn.is-edit { background: #f59e0b; }
         .alabasta-action-btn.is-laboon { background: linear-gradient(135deg, #0ea5e9, #2563eb); }
+        .alabasta-action-btn.is-case-card { background: linear-gradient(135deg, #a855f7, #7c3aed); }
         .alabasta-action-btn.is-poneglyph { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
         .alabasta-action-btn.is-review { background: #16a34a; }
         .alabasta-action-btn.is-reopen { background: #334155; }
         .alabasta-action-btn.is-delete {
             background: #ef4444;
-            min-width: 34px;
-            padding-inline: 9px;
+        }
+
+        .alabasta-visual-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .alabasta-visual-card {
+            background: linear-gradient(180deg, #fcfbff 0%, #ffffff 100%);
+            border: 1px solid #ddd6fe;
+            border-radius: 18px;
+            padding: 14px;
+        }
+
+        .alabasta-visual-label {
+            display: block;
+            margin-bottom: 7px;
+            font-size: 0.78em;
+            color: #6d28d9;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .alabasta-casecard-shell {
+            max-width: 980px !important;
+            width: 95%;
+            text-align: left;
+            border-radius: 28px !important;
+            border: 1px solid rgba(124,58,237,0.18) !important;
+            background:
+                radial-gradient(140% 120% at 0% 0%, rgba(196,181,253,0.18) 0%, rgba(196,181,253,0) 42%),
+                radial-gradient(120% 120% at 100% 100%, rgba(251,191,36,0.1) 0%, rgba(251,191,36,0) 36%),
+                linear-gradient(180deg,#fcfbff 0%,#ffffff 100%) !important;
+            box-shadow: 0 28px 70px rgba(15,23,42,0.18) !important;
+            padding: 28px 28px 24px !important;
+        }
+
+        .alabasta-casecard-header {
+            display:flex;
+            align-items:flex-start;
+            justify-content:space-between;
+            gap:18px;
+            margin-bottom:18px;
+            padding-bottom:16px;
+            border-bottom:1px solid rgba(196,181,253,0.45);
+        }
+
+        .alabasta-casecard-title {
+            margin:0;
+            color:#6d28d9;
+            font-size:1.54em;
+            font-weight:900;
+            letter-spacing:-0.03em;
+            display:flex;
+            align-items:center;
+            gap:10px;
+        }
+
+        .alabasta-casecard-subtitle {
+            margin-top:8px;
+            max-width:640px;
+            font-size:0.92em;
+            color:#5b6475;
+            line-height:1.65;
+        }
+
+        .alabasta-casecard-badge {
+            background:linear-gradient(135deg, rgba(245,243,255,0.95) 0%, rgba(237,233,254,0.92) 100%);
+            color:#6d28d9;
+            border:1px solid rgba(196,181,253,0.9);
+            border-radius:999px;
+            padding:7px 13px;
+            font-size:0.75em;
+            font-weight:900;
+            letter-spacing:0.04em;
+            text-transform:uppercase;
+            white-space:nowrap;
+        }
+
+        .alabasta-visual-card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(252,251,255,0.96) 100%);
+            border: 1px solid rgba(221,214,254,0.88);
+            border-radius: 20px;
+            padding: 16px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), 0 10px 24px rgba(124,58,237,0.06);
+            transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease, background 0.22s ease;
+            transform: translateY(0);
+        }
+
+        .alabasta-visual-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(196,181,253,1);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 18px 34px rgba(124,58,237,0.1);
+            background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(250,245,255,0.98) 100%);
+        }
+
+        .alabasta-casecard-textarea {
+            width:100%;
+            resize:vertical;
+            padding:14px 16px;
+            border-radius:16px;
+            border:1.5px solid rgba(196,181,253,0.85);
+            background:#fff;
+            color:#111827;
+            font-size:0.94em;
+            line-height:1.65;
+            box-shadow: inset 0 1px 3px rgba(124,58,237,0.04);
+        }
+
+        .alabasta-casecard-textarea.readonly {
+            background:#fcfbff;
+        }
+
+        .alabasta-casecard-textarea:focus {
+            outline:none;
+            border-color:#a78bfa;
+            box-shadow:0 0 0 4px rgba(167,139,250,0.14);
+        }
+
+        .alabasta-casecard-note {
+            margin-top:8px;
+            font-size:0.79em;
+            color:#7c6f97;
+            line-height:1.5;
+        }
+
+        .alabasta-casecard-details {
+            margin-bottom:14px;
+            border:1px solid rgba(221,214,254,0.88);
+            border-radius:18px;
+            background:linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(250,245,255,0.85) 100%);
+            padding:12px 14px;
+        }
+
+        .alabasta-casecard-details summary {
+            cursor:pointer;
+            color:#6d28d9;
+            font-size:0.84em;
+            font-weight:900;
+            letter-spacing:0.03em;
+        }
+
+        .alabasta-casecard-details-summary {
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px;
+            list-style:none;
+        }
+
+        .alabasta-casecard-details-summary::-webkit-details-marker {
+            display:none;
+        }
+
+        .alabasta-casecard-details-kicker {
+            display:flex;
+            align-items:center;
+            gap:10px;
+            color:#5b21b6;
+            font-size:0.92em;
+            font-weight:900;
+            letter-spacing:0.01em;
+        }
+
+        .alabasta-casecard-details-kicker i {
+            width:28px;
+            height:28px;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            border-radius:10px;
+            background:rgba(124,58,237,0.1);
+            color:#6d28d9;
+        }
+
+        .alabasta-casecard-details-caption {
+            color:#8b7aa8;
+            font-size:0.78em;
+            font-weight:700;
+        }
+
+        .alabasta-casecard-details-chevron {
+            width:28px;
+            height:28px;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            border-radius:10px;
+            background:rgba(255,255,255,0.92);
+            border:1px solid rgba(221,214,254,0.9);
+            color:#7c3aed;
+            transition:transform 0.18s ease;
+        }
+
+        .alabasta-casecard-details[open] .alabasta-casecard-details-chevron {
+            transform:rotate(180deg);
+        }
+
+        .alabasta-casecard-actions {
+            display:flex;
+            gap:10px;
+            flex-wrap:wrap;
+            align-items:center;
+            justify-content:flex-end;
+        }
+
+        .alabasta-casecard-btn {
+            min-height:46px;
+            border:none;
+            border-radius:15px;
+            padding:11px 16px;
+            font-weight:900;
+            font-size:0.88em;
+            letter-spacing:-0.01em;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+            transition:transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+            position:relative;
+            overflow:hidden;
+        }
+
+        .alabasta-casecard-btn:hover {
+            transform:translateY(-1px);
+            filter:saturate(1.04);
+        }
+
+        .alabasta-casecard-btn::after {
+            content:'';
+            position:absolute;
+            inset:0;
+            background:linear-gradient(120deg, rgba(255,255,255,0) 22%, rgba(255,255,255,0.26) 50%, rgba(255,255,255,0) 78%);
+            transform:translateX(-130%);
+            transition:transform 0.75s ease;
+            pointer-events:none;
+        }
+
+        .alabasta-casecard-btn:hover::after {
+            transform:translateX(130%);
+        }
+
+        .alabasta-casecard-btn.primary {
+            background:linear-gradient(135deg,#6d28d9 0%, #4c1d95 100%);
+            color:#fff;
+            box-shadow:0 14px 30px rgba(91,33,182,0.28);
+            min-width:140px;
+        }
+
+        .alabasta-casecard-btn.secondary {
+            background:linear-gradient(135deg,#8b5cf6 0%, #7c3aed 100%);
+            color:#fff;
+            box-shadow:0 12px 26px rgba(124,58,237,0.18);
+            min-width:146px;
+        }
+
+        .alabasta-casecard-btn.utility {
+            background:#111827;
+            color:#fff;
+            box-shadow:0 10px 20px rgba(15,23,42,0.14);
+        }
+
+        .alabasta-casecard-btn.ghost {
+            background:#f5f3ff;
+            color:#5b21b6;
+            border:1px solid rgba(196,181,253,0.8);
+            box-shadow:none;
+        }
+
+        .alabasta-casecard-btn.muted {
+            background:#e5e7eb;
+            color:#374151;
+            font-weight:800;
+        }
+
+        .alabasta-casecard-footer {
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px;
+            margin-top:16px;
+            flex-wrap:wrap;
+            padding-top:16px;
+            border-top:1px solid rgba(221,214,254,0.55);
+        }
+
+        .alabasta-casecard-meta {
+            font-size:0.8em;
+            color:#64748b;
+            line-height:1.55;
+        }
+
+        .edit-case-note-modal-content {
+            max-width: 680px;
+            width: 94%;
+            text-align: left;
+            border-radius: 24px;
+            border: 1px solid rgba(245,158,11,0.28);
+            background: linear-gradient(180deg,#fffdf7 0%,#ffffff 100%);
+            box-shadow: 0 24px 60px rgba(15,23,42,0.22);
+            padding: 26px 26px 22px;
+        }
+
+        .edit-case-note-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid #fde68a;
+        }
+
+        .edit-case-note-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .edit-case-taxonomy-card {
+            background: linear-gradient(180deg, #fffef8 0%, #ffffff 100%);
+            border: 1px solid #fde68a;
+            border-radius: 18px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .edit-case-taxonomy-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .edit-case-taxonomy-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+            gap: 12px;
+            align-items: end;
+            margin-bottom: 12px;
+        }
+
+        .edit-case-taxonomy-label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.76em;
+            color: #92400e;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .edit-case-taxonomy-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .edit-case-taxonomy-chip {
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #475569;
+            border-radius: 999px;
+            padding: 7px 12px;
+            font-size: 0.78em;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .edit-case-taxonomy-chip.active {
+            background: linear-gradient(135deg, #f59e0b, #ea580c);
+            border-color: #ea580c;
+            color: #fff;
+            box-shadow: 0 6px 16px rgba(234, 88, 12, 0.2);
+        }
+
+        .edit-case-taxonomy-chip.muted {
+            background: #f8fafc;
+            color: #94a3b8;
+            cursor: default;
+        }
+
+        .edit-case-taxonomy-preview {
+            margin-top: 12px;
+            background: #fff;
+            border: 1px dashed #f59e0b;
+            border-radius: 14px;
+            padding: 10px 12px;
+            font-size: 0.82em;
+            color: #7c2d12;
+            line-height: 1.5;
+        }
+
+        .case-score-modal-shell {
+            max-width: 460px;
+            width: 92%;
+            text-align: left;
+            border-radius: 24px;
+            border: 1px solid rgba(245, 158, 11, 0.24);
+            background: linear-gradient(180deg, #fffef9 0%, #ffffff 100%);
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+            padding: 24px 24px 20px;
+        }
+
+        .case-score-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 12px 0 14px;
+        }
+
+        .case-score-chip {
+            border: 1px solid #f59e0b;
+            background: #fff7ed;
+            color: #c2410c;
+            border-radius: 999px;
+            padding: 8px 14px;
+            font-size: 0.88em;
+            font-weight: 900;
+            cursor: pointer;
+            transition: all 0.18s ease;
+        }
+
+        .case-score-chip:hover,
+        .case-score-chip.active {
+            background: linear-gradient(135deg, #f59e0b, #ea580c);
+            color: #fff;
+            box-shadow: 0 10px 24px rgba(234, 88, 12, 0.18);
         }
 
         @media (max-width: 980px) {
@@ -281,6 +1048,44 @@
 
             #alabastaCaseTable td:last-child {
                 min-width: 176px;
+            }
+
+            .edit-case-note-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .edit-case-taxonomy-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .edit-case-note-modal-content {
+                width: calc(100% - 20px);
+                padding: 20px 16px 18px;
+                border-radius: 20px;
+            }
+
+            .edit-case-note-header {
+                flex-direction: column;
+                align-items: flex-start;
+                padding-right: 28px;
+            }
+
+            .edit-case-note-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .edit-case-taxonomy-card {
+                padding: 14px;
+            }
+
+            .case-score-modal-shell {
+                padding: 20px 18px 16px;
+            }
+
+            .alabasta-visual-grid {
+                grid-template-columns: 1fr;
             }
         }
 
@@ -1322,7 +2127,7 @@
 
         // Google Drive Config ([Version: V87.67] Inlined for GitHub Pages)
         window.GDRIVE_CLIENT_ID = '367076866368-folligjcmmnrcu1u2tt3q9cvn9j5n2a6.apps.googleusercontent.com';
-        window.GDRIVE_API_KEY = 'AIzaSyC5JAPSLDCkHGEOPKc9mm9UqOIJk0i_7tw';
+        window.GDRIVE_API_KEY = '__GDRIVE_API_KEY__';
         window.GDRIVE_APP_ID = 'intern-port-edfa7';
     </script>
 
@@ -2661,7 +3466,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; background:linear-gradient(135deg, #f59e0b, #ef4444); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.6em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         ☀️ Nika
-                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V90.99.3.9.1</span>
+                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.20</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -3180,7 +3985,7 @@
 
                     <div class="hub-mode-toggle" style="margin:0; background:linear-gradient(135deg, #f8fafc, #fefce8); padding:8px; border-radius:18px; border:1.5px solid #dbeafe;">
                         <button class="hub-mode-btn active" id="btn-hub-design" onclick="switchHubMode('design')">
-                            🏴 Design Deck
+                            🏴 Miss Goldenweek
                         </button>
                         <button class="hub-mode-btn" id="btn-hub-research" onclick="switchHubMode('research')">
                             🧭 Research Log
@@ -3209,7 +4014,7 @@
                             <div id="hub-ctrl-design-engine">
                                 <select id="design-engine" style="width:100%; padding:12px; border:1.5px solid #eee; border-radius:14px; font-size:0.95em; color:var(--primary); font-weight:bold; cursor:pointer; outline:none; background:#f9fbff;" onchange="if(document.getElementById('design-engine-inline')) document.getElementById('design-engine-inline').value = this.value;">
                                     <option value="imagen">Google Vertex AI (Imagen 3)</option>
-                                    <option value="imagen-nano">Google Imagen 3 (Nano - Fast)</option>
+                                    <option value="imagen-nano">Google Imagen 3 Fast</option>
                                     <option value="dalle">OpenAI DALL-E 3</option>
                                 </select>
                             </div>
@@ -3326,7 +4131,7 @@
                                             <i class="fa-solid fa-microchip" style="color:#94a3b8;"></i>
                                             <select id="design-engine-inline" style="padding:10px 15px; border-radius:14px; border:1.5px solid #e2e8f0; background:white; font-size:0.9em; font-weight:700; color:#1e293b; outline:none; cursor:pointer;" onchange="document.getElementById('design-engine').value = this.value">
                                                 <option value="imagen">🚀 Google Vertex (Imagen 3)</option>
-                                                <option value="imagen-nano">⚡ Vertex (Imagen Nano)</option>
+                                                <option value="imagen-nano">⚡ Vertex (Imagen Fast)</option>
                                                 <option value="dalle">🎨 OpenAI (DALL-E 3)</option>
                                             </select>
                                         </div>
@@ -3846,7 +4651,7 @@
                     }
                     if (typeof syncTtsChips === 'function') setTimeout(syncTtsChips, 50);
                 }
-                const _modeLabels = { design: 'Design Lab', research: 'Research Assistant', laboon: 'Laboon' };
+                const _modeLabels = { design: 'Miss Goldenweek', research: 'Research Assistant', laboon: 'Laboon' };
                 if (typeof showToast === 'function') showToast('Switched to ' + (_modeLabels[mode] || mode));
             };
 
@@ -6368,7 +7173,7 @@
             <div class="modal-content"><span class="close-modal"
                     onclick="document.getElementById('certModal').style.display='none'">&times;</span>
                 <h2> Certificate <small style="font-size:0.4em; opacity:0.5;">v90.29r</small></h2><input type="hidden" id="cert-uid"><input type="hidden" id="cert-uname">
-                <div style="margin-bottom:15px;">
+                <div class="reflective-review-card reflective-review-field">
                     <label style="font-size:0.8em; color:#666; display:block; margin-bottom:8px;"> Special Awards
                         (Multiple selectable):</label>
                     <style>
@@ -6859,7 +7664,8 @@
                     <!-- Content injected by JS renderPendingQuizzes -> reviewQuiz -->
                 </div>
                 <div style="margin-top: 15px; text-align: right; position: sticky; bottom: 0; background: white; padding: 10px 0; border-top: 1px solid #eee;">
-                    <button class="btn-sm" style="background:#0ea5e9; color:white; border:none;" onclick="openTimingRiskConfigModal()">Timing Config</button>
+                    <button class="btn-sm" style="background:#0ea5e9; color:white; border:none; font-size:1.2em;" onclick="openTimingRiskConfigModal()" title="Timing Config">⚙</button>
+                    <button class="btn-sm" style="background:#ef4444; color:white; border:none;" onclick="exportIncorrectToPDF()"><i class="fa-solid fa-file-pdf"></i> Export Incorrect</button>
                     <button class="btn-sm btn-dark"
                         onclick="document.getElementById('quizReviewModal').style.display='none'">Close</button>
                 </div>
@@ -6868,11 +7674,16 @@
 
         <!-- 🔥 Reflective Review Modal -->
         <div id="reflectiveReviewModal" class="modal" style="z-index: 2501;">
-            <div class="modal-content" style="max-width: 500px; border-top: 5px solid #d35400; border-radius: 12px;">
-                <span class="close-modal" onclick="forceHideModal('reflectiveReviewModal')">&times;</span>
-                <h3 style="color:#d35400; margin-bottom:15px;"><i class="fa-solid fa-comment-medical"></i> Reflective Log Review</h3>
-                
-                <div id="reflective-review-user-info" style="background:#f8f9fa; padding:12px; border-radius:10px; margin-bottom:15px; border:1px solid #eee;">
+            <div class="modal-content reflective-liquid-modal">
+                <div class="reflective-liquid-header" style="margin-bottom:10px;">
+                    <h3 class="reflective-liquid-title">Reflective Review</h3>
+                    <button type="button" class="reflective-close-btn" onclick="forceHideModal('reflectiveReviewModal')" aria-label="Close review modal" style="width:28px; height:28px; border-radius:8px;">
+                        <i class="fa-solid fa-xmark" style="font-size:0.8em;"></i>
+                    </button>
+                </div>
+
+                <div class="reflective-review-shell">
+                <div id="reflective-review-user-info" class="reflective-review-card reflective-review-user-card">
                     <!-- User Info injected by JS -->
                 </div>
 
@@ -6880,42 +7691,22 @@
                 <input type="hidden" id="reflective-review-uid">
                 <input type="hidden" id="reflective-review-uname">
 
-                <div style="margin-bottom:15px;">
-                    <label style="display:block; font-size:0.85em; font-weight:bold; color:#555; margin-bottom:5px;">💰 Bonus Points:</label>
-                    <div style="display:flex; gap:10px; align-items:center;">
-                        <input type="number" id="reflective-review-bonus" value="0.5" step="0.1" min="0" 
-                            style="flex:1; padding:10px; border:1.5px solid #eee; border-radius:8px; font-weight:bold; font-size:1.1em; color:#d35400;">
-                        <span style="color:#999; font-size:0.9em;">Pts</span>
-                    </div>
-                </div>
-
-                <div style="margin-bottom:20px;">
-                    <label style="display:block; font-size:0.85em; font-weight:bold; color:#555; margin-bottom:5px;">💬 Admin Feedback / Comment:</label>
-                    <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-bottom:5px; flex-wrap:wrap;">
-                        <!-- AI Controls consolidated to Header -->
-                        <div style="display:flex; align-items:center; gap:4px; padding:4px; border:1px solid #e2e8f0; border-radius:16px; background:#f8fafc;">
-                            <button type="button" class="reflective-review-model-chip active" data-value="gpt-4o" onclick="selectReflectiveReviewModel(this)" title="GPT-4o" style="border:none; background:linear-gradient(135deg,#10b981,#34d399); color:white; padding:5px 9px; border-radius:12px; font-size:0.72em; font-weight:800; cursor:pointer;">GPT</button>
-                            <button type="button" class="reflective-review-model-chip" data-value="gpt-4o-mini" onclick="selectReflectiveReviewModel(this)" title="GPT-4o Mini" style="border:none; background:transparent; color:#64748b; padding:5px 9px; border-radius:12px; font-size:0.72em; font-weight:800; cursor:pointer;">Mini</button>
-                            <button type="button" class="reflective-review-model-chip" data-value="gemini-1.5-flash" onclick="selectReflectiveReviewModel(this)" title="Gemini Flash" style="border:none; background:transparent; color:#64748b; padding:5px 9px; border-radius:12px; font-size:0.72em; font-weight:800; cursor:pointer;">Flash</button>
-                            <button type="button" class="reflective-review-model-chip" data-value="claude-4-sonnet-latest" onclick="selectReflectiveReviewModel(this)" title="Claude Sonnet" style="border:none; background:transparent; color:#64748b; padding:5px 9px; border-radius:12px; font-size:0.72em; font-weight:800; cursor:pointer;">Claude</button>
+                <div style="display:grid; grid-template-columns: 1fr 1.2fr; gap:12px; margin-bottom:12px;">
+                    <div class="reflective-review-card reflective-review-field">
+                        <div class="reflective-review-label-row" style="margin-bottom:6px;">
+                            <label class="reflective-review-label">Bonus Points</label>
                         </div>
-                        <select id="ai-model-review" style="display:none; padding:4px 8px; font-size:0.8em; border-radius:10px; border:1px solid #e0e6ed; background:#f8fafc; color:#1a2a3a; font-weight:600;">
-                            <option value="gpt-4o" selected>🟢 GPT-4o (Frontier)</option>
-                            <option value="gpt-4o-mini">Mini</option>
-                            <option value="gemini-1.5-flash">Flash</option>
-                            <option value="claude-4-sonnet-latest">🎭 Claude Sonnet 4.6</option>
-                            <option value="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo">🦙 Llama 3.1 8B</option>
-                            <option value="meta-llama/Llama-3.2-3B-Instruct-Turbo">🦙 Llama 3.2 3B</option>
-                            <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">🦙 Llama 3.3 70B</option>
-                        </select>
-                        <select id="ai-lang-review" style="padding:2px 5px; font-size:0.7em; border-radius:10px; border:1px solid #ccc; background:#fff; font-weight:bold; cursor:pointer;" title="Target Language">
-                            <option value="Thai" selected>🇹🇭 TH</option>
-                            <option value="English">🇺🇸 EN</option>
-                            <option value="Chinese">🇨🇳 CN</option>
-                            <option value="Korean">🇰🇷 KO</option>
-                            <option value="Japanese">🇯🇵 JP</option>
-                        </select>
-                        <select id="ai-preset-review" style="padding:4px 8px; font-size:0.78em; border-radius:12px; border:1px solid #e0e6ed; background:#f8fafc; color:#1a2a3a; font-weight:700;" title="AI preset">
+                        <div class="reflective-bonus-row">
+                            <input type="number" id="reflective-review-bonus" class="reflective-bonus-input" value="0.5" step="0.1" min="0" style="padding:6px 12px; font-size:1em; border-radius:12px;">
+                            <span class="reflective-bonus-unit" style="padding:6px 10px; min-width:40px; border-radius:12px; font-size:0.7em;">PTS</span>
+                        </div>
+                    </div>
+
+                    <div class="reflective-review-card reflective-review-field">
+                        <div class="reflective-review-label-row" style="margin-bottom:6px;">
+                            <label class="reflective-review-label">AI Focus</label>
+                        </div>
+                        <select id="ai-preset-review" class="reflective-review-select preset" style="padding:6px 10px; border-radius:12px;">
                             <option value="encourage" selected>✨ Encourage</option>
                             <option value="coach_next_step">🧭 Coach</option>
                             <option value="confidence_boost">🌈 Confidence</option>
@@ -6923,20 +7714,46 @@
                             <option value="accountability">🎯 Accountability</option>
                             <option value="celebrate_win">🎉 Celebrate</option>
                         </select>
-                        <button class="btn-sm" id="btn-ai-suggest" onclick="getAISuggestion(this)" style="background:#8e44ad; color:white; border:none; border-radius:15px; padding:4px 12px; font-size:0.75em; cursor:pointer; display:flex; align-items:center; gap:5px;">
-                            <i class="fa-solid fa-robot"></i> <span class="btn-text">AI Suggest</span>
-                        </button>
-                        <button class="btn-sm" onclick="openAIKeysModal()" title="AI Settings" style="background:#f0efff; color:#6b5cea; border:1px solid #dcd4ff; border-radius:999px; width:34px; height:34px; padding:0; font-size:0.9em; cursor:pointer; display:flex; align-items:center; justify-content:center;">
-                            <i class="fa-solid fa-key"></i>
-                        </button>
                     </div>
-                    <textarea id="reflective-review-comment" placeholder="พิมพ์ภาษาไทยแล้วกด AI Suggest → แปลเป็นภาษาที่เลือก ✨ หรือเว้นว่างให้ AI สร้างให้อัตโนมัติ" 
-                        style="width:100%; height:100px; padding:12px; border:1.5px solid #eee; border-radius:8px; font-size:0.95em;"></textarea>
                 </div>
 
-                <div style="display:flex; gap:10px;">
-                    <button class="magic-btn" style="flex:2; background:#d35400;" onclick="saveReflectiveReview()">💾 Save & Score</button>
-                    <button class="btn-sm btn-dark" style="flex:1; border-radius:8px;" onclick="forceHideModal('reflectiveReviewModal')">Cancel</button>
+                <div class="reflective-review-card reflective-review-field">
+                    <div class="reflective-review-label-row" style="margin-bottom:8px;">
+                        <label class="reflective-review-label">Admin Feedback</label>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <select id="ai-lang-review" class="reflective-review-select lang" style="padding:4px 8px; width:auto; border-radius:10px; font-size:0.7em;">
+                                <option value="Thai" selected>🇹🇭 TH</option>
+                                <option value="English">🇺🇸 EN</option>
+                            </select>
+                            <button type="button" id="btn-ai-suggest" class="reflective-review-ai-btn" onclick="getAISuggestion(this)" style="padding:6px 12px; border-radius:12px; font-size:0.75em;">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggest
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="reflective-review-tabs" style="margin-bottom:10px; padding:4px;">
+                        <button type="button" class="reflective-review-model-chip active" data-value="gpt-4o" onclick="selectReflectiveReviewModel(this)" style="padding:6px 10px; font-size:0.7em;">GPT Frontier</button>
+                        <button type="button" class="reflective-review-model-chip" data-value="gpt-4o-mini" onclick="selectReflectiveReviewModel(this)" style="padding:6px 10px; font-size:0.7em;">Mini</button>
+                        <button type="button" class="reflective-review-model-chip" data-value="gemini-1.5-flash" onclick="selectReflectiveReviewModel(this)" style="padding:6px 10px; font-size:0.7em;">Flash</button>
+                        <button type="button" class="reflective-review-model-chip" data-value="claude-3-5-sonnet-latest" onclick="selectReflectiveReviewModel(this)" style="padding:6px 10px; font-size:0.7em;">Claude 3.5</button>
+                        <button type="button" class="reflective-review-model-chip" data-value="meta-llama/Llama-3.3-70B-Instruct-Turbo" onclick="selectReflectiveReviewModel(this)" style="padding:6px 10px; font-size:0.7em;">Llama 70B</button>
+                    </div>
+                    
+                    <select id="ai-model-review" style="display:none;">
+                        <option value="gpt-4o" selected>GPT-4o</option>
+                        <option value="gpt-4o-mini">Mini</option>
+                        <option value="gemini-1.5-flash">Flash</option>
+                        <option value="claude-3-5-sonnet-latest">Claude 3.5</option>
+                        <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">Llama 70B</option>
+                    </select>
+
+                    <textarea id="reflective-review-comment" class="reflective-review-textarea" placeholder="พิมพ์ draft ไทยไว้ก่อน แล้วกด AI Suggest หรือปล่อยว่างให้ AI เขียนอัตโนมัติ" style="min-height:85px; font-size:0.9em;"></textarea>
+                    <div id="reflective-review-ai-status" class="reflective-review-status" aria-live="polite"></div>
+                </div>
+
+                <div class="reflective-review-actions">
+                    <button class="magic-btn reflective-review-save-btn" onclick="saveReflectiveReview()">Save & Score</button>
+                    <button class="btn-sm btn-dark reflective-review-cancel-btn" onclick="forceHideModal('reflectiveReviewModal')">Cancel</button>
                 </div>
             </div>
         </div>
@@ -7116,7 +7933,7 @@
             </div>
         </div>
 
-        <div id="quizParticipantsModal" class="modal" style="z-index:20000;">
+        <div id="quizParticipantsModal" class="modal" style="z-index:30000;">
             <div class="modal-content" style="max-width: 1000px;">
                 <span class="close-modal"
                     onclick="forceHideModal('quizParticipantsModal')">&times;</span>
@@ -7369,9 +8186,9 @@
     </div>
 
     <div id="editCaseNoteModal" class="modal" style="z-index:4300;">
-        <div class="modal-content" style="max-width:680px; width:94%; text-align:left; border-radius:24px; border:1px solid rgba(245,158,11,0.28); background:linear-gradient(180deg,#fffdf7 0%,#ffffff 100%); box-shadow:0 24px 60px rgba(15,23,42,0.22); padding:26px 26px 22px;">
+        <div class="modal-content edit-case-note-modal-content">
             <span class="close-modal" onclick="closeEditCaseNoteModal()" style="top:14px; right:16px;">&times;</span>
-            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid #fde68a;">
+            <div class="edit-case-note-header">
                 <div>
                     <h3 style="margin:0; color:#92400e; font-size:1.45em; font-weight:900; display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-pen-to-square"></i> Edit Case Note</h3>
                     <div style="margin-top:6px; font-size:0.88em; color:#78716c;">Adjust the submitted note while keeping the case context visible for admin review.</div>
@@ -7381,7 +8198,7 @@
 
             <input type="hidden" id="edit-case-note-id">
 
-            <div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; margin-bottom:14px;">
+            <div class="edit-case-note-grid">
                 <div style="background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px;">
                     <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">User</div>
                     <div id="edit-case-note-user" style="margin-top:4px; color:#1f2937; font-weight:800; word-break:break-word;">-</div>
@@ -7394,6 +8211,61 @@
                     <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Disease</div>
                     <div id="edit-case-note-disease" style="margin-top:4px; color:#1f2937; font-weight:800; word-break:break-word;">-</div>
                 </div>
+                <div style="background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px;">
+                    <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Customer</div>
+                    <div id="edit-case-note-customer" style="margin-top:4px; color:#1f2937; font-weight:800; word-break:break-word;">-</div>
+                </div>
+                <div style="background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px;">
+                    <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Score</div>
+                    <div id="edit-case-note-score" style="margin-top:4px; color:#166534; font-weight:900; word-break:break-word;">0.00 pts</div>
+                </div>
+            </div>
+
+            <div class="edit-case-taxonomy-card">
+                <div class="edit-case-taxonomy-head">
+                    <div>
+                        <div style="font-size:0.95em; color:#92400e; font-weight:900;">Unified Tags & Taxonomy</div>
+                        <div style="margin-top:4px; font-size:0.8em; color:#78716c; line-height:1.5;">Normalize disease system and symptom tags here so Alabasta, Poneglyph, and downstream filters use the same structure.</div>
+                    </div>
+                    <span style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; border-radius:999px; padding:5px 10px; font-size:0.72em; font-weight:800;">Admin Taxonomy</span>
+                </div>
+
+                <div class="edit-case-taxonomy-grid">
+                    <div>
+                        <label class="edit-case-taxonomy-label" for="edit-case-taxonomy-system">Primary System</label>
+                        <select id="edit-case-taxonomy-system" onchange="renderEditCaseTaxonomyCard()" style="margin:0; border-radius:12px;">
+                            <option value="">Select system...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="edit-case-taxonomy-label" for="edit-case-taxonomy-custom">Custom Tag</label>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <input id="edit-case-taxonomy-custom" type="text" placeholder="Add custom tag..." style="margin:0; border-radius:12px;" onkeydown="handleEditCaseTaxonomyKeydown(event)">
+                            <button type="button" class="btn-sm" onclick="addEditCaseCustomTag()" style="min-width:72px; background:#334155; color:#fff; border:none; border-radius:12px; padding:10px 12px; font-weight:800;">Add</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="edit-case-taxonomy-label">Suggested Tags</label>
+                    <div id="edit-case-taxonomy-suggestions" class="edit-case-taxonomy-chips"></div>
+                </div>
+
+                <div style="margin-top:10px;">
+                    <label class="edit-case-taxonomy-label">Selected Tags</label>
+                    <div id="edit-case-taxonomy-selected" class="edit-case-taxonomy-chips"></div>
+                </div>
+
+                <div id="edit-case-taxonomy-preview" class="edit-case-taxonomy-preview">Choose a primary system to generate a canonical taxonomy summary.</div>
+                <details style="margin-top:10px; background:#fff; border:1px solid #fcd34d; border-radius:12px; padding:8px 10px;">
+                    <summary style="cursor:pointer; font-size:0.8em; font-weight:800; color:#92400e;">Mini Help (Admin)</summary>
+                    <div style="margin-top:8px; font-size:0.78em; line-height:1.55; color:#475569;">
+                        1. Set one <b>Primary System</b> as the main classification.<br>
+                        2. Pick from <b>Suggested Tags</b> first to keep data consistent.<br>
+                        3. Use <b>Custom Tag</b> only when needed for rare or specific terms.<br>
+                        4. Confirm <b>Selected Tags</b> and Canonical Summary before saving.
+                    </div>
+                </details>
             </div>
 
             <label for="edit-case-note-text" style="display:block; margin-bottom:8px; font-weight:800; color:#374151;">Case Note</label>
@@ -7405,6 +8277,32 @@
                     <button type="button" class="btn-sm" onclick="closeEditCaseNoteModal()" style="min-width:110px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Cancel</button>
                     <button type="button" id="edit-case-note-save-btn" class="btn-sm" onclick="saveEditedCaseNote()" style="min-width:150px; background:linear-gradient(135deg,#f59e0b,#ea580c); color:white; border:none; border-radius:12px; padding:10px 18px; font-weight:900; box-shadow:0 8px 20px rgba(234,88,12,0.22);"><i class="fa-solid fa-save"></i> Save Changes</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="caseReviewScoreModal" class="modal" style="z-index:4302;">
+        <div class="modal-content case-score-modal-shell">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+                <div>
+                    <div style="font-size:1.08em; color:#92400e; font-weight:900;">Review Case Score</div>
+                    <div id="case-review-score-subtitle" style="margin-top:4px; font-size:0.84em; color:#78716c; line-height:1.5;">Choose a quick score or enter a custom value for this Alabasta case.</div>
+                </div>
+                <button type="button" onclick="closeCaseReviewScoreModal(false)" style="border:none; background:transparent; color:#475569; font-size:1.45em; line-height:1; cursor:pointer;">&times;</button>
+            </div>
+
+            <div class="case-score-chip-row">
+                <button type="button" class="case-score-chip" data-score="0.1" onclick="setCaseReviewScoreValue(0.1)">0.1 pts</button>
+                <button type="button" class="case-score-chip" data-score="0.2" onclick="setCaseReviewScoreValue(0.2)">0.2 pts</button>
+                <button type="button" class="case-score-chip" data-score="0.5" onclick="setCaseReviewScoreValue(0.5)">0.5 pts</button>
+            </div>
+
+            <label for="case-review-score-input" style="display:block; margin-bottom:8px; font-weight:800; color:#374151;">Custom Score</label>
+            <input id="case-review-score-input" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0.1" style="margin:0; border-radius:14px;" oninput="syncCaseReviewScoreChips()" onkeydown="if(event.key==='Enter'){event.preventDefault();closeCaseReviewScoreModal(true);}">
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px; flex-wrap:wrap;">
+                <button type="button" class="btn-sm" onclick="closeCaseReviewScoreModal(false)" style="min-width:96px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Cancel</button>
+                <button type="button" class="btn-sm" onclick="closeCaseReviewScoreModal(true)" style="min-width:110px; background:linear-gradient(135deg,#f59e0b,#ea580c); color:#fff; border:none; border-radius:12px; padding:10px 18px; font-weight:900;">Save Score</button>
             </div>
         </div>
     </div>
@@ -7484,6 +8382,115 @@
                     <button type="button" class="btn-sm" onclick="saveAlabastaPoneglyphDraft()" id="alabasta-poneglyph-save-btn" style="background:linear-gradient(135deg,#2563eb,#1d4ed8); color:white; border:none; border-radius:12px; padding:10px 16px; font-weight:900;"><i class="fa-solid fa-floppy-disk"></i> Save to Poneglyph</button>
                     <button type="button" class="btn-sm" onclick="openAlabastaDraftInPoneglyph()" style="background:#0f172a; color:#fff; border:none; border-radius:12px; padding:10px 16px; font-weight:800;"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open Poneglyph</button>
                     <button type="button" class="btn-sm" onclick="closeAlabastaPoneglyphModal()" style="background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="alabastaCaseCardModal" class="modal" style="z-index:4303;">
+        <div class="modal-content alabasta-casecard-shell">
+            <span class="close-modal" onclick="closeAlabastaCaseCardModal()" style="top:14px; right:16px;">&times;</span>
+            <div class="alabasta-casecard-header">
+                <div>
+                    <h3 class="alabasta-casecard-title"><i class="fa-solid fa-image"></i> Generate Case Card</h3>
+                    <div class="alabasta-casecard-subtitle">Build a patient-safe visual brief with a calmer editorial layout, cleaner field rhythm, and a more polished handoff into GenMage.</div>
+                </div>
+                <span class="alabasta-casecard-badge">Privacy Checked</span>
+            </div>
+
+            <input type="hidden" id="alabasta-case-card-id">
+
+            <div class="alabasta-visual-card" style="margin-bottom:12px;">
+                <label class="alabasta-visual-label" for="alabasta-case-card-safe-summary">Anonymized Summary</label>
+                <textarea id="alabasta-case-card-safe-summary" onblur="rebuildAlabastaCaseCardPromptFromInputs()" class="alabasta-casecard-textarea" style="min-height:150px;"></textarea>
+                <div class="alabasta-casecard-note">This summary will be translated into concise English first, then rebuilt into the final GenMage prompt.</div>
+            </div>
+
+            <details class="alabasta-casecard-details">
+                <summary class="alabasta-casecard-details-summary">
+                    <span class="alabasta-casecard-details-kicker">
+                        <i class="fa-solid fa-layer-group"></i>
+                        <span>Advanced Draft Details</span>
+                    </span>
+                    <span class="alabasta-casecard-details-caption">Source notes, taxonomy, and safe payload</span>
+                    <span class="alabasta-casecard-details-chevron"><i class="fa-solid fa-chevron-down"></i></span>
+                </summary>
+                <div class="alabasta-visual-grid" style="margin-top:12px;">
+                    <div class="alabasta-visual-card">
+                        <label class="alabasta-visual-label" for="alabasta-case-card-taxonomy">Taxonomy Summary</label>
+                        <textarea id="alabasta-case-card-taxonomy" readonly class="alabasta-casecard-textarea readonly" style="min-height:76px; color:#3b0764;"></textarea>
+                    </div>
+                    <div class="alabasta-visual-card">
+                        <label class="alabasta-visual-label" for="alabasta-case-card-safe-payload">Safe Payload</label>
+                        <textarea id="alabasta-case-card-safe-payload" readonly class="alabasta-casecard-textarea readonly" style="min-height:76px; color:#3b0764;"></textarea>
+                    </div>
+                </div>
+                <div class="alabasta-visual-grid">
+                    <div class="alabasta-visual-card">
+                        <label class="alabasta-visual-label" for="alabasta-case-card-original">Original Note</label>
+                        <textarea id="alabasta-case-card-original" readonly class="alabasta-casecard-textarea readonly" style="min-height:130px; border-color:#e5e7eb;"></textarea>
+                    </div>
+                    <div class="alabasta-visual-card">
+                        <label class="alabasta-visual-label" for="alabasta-case-card-prompt">GenMage Prompt</label>
+                        <textarea id="alabasta-case-card-prompt" class="alabasta-casecard-textarea" style="min-height:130px;"></textarea>
+                        <div class="alabasta-casecard-note">Optimized for clearer English copy, minimal clutter, and better infographic readability.</div>
+                    </div>
+                </div>
+            </details>
+
+            <div class="alabasta-visual-card" style="margin-bottom:12px; padding:12px 14px;">
+                <label class="alabasta-visual-label" for="alabasta-case-card-model">GenMage AI Model</label>
+                <div class="alabasta-genmage-model-rail" aria-label="GenMage AI model tabs">
+                    <button type="button" class="alabasta-genmage-model-chip active" data-value="gpt-image-1" onclick="selectAlabastaCaseCardModel(this)">OpenAI Images</button>
+                    <button type="button" class="alabasta-genmage-model-chip" data-value="imagen" onclick="selectAlabastaCaseCardModel(this)">Vertex Imagen 3</button>
+                    <button type="button" class="alabasta-genmage-model-chip" data-value="imagen-nano" onclick="selectAlabastaCaseCardModel(this)">Imagen 3 Fast</button>
+                </div>
+                <div style="display:none;">
+                    <select id="alabasta-case-card-model" style="min-width:260px; max-width:100%; border:1.5px solid #ddd6fe; border-radius:12px; padding:10px 12px; background:#fff; color:#312e81; font-weight:800;">
+                        <option value="gpt-image-1">OpenAI Images (gpt-image-1)</option>
+                        <option value="imagen">Google Vertex Imagen 3</option>
+                        <option value="imagen-nano">Google Imagen 3 Fast</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="alabasta-case-card-image-wrap" class="alabasta-visual-card" style="margin-bottom:12px; display:none;">
+                <label class="alabasta-visual-label">Generated Image</label>
+                <div class="alabasta-genmage-gallery">
+                    <div id="alabasta-case-card-image-stage" class="alabasta-genmage-stage">
+                        <div class="alabasta-genmage-skeleton" aria-hidden="true">
+                            <div class="alabasta-genmage-skeleton-topbar"></div>
+                            <div class="alabasta-genmage-skeleton-line one"></div>
+                            <div class="alabasta-genmage-skeleton-line two"></div>
+                            <div class="alabasta-genmage-skeleton-line three"></div>
+                            <div class="alabasta-genmage-skeleton-avatar"></div>
+                            <div class="alabasta-genmage-skeleton-line four"></div>
+                            <div class="alabasta-genmage-skeleton-line five"></div>
+                            <div class="alabasta-genmage-skeleton-badge"></div>
+                            <div class="alabasta-genmage-skeleton-line six"></div>
+                            <div class="alabasta-genmage-skeleton-line seven"></div>
+                            <div class="alabasta-genmage-skeleton-footer"></div>
+                        </div>
+                        <img id="alabasta-case-card-image-preview" src="" alt="Generated case card" style="width:100%; max-height:560px; object-fit:contain; border-radius:18px; border:1.5px solid rgba(221,214,254,0.92); background:#fffdfd; box-shadow:0 24px 48px rgba(15,23,42,0.12); transition:transform 0.28s ease, box-shadow 0.28s ease;">
+                    </div>
+                    <div class="alabasta-genmage-toolbar">
+                        <div class="alabasta-genmage-toolbar-meta">
+                            <span id="alabasta-case-card-image-status" class="alabasta-genmage-status-pill"><i class="fa-regular fa-image"></i> Preview</span>
+                            <span id="alabasta-case-card-image-meta" class="alabasta-genmage-image-meta"></span>
+                        </div>
+                        <a id="alabasta-case-card-image-download" href="#" download="alabasta-case-card.png" class="btn-sm alabasta-casecard-btn utility" style="align-self:flex-start; text-decoration:none;">Download PNG</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alabasta-casecard-footer">
+                <div id="alabasta-case-card-meta" class="alabasta-casecard-meta">No identifiers should appear in the safe summary or image prompt.</div>
+                <div class="alabasta-casecard-actions">
+                    <button type="button" class="btn-sm alabasta-casecard-btn ghost" onclick="refreshAlabastaCaseCardDraft()"><i class="fa-solid fa-wand-magic-sparkles"></i> Refresh Scaffold</button>
+                    <button type="button" class="btn-sm alabasta-casecard-btn primary" onclick="generateAlabastaCaseCardImage()" id="alabasta-case-card-generate-btn"><i class="fa-solid fa-image"></i> GenMage</button>
+                    <button type="button" class="btn-sm alabasta-casecard-btn utility" onclick="copyAlabastaCaseCardPrompt()"><i class="fa-solid fa-copy"></i> Copy Prompt</button>
+                    <button type="button" class="btn-sm alabasta-casecard-btn secondary" onclick="saveAlabastaCaseCardScaffold()" id="alabasta-case-card-save-btn"><i class="fa-solid fa-floppy-disk"></i> Save Scaffold</button>
+                    <button type="button" class="btn-sm alabasta-casecard-btn muted" onclick="closeAlabastaCaseCardModal()">Close</button>
                 </div>
             </div>
         </div>
@@ -7856,10 +8863,13 @@
             if (typeof initAIUsageDisplay === 'function') initAIUsageDisplay();
         };
 
-        window.callUniversalAI = async function(modelName, prompt, isJson = false, visionData = null, quickApiKey = '') {
+        window.callUniversalAI = async function(modelName, prompt, isJson = false, visionData = null, quickApiKey = '', generationOptions = null) {
             const PROXY_SECRET = "mlp-secret-8888";
-            let PROXY_URL = (window.location.hostname === 'mlp-int.work') ? '/api/ai' : 'https://mlp-int.work/api/ai'; 
-            const BACKUP_PROXY = 'https://intern-port-edfa7.web.app/api/ai';
+            const DIRECT_PROXY = 'https://us-central1-intern-port-edfa7.cloudfunctions.net/callAIProxy';
+            let PROXY_URL = (window.location.hostname === 'mlp-int.work')
+                ? '/api/ai'
+                : (window.location.hostname.endsWith('web.app') ? '/api/ai' : DIRECT_PROXY);
+            const BACKUP_PROXY = DIRECT_PROXY;
             if (window.loadAIKeys) window.loadAIKeys();
 
             let proxyProvider = "";
@@ -7882,29 +8892,36 @@
             } else if (modelName.includes('glm-5.1') || modelName.includes('ollama')) {
                 proxyProvider = "ollama";
             }
+            const isProxyOnlyImageModel = ['gpt-image-1', 'imagen', 'imagen-nano'].includes(modelName);
             try {
 
                 if (proxyProvider !== "") {
                     const proxyResponse = await fetch(PROXY_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'x-mlp-secret': PROXY_SECRET },
-                        body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData })
+                        body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData, generationOptions: generationOptions || undefined })
                     });
                     if (proxyResponse.ok) {
                         const proxyData = await proxyResponse.json();
+                        if (proxyData.error) throw new Error(proxyData.error);
                         updateAIUsage(proxyProvider, proxyData.tokens || 0);
-                        return { text: proxyData.text, tokens: proxyData.tokens || 0, model: proxyData.model || modelName };
+                        return { text: proxyData.text || proxyData.imageDataUrl || proxyData.dataUrl || '', tokens: proxyData.tokens || 0, model: proxyData.model || modelName, raw: proxyData };
                     } else {
+                        const primaryError = await proxyResponse.json().catch(() => ({}));
                         console.warn(`[AI Proxy] Primary endpoint returned status ${proxyResponse.status}. Trying backup...`);
                         const backupResponse = await fetch(BACKUP_PROXY, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'x-mlp-secret': PROXY_SECRET },
-                            body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData })
+                            body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData, generationOptions: generationOptions || undefined })
                         }).catch(() => null);
                         if (backupResponse && backupResponse.ok) {
                             const proxyData = await backupResponse.json();
+                            if (proxyData.error) throw new Error(proxyData.error);
                             updateAIUsage(proxyProvider, proxyData.tokens || 0);
-                            return { text: proxyData.text, tokens: proxyData.tokens || 0, model: proxyData.model || modelName };
+                            return { text: proxyData.text || proxyData.imageDataUrl || proxyData.dataUrl || '', tokens: proxyData.tokens || 0, model: proxyData.model || modelName, raw: proxyData };
+                        }
+                        if (isProxyOnlyImageModel) {
+                            throw new Error(primaryError?.error || `Images proxy failed with status ${proxyResponse.status}`);
                         }
                         console.warn('[AI Proxy] Backup failed. Attempting local fallback...');
                     }
@@ -7915,14 +8932,20 @@
                     const backupResponse = await fetch(BACKUP_PROXY, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'x-mlp-secret': PROXY_SECRET },
-                        body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData })
+                        body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData, generationOptions: generationOptions || undefined })
                     });
                     if (backupResponse.ok) {
                         const proxyData = await backupResponse.json();
+                        if (proxyData.error) throw new Error(proxyData.error);
                         updateAIUsage(proxyProvider, proxyData.tokens || 0);
-                        return { text: proxyData.text, tokens: proxyData.tokens || 0, model: proxyData.model || modelName };
+                        return { text: proxyData.text || proxyData.imageDataUrl || proxyData.dataUrl || '', tokens: proxyData.tokens || 0, model: proxyData.model || modelName, raw: proxyData };
+                    }
+                    if (isProxyOnlyImageModel) {
+                        const backupError = await backupResponse.json().catch(() => ({}));
+                        throw new Error(backupError?.error || `Images proxy failed with status ${backupResponse.status}`);
                     }
                 } catch (be) {
+                    if (isProxyOnlyImageModel) throw be;
                     console.warn('[AI Proxy] Backup also failed. Using local SDK.');
                 }
             }
@@ -8009,6 +9032,8 @@
                     const d = await resp.json();
                     if (d.error) throw new Error(`Anthropic Local Error: ${d.error.message}`);
                     return { text: d.content[0].text, tokens: d.usage?.total_tokens || 0, model: modelName };
+                } else if (isProxyOnlyImageModel) {
+                    throw new Error("GenMage image models require the server proxy. Please check Firebase Functions deployment.");
                 } else if (modelName.includes('gpt')) {
                     const apiKey = quickApiKey || window.OPENAI_API_KEY;
                     if (!apiKey) throw new Error("OpenAI API Key not found for local fallback.");
@@ -9208,15 +10233,24 @@
             const hiddenInput = document.getElementById('ai-model-review');
             document.querySelectorAll('.reflective-review-model-chip').forEach(chip => {
                 chip.classList.remove('active');
-                chip.style.background = 'transparent';
-                chip.style.color = '#64748b';
             });
             if (!btn) return;
             btn.classList.add('active');
-            btn.style.background = 'linear-gradient(135deg,#10b981,#34d399)';
-            btn.style.color = 'white';
             if (hiddenInput) hiddenInput.value = btn.dataset.value || 'gpt-4o';
         };
+
+        function setReflectiveReviewStatus(message, tone) {
+            const el = document.getElementById('reflective-review-ai-status');
+            if (!el) return;
+            if (!message) {
+                el.className = 'reflective-review-status';
+                el.innerHTML = '';
+                return;
+            }
+            const icon = tone === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check';
+            el.className = 'reflective-review-status show ' + (tone || 'success');
+            el.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
+        }
 
         function getReflectiveReviewPresetInstruction(preset) {
             const presetMap = {
@@ -9246,6 +10280,7 @@
             const existingDraft = textarea.value.trim();
             
             try {
+                setReflectiveReviewStatus('');
                 btn.disabled = true;
                 const originalHtml = btn.innerHTML;
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>' + (btn.offsetWidth > 60 ? ' Analyzing...' : '');
@@ -9283,14 +10318,20 @@ Do not include any explanation other than the feedback body.`;
                 const { text } = await window.callUniversalAI(selectedModelName, prompt);
                 
                 textarea.value = text;
+                setReflectiveReviewStatus(existingDraft ? `AI refined your draft in ${targetLang}.` : `AI suggestion ready in ${targetLang}.`, 'success');
                 showToast(existingDraft ? "✨ AI refined your Thai draft → " + targetLang : "✨ AI suggested feedback!");
                 
             } catch (error) {
                 console.error("AI Error:", error);
-                alert("AI is currently unavailable: " + error.message);
+                const rawMessage = error && error.message ? String(error.message) : 'Unknown error';
+                const friendlyMessage = /NetworkError|Failed to fetch|Load failed|fetch resource/i.test(rawMessage)
+                    ? 'AI unavailable right now. Check AI keys or network and try again.'
+                    : ('AI unavailable: ' + rawMessage);
+                setReflectiveReviewStatus(friendlyMessage, 'error');
+                showToast(friendlyMessage);
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-robot"></i> <span class="btn-text">AI Suggest</span>';
+                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <span class="btn-text">AI Suggest</span>';
             }
         };
 
@@ -12332,6 +13373,10 @@ async function saveQuiz() {
                 const quiz = quizzesData.find(x => x.id === att.quizId);
                 if (!quiz) return alert("Quiz Reference missing");
 
+                // Set ID for export function
+                const idInput = document.getElementById('review-attempt-id');
+                if (idInput) idInput.value = attemptId;
+
                 const cheat = att.cheatMonitoring || {};
                 const cheatSummary = cheat.summary || {};
                 const cheatEvents = Array.isArray(cheat.events) ? cheat.events : [];
@@ -12580,9 +13625,10 @@ async function saveQuiz() {
                         <div style="padding:15px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;background:#f8f9fa;">
                             <h3 style="margin:0;color:#4361ee;font-size:1.1em;"><i class="fa-solid fa-magnifying-glass"></i> Review Quiz Attempt</h3>
                             <div style="display:flex; gap:8px;">
-                                <button onclick="openTimingRiskConfigModal()" style="background:#0ea5e9;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.85em;">⚙ Timing Config</button>
+                                <button onclick="openTimingRiskConfigModal()" style="background:#0ea5e9;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:1.1em;" title="Timing Config">⚙</button>
                                 <button onclick="approveQuizAttempt('${attemptId}')" style="background:#2ecc71;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;">🍎 Manten Manten no Mi (100%)</button>
                                 <button onclick="approveQuizAttemptActual('${attemptId}')" style="background:#3498db;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;">🍇 Shōjiki Shōjiki no Mi (${actualApproveLabel})</button>
+                                <button onclick="exportIncorrectToPDF()" style="background:#ef4444;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                                 <button onclick="closeReviewOverlay()" style="background:#ef233c;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;">Close</button>
                             </div>
                         </div>
@@ -12728,6 +13774,160 @@ async function saveQuiz() {
         }
 
         const GDRIVE_CLIENT_ID  = getStoredConfig('GDRIVE_CLIENT_ID');
+        async function exportIncorrectToPDF() {
+            const attemptId = document.getElementById('review-attempt-id')?.value;
+            if (!attemptId) return alert("Attempt ID missing");
+
+            try {
+                if (typeof showToast === 'function') showToast("Generating PDF...");
+                
+                const attemptDoc = await db.collection("quiz_attempts").doc(attemptId).get();
+                if (!attemptDoc.exists) return alert("Data not found");
+                const att = attemptDoc.data();
+                const quiz = quizzesData.find(x => x.id === att.quizId);
+                if (!quiz) return alert("Quiz Reference missing");
+
+                const jsPdfCtor = window.jspdf && window.jspdf.jsPDF;
+                if (!jsPdfCtor) return alert('PDF engine is not ready.');
+
+                const doc = new jsPdfCtor('p', 'mm', 'a4');
+                let y = 20;
+                const margin = 15;
+                const pageW = doc.internal.pageSize.getWidth();
+                const pageH = doc.internal.pageSize.getHeight();
+                const maxW = pageW - (margin * 2);
+
+                const ensureSpace = (h) => {
+                    if (y + h > pageH - margin) {
+                        doc.addPage();
+                        y = 20;
+                        return true;
+                    }
+                    return false;
+                };
+
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(18);
+                doc.setTextColor(220, 53, 69);
+                doc.text("Incorrect Questions Review", margin, y);
+                y += 12;
+
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(80);
+                doc.text(`Quiz: ${quiz.title || 'Untitled'}`, margin, y); y += 6;
+                doc.text(`Student: ${att.displayName || 'Anonymous'}`, margin, y); y += 6;
+                doc.text(`Date: ${att.timestamp ? new Date(att.timestamp).toLocaleString() : 'N/A'}`, margin, y); y += 10;
+
+                doc.setDrawColor(220);
+                doc.line(margin, y, pageW - margin, y);
+                y += 12;
+
+                let incorrectCount = 0;
+                (quiz.questions || []).forEach((q, i) => {
+                    const studentAns = (att.answers || att.practiceAnswers || [])[i];
+                    const isChoice = (q.type || 'choice') === 'choice';
+                    const isManuallyCorrect = !!(att.manualCorrect && att.manualCorrect[i] === true);
+                    
+                    let isCorrect = false;
+                    if (isChoice) {
+                        const target = q.correct;
+                        const sAns = Array.isArray(studentAns) ? studentAns : (studentAns !== undefined && studentAns !== null ? [studentAns] : []);
+                        const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
+                        if (tAns.length > 0) {
+                            if (tAns.length === 1 && sAns.length === 1) isCorrect = (String(sAns[0]).trim() === String(tAns[0]).trim());
+                            else isCorrect = (sAns.length === tAns.length && tAns.every(v => sAns.map(String).includes(String(v))));
+                        }
+                    } else {
+                        isCorrect = !!((att.gradedAnswers && att.gradedAnswers[i]) || isManuallyCorrect);
+                    }
+                    isCorrect = isCorrect || isManuallyCorrect;
+
+                    if (!isCorrect) {
+                        incorrectCount++;
+                        ensureSpace(30);
+
+                        doc.setFont('helvetica', 'bold');
+                        doc.setTextColor(30);
+                        const qLines = doc.splitTextToSize(`Q${i + 1}: ${q.q}`, maxW);
+                        qLines.forEach(line => {
+                            ensureSpace(6);
+                            doc.text(line, margin, y);
+                            y += 6;
+                        });
+
+                        y += 2;
+                        doc.setFont('helvetica', 'normal');
+                        doc.setTextColor(220, 53, 69); // Red
+                        
+                        let studentText = "Student Answer: ";
+                        if (isChoice) {
+                            const idx = parseInt(studentAns);
+                            studentText += isNaN(idx) ? "None" : (q.options[idx] || "None");
+                            if (!isNaN(idx)) studentText += ` (Choice ${idx + 1})`;
+                        } else {
+                            const ans = Array.isArray(studentAns) ? studentAns.join(", ") : studentAns;
+                            studentText += ans || "None";
+                        }
+                        
+                        const sLines = doc.splitTextToSize(studentText, maxW);
+                        sLines.forEach(line => {
+                            ensureSpace(5);
+                            doc.text(line, margin, y);
+                            y += 5;
+                        });
+
+                        doc.setTextColor(40, 167, 69); // Green
+                        let correctText = "Correct Answer: ";
+                        if (isChoice) {
+                            const idx = parseInt(q.correct);
+                            correctText += isNaN(idx) ? "N/A" : (q.options[idx] || "N/A");
+                            if (!isNaN(idx)) correctText += ` (Choice ${idx + 1})`;
+                        } else {
+                            correctText += "(Refer to answer key)";
+                        }
+                        
+                        const cLines = doc.splitTextToSize(correctText, maxW);
+                        cLines.forEach(line => {
+                            ensureSpace(5);
+                            doc.text(line, margin, y);
+                            y += 5;
+                        });
+
+                        if (q.explanation) {
+                            y += 2;
+                            doc.setTextColor(100);
+                            doc.setFont('helvetica', 'italic');
+                            const eLines = doc.splitTextToSize(`Explanation: ${q.explanation}`, maxW);
+                            eLines.forEach(line => {
+                                ensureSpace(5);
+                                doc.text(line, margin, y);
+                                y += 5;
+                            });
+                        }
+
+                        doc.setTextColor(0);
+                        y += 10;
+                        doc.setDrawColor(240);
+                        doc.line(margin, y - 5, pageW - margin, y - 5);
+                    }
+                });
+
+                if (incorrectCount === 0) {
+                    alert("No incorrect questions found in this attempt!");
+                    return;
+                }
+
+                const filename = `Review_Incorrect_${(att.displayName || 'Attempt').replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
+                doc.save(filename);
+                if (typeof showToast === 'function') showToast("PDF Exported Successfully", "success");
+
+            } catch (e) {
+                console.error(e);
+                alert("Export failed: " + e.message);
+            }
+        }
+
         const GDRIVE_API_KEY    = getStoredConfig('GDRIVE_API_KEY');
         const GDRIVE_APP_ID     = getStoredConfig('GDRIVE_APP_ID', 'intern-port-edfa7');
 
@@ -15857,22 +17057,29 @@ async function saveQuiz() {
             // 🔥 Load Group Settings ([Version: V69.0])
             db.collection("quizzes").doc("--group-settings--").onSnapshot(doc => {
                 if (doc.exists) groupSettings = doc.data();
-            });
+            }, e => console.error("🔥 [Firestore Error] quizzes/--group-settings--:", e));
 
             db.collection("quizzes").doc(QUIZ_TIMING_CONFIG_DOC_ID).onSnapshot(doc => {
                 if (doc.exists) applyTimingRiskConfig(doc.data());
                 else applyTimingRiskConfig({ activeProfile: 'exam', profiles: getDefaultTimingProfiles() });
-            });
+            }, e => console.error("🔥 [Firestore Error] quizzes/timing_config:", e));
 
             db.collection("works").orderBy("timestamp", "desc").limit(100).onSnapshot(s => { 
                 worksData = s.docs.map(d => ({ id: d.id, ...d.data() })); 
                 renderTable('works'); 
                 drawKanban(); 
-            });
+            }, e => console.error("🔥 [Firestore Error] works:", e));
+
             db.collection("cases").orderBy("timestamp", "desc").limit(200).onSnapshot(s => {
                 casesData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderAlabastaCases();
+            }, e => {
+                console.error("🔥 [Firestore Error] cases:", e);
+                if (e.code === 'permission-denied') {
+                    showToast("⚠️ Permission denied for Alabasta Cases", "error");
+                }
             });
+
             db.collection("users").orderBy("score", "desc").onSnapshot(s => { 
                 usersData = s.docs.map(d => ({ id: d.id, ...d.data() })); 
                 renderUserGroupTabs();
@@ -15881,27 +17088,29 @@ async function saveQuiz() {
                 renderLeaderboard(); 
                 updateAssigneeList(); 
                 renderCertTable(); 
-                drawKanban(); // Update board cards (e.g. if filtering by group)
+                drawKanban(); 
                 renderAlabastaCases();
-            });
-            db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban);
+            }, e => console.error("🔥 [Firestore Error] users:", e));
+
+            db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban, e => console.error("🔥 [Firestore Error] side_quests:", e));
+
             db.collection("quests").onSnapshot(s => { 
                 questsCache = s.docs.map(d => ({ id: d.id, ...d.data() })); 
                 loadQuestHistory(); 
                 loadReflectiveLogsAdmin(); 
-                filterBoard(); // Update Kanban too
-            });
+                filterBoard(); 
+            }, e => console.error("🔥 [Firestore Error] quests:", e));
+
             db.collection("knowledge_base").orderBy("createdAt", "desc").onSnapshot(s => {
                 knowledgeBaseCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderKnowledgeBase();
-            });
+            }, e => console.error("🔥 [Firestore Error] knowledge_base:", e));
+
             db.collection("quizzes").onSnapshot(s => { 
                 quizzesData = s.docs.map(d => ({ id: d.id, ...d.data() })); 
                 console.log("🔍 Firebase quizzes updated, count:", quizzesData.length);
-                console.log("🔍 Firebase raw docs:", s.docs);
-                console.log("🔍 Firebase quizzesData sample:", quizzesData.slice(0, 2));
                 renderQuizzes(); 
-            });
+            }, e => console.error("🔥 [Firestore Error] quizzes:", e));
             // 🔥 Refined [Version: V77.6] Listen only for actionable items (Pending Review or New Request)
             db.collection("quiz_attempts").where("status", "in", ["pending", "requesting"]).onSnapshot(s => {
                 renderPendingQuizzes(s.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -16373,14 +17582,15 @@ async function saveQuiz() {
                     ? `<span class="badge" style="background:#ecfdf5; color:#166534; border:1px solid rgba(22,101,52,0.18); font-weight:800;">${bonus.toFixed(2)} pts</span>`
                     : `<span style="color:#94a3b8; font-size:0.82em;">-</span>`;
                 const statusBtn = isReviewed
-                    ? `<button class="btn-sm alabasta-action-btn is-reopen" title="Reopen case" onclick="updateCaseStatus('${c.id}', 'pending')"><i class="fa-solid fa-rotate-left"></i><span class="alabasta-action-label">Reopen</span></button>`
-                    : `<button class="btn-sm alabasta-action-btn is-review" title="Mark reviewed" onclick="updateCaseStatus('${c.id}', 'reviewed')"><i class="fa-solid fa-check"></i><span class="alabasta-action-label">Review</span></button>`;
-                const editBtn = `<button class="btn-sm alabasta-action-btn is-edit" title="Edit case note" onclick="editCaseNote('${c.id}')"><i class="fa-solid fa-pen"></i><span class="alabasta-action-label">Edit</span></button>`;
-                const laboonBtn = `<button class="btn-sm alabasta-action-btn is-laboon" title="Ask Laboon" onclick="openAlabastaLaboon('${c.id}')"><i class="fa-solid fa-wand-magic-sparkles"></i><span class="alabasta-action-label">Laboon</span></button>`;
+                    ? `<button class="btn-sm alabasta-action-btn is-reopen" title="Reopen case" onclick="updateCaseStatus('${c.id}', 'pending')"><span class="alabasta-emoji">↩️</span></button>`
+                    : `<button class="btn-sm alabasta-action-btn is-review" title="Mark reviewed" onclick="updateCaseStatus('${c.id}', 'reviewed')"><span class="alabasta-emoji">✅</span></button>`;
+                const editBtn = `<button class="btn-sm alabasta-action-btn is-edit" title="Edit case note" onclick="editCaseNote('${c.id}')"><span class="alabasta-emoji">✏️</span></button>`;
+                const laboonBtn = `<button class="btn-sm alabasta-action-btn is-laboon" title="Ask Laboon" onclick="openAlabastaLaboon('${c.id}')"><span class="alabasta-emoji">🐳</span></button>`;
+                const caseCardBtn = `<button class="btn-sm alabasta-action-btn is-case-card" title="Generate patient-safe case card" onclick="openAlabastaCaseCard('${c.id}')"><span class="alabasta-emoji">🖼️</span></button>`;
                 const hasPoneglyphLink = !!c.poneglyphNoteId;
-                const poneglyphBtn = `<button class="btn-sm alabasta-action-btn is-poneglyph" title="${hasPoneglyphLink ? 'Open linked Poneglyph draft' : 'Promote to Poneglyph'}" onclick="openAlabastaPoneglyph('${c.id}')"><i class="fa-solid fa-book-bookmark"></i><span class="alabasta-action-label">${hasPoneglyphLink ? 'PGL *' : 'PGL'}</span></button>`;
-                const deleteBtn = `<button class="btn-sm alabasta-action-btn is-delete" title="Delete case" onclick="deleteCaseSubmission('${c.id}')"><i class="fa-solid fa-trash-can"></i><span class="alabasta-action-label">Delete</span></button>`;
-                const actionBtn = `<div class="alabasta-action-row">${editBtn}${laboonBtn}${poneglyphBtn}${statusBtn}${deleteBtn}</div>`;
+                const poneglyphBtn = `<button class="btn-sm alabasta-action-btn is-poneglyph" title="${hasPoneglyphLink ? 'Open linked Poneglyph draft' : 'Promote to Poneglyph'}" onclick="openAlabastaPoneglyph('${c.id}')"><span class="alabasta-emoji">🪨</span></button>`;
+                const deleteBtn = `<button class="btn-sm alabasta-action-btn is-delete" title="Delete case" onclick="deleteCaseSubmission('${c.id}')"><span class="alabasta-emoji">🗑️</span></button>`;
+                const actionBtn = `<div class="alabasta-action-row">${editBtn}${laboonBtn}${caseCardBtn}${poneglyphBtn}${statusBtn}${deleteBtn}</div>`;
 
                 return `
                     <tr>
@@ -16397,15 +17607,139 @@ async function saveQuiz() {
                         <td style="max-width:260px; white-space:normal;">${safe(c.note || '-')}</td>
                         <td>${scoreHtml}</td>
                         <td><span class="badge" style="background:${statusBg}; color:${statusColor}; border:1px solid ${statusColor}33;">${isArchived ? 'archived' : (isReviewed ? 'reviewed' : 'pending')}</span></td>
-                        <td>
-                            <div style="display:flex; gap:5px;">
-                                ${actionBtn}
-                                <button class="btn-sm" style="background:#ef4444; color:white; border:none; border-radius:8px;" onclick="deleteCase('${c.id}')"><i class="fa-solid fa-trash"></i></button>
-                            </div>
-                        </td>
+                        <td>${actionBtn}</td>
                     </tr>
                 `;
             }).join('');
+        }
+
+        const alabastaTaxonomyCatalog = [
+            { key: 'respiratory', label: 'Respiratory', thaiLabel: 'ระบบทางเดินหายใจ', tags: ['cough', 'dyspnea', 'sore throat', 'fever', 'runny nose'] },
+            { key: 'cardio', label: 'Cardiovascular', thaiLabel: 'ระบบหัวใจและหลอดเลือด', tags: ['chest pain', 'palpitations', 'edema', 'fatigue', 'high BP'] },
+            { key: 'gi', label: 'GI', thaiLabel: 'ระบบทางเดินอาหาร', tags: ['abdominal pain', 'nausea', 'vomiting', 'diarrhea', 'constipation', 'bloating'] },
+            { key: 'skin', label: 'Skin', thaiLabel: 'ระบบผิวหนัง', tags: ['rash', 'itching', 'redness', 'swelling', 'lesion'] },
+            { key: 'neuro', label: 'Neurological', thaiLabel: 'ระบบประสาท', tags: ['headache', 'dizziness', 'numbness', 'weakness', 'insomnia'] },
+            { key: 'msk', label: 'Musculoskeletal', thaiLabel: 'กล้ามเนื้อและกระดูก', tags: ['joint pain', 'back pain', 'stiffness', 'sprain', 'swelling'] },
+            { key: 'endocrine', label: 'Endocrine / NCDs', thaiLabel: 'โรคเรื้อรัง / ต่อมไร้ท่อ', tags: ['hyperglycemia', 'polyuria', 'weight loss', 'fatigue', 'poor adherence'] },
+            { key: 'mental', label: 'Mental Health', thaiLabel: 'สุขภาพจิต', tags: ['stress', 'anxiety', 'low mood', 'panic', 'poor sleep'] },
+            { key: 'other', label: 'Other', thaiLabel: 'อื่นๆ', tags: ['follow-up', 'medication question', 'unclear symptom'] }
+        ];
+
+        window.editCaseTaxonomyState = window.editCaseTaxonomyState || { selectedTags: [] };
+
+        function getAlabastaTaxonomyEntry(key) {
+            return alabastaTaxonomyCatalog.find(item => item.key === key) || null;
+        }
+
+        function inferAlabastaTaxonomyKey(caseItem) {
+            if (caseItem?.diseaseSystemKey) return caseItem.diseaseSystemKey;
+            const text = String(caseItem?.disease || '').toLowerCase();
+            if (text.includes('gi') || text.includes('ทางเดินอาหาร')) return 'gi';
+            if (text.includes('หายใจ') || text.includes('respir')) return 'respiratory';
+            if (text.includes('หัวใจ') || text.includes('cardio')) return 'cardio';
+            if (text.includes('ผิวหนัง') || text.includes('skin')) return 'skin';
+            if (text.includes('ประสาท') || text.includes('neuro')) return 'neuro';
+            if (text.includes('กล้าม') || text.includes('กระดูก') || text.includes('musculo')) return 'msk';
+            if (text.includes('เรื้อรัง') || text.includes('endocr') || text.includes('ncd')) return 'endocrine';
+            if (text.includes('จิต') || text.includes('mental')) return 'mental';
+            return 'other';
+        }
+
+        function getAlabastaPrimarySystemLabel(caseItem = {}, logData = {}) {
+            const directLabel = logData.primarySystemLabel || caseItem.diseaseSystemLabel || caseItem.primarySystemLabel;
+            if (directLabel) return directLabel;
+            const key = logData.primarySystemKey || caseItem.diseaseSystemKey || inferAlabastaTaxonomyKey(caseItem);
+            const entry = getAlabastaTaxonomyEntry(key) || getAlabastaTaxonomyEntry('other');
+            return entry ? `${entry.thaiLabel} (${entry.label})` : 'Other';
+        }
+
+        function findAlabastaCaseForLog(logData = {}) {
+            const caseDocId = logData.sourceCaseDocId || '';
+            const caseRef = logData.sourceCaseRef || '';
+            return (casesData || []).find(c => c.id === caseDocId || (!!caseRef && c.caseId === caseRef)) || {};
+        }
+
+        function buildAlabastaReviewLogNote(caseItem = {}, logData = {}) {
+            const caseRef = logData.sourceCaseRef || caseItem.caseId || caseItem.id || logData.sourceCaseDocId || '';
+            const primarySystemLabel = getAlabastaPrimarySystemLabel(caseItem, logData);
+            return `Alabasta reviewed: ${primarySystemLabel}${caseRef ? ` - ${caseRef}` : ''}`;
+        }
+
+        function initEditCaseTaxonomyOptions() {
+            const selectEl = document.getElementById('edit-case-taxonomy-system');
+            if (!selectEl || selectEl.options.length > 1) return;
+            selectEl.innerHTML = `<option value="">Select system...</option>` + alabastaTaxonomyCatalog.map(item => (
+                `<option value="${item.key}">${item.thaiLabel} (${item.label})</option>`
+            )).join('');
+        }
+
+        function getEditCaseSelectedTags() {
+            if (!window.editCaseTaxonomyState || !Array.isArray(window.editCaseTaxonomyState.selectedTags)) {
+                window.editCaseTaxonomyState = { selectedTags: [] };
+            }
+            return window.editCaseTaxonomyState.selectedTags;
+        }
+
+        function renderEditCaseTaxonomyCard() {
+            const selectEl = document.getElementById('edit-case-taxonomy-system');
+            const suggestedEl = document.getElementById('edit-case-taxonomy-suggestions');
+            const selectedEl = document.getElementById('edit-case-taxonomy-selected');
+            const previewEl = document.getElementById('edit-case-taxonomy-preview');
+            if (!selectEl || !suggestedEl || !selectedEl || !previewEl) return;
+
+            const entry = getAlabastaTaxonomyEntry(selectEl.value);
+            const selectedTags = getEditCaseSelectedTags();
+            const suggestions = entry ? entry.tags : [];
+
+            suggestedEl.innerHTML = suggestions.length
+                ? suggestions.map(tag => `<button type="button" class="edit-case-taxonomy-chip ${selectedTags.includes(tag) ? 'active' : ''}" onclick='toggleEditCaseTaxonomyTag(${JSON.stringify(tag)})'>${tag}</button>`).join('')
+                : `<span class="edit-case-taxonomy-chip muted">Select a system to see suggested tags</span>`;
+
+            selectedEl.innerHTML = selectedTags.length
+                ? selectedTags.map(tag => `<button type="button" class="edit-case-taxonomy-chip active" onclick='toggleEditCaseTaxonomyTag(${JSON.stringify(tag)})'>${tag}</button>`).join('')
+                : `<span class="edit-case-taxonomy-chip muted">No tags selected yet</span>`;
+
+            const summary = entry
+                ? `${entry.thaiLabel} (${entry.label})${selectedTags.length ? ` - ${selectedTags.join(', ')}` : ''}`
+                : 'Choose a primary system to generate a canonical taxonomy summary.';
+            previewEl.innerHTML = entry
+                ? `<strong>Canonical Summary:</strong> ${summary}`
+                : summary;
+        }
+
+        function toggleEditCaseTaxonomyTag(tag) {
+            const selectedTags = getEditCaseSelectedTags();
+            const idx = selectedTags.indexOf(tag);
+            if (idx >= 0) selectedTags.splice(idx, 1);
+            else selectedTags.push(tag);
+            renderEditCaseTaxonomyCard();
+        }
+
+        function addEditCaseCustomTag() {
+            const inputEl = document.getElementById('edit-case-taxonomy-custom');
+            if (!inputEl) return;
+            const tag = String(inputEl.value || '').trim();
+            if (!tag) return;
+            const selectedTags = getEditCaseSelectedTags();
+            if (!selectedTags.includes(tag)) selectedTags.push(tag);
+            inputEl.value = '';
+            renderEditCaseTaxonomyCard();
+        }
+
+        function handleEditCaseTaxonomyKeydown(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                addEditCaseCustomTag();
+            }
+        }
+
+        function resetEditCaseTaxonomyState() {
+            window.editCaseTaxonomyState = { selectedTags: [] };
+            const selectEl = document.getElementById('edit-case-taxonomy-system');
+            const customEl = document.getElementById('edit-case-taxonomy-custom');
+            if (selectEl) selectEl.value = '';
+            if (customEl) customEl.value = '';
+            renderEditCaseTaxonomyCard();
         }
 
         function closeEditCaseNoteModal() {
@@ -16414,9 +17748,14 @@ async function saveQuiz() {
             const idEl = document.getElementById('edit-case-note-id');
             const saveBtn = document.getElementById('edit-case-note-save-btn');
             const metaEl = document.getElementById('edit-case-note-meta');
+            const customerEl = document.getElementById('edit-case-note-customer');
+            const scoreEl = document.getElementById('edit-case-note-score');
             if (noteEl) noteEl.value = '';
             if (idEl) idEl.value = '';
+            if (customerEl) customerEl.textContent = '-';
+            if (scoreEl) scoreEl.textContent = '0.00 pts';
             if (metaEl) metaEl.textContent = 'Changes will be saved with admin audit fields.';
+            resetEditCaseTaxonomyState();
             if (saveBtn) {
                 saveBtn.disabled = false;
                 saveBtn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes';
@@ -16434,13 +17773,19 @@ async function saveQuiz() {
             const userEl = document.getElementById('edit-case-note-user');
             const refEl = document.getElementById('edit-case-note-ref');
             const diseaseEl = document.getElementById('edit-case-note-disease');
+            const customerEl = document.getElementById('edit-case-note-customer');
+            const scoreEl = document.getElementById('edit-case-note-score');
             const noteEl = document.getElementById('edit-case-note-text');
             const metaEl = document.getElementById('edit-case-note-meta');
+            const taxonomySelectEl = document.getElementById('edit-case-taxonomy-system');
 
+            initEditCaseTaxonomyOptions();
             if (idEl) idEl.value = caseDocId;
             if (userEl) userEl.textContent = caseItem.displayName || caseItem.userId || '-';
             if (refEl) refEl.textContent = caseItem.caseId || '-';
             if (diseaseEl) diseaseEl.textContent = caseItem.disease || '-';
+            if (customerEl) customerEl.textContent = caseItem.customer || '-';
+            if (scoreEl) scoreEl.textContent = `${Number(caseItem.adminBonus || 0).toFixed(2)} pts`;
             if (noteEl) {
                 noteEl.value = String(caseItem.note || '');
                 setTimeout(() => noteEl.focus(), 40);
@@ -16453,6 +17798,17 @@ async function saveQuiz() {
                     ? `Last edited ${updatedAt}`
                     : 'Changes will be saved with admin audit fields.';
             }
+            window.editCaseTaxonomyState = {
+                selectedTags: Array.isArray(caseItem.symptomTags) ? [...caseItem.symptomTags] : []
+            };
+            if (taxonomySelectEl) taxonomySelectEl.value = inferAlabastaTaxonomyKey(caseItem);
+            const taxonomySummary = String(caseItem.taxonomySummary || '').trim();
+            if (!window.editCaseTaxonomyState.selectedTags.length && taxonomySummary.includes(' - ')) {
+                window.editCaseTaxonomyState.selectedTags = taxonomySummary.split(' - ').slice(1).join(' - ').split(',').map(x => x.trim()).filter(Boolean);
+            }
+            const customEl = document.getElementById('edit-case-taxonomy-custom');
+            if (customEl) customEl.value = '';
+            renderEditCaseTaxonomyCard();
 
             forceShowModal('editCaseNoteModal');
         }
@@ -16485,6 +17841,418 @@ async function saveQuiz() {
                 'Raw Note:',
                 String(caseItem.note || '-')
             ].join('\n');
+        }
+
+        function scrubAlabastaCaseIdentifiers(text, caseItem = {}) {
+            let safeText = String(text || '');
+            const directIdentifiers = [
+                caseItem.caseId,
+                caseItem.customer,
+                caseItem.displayName,
+                caseItem.userId,
+                caseItem.email,
+                caseItem.phone
+            ].map(v => String(v || '').trim()).filter(v => v.length >= 2);
+
+            directIdentifiers.forEach(identifier => {
+                const escaped = identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                safeText = safeText.replace(new RegExp(escaped, 'gi'), '[redacted]');
+            });
+
+            return safeText
+                .replace(/\b(?:HN|Ref|Case\s*No\.?)\s*[:#-]?\s*[A-Z0-9-]{3,}\b/gi, '[redacted-ref]')
+                .replace(/\b\d{4,}\b/g, '[redacted-number]')
+                .replace(/\b0\d{8,9}\b/g, '[redacted-phone]')
+                .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function getAlabastaCaseTaxonomy(caseItem = {}) {
+            const entry = getAlabastaTaxonomyEntry(caseItem.diseaseSystemKey) || getAlabastaTaxonomyEntry(inferAlabastaTaxonomyKey(caseItem)) || getAlabastaTaxonomyEntry('other');
+            const symptomTags = Array.isArray(caseItem.symptomTags)
+                ? caseItem.symptomTags.filter(Boolean)
+                : [];
+            return {
+                primarySystemKey: entry?.key || 'other',
+                primarySystemLabel: caseItem.diseaseSystemLabel || (entry ? `${entry.thaiLabel} (${entry.label})` : 'Other'),
+                symptomTags,
+                taxonomySummary: caseItem.taxonomySummary || `${entry?.thaiLabel || 'อื่นๆ'} (${entry?.label || 'Other'})${symptomTags.length ? ` - ${symptomTags.join(', ')}` : ''}`
+            };
+        }
+
+        function buildSafeAlabastaCaseVisualPayload(caseItem = {}) {
+            const taxonomy = getAlabastaCaseTaxonomy(caseItem);
+            const rawNote = String(caseItem.note || '').trim();
+            const safeNote = scrubAlabastaCaseIdentifiers(rawNote, caseItem);
+            const safeSummary = safeNote
+                ? `Educational case summary: ${safeNote}`
+                : `Educational case summary for ${taxonomy.primarySystemLabel} with tags: ${taxonomy.symptomTags.join(', ') || 'not specified'}.`;
+
+            return {
+                visualMode: 'educational_case_card',
+                privacyStatus: 'patient_safe_anonymized',
+                primarySystemKey: taxonomy.primarySystemKey,
+                primarySystemLabel: taxonomy.primarySystemLabel,
+                symptomTags: taxonomy.symptomTags,
+                taxonomySummary: taxonomy.taxonomySummary,
+                safeSummary,
+                stylePreset: 'Miss Goldenweek / clean medical infographic',
+                forbiddenIdentifiers: ['HN', 'case number', 'customer name', 'patient name', 'LINE name', 'user id', 'phone', 'email']
+            };
+        }
+
+        function buildAlabastaCaseCardPrompt(payload) {
+            return [
+                'Create a short educational visual case summary card for admin review.',
+                '',
+                `Primary system: ${payload.primarySystemLabel}`,
+                `Symptom tags: ${payload.symptomTags.length ? payload.symptomTags.join(', ') : 'not specified'}`,
+                `Safe case summary: ${payload.safeSummary}`,
+                '',
+                'Output style:',
+                '- Clean medical infographic card',
+                '- Warm Alabasta theme with Miss Goldenweek visual direction',
+                '- English language with concise headings',
+                '- 1-page educational card, square or portrait layout',
+                '- Focus on learning points, symptom pattern, counseling points, and review cues',
+                '',
+                'Privacy requirements:',
+                '- Do not include HN, Ref No., case number, customer name, patient name, user name, LINE name, phone, email, or any identifier',
+                '- Do not invent patient identity',
+                '- Keep the content educational and anonymized'
+            ].join('\n');
+        }
+
+        window.selectAlabastaCaseCardModel = function(btn) {
+            const hiddenInput = document.getElementById('alabasta-case-card-model');
+            document.querySelectorAll('.alabasta-genmage-model-chip').forEach(chip => chip.classList.remove('active'));
+            if (!btn) return;
+            btn.classList.add('active');
+            if (hiddenInput) hiddenInput.value = btn.dataset.value || 'gpt-image-1';
+        };
+
+        async function translateAlabastaSummaryToEnglish(summary, taxonomyLabel = '') {
+            const cleanSummary = String(summary || '').trim();
+            if (!cleanSummary) return '';
+            try {
+                const prompt = [
+                    'Translate the anonymized medical case summary into concise natural English.',
+                    'Keep it privacy-safe and educational.',
+                    'Do not add identifiers, do not add extra facts, do not explain your work.',
+                    taxonomyLabel ? `Medical context: ${taxonomyLabel}` : '',
+                    '',
+                    cleanSummary
+                ].filter(Boolean).join('\n');
+                const { text } = await window.callUniversalAI('gpt-4o-mini', prompt);
+                return String(text || '').trim() || cleanSummary;
+            } catch (error) {
+                console.warn('Failed to translate anonymized summary to English:', error);
+                return cleanSummary;
+            }
+        }
+
+        async function rebuildAlabastaCaseCardPromptFromInputs(options = {}) {
+            const safeSummaryEl = document.getElementById('alabasta-case-card-safe-summary');
+            const taxonomyEl = document.getElementById('alabasta-case-card-taxonomy');
+            const promptEl = document.getElementById('alabasta-case-card-prompt');
+            const metaEl = document.getElementById('alabasta-case-card-meta');
+            if (!safeSummaryEl || !promptEl) return '';
+            const currentSummary = String(safeSummaryEl.value || '').trim();
+            const taxonomyLabel = String(taxonomyEl?.value || '').trim();
+            if (!currentSummary) {
+                promptEl.value = '';
+                return '';
+            }
+            if (metaEl && !options.quiet) metaEl.textContent = 'Converting anonymized summary to English for GenMage prompt...';
+            const englishSummary = await translateAlabastaSummaryToEnglish(currentSummary, taxonomyLabel);
+            if (englishSummary) safeSummaryEl.value = englishSummary;
+            const payload = {
+                primarySystemLabel: taxonomyLabel || 'General medicine',
+                symptomTags: [],
+                safeSummary: englishSummary || currentSummary
+            };
+            const prompt = buildAlabastaCaseCardPrompt(payload);
+            promptEl.value = prompt;
+            if (metaEl && !options.quiet) metaEl.textContent = 'English prompt scaffold ready for GenMage.';
+            return prompt;
+        }
+
+        function setAlabastaCaseCardImageLoadingState(isLoading, modelLabel) {
+            const imageWrap = document.getElementById('alabasta-case-card-image-wrap');
+            const stageEl = document.getElementById('alabasta-case-card-image-stage');
+            const imageEl = document.getElementById('alabasta-case-card-image-preview');
+            const imageMetaEl = document.getElementById('alabasta-case-card-image-meta');
+            const statusEl = document.getElementById('alabasta-case-card-image-status');
+            const downloadEl = document.getElementById('alabasta-case-card-image-download');
+            if (imageWrap) imageWrap.style.display = 'block';
+            if (stageEl) stageEl.classList.toggle('is-loading', !!isLoading);
+            if (imageEl && isLoading) imageEl.removeAttribute('src');
+            if (imageMetaEl) {
+                imageMetaEl.textContent = isLoading
+                    ? `Generating visual via ${modelLabel || 'selected model'}`
+                    : (imageMetaEl.textContent || '');
+            }
+            if (statusEl) {
+                statusEl.className = 'alabasta-genmage-status-pill ' + (isLoading ? 'is-loading' : 'is-ready');
+                statusEl.innerHTML = isLoading
+                    ? '<i class="fa-solid fa-spinner fa-spin"></i> Generating'
+                    : '<i class="fa-solid fa-circle-check"></i> Ready';
+            }
+            if (downloadEl) {
+                downloadEl.style.pointerEvents = isLoading ? 'none' : 'auto';
+                downloadEl.style.opacity = isLoading ? '0.55' : '1';
+            }
+        }
+
+        async function populateAlabastaCaseCardModal(caseItem) {
+            const payload = buildSafeAlabastaCaseVisualPayload(caseItem);
+            const ids = {
+                taxonomy: document.getElementById('alabasta-case-card-taxonomy'),
+                safePayload: document.getElementById('alabasta-case-card-safe-payload'),
+                original: document.getElementById('alabasta-case-card-original'),
+                safeSummary: document.getElementById('alabasta-case-card-safe-summary'),
+                prompt: document.getElementById('alabasta-case-card-prompt'),
+                meta: document.getElementById('alabasta-case-card-meta'),
+                imageWrap: document.getElementById('alabasta-case-card-image-wrap'),
+                image: document.getElementById('alabasta-case-card-image-preview'),
+                imageDownload: document.getElementById('alabasta-case-card-image-download'),
+                imageMeta: document.getElementById('alabasta-case-card-image-meta'),
+                imageStatus: document.getElementById('alabasta-case-card-image-status')
+            };
+
+            if (ids.taxonomy) ids.taxonomy.value = payload.taxonomySummary;
+            if (ids.safePayload) ids.safePayload.value = JSON.stringify({
+                visualMode: payload.visualMode,
+                privacyStatus: payload.privacyStatus,
+                primarySystemKey: payload.primarySystemKey,
+                symptomTags: payload.symptomTags,
+                stylePreset: payload.stylePreset
+            }, null, 2);
+            if (ids.original) ids.original.value = String(caseItem.note || '');
+            if (ids.safeSummary) ids.safeSummary.value = payload.safeSummary;
+            if (ids.prompt) ids.prompt.value = '';
+            if (ids.meta) ids.meta.textContent = 'Converting anonymized summary to English for GenMage prompt...';
+            if (ids.imageWrap) ids.imageWrap.style.display = 'none';
+            if (ids.image) ids.image.src = '';
+            if (ids.imageDownload) ids.imageDownload.href = '#';
+            if (ids.imageMeta) ids.imageMeta.textContent = '';
+            if (ids.imageStatus) {
+                ids.imageStatus.className = 'alabasta-genmage-status-pill';
+                ids.imageStatus.innerHTML = '<i class="fa-regular fa-image"></i> Preview';
+            }
+            await rebuildAlabastaCaseCardPromptFromInputs({ quiet: false });
+        }
+
+        function closeAlabastaCaseCardModal() {
+            forceHideModal('alabastaCaseCardModal');
+            ['alabasta-case-card-id', 'alabasta-case-card-taxonomy', 'alabasta-case-card-safe-payload', 'alabasta-case-card-original', 'alabasta-case-card-safe-summary', 'alabasta-case-card-prompt'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            const metaEl = document.getElementById('alabasta-case-card-meta');
+            const imageWrap = document.getElementById('alabasta-case-card-image-wrap');
+            const imageStageEl = document.getElementById('alabasta-case-card-image-stage');
+            const imageEl = document.getElementById('alabasta-case-card-image-preview');
+            const dlEl = document.getElementById('alabasta-case-card-image-download');
+            const imageMetaEl = document.getElementById('alabasta-case-card-image-meta');
+            const imageStatusEl = document.getElementById('alabasta-case-card-image-status');
+            const genBtn = document.getElementById('alabasta-case-card-generate-btn');
+            const saveBtn = document.getElementById('alabasta-case-card-save-btn');
+            if (metaEl) metaEl.textContent = 'No identifiers should appear in the safe summary or image prompt.';
+            if (imageWrap) imageWrap.style.display = 'none';
+            if (imageStageEl) imageStageEl.classList.remove('is-loading');
+            if (imageEl) imageEl.src = '';
+            if (dlEl) {
+                dlEl.href = '#';
+                dlEl.style.pointerEvents = 'auto';
+                dlEl.style.opacity = '1';
+            }
+            if (imageMetaEl) imageMetaEl.textContent = '';
+            if (imageStatusEl) {
+                imageStatusEl.className = 'alabasta-genmage-status-pill';
+                imageStatusEl.innerHTML = '<i class="fa-regular fa-image"></i> Preview';
+            }
+            if (genBtn) {
+                genBtn.disabled = false;
+                genBtn.innerHTML = '<i class="fa-solid fa-image"></i> GenMage';
+            }
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Scaffold';
+            }
+        }
+
+        async function openAlabastaCaseCard(caseDocId) {
+            const caseItem = getAlabastaCaseById(caseDocId);
+            if (!caseItem) return alert('Case not found');
+            const idEl = document.getElementById('alabasta-case-card-id');
+            if (idEl) idEl.value = caseDocId;
+            await populateAlabastaCaseCardModal(caseItem);
+            forceShowModal('alabastaCaseCardModal');
+        }
+
+        async function refreshAlabastaCaseCardDraft() {
+            const caseDocId = document.getElementById('alabasta-case-card-id')?.value || '';
+            const caseItem = getAlabastaCaseById(caseDocId);
+            if (!caseItem) return alert('Case not found');
+            await populateAlabastaCaseCardModal(caseItem);
+        }
+
+        async function copyAlabastaCaseCardPrompt() {
+            const prompt = String(document.getElementById('alabasta-case-card-prompt')?.value || '').trim();
+            if (!prompt) return alert('No prompt to copy yet.');
+            try {
+                await navigator.clipboard.writeText(prompt);
+                if (typeof showToast === 'function') showToast('Case card prompt copied', 'success');
+            } catch (e) {
+                const promptEl = document.getElementById('alabasta-case-card-prompt');
+                if (promptEl) {
+                    promptEl.focus();
+                    promptEl.select();
+                }
+                alert('Prompt selected. Press Ctrl+C to copy.');
+            }
+        }
+
+        async function saveAlabastaCaseCardScaffold() {
+            const caseDocId = document.getElementById('alabasta-case-card-id')?.value || '';
+            const caseItem = getAlabastaCaseById(caseDocId);
+            const saveBtn = document.getElementById('alabasta-case-card-save-btn');
+            if (!caseItem || !caseDocId) return alert('Case not found');
+            const prompt = await rebuildAlabastaCaseCardPromptFromInputs({ quiet: true });
+            const safeSummary = String(document.getElementById('alabasta-case-card-safe-summary')?.value || '').trim();
+            if (!safeSummary || !prompt) return alert('Safe summary and prompt are required.');
+
+            const payload = buildSafeAlabastaCaseVisualPayload({ ...caseItem, note: safeSummary });
+            const originalHtml = saveBtn ? saveBtn.innerHTML : '';
+            try {
+                if (saveBtn) {
+                    saveBtn.disabled = true;
+                    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+                }
+                await db.collection('cases').doc(caseDocId).update({
+                    caseVisualSafe: true,
+                    caseVisualMode: payload.visualMode,
+                    caseVisualSafeSummary: safeSummary,
+                    caseVisualPrompt: prompt,
+                    caseVisualPayload: {
+                        primarySystemKey: payload.primarySystemKey,
+                        primarySystemLabel: payload.primarySystemLabel,
+                        symptomTags: payload.symptomTags,
+                        taxonomySummary: payload.taxonomySummary,
+                        stylePreset: payload.stylePreset,
+                        privacyStatus: payload.privacyStatus
+                    },
+                    caseVisualPreparedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    caseVisualPreparedBy: ALLOWED_EMAIL || 'admin'
+                });
+                syncAlabastaCaseBridgeMarker(caseDocId, {
+                    caseVisualSafe: true,
+                    caseVisualSafeSummary: safeSummary,
+                    caseVisualPrompt: prompt,
+                    caseVisualPayload: payload,
+                    caseVisualPreparedBy: ALLOWED_EMAIL || 'admin'
+                });
+                if (typeof showToast === 'function') showToast('Case card scaffold saved', 'success');
+                const metaEl = document.getElementById('alabasta-case-card-meta');
+                if (metaEl) metaEl.textContent = 'Safe scaffold saved to this case.';
+            } catch (e) {
+                console.error('Failed to save case card scaffold:', e);
+                alert('Failed to save case card scaffold: ' + e.message);
+            } finally {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = originalHtml || '<i class="fa-solid fa-floppy-disk"></i> Save Scaffold';
+                }
+            }
+        }
+
+        async function generateAlabastaCaseCardImage() {
+            const caseDocId = document.getElementById('alabasta-case-card-id')?.value || '';
+            const metaEl = document.getElementById('alabasta-case-card-meta');
+            const imageWrap = document.getElementById('alabasta-case-card-image-wrap');
+            const imageEl = document.getElementById('alabasta-case-card-image-preview');
+            const dlEl = document.getElementById('alabasta-case-card-image-download');
+            const imageMetaEl = document.getElementById('alabasta-case-card-image-meta');
+            const genBtn = document.getElementById('alabasta-case-card-generate-btn');
+            const selectedModel = document.getElementById('alabasta-case-card-model')?.value || 'gpt-image-1';
+            const caseItem = getAlabastaCaseById(caseDocId);
+            if (!caseItem || !caseDocId) return alert('Case not found');
+            const prompt = await rebuildAlabastaCaseCardPromptFromInputs({ quiet: true });
+            if (!prompt) return alert('Prompt is empty');
+
+            const originalHtml = genBtn ? genBtn.innerHTML : '';
+            try {
+                if (genBtn) {
+                    genBtn.disabled = true;
+                    genBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+                }
+                const modelLabelMap = {
+                    'gpt-image-1': 'OpenAI Images (gpt-image-1)',
+                    imagen: 'Google Vertex Imagen 3',
+                    'imagen-nano': 'Google Imagen 3 Fast'
+                };
+                setAlabastaCaseCardImageLoadingState(true, modelLabelMap[selectedModel] || selectedModel);
+                if (metaEl) metaEl.textContent = `GenMage is generating via ${modelLabelMap[selectedModel] || selectedModel}...`;
+
+                const imageResponse = await window.callUniversalAI(
+                    selectedModel,
+                    prompt,
+                    false,
+                    null,
+                    '',
+                    selectedModel === 'gpt-image-1'
+                        ? { size: '1024x1024', quality: 'medium', background: 'opaque', output_format: 'png' }
+                        : { size: '1024x1024' }
+                );
+                const { model } = imageResponse || {};
+                const rawImage = imageResponse?.text
+                    || imageResponse?.imageDataUrl
+                    || imageResponse?.dataUrl
+                    || imageResponse?.raw?.imageDataUrl
+                    || imageResponse?.raw?.dataUrl
+                    || imageResponse?.raw?.text
+                    || imageResponse?.raw?.data?.[0]?.url
+                    || imageResponse?.raw?.data?.[0]?.b64_json
+                    || '';
+                const imageDataUrl = String(rawImage).startsWith('data:image/')
+                    ? String(rawImage)
+                    : (String(rawImage).length > 100 ? `data:image/png;base64,${rawImage}` : '');
+
+                if (!imageDataUrl) {
+                    throw new Error('Image response not returned as a valid data URL');
+                }
+
+                if (imageEl) imageEl.src = imageDataUrl;
+                if (dlEl) dlEl.href = imageDataUrl;
+                if (imageWrap) imageWrap.style.display = 'block';
+                setAlabastaCaseCardImageLoadingState(false, model || selectedModel);
+                if (imageMetaEl) imageMetaEl.textContent = `Generated with ${model || selectedModel}`;
+                if (metaEl) metaEl.textContent = 'Generated image is ready for review.';
+
+                await db.collection('cases').doc(caseDocId).update({
+                    caseVisualGeneratedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    caseVisualImageModel: model || selectedModel,
+                    caseVisualGenerationStatus: 'generated',
+                    caseVisualGeneratedBy: ALLOWED_EMAIL || 'admin'
+                });
+                syncAlabastaCaseBridgeMarker(caseDocId, {
+                    caseVisualImageModel: model || selectedModel,
+                    caseVisualGenerationStatus: 'generated',
+                    caseVisualGeneratedBy: ALLOWED_EMAIL || 'admin'
+                });
+            } catch (e) {
+                console.error('Failed to generate case card image:', e);
+                setAlabastaCaseCardImageLoadingState(false, '');
+                if (metaEl) metaEl.textContent = `Image generation failed: ${e.message}`;
+                alert('Failed to generate case card image: ' + e.message);
+            } finally {
+                if (genBtn) {
+                    genBtn.disabled = false;
+                    genBtn.innerHTML = originalHtml || '<i class="fa-solid fa-image"></i> GenMage';
+                }
+            }
         }
 
         function buildAlabastaPoneglyphDraft(caseItem) {
@@ -16741,11 +18509,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const idEl = document.getElementById('edit-case-note-id');
             const noteEl = document.getElementById('edit-case-note-text');
             const saveBtn = document.getElementById('edit-case-note-save-btn');
-            if (!idEl || !noteEl || !saveBtn) return;
+            const taxonomySelectEl = document.getElementById('edit-case-taxonomy-system');
+            if (!idEl || !noteEl || !saveBtn || !taxonomySelectEl) return;
 
             const caseDocId = idEl.value;
             const nextNote = String(noteEl.value || '').trim();
             if (!caseDocId) return;
+            const taxonomyEntry = getAlabastaTaxonomyEntry(taxonomySelectEl.value) || getAlabastaTaxonomyEntry('other');
+            const symptomTags = [...getEditCaseSelectedTags()];
+            const diseaseLabel = `${taxonomyEntry.thaiLabel} (${taxonomyEntry.label})`;
+            const taxonomySummary = `${diseaseLabel}${symptomTags.length ? ` - ${symptomTags.join(', ')}` : ''}`;
 
             const originalHtml = saveBtn.innerHTML;
             try {
@@ -16754,6 +18527,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
                 await db.collection('cases').doc(caseDocId).update({
                     note: nextNote,
+                    disease: diseaseLabel,
+                    diseaseSystemKey: taxonomyEntry.key,
+                    diseaseSystemLabel: diseaseLabel,
+                    symptomTags,
+                    taxonomySummary,
+                    adminTaggedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    adminTaggedBy: ALLOWED_EMAIL || 'admin',
                     adminUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     adminReviewedBy: ALLOWED_EMAIL || 'admin'
                 });
@@ -16763,6 +18543,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     casesData[idx] = {
                         ...casesData[idx],
                         note: nextNote,
+                        disease: diseaseLabel,
+                        diseaseSystemKey: taxonomyEntry.key,
+                        diseaseSystemLabel: diseaseLabel,
+                        symptomTags,
+                        taxonomySummary,
+                        adminTaggedBy: ALLOWED_EMAIL || 'admin',
                         adminReviewedBy: ALLOWED_EMAIL || 'admin'
                     };
                 }
@@ -16779,17 +18565,105 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         async function deleteCaseSubmission(caseDocId) {
-            if (!confirm('Delete this case submission? This cannot be undone.')) return;
+            const caseItem = casesData.find(c => c.id === caseDocId);
+            if (!caseItem) {
+                alert('Case not found');
+                return;
+            }
+            const bonus = Number(caseItem.adminBonus || 0);
+            const confirmText = bonus > 0
+                ? `Delete this case submission and revert ${bonus.toFixed(2)} pts? This cannot be undone.`
+                : 'Delete this case submission? This cannot be undone.';
+            if (!confirm(confirmText)) return;
 
             try {
-                await db.collection('cases').doc(caseDocId).delete();
+                const batch = db.batch();
+                batch.delete(db.collection('cases').doc(caseDocId));
+
+                if (bonus > 0 && caseItem.userId) {
+                    batch.update(db.collection('users').doc(caseItem.userId), {
+                        score: firebase.firestore.FieldValue.increment(-bonus)
+                    });
+                }
+
+                const logIdsToDelete = [];
+                if (caseItem.reviewLogId) logIdsToDelete.push(caseItem.reviewLogId);
+
+                const reviewLogSnap = await db.collection('checkin_logs')
+                    .where('userId', '==', caseItem.userId || '__none__')
+                    .where('type', '==', 'case_review_bonus')
+                    .get();
+
+                reviewLogSnap.forEach(doc => {
+                    const data = doc.data() || {};
+                    const sameDoc = data.sourceCaseDocId === caseDocId;
+                    const sameRef = !!caseItem.caseId && data.sourceCaseRef === caseItem.caseId;
+                    const legacyRef = !!caseItem.caseId && data.note === `Alabasta reviewed: ${caseItem.caseId}`;
+                    const sameAmount = Number(data.amount || 0) === bonus;
+                    if (sameDoc || ((sameRef || legacyRef) && sameAmount)) {
+                        logIdsToDelete.push(doc.id);
+                    }
+                });
+
+                Array.from(new Set(logIdsToDelete)).forEach(logId => {
+                    batch.delete(db.collection('checkin_logs').doc(logId));
+                });
+
+                await batch.commit();
                 casesData = casesData.filter(c => c.id !== caseDocId);
                 renderAlabastaCases();
-                if (typeof showToast === 'function') showToast('Case deleted', 'success');
+                if (typeof showToast === 'function') showToast(bonus > 0 ? `Case deleted and reverted ${bonus.toFixed(2)} pts` : 'Case deleted', 'success');
             } catch (e) {
                 console.error('Failed to delete case:', e);
                 alert('Failed to delete case: ' + e.message);
             }
+        }
+
+        window.caseReviewScoreModalState = window.caseReviewScoreModalState || { resolver: null };
+
+        function syncCaseReviewScoreChips() {
+            const inputEl = document.getElementById('case-review-score-input');
+            const current = inputEl ? Number(String(inputEl.value || '').trim()) : NaN;
+            document.querySelectorAll('#caseReviewScoreModal .case-score-chip').forEach(btn => {
+                btn.classList.toggle('active', Number.isFinite(current) && Number(btn.dataset.score) === current);
+            });
+        }
+
+        function setCaseReviewScoreValue(value) {
+            const inputEl = document.getElementById('case-review-score-input');
+            if (!inputEl) return;
+            inputEl.value = Number(value).toFixed(1);
+            syncCaseReviewScoreChips();
+        }
+
+        function closeCaseReviewScoreModal(shouldSubmit) {
+            const state = window.caseReviewScoreModalState || {};
+            const inputEl = document.getElementById('case-review-score-input');
+            const resolver = typeof state.resolver === 'function' ? state.resolver : null;
+            const rawValue = inputEl ? String(inputEl.value || '').trim() : '';
+
+            window.caseReviewScoreModalState = { resolver: null };
+            forceHideModal('caseReviewScoreModal');
+
+            if (resolver) resolver(shouldSubmit ? rawValue : null);
+        }
+
+        function openCaseReviewScoreModal(caseItem) {
+            return new Promise(resolve => {
+                window.caseReviewScoreModalState = { resolver: resolve };
+                const subtitleEl = document.getElementById('case-review-score-subtitle');
+                const inputEl = document.getElementById('case-review-score-input');
+                const caseLabel = caseItem?.caseId || caseItem?.id || 'this case';
+                if (subtitleEl) {
+                    subtitleEl.textContent = `Choose a quick score or enter a custom value for case ${caseLabel}.`;
+                }
+                if (inputEl) {
+                    inputEl.value = Number(caseItem?.adminBonus || 0).toFixed(1);
+                    syncCaseReviewScoreChips();
+                    setTimeout(() => inputEl.focus(), 40);
+                }
+                forceShowModal('caseReviewScoreModal');
+            });
         }
 
         async function updateCaseStatus(caseDocId, status) {
@@ -16798,7 +18672,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const caseRef = db.collection('cases').doc(caseDocId);
 
                 if (status === 'reviewed') {
-                    const input = prompt('เพิ่มคะแนนสำหรับเคสนี้ (pts):', String(caseItem.adminBonus || 0));
+                    const input = await openCaseReviewScoreModal({ ...caseItem, id: caseDocId });
                     if (input === null) return;
 
                     const bonus = parseFloat(String(input).trim());
@@ -16819,15 +18693,26 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     });
 
                     if (bonus > 0 && caseItem.userId) {
+                        const primarySystemKey = caseItem.diseaseSystemKey || inferAlabastaTaxonomyKey(caseItem);
+                        const primarySystemLabel = getAlabastaPrimarySystemLabel(caseItem, { primarySystemKey });
                         batch.update(db.collection('users').doc(caseItem.userId), {
                             score: firebase.firestore.FieldValue.increment(bonus)
                         });
-                        batch.set(db.collection('checkin_logs').doc(), {
+                        const reviewLogRef = db.collection('checkin_logs').doc();
+                        batch.set(reviewLogRef, {
                             userId: caseItem.userId,
                             type: 'case_review_bonus',
                             amount: bonus,
-                            note: `Alabasta reviewed: ${caseItem.caseId || caseDocId}`,
+                            note: buildAlabastaReviewLogNote(caseItem, { sourceCaseDocId: caseDocId, sourceCaseRef: caseItem.caseId || '', primarySystemKey, primarySystemLabel }),
+                            primarySystemKey,
+                            primarySystemLabel,
+                            taxonomySummary: caseItem.taxonomySummary || primarySystemLabel,
+                            sourceCaseDocId: caseDocId,
+                            sourceCaseRef: caseItem.caseId || '',
                             timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        batch.update(caseRef, {
+                            reviewLogId: reviewLogRef.id
                         });
                     }
 
@@ -17264,9 +19149,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     dash.logs += score;
                 });
 
+                const caseReviewLogTextByDocId = {};
                 l.forEach(d => {
                     const x = d.data();
                     const score = parseFloat(x.amount) || 0;
+                    if (x.type === 'case_review_bonus') {
+                        const caseItem = findAlabastaCaseForLog(x);
+                        caseReviewLogTextByDocId[d.id] = `📁 ${buildAlabastaReviewLogNote(caseItem, x)}`;
+                    }
                     if (x.type === 'streak') {
                         all.push({ t: x.timestamp?.toDate(), type: 'bonus', text: `🔥 Streak`, score: score, docId: d.id, source: 'checkin_logs' });
                         dash.bonus += score;
@@ -17285,6 +19175,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     }
                 });
                 
+                all.forEach(item => {
+                    if (item.type === 'work' && item.docId && caseReviewLogTextByDocId[item.docId]) {
+                        item.text = caseReviewLogTextByDocId[item.docId];
+                    }
+                });
+
                 all.sort((a, b) => (b.t || 0) - (a.t || 0));
                 historyCache = all;
                 historyPage = 1;
@@ -17774,9 +19670,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     }
                 });
 
+                const hubCaseReviewLogTextByDocId = {};
                 logsSnap.forEach(doc => { 
                     const d = doc.data();
                     const s = parseFloat(d.amount) || 0;
+                    if (d.type === 'case_review_bonus') {
+                        const caseItem = findAlabastaCaseForLog(d);
+                        hubCaseReviewLogTextByDocId[doc.id] = `📁 ${buildAlabastaReviewLogNote(caseItem, d)}`;
+                    }
                     const hubType = d.type === 'case_review_bonus' ? 'work' : (d.type || 'log');
                     const hubText = d.type === 'case_review_bonus' ? `📁 ${d.note || 'Alabasta Case Review'}` : (d.note || '-');
                     addP(d.timestamp, s, hubType, hubText, { docId: doc.id, source: 'checkin_logs' });
@@ -17791,7 +19692,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const qData = quizzesData.find(x => x.id === att.quizId) || {};
                     const qTitle = qData.shortTitle || qData.title || "Quiz";
                     const score = (att.correctCount / att.totalQuestions) * (qData.totalPoints || 1.0);
-                    addP(att.timestamp, score, 'quiz', `📝 Quiz: ${qTitle}`);
+                    
+                    // 🔥 UI Fix (V91.22): Don't add to allLogs list here if approved, 
+                    // because it's already added via logsSnap (checkin_logs) to avoid visual duplication.
+                    // However, we still update the dash counters for the summary cards.
                     dash.quizzes += score;
                     dash.qc++;
                 });
@@ -17811,6 +19715,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     });
                     dash.logs += score;
                     dash.lc++;
+                });
+
+                allLogs.forEach(item => {
+                    if (item.type === 'work' && item.docId && hubCaseReviewLogTextByDocId[item.docId]) {
+                        item.text = hubCaseReviewLogTextByDocId[item.docId];
+                    }
                 });
 
                 allLogs.sort((a,b) => (b.t || 0) - (a.t || 0));
@@ -21933,14 +23843,16 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             
             const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
             document.getElementById('reflective-review-user-info').innerHTML = `
-                <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                    <img class="lt-avatar" src="${log.pictureUrl || ''}" style="width:40px; height:40px; border-radius:50%; border:2px solid #d35400;">
-                    <div>
-                        <div style="font-weight:bold; color:#d35400;">${name}</div>
-                        <div style="font-size:0.75em; color:#888;">${log.timestamp ? log.timestamp.toDate().toLocaleString('en-US') : 'Pending sync...'}</div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <img class="lt-avatar reflective-log-avatar" src="${log.pictureUrl || ''}" style="width:34px; height:34px; border:1px solid rgba(245,158,11,0.4);">
+                    <div style="flex:1; overflow:hidden;">
+                        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                            <div class="reflective-log-name" style="font-size:0.85em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${name}</div>
+                            <div class="reflective-log-date" style="font-size:0.65em; opacity:0.7;">${log.timestamp ? log.timestamp.toDate().toLocaleString('en-US', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) : '...'}</div>
+                        </div>
+                        <div class="reflective-log-content" style="font-size:0.8em; margin-top:2px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${moodEmoji} ${log.content}</div>
                     </div>
                 </div>
-                <div style="font-size:1.05em; color:#333; line-height:1.4;">${moodEmoji} ${log.content}</div>
                 ${(() => {
                     const neg = detectNegativeWording(log.content);
                     if (!neg.found) return '';
@@ -21958,6 +23870,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
             document.getElementById('reflective-review-bonus').value = log.adminBonus !== undefined ? log.adminBonus : "0.5";
             document.getElementById('reflective-review-comment').value = log.adminComment || "";
+            setReflectiveReviewStatus('');
             console.log("DEBUG: About to call forceShowModal for reflectiveReviewModal");
             const modal = document.getElementById('reflectiveReviewModal');
             console.log("DEBUG: reflectiveReviewModal element:", modal);
@@ -22885,7 +24798,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
         window.AI_CORE_READY = true;
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V90.99.3.9.1 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V91.20 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
 
         // --- [Version: V90.36] Quiz Feedback Panel ---
         let _qfpCurrentId = null;

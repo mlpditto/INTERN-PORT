@@ -21,9 +21,16 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/user_auth_links/$(request.auth.uid)).data.effectiveUserId == resource.data.userId;
     }
 
+    function hasAuthLinkToUserId(userId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/user_auth_links/$(request.auth.uid))
+        && get(/databases/$(database)/documents/user_auth_links/$(request.auth.uid)).data.effectiveUserId == userId;
+    }
+
     // 1. Users
     match /users/{userId} {
-      allow read, create, update: if true;
+      allow read: if isAdmin() || request.auth.uid == userId || hasAuthLinkToUserId(userId);
+      allow create, update: if isAdmin() || request.auth.uid == userId || hasAuthLinkToUserId(userId);
       allow delete: if isAdmin();
     }
 
@@ -154,6 +161,19 @@ service cloud.firestore {
         && authUid == request.auth.uid
         && request.resource.data.authUid == request.auth.uid;
       allow delete: if isAdmin();
+    }
+
+    // 22. Daily quiz bonus status for LIFF Voyage Metrics notification
+    match /daily_bonus_quiz/{dateKey} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && !exists(/databases/$(database)/documents/daily_bonus_quiz/$(dateKey))
+        && request.resource.data.claimed == true
+        && request.resource.data.authUid == request.auth.uid
+        && request.resource.data.claimedBy is string
+        && request.resource.data.amount == 0.1
+        && request.resource.data.dateKey == dateKey;
+      allow update, delete: if isAdmin();
     }
   }
 }
