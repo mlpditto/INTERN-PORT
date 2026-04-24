@@ -60,6 +60,13 @@
             ];
             const isExclusive = exclusiveModals.includes(id);
 
+            // Keep overlays as body-level siblings. If malformed markup nests one modal
+            // inside another, opening the child must not un-hide the parent modal.
+            if (isExclusive && m.parentElement !== document.body) {
+                console.warn('forceShowModal: Moving nested modal to body:', id, 'from parent:', m.parentElement?.id || m.parentElement?.tagName);
+                document.body.appendChild(m);
+            }
+
             // Force hide siblings to prevent "เด้งซ้อนกัน" (overlapping)
             document.querySelectorAll('.modal').forEach(function(modal) {
                 if (modal.id !== id) {
@@ -86,6 +93,10 @@
 
             let p = m.parentElement;
             while (p && p !== document.body) {
+                if (p.classList && p.classList.contains('modal')) {
+                    console.warn('forceShowModal: Refusing to un-hide modal parent:', p.id || p.tagName);
+                    break;
+                }
                 if (window.getComputedStyle(p).display === 'none') {
                     p.style.setProperty('display', 'block', 'important');
                 }

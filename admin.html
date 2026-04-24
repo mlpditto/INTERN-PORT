@@ -43,6 +43,13 @@
                 'quickReviewModal'
             ];
             const isExclusive = exclusiveModals.includes(id);
+
+            // Keep overlays as body-level siblings. If malformed markup nests one modal
+            // inside another, opening the child must not un-hide the parent modal.
+            if (isExclusive && m.parentElement !== document.body) {
+                console.warn('forceShowModal: Moving nested modal to body:', id, 'from parent:', m.parentElement?.id || m.parentElement?.tagName);
+                document.body.appendChild(m);
+            }
             
             // Hide sibling overlays unless they are safe parent containers for the modal being opened.
             document.querySelectorAll('.modal').forEach(function(modal) {
@@ -66,6 +73,10 @@
             // NEW: Ensure all parents are visible
             let p = m.parentElement;
             while (p && p !== document.body) {
+                if (p.classList && p.classList.contains('modal')) {
+                    console.warn('forceShowModal: Refusing to un-hide modal parent:', p.id || p.tagName);
+                    break;
+                }
                 if (window.getComputedStyle(p).display === 'none') {
                     console.warn('forceShowModal: Un-hiding parent:', p.id || p.tagName);
                     p.style.setProperty('display', 'block', 'important');
@@ -7775,6 +7786,7 @@
         </div>
 
         <!-- 🔥 Score Adjustment Modal -->
+        </div>
         <div id="scoreAdjustmentModal" class="modal" style="z-index: 2503;">
             <div class="modal-content" style="max-width: 450px; border-top: 5px solid #f39c12; border-radius: 12px;">
                 <span class="close-modal" onclick="closeScoreAdjustmentModal()">&times;</span>
