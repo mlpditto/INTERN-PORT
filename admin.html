@@ -21283,7 +21283,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 });
             } catch (e) { console.error("Kanban Section 6 Error:", e); }
 
-            // 7. Render Active Daily Quests (Bounties) in "Backlog"
+            // 7. Render Active Daily Quests (Bounties) — Backlog if 0 subs, Doing if ≥1 sub
             try {
                 questsCache.forEach(q => {
                     const now = new Date();
@@ -21291,33 +21291,60 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const startTime = q.startTime?.toDate ? q.startTime.toDate() : (q.scheduledStart?.toDate ? q.scheduledStart.toDate() : null);
                     const isLive = q.deadline && q.deadline.toDate() > now && questStatus !== 'draft' && (!startTime || startTime <= now);
                     if (!isLive) return;
-                    
+
                     const title = q.question || "Untitled Quest";
                     if (filter && !title.toLowerCase().includes(filter)) return;
 
-                    cnt["Backlog"]++;
+                    // ── ตรวจว่ามี submission จริงๆ อย่างน้อย 1 คน ──
+                    const subs = questsSubList.filter(s => s.questId === q.id && s.status !== 'none');
+                    const colName = subs.length > 0 ? "Doing" : "Backlog";
+
+                    cnt[colName]++;
                     const d = document.createElement('div');
-                    d.className = 'kanban-card card-Backlog live-quest';
-                    d.style.borderLeft = "4px solid #f59e0b";
-                    d.style.background = "#fffaf5";
-                    
+                    d.className = `kanban-card card-${colName} live-quest`;
+
+                    const accentColor = colName === "Doing" ? "#3b82f6" : "#f59e0b";
+                    const bgColor    = colName === "Doing" ? "#f0f7ff" : "#fffaf5";
+                    const borderColor = colName === "Doing" ? "#bfdbfe" : "#ffe8d1";
+                    d.style.borderLeft = `4px solid ${accentColor}`;
+                    d.style.background = bgColor;
+
                     const dlVal = q.deadline.toMillis ? q.deadline.toMillis() : new Date(q.deadline).getTime();
-                    
+
+                    // ── แสดง avatar ของคนที่ submit แล้ว (สูงสุด 5 คน) ──
+                    let avatarHtml = '';
+                    if (subs.length > 0) {
+                        const avatars = subs.slice(0, 5).map(s => {
+                            const u = usersData.find(x => x.id === s.userId);
+                            const pic = u?.pictureUrl || '';
+                            const name = u?.displayName || 'User';
+                            return pic
+                                ? `<img src="${pic}" title="${name}" style="width:22px;height:22px;border-radius:50%;border:2px solid white;margin-left:-6px;object-fit:cover;">`
+                                : `<span title="${name}" style="width:22px;height:22px;border-radius:50%;border:2px solid white;margin-left:-6px;background:#94a3b8;display:inline-flex;align-items:center;justify-content:center;font-size:0.6em;color:white;font-weight:800;">${name.charAt(0)}</span>`;
+                        }).join('');
+                        const extra = subs.length > 5 ? `<span style="font-size:0.7em;color:#3b82f6;font-weight:800;margin-left:4px;">+${subs.length - 5}</span>` : '';
+                        avatarHtml = `<div style="display:flex;align-items:center;margin-bottom:6px;">
+                            <span style="font-size:0.7em;font-weight:700;color:${accentColor};margin-right:6px;">${subs.length} submitted</span>
+                            <div style="display:flex;padding-left:6px;">${avatars}${extra}</div>
+                        </div>`;
+                    }
+
                     d.innerHTML = `
-                        <div class="card-header-row" style="margin-bottom:12px;">
-                            <span class="badge" style="background:linear-gradient(135deg, #f59e0b, #d97706); padding:4px 12px; border-radius:8px; font-size:0.7em; letter-spacing:0.5px;">DAILY QUEST</span>
-                            <div class="card-header-right" onclick="recallQuest('${q.id}')" style="color:#f59e0b; cursor:pointer; font-size:1.1em; opacity:0.7; transition:0.2s;" onmouseover="this.style.opacity='1'; this.style.transform='scale(1.2)';" onmouseout="this.style.opacity='0.7'; this.style.transform='scale(1)'"><i class="fa-solid fa-pen-to-square"></i></div>
+                        <div class="card-header-row" style="margin-bottom:10px;">
+                            <span class="badge" style="background:linear-gradient(135deg, ${accentColor}, ${colName === 'Doing' ? '#2563eb' : '#d97706'}); padding:4px 12px; border-radius:8px; font-size:0.7em; letter-spacing:0.5px;">DAILY QUEST</span>
+                            <div class="card-header-right" onclick="recallQuest('${q.id}')" style="color:${accentColor}; cursor:pointer; font-size:1.1em; opacity:0.7; transition:0.2s;" onmouseover="this.style.opacity='1'; this.style.transform='scale(1.2)';" onmouseout="this.style.opacity='0.7'; this.style.transform='scale(1)'"><i class="fa-solid fa-pen-to-square"></i></div>
                         </div>
                         <div style="font-weight:800; font-size:1.05em; color:#1e293b; margin-bottom:8px; line-height:1.4;">${title}</div>
-                        <div style="font-size:0.8em; color:#64748b; background:white; padding:12px; border-radius:12px; border:1px solid #ffe8d1;">
-                            <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-weight:700;">
+                        <div style="font-size:0.8em; color:#64748b; background:white; padding:12px; border-radius:12px; border:1px solid ${borderColor};">
+                            ${avatarHtml}
+                            <div style="display:flex; justify-content:space-between; font-weight:700;">
                                 <span>🔥 +${q.baseScore} PTS</span>
                                 <span>⏱️ ${q.durationMinutes || 30}m</span>
                             </div>
-                            <div class="timer-global" data-dead="${dlVal}" style="color:#d35400; font-weight:900; font-size:0.9em;">⏳ Exp: ...</div>
+                            <div class="timer-global" data-dead="${dlVal}" style="color:#d35400; font-weight:900; font-size:0.9em; margin-top:6px;">⏳ Exp: ...</div>
                         </div>
                     `;
-                    cols["Backlog"].appendChild(d);
+                    cols[colName].appendChild(d);
                 });
             } catch (e) { console.error("Kanban Section 7 (Quests) Error:", e); }
 
