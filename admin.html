@@ -4,15 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.31</title>
-    <!-- [Version: V91.31] Daily Quest Drafts and User Backlog -->
+    <title>Nika V91.32</title>
+    <!-- [Version: V91.32] Daily Quest Drafts and User Backlog -->
     <!-- Release: 2026-04-24 08:40 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
     <script>
-        // Force unregister service workers to fix persistent caching issues ([Version: V91.31])
+        // Force unregister service workers to fix persistent caching issues ([Version: V91.32])
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for(let registration of registrations) { registration.unregister(); }
@@ -3538,7 +3538,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; background:linear-gradient(135deg, #f59e0b, #ef4444); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.6em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         ☀️ Nika
-                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.31</span>
+                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.32</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -7786,6 +7786,16 @@
                 <input type="hidden" id="reflective-review-id">
                 <input type="hidden" id="reflective-review-uid">
                 <input type="hidden" id="reflective-review-uname">
+                <input type="hidden" id="reflective-review-raw-content">
+
+                <!-- Writing Analysis Card (shown after AI Suggest) -->
+                <div id="reflective-grammar-card" class="reflective-review-card reflective-review-field" style="display:none;">
+                    <div class="reflective-review-label-row" style="margin-bottom:8px;">
+                        <label class="reflective-review-label">✍️ Writing Analysis</label>
+                        <span id="reflective-grammar-score" style="font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; border:1px solid transparent;"></span>
+                    </div>
+                    <div id="reflective-grammar-content"></div>
+                </div>
 
                 <div style="display:grid; grid-template-columns: 1fr 1.2fr; gap:12px; margin-bottom:12px;">
                     <div class="reflective-review-card reflective-review-field">
@@ -10449,6 +10459,7 @@
 
         window.getAISuggestion = async function(btn) {
             const logContent = document.getElementById('reflective-review-user-info').innerText;
+            const rawContent = document.getElementById('reflective-review-raw-content').value.trim();
             if (!btn) btn = document.getElementById('btn-ai-suggest');
             const textarea = document.getElementById('reflective-review-comment');
             const modelSelect = document.getElementById('ai-model-review');
@@ -10457,21 +10468,19 @@
             const selectedModelName = modelSelect ? modelSelect.value : (document.getElementById("ai-analyzer-model-val") ? document.getElementById("ai-analyzer-model-val").value : "gemini-1.5-flash");
             const targetLang = langSelect ? langSelect.value : (document.getElementById("toolbar-ai-lang") ? document.getElementById("toolbar-ai-lang").value : "English");
             const presetInstruction = getReflectiveReviewPresetInstruction(presetSelect ? presetSelect.value : 'encourage');
-            
+
             if (!logContent || logContent.length < 5) return alert("No reflective log content found to analyze");
-            
+
             const existingDraft = textarea.value.trim();
-            
+
             try {
                 setReflectiveReviewStatus('');
                 btn.disabled = true;
-                const originalHtml = btn.innerHTML;
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>' + (btn.offsetWidth > 60 ? ' Analyzing...' : '');
-                
-                let prompt;
+
+                let feedbackPrompt;
                 if (existingDraft && existingDraft.length >= 3) {
-                    // [Version: V89.01] Thai draft → AI refine & output in target language
-                    prompt = `You are a kind and expert Mentor.
+                    feedbackPrompt = `You are a kind and expert Mentor.
 Here is a Reflective Log from an intern:
 "${logContent}"
 
@@ -10482,12 +10491,11 @@ Your task:
 1. Understand the admin's intent from the Thai draft above.
 2. Refine, polish, and expand it into a warm, professional feedback message.
 3. The final output MUST be in "${targetLang}" only.
-                    4. Keep it 2-3 sentences max. Show empathy and encouragement.
-                    5. Follow this style preset: ${presetInstruction}
-                    6. Do not include any explanation other than the refined feedback text.`;
+4. Keep it 2-3 sentences max. Show empathy and encouragement.
+5. Follow this style preset: ${presetInstruction}
+6. Do not include any explanation other than the refined feedback text.`;
                 } else {
-                    // Original: Generate from scratch
-                    prompt = `You are a kind and expert Mentor. 
+                    feedbackPrompt = `You are a kind and expert Mentor.
 Here is a Reflective Log from an intern:
 "${logContent}"
 
@@ -10497,13 +10505,42 @@ Please write a short praise and feedback (max 2-3 sentences) showing empathy and
 Keep it friendly but professional. Response must be in "${targetLang}" only.
 Do not include any explanation other than the feedback body.`;
                 }
-                
-                const { text } = await window.callUniversalAI(selectedModelName, prompt);
-                
-                textarea.value = text;
-                setReflectiveReviewStatus(existingDraft ? `AI refined your draft in ${targetLang}.` : `AI suggestion ready in ${targetLang}.`, 'success');
-                showToast(existingDraft ? "✨ AI refined your Thai draft → " + targetLang : "✨ AI suggested feedback!");
-                
+
+                const grammarSource = rawContent || logContent;
+                const grammarPrompt = `You are an expert Thai-English writing coach. Analyze this reflective writing from a learner:
+
+"${grammarSource}"
+
+The learner may write in Thai, English, or mixed. Analyze grammar, sentence structure, and clarity.
+
+Respond ONLY with valid JSON (no markdown, no extra text):
+{
+  "grade": "ดี" or "พอใช้" or "ควรปรับ",
+  "issues": ["concise issue in Thai (max 3 items)"],
+  "suggestions": ["practical suggestion in Thai (max 3 items)"],
+  "improved": "improved rewrite in the same language as original"
+}
+
+If no issues, return empty array for issues. Keep suggestions kind and constructive.`;
+
+                // Run admin feedback + grammar check in parallel
+                const [feedbackResult, grammarResult] = await Promise.allSettled([
+                    window.callUniversalAI(selectedModelName, feedbackPrompt),
+                    window.callUniversalAI('gemini-1.5-flash', grammarPrompt)
+                ]);
+
+                if (feedbackResult.status === 'fulfilled') {
+                    textarea.value = feedbackResult.value.text;
+                    setReflectiveReviewStatus(existingDraft ? `AI refined your draft in ${targetLang}.` : `AI suggestion ready in ${targetLang}.`, 'success');
+                    showToast(existingDraft ? "✨ AI refined your Thai draft → " + targetLang : "✨ AI suggested feedback!");
+                } else {
+                    throw feedbackResult.reason;
+                }
+
+                if (grammarResult.status === 'fulfilled') {
+                    renderGrammarAnalysis(grammarResult.value.text);
+                }
+
             } catch (error) {
                 console.error("AI Error:", error);
                 const rawMessage = error && error.message ? String(error.message) : 'Unknown error';
@@ -10517,6 +10554,59 @@ Do not include any explanation other than the feedback body.`;
                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <span class="btn-text">AI Suggest</span>';
             }
         };
+
+        function renderGrammarAnalysis(rawText) {
+            const card = document.getElementById('reflective-grammar-card');
+            const content = document.getElementById('reflective-grammar-content');
+            const badge = document.getElementById('reflective-grammar-score');
+            if (!card || !content) return;
+
+            let data;
+            try {
+                const match = rawText.match(/\{[\s\S]*\}/);
+                data = JSON.parse(match ? match[0] : rawText);
+            } catch (e) {
+                card.style.display = '';
+                content.innerHTML = `<div style="font-size:0.82em; color:#475569; line-height:1.6;">${rawText}</div>`;
+                return;
+            }
+
+            const gradeMap = {
+                'ดี':      { color:'#15803d', bg:'#f0fdf4', border:'#86efac' },
+                'พอใช้':   { color:'#b45309', bg:'#fffbeb', border:'#fcd34d' },
+                'ควรปรับ': { color:'#dc2626', bg:'#fef2f2', border:'#fca5a5' }
+            };
+            const g = gradeMap[data.grade] || gradeMap['พอใช้'];
+
+            badge.textContent = data.grade || '';
+            badge.style.cssText = `font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; background:${g.bg}; color:${g.color}; border:1px solid ${g.border};`;
+
+            let html = '';
+
+            if (data.issues && data.issues.length > 0) {
+                html += `<div style="margin-bottom:8px;">
+                    <div style="font-size:0.7em; font-weight:900; color:#ef4444; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">⚠ จุดที่ควรแก้ไข</div>
+                    ${data.issues.map(i => `<div style="font-size:0.8em; color:#7f1d1d; background:#fef2f2; border-left:3px solid #ef4444; padding:5px 9px; border-radius:0 8px 8px 0; margin-bottom:4px; line-height:1.5;">${i}</div>`).join('')}
+                </div>`;
+            }
+
+            if (data.suggestions && data.suggestions.length > 0) {
+                html += `<div style="margin-bottom:8px;">
+                    <div style="font-size:0.7em; font-weight:900; color:#b45309; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">💡 คำแนะนำการเขียน</div>
+                    ${data.suggestions.map(s => `<div style="font-size:0.8em; color:#78350f; background:#fffbeb; border-left:3px solid #f59e0b; padding:5px 9px; border-radius:0 8px 8px 0; margin-bottom:4px; line-height:1.5;">${s}</div>`).join('')}
+                </div>`;
+            }
+
+            if (data.improved) {
+                html += `<div>
+                    <div style="font-size:0.7em; font-weight:900; color:#15803d; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">✏ ตัวอย่างประโยคที่ดีขึ้น</div>
+                    <div style="font-size:0.82em; color:#14532d; background:#f0fdf4; border:1px solid #bbf7d0; padding:9px 11px; border-radius:10px; line-height:1.6;">${data.improved}</div>
+                </div>`;
+            }
+
+            content.innerHTML = html || `<div style="font-size:0.82em; color:#15803d;">✅ การเขียนดี ไม่พบจุดที่ต้องแก้ไข</div>`;
+            card.style.display = '';
+        }
 
         window.copyQuestionToClipboard = function(btn) {
             const item = btn.closest('.quiz-q-item');
@@ -22315,7 +22405,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 showToast("Saved");
             }
         }
-        // ─── Daily Quest UI Helpers (V91.31) ───────────────────────────────────────
+        // ─── Daily Quest UI Helpers (V91.32) ───────────────────────────────────────
 
         const DQ_TAGS = [
             { val: '',            label: 'Auto',         icon: 'fa-wand-magic-sparkles', color: '#94a3b8' },
@@ -24727,6 +24817,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
             document.getElementById('reflective-review-bonus').value = log.adminBonus !== undefined ? log.adminBonus : "0.5";
             document.getElementById('reflective-review-comment').value = log.adminComment || "";
+            document.getElementById('reflective-review-raw-content').value = log.content || '';
+            const grammarCard = document.getElementById('reflective-grammar-card');
+            if (grammarCard) { grammarCard.style.display = 'none'; document.getElementById('reflective-grammar-content').innerHTML = ''; document.getElementById('reflective-grammar-score').textContent = ''; }
             setReflectiveReviewStatus('');
             console.log("DEBUG: About to call forceShowModal for reflectiveReviewModal");
             const modal = document.getElementById('reflectiveReviewModal');
@@ -25655,7 +25748,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
         window.AI_CORE_READY = true;
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V91.31 loaded OK (Daily Quest Drafts and User Backlog) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V91.32 loaded OK (Daily Quest Drafts and User Backlog) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
 
         // --- [Version: V90.36] Quiz Feedback Panel ---
         let _qfpCurrentId = null;
