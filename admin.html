@@ -7107,6 +7107,7 @@
                         <div id="dq-group-cards" style="display:flex; flex-wrap:wrap; gap:8px; min-height:38px;">
                             <span style="color:#94a3b8; font-size:0.8em; align-self:center;">Loading groups…</span>
                         </div>
+                        <div id="dq-group-user-count" style="margin-top:6px; font-size:0.78em; color:#64748b; min-height:18px;"></div>
                     </div>
 
                     <!-- Tag (card picker) -->
@@ -7237,6 +7238,7 @@
                                 <tr>
                                     <th>Quest</th>
                                     <th>Base Score</th>
+                                    <th>Participants</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -22341,6 +22343,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const input = document.getElementById('q-target-group-manual');
             if (input) input.value = g;
             renderDQGroupCards();
+            updateDQGroupUserCount(g);
+        }
+
+        function updateDQGroupUserCount(g) {
+            const el = document.getElementById('dq-group-user-count');
+            if (!el) return;
+            const members = (usersData || []).filter(u => !u.isIgnored && (g === 'Public' || (u.group || 'Public').trim() === g));
+            if (members.length === 0) { el.innerHTML = ''; return; }
+            const chips = members.map(u =>
+                `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.75em;font-weight:700;background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;">${u.displayName || u.id}</span>`
+            ).join('');
+            el.innerHTML = `<span style="font-weight:700;color:#475569;">จะส่งถึง ${members.length} คน:</span> <span style="display:inline-flex;flex-wrap:wrap;gap:4px;margin-left:4px;">${chips}</span>`;
         }
 
         async function createQuest(action = 'post') {
@@ -22429,7 +22443,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const isLiveNow = q.deadline && q.deadline.toDate() > new Date() && qStatus !== 'draft' && (!qStart || qStart <= new Date());
                     if (isLiveNow) return;
                     const stateLabel = qStatus === 'draft' ? 'Draft' : (qStart && qStart > new Date() ? 'Scheduled' : 'Archived');
-                    t.innerHTML += `<tr><td><span style="font-size:0.75em; font-weight:900; color:#64748b; text-transform:uppercase;">${stateLabel}</span><br>${q.question}</td><td>${q.baseScore}</td><td><div style="display:flex;gap:5px;"><button class="btn-sm btn-success" onclick="recallQuest('${d.id}')">Recall</button><button class="btn-delete-icon" onclick="delQ('${d.id}')">X</button></div></td></tr>`;
+
+                    const subs = (questsSubList || []).filter(s => s.questId === d.id && s.status !== 'none');
+                    const participantChips = subs.map(s => {
+                        const u = (usersData || []).find(u => u.id === s.userId);
+                        const name = u?.displayName || s.userId || '?';
+                        const reviewed = s.adminAcknowledged ? 'background:#dcfce7;color:#166534;border-color:#86efac;' : 'background:#fef9c3;color:#854d0e;border-color:#fde047;';
+                        return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.75em;font-weight:700;border:1px solid;${reviewed}white-space:nowrap;">${name}</span>`;
+                    }).join('');
+                    const countBadge = subs.length > 0
+                        ? `<span style="display:inline-flex;align-items:center;gap:4px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:999px;padding:2px 8px;font-size:0.75em;font-weight:900;margin-bottom:4px;">👥 ${subs.length}</span>`
+                        : `<span style="color:#94a3b8;font-size:0.78em;">—</span>`;
+                    const participantsHtml = `<div style="display:flex;flex-direction:column;gap:4px;">${countBadge}<div style="display:flex;flex-wrap:wrap;gap:4px;">${participantChips}</div></div>`;
+
+                    t.innerHTML += `<tr><td><span style="font-size:0.75em; font-weight:900; color:#64748b; text-transform:uppercase;">${stateLabel}</span><br>${q.question}</td><td>${q.baseScore}</td><td>${participantsHtml}</td><td><div style="display:flex;gap:5px;"><button class="btn-sm btn-success" onclick="recallQuest('${d.id}')">Recall</button><button class="btn-delete-icon" onclick="delQ('${d.id}')">X</button></div></td></tr>`;
                 });
             });
         }
