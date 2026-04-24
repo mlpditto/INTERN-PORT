@@ -10836,6 +10836,7 @@ Do not include any explanation other than the feedback body.`;
         const MY_URL = window.location.origin + window.location.pathname; // [Version: V88.64] Auto-detect current URL for GitHub Pages/Firebase compatibility
 
         var auth = firebase.auth();
+        const GOOGLE_REDIRECT_TIMEOUT_MS = 4500;
 
         var usersData = [], worksData = [], casesData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {}, questsSubList = [];
         var knowledgeBaseCache = []; // Required by PDF-to-Quiz and Research grounding
@@ -11028,6 +11029,20 @@ Do not include any explanation other than the feedback body.`;
         // 🔥 Google Sign-In Logic
         let googleLoginInProgress = false;
 
+        auth.getRedirectResult()
+            .then((result) => {
+                if (result && result.user) {
+                    console.log("Google Redirect Login Success:", result.user.email || result.user.uid);
+                }
+            })
+            .catch((error) => {
+                console.error("Google Redirect Result Error:", error);
+                const loginErrorEl = document.getElementById('login-error');
+                if (loginErrorEl) loginErrorEl.innerText = "Google Redirect Error: " + error.message;
+                googleLoginInProgress = false;
+                setGoogleLoginButtonState(false);
+            });
+
         function setGoogleLoginButtonState(isLoading) {
             const btn = document.querySelector('#login-screen .btn-google');
             if (!btn) return;
@@ -11052,9 +11067,33 @@ Do not include any explanation other than the feedback body.`;
 
             const provider = new firebase.auth.GoogleAuthProvider();
             provider.setCustomParameters({ prompt: 'select_account' });
+            const resetIfRedirectStalls = setTimeout(() => {
+                googleLoginInProgress = false;
+                setGoogleLoginButtonState(false);
+                const loginErrorEl = document.getElementById('login-error');
+                if (loginErrorEl) {
+                    loginErrorEl.innerText = 'Google redirect did not start. Please use Send Login Link or try Google again in Chrome/Safari.';
+                }
+            }, GOOGLE_REDIRECT_TIMEOUT_MS);
             try {
-                await auth.signInWithRedirect(provider);
+                auth.signInWithRedirect(provider).catch((error) => {
+                    clearTimeout(resetIfRedirectStalls);
+                    googleLoginInProgress = false;
+                    setGoogleLoginButtonState(false);
+                    const loginErrorEl = document.getElementById('login-error');
+                    const code = error && error.code ? error.code : '';
+                    if (code === 'auth/redirect-cancelled-by-user' || code === 'auth/cancelled-popup-request') {
+                        const msg = 'Google sign-in was cancelled. Please click Google again when ready.';
+                        console.warn("Google Redirect Cancelled:", error);
+                        if (loginErrorEl) loginErrorEl.innerText = msg;
+                    } else {
+                        console.error("Google Login Error:", error);
+                        alert("Google Login Error: " + error.message);
+                        if (loginErrorEl) loginErrorEl.innerText = "Google Error: " + error.message;
+                    }
+                });
             } catch (error) {
+                clearTimeout(resetIfRedirectStalls);
                 const loginErrorEl = document.getElementById('login-error');
                 const code = error && error.code ? error.code : '';
                 if (code === 'auth/redirect-cancelled-by-user' || code === 'auth/cancelled-popup-request') {
@@ -11066,7 +11105,6 @@ Do not include any explanation other than the feedback body.`;
                     alert("Google Login Error: " + error.message);
                     if (loginErrorEl) loginErrorEl.innerText = "Google Error: " + error.message;
                 }
-            } finally {
                 googleLoginInProgress = false;
                 setGoogleLoginButtonState(false);
             }
