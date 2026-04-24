@@ -4,15 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.32</title>
-    <!-- [Version: V91.32] Daily Quest Drafts and User Backlog -->
+    <title>Nika V91.33</title>
+    <!-- [Version: V91.33] Daily Quest Drafts and User Backlog -->
     <!-- Release: 2026-04-24 08:40 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
     <script>
-        // Force unregister service workers to fix persistent caching issues ([Version: V91.32])
+        // Force unregister service workers to fix persistent caching issues ([Version: V91.33])
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for(let registration of registrations) { registration.unregister(); }
@@ -3538,7 +3538,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; background:linear-gradient(135deg, #f59e0b, #ef4444); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.6em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         ☀️ Nika
-                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.32</span>
+                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.33</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -21469,6 +21469,37 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const now = new Date();
                     const questStatus = String(q.status || 'active').toLowerCase();
                     const startTime = q.startTime?.toDate ? q.startTime.toDate() : (q.scheduledStart?.toDate ? q.scheduledStart.toDate() : null);
+
+                    // ── Closed quests → Done column ──
+                    if (questStatus === 'closed') {
+                        const title = q.question || "Untitled Quest";
+                        if (filter && !title.toLowerCase().includes(filter)) return;
+                        const subs = questsSubList.filter(s => s.questId === q.id && s.status !== 'none');
+                        const closedAt = q.closedAt?.toDate ? q.closedAt.toDate() : null;
+                        const closedStr = closedAt ? closedAt.toLocaleString('th-TH', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+                        cnt["Done"]++;
+                        const d = document.createElement('div');
+                        d.className = 'kanban-card card-Done live-quest';
+                        d.style.borderLeft = '4px solid #22c55e';
+                        d.style.background = '#f0fdf4';
+                        d.innerHTML = `
+                            <div class="card-header-row" style="margin-bottom:10px;">
+                                <span class="badge" style="background:linear-gradient(135deg,#22c55e,#16a34a);padding:4px 12px;border-radius:8px;font-size:0.7em;letter-spacing:0.5px;">DAILY QUEST</span>
+                                <span style="font-size:0.7em;font-weight:800;color:#15803d;background:#dcfce7;padding:3px 8px;border-radius:999px;">✅ Closed</span>
+                            </div>
+                            <div style="font-weight:800;font-size:1.05em;color:#1e293b;margin-bottom:8px;line-height:1.4;">${title}</div>
+                            <div style="font-size:0.8em;color:#15803d;background:white;padding:10px;border-radius:12px;border:1px solid #bbf7d0;">
+                                <div style="display:flex;justify-content:space-between;font-weight:700;">
+                                    <span>👥 ${subs.length} submitted</span>
+                                    <span>🔥 +${q.baseScore} PTS</span>
+                                </div>
+                                <div style="margin-top:4px;color:#64748b;font-size:0.88em;">Closed: ${closedStr}</div>
+                            </div>
+                        `;
+                        cols["Done"].appendChild(d);
+                        return;
+                    }
+
                     const isLive = q.deadline && q.deadline.toDate() > now && questStatus !== 'draft' && (!startTime || startTime <= now);
                     if (!isLive) return;
 
@@ -21509,6 +21540,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         </div>`;
                     }
 
+                    const closeBtn = colName === 'Doing' ? `
+                        <button class="btn-sm" style="width:100%;margin-top:8px;background:#dcfce7;color:#15803d;border:1px solid #86efac;border-radius:10px;padding:7px;font-weight:800;font-size:0.8em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:0.2s;" onmouseover="this.style.background='#bbf7d0'" onmouseout="this.style.background='#dcfce7'" onclick="event.stopPropagation();closeQuest('${q.id}')">
+                            <i class="fa-solid fa-flag-checkered"></i> Close Quest
+                        </button>` : '';
+
                     d.innerHTML = `
                         <div class="card-header-row" style="margin-bottom:10px;">
                             <span class="badge" style="background:linear-gradient(135deg, ${accentColor}, ${colName === 'Doing' ? '#2563eb' : '#d97706'}); padding:4px 12px; border-radius:8px; font-size:0.7em; letter-spacing:0.5px;">DAILY QUEST</span>
@@ -21523,6 +21559,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             </div>
                             <div class="timer-global" data-dead="${dlVal}" style="color:#d35400; font-weight:900; font-size:0.9em; margin-top:6px;">⏳ Exp: ...</div>
                         </div>
+                        ${closeBtn}
                     `;
                     cols[colName].appendChild(d);
                 });
@@ -22405,7 +22442,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 showToast("Saved");
             }
         }
-        // ─── Daily Quest UI Helpers (V91.32) ───────────────────────────────────────
+        // ─── Daily Quest UI Helpers (V91.33) ───────────────────────────────────────
 
         const DQ_TAGS = [
             { val: '',            label: 'Auto',         icon: 'fa-wand-magic-sparkles', color: '#94a3b8' },
@@ -22629,6 +22666,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         async function editQ(id, q) { const nq = prompt("Edit Q:", q); if (nq) await db.collection("quests").doc(id).update({ question: nq }); }
         async function stopQ(id) { if (confirm("Stop?")) await db.collection("quests").doc(id).update({ deadline: new Date() }); }
         async function delQ(id) { if (confirm("Del?")) await db.collection("quests").doc(id).delete(); }
+
+        async function closeQuest(id) {
+            if (!confirm("ปิด Quest นี้และย้ายไป Done?\n\nผู้ที่ยังไม่ได้ submit จะไม่สามารถส่งงานได้อีก")) return;
+            try {
+                await db.collection("quests").doc(id).update({
+                    status: 'closed',
+                    closedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                showToast("✅ Quest ปิดแล้ว → Done");
+            } catch (e) { alert("Error: " + e.message); }
+        }
         function drawCertificate(ctx, name, dates, awards, level, score) {
             console.log("Drawing Certificate for:", name);
             // Handle both array (multiple) and string (legacy)
@@ -25748,7 +25796,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
         window.AI_CORE_READY = true;
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V91.32 loaded OK (Daily Quest Drafts and User Backlog) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V91.33 loaded OK (Daily Quest Drafts and User Backlog) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
 
         // --- [Version: V90.36] Quiz Feedback Panel ---
         let _qfpCurrentId = null;
