@@ -8541,7 +8541,12 @@
                 <div class="alabasta-casecard-actions">
                     <div class="alabasta-casecard-action-group draft" aria-label="Draft tools">
                         <button type="button" class="btn-sm alabasta-casecard-btn ghost" onclick="refreshAlabastaCaseCardDraft()"><i class="fa-solid fa-wand-magic-sparkles"></i> Refresh Scaffold</button>
-                        <button type="button" id="alabasta-case-card-refine-btn" class="btn-sm alabasta-casecard-btn refine" onclick="refineAlabastaCaseCardPromptWithClaude()" title="Refine this GenMage prompt with Claude"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Refine</button>
+                        <select id="alabasta-case-card-refine-model" class="btn-sm alabasta-casecard-btn" style="margin-right:8px;">
+                            <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet</option>
+                            <option value="gpt-4-turbo">OpenAI GPT-4 Turbo</option>
+                            <option value="vertex-ai-model-name">Vertex AI</option>
+                        </select>
+                        <button type="button" id="alabasta-case-card-refine-btn" class="btn-sm alabasta-casecard-btn refine" onclick="refineAlabastaCaseCardPromptWithSelectedModel()" title="Refine this GenMage prompt with AI"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Refine</button>
                         <button type="button" class="btn-sm alabasta-casecard-btn utility" onclick="copyAlabastaCaseCardPrompt()"><i class="fa-solid fa-copy"></i> Copy Prompt</button>
                     </div>
                     <div class="alabasta-casecard-action-group final" aria-label="Final actions">
@@ -18115,7 +18120,14 @@ async function saveQuiz() {
             return prompt;
         }
 
-        async function refineAlabastaCaseCardPromptWithClaude() {
+
+        async function refineAlabastaCaseCardPromptWithSelectedModel() {
+            const modelSelect = document.getElementById('alabasta-case-card-refine-model');
+            const modelName = modelSelect ? modelSelect.value : 'claude-3-5-sonnet-latest';
+            await refineAlabastaCaseCardPromptWithModel(modelName);
+        }
+
+        async function refineAlabastaCaseCardPromptWithModel(modelName) {
             const safeSummaryEl = document.getElementById('alabasta-case-card-safe-summary');
             const taxonomyEl = document.getElementById('alabasta-case-card-taxonomy');
             const safePayloadEl = document.getElementById('alabasta-case-card-safe-payload');
@@ -18167,15 +18179,15 @@ async function saveQuiz() {
                     refineBtn.disabled = true;
                     refineBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Refining';
                 }
-                if (metaEl) metaEl.textContent = 'Claude is refining the GenMage prompt...';
-                const { text, model } = await window.callUniversalAI('claude-3-5-sonnet-latest', refinePrompt);
+                if (metaEl) metaEl.textContent = `${modelName} is refining the GenMage prompt...`;
+                const { text, model } = await window.callUniversalAI(modelName, refinePrompt);
                 const refinedPrompt = String(text || '').replace(/^```(?:text)?/i, '').replace(/```$/g, '').trim();
-                if (!refinedPrompt) throw new Error('Claude returned an empty prompt.');
+                if (!refinedPrompt) throw new Error(`${modelName} returned an empty prompt.`);
                 promptEl.value = refinedPrompt;
-                if (metaEl) metaEl.textContent = `Claude-refined prompt ready${model ? ` (${model})` : ''}.`;
-                if (typeof showToast === 'function') showToast('GenMage prompt refined with Claude', 'success');
+                if (metaEl) metaEl.textContent = `${modelName}-refined prompt ready${model ? ` (${model})` : ''}.`;
+                if (typeof showToast === 'function') showToast(`GenMage prompt refined with ${modelName}`, 'success');
             } catch (e) {
-                console.error('Failed to refine GenMage prompt with Claude:', e);
+                console.error(`Failed to refine GenMage prompt with ${modelName}:`, e);
                 if (metaEl) metaEl.textContent = `AI Refine failed: ${e.message}`;
                 alert('AI Refine failed: ' + e.message);
             } finally {
@@ -21064,6 +21076,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     d.style.borderLeft = "4px solid #f59e0b";
                     d.style.background = "#fffcf5";
 
+                    const submittedAtStr = sub.submittedAt ? sub.submittedAt.toDate().toLocaleString() : 'Recently';
+                    const submittedAtISO = sub.submittedAt ? sub.submittedAt.toDate().toISOString() : '';
                     d.innerHTML = `
                         <div class="card-header-row">
                             <span class="badge" style="background:#f59e0b;">QUEST SUBMIT</span>
@@ -21072,7 +21086,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         <div style="font-weight:bold; font-size:0.95em; margin-bottom:4px; color:#1e293b;">${u.displayName}</div>
                         <div style="font-size:0.85em; color:#64748b; background:white; padding:10px; border-radius:10px; border:1px solid #ffe8d1;">
                             <div style="font-weight:800; color:#d35400; margin-bottom:5px;">${qData.question}</div>
-                            <div style="font-size:0.8em; color:#94a3b8;">Submitted: ${sub.submittedAt ? sub.submittedAt.toDate().toLocaleString() : 'Recently'}</div>
+                            <div style="font-size:0.8em; color:#94a3b8;">Submitted: <span class="submitted-time" data-iso="${submittedAtISO}">${submittedAtStr}</span></div>
+                            <div style="font-size:0.8em; color:#d35400; margin-top:2px; font-weight:700;">
+                                <span class="countdown-timer" data-subid="${sub.id}"></span>
+                            </div>
                         </div>
                         <div style="margin-top:12px;">
                             <button class="btn-sm btn-warning" style="width:100%; font-weight:900;" onclick="reviewQuestSubmission('${sub.id}')">
@@ -21080,6 +21097,40 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             </button>
                         </div>
                     `;
+                                // === Countdown Timer for Quest Submissions ===
+                                // กำหนดเวลานับถอยหลัง (นาที)
+                                const QUEST_SUBMISSION_TIME_LIMIT_MINUTES = 10;
+                                function startQuestSubmissionCountdown(card) {
+                                    const timeSpan = card.querySelector('.submitted-time');
+                                    const timerSpan = card.querySelector('.countdown-timer');
+                                    if (!timeSpan || !timerSpan) return;
+                                    const iso = timeSpan.getAttribute('data-iso');
+                                    if (!iso) {
+                                        timerSpan.textContent = '';
+                                        return;
+                                    }
+                                    const submitTime = new Date(iso);
+                                    const endTime = new Date(submitTime.getTime() + QUEST_SUBMISSION_TIME_LIMIT_MINUTES * 60000);
+                                    function update() {
+                                        const now = new Date();
+                                        let diff = Math.max(0, endTime - now);
+                                        let min = Math.floor(diff / 60000);
+                                        let sec = Math.floor((diff % 60000) / 1000);
+                                        if (diff > 0) {
+                                            timerSpan.textContent = `เหลือเวลา ${min}:${sec.toString().padStart(2, '0')} นาที`;
+                                        } else {
+                                            timerSpan.textContent = 'หมดเวลาแล้ว';
+                                            clearInterval(timer);
+                                        }
+                                    }
+                                    update();
+                                    const timer = setInterval(update, 1000);
+                                }
+
+                                // เรียกใช้หลังจาก render การ์ด submission เสร็จ
+                                setTimeout(() => {
+                                    document.querySelectorAll('.quest-submission-card').forEach(startQuestSubmissionCountdown);
+                                }, 0);
                     cols["Review"].appendChild(d);
                 });
             } catch (e) { console.error("Kanban Section 8 (Quest Subs) Error:", e); }
