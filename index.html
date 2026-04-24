@@ -2293,11 +2293,38 @@
             return groupIconMap[key] || groupIconMap[key2] || groupIconMap[group] || 'fa-tag';
         }
 
-        async function ensureFirebaseAuth() {
+        async function waitForExistingFirebaseAuthUser(timeoutMs = 1200) {
+            if (!firebase || !firebase.auth) return null;
+            const auth = firebase.auth();
+            if (auth.currentUser) return auth.currentUser;
+
+            return new Promise((resolve) => {
+                let settled = false;
+                let unsub = null;
+                const finish = (user) => {
+                    if (settled) return;
+                    settled = true;
+                    if (typeof unsub === 'function') unsub();
+                    clearTimeout(timer);
+                    resolve(user || auth.currentUser || null);
+                };
+                const timer = setTimeout(() => finish(auth.currentUser || null), timeoutMs);
+                unsub = auth.onAuthStateChanged((user) => {
+                    if (user) finish(user);
+                });
+            });
+        }
+
+        async function ensureFirebaseAuth(options = {}) {
             if (!firebase || !firebase.auth) return null;
             try {
                 const auth = firebase.auth();
                 if (auth.currentUser) return auth.currentUser;
+                const waitForExistingMs = typeof options === 'number'
+                    ? options
+                    : (Number.isFinite(options.waitForExistingMs) ? options.waitForExistingMs : 1200);
+                const existingUser = await waitForExistingFirebaseAuthUser(waitForExistingMs);
+                if (existingUser) return existingUser;
                 const cred = await auth.signInAnonymously();
                 return cred.user || null;
             } catch (err) {
@@ -2306,8 +2333,8 @@
             }
         }
 
-        async function ensureFirebaseAuthReady(timeoutMs = 6000) {
-            const bootUser = await ensureFirebaseAuth();
+        async function ensureFirebaseAuthReady(timeoutMs = 6000, options = {}) {
+            const bootUser = await ensureFirebaseAuth(options);
             if (!firebase || !firebase.auth) return bootUser;
 
             const auth = firebase.auth();
@@ -2455,10 +2482,12 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
                 isPreview = urlParams.get('mode') === 'preview' || isLocal;
+                const isAdminPreview = urlParams.get('adminPreview') === '1';
 
                 if (isPreview) {
-                    await ensureFirebaseAuth();
-                    const previewAuthUser = await ensureFirebaseAuthReady(10000);
+                    const previewAuthOptions = { waitForExistingMs: isAdminPreview ? 4000 : 1200 };
+                    await ensureFirebaseAuth(previewAuthOptions);
+                    const previewAuthUser = await ensureFirebaseAuthReady(10000, previewAuthOptions);
                     if (!previewAuthUser) {
                         notifyMissingFirebaseAuth('preview mode');
                         updateStatus("❌ Firestore auth unavailable in preview mode");
