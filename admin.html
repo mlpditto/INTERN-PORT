@@ -4,15 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.28</title>
-    <!-- [Version: V91.28] Daily Quest Works History -->
+    <title>Nika V91.29</title>
+    <!-- [Version: V91.29] Daily Quest Drafts and User Backlog -->
     <!-- Release: 2026-04-24 08:40 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
     <script>
-        // Force unregister service workers to fix persistent caching issues ([Version: V91.28])
+        // Force unregister service workers to fix persistent caching issues ([Version: V91.29])
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for(let registration of registrations) { registration.unregister(); }
@@ -204,6 +204,10 @@
         .reflective-log-name { font-weight:900; color:#9a3412; }
         .reflective-log-date { font-size:0.76em; color:#94a3b8; }
         .reflective-log-content { font-size:0.98em; color:#334155; line-height:1.55; }
+
+        #form-quest-container > button.magic-btn[onclick="createQuest()"] {
+            display: none !important;
+        }
 
         .alabasta-genmage-model-rail {
             display:flex;
@@ -2078,6 +2082,9 @@
                 <button class="insight-tab-btn" onclick="switchInsightTab('quiz')" id="tab-btn-quiz" style="padding:8px 20px; border-radius:8px; border:none; font-weight:700; font-size:0.85em; cursor:pointer; transition:all 0.3s; background:transparent; color:#64748b;">
                     <i class="fa-solid fa-brain"></i> Quiz Insight
                 </button>
+                <button class="insight-tab-btn" onclick="switchInsightTab('backlog')" id="tab-btn-backlog" style="padding:8px 20px; border-radius:8px; border:none; font-weight:700; font-size:0.85em; cursor:pointer; transition:all 0.3s; background:transparent; color:#64748b;">
+                    <i class="fa-solid fa-inbox"></i> Backlog
+                </button>
                 <button class="insight-tab-btn" onclick="switchInsightTab('history')" id="tab-btn-history" style="padding:8px 20px; border-radius:8px; border:none; font-weight:700; font-size:0.85em; cursor:pointer; transition:all 0.3s; background:transparent; color:#64748b;">
                     <i class="fa-solid fa-list-ul"></i> History
                 </button>
@@ -2109,6 +2116,19 @@
                          <div id="quiz-summary-tips" style="font-size:0.8em; color:#64748b;">Analysis pending...</div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Backlog Container -->
+            <div id="insight-backlog-view" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div>
+                        <div style="font-weight:900; color:#334155;">Assigned Backlog</div>
+                        <div style="font-size:0.78em; color:#94a3b8; font-weight:700;">Daily Quest status for this user</div>
+                    </div>
+                    <button class="btn-sm" onclick="renderHubBacklog(window._currentPopupUser)" style="border:1px solid #dbe3ef; background:#f8fafc; color:#475569; border-radius:999px; padding:5px 12px; font-size:0.72em; font-weight:800;">Refresh</button>
+                </div>
+                <div id="hub-backlog-summary" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;"></div>
+                <div id="hub-backlog-list" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; max-height:620px; overflow-y:auto; padding-right:4px;"></div>
             </div>
 
             <!-- History Container (Merged [Version: V90.20]) -->
@@ -3518,7 +3538,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; background:linear-gradient(135deg, #f59e0b, #ef4444); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.6em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         ☀️ Nika
-                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.28</span>
+                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.29</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -7049,29 +7069,36 @@
 
                 <!-- 2. Daily Quest Form -->
                 <div id="form-quest-container" style="display:none; text-align:left;">
-                    <h2 style="margin-top:0;">New Daily Quest</h2>
+                    <h2 style="margin:0; color:#1e293b;">New Daily Quest</h2>
+                    <div style="font-size:0.78em; color:#94a3b8; font-weight:700; margin:3px 0 14px;">Save as draft, schedule, or post now without changing score rules.</div>
                     <div style="margin-bottom:12px;">
                         <textarea id="q-text" placeholder="📝 Enter mission content or required answer... (Supports new lines)" 
-                            style="width:100%; height:85px; padding:10px; border-radius:8px; border:1px solid #ddd; font-family:inherit; resize:vertical; font-size:0.95em;"></textarea>
+                            style="width:100%; height:105px; padding:14px; border-radius:14px; border:1px solid #dbe3ef; font-family:inherit; resize:vertical; font-size:0.95em; line-height:1.55; background:#fff;"></textarea>
                     </div>
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
                         <div>
                             <label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:2px;">🖼️ Image URL</label>
-                            <input type="text" id="q-img" placeholder="https://..." style="width:100%; margin:0;">
+                            <input type="text" id="q-img" placeholder="https://..." style="width:100%; margin:0; border-radius:12px;">
                         </div>
                         <div>
                             <label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:2px;">🔗 Reference Link</label>
-                            <input type="text" id="q-link" placeholder="Reference link..." style="width:100%; margin:0;">
+                            <input type="text" id="q-link" placeholder="Reference link..." style="width:100%; margin:0; border-radius:12px;">
                         </div>
                     </div>
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
                         <div>
                             <label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:2px;">👥 Target Group</label>
-                            <input type="text" id="q-target-group-manual" placeholder="Public, IT..." list="group-list" style="width:100%; margin:0;">
+                            <input type="text" id="q-target-group-manual" placeholder="Select audience or type custom..." list="group-list" style="width:100%; margin:0 0 8px 0; border-radius:12px;">
+                            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                <button type="button" class="btn-sm" onclick="document.getElementById('q-target-group-manual').value='Public'" style="border:1px solid #dbe3ef; background:#f8fafc; color:#475569; border-radius:999px; padding:5px 10px; font-size:0.72em; font-weight:900;">Public</button>
+                                <button type="button" class="btn-sm" onclick="document.getElementById('q-target-group-manual').value='INTERN'" style="border:1px solid #dbe3ef; background:#f8fafc; color:#475569; border-radius:999px; padding:5px 10px; font-size:0.72em; font-weight:900;">Intern</button>
+                                <button type="button" class="btn-sm" onclick="document.getElementById('q-target-group-manual').value='Junior'" style="border:1px solid #dbe3ef; background:#f8fafc; color:#475569; border-radius:999px; padding:5px 10px; font-size:0.72em; font-weight:900;">Junior</button>
+                                <button type="button" class="btn-sm" onclick="document.getElementById('q-target-group-manual').value='Pharmacists'" style="border:1px solid #dbe3ef; background:#f8fafc; color:#475569; border-radius:999px; padding:5px 10px; font-size:0.72em; font-weight:900;">Pharmacists</button>
+                            </div>
                         </div>
                         <div>
                             <label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:2px;">🏷️ Tag</label>
-                            <select id="q-tag" style="width:100%; font-size:0.9em; height:38px;">
+                            <select id="q-tag" style="width:100%; font-size:0.9em; height:38px; border-radius:12px;">
                                 <option value="">-- Not Specified --</option>
                                 <option value="DIS">📋 DIS (Discussion)</option>
                                 <option value="INFOGRAPHIC">🎨 INFOGRAPHIC</option>
@@ -7082,6 +7109,13 @@
                                 <option value="REVIEW">📝 REVIEW</option>
                                 <option value="OTHER">📌 OTHER</option>
                             </select>
+                            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+                                <button type="button" class="btn-sm" onclick="setQuestTag('')" style="border:1px solid #dbe3ef; background:#f8fafc; color:#475569; border-radius:999px; padding:5px 10px; font-size:0.7em; font-weight:900;">Auto</button>
+                                <button type="button" class="btn-sm" onclick="setQuestTag('DIS')" style="border:1px solid #dbe3ef; background:#f8fafc; color:#475569; border-radius:999px; padding:5px 10px; font-size:0.7em; font-weight:900;">Discussion</button>
+                                <button type="button" class="btn-sm" onclick="setQuestTag('INFOGRAPHIC')" style="border:1px solid #dbe3ef; background:#f8fafc; color:#475569; border-radius:999px; padding:5px 10px; font-size:0.7em; font-weight:900;">Infographic</button>
+                                <button type="button" class="btn-sm" onclick="setQuestTag('CASE_STUDY')" style="border:1px solid #dbe3ef; background:#f8fafc; color:#475569; border-radius:999px; padding:5px 10px; font-size:0.7em; font-weight:900;">Case</button>
+                                <button type="button" class="btn-sm" onclick="setQuestTag('WRITING')" style="border:1px solid #dbe3ef; background:#f8fafc; color:#475569; border-radius:999px; padding:5px 10px; font-size:0.7em; font-weight:900;">Writing</button>
+                            </div>
                         </div>
                     </div>
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
@@ -7094,10 +7128,15 @@
                             <div style="font-size:0.7em; color:#999; margin-top:8px;">Quest will be styled based on Tag.</div>
                         </div>
                     </div>
-                    <div style="display:flex; justify-content:space-between; gap:10px; margin-bottom:20px; background:#f9f9f9; padding:10px; border-radius:8px; border:1px dashed #ddd;">
+                    <div style="display:flex; justify-content:space-between; gap:10px; margin-bottom:16px; background:#f8fafc; padding:12px; border-radius:14px; border:1px solid #e2e8f0;">
                         <div style="flex:1;"><label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:2px;">Expires (h)</label><input type="number" id="q-hours" value="24" style="text-align:center; width:100%;"></div>
                         <div style="flex:1;"><label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:2px;">Dur (min)</label><input type="number" id="q-duration" value="30" style="text-align:center; width:100%;"></div>
                         <div style="flex:1;"><label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:2px;">Score</label><input type="number" id="q-score" value="0.1" step="0.1" style="text-align:center; width:100%;"></div>
+                    </div>
+                    <div style="display:flex; gap:10px; justify-content:flex-end; align-items:center; border-top:1px solid #eef2f7; padding-top:14px;">
+                        <button class="btn-sm" onclick="createQuest('draft')" style="background:#f8fafc; color:#475569; border:1px solid #dbe3ef; padding:10px 16px; border-radius:12px; font-weight:900;">Save Draft</button>
+                        <button class="btn-sm" onclick="createQuest('schedule')" style="background:#111827; color:white; border:none; padding:10px 16px; border-radius:12px; font-weight:900;">Schedule</button>
+                        <button class="magic-btn" onclick="createQuest('post')" style="min-width:180px; background:#d35400; margin:0;">Post Now</button>
                     </div>
                     <button class="magic-btn" onclick="createQuest()" style="width:100%; background:#d35400;">🚀 Post New Quest</button>
                 </div>
@@ -19831,9 +19870,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
             document.getElementById('insight-activity-view').style.display = tab === 'activity' ? 'block' : 'none';
             document.getElementById('insight-quiz-view').style.display = tab === 'quiz' ? 'block' : 'none';
+            document.getElementById('insight-backlog-view').style.display = tab === 'backlog' ? 'block' : 'none';
             document.getElementById('insight-history-view').style.display = tab === 'history' ? 'block' : 'none';
             
             if (tab === 'quiz' && window._currentPopupUser) renderQuizInsight(window._currentPopupUser);
+            if (tab === 'backlog' && window._currentPopupUser) renderHubBacklog(window._currentPopupUser);
             if (tab === 'history' && window._currentPopupUser) renderHubHistoryPage();
         };
 
@@ -19900,6 +19941,100 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (typeof dateObj.toDate === 'function') return dateObj.toDate();
             const d = new Date(dateObj);
             return Number.isNaN(d.getTime()) ? null : d;
+        }
+
+        function isQuestAssignedToUser(quest, user) {
+            const target = String(quest?.targetGroup || 'Public').trim();
+            if (!target || target.toLowerCase() === 'public' || target.toLowerCase() === 'all') return true;
+            const userGroup = String(user?.group || 'Public').trim();
+            if (target.toLowerCase() === userGroup.toLowerCase()) return true;
+            if (Array.isArray(quest?.assigneeIds) && quest.assigneeIds.includes(user?.id)) return true;
+            if (Array.isArray(quest?.assignedUsers) && quest.assignedUsers.includes(user?.id)) return true;
+            return false;
+        }
+
+        function getQuestLifecycleStatus(quest, submission) {
+            const now = new Date();
+            const status = String(quest?.status || 'active').toLowerCase();
+            const start = toHubDate(quest?.startTime || quest?.scheduledStart);
+            const deadline = toHubDate(quest?.deadline);
+            if (status === 'draft') return 'draft';
+            if (start && start > now) return 'scheduled';
+            if (submission && submission.status !== 'none') {
+                return submission.adminAcknowledged ? 'done' : 'review';
+            }
+            if (deadline && deadline < now) return 'expired';
+            return 'backlog';
+        }
+
+        function renderHubBacklog(userId) {
+            const list = document.getElementById('hub-backlog-list');
+            const summary = document.getElementById('hub-backlog-summary');
+            if (!list || !summary) return;
+
+            const user = (usersData || []).find(u => u.id === userId) || {};
+            const counts = { backlog: 0, scheduled: 0, review: 0, done: 0, expired: 0 };
+            const visible = (questsCache || [])
+                .filter(q => isQuestAssignedToUser(q, user))
+                .map(q => {
+                    const sub = (questsSubList || []).find(s => s.questId === q.id && s.userId === userId);
+                    return { quest: q, sub, status: getQuestLifecycleStatus(q, sub) };
+                })
+                .filter(item => item.status !== 'draft')
+                .sort((a, b) => {
+                    const ad = toHubDate(a.quest.deadline)?.getTime() || 0;
+                    const bd = toHubDate(b.quest.deadline)?.getTime() || 0;
+                    return ad - bd;
+                });
+
+            visible.forEach(item => { if (counts[item.status] !== undefined) counts[item.status]++; });
+            summary.innerHTML = Object.entries(counts).map(([key, val]) => {
+                const colors = {
+                    backlog: ['#fff7ed', '#c2410c'],
+                    scheduled: ['#eff6ff', '#1d4ed8'],
+                    review: ['#fef3c7', '#b45309'],
+                    done: ['#dcfce7', '#166534'],
+                    expired: ['#fee2e2', '#b91c1c']
+                }[key];
+                return `<span style="border-radius:999px; padding:5px 10px; background:${colors[0]}; color:${colors[1]}; font-size:0.74em; font-weight:900; text-transform:uppercase;">${key}: ${val}</span>`;
+            }).join('');
+
+            if (!visible.length) {
+                list.innerHTML = `<div style="grid-column:1/-1; padding:18px; border:1px dashed #cbd5e1; border-radius:14px; color:#64748b; text-align:center; font-weight:800; background:#f8fafc;">No assigned Daily Quest found for this user.</div>`;
+                return;
+            }
+
+            const statusStyles = {
+                backlog: ['Backlog', '#fff7ed', '#c2410c'],
+                scheduled: ['Scheduled', '#eff6ff', '#1d4ed8'],
+                review: ['Review', '#fef3c7', '#b45309'],
+                done: ['Done', '#dcfce7', '#166534'],
+                expired: ['Expired', '#fee2e2', '#b91c1c']
+            };
+
+            list.innerHTML = visible.map(({ quest, sub, status }) => {
+                const [label, bg, fg] = statusStyles[status] || statusStyles.backlog;
+                const deadline = toHubDate(quest.deadline);
+                const start = toHubDate(quest.startTime || quest.scheduledStart);
+                const submitted = toHubDate(sub?.submittedAt);
+                const title = String(quest.question || 'Untitled Daily Quest');
+                return `
+                    <div style="border:1px solid #e2e8f0; border-radius:14px; background:white; padding:14px; box-shadow:0 8px 18px rgba(15,23,42,0.04);">
+                        <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start; margin-bottom:10px;">
+                            <span style="border-radius:999px; padding:4px 9px; background:${bg}; color:${fg}; font-size:0.7em; font-weight:900; text-transform:uppercase;">${label}</span>
+                            <button class="btn-sm" onclick="recallQuest('${quest.id}')" style="border:none; background:#f8fafc; color:#64748b; border-radius:8px; padding:4px 8px; font-size:0.72em; font-weight:800;">Open</button>
+                        </div>
+                        <div style="font-weight:900; color:#1e293b; line-height:1.35; margin-bottom:10px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${title}</div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.76em; color:#64748b; font-weight:700;">
+                            <div>Score<br><b style="color:#10b981;">+${Number(quest.baseScore || 0).toFixed(2)}</b></div>
+                            <div>Duration<br><b>${quest.durationMinutes || 30}m</b></div>
+                            <div>Start<br><b>${start ? start.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : 'Now'}</b></div>
+                            <div>Deadline<br><b>${deadline ? deadline.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '-'}</b></div>
+                        </div>
+                        ${submitted ? `<div style="margin-top:10px; padding-top:10px; border-top:1px dashed #e2e8f0; font-size:0.76em; color:#94a3b8; font-weight:700;">Submitted: ${submitted.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
         }
 
         window.openUserHub = async function(userId, initialTab = 'activity') {
@@ -21148,7 +21283,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // 7. Render Active Daily Quests (Bounties) in "Backlog"
             try {
                 questsCache.forEach(q => {
-                    const isLive = q.deadline && q.deadline.toDate() > new Date();
+                    const now = new Date();
+                    const questStatus = String(q.status || 'active').toLowerCase();
+                    const startTime = q.startTime?.toDate ? q.startTime.toDate() : (q.scheduledStart?.toDate ? q.scheduledStart.toDate() : null);
+                    const isLive = q.deadline && q.deadline.toDate() > now && questStatus !== 'draft' && (!startTime || startTime <= now);
                     if (!isLive) return;
                     
                     const title = q.question || "Untitled Quest";
@@ -22054,7 +22192,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 showToast("Saved");
             }
         }
-        async function createQuest() {
+        function setQuestTag(tag) {
+            const el = document.getElementById('q-tag');
+            if (el) el.value = tag || '';
+        }
+
+        async function createQuest(action = 'post') {
             const startTimeVal = document.getElementById('q-start-time').value;
             const hoursVal = parseFloat(document.getElementById('q-hours').value);
             let startTime = null;
@@ -22065,20 +22208,34 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             } else {
                 deadline = new Date(Date.now() + hoursVal * 3600000);
             }
+            const questionText = document.getElementById('q-text').value.trim();
+            if (!questionText) {
+                alert("Please enter Daily Quest prompt.");
+                return;
+            }
             const q = {
-                question: document.getElementById('q-text').value,
+                question: questionText,
                 imageUrl: document.getElementById('q-img').value,
                 questLink: document.getElementById('q-link').value,
-                targetGroup: document.getElementById('q-target-group-manual').value.trim() || "Public",
+                targetGroup: document.getElementById('q-target-group-manual').value.trim() || "",
                 tag: document.getElementById('q-tag').value || "",
                 baseScore: parseFloat(document.getElementById('q-score').value),
                 durationMinutes: parseInt(document.getElementById('q-duration').value),
                 deadline: deadline,
+                status: action === 'draft' ? 'draft' : (action === 'schedule' ? 'scheduled' : 'active'),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             };
-            if (startTime) q.startTime = startTime;
-            if (q.question) await db.collection("quests").add(q);
-            showToast(startTime ? `Scheduled for ${startTime.toLocaleString('en-US')}` : "Posted");
+            if (startTime) {
+                q.startTime = startTime;
+                q.scheduledStart = startTime;
+            }
+            if (action === 'schedule' && !startTime) {
+                alert("Please set Scheduled Start before scheduling.");
+                return;
+            }
+            if (action === 'post') q.publishedAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection("quests").add(q);
+            showToast(action === 'draft' ? "Draft saved" : action === 'schedule' ? `Scheduled for ${startTime.toLocaleString('en-US')}` : "Posted");
             document.getElementById('q-text').value = '';
             document.getElementById('q-start-time').value = '';
             document.getElementById('q-tag').value = '';
@@ -22092,7 +22249,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 let hasActive = false; 
                 s.forEach(d => { 
                     const q = d.data(); 
-                    if (q.deadline?.toDate() > new Date()) { 
+                    const qStatus = String(q.status || 'active').toLowerCase();
+                    const qStart = q.startTime?.toDate ? q.startTime.toDate() : (q.scheduledStart?.toDate ? q.scheduledStart.toDate() : null);
+                    if (q.deadline?.toDate() > new Date() && qStatus !== 'draft' && (!qStart || qStart <= new Date())) {
                         hasActive = true; 
                         t.innerHTML += `<tr><td>${q.question}</td><td><span class="quest-deadline" data-deadline="${q.deadline.toDate().getTime()}">Loading...</span></td><td>${q.durationMinutes || 30} min</td><td><button class="btn-sm btn-warning" onclick="editQ('${d.id}','${q.question.replace(/'/g, "")}')">✏️</button> <button class="btn-delete-icon" onclick="stopQ('${d.id}')">✕</button></td></tr>`; 
                     } 
@@ -22102,6 +22261,22 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }); 
         }
         function loadQuestHistory() { db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(s => { const t = document.querySelector("#questHistoryTable tbody"); t.innerHTML = ""; s.forEach(d => { const q = d.data(); if (q.deadline && q.deadline.toDate() > new Date()) return; t.innerHTML += `<tr><td>${q.question}</td><td>${q.baseScore}</td><td><div style="display:flex;gap:5px;"><button class="btn-sm btn-success" onclick="recallQuest('${d.id}')">♻️ Recall</button><button class="btn-delete-icon" onclick="delQ('${d.id}')">✕</button></div></td></tr>`; }) }); }
+        function loadQuestHistory() {
+            db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(s => {
+                const t = document.querySelector("#questHistoryTable tbody");
+                if (!t) return;
+                t.innerHTML = "";
+                s.forEach(d => {
+                    const q = d.data();
+                    const qStatus = String(q.status || 'active').toLowerCase();
+                    const qStart = q.startTime?.toDate ? q.startTime.toDate() : (q.scheduledStart?.toDate ? q.scheduledStart.toDate() : null);
+                    const isLiveNow = q.deadline && q.deadline.toDate() > new Date() && qStatus !== 'draft' && (!qStart || qStart <= new Date());
+                    if (isLiveNow) return;
+                    const stateLabel = qStatus === 'draft' ? 'Draft' : (qStart && qStart > new Date() ? 'Scheduled' : 'Archived');
+                    t.innerHTML += `<tr><td><span style="font-size:0.75em; font-weight:900; color:#64748b; text-transform:uppercase;">${stateLabel}</span><br>${q.question}</td><td>${q.baseScore}</td><td><div style="display:flex;gap:5px;"><button class="btn-sm btn-success" onclick="recallQuest('${d.id}')">Recall</button><button class="btn-delete-icon" onclick="delQ('${d.id}')">X</button></div></td></tr>`;
+                });
+            });
+        }
         function updateQuestTimers() { document.querySelectorAll('.quest-deadline').forEach(el => { const d = parseInt(el.dataset.deadline); const now = Date.now(); if (d - now <= 0) el.innerText = "Expired"; else { const h = Math.floor((d - now) / 3600000); const m = Math.floor(((d - now) % 3600000) / 60000); el.innerText = `${h}h ${m}m left`; } }); }
         function recallQuest(id) {
             db.collection("quests").doc(id).get().then(doc => {
@@ -25239,7 +25414,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
         window.AI_CORE_READY = true;
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V91.28 loaded OK (Daily Quest Works History) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V91.29 loaded OK (Daily Quest Drafts and User Backlog) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
 
         // --- [Version: V90.36] Quiz Feedback Panel ---
         let _qfpCurrentId = null;
