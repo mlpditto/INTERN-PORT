@@ -21,20 +21,35 @@
     </script>
 
     <script>
-        // [Version: V89.02] Reconstructed helper with nested modal and parent visibility support
+        // [Version: V91.24] Reconstructed helper with exclusive modal and parent visibility support
         function forceShowModal(id, displayType) {
             const m = document.getElementById(id);
             if (!m) { console.error('forceShowModal: not found:', id); return; }
             displayType = displayType || 'block';
 
-            // Special handling for nested modals (Participants/Review on top of Manager)
-            const isNested = (id === 'quizParticipantsModal' || id === 'reflectiveReviewModal' || id === 'quizReviewModal' || id === 'exportQuizPdfModal');
+            const exclusiveModals = [
+                'quizParticipantsModal',
+                'reflectiveReviewModal',
+                'quizReviewModal',
+                'scoreAdjustmentModal',
+                'exportQuizPdfModal',
+                'knowledgeBaseModal',
+                'alabastaLaboonModal',
+                'alabastaPoneglyphModal',
+                'editCaseNoteModal',
+                'caseReviewScoreModal',
+                'aiStorytellerModal',
+                'liffPreviewModal',
+                'quickReviewModal'
+            ];
+            const isExclusive = exclusiveModals.includes(id);
             
-            // Hide other modals unless they are safe parents
+            // Hide sibling overlays unless they are safe parent containers for the modal being opened.
             document.querySelectorAll('.modal').forEach(function(modal) {
                 if (modal.id !== id) {
                     const isSafeParent = (modal.id === 'quizManageModal' || modal.id === 'archiveModal' || modal.id === 'assignmentsManageModal');
-                    if (!isNested || !isSafeParent) {
+                    const otherIsExclusive = exclusiveModals.includes(modal.id);
+                    if ((isExclusive && (otherIsExclusive || !isSafeParent)) || (!isExclusive && !isSafeParent)) {
                         modal.classList.remove('force-show');
                         modal.style.setProperty('display', 'none', 'important');
                         modal.setAttribute('style', 'display:none;');
@@ -43,9 +58,10 @@
             });
 
             // Ensure current modal is visible and positioned correctly
-            m.removeAttribute('style');
-            m.className = 'modal force-show';
+            m.classList.add('force-show');
             m.style.setProperty('display', displayType, 'important');
+            m.style.setProperty('visibility', 'visible', 'important');
+            m.style.setProperty('opacity', '1', 'important');
             
             // NEW: Ensure all parents are visible
             let p = m.parentElement;
