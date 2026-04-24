@@ -3506,13 +3506,6 @@
             <div id="login-error" style="color:red; margin-top:10px; font-size:0.9em;"></div>
 
             <div
-                style="margin-top: 20px; text-align: left; background: #fffde7; padding: 10px; border-radius: 8px; border: 1px solid #fff59d; font-size: 0.8em; color: #856404;">
-                <b>💡 Admin Login Instruction:</b><br>
-                1. If opening in LINE: Tap <b>"Open in Default Browser"</b> (Chrome/Safari) at the top right to use Google Login.<br>
-                2. If using Magic Link: The system will send a link to your email (limited daily quota).
-            </div>
-
-            <div
                 style="margin-top: 20px; font-size: 0.75em; color: #999; border-top: 1px solid #eee; padding-top: 10px;">
                 Secure Access via Email, Google or LINE.<br>
             </div>
@@ -11060,20 +11053,13 @@ Do not include any explanation other than the feedback body.`;
             const provider = new firebase.auth.GoogleAuthProvider();
             provider.setCustomParameters({ prompt: 'select_account' });
             try {
-                const result = await auth.signInWithPopup(provider);
-                // Success handled by onAuthStateChanged
-                console.log("Google Login Success:", result.user.email);
+                await auth.signInWithRedirect(provider);
             } catch (error) {
                 const loginErrorEl = document.getElementById('login-error');
                 const code = error && error.code ? error.code : '';
-                if (code === 'auth/popup-blocked' || code === 'auth/cancelled-popup-request') {
-                    const msg = 'Google popup was blocked. Please allow popups for this site, then click Google again.';
-                    console.warn("Google Login Popup Blocked:", error);
-                    if (loginErrorEl) loginErrorEl.innerText = msg;
-                    alert(msg);
-                } else if (code === 'auth/popup-closed-by-user') {
-                    const msg = 'Google sign-in was closed before completion. Please click Google again when ready.';
-                    console.warn("Google Login Popup Closed:", error);
+                if (code === 'auth/redirect-cancelled-by-user' || code === 'auth/cancelled-popup-request') {
+                    const msg = 'Google sign-in was cancelled. Please click Google again when ready.';
+                    console.warn("Google Redirect Cancelled:", error);
                     if (loginErrorEl) loginErrorEl.innerText = msg;
                 } else {
                     console.error("Google Login Error:", error);
