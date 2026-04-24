@@ -4,15 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.26</title>
-    <!-- [Version: V91.26] Admin Magic Link Fallback -->
+    <title>Nika V91.27</title>
+    <!-- [Version: V91.27] User Hub Quiz History Dedup -->
     <!-- Release: 2026-04-24 08:40 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
     <script>
-        // Force unregister service workers to fix persistent caching issues ([Version: V91.26])
+        // Force unregister service workers to fix persistent caching issues ([Version: V91.27])
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for(let registration of registrations) { registration.unregister(); }
@@ -3518,7 +3518,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; background:linear-gradient(135deg, #f59e0b, #ef4444); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.6em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         ☀️ Nika
-                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.26</span>
+                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.27</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -19837,6 +19837,55 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (tab === 'history' && window._currentPopupUser) renderHubHistoryPage();
         };
 
+        function getHubQuizApprovalKey(log) {
+            const text = String(log?.text || '');
+            const isQuizApproval = /Quiz Approved/i.test(text) || /Quiz:/i.test(text);
+            if (!isQuizApproval) return '';
+
+            const normalizedTitle = text
+                .replace(/Quiz Approved \(Actual\):\s*\d+\s*\/\s*\d+\s*-\s*/i, '')
+                .replace(/Quiz Approved \(All Correct\):\s*/i, '')
+                .replace(/Quiz Approved:\s*/i, '')
+                .replace(/.*?Quiz:\s*/i, '')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .toLowerCase();
+
+            if (!normalizedTitle) return '';
+            const dayKey = log?.t instanceof Date ? log.t.toISOString().slice(0, 10) : 'nodate';
+            const scoreKey = Number(log?.score || 0).toFixed(2);
+            return `${dayKey}|${normalizedTitle}|${scoreKey}`;
+        }
+
+        function dedupeHubQuizApprovalLogs(logs) {
+            const uniqueLogs = [];
+            const seenIndexByKey = new Map();
+
+            logs.forEach(log => {
+                const key = getHubQuizApprovalKey(log);
+                if (!key) {
+                    uniqueLogs.push(log);
+                    return;
+                }
+
+                const existingIndex = seenIndexByKey.get(key);
+                if (existingIndex === undefined) {
+                    seenIndexByKey.set(key, uniqueLogs.length);
+                    uniqueLogs.push(log);
+                    return;
+                }
+
+                const existing = uniqueLogs[existingIndex];
+                const currentIsActual = /Quiz Approved \(Actual\)/i.test(String(log.text || ''));
+                const existingIsActual = /Quiz Approved \(Actual\)/i.test(String(existing.text || ''));
+                if (currentIsActual && !existingIsActual) {
+                    uniqueLogs[existingIndex] = log;
+                }
+            });
+
+            return uniqueLogs;
+        }
+
         window.openUserHub = async function(userId, initialTab = 'activity') {
             window._currentPopupUser = userId;
             window._hubTagPage = 1;
@@ -19952,10 +20001,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 });
 
                 allLogs.sort((a,b) => (b.t || 0) - (a.t || 0));
+                const displayLogs = dedupeHubQuizApprovalLogs(allLogs);
                 
                 // Save to Hub Cache
-                window._hubUserCache[userId] = { pointsMap, detailsMap, allLogs, dash, user: u };
-                historyCache = allLogs;
+                window._hubUserCache[userId] = { pointsMap, detailsMap, allLogs: displayLogs, dash, user: u };
+                historyCache = displayLogs;
                 historyPage = 1;
 
                 // Sync UI
@@ -25066,7 +25116,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
         window.AI_CORE_READY = true;
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V91.26 loaded OK (Admin Magic Link Fallback) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V91.27 loaded OK (User Hub Quiz History Dedup) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
 
         // --- [Version: V90.36] Quiz Feedback Panel ---
         let _qfpCurrentId = null;
