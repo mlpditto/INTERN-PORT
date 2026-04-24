@@ -11058,30 +11058,30 @@ Do not include any explanation other than the feedback body.`;
             setGoogleLoginButtonState(true);
 
             const provider = new firebase.auth.GoogleAuthProvider();
+            provider.setCustomParameters({ prompt: 'select_account' });
             try {
+                if (auth.currentUser && auth.currentUser.isAnonymous) {
+                    await auth.signOut();
+                }
                 const result = await auth.signInWithPopup(provider);
                 // Success handled by onAuthStateChanged
                 console.log("Google Login Success:", result.user.email);
             } catch (error) {
-                const shouldFallbackToRedirect = error && (
-                    error.code === 'auth/popup-blocked' ||
-                    error.code === 'auth/cancelled-popup-request' ||
-                    error.code === 'auth/popup-closed-by-user'
-                );
-
-                if (shouldFallbackToRedirect) {
-                    try {
-                        await auth.signInWithRedirect(provider);
-                        return;
-                    } catch (redirectError) {
-                        console.error("Google Redirect Login Error:", redirectError);
-                        alert("Google Redirect Login Error: " + redirectError.message);
-                        document.getElementById('login-error').innerText = "Google Error: " + redirectError.message;
-                    }
+                const loginErrorEl = document.getElementById('login-error');
+                const code = error && error.code ? error.code : '';
+                if (code === 'auth/popup-blocked' || code === 'auth/cancelled-popup-request') {
+                    const msg = 'Google popup was blocked. Please allow popups for this site, then click Google again.';
+                    console.warn("Google Login Popup Blocked:", error);
+                    if (loginErrorEl) loginErrorEl.innerText = msg;
+                    alert(msg);
+                } else if (code === 'auth/popup-closed-by-user') {
+                    const msg = 'Google sign-in was closed before completion. Please click Google again when ready.';
+                    console.warn("Google Login Popup Closed:", error);
+                    if (loginErrorEl) loginErrorEl.innerText = msg;
                 } else {
                     console.error("Google Login Error:", error);
                     alert("Google Login Error: " + error.message);
-                    document.getElementById('login-error').innerText = "Google Error: " + error.message;
+                    if (loginErrorEl) loginErrorEl.innerText = "Google Error: " + error.message;
                 }
             } finally {
                 googleLoginInProgress = false;
