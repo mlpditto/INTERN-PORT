@@ -4,15 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V90.99.3.9.1</title>
-    <!-- V90.99.3.9.1: Audio Player Visibility Fix -->
-    <!-- Release: 2026-04-21 13:10 UTC+7 -->
+    <title>Nika V91.26</title>
+    <!-- V91.26: Admin Magic Link Fallback -->
+    <!-- Release: 2026-04-24 08:40 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
     <script>
-        // Force unregister service workers to fix persistent caching issues (V90.99.3.9.1)
+        // Force unregister service workers to fix persistent caching issues (V91.26)
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function (registrations) {
                 for (let registration of registrations) { registration.unregister(); }
@@ -21,60 +21,6 @@
     </script>
 
     <script>
-        // V89.02: Reconstructed helper with nested modal and parent visibility support
-        function forceShowModal(id, displayType) {
-            const m = document.getElementById(id);
-            if (!m) { console.error('forceShowModal: not found:', id); return; }
-            displayType = displayType || 'block';
-
-            // Special handling for nested modals (Participants/Review on top of Manager)
-            const isNested = (id === 'quizParticipantsModal' || id === 'reflectiveReviewModal' || id === 'quizReviewModal' || id === 'exportQuizPdfModal');
-
-            // Hide other modals unless they are safe parents
-            document.querySelectorAll('.modal').forEach(function(modal) {
-                if (modal.id !== id) {
-                    const isSafeParent = (modal.id === 'quizManageModal' || modal.id === 'archiveModal' || modal.id === 'assignmentsManageModal');
-                    if (!isNested || !isSafeParent) {
-                        modal.classList.remove('force-show');
-                        modal.style.setProperty('display', 'none', 'important');
-                        modal.setAttribute('style', 'display:none;');
-                    }
-                }
-            });
-
-            // Ensure current modal is visible and positioned correctly
-            m.removeAttribute('style');
-            m.className = 'modal force-show';
-            m.style.setProperty('display', displayType, 'important');
-
-            // NEW: Ensure all parents are visible
-            let p = m.parentElement;
-            while (p && p !== document.body) {
-                if (window.getComputedStyle(p).display === 'none') {
-                    console.warn('forceShowModal: Un-hiding parent:', p.id || p.tagName);
-                    p.style.setProperty('display', 'block', 'important');
-                }
-                p = p.parentElement;
-            }
-
-            // Force reflow
-            m.offsetHeight;
-            document.body.offsetHeight;
-
-            setTimeout(() => {
-                const rect = m.getBoundingClientRect();
-                if (rect.width === 0 || rect.height === 0) {
-                    console.error('forceShowModal: CRITICAL failure for', id, '- Modal is still zero-size. Possible absolute centering issue or hidden ancestor.');
-                }
-            }, 100);
-        }
-        function forceHideModal(id) {
-            var m = document.getElementById(id);
-            if (!m) return;
-            m.classList.remove('force-show');
-            m.setAttribute('style', 'display:none;');
-        }
-
         // V89.74: Global Early-Defined AI Toggles
         window.selectAiToolbarToggle = function (el, hiddenId) {
             console.log(`🔘 [AI Toggle] Early-Bound Selection: ${el.dataset.value} for ${hiddenId}`);
@@ -88,7 +34,85 @@
                 if (typeof showToast === 'function') showToast(`🤖 Model set to: ${el.innerText}`);
             }
         };
-        // V90.99.3.4: Early definition to prevent ReferenceError
+
+        // V91.26: Improved Modal Control - Prevents overlap of nested modals
+        window.forceShowModal = function(id, displayType) {
+            console.log(`[Modal] forceShowModal triggered for: ${id}`);
+            const m = document.getElementById(id);
+            if (!m) { console.error('forceShowModal: not found:', id); return; }
+            displayType = displayType || 'block';
+
+            // Mutually exclusive modals that should NEVER overlap
+            const exclusiveModals = [
+                'quizParticipantsModal', 
+                'reflectiveReviewModal', 
+                'quizReviewModal', 
+                'scoreAdjustmentModal', 
+                'exportQuizPdfModal', 
+                'knowledgeBaseModal', 
+                'alabastaLaboonModal', 
+                'alabastaPoneglyphModal', 
+                'editCaseNoteModal', 
+                'caseReviewScoreModal',
+                'aiStorytellerModal',
+                'liffPreviewModal',
+                'quickReviewModal'
+            ];
+            const isExclusive = exclusiveModals.includes(id);
+
+            // Keep overlays as body-level siblings. If malformed markup nests one modal
+            // inside another, opening the child must not un-hide the parent modal.
+            if (isExclusive && m.parentElement !== document.body) {
+                console.warn('forceShowModal: Moving nested modal to body:', id, 'from parent:', m.parentElement?.id || m.parentElement?.tagName);
+                document.body.appendChild(m);
+            }
+
+            // Force hide siblings to prevent "เด้งซ้อนกัน" (overlapping)
+            document.querySelectorAll('.modal').forEach(function(modal) {
+                if (modal.id !== id) {
+                    const isSafeParent = (modal.id === 'quizManageModal' || modal.id === 'archiveModal' || modal.id === 'assignmentsManageModal');
+                    const otherIsExclusive = exclusiveModals.includes(modal.id);
+
+                    // If we are opening an exclusive modal, hide all other exclusive ones or non-parents
+                    if (isExclusive && (otherIsExclusive || !isSafeParent)) {
+                        modal.classList.remove('force-show');
+                        modal.style.setProperty('display', 'none', 'important');
+                        modal.setAttribute('style', 'display:none;');
+                    } else if (!isExclusive && !isSafeParent) {
+                        modal.classList.remove('force-show');
+                        modal.style.setProperty('display', 'none', 'important');
+                        modal.setAttribute('style', 'display:none;');
+                    }
+                }
+            });
+
+            m.classList.add('force-show');
+            m.style.setProperty('display', displayType, 'important');
+            m.style.setProperty('visibility', 'visible', 'important');
+            m.style.setProperty('opacity', '1', 'important');
+
+            let p = m.parentElement;
+            while (p && p !== document.body) {
+                if (p.classList && p.classList.contains('modal')) {
+                    console.warn('forceShowModal: Refusing to un-hide modal parent:', p.id || p.tagName);
+                    break;
+                }
+                if (window.getComputedStyle(p).display === 'none') {
+                    p.style.setProperty('display', 'block', 'important');
+                }
+                p = p.parentElement;
+            }
+        };
+
+        window.forceHideModal = function(id) {
+            var m = document.getElementById(id);
+            if (!m) return;
+            m.classList.remove('force-show');
+            m.style.setProperty('display', 'none', 'important');
+            m.setAttribute('style', 'display:none;');
+        };
+
+        // V91.26: Early definition to prevent ReferenceError
         window.switchHubMode = window.switchHubMode || function (mode) { console.warn('switchHubMode not yet fully loaded:', mode); };
 
     </script>
@@ -121,6 +145,120 @@
             display: block !important;
             opacity: 1 !important;
             visibility: visible !important;
+        }
+
+        .reflective-liquid-modal {
+            max-width: 560px;
+            border-radius: 28px !important;
+            border: 1px solid rgba(255,255,255,0.55);
+            background: radial-gradient(120% 120% at 0% 0%, rgba(251,191,36,0.22) 0%, rgba(251,191,36,0) 48%), radial-gradient(120% 120% at 100% 0%, rgba(14,165,233,0.16) 0%, rgba(14,165,233,0) 45%), linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(255,250,245,0.94) 100%);
+            box-shadow: 0 30px 80px rgba(15,23,42,0.24);
+            backdrop-filter: blur(22px);
+            -webkit-backdrop-filter: blur(22px);
+            padding: 22px 22px 18px;
+            overflow: hidden;
+        }
+
+        .reflective-liquid-header { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:16px; }
+        .reflective-liquid-kicker { display:inline-flex; align-items:center; gap:8px; padding:6px 12px; border-radius:999px; background:rgba(255,255,255,0.55); border:1px solid rgba(245,158,11,0.22); color:#b45309; font-size:0.76em; font-weight:900; letter-spacing:0.04em; text-transform:uppercase; }
+        .reflective-liquid-title { margin:8px 0 0; color:#7c2d12; font-size:1.26em; font-weight:900; letter-spacing:-0.02em; }
+        .reflective-liquid-subtitle { margin:4px 0 0; color:#7c6f67; font-size:0.84em; line-height:1.5; }
+        .reflective-close-btn { width:38px; height:38px; border:1px solid rgba(148,163,184,0.24); border-radius:14px; background:rgba(255,255,255,0.58); color:#475569; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:0.2s ease; }
+        .reflective-close-btn:hover { transform:translateY(-1px); background:rgba(255,255,255,0.82); color:#0f172a; }
+        .reflective-review-shell { display:grid; gap:14px; }
+        .reflective-review-card { border-radius:22px; border:1px solid rgba(255,255,255,0.65); background:linear-gradient(180deg, rgba(255,255,255,0.74) 0%, rgba(255,255,255,0.58) 100%); box-shadow:inset 0 1px 0 rgba(255,255,255,0.65), 0 14px 30px rgba(148,163,184,0.12); }
+        .reflective-review-user-card, .reflective-review-field { padding:14px; }
+        .reflective-review-label-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+        .reflective-review-label { color:#475569; font-size:0.78em; font-weight:900; text-transform:uppercase; letter-spacing:0.07em; }
+        .reflective-review-inline-hint { color:#94a3b8; font-size:0.75em; font-weight:700; }
+        .reflective-bonus-row { display:flex; align-items:center; gap:10px; }
+        .reflective-bonus-input, .reflective-review-select, .reflective-review-textarea { width:100%; border:1px solid rgba(203,213,225,0.9); background:rgba(255,255,255,0.76); color:#0f172a; outline:none; transition:border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease; }
+        .reflective-bonus-input:focus, .reflective-review-select:focus, .reflective-review-textarea:focus { border-color:rgba(245,158,11,0.7); box-shadow:0 0 0 4px rgba(245,158,11,0.12); background:rgba(255,255,255,0.94); }
+        .reflective-bonus-input { flex:1; padding:12px 14px; border-radius:16px; font-size:1.15em; font-weight:900; color:#c2410c; }
+        .reflective-bonus-unit { display:inline-flex; align-items:center; justify-content:center; min-width:56px; padding:12px 14px; border-radius:16px; background:rgba(255,255,255,0.66); border:1px solid rgba(226,232,240,0.95); color:#64748b; font-size:0.8em; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; }
+        .reflective-review-toolbar { display:grid; gap:10px; margin-bottom:10px; }
+        .reflective-review-tabs { display:flex; align-items:center; gap:8px; overflow-x:auto; padding:6px; border-radius:18px; background:linear-gradient(180deg, rgba(255,255,255,0.68) 0%, rgba(241,245,249,0.55) 100%); border:1px solid rgba(226,232,240,0.92); box-shadow:inset 0 1px 0 rgba(255,255,255,0.7); scrollbar-width:none; }
+        .reflective-review-tabs::-webkit-scrollbar { display:none; }
+        .reflective-review-model-chip { border:0; background:transparent; color:#64748b; padding:10px 14px; min-width:max-content; border-radius:14px; font-size:0.76em; font-weight:900; letter-spacing:0.02em; cursor:pointer; transition:transform 0.18s ease, background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease; }
+        .reflective-review-model-chip:hover { color:#1e293b; transform:translateY(-1px); }
+        .reflective-review-model-chip.active { background:linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,247,237,0.9) 100%); color:#9a3412; box-shadow:0 10px 24px rgba(245,158,11,0.18), inset 0 1px 0 rgba(255,255,255,0.85); }
+        .reflective-review-secondary-controls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+        .reflective-review-select { padding:9px 12px; border-radius:14px; font-size:0.78em; font-weight:800; cursor:pointer; }
+        .reflective-review-select.lang { min-width:86px; flex:0 0 auto; }
+        .reflective-review-select.preset { flex:1 1 180px; }
+        .reflective-review-ai-btn { border:0; border-radius:16px; background:linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); color:white; padding:10px 14px; font-size:0.78em; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:7px; box-shadow:0 12px 30px rgba(99,102,241,0.28); }
+        .reflective-review-ai-btn:disabled { opacity:0.7; cursor:progress; }
+        .reflective-review-settings-btn { width:40px; height:40px; border:1px solid rgba(196,181,253,0.8); border-radius:14px; background:rgba(245,243,255,0.92); color:#6d28d9; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+        .reflective-review-textarea { min-height:112px; padding:14px 15px; border-radius:18px; font-size:0.95em; line-height:1.6; resize:vertical; }
+        .reflective-review-status { display:none; align-items:center; gap:8px; padding:10px 12px; border-radius:14px; margin-top:10px; font-size:0.8em; font-weight:700; }
+        .reflective-review-status.show { display:flex; }
+        .reflective-review-status.error { background:rgba(254,242,242,0.95); border:1px solid rgba(248,113,113,0.22); color:#b91c1c; }
+        .reflective-review-status.success { background:rgba(240,253,244,0.96); border:1px solid rgba(74,222,128,0.22); color:#15803d; }
+        .reflective-review-actions { display:flex; gap:10px; }
+        .reflective-review-save-btn { flex:1.5; min-height:48px; border-radius:18px; border:0; background:linear-gradient(135deg, #ea580c 0%, #f59e0b 100%); color:white; font-size:0.92em; font-weight:900; box-shadow:0 16px 32px rgba(234,88,12,0.25); }
+        .reflective-review-cancel-btn { flex:1; min-height:48px; border-radius:18px !important; background:rgba(15,23,42,0.92) !important; }
+        .reflective-log-meta { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+        .reflective-log-avatar { width:42px; height:42px; border-radius:50%; border:2px solid rgba(245,158,11,0.7); object-fit:cover; background:linear-gradient(135deg, #fff7ed 0%, #fde68a 100%); }
+        .reflective-log-name { font-weight:900; color:#9a3412; }
+        .reflective-log-date { font-size:0.76em; color:#94a3b8; }
+        .reflective-log-content { font-size:0.98em; color:#334155; line-height:1.55; }
+
+        .alabasta-genmage-model-rail {
+            display:flex;
+            align-items:center;
+            gap:8px;
+            overflow-x:auto;
+            padding:6px;
+            border-radius:18px;
+            border:1px solid rgba(196,181,253,0.65);
+            background:linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(245,243,255,0.88) 100%);
+            box-shadow:inset 0 1px 0 rgba(255,255,255,0.92), 0 10px 24px rgba(124,58,237,0.08);
+            scrollbar-width:none;
+        }
+
+        .alabasta-genmage-model-rail::-webkit-scrollbar { display:none; }
+
+        .alabasta-genmage-model-chip {
+            border:none;
+            background:transparent;
+            color:#6d28d9;
+            padding:10px 14px;
+            border-radius:14px;
+            min-width:max-content;
+            font-size:0.82em;
+            font-weight:900;
+            cursor:pointer;
+            transition:0.18s ease;
+        }
+
+        .alabasta-genmage-model-chip:hover {
+            color:#4c1d95;
+            transform:translateY(-1px);
+        }
+
+        .alabasta-genmage-model-chip.active {
+            background:linear-gradient(135deg, rgba(124,58,237,0.98) 0%, rgba(168,85,247,0.94) 100%);
+            color:#fff;
+            box-shadow:0 14px 28px rgba(124,58,237,0.22);
+        }
+
+        .alabasta-genmage-image-actions {
+            display:flex;
+            align-items:center;
+            gap:12px;
+            flex-wrap:wrap;
+        }
+
+        .alabasta-genmage-image-meta {
+            font-size:0.8em;
+            color:#64748b;
+            font-weight:700;
+        }
+
+        @media (max-width: 640px) {
+            .reflective-liquid-modal { max-width:calc(100vw - 20px); padding:18px 14px 14px; border-radius:24px !important; }
+            .reflective-review-secondary-controls, .reflective-review-actions { flex-direction:column; }
+            .reflective-review-ai-btn, .reflective-review-settings-btn, .reflective-review-select.lang, .reflective-review-select.preset { width:100%; }
         }
 
         /* Hide Spinners/Controllers for q-timer */
@@ -1613,7 +1751,7 @@
 
         // Google Drive Config (V87.67 - Inlined for GitHub Pages)
         window.GDRIVE_CLIENT_ID = '367076866368-folligjcmmnrcu1u2tt3q9cvn9j5n2a6.apps.googleusercontent.com';
-        window.GDRIVE_API_KEY = 'AIzaSyC5JAPSLDCkHGEOPKc9mm9UqOIJk0i_7tw';
+        window.GDRIVE_API_KEY = '__GDRIVE_API_KEY__';
         window.GDRIVE_APP_ID = 'intern-port-edfa7';
     </script>
 
@@ -2989,7 +3127,7 @@
             <p style="color:#666; font-size:0.9em; margin-bottom:20px;">Internal Use Only</p>
 
             <!-- Magic Link UI -->
-            <input type="email" id="email-input" value="" placeholder="Enter Admin Email" style="margin-bottom:10px;">
+            <input type="email" id="email-input" value="medlifeplus@gmail.com" placeholder="Enter Admin Email" style="margin-bottom:10px;">
             <button class="magic-btn" onclick="sendMagicLink()" style="width:100%;">
                 ✨ Send Login Link
             </button>
@@ -3018,14 +3156,6 @@
             <div id="login-error" style="color:red; margin-top:10px; font-size:0.9em;"></div>
 
             <div
-                style="margin-top: 20px; text-align: left; background: #fffde7; padding: 10px; border-radius: 8px; border: 1px solid #fff59d; font-size: 0.8em; color: #856404;">
-                <b>💡 Admin Login Instruction:</b><br>
-                1. If opening in LINE: Tap <b>"Open in Default Browser"</b> (Chrome/Safari) at the top right to use
-                Google Login.<br>
-                2. If using Magic Link: The system will send a link to your email (limited daily quota).
-            </div>
-
-            <div
                 style="margin-top: 20px; font-size: 0.75em; color: #999; border-top: 1px solid #eee; padding-top: 10px;">
                 Secure Access via Email, Google or LINE.<br>
             </div>
@@ -3041,7 +3171,7 @@
                         style="margin:0; background:linear-gradient(135deg, #f59e0b, #ef4444); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.6em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         ☀️ Nika
                         <span
-                            style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V90.99.3.9.1</span>
+                            style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.26</span>
                     </h1>
                     <span id="admin-email"
                         style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
@@ -3139,7 +3269,7 @@
                     style="display:none; background:rgba(211, 84, 0, 0.08); color:#d35400; border:1px solid rgba(211, 84, 0, 0.15); padding:6px 14px; border-radius:14px; font-weight:800; font-size:0.85em; display:flex; align-items:center; gap:8px; cursor:pointer; transition:0.2s;"
                     onmouseover="this.style.background='rgba(211, 84, 0, 0.15)'"
                     onmouseout="this.style.background='rgba(211, 84, 0, 0.08)'" onclick="openQuickReview('reflective')">
-                    <span style="font-size:1.2em;">📖</span> Review <span id="stat-reflective-count"
+                    <span style="font-size:1.2em;">📖</span> Log Review <span id="stat-reflective-count"
                         style="margin-left:4px; opacity:0.8;">0</span>
                 </div>
                 <div id="chip-claimed" class="stat-badge"
@@ -3217,7 +3347,7 @@
                             <div
                                 style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #fdf2d0; padding-bottom:8px; margin-bottom:10px;">
                                 <h4 style="color:#d35400; font-size:1em; margin:0;">
-                                    <i class="fa-solid fa-book-journal-whills"></i> Reflective Review
+                                    <i class="fa-solid fa-book-journal-whills"></i> Reflective Log Review
                                 </h4>
                                 <div style="display:flex; gap:8px; align-items:center;">
                                     <input type="text" id="reflective-search" placeholder="🔍 Search logs..."
@@ -3771,7 +3901,7 @@
                                     style="width:100%; padding:12px; border:1.5px solid #eee; border-radius:14px; font-size:0.95em; color:var(--primary); font-weight:bold; cursor:pointer; outline:none; background:#f9fbff;"
                                     onchange="if(document.getElementById('design-engine-inline')) document.getElementById('design-engine-inline').value = this.value;">
                                     <option value="imagen">Google Vertex AI (Imagen 3)</option>
-                                    <option value="imagen-nano">Google Imagen 3 (Nano - Fast)</option>
+                                    <option value="imagen-nano">Google Imagen 3 Fast</option>
                                     <option value="dalle">OpenAI DALL-E 3</option>
                                 </select>
                             </div>
@@ -3944,7 +4074,7 @@
                                                 style="padding:10px 15px; border-radius:14px; border:1.5px solid #e2e8f0; background:white; font-size:0.9em; font-weight:700; color:#1e293b; outline:none; cursor:pointer;"
                                                 onchange="document.getElementById('design-engine').value = this.value">
                                                 <option value="imagen">🚀 Google Vertex (Imagen 3)</option>
-                                                <option value="imagen-nano">⚡ Vertex (Imagen Nano)</option>
+                                                <option value="imagen-nano">⚡ Vertex (Imagen Fast)</option>
                                                 <option value="dalle">🎨 OpenAI (DALL-E 3)</option>
                                             </select>
                                         </div>
@@ -6938,99 +7068,93 @@
             </div>
             <div
                 style="margin-top: 15px; text-align: right; position: sticky; bottom: 0; background: white; padding: 10px 0; border-top: 1px solid #eee;">
-                <button class="btn-sm" style="background:#0ea5e9; color:white; border:none;"
-                    onclick="openTimingRiskConfigModal()">Timing Config</button>
+                <button class="btn-sm" style="background:#0ea5e9; color:white; border:none; font-size:1.2em;"
+                    onclick="openTimingRiskConfigModal()" title="Timing Config">⚙</button>
+                <button class="btn-sm" style="background:#ef4444; color:white; border:none;" onclick="exportIncorrectToPDF()"><i class="fa-solid fa-file-pdf"></i> Export Incorrect</button>
                 <button class="btn-sm btn-dark"
                     onclick="document.getElementById('quizReviewModal').style.display='none'">Close</button>
             </div>
         </div>
     </div>
 
-    <!-- 🔥 Reflective Review Modal -->
+    <!-- ?? Lean Reflective Log Review Modal (V91.23) -->
     <div id="reflectiveReviewModal" class="modal" style="z-index: 2501;">
-        <div class="modal-content" style="max-width: 500px; border-top: 5px solid #d35400; border-radius: 12px;">
-            <span class="close-modal" onclick="forceHideModal('reflectiveReviewModal')">&times;</span>
-            <h3 style="color:#d35400; margin-bottom:15px;"><i class="fa-solid fa-comment-medical"></i> Reflective Log
-                Review</h3>
-
-            <div id="reflective-review-user-info"
-                style="background:#f8f9fa; padding:12px; border-radius:10px; margin-bottom:15px; border:1px solid #eee;">
-                <!-- User Info injected by JS -->
-            </div>
-
-            <input type="hidden" id="reflective-review-id">
-            <input type="hidden" id="reflective-review-uid">
-            <input type="hidden" id="reflective-review-uname">
-
-            <div style="margin-bottom:15px;">
-                <label style="display:block; font-size:0.85em; font-weight:bold; color:#555; margin-bottom:5px;">💰
-                    Bonus Points:</label>
-                <div style="display:flex; gap:10px; align-items:center;">
-                    <input type="number" id="reflective-review-bonus" value="0.5" step="0.1" min="0"
-                        style="flex:1; padding:10px; border:1.5px solid #eee; border-radius:8px; font-weight:bold; font-size:1.1em; color:#d35400;">
-                    <span style="color:#999; font-size:0.9em;">Pts</span>
-                </div>
-            </div>
-
-            <div style="margin-bottom:20px;">
-                <label style="display:block; font-size:0.85em; font-weight:bold; color:#555; margin-bottom:5px;">💬
-                    Admin Feedback / Comment:</label>
-                <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-bottom:5px; flex-wrap:wrap;">
-                    <!-- AI Controls consolidated to Header -->
-                    <div style="display:flex; align-items:center; gap:4px; padding:4px; border:1px solid #e2e8f0; border-radius:16px; background:#f8fafc;">
-                        <button type="button" class="reflective-review-model-chip active" data-value="gpt-4o" onclick="selectReflectiveReviewModel(this)" title="GPT-4o" style="border:none; background:linear-gradient(135deg,#10b981,#34d399); color:white; padding:5px 9px; border-radius:12px; font-size:0.72em; font-weight:800; cursor:pointer;">GPT</button>
-                        <button type="button" class="reflective-review-model-chip" data-value="gpt-4o-mini" onclick="selectReflectiveReviewModel(this)" title="GPT-4o Mini" style="border:none; background:transparent; color:#64748b; padding:5px 9px; border-radius:12px; font-size:0.72em; font-weight:800; cursor:pointer;">Mini</button>
-                        <button type="button" class="reflective-review-model-chip" data-value="gemini-1.5-flash" onclick="selectReflectiveReviewModel(this)" title="Gemini Flash" style="border:none; background:transparent; color:#64748b; padding:5px 9px; border-radius:12px; font-size:0.72em; font-weight:800; cursor:pointer;">Flash</button>
-                        <button type="button" class="reflective-review-model-chip" data-value="claude-4-sonnet-latest" onclick="selectReflectiveReviewModel(this)" title="Claude Sonnet" style="border:none; background:transparent; color:#64748b; padding:5px 9px; border-radius:12px; font-size:0.72em; font-weight:800; cursor:pointer;">Claude</button>
+        <div class="modal-content reflective-liquid-modal" style="max-width: 540px; padding: 20px 20px 15px;">
+            <div class="reflective-liquid-header" style="margin-bottom: 12px; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="background: rgba(245,158,11,0.1); color: #d97706; padding: 6px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 900; letter-spacing: 0.5px;">
+                        <i class="fa-solid fa-sparkles"></i> REVIEW
                     </div>
-                    <select id="ai-model-review"
-                        style="display:none; padding:4px 8px; font-size:0.8em; border-radius:10px; border:1px solid #e0e6ed; background:#f8fafc; color:#1a2a3a; font-weight:600;">
-                        <option value="gpt-4o" selected>🟢 GPT-4o (Frontier)</option>
-                        <option value="gpt-4o-mini">Mini</option>
-                        <option value="gemini-1.5-flash">Flash</option>
-                        <option value="claude-4-sonnet-latest">🎭 Claude Sonnet 4.6</option>
-                        <option value="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo">🦙 Llama 3.1 8B</option>
-                        <option value="meta-llama/Llama-3.2-3B-Instruct-Turbo">🦙 Llama 3.2 3B</option>
-                        <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">🦙 Llama 3.3 70B</option>
-                    </select>
-                    <select id="ai-lang-review"
-                        style="padding:2px 5px; font-size:0.7em; border-radius:10px; border:1px solid #ccc; background:#fff; font-weight:bold; cursor:pointer;"
-                        title="Target Language">
-                        <option value="Thai" selected>🇹🇭 TH</option>
-                        <option value="English">🇺🇸 EN</option>
-                        <option value="Chinese">🇨🇳 CN</option>
-                        <option value="Korean">🇰🇷 KO</option>
-                        <option value="Japanese">🇯🇵 JP</option>
-                    </select>
-                    <select id="ai-preset-review"
-                        style="padding:4px 8px; font-size:0.78em; border-radius:12px; border:1px solid #e0e6ed; background:#f8fafc; color:#1a2a3a; font-weight:700;"
-                        title="AI preset">
-                        <option value="encourage" selected>✨ Encourage</option>
-                        <option value="coach_next_step">🧭 Coach</option>
-                        <option value="confidence_boost">🌈 Confidence</option>
-                        <option value="professional_polish">🪄 Polish</option>
-                        <option value="accountability">🎯 Accountability</option>
-                        <option value="celebrate_win">🎉 Celebrate</option>
-                    </select>
-                    <button class="btn-sm" id="btn-ai-suggest" onclick="getAISuggestion(this)"
-                        style="background:#8e44ad; color:white; border:none; border-radius:15px; padding:4px 12px; font-size:0.75em; cursor:pointer; display:flex; align-items:center; gap:5px;">
-                        <i class="fa-solid fa-robot"></i> <span class="btn-text">AI Suggest</span>
-                    </button>
-                    <button class="btn-sm" onclick="openAIKeysModal()" title="AI Settings"
-                        style="background:#f0efff; color:#6b5cea; border:1px solid #dcd4ff; border-radius:999px; width:34px; height:34px; padding:0; font-size:0.9em; cursor:pointer; display:flex; align-items:center; justify-content:center;">
-                        <i class="fa-solid fa-key"></i>
-                    </button>
+                    <h3 class="reflective-liquid-title" style="margin: 0; font-size: 1.15em;">Reflective Log Review</h3>
                 </div>
-                <textarea id="reflective-review-comment"
-                    placeholder="พิมพ์ภาษาไทยแล้วกด AI Suggest → แปลเป็นภาษาที่เลือก ✨ หรือเว้นว่างให้ AI สร้างให้อัตโนมัติ"
-                    style="width:100%; height:100px; padding:12px; border:1.5px solid #eee; border-radius:8px; font-size:0.95em;"></textarea>
+                <button type="button" class="reflective-close-btn" onclick="forceHideModal('reflectiveReviewModal')" style="width: 32px; height: 32px; border-radius: 10px;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
 
-            <div style="display:flex; gap:10px;">
-                <button class="magic-btn" style="flex:2; background:#d35400;" onclick="saveReflectiveReview()">💾 Save &
-                    Score</button>
-                <button class="btn-sm btn-dark" style="flex:1; border-radius:8px;"
-                    onclick="forceHideModal('reflectiveReviewModal')">Cancel</button>
+            <div class="reflective-review-shell" style="gap: 12px;">
+                <div id="reflective-review-user-info" class="reflective-review-card reflective-review-user-card" style="padding: 10px; border-radius: 18px;">
+                    <!-- User Info injected by JS -->
+                </div>
+
+                <input type="hidden" id="reflective-review-id">
+                <input type="hidden" id="reflective-review-uid">
+                <input type="hidden" id="reflective-review-uname">
+                <input type="hidden" id="ai-model-review" value="gpt-4o">
+
+                <!-- Lean Feedback & Bonus Section (Image 2 Space Optimized) -->
+                <div style="display: grid; grid-template-columns: 1fr 130px; gap: 10px;">
+                    <!-- Admin Feedback Toolstrip -->
+                    <div class="reflective-review-card" style="padding: 12px; border-radius: 18px; display: flex; flex-direction: column; justify-content: center;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label class="reflective-review-label" style="font-size: 0.72em;">Admin Feedback</label>
+                            <div style="display: flex; gap: 4px;">
+                                <button class="btn-sm" id="btn-ai-suggest" onclick="getAISuggestion(this)" style="background: #7c3aed; color: white; border: none; border-radius: 8px; padding: 2px 8px; font-size: 0.65em; font-weight: 800; cursor: pointer;">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggest
+                                </button>
+                                <button class="btn-sm" onclick="openAIKeysModal()" style="background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; border-radius: 8px; width: 22px; height: 22px; padding: 0; font-size: 0.7em;">
+                                    <i class="fa-solid fa-key"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="reflective-review-tabs" style="padding: 3px; background: rgba(0,0,0,0.02); border-radius: 10px; gap: 2px;">
+                            <button type="button" class="reflective-review-model-chip active" data-value="gpt-4o" onclick="selectReflectiveReviewModel(this)" style="padding: 5px 8px; font-size: 0.65em;">GPT-4o</button>
+                            <button type="button" class="reflective-review-model-chip" data-value="gemini-1.5-flash" onclick="selectReflectiveReviewModel(this)" style="padding: 5px 8px; font-size: 0.65em;">Flash</button>
+                            <button type="button" class="reflective-review-model-chip" data-value="meta-llama/Llama-3.3-70B-Instruct-Turbo" onclick="selectReflectiveReviewModel(this)" style="padding: 5px 8px; font-size: 0.65em;">Llama</button>
+                        </div>
+                    </div>
+
+                    <!-- Bonus Points Control -->
+                    <div class="reflective-review-card" style="padding: 12px; border-radius: 18px; background: linear-gradient(180deg, #fff 0%, #fffbf0 100%); border: 1px solid rgba(245,158,11,0.2);">
+                        <label class="reflective-review-label" style="font-size: 0.72em; margin-bottom: 5px; display: block; color: #b45309;">Bonus Points</label>
+                        <div class="reflective-bonus-row" style="background: white; border-radius: 10px; border: 1px solid #fed7aa; padding: 2px 8px;">
+                            <input type="number" id="reflective-review-bonus" class="reflective-bonus-input" value="0.5" step="0.1" min="0" style="width: 50px; border: none; font-size: 1.1em; padding: 4px 0;">
+                            <span style="font-size: 0.65em; font-weight: 900; color: #f59e0b;">PTS</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Textarea -->
+                <div style="position: relative;">
+                    <textarea id="reflective-review-comment" class="reflective-review-textarea" placeholder="Provide constructive feedback..." style="min-height: 90px; padding: 12px; border-radius: 18px; font-size: 0.9em; background: #fff; border: 1px solid #e2e8f0; line-height: 1.5;"></textarea>
+                    <div style="position: absolute; bottom: 8px; right: 12px; display: flex; gap: 6px;">
+                        <select id="ai-lang-review" style="background: rgba(255,255,255,0.9); border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.65em; font-weight: 800; cursor: pointer;">
+                            <option value="Thai" selected>🇹🇭 TH</option>
+                            <option value="English">🇺🇸 EN</option>
+                        </select>
+                        <select id="ai-preset-review" style="background: rgba(255,255,255,0.9); border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.65em; font-weight: 800; cursor: pointer;">
+                            <option value="encourage" selected>✨ Encourage</option>
+                            <option value="coach_next_step">🧭 Coach</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="reflective-review-ai-status" class="reflective-review-status" style="margin: 0; font-size: 0.75em; min-height: 18px;"></div>
+
+                <div class="reflective-review-actions" style="gap: 8px; margin-top: 5px;">
+                    <button class="reflective-review-save-btn" onclick="saveReflectiveReview()" style="min-height: 44px; font-size: 0.9em; border-radius: 15px; background: linear-gradient(135deg, #ea580c, #f59e0b);">Save Review</button>
+                    <button class="reflective-review-cancel-btn" onclick="forceHideModal('reflectiveReviewModal')" style="min-height: 44px; font-size: 0.9em; border-radius: 15px; background: #f1f5f9; color: #475569; border: none; font-weight: 800; flex: 1; cursor: pointer;">Cancel</button>
+                </div>
             </div>
         </div>
     </div>
@@ -7465,41 +7589,71 @@
             </div>
             <input type="hidden" id="gs-uid">
 
-            <div
-                style="margin-bottom:15px; background:#f8f9fa; padding:12px; border-radius:8px; border:1px solid #eee;">
-                <label style="font-size:0.85em; color:#666; font-weight:bold;">🇹🇭 ชื่อ-นามสกุล (ภาษาไทย)</label>
-                <input type="text" id="gs-fullname-th" placeholder="ชื่อ-นามสกุล ภาษาไทย (สำหรับแสดงผลบนหน้าต่างหลัก)"
-                    style="width:100%; margin-top:5px; margin-bottom:8px; font-size:0.9em; padding:10px; border-radius:8px; border:1px solid #ddd;">
+            <div style="margin-bottom:15px; background:#f8f9fa; padding:12px; border-radius:8px; border:1px solid #eee; display:flex; flex-direction:column; gap:8px;">
+                <!-- Row 1: ชื่อ-นามสกุล + ชื่อเล่น -->
+                <div style="display:flex; gap:8px;">
+                    <div style="flex:3;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">🇹🇭 ชื่อ-นามสกุล (ภาษาไทย)</label>
+                        <input type="text" id="gs-fullname-th" placeholder="ชื่อ-นามสกุล ภาษาไทย" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                    <div style="flex:1.5;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">😊 ชื่อเล่น</label>
+                        <input type="text" id="gs-cert-nickname" placeholder="ชื่อเล่น" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                </div>
 
-                <div style="display:flex; gap:10px; margin-bottom:12px;">
+                <!-- Row 2: เลขที่ใบอนุญาต + คุณวุฒิ -->
+                <div style="display:flex; gap:8px;">
                     <div style="flex:1;">
                         <label style="font-size:0.75em; color:#888; font-weight:bold;">🪪 เลขที่ใบอนุญาต</label>
-                        <input type="text" id="gs-license-id" placeholder="เลขที่ใบอนุญาต"
-                            style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em;">
+                        <input type="text" id="gs-license-id" placeholder="เลขที่ใบอนุญาต" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
                     </div>
                     <div style="flex:2;">
                         <label style="font-size:0.75em; color:#888; font-weight:bold;">📘 คุณวุฒิ</label>
-                        <input type="text" id="gs-qualification" placeholder="คุณวุฒิ / ระดับการศึกษา"
-                            style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em;">
+                        <input type="text" id="gs-qualification" placeholder="คุณวุฒิ / ระดับการศึกษา" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
                     </div>
                 </div>
 
-                <label style="font-size:0.85em; color:#666; font-weight:bold;">🎓 Certificate Info (English)</label>
-                <div style="display:flex; gap:5px; margin-top:5px;">
-                    <input type="text" id="gs-firstname-en" placeholder="FIRST NAME"
-                        style="flex:2; font-size:0.9em; padding:8px;">
-                    <input type="text" id="gs-middlename-en" placeholder="MIDDLE"
-                        style="flex:1; font-size:0.9em; padding:8px;">
-                    <input type="text" id="gs-lastname-en" placeholder="LAST NAME"
-                        style="flex:2; font-size:0.9em; padding:8px;">
+                <!-- Row 3: โทรศัพท์ + อีเมล -->
+                <div style="display:flex; gap:8px;">
+                    <div style="flex:1;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">📞 โทรศัพท์</label>
+                        <input type="tel" id="gs-tel" placeholder="08x-xxx-xxxx" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">📧 อีเมล</label>
+                        <input type="email" id="gs-email" placeholder="email@example.com" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
                 </div>
-                <input type="text" id="gs-cert-fullname" placeholder="Full Name (Combined Preview / Manual Override)"
-                    style="margin-top:8px; width:100%; box-sizing:border-box; margin-bottom:8px; font-size:0.9em; padding:8px; background:#fff; border:1px solid #ddd; border-radius:4px;"
-                    title="This field is used for Certificate Generation">
-                <input type="text" id="gs-cert-nickname" placeholder="Nickname/AKA..."
-                    style="width:100%; box-sizing:border-box; font-size:0.9em; padding:8px; margin-bottom:8px;">
-                <input type="text" id="gs-institute" placeholder="Institution / Workplace..."
-                    style="width:100%; box-sizing:border-box; font-size:0.9em; padding:8px;">
+
+                <!-- Row 4: วันเกิด + สถาบัน -->
+                <div style="display:flex; gap:8px;">
+                    <div style="flex:1;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">🎂 วันเกิด</label>
+                        <input type="date" id="gs-birthday" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                    <div style="flex:2;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">🏢 สถาบัน / ที่ทำงาน</label>
+                        <input type="text" id="gs-institute" placeholder="Institution / Workplace..." style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                </div>
+
+                <!-- Row 5: ที่อยู่ -->
+                <div>
+                    <label style="font-size:0.75em; color:#888; font-weight:bold;">📍 ที่อยู่</label>
+                    <input type="text" id="gs-address" placeholder="ที่อยู่..." style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                </div>
+
+                <!-- Certificate Info (English) -->
+                <div style="border-top:1px solid #e2e8f0; padding-top:8px;">
+                    <label style="font-size:0.75em; color:#888; font-weight:bold;">🎓 Certificate Info (English)</label>
+                    <div style="display:flex; gap:5px; margin-top:5px; margin-bottom:5px;">
+                        <input type="text" id="gs-firstname-en" placeholder="FIRST NAME" style="flex:2; font-size:0.85em; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <input type="text" id="gs-middlename-en" placeholder="MIDDLE" style="flex:1; font-size:0.85em; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <input type="text" id="gs-lastname-en" placeholder="LAST NAME" style="flex:2; font-size:0.85em; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                    </div>
+                    <input type="text" id="gs-cert-fullname" placeholder="Full Name (Combined Preview / Manual Override)" style="width:100%; box-sizing:border-box; font-size:0.85em; padding:8px; border:1px solid #ddd; border-radius:6px;" title="This field is used for Certificate Generation">
+                </div>
             </div>
 
             <div style="margin-bottom:15px;">
@@ -7638,49 +7792,6 @@
                     <button type="button" class="btn-sm" onclick="closeEditCaseNoteModal()" style="min-width:110px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Cancel</button>
                     <button type="button" id="edit-case-note-save-btn" class="btn-sm" onclick="saveEditedCaseNote()" style="min-width:150px; background:linear-gradient(135deg,#f59e0b,#ea580c); color:white; border:none; border-radius:12px; padding:10px 18px; font-weight:900; box-shadow:0 8px 20px rgba(234,88,12,0.22);"><i class="fa-solid fa-save"></i> Save Changes</button>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quest Review Bonus Modal -->
-    <div id="questReviewBonusModal" class="modal" style="z-index:4303;">
-        <div class="modal-content case-score-modal-shell" style="border-color:rgba(99,102,241,0.28); background:linear-gradient(180deg,#fafafe 0%,#ffffff 100%);">
-            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
-                <div>
-                    <div style="font-size:1.08em; color:#3730a3; font-weight:900;">Review Quest Submission</div>
-                    <div id="quest-review-bonus-subtitle" style="margin-top:4px; font-size:0.84em; color:#78716c; line-height:1.5;"></div>
-                </div>
-                <button type="button" onclick="closeQuestReviewBonusModal(false)" style="border:none; background:transparent; color:#475569; font-size:1.45em; line-height:1; cursor:pointer;">&times;</button>
-            </div>
-
-            <div id="quest-review-bonus-meta" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0 4px;">
-                <div style="background:#ede9fe; border-radius:12px; padding:10px 12px;">
-                    <div style="font-size:0.72em; color:#5b21b6; font-weight:800; text-transform:uppercase;">Base Score</div>
-                    <div id="quest-review-base-score" style="font-size:1.3em; font-weight:900; color:#3730a3; margin-top:2px;">-</div>
-                </div>
-                <div style="background:#f0fdf4; border-radius:12px; padding:10px 12px;">
-                    <div style="font-size:0.72em; color:#166534; font-weight:800; text-transform:uppercase;">User</div>
-                    <div id="quest-review-user-name" style="font-size:1em; font-weight:900; color:#14532d; margin-top:2px; word-break:break-word;">-</div>
-                </div>
-            </div>
-
-            <div style="font-size:0.82em; color:#64748b; margin-bottom:6px; font-style:italic;" id="quest-review-question-text"></div>
-
-            <div style="font-weight:800; color:#374151; font-size:0.9em; margin-bottom:6px;">Quick Bonus</div>
-            <div class="case-score-chip-row" style="">
-                <button type="button" class="case-score-chip quest-bonus-chip" data-score="-0.5" onclick="setQuestBonusValue(-0.5)" style="border-color:#f43f5e; background:#fff1f2; color:#be123c;">-0.5</button>
-                <button type="button" class="case-score-chip quest-bonus-chip" data-score="0" onclick="setQuestBonusValue(0)" style="">0</button>
-                <button type="button" class="case-score-chip quest-bonus-chip" data-score="0.1" onclick="setQuestBonusValue(0.1)">+0.1</button>
-                <button type="button" class="case-score-chip quest-bonus-chip" data-score="0.5" onclick="setQuestBonusValue(0.5)">+0.5</button>
-                <button type="button" class="case-score-chip quest-bonus-chip" data-score="1" onclick="setQuestBonusValue(1)">+1.0</button>
-            </div>
-
-            <label for="quest-review-bonus-input" style="display:block; margin-bottom:8px; font-weight:800; color:#374151;">Custom Bonus <span style="font-weight:400; color:#94a3b8;">(can be negative)</span></label>
-            <input id="quest-review-bonus-input" type="number" step="0.1" inputmode="decimal" placeholder="0" style="margin:0; border-radius:14px; border-color:rgba(99,102,241,0.4);" oninput="syncQuestBonusChips()" onkeydown="if(event.key==='Enter'){event.preventDefault();closeQuestReviewBonusModal(true);}">
-
-            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px; flex-wrap:wrap;">
-                <button type="button" class="btn-sm" onclick="closeQuestReviewBonusModal(false)" style="min-width:96px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Cancel</button>
-                <button type="button" class="btn-sm" onclick="closeQuestReviewBonusModal(true)" style="min-width:110px; background:linear-gradient(135deg,#6366f1,#4f46e5); color:#fff; border:none; border-radius:12px; padding:10px 18px; font-weight:900;">Confirm & Award</button>
             </div>
         </div>
     </div>
@@ -8419,7 +8530,7 @@
 
 
                         window.AI_CORE_READY = true;
-                        console.log("🤖 [AI Engine] Global Core V90.99.3.9.1 Ready");
+                        console.log("🤖 [AI Engine] Global Core V91.00 Ready");
 
                         // --- AI Diagnostic Tool (V88.55 Handle 403) ---
                         window.checkGeminiModels = async function () {
@@ -9537,14 +9648,23 @@
                             const hiddenInput = document.getElementById('ai-model-review');
                             document.querySelectorAll('.reflective-review-model-chip').forEach(chip => {
                                 chip.classList.remove('active');
-                                chip.style.background = 'transparent';
-                                chip.style.color = '#64748b';
                             });
                             if (!btn) return;
                             btn.classList.add('active');
-                            btn.style.background = 'linear-gradient(135deg,#10b981,#34d399)';
-                            btn.style.color = 'white';
                             if (hiddenInput) hiddenInput.value = btn.dataset.value || 'gpt-4o';
+                        };
+
+                        window.setReflectiveReviewStatus = function(message, tone) {
+                            const el = document.getElementById('reflective-review-ai-status');
+                            if (!el) return;
+                            if (!message) {
+                                el.className = 'reflective-review-status';
+                                el.innerHTML = '';
+                                return;
+                            }
+                            const icon = tone === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check';
+                            el.className = 'reflective-review-status show ' + (tone || 'success');
+                            el.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
                         };
 
                         function getReflectiveReviewPresetInstruction(preset) {
@@ -9612,11 +9732,17 @@ Do not include any explanation other than the feedback body.`;
                                 const { text } = await window.callUniversalAI(selectedModelName, prompt);
 
                                 textarea.value = text;
+                                setReflectiveReviewStatus(existingDraft ? `AI refined your draft in ${targetLang}.` : `AI suggestion ready in ${targetLang}.`, 'success');
                                 showToast(existingDraft ? "✨ AI refined your Thai draft → " + targetLang : "✨ AI suggested feedback!");
 
                             } catch (error) {
                                 console.error("AI Error:", error);
-                                alert("AI is currently unavailable: " + error.message);
+                                const rawMessage = error && error.message ? String(error.message) : 'Unknown error';
+                                const friendlyMessage = /NetworkError|Failed to fetch|Load failed|fetch resource/i.test(rawMessage)
+                                    ? 'AI unavailable right now. Check AI keys or network and try again.'
+                                    : ('AI unavailable: ' + rawMessage);
+                                setReflectiveReviewStatus(friendlyMessage, 'error');
+                                showToast(friendlyMessage);
                             } finally {
                                 btn.disabled = false;
                                 btn.innerHTML = '<i class="fa-solid fa-robot"></i> <span class="btn-text">AI Suggest</span>';
@@ -10066,6 +10192,7 @@ Do not include any explanation other than the feedback body.`;
                         const MY_URL = window.location.origin + window.location.pathname; // V88.64: Auto-detect current URL for GitHub Pages/Firebase compatibility
 
                         var auth = firebase.auth();
+                        const GOOGLE_POPUP_TIMEOUT_MS = 7000;
 
                         var usersData = [], worksData = [], casesData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {}, questsSubList = [];
                         var knowledgeBaseCache = []; // Required by PDF-to-Quiz and Research grounding
@@ -10121,7 +10248,7 @@ Do not include any explanation other than the feedback body.`;
                             refreshOnePieceScopeThemeButton();
                         });
 
-                        // V89.01: Negative Wording Detection for Reflective Review
+                        // V89.01: Negative Wording Detection for Reflective Log Review
                         function detectNegativeWording(text) {
                             if (!text) return { found: false, words: [] };
                             const lower = text.toLowerCase();
@@ -10257,6 +10384,7 @@ Do not include any explanation other than the feedback body.`;
 
                         // 🔥 Google Sign-In Logic
                         let googleLoginInProgress = false;
+                        let googleFallbackMagicLinkSent = false;
 
                         function setGoogleLoginButtonState(isLoading) {
                             const btn = document.querySelector('#login-screen .btn-google');
@@ -10275,38 +10403,59 @@ Do not include any explanation other than the feedback body.`;
                             if (btn.dataset.originalHtml) btn.innerHTML = btn.dataset.originalHtml;
                         }
 
+                        function triggerMagicLinkFallback(reason = '') {
+                            if (googleFallbackMagicLinkSent) return;
+                            googleFallbackMagicLinkSent = true;
+                            const emailEl = document.getElementById('email-input');
+                            const loginErrorEl = document.getElementById('login-error');
+                            if (emailEl) emailEl.value = ALLOWED_EMAIL;
+                            if (loginErrorEl) {
+                                loginErrorEl.innerText = reason
+                                    ? `${reason} Sending a secure login link to ${ALLOWED_EMAIL}...`
+                                    : `Sending a secure login link to ${ALLOWED_EMAIL}...`;
+                            }
+                            sendMagicLink({ auto: true });
+                        }
+
                         async function loginWithGoogle() {
                             if (googleLoginInProgress) return;
                             googleLoginInProgress = true;
                             setGoogleLoginButtonState(true);
 
                             const provider = new firebase.auth.GoogleAuthProvider();
+                            provider.setCustomParameters({ prompt: 'select_account' });
+                            const resetIfPopupStalls = setTimeout(() => {
+                                googleLoginInProgress = false;
+                                setGoogleLoginButtonState(false);
+                                const loginErrorEl = document.getElementById('login-error');
+                                const emailEl = document.getElementById('email-input');
+                                if (emailEl) emailEl.value = ALLOWED_EMAIL;
+                                triggerMagicLinkFallback('Google sign-in is blocked or still waiting.');
+                            }, GOOGLE_POPUP_TIMEOUT_MS);
                             try {
                                 const result = await auth.signInWithPopup(provider);
-                                // Success handled by onAuthStateChanged
+                                clearTimeout(resetIfPopupStalls);
                                 console.log("Google Login Success:", result.user.email);
                             } catch (error) {
-                                const shouldFallbackToRedirect = error && (
-                                    error.code === 'auth/popup-blocked' ||
-                                    error.code === 'auth/cancelled-popup-request' ||
-                                    error.code === 'auth/popup-closed-by-user'
-                                );
-
-                                if (shouldFallbackToRedirect) {
-                                    try {
-                                        await auth.signInWithRedirect(provider);
-                                        return;
-                                    } catch (redirectError) {
-                                        console.error("Google Redirect Login Error:", redirectError);
-                                        alert("Google Redirect Login Error: " + redirectError.message);
-                                        document.getElementById('login-error').innerText = "Google Error: " + redirectError.message;
-                                    }
+                                clearTimeout(resetIfPopupStalls);
+                                const loginErrorEl = document.getElementById('login-error');
+                                const emailEl = document.getElementById('email-input');
+                                if (emailEl) emailEl.value = ALLOWED_EMAIL;
+                                const code = error && error.code ? error.code : '';
+                                if (code === 'auth/popup-blocked' || code === 'auth/cancelled-popup-request') {
+                                    const msg = 'Google popup was blocked.';
+                                    console.warn("Google Login Popup Blocked:", error);
+                                    if (loginErrorEl) loginErrorEl.innerText = `${msg} Sending Magic Link instead...`;
+                                    triggerMagicLinkFallback(msg);
+                                } else if (code === 'auth/popup-closed-by-user') {
+                                    const msg = 'Google sign-in was closed before completion. Please click Google again when ready.';
+                                    console.warn("Google Login Popup Closed:", error);
+                                    if (loginErrorEl) loginErrorEl.innerText = msg;
                                 } else {
                                     console.error("Google Login Error:", error);
                                     alert("Google Login Error: " + error.message);
-                                    document.getElementById('login-error').innerText = "Google Error: " + error.message;
+                                    if (loginErrorEl) loginErrorEl.innerText = "Google Error: " + error.message;
                                 }
-                            } finally {
                                 googleLoginInProgress = false;
                                 setGoogleLoginButtonState(false);
                             }
@@ -10341,7 +10490,7 @@ Do not include any explanation other than the feedback body.`;
                         }
 
                         // 🔥 Magic Link Logic (Replaces Google Sign-In)
-                        function sendMagicLink() {
+                        function sendMagicLink(options = {}) {
                             const email = document.getElementById('email-input').value;
                             if (email !== ALLOWED_EMAIL) {
                                 alert("❌ Access Denied: Email not authorized.");
@@ -12661,6 +12810,10 @@ Do not include any explanation other than the feedback body.`;
                                 const quiz = quizzesData.find(x => x.id === att.quizId);
                                 if (!quiz) return alert("Quiz Reference missing");
 
+                                // Set ID for export function
+                                const idInput = document.getElementById('review-attempt-id');
+                                if (idInput) idInput.value = attemptId;
+
                                 const cheat = att.cheatMonitoring || {};
                                 const cheatSummary = cheat.summary || {};
                                 const cheatEvents = Array.isArray(cheat.events) ? cheat.events : [];
@@ -12909,9 +13062,10 @@ Do not include any explanation other than the feedback body.`;
                         <div style="padding:15px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;background:#f8f9fa;">
                             <h3 style="margin:0;color:#4361ee;font-size:1.1em;"><i class="fa-solid fa-magnifying-glass"></i> Review Quiz Attempt</h3>
                             <div style="display:flex; gap:8px;">
-                                <button onclick="openTimingRiskConfigModal()" style="background:#0ea5e9;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.85em;">⚙ Timing Config</button>
+                                <button onclick="openTimingRiskConfigModal()" style="background:#0ea5e9;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:1.1em;" title="Timing Config">⚙</button>
                                 <button onclick="approveQuizAttempt('${attemptId}')" style="background:#2ecc71;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;">🍎 Manten Manten no Mi (100%)</button>
                                 <button onclick="approveQuizAttemptActual('${attemptId}')" style="background:#3498db;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;">🍇 Shōjiki Shōjiki no Mi (${actualApproveLabel})</button>
+                                <button onclick="exportIncorrectToPDF()" style="background:#ef4444;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                                 <button onclick="closeReviewOverlay()" style="background:#ef233c;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;">Close</button>
                             </div>
                         </div>
@@ -13028,6 +13182,160 @@ Do not include any explanation other than the feedback body.`;
                         </div>
                     </div>
                 `).join('');
+                            }
+                        }
+
+                        async function exportIncorrectToPDF() {
+                            const attemptId = document.getElementById('review-attempt-id')?.value;
+                            if (!attemptId) return alert("Attempt ID missing");
+
+                            try {
+                                if (typeof showToast === 'function') showToast("Generating PDF...");
+                                
+                                const attemptDoc = await db.collection("quiz_attempts").doc(attemptId).get();
+                                if (!attemptDoc.exists) return alert("Data not found");
+                                const att = attemptDoc.data();
+                                const quiz = quizzesData.find(x => x.id === att.quizId);
+                                if (!quiz) return alert("Quiz Reference missing");
+
+                                const jsPdfCtor = window.jspdf && window.jspdf.jsPDF;
+                                if (!jsPdfCtor) return alert('PDF engine is not ready.');
+
+                                const doc = new jsPdfCtor('p', 'mm', 'a4');
+                                let y = 20;
+                                const margin = 15;
+                                const pageW = doc.internal.pageSize.getWidth();
+                                const pageH = doc.internal.pageSize.getHeight();
+                                const maxW = pageW - (margin * 2);
+
+                                const ensureSpace = (h) => {
+                                    if (y + h > pageH - margin) {
+                                        doc.addPage();
+                                        y = 20;
+                                        return true;
+                                    }
+                                    return false;
+                                };
+
+                                doc.setFont('helvetica', 'bold');
+                                doc.setFontSize(18);
+                                doc.setTextColor(220, 53, 69);
+                                doc.text("Incorrect Questions Review", margin, y);
+                                y += 12;
+
+                                doc.setFontSize(10);
+                                doc.setFont('helvetica', 'normal');
+                                doc.setTextColor(80);
+                                doc.text(`Quiz: ${quiz.title || 'Untitled'}`, margin, y); y += 6;
+                                doc.text(`Student: ${att.displayName || 'Anonymous'}`, margin, y); y += 6;
+                                doc.text(`Date: ${att.timestamp ? new Date(att.timestamp).toLocaleString() : 'N/A'}`, margin, y); y += 10;
+
+                                doc.setDrawColor(220);
+                                doc.line(margin, y, pageW - margin, y);
+                                y += 12;
+
+                                let incorrectCount = 0;
+                                (quiz.questions || []).forEach((q, i) => {
+                                    const studentAns = (att.answers || att.practiceAnswers || [])[i];
+                                    const isChoice = (q.type || 'choice') === 'choice';
+                                    const isManuallyCorrect = !!(att.manualCorrect && att.manualCorrect[i] === true);
+                                    
+                                    let isCorrect = false;
+                                    if (isChoice) {
+                                        const target = q.correct;
+                                        const sAns = Array.isArray(studentAns) ? studentAns : (studentAns !== undefined && studentAns !== null ? [studentAns] : []);
+                                        const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
+                                        if (tAns.length > 0) {
+                                            if (tAns.length === 1 && sAns.length === 1) isCorrect = (String(sAns[0]).trim() === String(tAns[0]).trim());
+                                            else isCorrect = (sAns.length === tAns.length && tAns.every(v => sAns.map(String).includes(String(v))));
+                                        }
+                                    } else {
+                                        isCorrect = !!((att.gradedAnswers && att.gradedAnswers[i]) || isManuallyCorrect);
+                                    }
+                                    isCorrect = isCorrect || isManuallyCorrect;
+
+                                    if (!isCorrect) {
+                                        incorrectCount++;
+                                        ensureSpace(30);
+
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.setTextColor(30);
+                                        const qLines = doc.splitTextToSize(`Q${i + 1}: ${q.q}`, maxW);
+                                        qLines.forEach(line => {
+                                            ensureSpace(6);
+                                            doc.text(line, margin, y);
+                                            y += 6;
+                                        });
+
+                                        y += 2;
+                                        doc.setFont('helvetica', 'normal');
+                                        doc.setTextColor(220, 53, 69); // Red
+                                        
+                                        let studentText = "Student Answer: ";
+                                        if (isChoice) {
+                                            const idx = parseInt(studentAns);
+                                            studentText += isNaN(idx) ? "None" : (q.options[idx] || "None");
+                                            if (!isNaN(idx)) studentText += ` (Choice ${idx + 1})`;
+                                        } else {
+                                            const ans = Array.isArray(studentAns) ? studentAns.join(", ") : studentAns;
+                                            studentText += ans || "None";
+                                        }
+                                        
+                                        const sLines = doc.splitTextToSize(studentText, maxW);
+                                        sLines.forEach(line => {
+                                            ensureSpace(5);
+                                            doc.text(line, margin, y);
+                                            y += 5;
+                                        });
+
+                                        doc.setTextColor(40, 167, 69); // Green
+                                        let correctText = "Correct Answer: ";
+                                        if (isChoice) {
+                                            const idx = parseInt(q.correct);
+                                            correctText += isNaN(idx) ? "N/A" : (q.options[idx] || "N/A");
+                                            if (!isNaN(idx)) correctText += ` (Choice ${idx + 1})`;
+                                        } else {
+                                            correctText += "(Refer to answer key)";
+                                        }
+                                        
+                                        const cLines = doc.splitTextToSize(correctText, maxW);
+                                        cLines.forEach(line => {
+                                            ensureSpace(5);
+                                            doc.text(line, margin, y);
+                                            y += 5;
+                                        });
+
+                                        if (q.explanation) {
+                                            y += 2;
+                                            doc.setTextColor(100);
+                                            doc.setFont('helvetica', 'italic');
+                                            const eLines = doc.splitTextToSize(`Explanation: ${q.explanation}`, maxW);
+                                            eLines.forEach(line => {
+                                                ensureSpace(5);
+                                                doc.text(line, margin, y);
+                                                y += 5;
+                                            });
+                                        }
+
+                                        doc.setTextColor(0);
+                                        y += 10;
+                                        doc.setDrawColor(240);
+                                        doc.line(margin, y - 5, pageW - margin, y - 5);
+                                    }
+                                });
+
+                                if (incorrectCount === 0) {
+                                    alert("No incorrect questions found in this attempt!");
+                                    return;
+                                }
+
+                                const filename = `Review_Incorrect_${(att.displayName || 'Attempt').replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
+                                doc.save(filename);
+                                if (typeof showToast === 'function') showToast("PDF Exported Successfully", "success");
+
+                            } catch (e) {
+                                console.error(e);
+                                alert("Export failed: " + e.message);
                             }
                         }
 
@@ -14434,7 +14742,9 @@ Do not include any explanation other than the feedback body.`;
                                 const docRef = db.collection("quiz_attempts").doc(attemptId);
                                 const docSnap = await docRef.get();
                                 if (!docSnap.exists) return alert("Attempt data not found");
-                                const att = docSnap.data();
+                                                                const att = docSnap.data();
+                                if (att.status === 'approved') return alert("⚠️ This attempt has already been approved.");
+
                                 const quiz = quizzesData.find(x => x.id === att.quizId);
                                 if (!quiz) return alert("Quiz data not found");
 
@@ -14489,7 +14799,9 @@ Do not include any explanation other than the feedback body.`;
                                 const docRef = db.collection("quiz_attempts").doc(attemptId);
                                 const docSnap = await docRef.get();
                                 if (!docSnap.exists) return alert("Attempt data not found");
-                                const att = docSnap.data();
+                                                                const att = docSnap.data();
+                                if (att.status === 'approved') return alert("⚠️ This attempt has already been approved.");
+
                                 const quiz = quizzesData.find(x => x.id === att.quizId);
                                 if (!quiz) return alert("Quiz data not found");
 
@@ -14641,7 +14953,12 @@ Do not include any explanation other than the feedback body.`;
                                 if (!confirm(`Confirm approving ${score.toFixed(3)} points for this user?`)) return;
                             }
                             try {
+                                                                const docSnap = await db.collection("quiz_attempts").doc(attemptId).get();
+                                if (docSnap.exists && docSnap.data().status === 'approved') {
+                                    return alert("⚠️ This attempt has already been approved.");
+                                }
                                 const b = db.batch();
+
                                 b.update(db.collection("quiz_attempts").doc(attemptId), { status: 'approved', approvedAt: firebase.firestore.FieldValue.serverTimestamp() });
                                 b.update(db.collection("users").doc(uid), { score: firebase.firestore.FieldValue.increment(score) });
                                 const quizId = attemptId.split('_')[0];
@@ -16258,13 +16575,13 @@ Do not include any explanation other than the feedback body.`;
                                 questsSubList = s.docs.map(d => ({ id: d.id, ...d.data() }));
                                 s.forEach(d => { questsSubCache[`${d.data().questId}_${d.data().userId}`] = d.data(); });
                                 filterBoard();
-                            });
+                            }, err => console.error("🔥 [Firebase] Quest Submissions listener failed:", err));
 
                             // 🔥 Load Division Config (V77.8)
                             db.collection("quizzes").doc("--divisions-config--").onSnapshot(doc => {
                                 if (doc.exists) divisionConfig = doc.data();
                                 renderLeaderboard();
-                            });
+                            }, err => console.error("🔥 [Firebase] Divisions Config listener failed:", err));
 
                             db.collection("pre_users").orderBy("createdAt", "desc").onSnapshot(s => {
                                 preRegData = s.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -16273,13 +16590,13 @@ Do not include any explanation other than the feedback body.`;
                                 }
                                 renderUserGroupTabs();
                                 renderTable('users');
-                            });
+                            }, err => console.error("🔥 [Firebase] Pre-Users listener failed:", err));
 
                             // 🔥 Access Request Listener (V84.3)
                             db.collection("reports").where("type", "==", "access_request").where("status", "==", "รอตรวจ")
                                 .onSnapshot(s => {
                                     renderAccessRequests(s.docs.map(d => ({ id: d.id, ...d.data() })));
-                                });
+                                }, err => console.error("🔥 [Firebase] Access Requests listener failed:", err));
 
                             // 🔥 Points Claimed Notifications
                             loadPointsClaimedNotifications();
@@ -16405,6 +16722,10 @@ Do not include any explanation other than the feedback body.`;
                             document.getElementById('gs-cert-fullname').value = user?.fullNameEn || '';
                             document.getElementById('gs-cert-nickname').value = user?.nickname || user?.nickName || '';
                             document.getElementById('gs-institute').value = user?.institute || '';
+                            document.getElementById('gs-tel').value = user?.phone || user?.tel || '';
+                            document.getElementById('gs-email').value = user?.email || '';
+                            document.getElementById('gs-birthday').value = user?.birthday || '';
+                            document.getElementById('gs-address').value = user?.address || '';
 
                             // Helper to update full name preview
                             const updateGsFullname = () => {
@@ -16510,6 +16831,10 @@ Do not include any explanation other than the feedback body.`;
                             const newInstitute = document.getElementById('gs-institute').value.trim();
                             const licenseId = document.getElementById('gs-license-id').value.trim();
                             const qualification = document.getElementById('gs-qualification').value.trim();
+                            const tel = document.getElementById('gs-tel').value.trim();
+                            const email = document.getElementById('gs-email').value.trim();
+                            const birthday = document.getElementById('gs-birthday').value.trim();
+                            const address = document.getElementById('gs-address').value.trim();
 
                             if (!uid) return;
 
@@ -16524,7 +16849,11 @@ Do not include any explanation other than the feedback body.`;
                                     nickname: newNickname,
                                     institute: newInstitute,
                                     licenseId: licenseId,
-                                    qualification: qualification
+                                    qualification: qualification,
+                                    phone: tel,
+                                    email: email,
+                                    birthday: birthday,
+                                    address: address
                                 });
                                 showToast("User updated successfully!");
                                 forceHideModal('groupSelectModal');
@@ -16754,6 +17083,26 @@ Do not include any explanation other than the feedback body.`;
                             if (text.includes('เรื้อรัง') || text.includes('endocr') || text.includes('ncd')) return 'endocrine';
                             if (text.includes('จิต') || text.includes('mental')) return 'mental';
                             return 'other';
+                        }
+
+                        function getAlabastaPrimarySystemLabel(caseItem = {}, logData = {}) {
+                            const directLabel = logData.primarySystemLabel || caseItem.diseaseSystemLabel || caseItem.primarySystemLabel;
+                            if (directLabel) return directLabel;
+                            const key = logData.primarySystemKey || caseItem.diseaseSystemKey || inferAlabastaTaxonomyKey(caseItem);
+                            const entry = getAlabastaTaxonomyEntry(key) || getAlabastaTaxonomyEntry('other');
+                            return entry ? `${entry.thaiLabel} (${entry.label})` : 'Other';
+                        }
+
+                        function findAlabastaCaseForLog(logData = {}) {
+                            const caseDocId = logData.sourceCaseDocId || '';
+                            const caseRef = logData.sourceCaseRef || '';
+                            return (casesData || []).find(c => c.id === caseDocId || (!!caseRef && c.caseId === caseRef)) || {};
+                        }
+
+                        function buildAlabastaReviewLogNote(caseItem = {}, logData = {}) {
+                            const caseRef = logData.sourceCaseRef || caseItem.caseId || caseItem.id || logData.sourceCaseDocId || '';
+                            const primarySystemLabel = getAlabastaPrimarySystemLabel(caseItem, logData);
+                            return `Alabasta reviewed: ${primarySystemLabel}${caseRef ? ` - ${caseRef}` : ''}`;
                         }
 
                         function initEditCaseTaxonomyOptions() {
@@ -17372,23 +17721,28 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     });
 
                                     if (bonus > 0 && caseItem.userId) {
+                                        const primarySystemKey = caseItem.diseaseSystemKey || inferAlabastaTaxonomyKey(caseItem);
+                                        const primarySystemLabel = getAlabastaPrimarySystemLabel(caseItem, { primarySystemKey });
                                         batch.update(db.collection('users').doc(caseItem.userId), {
                                             score: firebase.firestore.FieldValue.increment(bonus)
                                         });
-                        const reviewLogRef = db.collection('checkin_logs').doc();
-                        batch.set(reviewLogRef, {
-                            userId: caseItem.userId,
-                            type: 'case_review_bonus',
-                            amount: bonus,
-                            note: `Alabasta reviewed: ${caseItem.caseId || caseDocId}`,
-                            sourceCaseDocId: caseDocId,
-                            sourceCaseRef: caseItem.caseId || '',
-                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                        batch.update(caseRef, {
-                            reviewLogId: reviewLogRef.id
-                        });
-                    }
+                                        const reviewLogRef = db.collection('checkin_logs').doc();
+                                        batch.set(reviewLogRef, {
+                                            userId: caseItem.userId,
+                                            type: 'case_review_bonus',
+                                            amount: bonus,
+                                            note: buildAlabastaReviewLogNote(caseItem, { sourceCaseDocId: caseDocId, sourceCaseRef: caseItem.caseId || '', primarySystemKey, primarySystemLabel }),
+                                            primarySystemKey,
+                                            primarySystemLabel,
+                                            taxonomySummary: caseItem.taxonomySummary || primarySystemLabel,
+                                            sourceCaseDocId: caseDocId,
+                                            sourceCaseRef: caseItem.caseId || '',
+                                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                                        });
+                                        batch.update(caseRef, {
+                                            reviewLogId: reviewLogRef.id
+                                        });
+                                    }
 
                                     await batch.commit();
                                     if (typeof showToast === 'function') showToast(`Archived +${bonus.toFixed(2)} pts`, 'success');
@@ -17824,9 +18178,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     dash.logs += score;
                                 });
 
+                                const caseReviewLogTextByDocId = {};
                                 l.forEach(d => {
                                     const x = d.data();
                                     const score = parseFloat(x.amount) || 0;
+                                    if (x.type === 'case_review_bonus') {
+                                        const caseItem = findAlabastaCaseForLog(x);
+                                        caseReviewLogTextByDocId[d.id] = `📁 ${buildAlabastaReviewLogNote(caseItem, x)}`;
+                                    }
                                     if (x.type === 'streak') {
                                         all.push({ t: x.timestamp?.toDate(), type: 'bonus', text: `🔥 Streak`, score: score, docId: d.id, source: 'checkin_logs' });
                                         dash.bonus += score;
@@ -17842,6 +18201,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     } else if (x.type === 'reflective_bonus') {
                                         all.push({ t: x.timestamp?.toDate(), type: 'bonus', text: `🎁 Reflective Bonus: ${x.note}`, score: score, docId: d.id, source: 'checkin_logs' });
                                         dash.bonus += score;
+                                    }
+                                });
+
+                                all.forEach(item => {
+                                    if (item.type === 'work' && item.docId && caseReviewLogTextByDocId[item.docId]) {
+                                        item.text = caseReviewLogTextByDocId[item.docId];
                                     }
                                 });
 
@@ -18301,8 +18666,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 const dash = { quizzes: 0, works: 0, logs: 0, bonus: 0, manual: 0, qc: 0, wc: 0, lc: 0, bc: 0, mc: 0 };
 
                                 const addP = (dateObj, score, type, note, extra = {}) => {
-                                    if (!dateObj || score === undefined) return;
-                                    const dRaw = dateObj.toDate();
+                                                                        const sVal = parseFloat(score) || 0;
+                                    const dRaw = (dateObj && typeof dateObj.toDate === 'function') ? dateObj.toDate() : new Date();
+
+                                    
                                     const dStr = dRaw.toISOString().split('T')[0];
                                     if (!pointsMap[dStr]) pointsMap[dStr] = 0;
                                     pointsMap[dStr] += parseFloat(score);
@@ -18323,7 +18690,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     const d = doc.data();
                                     const s = (d.earnedScore || 0) + (d.bonusGiven || 0);
                                     if (d.status !== 'none') {
-                                        addP(d.receivedAt, 0.1, 'bonus', `🚀 Receive: ${d.questTitle}`);
+                                        addP(d.receivedAt || d.startedAt, 0.1, 'bonus', `🚀 Receive: ${d.questTitle}`);
+
                                         dash.bonus += 0.1;
                                         dash.bc++;
                                     }
@@ -18334,15 +18702,30 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     }
                                 });
 
+                                const hubCaseReviewLogTextByDocId = {};
                                 logsSnap.forEach(doc => {
                                     const d = doc.data();
                                     const s = parseFloat(d.amount) || 0;
-                                    const hubType = d.type === 'case_review_bonus' ? 'work' : (d.type || 'log');
-                                    const hubText = d.type === 'case_review_bonus' ? `📁 ${d.note || 'Alabasta Case Review'}` : (d.note || '-');
-                                    addP(d.timestamp, s, hubType, hubText, { docId: doc.id, source: 'checkin_logs' });
+                                    if (d.type === 'case_review_bonus') {
+                                        const caseItem = findAlabastaCaseForLog(d);
+                                        hubCaseReviewLogTextByDocId[doc.id] = `📁 ${buildAlabastaReviewLogNote(caseItem, d)}`;
+                                    }
+                                    const isQuestLog = d.type === 'quest' || (d.note && d.note.includes('Quest Bonus'));
+                                    const hubType = (d.type === 'case_review_bonus' || isQuestLog) ? 'work' : (d.type || 'log');
+                                    let hubText = d.note || '-';
+                                    if (d.type === 'case_review_bonus') hubText = `📁 ${d.note || 'Alabasta Case Review'}`;
+                                    else if (isQuestLog && !hubText.startsWith('📁')) hubText = `📁 ${hubText}`;
+
+                                    addP(d.timestamp, s, hubType, hubText, { 
+                                        docId: doc.id, 
+                                        source: 'checkin_logs',
+                                        isQuest: isQuestLog || d.isQuest,
+                                        answer: d.answer,
+                                        questTitle: d.questTitle || (d.note ? d.note.replace('Quest Bonus: ', '') : '')
+                                    });
                                     if (d.type === 'streak') { dash.bonus += s; dash.bc++; }
                                     else if (d.type === 'manual' || d.type === 'manual_adjust') { dash.manual += s; dash.mc++; }
-                                    else if (d.type === 'case_review_bonus') { dash.works += s; dash.wc++; }
+                                    else if (d.type === 'case_review_bonus' || isQuestLog) { dash.works += s; dash.wc++; }
                                     else if (d.type === 'reflective_log' || d.type === 'reflective_bonus') { dash.logs += s; dash.lc++; }
                                 });
 
@@ -18373,11 +18756,30 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     dash.lc++;
                                 });
 
-                                allLogs.sort((a, b) => (b.t || 0) - (a.t || 0));
+                                allLogs.forEach(item => {
+                                    if (item.type === 'work' && item.docId && hubCaseReviewLogTextByDocId[item.docId]) {
+                                        item.text = hubCaseReviewLogTextByDocId[item.docId];
+                                    }
+                                });
+
+                                                                allLogs.sort((a, b) => (b.t || 0) - (a.t || 0));
+                                const uniqueLogs = [];
+                                const seenQuizLogs = new Set();
+                                allLogs.forEach(log => {
+                                    if (log.type === 'quiz' || log.type === 'quest') {
+                                        const dKey = log.t ? log.t.toISOString().split('T')[0] : 'nodate';
+                                        const normalizedText = log.text.replace(/Quiz Approved \(Actual\): \d+\/\d+ - /, '').replace(/Quiz Approved: /, '').replace(/⚡ Submit: /, '').replace(/📝 Quiz: /, '');
+                                        const key = `${dKey}_${normalizedText}_${log.score.toFixed(2)}`;
+                                        if (!seenQuizLogs.has(key)) { seenQuizLogs.add(key); uniqueLogs.push(log); }
+                                    } else { uniqueLogs.push(log); }
+                                });
+                                window._hubUserCache[userId] = { pointsMap, detailsMap, allLogs: uniqueLogs, dash, user: u };
+                                historyCache = uniqueLogs;
+
 
                                 // Save to Hub Cache
-                                window._hubUserCache[userId] = { pointsMap, detailsMap, allLogs, dash, user: u };
-                                historyCache = allLogs;
+                                
+                                
                                 historyPage = 1;
 
                                 // Sync UI
@@ -18473,10 +18875,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         function getHubFilteredHistory() {
                             const mode = window._hubHistoryFilter || 'all';
                             if (mode === 'all') return historyCache;
-                            if (mode === 'quizzes') return historyCache.filter(e => e.type === 'quiz' || e.type === 'quest');
+                            if (mode === 'quizzes') return historyCache.filter(e => e.type === 'quiz');
                             if (mode === 'works') return historyCache.filter(e => e.type === 'work');
                             if (mode === 'logs') return historyCache.filter(e => e.type === 'reflective_log' || e.type === 'reflective_bonus');
-                            if (mode === 'bonus') return historyCache.filter(e => e.type === 'bonus' || e.type === 'streak');
+                            if (mode === 'bonus') return historyCache.filter(e => (e.type === 'bonus' && !e.isQuest) || e.type === 'streak');
+
                             if (mode === 'manual') return historyCache.filter(e => e.type === 'manual' || e.type === 'manual_adjust');
                             return historyCache;
                         }
@@ -19857,6 +20260,50 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 `;
 
                                 alert("Work Details:\n\n" + (w.title || 'Work Item') + "\nScore: " + (w.score || 0).toFixed(2) + " pts\nStatus: " + (w.status || 'Not Submitted') + "\n\nFor full details, click OK to open detailed view.");
+                                const modal = document.getElementById('workDetailModal') || createWorkDetailModal();
+                                document.getElementById('work-detail-content').innerHTML = detailsHtml;
+                                modal.style.display = 'block';
+                            } else if (item.isQuest) {
+                                const d = item.t ? item.t.toLocaleString('th-TH') : '-';
+                                const detailsHtml = `
+                    <div style="padding:20px; border-radius:12px; background:white; border:1px solid #f1f5f9;">
+                        <h3 style="margin:0 0 15px 0; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:1.5em;">⚡</span> Daily Quest Submission
+                        </h3>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:15px;">
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #10b981;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Awarded Score</div>
+                                <div style="font-size:1.3em; font-weight:900; color:#10b981; margin-top:6px;">
+                                    ${(item.score || 0).toFixed(2)} pts
+                                </div>
+                            </div>
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #f59e0b;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Reviewed At</div>
+                                <div style="font-size:0.85em; color:#475569; margin-top:6px; font-weight:600;">
+                                    ${d}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:12px;">
+                            <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase; margin-bottom:8px;">Quest Title</div>
+                            <div style="color:#1e293b; font-weight:700; font-size:1em;">
+                                ${item.questTitle || 'Daily Quest'}
+                            </div>
+                        </div>
+                        ${item.answer ? `
+                            <div style="background:#eff6ff; padding:15px; border-radius:12px; border-left:4px solid #3b82f6; margin-bottom:12px;">
+                                <div style="font-size:0.75em; color:#1d4ed8; font-weight:700; text-transform:uppercase; margin-bottom:10px;">User Answer</div>
+                                <div style="color:#1e3a8a; font-size:0.95em; line-height:1.6; white-space:pre-wrap; font-family:inherit;">
+                                    ${item.answer}
+                                </div>
+                            </div>
+                        ` : `
+                            <div style="padding:15px; border-radius:12px; border:1px dashed #cbd5e1; color:#94a3b8; text-align:center; font-size:0.9em;">
+                                (No submission content found in this log)
+                            </div>
+                        `}
+                    </div>
+                `;
                                 const modal = document.getElementById('workDetailModal') || createWorkDetailModal();
                                 document.getElementById('work-detail-content').innerHTML = detailsHtml;
                                 modal.style.display = 'block';
@@ -21262,7 +21709,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         }
 
                         // ===================================================================
-                        // 🪨 PONEGLYPH — V90.99.3.9.1 (Hardened)
+                        // 🪨 PONEGLYPH — V91.00 (Hardened)
                         // ===================================================================
                         let poneglyphNotesCache = [];
                         let poneglyphActiveNoteId = null;
@@ -22531,14 +22978,14 @@ ${stories.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
 
                             const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
                             document.getElementById('reflective-review-user-info').innerHTML = `
-                <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                    <img class="lt-avatar" src="${log.pictureUrl || ''}" style="width:40px; height:40px; border-radius:50%; border:2px solid #d35400;">
+                <div class="reflective-log-meta">
+                    <img class="lt-avatar reflective-log-avatar" src="${log.pictureUrl || ''}">
                     <div>
-                        <div style="font-weight:bold; color:#d35400;">${name}</div>
-                        <div style="font-size:0.75em; color:#888;">${log.timestamp ? log.timestamp.toDate().toLocaleString('en-US') : 'Pending sync...'}</div>
+                        <div class="reflective-log-name">${name}</div>
+                        <div class="reflective-log-date">${log.timestamp ? log.timestamp.toDate().toLocaleString('en-US') : 'Pending sync...'}</div>
                     </div>
                 </div>
-                <div style="font-size:1.05em; color:#333; line-height:1.4;">${moodEmoji} ${log.content}</div>
+                <div class="reflective-log-content">${moodEmoji} ${log.content}</div>
                 ${(() => {
                                     const neg = detectNegativeWording(log.content);
                                     if (!neg.found) return '';
@@ -22556,6 +23003,7 @@ ${stories.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
 
                             document.getElementById('reflective-review-bonus').value = log.adminBonus !== undefined ? log.adminBonus : "0.5";
                             document.getElementById('reflective-review-comment').value = log.adminComment || "";
+                            setReflectiveReviewStatus('');
                             console.log("DEBUG: About to call forceShowModal for reflectiveReviewModal");
                             const modal = document.getElementById('reflectiveReviewModal');
                             console.log("DEBUG: reflectiveReviewModal element:", modal);
@@ -22886,7 +23334,7 @@ ${stories.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
                                 accentColor = "#6f42c1";
                             } else if (type === 'reflective') {
                                 sourceId = 'reflective-log-review-section';
-                                title = "Reflective Review";
+                                title = "Reflective Log Review";
                                 icon = "fa-book-journal-whills";
                                 accentColor = "#d35400";
                             } else if (type === 'claimed') {
@@ -23483,7 +23931,7 @@ ${stories.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
 
                         window.AI_CORE_READY = true;
                         if (window.loadAIKeys) window.loadAIKeys();
-                        console.log('%c V90.99.3.9.1 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+                        console.log('%c V91.26 loaded OK (Admin Magic Link Fallback) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
 
                         // --- V90.36: Quiz Feedback Panel ---
                         let _qfpCurrentId = null;
@@ -23851,57 +24299,13 @@ ${comment}
                             }
                         }
 
-                        window.questReviewBonusModalState = { resolver: null };
-
-                        function syncQuestBonusChips() {
-                            const inputEl = document.getElementById('quest-review-bonus-input');
-                            const current = inputEl ? Number(String(inputEl.value || '').trim()) : NaN;
-                            document.querySelectorAll('#questReviewBonusModal .quest-bonus-chip').forEach(btn => {
-                                btn.classList.toggle('active', Number.isFinite(current) && Number(btn.dataset.score) === current);
-                            });
-                        }
-
-                        function setQuestBonusValue(value) {
-                            const inputEl = document.getElementById('quest-review-bonus-input');
-                            if (!inputEl) return;
-                            inputEl.value = Number(value).toFixed(1);
-                            syncQuestBonusChips();
-                        }
-
-                        function closeQuestReviewBonusModal(shouldSubmit) {
-                            const state = window.questReviewBonusModalState || {};
-                            const inputEl = document.getElementById('quest-review-bonus-input');
-                            const resolver = typeof state.resolver === 'function' ? state.resolver : null;
-                            const rawValue = inputEl ? String(inputEl.value || '').trim() : '';
-                            window.questReviewBonusModalState = { resolver: null };
-                            forceHideModal('questReviewBonusModal');
-                            if (resolver) resolver(shouldSubmit ? rawValue : null);
-                        }
-
-                        function openQuestReviewBonusModal(sub, q, u) {
-                            return new Promise(resolve => {
-                                window.questReviewBonusModalState = { resolver: resolve };
-                                const subtitleEl = document.getElementById('quest-review-bonus-subtitle');
-                                const questionEl = document.getElementById('quest-review-question-text');
-                                const baseEl = document.getElementById('quest-review-base-score');
-                                const userEl = document.getElementById('quest-review-user-name');
-                                const inputEl = document.getElementById('quest-review-bonus-input');
-                                if (subtitleEl) subtitleEl.textContent = `Quest: ${q ? (q.questId || q.id || '') : ''}`;
-                                if (questionEl) questionEl.textContent = q ? q.question : '';
-                                if (baseEl) baseEl.textContent = q ? `${q.baseScore} pts` : '-';
-                                if (userEl) userEl.textContent = u.displayName || u.id || '-';
-                                if (inputEl) { inputEl.value = '0'; syncQuestBonusChips(); setTimeout(() => inputEl.focus(), 40); }
-                                forceShowModal('questReviewBonusModal');
-                            });
-                        }
-
                         async function reviewQuestSubmission(subId) {
                             const sub = questsSubList.find(x => x.id === subId);
                             if (!sub) return;
                             const q = questsCache.find(x => x.id === sub.questId);
                             const u = usersData.find(x => x.id === sub.userId) || {};
 
-                            const bonusStr = await openQuestReviewBonusModal(sub, q, u);
+                            const bonusStr = prompt(`Reviewing Quest: ${q ? q.question : '?'}\nUser: ${u.displayName}\n\nBase Score: ${q ? q.baseScore : '?'}\nEnter Bonus (can be negative or zero):`, "0");
                             if (bonusStr === null) return;
 
                             const bonus = parseFloat(bonusStr) || 0;
@@ -23918,8 +24322,13 @@ ${comment}
                                     });
                                     await db.collection("checkin_logs").add({
                                         userId: sub.userId,
-                                        type: 'bonus',
+                                        type: 'work',
+                                        isQuest: true,
                                         amount: bonus,
+                                        questId: sub.questId,
+                                        questSubId: subId,
+                                        questTitle: q ? q.question : 'Quest',
+                                        answer: sub.answer || '',
                                         note: `Quest Bonus: ${q ? q.question : 'Quest'}`,
                                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                                     });

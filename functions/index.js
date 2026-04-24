@@ -1,9 +1,35 @@
+
+const admin = require("firebase-admin");
+admin.initializeApp();
+// === Quest Submission API: รองรับ field poneglyphRef/linkedPoneglyphs ===
+const functionsV1 = require("firebase-functions");
+
+exports.questSubmission = functionsV1.https.onRequest(async (req, res) => {
+    if (req.method === "POST") {
+        const { userId, questId, answer, poneglyphRef, linkedPoneglyphs } = req.body;
+        if (!userId || !questId) return res.status(400).json({ error: "Missing userId or questId" });
+        const docRef = admin.firestore().collection("quest_submissions").doc(`${userId}_${questId}`);
+        await docRef.set({
+            userId, questId, answer,
+            poneglyphRef: poneglyphRef || null,
+            linkedPoneglyphs: linkedPoneglyphs || [],
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        return res.json({ success: true });
+    }
+    if (req.method === "GET") {
+        const { userId, questId } = req.query;
+        if (!userId || !questId) return res.status(400).json({ error: "Missing userId or questId" });
+        const doc = await admin.firestore().collection("quest_submissions").doc(`${userId}_${questId}`).get();
+        if (!doc.exists) return res.status(404).json({ error: "Not found" });
+        return res.json(doc.data());
+    }
+    return res.status(405).json({ error: "Method not allowed" });
+});
 const { onRequest } = require("firebase-functions/v2/https");
 const { GoogleAuth } = require("google-auth-library");
 const axios = require("axios");
-const admin = require("firebase-admin");
 
-admin.initializeApp();
 
 // Configuration
 const PROJECT_ID = "intern-port-edfa7";
@@ -343,3 +369,4 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
         });
     }
 });
+
