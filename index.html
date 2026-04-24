@@ -7746,27 +7746,41 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                             <div id="${descId}" style="display:none; font-size:0.85em;color:#666;margin-bottom:10px; white-space:pre-wrap; background:#fafafa; padding:10px; border-radius:6px; border:1px solid #eee;">${q.description}</div>
                         ` : "";
 
-                        // Add user profile for Done cards
+                        // Add user profile for Done cards with 24h countdown
                         let userProfileHtml = "";
+                        let countdownHtml = "";
                         console.log(`[DEBUG] Card ${d.id}: status=${q.status}, completedBy=${q.completedBy}`);
-                        if (q.status === "Done" && q.completedBy) {
-                            console.log(`[DEBUG] Creating profile HTML for Done card ${d.id}`);
-                            userProfileHtml = `
-                                <div style="display:flex; align-items:center; gap:8px; margin-top:10px; padding:8px; background:#f8f9fa; border-radius:6px; border-left:3px solid #28a745;">
-                                    <img src="https://via.placeholder.com/40/28a745/FFFFFF/?text=✓" 
-                                         style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:2px solid #28a745;"
-                                         id="profile-${d.id}"
-                                         onerror="this.src='https://via.placeholder.com/40/28a745/FFFFFF/?text=✓'">
-                                    <div style="flex:1;">
-                                        <div style="font-weight:600; color:#28a745; font-size:0.9em;">Completed by</div>
-                                        <div id="profile-name-${d.id}" style="color:#666; font-size:0.8em;">Loading...</div>
-                                    </div>
+                        if (q.status === "Done") {
+                            // Add 24-hour countdown timer
+                            const completedAt = q.completedAt ? (q.completedAt.toMillis ? q.completedAt.toMillis() : new Date(q.completedAt).getTime()) : Date.now();
+                            const expiryTime = completedAt + (24 * 60 * 60 * 1000); // 24 hours from completion
+                            countdownHtml = `
+                                <div class="done-countdown" data-expiry="${expiryTime}" data-card-id="${d.id}" 
+                                     style="margin-top:8px; padding:6px 10px; background:#fff3cd; border:1px solid #ffeaa7; border-radius:6px; font-size:0.8em; color:#856404;">
+                                    <i class="fa-solid fa-clock"></i> 
+                                    <span class="countdown-text">Auto-archive in: <span class="countdown-timer">calculating...</span></span>
                                 </div>
                             `;
                             
-                            // Fetch user profile data
-                            console.log(`[DEBUG] Calling fetchUserProfileForDoneCard for card ${d.id}, user ${q.completedBy}`);
-                            fetchUserProfileForDoneCard(d.id, q.completedBy);
+                            if (q.completedBy) {
+                                console.log(`[DEBUG] Creating profile HTML for Done card ${d.id}`);
+                                userProfileHtml = `
+                                    <div style="display:flex; align-items:center; gap:8px; margin-top:10px; padding:8px; background:#f8f9fa; border-radius:6px; border-left:3px solid #28a745;">
+                                        <img src="https://via.placeholder.com/40/28a745/FFFFFF/?text=✓" 
+                                             style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:2px solid #28a745;"
+                                             id="profile-${d.id}"
+                                             onerror="this.src='https://via.placeholder.com/40/28a745/FFFFFF/?text=✓'">
+                                        <div style="flex:1;">
+                                            <div style="font-weight:600; color:#28a745; font-size:0.9em;">Completed by</div>
+                                            <div id="profile-name-${d.id}" style="color:#666; font-size:0.8em;">Loading...</div>
+                                        </div>
+                                    </div>
+                                `;
+                                
+                                // Fetch user profile data
+                                console.log(`[DEBUG] Calling fetchUserProfileForDoneCard for card ${d.id}, user ${q.completedBy}`);
+                                fetchUserProfileForDoneCard(d.id, q.completedBy);
+                            }
                         }
 
                         const c = document.createElement("div");
@@ -7780,6 +7794,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                             <div style="font-weight:bold;margin-top:5px; font-size:1.05em; color:#333;">${q.title}</div>
                             ${timersHtml}
                             <div style="margin-top:10px;">${descHtml}</div>
+                            ${countdownHtml}
                             ${userProfileHtml}
                             <div style="display:flex; gap:5px; margin-top:5px;">${btn}${chatBtn}</div>
                         `;
@@ -7846,6 +7861,8 @@ async function fetchUserProfileForDoneCard(cardId, userId) {
 
 function updateRealtimeTimers() {
     const now = Date.now();
+    
+    // Update global timers
     document.querySelectorAll('.timer-global').forEach(el => {
         const d = parseInt(el.dataset.dead);
         const diff = d - now;
@@ -7859,6 +7876,54 @@ function updateRealtimeTimers() {
             // If less than 1 hour, show seconds
             if (h === 0) el.innerText = `⏳ Ends: ${m}m ${s}s`;
             else el.innerText = `⏳ Ends: ${h}h ${m}m`;
+        }
+    });
+    
+    // Update Done card countdowns and handle auto-archive
+    document.querySelectorAll('.done-countdown').forEach(el => {
+        const expiryTime = parseInt(el.dataset.expiry);
+        const cardId = el.dataset.cardId;
+        const diff = expiryTime - now;
+        
+        if (diff <= 0) {
+            // Time expired - auto-archive
+            el.innerHTML = `<i class="fa-solid fa-archive"></i> <span class="countdown-text">Archived</span>`;
+            el.style.background = "#f8d7da";
+            el.style.borderColor = "#f5c6cb";
+            el.style.color = "#721c24";
+            
+            // Auto-archive the card
+            archiveDoneCard(cardId);
+        } else {
+            // Update countdown display
+            const h = Math.floor(diff / 3600000);
+            const m = Math.floor((diff % 3600000) / 60000);
+            const s = Math.floor((diff % 60000) / 1000);
+            
+            let timeText;
+            if (h > 0) {
+                timeText = `${h}h ${m}m ${s}s`;
+            } else if (m > 0) {
+                timeText = `${m}m ${s}s`;
+            } else {
+                timeText = `${s}s`;
+            }
+            
+            const timerEl = el.querySelector('.countdown-timer');
+            if (timerEl) {
+                timerEl.innerText = timeText;
+            }
+            
+            // Change color as time gets shorter
+            if (diff < 3600000) { // Less than 1 hour
+                el.style.background = "#f8d7da";
+                el.style.borderColor = "#f5c6cb";
+                el.style.color = "#721c24";
+            } else if (diff < 14400000) { // Less than 4 hours
+                el.style.background = "#fff3cd";
+                el.style.borderColor = "#ffeaa7";
+                el.style.color = "#856404";
+            }
         }
     });
 }
@@ -7875,17 +7940,24 @@ function toggleSqDesc(id) {
     }
 }
 
-async function upSQ(id, s) { 
-    if (confirm("Move?")) {
-        const updateData = { status: s };
-        // Set completedBy when moving to Done status
-        if (s === "Done") {
-            updateData.completedBy = userId;
-            updateData.completedAt = firebase.firestore.FieldValue.serverTimestamp();
-        }
-        await db.collection("side_quests").doc(id).update(updateData);
+// ── Auto-Archive Done Cards (24h countdown) ──
+async function archiveDoneCard(cardId) {
+    try {
+        console.log(`[ARCHIVE] Auto-archiving Done card: ${cardId}`);
+        
+        // Update the card status to 'Archived' and remove from active view
+        await db.collection("side_quests").doc(cardId).update({
+            status: 'Archived',
+            archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            archivedBy: 'system'
+        });
+        
+        console.log(`[ARCHIVE] Successfully archived card: ${cardId}`);
+    } catch (error) {
+        console.error(`[ARCHIVE] Error archiving card ${cardId}:`, error);
     }
 }
+
         let chatUnsub;
         function openChat(id, title) {
             document.getElementById('chatModal').style.display = 'flex';
