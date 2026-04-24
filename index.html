@@ -966,6 +966,43 @@
             color: #15803d;
         }
 
+        /* ── Work Tabs (V90.98) ────────────────────────────────── */
+        .work-tabs-bar {
+            display: flex;
+            background: #f0fff4;
+            padding: 8px 15px;
+            gap: 8px;
+            border-bottom: 1px solid #bbf7d0;
+        }
+        .work-tab-btn {
+            flex: 1;
+            padding: 10px 5px;
+            border: none;
+            background: transparent;
+            color: #28a745;
+            font-size: 0.85em;
+            font-weight: 700;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            opacity: 0.55;
+        }
+        .work-tab-btn i { font-size: 1.2em; }
+        .work-tab-btn.active {
+            background: white;
+            color: #28a745;
+            opacity: 1;
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.15);
+        }
+        .work-tab-pane { display: none; animation: fadeIn 0.25s ease; }
+        .work-tab-pane.active { display: block; }
+        .work-pane-shell { padding: 20px; }
+        /* ── end Work Tabs ──────────────────────────────────── */
+
         /* ── Case Submit Step UI (V90.97) ─────────────────────── */
         .cs-step {
             margin-bottom: 18px;
@@ -1893,17 +1930,40 @@
                         <i id="work-section-icon" class="fa-solid fa-chevron-down" style="color: #28a745; transition: 0.3s; font-size: 0.9em;"></i>
                     </div>
                     <div id="work-section-content" style="display: none; border-top: 1px solid #f0f0f0; background: #fff;">
-                        <!-- Form -->
-                        <div style="padding: 20px; border-bottom: 1px solid #f9f9f9;">
-                            <h5 style="margin-top:0; color:#28a745;"><i class="fa-solid fa-plus-circle"></i> Submit New Work</h5>
-                            <input type="text" id="w-title" placeholder="Work Title...">
-                            <input type="url" id="w-link" placeholder="Work Link (Optional)...">
-                            <button class="btn-success" onclick="submitWork()" style="width:100%; font-weight:bold; border-radius:12px; height:45px;">Submit Work</button>
+                        <!-- Tab bar -->
+                        <div class="work-tabs-bar">
+                            <button class="work-tab-btn active" id="wtab-submit" onclick="switchWorkTab('submit')">
+                                <i class="fa-solid fa-upload"></i>
+                                Submit
+                            </button>
+                            <button class="work-tab-btn" id="wtab-history" onclick="switchWorkTab('history')">
+                                <i class="fa-solid fa-clock-rotate-left"></i>
+                                History
+                            </button>
                         </div>
-                        <!-- History -->
-                        <div style="padding: 20px; background: #f9fdf9;">
-                            <h5 style="margin-top:0; color:#333;"><i class="fa-solid fa-clock-rotate-left"></i> Work Submission History</h5>
-                            <div id="work-list"></div>
+
+                        <!-- Submit pane -->
+                        <div id="work-pane-submit" class="work-tab-pane active">
+                            <div class="work-pane-shell">
+                                <div style="margin-bottom:12px;">
+                                    <label style="font-size:0.8em; font-weight:700; color:#28a745; display:block; margin-bottom:5px;">📌 Work Title*</label>
+                                    <input type="text" id="w-title" placeholder="Work Title..." style="margin:0;">
+                                </div>
+                                <div style="margin-bottom:16px;">
+                                    <label style="font-size:0.8em; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">🔗 Work Link</label>
+                                    <input type="url" id="w-link" placeholder="https://..." style="margin:0;">
+                                </div>
+                                <button class="btn-success" onclick="submitWork()" style="width:100%; font-weight:bold; border-radius:12px; height:48px;">
+                                    🚀 Submit Work
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- History pane -->
+                        <div id="work-pane-history" class="work-tab-pane">
+                            <div class="work-pane-shell" style="background:#f9fdf9;">
+                                <div id="work-list"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -7178,6 +7238,13 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
         }
 
         // --- Work Submission (Notify Fix) ---
+        function switchWorkTab(tab) {
+            ['submit', 'history'].forEach(t => {
+                document.getElementById(`wtab-${t}`)?.classList.toggle('active', t === tab);
+                document.getElementById(`work-pane-${t}`)?.classList.toggle('active', t === tab);
+            });
+        }
+
         async function submitWork() {
             const t = document.getElementById('w-title').value.trim();
             const l = document.getElementById('w-link').value.trim();
@@ -7210,9 +7277,9 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     }
                 }
 
-                alert("Work submitted successfully");
                 document.getElementById('w-title').value = "";
                 document.getElementById('w-link').value = "";
+                switchWorkTab('history'); // Switch to History tab after submit
             } catch (e) {
                 alert("Error: " + e.message);
             } finally {
