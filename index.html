@@ -7748,7 +7748,9 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
 
                         // Add user profile for Done cards
                         let userProfileHtml = "";
+                        console.log(`[DEBUG] Card ${d.id}: status=${q.status}, completedBy=${q.completedBy}`);
                         if (q.status === "Done" && q.completedBy) {
+                            console.log(`[DEBUG] Creating profile HTML for Done card ${d.id}`);
                             userProfileHtml = `
                                 <div style="display:flex; align-items:center; gap:8px; margin-top:10px; padding:8px; background:#f8f9fa; border-radius:6px; border-left:3px solid #28a745;">
                                     <img src="https://via.placeholder.com/40/28a745/FFFFFF/?text=✓" 
@@ -7763,6 +7765,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                             `;
                             
                             // Fetch user profile data
+                            console.log(`[DEBUG] Calling fetchUserProfileForDoneCard for card ${d.id}, user ${q.completedBy}`);
                             fetchUserProfileForDoneCard(d.id, q.completedBy);
                         }
 
@@ -7801,21 +7804,31 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
 
 // ── Fetch User Profile for Done Cards ──
 async function fetchUserProfileForDoneCard(cardId, userId) {
+    console.log(`[DEBUG] Fetching profile for card ${cardId}, user ${userId}`);
     try {
         const userDoc = await db.collection("users").doc(userId).get();
+        console.log(`[DEBUG] User doc exists: ${userDoc.exists}`);
         if (userDoc.exists) {
             const userData = userDoc.data();
+            console.log(`[DEBUG] User data:`, userData);
             const profileImg = document.getElementById(`profile-${cardId}`);
             const profileName = document.getElementById(`profile-name-${cardId}`);
             
+            console.log(`[DEBUG] Profile elements found:`, { profileImg: !!profileImg, profileName: !!profileName });
+            
             if (profileImg) {
-                profileImg.src = userData.pictureUrl || "https://via.placeholder.com/40/28a745/FFFFFF/?text=✓";
+                const pictureUrl = userData.pictureUrl || "https://via.placeholder.com/40/28a745/FFFFFF/?text=✓";
+                console.log(`[DEBUG] Setting profile image src to:`, pictureUrl);
+                profileImg.src = pictureUrl;
             }
             
             if (profileName) {
-                profileName.innerText = userData.displayName || "Unknown User";
+                const displayName = userData.displayName || "Unknown User";
+                console.log(`[DEBUG] Setting profile name to:`, displayName);
+                profileName.innerText = displayName;
             }
         } else {
+            console.log(`[DEBUG] User not found for ID: ${userId}`);
             // User not found, show placeholder
             const profileName = document.getElementById(`profile-name-${cardId}`);
             if (profileName) {
