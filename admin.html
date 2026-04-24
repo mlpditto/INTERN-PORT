@@ -4,15 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.24</title>
-    <!-- [Version: V91.24] Exclusive Analytics Modal Fix -->
-    <!-- Release: 2026-04-24 07:45 UTC+7 -->
+    <title>Nika V91.25</title>
+    <!-- [Version: V91.25] Admin Google Login Recovery -->
+    <!-- Release: 2026-04-24 08:25 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
     <script>
-        // Force unregister service workers to fix persistent caching issues ([Version: V91.24])
+        // Force unregister service workers to fix persistent caching issues ([Version: V91.25])
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for(let registration of registrations) { registration.unregister(); }
@@ -21,7 +21,7 @@
     </script>
 
     <script>
-        // [Version: V91.24] Reconstructed helper with exclusive modal and parent visibility support
+        // [Version: V91.25] Reconstructed helper with exclusive modal and parent visibility support
         function forceShowModal(id, displayType) {
             const m = document.getElementById(id);
             if (!m) { console.error('forceShowModal: not found:', id); return; }
@@ -115,7 +115,7 @@
                 if (typeof showToast === 'function') showToast(`🤖 Model set to: ${el.innerText}`);
             }
         };
-        // [Version: V91.24] Early definition to prevent ReferenceError
+        // [Version: V91.25] Early definition to prevent ReferenceError
         window.switchHubMode = window.switchHubMode || function(mode) { console.warn('switchHubMode not yet fully loaded:', mode); };
 
     </script>
@@ -3477,7 +3477,7 @@
             <p style="color:#666; font-size:0.9em; margin-bottom:20px;">Internal Use Only</p>
 
             <!-- Magic Link UI -->
-            <input type="email" id="email-input" value="" placeholder="Enter Admin Email" style="margin-bottom:10px;">
+            <input type="email" id="email-input" value="medlifeplus@gmail.com" placeholder="Enter Admin Email" style="margin-bottom:10px;">
             <button class="magic-btn" onclick="sendMagicLink()" style="width:100%;">
                 ✨ Send Login Link
             </button>
@@ -3518,7 +3518,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; background:linear-gradient(135deg, #f59e0b, #ef4444); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.6em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         ☀️ Nika
-                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.24</span>
+                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.25</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -10836,7 +10836,7 @@ Do not include any explanation other than the feedback body.`;
         const MY_URL = window.location.origin + window.location.pathname; // [Version: V88.64] Auto-detect current URL for GitHub Pages/Firebase compatibility
 
         var auth = firebase.auth();
-        const GOOGLE_REDIRECT_TIMEOUT_MS = 4500;
+        const GOOGLE_POPUP_TIMEOUT_MS = 7000;
 
         var usersData = [], worksData = [], casesData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {}, questsSubList = [];
         var knowledgeBaseCache = []; // Required by PDF-to-Quiz and Research grounding
@@ -11029,20 +11029,6 @@ Do not include any explanation other than the feedback body.`;
         // 🔥 Google Sign-In Logic
         let googleLoginInProgress = false;
 
-        auth.getRedirectResult()
-            .then((result) => {
-                if (result && result.user) {
-                    console.log("Google Redirect Login Success:", result.user.email || result.user.uid);
-                }
-            })
-            .catch((error) => {
-                console.error("Google Redirect Result Error:", error);
-                const loginErrorEl = document.getElementById('login-error');
-                if (loginErrorEl) loginErrorEl.innerText = "Google Redirect Error: " + error.message;
-                googleLoginInProgress = false;
-                setGoogleLoginButtonState(false);
-            });
-
         function setGoogleLoginButtonState(isLoading) {
             const btn = document.querySelector('#login-screen .btn-google');
             if (!btn) return;
@@ -11067,38 +11053,33 @@ Do not include any explanation other than the feedback body.`;
 
             const provider = new firebase.auth.GoogleAuthProvider();
             provider.setCustomParameters({ prompt: 'select_account' });
-            const resetIfRedirectStalls = setTimeout(() => {
+            const resetIfPopupStalls = setTimeout(() => {
                 googleLoginInProgress = false;
                 setGoogleLoginButtonState(false);
                 const loginErrorEl = document.getElementById('login-error');
+                const emailEl = document.getElementById('email-input');
+                if (emailEl) emailEl.value = ALLOWED_EMAIL;
                 if (loginErrorEl) {
-                    loginErrorEl.innerText = 'Google redirect did not start. Please use Send Login Link or try Google again in Chrome/Safari.';
+                    loginErrorEl.innerText = 'Google sign-in is blocked or still waiting. Use Send Login Link above, or allow popups and click Google again.';
                 }
-            }, GOOGLE_REDIRECT_TIMEOUT_MS);
+            }, GOOGLE_POPUP_TIMEOUT_MS);
             try {
-                auth.signInWithRedirect(provider).catch((error) => {
-                    clearTimeout(resetIfRedirectStalls);
-                    googleLoginInProgress = false;
-                    setGoogleLoginButtonState(false);
-                    const loginErrorEl = document.getElementById('login-error');
-                    const code = error && error.code ? error.code : '';
-                    if (code === 'auth/redirect-cancelled-by-user' || code === 'auth/cancelled-popup-request') {
-                        const msg = 'Google sign-in was cancelled. Please click Google again when ready.';
-                        console.warn("Google Redirect Cancelled:", error);
-                        if (loginErrorEl) loginErrorEl.innerText = msg;
-                    } else {
-                        console.error("Google Login Error:", error);
-                        alert("Google Login Error: " + error.message);
-                        if (loginErrorEl) loginErrorEl.innerText = "Google Error: " + error.message;
-                    }
-                });
+                const result = await auth.signInWithPopup(provider);
+                clearTimeout(resetIfPopupStalls);
+                console.log("Google Login Success:", result.user.email);
             } catch (error) {
-                clearTimeout(resetIfRedirectStalls);
+                clearTimeout(resetIfPopupStalls);
                 const loginErrorEl = document.getElementById('login-error');
+                const emailEl = document.getElementById('email-input');
+                if (emailEl) emailEl.value = ALLOWED_EMAIL;
                 const code = error && error.code ? error.code : '';
-                if (code === 'auth/redirect-cancelled-by-user' || code === 'auth/cancelled-popup-request') {
-                    const msg = 'Google sign-in was cancelled. Please click Google again when ready.';
-                    console.warn("Google Redirect Cancelled:", error);
+                if (code === 'auth/popup-blocked' || code === 'auth/cancelled-popup-request') {
+                    const msg = 'Google popup was blocked. Use Send Login Link above, or allow popups and click Google again.';
+                    console.warn("Google Login Popup Blocked:", error);
+                    if (loginErrorEl) loginErrorEl.innerText = msg;
+                } else if (code === 'auth/popup-closed-by-user') {
+                    const msg = 'Google sign-in was closed before completion. Please click Google again when ready.';
+                    console.warn("Google Login Popup Closed:", error);
                     if (loginErrorEl) loginErrorEl.innerText = msg;
                 } else {
                     console.error("Google Login Error:", error);
@@ -25020,7 +25001,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
         window.AI_CORE_READY = true;
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V91.24 loaded OK (Exclusive Analytics Modal Fix) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V91.25 loaded OK (Admin Google Login Recovery) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
 
         // --- [Version: V90.36] Quiz Feedback Panel ---
         let _qfpCurrentId = null;
