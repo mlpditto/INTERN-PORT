@@ -8376,6 +8376,49 @@
         </div>
     </div>
 
+    <!-- Quest Review Bonus Modal -->
+    <div id="questReviewBonusModal" class="modal" style="z-index:4303;">
+        <div class="modal-content case-score-modal-shell" style="border-color:rgba(99,102,241,0.28); background:linear-gradient(180deg,#fafafe 0%,#ffffff 100%);">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+                <div>
+                    <div style="font-size:1.08em; color:#3730a3; font-weight:900;">Review Quest Submission</div>
+                    <div id="quest-review-bonus-subtitle" style="margin-top:4px; font-size:0.84em; color:#78716c; line-height:1.5;"></div>
+                </div>
+                <button type="button" onclick="closeQuestReviewBonusModal(false)" style="border:none; background:transparent; color:#475569; font-size:1.45em; line-height:1; cursor:pointer;">&times;</button>
+            </div>
+
+            <div id="quest-review-bonus-meta" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0 4px;">
+                <div style="background:#ede9fe; border-radius:12px; padding:10px 12px;">
+                    <div style="font-size:0.72em; color:#5b21b6; font-weight:800; text-transform:uppercase;">Base Score</div>
+                    <div id="quest-review-base-score" style="font-size:1.3em; font-weight:900; color:#3730a3; margin-top:2px;">-</div>
+                </div>
+                <div style="background:#f0fdf4; border-radius:12px; padding:10px 12px;">
+                    <div style="font-size:0.72em; color:#166534; font-weight:800; text-transform:uppercase;">User</div>
+                    <div id="quest-review-user-name" style="font-size:1em; font-weight:900; color:#14532d; margin-top:2px; word-break:break-word;">-</div>
+                </div>
+            </div>
+
+            <div style="font-size:0.82em; color:#64748b; margin-bottom:6px; font-style:italic;" id="quest-review-question-text"></div>
+
+            <div style="font-weight:800; color:#374151; font-size:0.9em; margin-bottom:6px;">Quick Bonus</div>
+            <div class="case-score-chip-row">
+                <button type="button" class="case-score-chip quest-bonus-chip" data-score="-0.5" onclick="setQuestBonusValue(-0.5)" style="border-color:#f43f5e; background:#fff1f2; color:#be123c;">-0.5</button>
+                <button type="button" class="case-score-chip quest-bonus-chip" data-score="0" onclick="setQuestBonusValue(0)">0</button>
+                <button type="button" class="case-score-chip quest-bonus-chip" data-score="0.1" onclick="setQuestBonusValue(0.1)">+0.1</button>
+                <button type="button" class="case-score-chip quest-bonus-chip" data-score="0.5" onclick="setQuestBonusValue(0.5)">+0.5</button>
+                <button type="button" class="case-score-chip quest-bonus-chip" data-score="1" onclick="setQuestBonusValue(1)">+1.0</button>
+            </div>
+
+            <label for="quest-review-bonus-input" style="display:block; margin-bottom:8px; font-weight:800; color:#374151;">Custom Bonus <span style="font-weight:400; color:#94a3b8;">(can be negative)</span></label>
+            <input id="quest-review-bonus-input" type="number" step="0.1" inputmode="decimal" placeholder="0" style="margin:0; border-radius:14px; border-color:rgba(99,102,241,0.4);" oninput="syncQuestBonusChips()" onkeydown="if(event.key==='Enter'){event.preventDefault();closeQuestReviewBonusModal(true);}">
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px; flex-wrap:wrap;">
+                <button type="button" class="btn-sm" onclick="closeQuestReviewBonusModal(false)" style="min-width:96px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Cancel</button>
+                <button type="button" class="btn-sm" onclick="closeQuestReviewBonusModal(true)" style="min-width:110px; background:linear-gradient(135deg,#6366f1,#4f46e5); color:#fff; border:none; border-radius:12px; padding:10px 18px; font-weight:900;">Confirm & Award</button>
+            </div>
+        </div>
+    </div>
+
     <div id="caseReviewScoreModal" class="modal" style="z-index:4302;">
         <div class="modal-content case-score-modal-shell">
             <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
@@ -25896,15 +25939,59 @@ ${comment}
             }
         }
 
+        window.questReviewBonusModalState = { resolver: null };
+
+        function syncQuestBonusChips() {
+            const inputEl = document.getElementById('quest-review-bonus-input');
+            const current = inputEl ? Number(String(inputEl.value || '').trim()) : NaN;
+            document.querySelectorAll('#questReviewBonusModal .quest-bonus-chip').forEach(btn => {
+                btn.classList.toggle('active', Number.isFinite(current) && Number(btn.dataset.score) === current);
+            });
+        }
+
+        function setQuestBonusValue(value) {
+            const inputEl = document.getElementById('quest-review-bonus-input');
+            if (!inputEl) return;
+            inputEl.value = Number(value).toFixed(1);
+            syncQuestBonusChips();
+        }
+
+        function closeQuestReviewBonusModal(shouldSubmit) {
+            const state = window.questReviewBonusModalState || {};
+            const inputEl = document.getElementById('quest-review-bonus-input');
+            const resolver = typeof state.resolver === 'function' ? state.resolver : null;
+            const rawValue = inputEl ? String(inputEl.value || '').trim() : '';
+            window.questReviewBonusModalState = { resolver: null };
+            forceHideModal('questReviewBonusModal');
+            if (resolver) resolver(shouldSubmit ? rawValue : null);
+        }
+
+        function openQuestReviewBonusModal(sub, q, u) {
+            return new Promise(resolve => {
+                window.questReviewBonusModalState = { resolver: resolve };
+                const subtitleEl = document.getElementById('quest-review-bonus-subtitle');
+                const questionEl = document.getElementById('quest-review-question-text');
+                const baseEl = document.getElementById('quest-review-base-score');
+                const userEl = document.getElementById('quest-review-user-name');
+                const inputEl = document.getElementById('quest-review-bonus-input');
+                if (subtitleEl) subtitleEl.textContent = q ? (q.questId || q.id || '') : '';
+                if (questionEl) questionEl.textContent = q ? q.question : '';
+                if (baseEl) baseEl.textContent = q ? `${q.baseScore} pts` : '-';
+                if (userEl) userEl.textContent = u.displayName || u.id || '-';
+                if (inputEl) { inputEl.value = '0'; syncQuestBonusChips(); setTimeout(() => inputEl.focus(), 40); }
+                forceShowModal('questReviewBonusModal');
+            });
+        }
+
         async function reviewQuestSubmission(subId) {
             const sub = questsSubList.find(x => x.id === subId);
             if (!sub) return;
             const q = questsCache.find(x => x.id === sub.questId);
             const u = usersData.find(x => x.id === sub.userId) || {};
-            
-            const bonusStr = prompt(`Reviewing Quest: ${q ? q.question : '?'}\nUser: ${u.displayName}\n\nBase Score: ${q ? q.baseScore : '?'}\nEnter Bonus (can be negative or zero):`, "0");
+
+            const bonusStr = await openQuestReviewBonusModal(sub, q, u);
             if (bonusStr === null) return;
-            
+
             const bonus = parseFloat(bonusStr) || 0;
             try {
                 await db.collection("quest_submissions").doc(subId).update({
