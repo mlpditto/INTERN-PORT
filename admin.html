@@ -8459,7 +8459,13 @@
                         <textarea id="alabasta-case-card-original" readonly class="alabasta-casecard-textarea readonly" style="min-height:130px; border-color:#e5e7eb;"></textarea>
                     </div>
                     <div class="alabasta-visual-card">
-                        <label class="alabasta-visual-label" for="alabasta-case-card-prompt">GenMage Prompt</label>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;">
+                            <label class="alabasta-visual-label" for="alabasta-case-card-prompt" style="margin:0;">GenMage Prompt</label>
+                            <button type="button" id="alabasta-case-card-refine-btn" onclick="refineAlabastaCaseCardPromptWithClaude()" title="Refine this GenMage prompt with Claude"
+                                style="border:none; border-radius:12px; padding:7px 12px; background:linear-gradient(135deg,#7c3aed,#ec4899); color:white; font-weight:900; font-size:0.78em; cursor:pointer; display:inline-flex; align-items:center; gap:7px; box-shadow:0 8px 18px rgba(124,58,237,0.18); white-space:nowrap;">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> AI Refine
+                            </button>
+                        </div>
                         <textarea id="alabasta-case-card-prompt" class="alabasta-casecard-textarea" style="min-height:130px;"></textarea>
                         <div class="alabasta-casecard-note">Optimized for clearer English copy, minimal clutter, and better infographic readability.</div>
                     </div>
@@ -17916,6 +17922,12 @@ async function saveQuiz() {
             const safeSummary = safeNote
                 ? `Educational case summary: ${safeNote}`
                 : `Educational case summary for ${taxonomy.primarySystemLabel} with tags: ${taxonomy.symptomTags.join(', ') || 'not specified'}.`;
+            const title = taxonomy.primarySystemLabel && taxonomy.primarySystemLabel !== 'Other'
+                ? `${taxonomy.primarySystemLabel} Case Brief`
+                : 'Medical Case Brief';
+            const subtitle = taxonomy.symptomTags.length
+                ? taxonomy.symptomTags.slice(0, 3).join(' / ')
+                : 'Privacy-safe clinical learning summary';
 
             return {
                 visualMode: 'educational_case_card',
@@ -17926,13 +17938,59 @@ async function saveQuiz() {
                 taxonomySummary: taxonomy.taxonomySummary,
                 safeSummary,
                 stylePreset: 'Miss Goldenweek / clean medical infographic',
+                imageBrief: {
+                    format: 'high-quality medical infographic poster',
+                    audience: 'pharmacy interns and clinical reviewers',
+                    language: 'English',
+                    layout: 'clean two-column infographic with a bottom review section',
+                    aspectRatio: 'square or portrait',
+                    tone: 'professional, calm, educational, patient-safe'
+                },
+                textContent: {
+                    title,
+                    subtitle,
+                    leftColumnTitle: 'Case Snapshot',
+                    rightColumnTitle: 'Clinical Review Cues',
+                    bottomSectionTitle: 'Counseling and Follow-up Points'
+                },
+                visualRequirements: [
+                    'perfect typography',
+                    'sharp readable English text',
+                    'no spelling errors',
+                    'clean infographic layout',
+                    'clear hierarchy',
+                    'minimal clutter',
+                    'balanced spacing',
+                    'warm medical editorial style'
+                ],
+                negativePrompt: [
+                    'no real patient photo',
+                    'no ID card',
+                    'no hospital form',
+                    'no prescription label with personal data',
+                    'no tiny unreadable text',
+                    'no misspelled medical terms',
+                    'no crowded poster',
+                    'no graphic or scary medical imagery'
+                ],
                 forbiddenIdentifiers: ['HN', 'case number', 'customer name', 'patient name', 'LINE name', 'user id', 'phone', 'email']
             };
         }
 
         function buildAlabastaCaseCardPrompt(payload) {
+            const textContent = payload.textContent || {};
+            const imageBrief = payload.imageBrief || {};
+            const visualRequirements = Array.isArray(payload.visualRequirements) ? payload.visualRequirements : [];
+            const negativePrompt = Array.isArray(payload.negativePrompt) ? payload.negativePrompt : [];
             return [
-                'Create a short educational visual case summary card for admin review.',
+                `Create a ${imageBrief.format || 'high-quality medical infographic poster'} about a privacy-safe educational medical case.`,
+                '',
+                'Text content:',
+                `Title: ${textContent.title || 'Medical Case Brief'}`,
+                `Subtitle: ${textContent.subtitle || 'Privacy-safe clinical learning summary'}`,
+                `Left column title: ${textContent.leftColumnTitle || 'Case Snapshot'}`,
+                `Right column title: ${textContent.rightColumnTitle || 'Clinical Review Cues'}`,
+                `Bottom section: ${textContent.bottomSectionTitle || 'Counseling and Follow-up Points'}`,
                 '',
                 `Primary system: ${payload.primarySystemLabel}`,
                 `Symptom tags: ${payload.symptomTags.length ? payload.symptomTags.join(', ') : 'not specified'}`,
@@ -17942,13 +18000,17 @@ async function saveQuiz() {
                 '- Clean medical infographic card',
                 '- Warm Alabasta theme with Miss Goldenweek visual direction',
                 '- English language with concise headings',
-                '- 1-page educational card, square or portrait layout',
+                `- ${imageBrief.layout || '1-page educational card, square or portrait layout'}`,
                 '- Focus on learning points, symptom pattern, counseling points, and review cues',
+                ...visualRequirements.map(item => `- ${item}`),
                 '',
                 'Privacy requirements:',
                 '- Do not include HN, Ref No., case number, customer name, patient name, user name, LINE name, phone, email, or any identifier',
                 '- Do not invent patient identity',
-                '- Keep the content educational and anonymized'
+                '- Keep the content educational and anonymized',
+                '',
+                'Avoid:',
+                ...negativePrompt.map(item => `- ${item}`)
             ].join('\n');
         }
 
@@ -18006,6 +18068,77 @@ async function saveQuiz() {
             return prompt;
         }
 
+        async function refineAlabastaCaseCardPromptWithClaude() {
+            const safeSummaryEl = document.getElementById('alabasta-case-card-safe-summary');
+            const taxonomyEl = document.getElementById('alabasta-case-card-taxonomy');
+            const safePayloadEl = document.getElementById('alabasta-case-card-safe-payload');
+            const promptEl = document.getElementById('alabasta-case-card-prompt');
+            const metaEl = document.getElementById('alabasta-case-card-meta');
+            const refineBtn = document.getElementById('alabasta-case-card-refine-btn');
+            if (!safeSummaryEl || !taxonomyEl || !safePayloadEl || !promptEl) return;
+
+            const safeSummary = String(safeSummaryEl.value || '').trim();
+            const taxonomySummary = String(taxonomyEl.value || '').trim();
+            const currentPrompt = String(promptEl.value || '').trim() || await rebuildAlabastaCaseCardPromptFromInputs({ quiet: true });
+            if (!safeSummary || !currentPrompt) return alert('Safe summary and GenMage prompt are required before AI Refine.');
+
+            const safePayload = (typeof safeJsonParse === 'function')
+                ? safeJsonParse(safePayloadEl.value)
+                : JSON.parse(safePayloadEl.value || '{}');
+            const originalHtml = refineBtn ? refineBtn.innerHTML : '';
+
+            const refinePrompt = [
+                'You are refining a privacy-safe medical infographic image prompt.',
+                'Return only the final English image-generation prompt. Do not explain your work.',
+                '',
+                'Inputs:',
+                '1) Anonymized Summary:',
+                safeSummary,
+                '',
+                '2) Taxonomy Summary:',
+                taxonomySummary || 'Not specified',
+                '',
+                '3) Safe Payload JSON:',
+                JSON.stringify(safePayload || {}, null, 2),
+                '',
+                '4) Current GenMage Prompt:',
+                currentPrompt,
+                '',
+                'Task:',
+                '- Rewrite these into one concise English prompt for an image generation model.',
+                '- Start with: Create a high-quality medical infographic poster about ...',
+                '- Include visible text sections when useful: Title, Subtitle, Left column title, Right column title, Bottom section.',
+                '- Preserve privacy. Do not include HN, Ref No., case number, customer name, patient name, LINE name, user ID, phone, email, or any identifier.',
+                '- Do not invent patient identity or extra clinical facts.',
+                '- Keep the wording short enough to render clearly inside a poster.',
+                '- Explicitly request perfect typography, sharp readable text, no spelling errors, clean infographic layout, clear hierarchy, minimal clutter, and balanced spacing.',
+                '- Avoid real patient photos, ID cards, hospital forms, prescription labels with personal data, tiny unreadable text, misspelled medical terms, crowded posters, or graphic medical imagery.'
+            ].join('\n');
+
+            try {
+                if (refineBtn) {
+                    refineBtn.disabled = true;
+                    refineBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Refining';
+                }
+                if (metaEl) metaEl.textContent = 'Claude is refining the GenMage prompt...';
+                const { text, model } = await window.callUniversalAI('claude-3-5-sonnet-latest', refinePrompt);
+                const refinedPrompt = String(text || '').replace(/^```(?:text)?/i, '').replace(/```$/g, '').trim();
+                if (!refinedPrompt) throw new Error('Claude returned an empty prompt.');
+                promptEl.value = refinedPrompt;
+                if (metaEl) metaEl.textContent = `Claude-refined prompt ready${model ? ` (${model})` : ''}.`;
+                if (typeof showToast === 'function') showToast('GenMage prompt refined with Claude', 'success');
+            } catch (e) {
+                console.error('Failed to refine GenMage prompt with Claude:', e);
+                if (metaEl) metaEl.textContent = `AI Refine failed: ${e.message}`;
+                alert('AI Refine failed: ' + e.message);
+            } finally {
+                if (refineBtn) {
+                    refineBtn.disabled = false;
+                    refineBtn.innerHTML = originalHtml || '<i class="fa-solid fa-wand-magic-sparkles"></i> AI Refine';
+                }
+            }
+        }
+
         function setAlabastaCaseCardImageLoadingState(isLoading, modelLabel) {
             const imageWrap = document.getElementById('alabasta-case-card-image-wrap');
             const stageEl = document.getElementById('alabasta-case-card-image-stage');
@@ -18055,7 +18188,11 @@ async function saveQuiz() {
                 privacyStatus: payload.privacyStatus,
                 primarySystemKey: payload.primarySystemKey,
                 symptomTags: payload.symptomTags,
-                stylePreset: payload.stylePreset
+                stylePreset: payload.stylePreset,
+                imageBrief: payload.imageBrief,
+                textContent: payload.textContent,
+                visualRequirements: payload.visualRequirements,
+                negativePrompt: payload.negativePrompt
             }, null, 2);
             if (ids.original) ids.original.value = String(caseItem.note || '');
             if (ids.safeSummary) ids.safeSummary.value = payload.safeSummary;
@@ -18170,7 +18307,11 @@ async function saveQuiz() {
                         symptomTags: payload.symptomTags,
                         taxonomySummary: payload.taxonomySummary,
                         stylePreset: payload.stylePreset,
-                        privacyStatus: payload.privacyStatus
+                        privacyStatus: payload.privacyStatus,
+                        imageBrief: payload.imageBrief,
+                        textContent: payload.textContent,
+                        visualRequirements: payload.visualRequirements,
+                        negativePrompt: payload.negativePrompt
                     },
                     caseVisualPreparedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     caseVisualPreparedBy: ALLOWED_EMAIL || 'admin'
