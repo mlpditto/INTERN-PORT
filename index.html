@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V90.96)</title>
-    <!-- V90.96: UI Modernization & Localization (Case, Mission, Work, Voyage Metrics) -->
-    <!-- Release: 2026-04-18 12:00 UTC+7 -->
+    <title>Internship Portfolio (V91.34)</title>
+    <!-- V91.34: Progress Dashboard with User Profile Pictures in Done Cards -->
+    <!-- Release: 2026-04-25 03:30 UTC+7 -->
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -2335,7 +2335,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V90.96 (UI Modernization & Localization)
+                V91.34 (Progress Dashboard with User Profile Pictures)
             </div>
         </div>
     </div>
@@ -7746,6 +7746,26 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                             <div id="${descId}" style="display:none; font-size:0.85em;color:#666;margin-bottom:10px; white-space:pre-wrap; background:#fafafa; padding:10px; border-radius:6px; border:1px solid #eee;">${q.description}</div>
                         ` : "";
 
+                        // Add user profile for Done cards
+                        let userProfileHtml = "";
+                        if (q.status === "Done" && q.completedBy) {
+                            userProfileHtml = `
+                                <div style="display:flex; align-items:center; gap:8px; margin-top:10px; padding:8px; background:#f8f9fa; border-radius:6px; border-left:3px solid #28a745;">
+                                    <img src="https://via.placeholder.com/40/28a745/FFFFFF/?text=✓" 
+                                         style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:2px solid #28a745;"
+                                         id="profile-${d.id}"
+                                         onerror="this.src='https://via.placeholder.com/40/28a745/FFFFFF/?text=✓'">
+                                    <div style="flex:1;">
+                                        <div style="font-weight:600; color:#28a745; font-size:0.9em;">Completed by</div>
+                                        <div id="profile-name-${d.id}" style="color:#666; font-size:0.8em;">Loading...</div>
+                                    </div>
+                                </div>
+                            `;
+                            
+                            // Fetch user profile data
+                            fetchUserProfileForDoneCard(d.id, q.completedBy);
+                        }
+
                         const c = document.createElement("div");
                         c.className = `sq-card status-${q.status} ${scClass} ${isProj ? 'project' : ''}`;
                         c.innerHTML = `
@@ -7757,6 +7777,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                             <div style="font-weight:bold;margin-top:5px; font-size:1.05em; color:#333;">${q.title}</div>
                             ${timersHtml}
                             <div style="margin-top:10px;">${descHtml}</div>
+                            ${userProfileHtml}
                             <div style="display:flex; gap:5px; margin-top:5px;">${btn}${chatBtn}</div>
                         `;
                         cols[q.status].appendChild(c)
@@ -7778,40 +7799,80 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             }
         }
 
-        function updateRealtimeTimers() {
-            const now = Date.now();
-            document.querySelectorAll('.timer-global').forEach(el => {
-                const d = parseInt(el.dataset.dead);
-                const diff = d - now;
-                if (diff <= 0) {
-                    el.innerText = "⏳ Expired";
-                    el.style.color = "#999";
-                } else {
-                    const h = Math.floor(diff / 3600000);
-                    const m = Math.floor((diff % 3600000) / 60000);
-                    const s = Math.floor((diff % 60000) / 1000);
-                    // If less than 1 hour, show seconds
-                    if (h === 0) el.innerText = `⏳ Ends: ${m}m ${s}s`;
-                    else el.innerText = `⏳ Ends: ${h}h ${m}m`;
-                }
-            });
-        }
-
-        function toggleSqDesc(id) {
-            const el = document.getElementById(id);
-            const icon = document.getElementById('icon-' + id);
-            if (el.style.display === 'none') {
-                el.style.display = 'block';
-                if (icon) icon.className = "fa-solid fa-chevron-up";
-            } else {
-                el.style.display = 'none';
-                if (icon) icon.className = "fa-solid fa-chevron-down";
+// ── Fetch User Profile for Done Cards ──
+async function fetchUserProfileForDoneCard(cardId, userId) {
+    try {
+        const userDoc = await db.collection("users").doc(userId).get();
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            const profileImg = document.getElementById(`profile-${cardId}`);
+            const profileName = document.getElementById(`profile-name-${cardId}`);
+            
+            if (profileImg) {
+                profileImg.src = userData.pictureUrl || "https://via.placeholder.com/40/28a745/FFFFFF/?text=✓";
+            }
+            
+            if (profileName) {
+                profileName.innerText = userData.displayName || "Unknown User";
+            }
+        } else {
+            // User not found, show placeholder
+            const profileName = document.getElementById(`profile-name-${cardId}`);
+            if (profileName) {
+                profileName.innerText = "User Not Found";
             }
         }
+    } catch (error) {
+        console.error("Error fetching user profile for Done card:", error);
+        const profileName = document.getElementById(`profile-name-${cardId}`);
+        if (profileName) {
+            profileName.innerText = "Error Loading";
+        }
+    }
+}
 
-        async function upSQ(id, s) { if (confirm("Move?")) await db.collection("side_quests").doc(id).update({ status: s }) }
+function updateRealtimeTimers() {
+    const now = Date.now();
+    document.querySelectorAll('.timer-global').forEach(el => {
+        const d = parseInt(el.dataset.dead);
+        const diff = d - now;
+        if (diff <= 0) {
+            el.innerText = "⏳ Expired";
+            el.style.color = "#999";
+        } else {
+            const h = Math.floor(diff / 3600000);
+            const m = Math.floor((diff % 3600000) / 60000);
+            const s = Math.floor((diff % 60000) / 1000);
+            // If less than 1 hour, show seconds
+            if (h === 0) el.innerText = `⏳ Ends: ${m}m ${s}s`;
+            else el.innerText = `⏳ Ends: ${h}h ${m}m`;
+        }
+    });
+}
 
-        // --- Chat System ---
+function toggleSqDesc(id) {
+    const el = document.getElementById(id);
+    const icon = document.getElementById('icon-' + id);
+    if (el.style.display === 'none') {
+        el.style.display = 'block';
+        if (icon) icon.className = "fa-solid fa-chevron-up";
+    } else {
+        el.style.display = 'none';
+        if (icon) icon.className = "fa-solid fa-chevron-down";
+    }
+}
+
+async function upSQ(id, s) { 
+    if (confirm("Move?")) {
+        const updateData = { status: s };
+        // Set completedBy when moving to Done status
+        if (s === "Done") {
+            updateData.completedBy = userId;
+            updateData.completedAt = firebase.firestore.FieldValue.serverTimestamp();
+        }
+        await db.collection("side_quests").doc(id).update(updateData);
+    }
+}
         let chatUnsub;
         function openChat(id, title) {
             document.getElementById('chatModal').style.display = 'flex';
