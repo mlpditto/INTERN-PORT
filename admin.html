@@ -4,15 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.27</title>
-    <!-- [Version: V91.27] User Hub Quiz History Dedup -->
+    <title>Nika V91.28</title>
+    <!-- [Version: V91.28] Daily Quest Works History -->
     <!-- Release: 2026-04-24 08:40 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
     <script>
-        // Force unregister service workers to fix persistent caching issues ([Version: V91.27])
+        // Force unregister service workers to fix persistent caching issues ([Version: V91.28])
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for(let registration of registrations) { registration.unregister(); }
@@ -3518,7 +3518,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; background:linear-gradient(135deg, #f59e0b, #ef4444); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.6em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         ☀️ Nika
-                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.27</span>
+                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.28</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -19886,6 +19886,22 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return uniqueLogs;
         }
 
+        function getQuestLogDate(data) {
+            return data?.submittedAt || data?.reviewedAt || data?.receivedAt || data?.startedAt || data?.createdAt || data?.timestamp;
+        }
+
+        function getQuestLogTitle(data, fallback = 'Daily Quest') {
+            return data?.questTitle || data?.title || data?.question || fallback;
+        }
+
+        function toHubDate(dateObj) {
+            if (!dateObj) return null;
+            if (dateObj instanceof Date) return dateObj;
+            if (typeof dateObj.toDate === 'function') return dateObj.toDate();
+            const d = new Date(dateObj);
+            return Number.isNaN(d.getTime()) ? null : d;
+        }
+
         window.openUserHub = async function(userId, initialTab = 'activity') {
             window._currentPopupUser = userId;
             window._hubTagPage = 1;
@@ -19946,6 +19962,69 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         dash.qc++;
                     }
                 });
+
+                const questDisplayLogs = [];
+                let questReceiveScore = 0;
+                let questReceiveCount = 0;
+                let questReviewScore = 0;
+                let questReviewCount = 0;
+
+                questsSnap.forEach(doc => {
+                    const d = doc.data();
+                    const questTitle = getQuestLogTitle(d);
+                    const questDate = toHubDate(getQuestLogDate(d));
+                    const answer = d.answer || d.submission || d.content || '';
+                    const questExtra = {
+                        isQuest: true,
+                        questSubId: doc.id,
+                        questTitle,
+                        answer,
+                        questData: d
+                    };
+
+                    if (d.status !== 'none') {
+                        questReceiveScore += 0.1;
+                        questReceiveCount++;
+                        questDisplayLogs.push({
+                            t: questDate,
+                            type: 'work',
+                            text: `Daily Quest: ${questTitle}`,
+                            score: 0.1,
+                            questScoreKind: 'received',
+                            ...questExtra
+                        });
+                    }
+
+                    const reviewedScore = (d.earnedScore || 0) + (d.bonusGiven || 0);
+                    if (reviewedScore > 0) {
+                        questReviewScore += reviewedScore;
+                        questReviewCount++;
+                        questDisplayLogs.push({
+                            t: questDate,
+                            type: 'work',
+                            text: `Daily Quest Reviewed: ${questTitle}`,
+                            score: reviewedScore,
+                            questScoreKind: 'reviewed',
+                            ...questExtra
+                        });
+                    }
+                });
+
+                for (let i = allLogs.length - 1; i >= 0; i--) {
+                    const log = allLogs[i];
+                    const text = String(log.text || '');
+                    if (log.type === 'quest' || (log.type === 'bonus' && text.includes('Receive:'))) {
+                        allLogs.splice(i, 1);
+                    }
+                }
+
+                allLogs.push(...questDisplayLogs);
+                dash.bonus = Math.max(0, dash.bonus - questReceiveScore);
+                dash.bc = Math.max(0, dash.bc - questReceiveCount);
+                dash.quizzes = Math.max(0, dash.quizzes - questReviewScore);
+                dash.qc = Math.max(0, dash.qc - questReviewCount);
+                dash.works += questReceiveScore + questReviewScore;
+                dash.wc += questReceiveCount + questReviewCount;
 
                 const hubCaseReviewLogTextByDocId = {};
                 logsSnap.forEach(doc => { 
@@ -20101,10 +20180,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function getHubFilteredHistory() {
             const mode = window._hubHistoryFilter || 'all';
             if (mode === 'all') return historyCache;
-            if (mode === 'quizzes') return historyCache.filter(e => e.type === 'quiz' || e.type === 'quest');
-            if (mode === 'works') return historyCache.filter(e => e.type === 'work');
+            if (mode === 'quizzes') return historyCache.filter(e => e.type === 'quiz');
+            if (mode === 'works') return historyCache.filter(e => e.type === 'work' || e.isQuest);
             if (mode === 'logs') return historyCache.filter(e => e.type === 'reflective_log' || e.type === 'reflective_bonus');
-            if (mode === 'bonus') return historyCache.filter(e => e.type === 'bonus' || e.type === 'streak');
+            if (mode === 'bonus') return historyCache.filter(e => (e.type === 'bonus' && !e.isQuest && !String(e.text || '').includes('Quest Bonus')) || e.type === 'streak');
             if (mode === 'manual') return historyCache.filter(e => e.type === 'manual' || e.type === 'manual_adjust');
             return historyCache;
         }
@@ -21455,7 +21534,51 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         function showHubItemDetails(item) {
-            if (item.type === 'work' && item.workData) {
+            if (item.isQuest) {
+                const d = item.t ? item.t.toLocaleString('th-TH') : '-';
+                const detailsHtml = `
+                    <div style="padding:20px; border-radius:12px; background:white; border:1px solid #f1f5f9;">
+                        <h3 style="margin:0 0 15px 0; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:1.5em;">⚡</span> Daily Quest Submission
+                        </h3>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:15px;">
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #10b981;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Awarded Score</div>
+                                <div style="font-size:1.3em; font-weight:900; color:#10b981; margin-top:6px;">
+                                    ${(item.score || 0).toFixed(2)} pts
+                                </div>
+                            </div>
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #f59e0b;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Date</div>
+                                <div style="font-size:0.85em; color:#475569; margin-top:6px; font-weight:600;">
+                                    ${d}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:12px;">
+                            <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase; margin-bottom:8px;">Quest Title</div>
+                            <div style="color:#1e293b; font-weight:700; font-size:1em;">
+                                ${item.questTitle || 'Daily Quest'}
+                            </div>
+                        </div>
+                        ${item.answer ? `
+                            <div style="background:#eff6ff; padding:15px; border-radius:12px; border-left:4px solid #3b82f6; margin-bottom:12px;">
+                                <div style="font-size:0.75em; color:#1d4ed8; font-weight:700; text-transform:uppercase; margin-bottom:10px;">User Answer</div>
+                                <div style="color:#1e3a8a; font-size:0.95em; line-height:1.6; white-space:pre-wrap; font-family:inherit;">
+                                    ${item.answer}
+                                </div>
+                            </div>
+                        ` : `
+                            <div style="padding:15px; border-radius:12px; border:1px dashed #cbd5e1; color:#94a3b8; text-align:center; font-size:0.9em;">
+                                No submission content found in this log.
+                            </div>
+                        `}
+                    </div>
+                `;
+                const modal = document.getElementById('workDetailModal') || createWorkDetailModal();
+                document.getElementById('work-detail-content').innerHTML = detailsHtml;
+                modal.style.display = 'block';
+            } else if (item.type === 'work' && item.workData) {
                 const w = item.workData;
                 const d = w.timestamp ? w.timestamp.toDate().toLocaleString('th-TH') : '-';
                 const statusColor = w.status === 'ตรวจแล้ว' ? '#10b981' : w.status === 'ตรวจปฏิเสธ' ? '#ef4444' : '#f59e0b';
@@ -25116,7 +25239,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
         window.AI_CORE_READY = true;
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V91.27 loaded OK (User Hub Quiz History Dedup) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V91.28 loaded OK (Daily Quest Works History) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
 
         // --- [Version: V90.36] Quiz Feedback Panel ---
         let _qfpCurrentId = null;
