@@ -54,6 +54,7 @@
                 'alabastaPoneglyphModal', 
                 'editCaseNoteModal', 
                 'caseReviewScoreModal',
+                'progressNoteModal',
                 'aiStorytellerModal',
                 'liffPreviewModal',
                 'quickReviewModal'
@@ -421,6 +422,25 @@
         .alabasta-action-btn.is-delete {
             background: #ef4444;
         }
+        .alabasta-action-btn.is-progress-note { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+
+        .progress-note-modal-content { max-width:720px; width:94%; text-align:left; border-radius:24px; border:1px solid rgba(139,92,246,0.28); background:linear-gradient(180deg,#faf5ff 0%,#ffffff 100%); box-shadow:0 24px 60px rgba(15,23,42,0.22); padding:26px 26px 22px; max-height:90vh; overflow-y:auto; }
+        .progress-note-timeline { margin-top:20px; position:relative; padding-left:30px; }
+        .progress-note-timeline::before { content:''; position:absolute; left:10px; top:0; bottom:0; width:2px; background:linear-gradient(180deg,#8b5cf6,#e5e7eb); }
+        .progress-note-item { position:relative; margin-bottom:20px; background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+        .progress-note-item::before { content:''; position:absolute; left:-24px; top:20px; width:12px; height:12px; border-radius:50%; background:#8b5cf6; border:2px solid #fff; box-shadow:0 0 0 2px #8b5cf6; }
+        .progress-note-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+        .progress-note-author { display:flex; align-items:center; gap:8px; font-weight:700; color:#1f2937; }
+        .progress-note-author img { width:32px; height:32px; border-radius:50%; object-fit:cover; border:2px solid #8b5cf6; }
+        .progress-note-timestamp { font-size:0.78em; color:#9ca3af; }
+        .progress-note-content { font-size:0.9em; color:#374151; line-height:1.6; white-space:pre-wrap; }
+        .progress-note-actions { display:flex; gap:8px; margin-top:10px; justify-content:flex-end; }
+        .progress-note-empty { text-align:center; color:#9ca3af; padding:30px; font-size:0.9em; }
+        .progress-note-form { margin-bottom:16px; }
+        .progress-note-form textarea { width:100%; min-height:80px; padding:10px 14px; border:1.5px solid #c4b5fd; border-radius:12px; font-family:inherit; font-size:0.92em; resize:vertical; outline:none; box-sizing:border-box; transition:border-color 0.2s; }
+        .progress-note-form textarea:focus { border-color:#8b5cf6; box-shadow:0 0 0 3px rgba(139,92,246,0.12); }
+        .progress-note-attachments { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+        .progress-note-attachment { font-size:0.8em; background:#f3e8ff; color:#7c3aed; border:1px solid #e9d5ff; border-radius:6px; padding:3px 8px; text-decoration:none; }
 
         .edit-case-note-modal-content {
             max-width: 680px;
@@ -7785,6 +7805,41 @@
                     <button type="button" class="btn-sm" onclick="closeEditCaseNoteModal()" style="min-width:110px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Cancel</button>
                     <button type="button" id="edit-case-note-save-btn" class="btn-sm" onclick="saveEditedCaseNote()" style="min-width:150px; background:linear-gradient(135deg,#f59e0b,#ea580c); color:white; border:none; border-radius:12px; padding:10px 18px; font-weight:900; box-shadow:0 8px 20px rgba(234,88,12,0.22);"><i class="fa-solid fa-save"></i> Save Changes</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="progressNoteModal" class="modal" style="z-index:4301;">
+        <div class="modal-content progress-note-modal-content">
+            <span class="close-modal" onclick="closeProgressNoteModal()" style="top:14px; right:16px;">&times;</span>
+            <div class="edit-case-note-header" style="border-bottom-color:#c4b5fd;">
+                <div>
+                    <h3 style="margin:0; color:#7c3aed; font-size:1.45em; font-weight:900; display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-clipboard-list"></i> Progress Notes</h3>
+                    <div id="progress-note-subtitle" style="margin-top:6px; font-size:0.88em; color:#78716c;">Track progress and updates for this case.</div>
+                </div>
+                <span style="background:#faf5ff; color:#7c3aed; border:1px solid #c4b5fd; border-radius:999px; padding:6px 12px; font-size:0.76em; font-weight:800;">Alabasta</span>
+            </div>
+            <input type="hidden" id="progress-note-case-id">
+            <div style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:12px; margin-bottom:16px;">
+                <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px;">
+                    <div>
+                        <div style="font-size:0.72em; color:#6b7280; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">HN / Ref</div>
+                        <div id="progress-note-case-ref" style="margin-top:4px; color:#1f2937; font-weight:800;">-</div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.72em; color:#6b7280; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Disease</div>
+                        <div id="progress-note-disease" style="margin-top:4px; color:#1f2937; font-weight:800;">-</div>
+                    </div>
+                </div>
+            </div>
+            <div class="progress-note-form">
+                <textarea id="progress-note-input" placeholder="Add a progress note..."></textarea>
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+                    <button type="button" onclick="addProgressNote()" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed); color:white; border:none; border-radius:10px; padding:8px 16px; font-weight:900; cursor:pointer; box-shadow:0 4px 12px rgba(139,92,246,0.3);"><i class="fa-solid fa-plus"></i> Add Note</button>
+                </div>
+            </div>
+            <div id="progress-note-timeline" class="progress-note-timeline">
+                <div class="progress-note-empty">No progress notes yet. Add your first note above.</div>
             </div>
         </div>
     </div>
@@ -17104,7 +17159,8 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                 const hasPoneglyphLink = !!c.poneglyphNoteId;
                 const poneglyphBtn = `<button class="btn-sm alabasta-action-btn is-poneglyph" title="${hasPoneglyphLink ? 'Open linked Poneglyph draft' : 'Promote to Poneglyph'}" onclick="openAlabastaPoneglyph('${c.id}')"><span class="alabasta-emoji">🪨</span></button>`;
                 const deleteBtn = `<button class="btn-sm alabasta-action-btn is-delete" title="Delete case" onclick="deleteCaseSubmission('${c.id}')"><span class="alabasta-emoji">🗑️</span></button>`;
-                const actionBtn = `<div class="alabasta-action-row">${editBtn}${laboonBtn}${poneglyphBtn}${statusBtn}${deleteBtn}</div>`;
+                const progressNoteBtn = `<button class="btn-sm alabasta-action-btn is-progress-note" title="Progress Notes" onclick="openProgressNoteModal('${c.id}')"><span class="alabasta-emoji">📝</span></button>`;
+                const actionBtn = `<div class="alabasta-action-row">${editBtn}${laboonBtn}${poneglyphBtn}${progressNoteBtn}${statusBtn}${deleteBtn}</div>`;
 
                                 return `
                     <tr>
@@ -17325,6 +17381,107 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                             renderEditCaseTaxonomyCard();
 
                             forceShowModal('editCaseNoteModal');
+                        }
+
+                        function openProgressNoteModal(caseDocId) {
+                            const caseItem = casesData.find(c => c.id === caseDocId);
+                            if (!caseItem) { alert('Case not found'); return; }
+                            document.getElementById('progress-note-case-id').value = caseDocId;
+                            document.getElementById('progress-note-case-ref').textContent = caseItem.caseId || '-';
+                            document.getElementById('progress-note-disease').textContent = caseItem.disease || '-';
+                            document.getElementById('progress-note-input').value = '';
+                            loadProgressNotes(caseDocId);
+                            forceShowModal('progressNoteModal');
+                        }
+
+                        function closeProgressNoteModal() {
+                            document.getElementById('progressNoteModal').style.display = 'none';
+                        }
+
+                        async function loadProgressNotes(caseDocId) {
+                            const timelineEl = document.getElementById('progress-note-timeline');
+                            if (!timelineEl) return;
+                            try {
+                                const caseDoc = await db.collection('cases').doc(caseDocId).get();
+                                if (!caseDoc.exists) { timelineEl.innerHTML = '<div class="progress-note-empty">Case not found.</div>'; return; }
+                                const progressNotes = caseDoc.data().progressNotes || [];
+                                if (progressNotes.length === 0) { timelineEl.innerHTML = '<div class="progress-note-empty">No progress notes yet. Add your first note above.</div>'; return; }
+                                timelineEl.innerHTML = progressNotes.map((note, index) => {
+                                    const ts = note.createdAt?.toDate ? note.createdAt.toDate().toLocaleString('th-TH') : '-';
+                                    const updated = note.updatedAt?.toDate ? ` <span style="font-size:0.75em;color:#a78bfa;">(edited)</span>` : '';
+                                    const authorName = note.authorName || note.authorId || 'Unknown';
+                                    const authorPhoto = note.authorPhoto || '';
+                                    const safe = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                                    const attachments = note.attachments || [];
+                                    const attachHtml = attachments.length > 0 ? `<div class="progress-note-attachments">${attachments.map(a=>`<a href="${safe(a.url)}" target="_blank" rel="noopener" class="progress-note-attachment"><i class="fa-solid fa-paperclip"></i> ${safe(a.name||'Attachment')}</a>`).join('')}</div>` : '';
+                                    return `<div class="progress-note-item">
+                                        <div class="progress-note-header">
+                                            <div class="progress-note-author">${authorPhoto?`<img src="${safe(authorPhoto)}" onerror="this.style.display='none'">`:''}
+                                                <span>${safe(authorName)}</span></div>
+                                            <div class="progress-note-timestamp">${ts}${updated}</div>
+                                        </div>
+                                        <div class="progress-note-content">${safe(note.content||'')}</div>
+                                        ${attachHtml}
+                                        <div class="progress-note-actions">
+                                            <button onclick="editProgressNote('${caseDocId}',${index})" style="background:#f59e0b;color:white;border:none;border-radius:6px;padding:4px 10px;font-size:0.8em;font-weight:700;cursor:pointer;">Edit</button>
+                                            <button onclick="deleteProgressNote('${caseDocId}',${index})" style="background:#ef4444;color:white;border:none;border-radius:6px;padding:4px 10px;font-size:0.8em;font-weight:700;cursor:pointer;">Delete</button>
+                                        </div>
+                                    </div>`;
+                                }).join('');
+                            } catch(e) {
+                                console.error('Error loading progress notes:', e);
+                                timelineEl.innerHTML = '<div class="progress-note-empty">Error loading progress notes.</div>';
+                            }
+                        }
+
+                        async function addProgressNote() {
+                            const caseDocId = document.getElementById('progress-note-case-id').value;
+                            const inputEl = document.getElementById('progress-note-input');
+                            const content = inputEl.value.trim();
+                            if (!content) { alert('Please enter a note'); return; }
+                            const user = firebase.auth().currentUser;
+                            if (!user) { alert('You must be logged in'); return; }
+                            try {
+                                const caseDoc = await db.collection('cases').doc(caseDocId).get();
+                                if (!caseDoc.exists) { alert('Case not found'); return; }
+                                const progressNotes = caseDoc.data().progressNotes || [];
+                                progressNotes.push({ content, authorId: user.uid, authorName: user.displayName || user.email || 'Admin', authorPhoto: user.photoURL || '', createdAt: firebase.firestore.FieldValue.serverTimestamp(), attachments: [] });
+                                await db.collection('cases').doc(caseDocId).update({ progressNotes });
+                                inputEl.value = '';
+                                loadProgressNotes(caseDocId);
+                                showToast('Progress note added');
+                            } catch(e) { console.error(e); alert('Error: ' + e.message); }
+                        }
+
+                        async function editProgressNote(caseDocId, noteIndex) {
+                            try {
+                                const caseDoc = await db.collection('cases').doc(caseDocId).get();
+                                if (!caseDoc.exists) { alert('Case not found'); return; }
+                                const progressNotes = caseDoc.data().progressNotes || [];
+                                if (noteIndex < 0 || noteIndex >= progressNotes.length) { alert('Note not found'); return; }
+                                const newContent = prompt('Edit progress note:', progressNotes[noteIndex].content);
+                                if (newContent === null) return;
+                                if (!newContent.trim()) { alert('Note cannot be empty'); return; }
+                                progressNotes[noteIndex].content = newContent.trim();
+                                progressNotes[noteIndex].updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+                                await db.collection('cases').doc(caseDocId).update({ progressNotes });
+                                loadProgressNotes(caseDocId);
+                                showToast('Progress note updated');
+                            } catch(e) { console.error(e); alert('Error: ' + e.message); }
+                        }
+
+                        async function deleteProgressNote(caseDocId, noteIndex) {
+                            if (!confirm('Delete this progress note?')) return;
+                            try {
+                                const caseDoc = await db.collection('cases').doc(caseDocId).get();
+                                if (!caseDoc.exists) { alert('Case not found'); return; }
+                                const progressNotes = caseDoc.data().progressNotes || [];
+                                if (noteIndex < 0 || noteIndex >= progressNotes.length) { alert('Note not found'); return; }
+                                progressNotes.splice(noteIndex, 1);
+                                await db.collection('cases').doc(caseDocId).update({ progressNotes });
+                                loadProgressNotes(caseDocId);
+                                showToast('Progress note deleted');
+                            } catch(e) { console.error(e); alert('Error: ' + e.message); }
                         }
 
                         let alabastaBridgeSavedPoneglyphId = '';
