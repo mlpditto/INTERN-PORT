@@ -19945,11 +19945,32 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                         const subs = questsSubList.filter(s => s.questId === q.id && s.status !== 'none');
                                         const closedAt = q.closedAt?.toDate ? q.closedAt.toDate() : null;
                                         const closedStr = closedAt ? closedAt.toLocaleString('th-TH', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+                                        const closedMs = closedAt ? closedAt.getTime() : Date.now();
+                                        const archiveExpiry = closedMs + (24 * 60 * 60 * 1000);
                                         cnt["Done"]++;
                                         const d = document.createElement('div');
                                         d.className = 'kanban-card card-Done live-quest';
                                         d.style.borderLeft = '4px solid #22c55e';
                                         d.style.background = '#f0fdf4';
+
+                                        // Build avatar stack for submitters
+                                        let avatarHtml = '';
+                                        if (subs.length > 0) {
+                                            const avatars = subs.slice(0, 5).map(s => {
+                                                const u = usersData.find(x => x.id === s.userId);
+                                                const pic = u?.pictureUrl || '';
+                                                const name = u?.displayName || 'User';
+                                                return pic
+                                                    ? `<img src="${pic}" title="${name}" style="width:22px;height:22px;border-radius:50%;border:2px solid white;margin-left:-6px;object-fit:cover;">`
+                                                    : `<span title="${name}" style="width:22px;height:22px;border-radius:50%;border:2px solid white;margin-left:-6px;background:#94a3b8;display:inline-flex;align-items:center;justify-content:center;font-size:0.6em;color:white;font-weight:800;">${name.charAt(0)}</span>`;
+                                            }).join('');
+                                            const extra = subs.length > 5 ? `<span style="font-size:0.7em;color:#15803d;font-weight:800;margin-left:4px;">+${subs.length - 5}</span>` : '';
+                                            avatarHtml = `<div style="display:flex;align-items:center;margin-bottom:6px;">
+                                                <span style="font-size:0.7em;font-weight:700;color:#15803d;margin-right:6px;">${subs.length} submitted</span>
+                                                <div style="display:flex;padding-left:6px;">${avatars}${extra}</div>
+                                            </div>`;
+                                        }
+
                                         d.innerHTML = `
                             <div class="card-header-row" style="margin-bottom:10px;">
                                 <span class="badge" style="background:linear-gradient(135deg,#22c55e,#16a34a);padding:4px 12px;border-radius:8px;font-size:0.7em;letter-spacing:0.5px;">DAILY QUEST</span>
@@ -19957,11 +19978,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             </div>
                             <div style="font-weight:800;font-size:1.05em;color:#1e293b;margin-bottom:8px;line-height:1.4;">${title}</div>
                             <div style="font-size:0.8em;color:#15803d;background:white;padding:10px;border-radius:12px;border:1px solid #bbf7d0;">
+                                ${avatarHtml}
                                 <div style="display:flex;justify-content:space-between;font-weight:700;">
-                                    <span>👥 ${subs.length} submitted</span>
                                     <span>🔥 +${q.baseScore} PTS</span>
                                 </div>
                                 <div style="margin-top:4px;color:#64748b;font-size:0.88em;">Closed: ${closedStr}</div>
+                                <div class="done-quest-countdown" data-expiry="${archiveExpiry}" style="margin-top:6px;padding:4px 8px;background:#fff3cd;border:1px solid #ffeaa7;border-radius:6px;font-size:0.8em;color:#856404;font-weight:700;">
+                                    🗂️ Auto-archive in: <span class="done-quest-timer">...</span>
+                                </div>
                             </div>
                         `;
                                         cols["Done"].appendChild(d);
@@ -20103,7 +20127,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             }
                         }
 
-                        function updateRealtimeTimers() { const now = Date.now(); document.querySelectorAll('.timer-global').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) el.innerText = "⏳ Expired"; else { const h = Math.floor(diff / 3600000); const m = Math.floor((diff % 3600000) / 60000); el.innerText = `⏳ Ends: ${h}h ${m}m`; } }); document.querySelectorAll('.timer-active').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) { el.innerText = "⏱️ Time Up!"; const card = el.closest('.kanban-card'); if (card && card.parentElement.id === 'Doing') { db.collection("side_quests").doc(card.dataset.id).update({ status: 'Review' }); } } else { const m = Math.floor(diff / 60000); const s = Math.floor((diff % 60000) / 1000); el.innerText = `⏱️ ${m}m ${s}s`; } }); document.querySelectorAll('.timer-cooldown').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) el.innerText = "❄️ Ready"; else { const m = Math.floor(diff / 60000); const s = Math.floor((diff % 60000) / 1000); el.innerText = `❄️ Cool: ${m}m ${s}s`; } }); updateQuestTimers(); }
+                        function updateRealtimeTimers() { const now = Date.now(); document.querySelectorAll('.timer-global').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) el.innerText = "⏳ Expired"; else { const h = Math.floor(diff / 3600000); const m = Math.floor((diff % 3600000) / 60000); el.innerText = `⏳ Ends: ${h}h ${m}m`; } }); document.querySelectorAll('.timer-active').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) { el.innerText = "⏱️ Time Up!"; const card = el.closest('.kanban-card'); if (card && card.parentElement.id === 'Doing') { db.collection("side_quests").doc(card.dataset.id).update({ status: 'Review' }); } } else { const m = Math.floor(diff / 60000); const s = Math.floor((diff % 60000) / 1000); el.innerText = `⏱️ ${m}m ${s}s`; } }); document.querySelectorAll('.timer-cooldown').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) el.innerText = "❄️ Ready"; else { const m = Math.floor(diff / 60000); const s = Math.floor((diff % 60000) / 1000); el.innerText = `❄️ Cool: ${m}m ${s}s`; } }); document.querySelectorAll('.done-quest-countdown').forEach(el => { const expiry = parseInt(el.dataset.expiry); const diff = expiry - now; const timerEl = el.querySelector('.done-quest-timer'); if (!timerEl) return; if (diff <= 0) { timerEl.innerText = 'Archiving...'; el.style.background = '#f8d7da'; el.style.borderColor = '#f5c6cb'; el.style.color = '#721c24'; } else { const h = Math.floor(diff / 3600000); const m = Math.floor((diff % 3600000) / 60000); const s = Math.floor((diff % 60000) / 1000); timerEl.innerText = h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`; if (diff < 3600000) { el.style.background = '#f8d7da'; el.style.borderColor = '#f5c6cb'; el.style.color = '#721c24'; } else if (diff < 14400000) { el.style.background = '#fff3cd'; el.style.borderColor = '#ffeaa7'; el.style.color = '#856404'; } } }); updateQuestTimers(); }
                         function startDeleteCard(id) { deleteCardId = id; document.getElementById('delCardModal').style.display = 'block'; const btn = document.getElementById('btn-del-card-confirm'); btn.disabled = false; btn.style.background = '#ef233c'; let c = 5; btn.innerText = `Confirm (${c})`; if (deleteTimer) clearInterval(deleteTimer); deleteTimer = setInterval(() => { c--; btn.innerText = `Confirm (${c})`; if (c <= 0) { clearInterval(deleteTimer); document.getElementById('delCardModal').style.display = 'none'; showToast("Cancelled"); } }, 1000); btn.onclick = executeDeleteCard; }
                         async function executeDeleteCard() { if (!deleteCardId) return; clearInterval(deleteTimer); document.getElementById('delCardModal').style.display = 'none'; const deduct = confirm("Deduct points from assignee?\nOK=Deduct, Cancel=No"); try { const q = sideQuestsCache[deleteCardId]; const b = db.batch(); if (deduct && q.assigneeIds) { const s = prompt("Points to deduct (e.g., 0.5):"); if (s) { q.assigneeIds.forEach(u => { b.update(db.collection("users").doc(u), { score: firebase.firestore.FieldValue.increment(-parseFloat(s)) }); b.set(db.collection("checkin_logs").doc(), { userId: u, type: 'manual_adjust', amount: -parseFloat(s), note: `Del: ${q.title}`, timestamp: firebase.firestore.FieldValue.serverTimestamp() }); }); } } b.delete(db.collection("side_quests").doc(deleteCardId)); await b.commit(); showToast("Deleted!"); } catch (e) { alert(e.message); } }
                         function openTaskModal(id = null) {
