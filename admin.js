@@ -15315,6 +15315,16 @@ ${comment}
                 if (baseEl) baseEl.textContent = q ? `${q.baseScore} pts` : '-';
                 if (userEl) userEl.textContent = u.displayName || u.id || '-';
                 if (inputEl) { inputEl.value = '0'; syncQuestBonusChips(); setTimeout(() => inputEl.focus(), 40); }
+                const answerBox = document.getElementById('quest-review-answer-box');
+                const answerText = document.getElementById('quest-review-answer-text');
+                if (answerBox && answerText) {
+                    if (sub.answer) {
+                        answerText.textContent = sub.answer;
+                        answerBox.style.display = 'block';
+                    } else {
+                        answerBox.style.display = 'none';
+                    }
+                }
                 forceShowModal('questReviewBonusModal');
             });
         }
