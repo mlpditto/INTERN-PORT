@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V91.41)</title>
-    <!-- V91.41: Profile Card with Tabs - Leaderboard & Badges moved from Mission -->
+    <title>Internship Portfolio (V91.42)</title>
+    <!-- V91.42: Profile Card with Tabs - Leaderboard & Badges moved from Mission -->
     <!-- Release: 2026-04-25 03:30 UTC+7 -->
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -1456,13 +1456,9 @@
                     </div>
                 </div>
 
-                <!-- 🔥 Profile Tabs (V91.41) - Stats / Ranks / Badges -->
+                <!-- 🔥 Profile Tabs (V91.42) - Ranks / Badges -->
                 <div class="profile-tabs-bar">
-                    <button class="profile-tab-btn active" id="ptab-stats" onclick="switchProfileTab('stats')">
-                        <i class="fa-solid fa-chart-pie"></i>
-                        <span>Stats</span>
-                    </button>
-                    <button class="profile-tab-btn" id="ptab-ranks" onclick="switchProfileTab('ranks')">
+                    <button class="profile-tab-btn active" id="ptab-ranks" onclick="switchProfileTab('ranks')">
                         <i class="fa-solid fa-trophy"></i>
                         <span>Ranks</span>
                     </button>
@@ -1473,17 +1469,8 @@
                 </div>
 
                 <div class="profile-tab-content">
-                    <!-- Tab 1: Stats (Current Unified Metrics) -->
-                    <div id="pane-profile-stats" class="profile-tab-pane active">
-                        <div style="padding: 10px 0;">
-                            <div style="font-size: 0.82em; color: #64748b; text-align: center;">
-                                <i class="fa-solid fa-info-circle"></i> Your voyage metrics are shown above
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Tab 2: Ranks (Leaderboard) -->
-                    <div id="pane-profile-ranks" class="profile-tab-pane">
+                    <!-- Tab 1: Ranks (Leaderboard) -->
+                    <div id="pane-profile-ranks" class="profile-tab-pane active">
                         <div id="profile-leaderboard-container" style="padding: 10px 0;">
                             <div style="text-align:center; padding:15px; color:#999;">
                                 <i class="fa-solid fa-spinner fa-spin"></i> Loading rankings...
@@ -1491,7 +1478,7 @@
                         </div>
                     </div>
 
-                    <!-- Tab 3: Badges -->
+                    <!-- Tab 2: Badges -->
                     <div id="pane-profile-badges" class="profile-tab-pane">
                         <div id="profile-badges-container" style="padding: 10px 0;">
                             <div style="text-align:center; padding:15px; color:#999;">
@@ -1697,7 +1684,7 @@
                     font-size: 0.9em;
                 }
 
-                /* 🔥 Profile Tabs (V91.41) */
+                /* 🔥 Profile Tabs (V91.42) */
                 .profile-tabs-bar {
                     display: flex;
                     gap: 0;
@@ -5545,7 +5532,7 @@
                     if (Array.isArray(userAns)) {
                         userAnsText = userAns.join('\n\n');
                     } else if (typeof userAns === 'string' && userAns.includes("\n---\n")) {
-                        userAnsText = userAns.replace(/\n---\n/g, '\n\n');
+                        userAnsText = userAns.replace(/\\n---\\n/g, '\\n\\n');
                     } else {
                         userAnsText = userAns;
                     }
@@ -6510,7 +6497,7 @@
             else if (tab === 'analytics') loadLearningAnalytics();
         }
 
-        // 🔥 Profile Tab Switching (V91.41)
+        // 🔥 Profile Tab Switching (V91.42)
         function switchProfileTab(tab) {
             // Update buttons
             document.querySelectorAll('.profile-tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -6521,38 +6508,83 @@
             document.getElementById('pane-profile-' + tab).classList.add('active');
 
             // Load data if needed
-            if (tab === 'ranks') loadProfileLeaderboard();
-            else if (tab === 'badges') loadProfileBadges();
+            if (tab === 'ranks') renderProfileLeaderboard();
+            else if (tab === 'badges') renderProfileBadges();
         }
 
-        // 🔥 Load Leaderboard in Profile Tab
-        function loadProfileLeaderboard() {
+        // 🔥 Render Leaderboard in Profile Tab
+        function renderProfileLeaderboard() {
             const container = document.getElementById('profile-leaderboard-container');
-            // Reuse existing leaderboard logic
-            loadLeaderboardData();
-            // Clone or move the leaderboard content
-            const existingBoard = document.getElementById('rl-reflective-leaderboard-mini');
-            if (existingBoard && container) {
-                container.innerHTML = '';
-                const cloned = existingBoard.cloneNode(true);
-                cloned.id = 'profile-leaderboard-content';
-                cloned.style.display = 'block';
-                container.appendChild(cloned);
+            if (!container) return;
+
+            // Reuse the existing renderReflectiveMiniLeaderboard logic
+            const myDiv = getMyDivision();
+            const relevantGroups = divisionConfig[myDiv] || [myGroup];
+            let ranked = allUsersData.filter(u => relevantGroups.includes(u.group || 'Public') || (u.group === myGroup));
+            if (!ranked.length) ranked = allUsersData.filter(u => (u.group || 'Public') === myGroup);
+
+            ranked = ranked
+                .filter(u => (u.reflectiveTotalLogs || 0) > 0 || u.id === userId)
+                .sort((a, b) => {
+                    const diff = (b.reflectiveTotalLogs || 0) - (a.reflectiveTotalLogs || 0);
+                    if (diff !== 0) return diff;
+                    return (b.reflectiveBestStreak || 0) - (a.reflectiveBestStreak || 0);
+                })
+                .slice(0, 5);
+
+            if (!ranked.length) {
+                container.innerHTML = '<div style="font-size:0.78em; color:#999; text-align:center; padding:20px;">No data yet in this division</div>';
+                return;
             }
+
+            container.innerHTML = ranked.map((u, idx) => {
+                const isMe = u.id === userId;
+                const name = isMe ? (u.displayName || 'Me') : `Intern #${idx + 1}`;
+                const bg = isMe ? '#f0f7ff' : (idx < 3 ? '#fffef0' : 'transparent');
+                const medal = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : ''));
+
+                return `<div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-radius:10px; margin-bottom:5px; background:${bg}; border:1px solid ${isMe ? '#dbeafe' : 'transparent'};">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="width:24px; text-align:center; font-weight:900; color:${idx < 3 ? '#b45309' : '#94a3b8'}; font-size:0.9em;">${medal || (idx + 1)}</div>
+                        <img src="${u.pictureUrl || 'https://via.placeholder.com/30'}" style="width:28px; height:28px; border-radius:50%; border:2px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+                        <span style="font-weight:600; font-size:0.9em; color:${isMe ? '#1e40af' : '#4b5563'};">${name}${isMe ? ' <span style="font-size:0.8em;">(You)</span>' : ''}</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-weight:800; color:#111827; font-size:0.9em;">${u.reflectiveTotalLogs || 0} <small style="font-weight:400; color:#6b7280;">logs</small></div>
+                        <div style="font-size:0.7em; color:#e67e22; font-weight:bold;">🔥 Streak: ${u.reflectiveBestStreak || 0}</div>
+                    </div>
+                </div>`;
+            }).join('');
         }
 
-        // 🔥 Load Badges in Profile Tab
-        function loadProfileBadges() {
+        // 🔥 Render Badges in Profile Tab
+        function renderProfileBadges() {
             const container = document.getElementById('profile-badges-container');
-            // Reuse existing badge logic
-            const existingBadges = document.getElementById('rl-badge-collection');
-            if (existingBadges && container) {
-                container.innerHTML = '';
-                const cloned = existingBadges.cloneNode(true);
-                cloned.id = 'profile-badges-content';
-                cloned.style.display = 'flex';
-                container.appendChild(cloned);
+            if (!container) return;
+
+            // Get unlocked badges from user data
+            const myData = allUsersData.find(u => u.id === userId);
+            const unlockedBadgeIds = myData ? (myData.reflectiveUnlockedBadgeIds || []) : [];
+            
+            // Reuse the existing badge catalog logic
+            const unlocked = new Set(unlockedBadgeIds || []);
+            const preview = [...reflectiveBadgeCatalog].sort((a, b) => {
+                const aUnlocked = unlocked.has(a.id) ? 1 : 0;
+                const bUnlocked = unlocked.has(b.id) ? 1 : 0;
+                return bUnlocked - aUnlocked;
+            });
+
+            if (!preview.length) {
+                container.innerHTML = '<div style="font-size:0.78em; color:#999; text-align:center; padding:20px;">No badges available yet</div>';
+                return;
             }
+
+            container.innerHTML = '<div style="display:flex; flex-wrap:wrap; gap:6px;">' + preview.map(b => {
+                const isUnlocked = unlocked.has(b.id);
+                return `<div class="badge-chip ${isUnlocked ? 'unlocked' : 'locked'}" style="display:inline-flex; align-items:center; gap:6px; font-size:0.75em; border-radius:12px; padding:6px 12px; border:1px solid ${isUnlocked ? '#f0c36d' : '#e0e0e0'}; background:${isUnlocked ? 'linear-gradient(135deg, #fffcf5 0%, #fff7e6 100%)' : '#f9f9f9'}; color:${isUnlocked ? '#915f16' : '#999'}; box-shadow: ${isUnlocked ? '0 2px 5px rgba(230, 126, 34, 0.1)' : 'none'};">
+                    <span style="font-size:1.2em;">${b.icon}</span><span style="font-weight:600;">${b.title}</span>
+                </div>`;
+            }).join('') + '</div>';
         }
 
         function toggleAssignmentList() {
