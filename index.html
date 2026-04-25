@@ -2165,11 +2165,18 @@
                     <div id="case-section-content"
                         style="display: none; border-top: 1px solid #f0f0f0; background: #fff;">
                         <div class="case-tabs-bar">
-                            <button id="case-tab-submit" class="case-tab-btn active"
-                                onclick="switchCaseTab('submit')"><i class="fa-solid fa-plus-circle"></i> Submit New
-                                Case</button>
-                            <button id="case-tab-systems" class="case-tab-btn" onclick="switchCaseTab('systems')"><i
-                                    class="fa-solid fa-chart-pie"></i> Cases by System</button>
+                            <button class="case-tab-btn active" id="case-tab-submit" onclick="switchCaseTab('submit')">
+                                <i class="fa-solid fa-plus-circle"></i>
+                                <span>บันทึกเคส</span>
+                            </button>
+                            <button class="case-tab-btn" id="case-tab-systems" onclick="switchCaseTab('systems')">
+                                <i class="fa-solid fa-list-ul"></i>
+                                <span>My Cases</span>
+                            </button>
+                            <button class="case-tab-btn" id="case-tab-stats" onclick="switchCaseTab('stats')">
+                                <i class="fa-solid fa-chart-bar"></i>
+                                <span>สถิติ</span>
+                            </button>
                         </div>
                         <div id="case-pane-submit" class="case-tab-pane active">
                             <div class="case-pane-shell" style="border-bottom: 1px solid #f7f7f7;">
@@ -2256,18 +2263,17 @@
                         </div>
                         <div id="case-pane-systems" class="case-tab-pane">
                             <div class="case-pane-shell" style="background: #fbfbff;">
-                                <div class="case-helper-card" style="margin-bottom:14px;">
-                                    <div class="case-helper-title">Cases by System Spec</div>
-                                    <div class="case-helper-copy">This tab should work as both history and discovery.
-                                        Cases are grouped by system, filterable by pill, and still show patient, symptom
-                                        tags, note, and review status at a glance.</div>
-                                </div>
                                 <div class="case-stats-toolbar">
                                     <div id="case-stats-summary" class="case-filter-pills"></div>
                                     <div id="case-summary-meta"
                                         style="font-size:0.78em; color:#64748b; font-weight:700;"></div>
                                 </div>
                                 <div id="case-list-grouped"></div>
+                            </div>
+                        </div>
+                        <div id="case-pane-stats" class="case-tab-pane">
+                            <div class="case-pane-shell">
+                                <div id="case-stats-pane-content"></div>
                             </div>
                         </div>
                     </div>
@@ -8439,16 +8445,57 @@ async function archiveDoneCard(cardId) {
 
         function switchCaseTab(tabName) {
             window.caseActiveTab = tabName;
-            const submitBtn = document.getElementById('case-tab-submit');
-            const systemsBtn = document.getElementById('case-tab-systems');
-            const submitPane = document.getElementById('case-pane-submit');
-            const systemsPane = document.getElementById('case-pane-systems');
-            if (!submitBtn || !systemsBtn || !submitPane || !systemsPane) return;
+            ['submit', 'systems', 'stats'].forEach(t => {
+                const btn = document.getElementById(`case-tab-${t}`);
+                const pane = document.getElementById(`case-pane-${t}`);
+                if (btn) btn.classList.toggle('active', t === tabName);
+                if (pane) pane.classList.toggle('active', t === tabName);
+            });
+            if (tabName === 'stats') renderCaseStats(window.myCasesCache || []);
+            if (tabName === 'systems') renderCaseGrouped(window.myCasesCache || []);
+        }
 
-            submitBtn.classList.toggle('active', tabName === 'submit');
-            systemsBtn.classList.toggle('active', tabName === 'systems');
-            submitPane.classList.toggle('active', tabName === 'submit');
-            systemsPane.classList.toggle('active', tabName === 'systems');
+        function renderCaseStats(cases) {
+            const container = document.getElementById('case-stats-pane-content');
+            if (!container) return;
+
+            if (!cases.length) {
+                container.innerHTML = `<p style="text-align:center; color:#94a3b8; padding:30px 0;">ยังไม่มีเคสที่บันทึกไว้</p>`;
+                return;
+            }
+
+            const groups = {};
+            cases.forEach(c => {
+                const key = c.diseaseSystem || 'other';
+                if (!groups[key]) groups[key] = 0;
+                groups[key]++;
+            });
+
+            const total = cases.length;
+            const sorted = Object.entries(groups).sort((a, b) => b[1] - a[1]);
+
+            const rows = sorted.map(([key, count]) => {
+                const item = caseTaxonomyCatalog.find(x => x.key === key) || { label: key, key };
+                const emoji = CASE_SYSTEM_EMOJI[key] || '📋';
+                const pct = Math.round((count / total) * 100);
+                return `
+                    <div style="margin-bottom:14px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                            <span style="font-size:0.88em; font-weight:700; color:#334155;">${emoji} ${item.label}</span>
+                            <span style="font-size:0.82em; font-weight:800; color:#4361ee;">${count} case${count>1?'s':''}</span>
+                        </div>
+                        <div style="background:#e8eeff; border-radius:99px; height:8px; overflow:hidden;">
+                            <div style="width:${pct}%; background:linear-gradient(90deg,#4361ee,#7b93f8); height:100%; border-radius:99px; transition:width 0.4s ease;"></div>
+                        </div>
+                    </div>`;
+            }).join('');
+
+            container.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+                    <span style="font-size:1em; font-weight:800; color:#334155;"><i class="fa-solid fa-chart-bar" style="color:#4361ee; margin-right:6px;"></i>สรุปเคสของฉัน</span>
+                    <span style="font-size:0.82em; font-weight:700; background:#e8eeff; color:#4361ee; padding:4px 10px; border-radius:99px;">${total} total</span>
+                </div>
+                ${rows}`;
         }
 
         function initCaseComposer() {
