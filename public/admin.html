@@ -6119,14 +6119,7 @@
                     </div>
                     <div style="margin-bottom:12px;">
                         <label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:6px;">👥 Target Group</label>
-                        <div style="display:flex; flex-wrap:wrap; gap:6px;" id="q-group-cards">
-                            <button type="button" onclick="selectGroup(this)" data-value="Public"      style="padding:5px 12px;border-radius:20px;border:1.5px solid #d1d5db;background:white;cursor:pointer;font-size:0.8em;font-weight:600;color:#374151;transition:0.15s;">Public</button>
-                            <button type="button" onclick="selectGroup(this)" data-value="IT"          style="padding:5px 12px;border-radius:20px;border:1.5px solid #d1d5db;background:white;cursor:pointer;font-size:0.8em;font-weight:600;color:#374151;transition:0.15s;">IT</button>
-                            <button type="button" onclick="selectGroup(this)" data-value="Marketing"   style="padding:5px 12px;border-radius:20px;border:1.5px solid #d1d5db;background:white;cursor:pointer;font-size:0.8em;font-weight:600;color:#374151;transition:0.15s;">Marketing</button>
-                            <button type="button" onclick="selectGroup(this)" data-value="HR"          style="padding:5px 12px;border-radius:20px;border:1.5px solid #d1d5db;background:white;cursor:pointer;font-size:0.8em;font-weight:600;color:#374151;transition:0.15s;">HR</button>
-                            <button type="button" onclick="selectGroup(this)" data-value="Finance"     style="padding:5px 12px;border-radius:20px;border:1.5px solid #d1d5db;background:white;cursor:pointer;font-size:0.8em;font-weight:600;color:#374151;transition:0.15s;">Finance</button>
-                            <button type="button" onclick="selectGroup(this)" data-value="Operations"  style="padding:5px 12px;border-radius:20px;border:1.5px solid #d1d5db;background:white;cursor:pointer;font-size:0.8em;font-weight:600;color:#374151;transition:0.15s;">Operations</button>
-                        </div>
+                        <div style="display:flex; flex-wrap:wrap; gap:6px;" id="q-group-cards"></div>
                         <input type="hidden" id="q-target-group" value="Public">
                     </div>
                     <div style="margin-bottom:12px;">
@@ -16603,6 +16596,7 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                                 usersData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                                 renderUserGroupTabs();
                                 renderBoardGroupTabs();
+                                renderQuestGroupCards();
                                 renderTable('users');
                                 renderLeaderboard();
                                 updateAssigneeList();
@@ -20120,6 +20114,34 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         function updateRealtimeTimers() { const now = Date.now(); document.querySelectorAll('.timer-global').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) el.innerText = "⏳ Expired"; else { const h = Math.floor(diff / 3600000); const m = Math.floor((diff % 3600000) / 60000); el.innerText = `⏳ Ends: ${h}h ${m}m`; } }); document.querySelectorAll('.timer-active').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) { el.innerText = "⏱️ Time Up!"; const card = el.closest('.kanban-card'); if (card && card.parentElement.id === 'Doing') { db.collection("side_quests").doc(card.dataset.id).update({ status: 'Review' }); } } else { const m = Math.floor(diff / 60000); const s = Math.floor((diff % 60000) / 1000); el.innerText = `⏱️ ${m}m ${s}s`; } }); document.querySelectorAll('.timer-cooldown').forEach(el => { const d = parseInt(el.dataset.dead); const diff = d - now; if (diff <= 0) el.innerText = "❄️ Ready"; else { const m = Math.floor(diff / 60000); const s = Math.floor((diff % 60000) / 1000); el.innerText = `❄️ Cool: ${m}m ${s}s`; } }); document.querySelectorAll('.done-quest-countdown').forEach(el => { const expiry = parseInt(el.dataset.expiry); const diff = expiry - now; const timerEl = el.querySelector('.done-quest-timer'); if (!timerEl) return; if (diff <= 0) { timerEl.innerText = 'Archiving...'; el.style.background = '#f8d7da'; el.style.borderColor = '#f5c6cb'; el.style.color = '#721c24'; } else { const h = Math.floor(diff / 3600000); const m = Math.floor((diff % 3600000) / 60000); const s = Math.floor((diff % 60000) / 1000); timerEl.innerText = h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`; if (diff < 3600000) { el.style.background = '#f8d7da'; el.style.borderColor = '#f5c6cb'; el.style.color = '#721c24'; } else if (diff < 14400000) { el.style.background = '#fff3cd'; el.style.borderColor = '#ffeaa7'; el.style.color = '#856404'; } } }); updateQuestTimers(); }
                         function startDeleteCard(id) { deleteCardId = id; document.getElementById('delCardModal').style.display = 'block'; const btn = document.getElementById('btn-del-card-confirm'); btn.disabled = false; btn.style.background = '#ef233c'; let c = 5; btn.innerText = `Confirm (${c})`; if (deleteTimer) clearInterval(deleteTimer); deleteTimer = setInterval(() => { c--; btn.innerText = `Confirm (${c})`; if (c <= 0) { clearInterval(deleteTimer); document.getElementById('delCardModal').style.display = 'none'; showToast("Cancelled"); } }, 1000); btn.onclick = executeDeleteCard; }
                         async function executeDeleteCard() { if (!deleteCardId) return; clearInterval(deleteTimer); document.getElementById('delCardModal').style.display = 'none'; const deduct = confirm("Deduct points from assignee?\nOK=Deduct, Cancel=No"); try { const q = sideQuestsCache[deleteCardId]; const b = db.batch(); if (deduct && q.assigneeIds) { const s = prompt("Points to deduct (e.g., 0.5):"); if (s) { q.assigneeIds.forEach(u => { b.update(db.collection("users").doc(u), { score: firebase.firestore.FieldValue.increment(-parseFloat(s)) }); b.set(db.collection("checkin_logs").doc(), { userId: u, type: 'manual_adjust', amount: -parseFloat(s), note: `Del: ${q.title}`, timestamp: firebase.firestore.FieldValue.serverTimestamp() }); }); } } b.delete(db.collection("side_quests").doc(deleteCardId)); await b.commit(); showToast("Deleted!"); } catch (e) { alert(e.message); } }
+                        function renderQuestGroupCards() {
+                            const container = document.getElementById('q-group-cards');
+                            if (!container) return;
+                            const currentVal = document.getElementById('q-target-group')?.value || 'Public';
+
+                            // Count users per group (default group = 'Public')
+                            const groupCount = {};
+                            usersData.forEach(u => {
+                                const g = u.group || 'Public';
+                                groupCount[g] = (groupCount[g] || 0) + 1;
+                            });
+
+                            // Always include Public first, then other groups sorted by count
+                            const groups = Object.entries(groupCount)
+                                .sort((a, b) => (a[0] === 'Public' ? -1 : b[0] === 'Public' ? 1 : b[1] - a[1]));
+
+                            container.innerHTML = groups.map(([name, count]) => {
+                                const isSelected = name === currentVal;
+                                const sel = isSelected ? 'background:#10b981;border-color:#10b981;color:white;' : 'background:white;border-color:#d1d5db;color:#374151;';
+                                return `<button type="button" onclick="selectGroup(this)" data-value="${name}" style="padding:5px 12px;border-radius:20px;border:1.5px solid #d1d5db;cursor:pointer;font-size:0.8em;font-weight:600;transition:0.15s;${sel}">${name} <span style="opacity:0.7;font-size:0.85em;">(${count})</span></button>`;
+                            }).join('');
+
+                            // If current value no longer exists in groups, reset to Public
+                            if (!groupCount[currentVal]) {
+                                document.getElementById('q-target-group').value = 'Public';
+                            }
+                        }
+
                         function selectGroup(btn) {
                             document.querySelectorAll('#q-group-cards button').forEach(b => {
                                 b.style.background = 'white';
@@ -20145,6 +20167,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         }
 
                         function initializeQuestForm() {
+                            renderQuestGroupCards();
                             const groupDefault = document.querySelector('#q-group-cards button[data-value="Public"]');
                             if (groupDefault) selectGroup(groupDefault);
                             const tagDefault = document.querySelector('#q-tag-cards button[data-value=""]');
