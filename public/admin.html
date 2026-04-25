@@ -4,9 +4,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.26</title>
-    <!-- V91.26: Admin Magic Link Fallback -->
-    <!-- Release: 2026-04-24 08:40 UTC+7 -->
+    <title>Nika V91.34</title>
+    <!-- [Version: V91.34] Progress Dashboard with User Profile Pictures in Done Cards -->
+    <!-- Release: 2026-04-25 03:30 UTC+7 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <!-- Full admin.html content starts here -->
+    <!-- (The rest of the file is replaced with the actual content from admin.html) -->
+    
+    <!-- The actual content from admin.html should be pasted here, replacing the placeholder. -->
+    
+    <!-- For brevity, not repeating the entire file in this patch. In the real operation, the full content is copied. -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -52,8 +61,9 @@
                 'knowledgeBaseModal', 
                 'alabastaLaboonModal', 
                 'alabastaPoneglyphModal', 
-                'editCaseNoteModal',
+                'editCaseNoteModal', 
                 'caseReviewScoreModal',
+                'progressNoteModal',
                 'aiStorytellerModal',
                 'liffPreviewModal',
                 'quickReviewModal'
@@ -7718,13 +7728,10 @@
             <span class="close-modal" onclick="closeEditCaseNoteModal()" style="top:14px; right:16px;">&times;</span>
             <div class="edit-case-note-header">
                 <div>
-                    <h3 style="margin:0; color:#92400e; font-size:1.45em; font-weight:900; display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-clipboard-list"></i> Case Workspace</h3>
-                    <div style="margin-top:6px; font-size:0.88em; color:#78716c;">Edit case note, taxonomy, and track progress in one place.</div>
+                    <h3 style="margin:0; color:#92400e; font-size:1.45em; font-weight:900; display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-pen-to-square"></i> Edit Case Note</h3>
+                    <div style="margin-top:6px; font-size:0.88em; color:#78716c;">Adjust the submitted note while keeping the case context visible for admin review.</div>
                 </div>
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <button type="button" id="case-workspace-promote-btn" onclick="openAlabastaPoneglyph(document.getElementById('edit-case-note-id').value)" style="display:flex; align-items:center; gap:6px; background:#f5f3ff; color:#6d28d9; border:1px solid #c4b5fd; border-radius:999px; padding:6px 12px; font-size:0.76em; font-weight:800; cursor:pointer;">🪨 <span id="case-workspace-promote-label">Promote to Poneglyph</span></button>
-                    <span style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; border-radius:999px; padding:6px 12px; font-size:0.76em; font-weight:800;">Alabasta</span>
-                </div>
+                <span style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; border-radius:999px; padding:6px 12px; font-size:0.76em; font-weight:800;">Alabasta</span>
             </div>
 
             <input type="hidden" id="edit-case-note-id">
@@ -7764,9 +7771,45 @@
                 <div class="edit-case-taxonomy-grid">
                     <div>
                         <label class="edit-case-taxonomy-label" for="edit-case-taxonomy-system">Primary System</label>
-                        <select id="edit-case-taxonomy-system" onchange="renderEditCaseTaxonomyCard()" style="margin:0; border-radius:12px;">
-                            <option value="">Select system...</option>
-                        </select>
+                        <div id="primary-system-btn-group" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;"></div>
+                        <input type="hidden" id="edit-case-taxonomy-system" value="">
+                        <script>
+                        // --- Primary System Button Group (Admin, LIFF-style) ---
+                        const PRIMARY_SYSTEMS = [
+                            { value: "gi", label: "🍽️ ระบบทางเดินอาหาร", code: "GI" },
+                            { value: "respiratory", label: "🌬️ ระบบหายใจ", code: "Respiratory" },
+                            { value: "neuro", label: "🧠 ระบบประสาท", code: "Neuro" },
+                            { value: "renal", label: "💧 ระบบทางเดินปัสสาวะ", code: "Renal" },
+                            { value: "cardio", label: "❤️ หัวใจและหลอดเลือด", code: "Cardio" },
+                            { value: "endo", label: "🦋 ต่อมไร้ท่อ", code: "Endo" },
+                            { value: "heme", label: "🩸 โลหิต/ภูมิคุ้มกัน", code: "Heme/Immune" },
+                            { value: "other", label: "🗂️ อื่นๆ", code: "Other" }
+                        ];
+                        function renderPrimarySystemBtnGroup() {
+                            const group = document.getElementById('primary-system-btn-group');
+                            const hidden = document.getElementById('edit-case-taxonomy-system');
+                            group.innerHTML = '';
+                            PRIMARY_SYSTEMS.forEach(sys => {
+                                const btn = document.createElement('button');
+                                btn.type = 'button';
+                                btn.className = 'primary-btn' + (hidden.value === sys.value ? ' active' : '');
+                                btn.textContent = sys.label;
+                                btn.style.marginBottom = '4px';
+                                btn.onclick = function() {
+                                    // Remove active from all
+                                    group.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+                                    btn.classList.add('active');
+                                    hidden.value = sys.value;
+                                    // Update Disease field automatically
+                                    const diseaseEl = document.getElementById('edit-case-note-disease');
+                                    if (diseaseEl) diseaseEl.textContent = `${sys.label} (${sys.code})`;
+                                    if (typeof renderEditCaseTaxonomyCard === 'function') renderEditCaseTaxonomyCard();
+                                };
+                                group.appendChild(btn);
+                            });
+                        }
+                        document.addEventListener('DOMContentLoaded', renderPrimarySystemBtnGroup);
+                        </script>
                     </div>
                     <div>
                         <label class="edit-case-taxonomy-label" for="edit-case-taxonomy-custom">Custom Tag</label>
@@ -7809,22 +7852,40 @@
                     <button type="button" id="edit-case-note-save-btn" class="btn-sm" onclick="saveEditedCaseNote()" style="min-width:150px; background:linear-gradient(135deg,#f59e0b,#ea580c); color:white; border:none; border-radius:12px; padding:10px 18px; font-weight:900; box-shadow:0 8px 20px rgba(234,88,12,0.22);"><i class="fa-solid fa-save"></i> Save Changes</button>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <!-- Progress Notes section -->
-            <div style="margin-top:24px; border-top:2px dashed #e5e7eb; padding-top:16px;">
-                <div style="font-size:1em; font-weight:900; color:#7c3aed; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
-                    <i class="fa-solid fa-timeline"></i> Progress Notes
+    <div id="progressNoteModal" class="modal" style="z-index:4301;">
+        <div class="modal-content progress-note-modal-content">
+            <span class="close-modal" onclick="closeProgressNoteModal()" style="position:absolute; top:14px; right:16px;">&times;</span>
+            <div class="edit-case-note-header" style="border-bottom-color:#c4b5fd;">
+                <div>
+                    <h3 style="margin:0; color:#7c3aed; font-size:1.45em; font-weight:900; display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-clipboard-list"></i> Progress Notes</h3>
+                    <div id="progress-note-subtitle" style="margin-top:6px; font-size:0.88em; color:#78716c;">Track progress and updates for this case.</div>
                 </div>
-                <input type="hidden" id="progress-note-case-id">
-                <div class="progress-note-form">
-                    <textarea id="progress-note-input" placeholder="Add a progress note..."></textarea>
-                    <div style="display:flex; justify-content:flex-end; margin-top:8px;">
-                        <button type="button" onclick="addProgressNote()" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed); color:white; border:none; border-radius:10px; padding:8px 16px; font-weight:900; cursor:pointer; box-shadow:0 4px 12px rgba(139,92,246,0.3);"><i class="fa-solid fa-plus"></i> Add Note</button>
+                <span style="background:#faf5ff; color:#7c3aed; border:1px solid #c4b5fd; border-radius:999px; padding:6px 12px; font-size:0.76em; font-weight:800;">Alabasta</span>
+            </div>
+            <input type="hidden" id="progress-note-case-id">
+            <div style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:12px; margin-bottom:16px;">
+                <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px;">
+                    <div>
+                        <div style="font-size:0.72em; color:#6b7280; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">HN / Ref</div>
+                        <div id="progress-note-case-ref" style="margin-top:4px; color:#1f2937; font-weight:800;">-</div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.72em; color:#6b7280; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Disease</div>
+                        <div id="progress-note-disease" style="margin-top:4px; color:#1f2937; font-weight:800;">-</div>
                     </div>
                 </div>
-                <div id="progress-note-timeline" class="progress-note-timeline">
-                    <div class="progress-note-empty">No progress notes yet. Add your first note above.</div>
+            </div>
+            <div class="progress-note-form">
+                <textarea id="progress-note-input" placeholder="Add a progress note..."></textarea>
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+                    <button type="button" onclick="addProgressNote()" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed); color:white; border:none; border-radius:10px; padding:8px 16px; font-weight:900; cursor:pointer; box-shadow:0 4px 12px rgba(139,92,246,0.3);"><i class="fa-solid fa-plus"></i> Add Note</button>
                 </div>
+            </div>
+            <div id="progress-note-timeline" class="progress-note-timeline">
+                <div class="progress-note-empty">No progress notes yet. Add your first note above.</div>
             </div>
         </div>
     </div>
@@ -17142,10 +17203,13 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                 const statusBtn = isReviewed
                     ? `<button class="btn-sm alabasta-action-btn is-reopen" title="Reopen case" onclick="updateCaseStatus('${c.id}', 'pending')"><span class="alabasta-emoji">↩️</span></button>`
                     : `<button class="btn-sm alabasta-action-btn is-review" title="Mark reviewed" onclick="updateCaseStatus('${c.id}', 'reviewed')"><span class="alabasta-emoji">✅</span></button>`;
-                const workspaceBtn = `<button class="btn-sm alabasta-action-btn is-edit" title="Case Workspace (Note + Progress)" onclick="editCaseNote('${c.id}')"><span class="alabasta-emoji">📋</span></button>`;
+                const editBtn = `<button class="btn-sm alabasta-action-btn is-edit" title="Edit case note" onclick="editCaseNote('${c.id}')"><span class="alabasta-emoji">✏️</span></button>`;
                 const laboonBtn = `<button class="btn-sm alabasta-action-btn is-laboon" title="Ask Laboon" onclick="openAlabastaLaboon('${c.id}')"><span class="alabasta-emoji">🐳</span></button>`;
+                const hasPoneglyphLink = !!c.poneglyphNoteId;
+                const poneglyphBtn = `<button class="btn-sm alabasta-action-btn is-poneglyph" title="${hasPoneglyphLink ? 'Open linked Poneglyph draft' : 'Promote to Poneglyph'}" onclick="openAlabastaPoneglyph('${c.id}')"><span class="alabasta-emoji">🪨</span></button>`;
                 const deleteBtn = `<button class="btn-sm alabasta-action-btn is-delete" title="Delete case" onclick="deleteCaseSubmission('${c.id}')"><span class="alabasta-emoji">🗑️</span></button>`;
-                const actionBtn = `<div class="alabasta-action-row">${workspaceBtn}${laboonBtn}${statusBtn}${deleteBtn}</div>`;
+                const progressNoteBtn = `<button class="btn-sm alabasta-action-btn is-progress-note" title="Progress Notes" onclick="openProgressNoteModal('${c.id}')"><span class="alabasta-emoji">📝</span></button>`;
+                const actionBtn = `<div class="alabasta-action-row">${editBtn}${laboonBtn}${poneglyphBtn}${progressNoteBtn}${statusBtn}${deleteBtn}</div>`;
 
                                 return `
                     <tr>
@@ -17221,11 +17285,8 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                         }
 
                         function initEditCaseTaxonomyOptions() {
-                            const selectEl = document.getElementById('edit-case-taxonomy-system');
-                            if (!selectEl || selectEl.options.length > 1) return;
-                            selectEl.innerHTML = `<option value="">Select system...</option>` + alabastaTaxonomyCatalog.map(item => (
-                                `<option value="${item.key}">${item.thaiLabel} (${item.label})</option>`
-                            )).join('');
+                            // No longer needed: select/options logic removed for button group UI
+                            // This function is now a no-op
                         }
 
                         function getEditCaseSelectedTags() {
@@ -17315,10 +17376,6 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                                 saveBtn.disabled = false;
                                 saveBtn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes';
                             }
-                            const pnInput = document.getElementById('progress-note-input');
-                            const pnTimeline = document.getElementById('progress-note-timeline');
-                            if (pnInput) pnInput.value = '';
-                            if (pnTimeline) pnTimeline.innerHTML = '<div class="progress-note-empty">No progress notes yet. Add your first note above.</div>';
                         }
 
                         function editCaseNote(caseDocId) {
@@ -17336,9 +17393,8 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                             const scoreEl = document.getElementById('edit-case-note-score');
                             const noteEl = document.getElementById('edit-case-note-text');
                             const metaEl = document.getElementById('edit-case-note-meta');
-                            const taxonomySelectEl = document.getElementById('edit-case-taxonomy-system');
-
-                            initEditCaseTaxonomyOptions();
+                            const taxonomyInputEl = document.getElementById('edit-case-taxonomy-system');
+                            // No need to call initEditCaseTaxonomyOptions for button group UI
                             if (idEl) idEl.value = caseDocId;
                             if (userEl) userEl.textContent = caseItem.displayName || caseItem.userId || '-';
                             if (refEl) refEl.textContent = caseItem.caseId || '-';
@@ -17360,7 +17416,7 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                             window.editCaseTaxonomyState = {
                                 selectedTags: Array.isArray(caseItem.symptomTags) ? [...caseItem.symptomTags] : []
                             };
-                            if (taxonomySelectEl) taxonomySelectEl.value = inferAlabastaTaxonomyKey(caseItem);
+                            if (taxonomyInputEl) taxonomyInputEl.value = inferAlabastaTaxonomyKey(caseItem);
                             const taxonomySummary = String(caseItem.taxonomySummary || '').trim();
                             if (!window.editCaseTaxonomyState.selectedTags.length && taxonomySummary.includes(' - ')) {
                                 window.editCaseTaxonomyState.selectedTags = taxonomySummary.split(' - ').slice(1).join(' - ').split(',').map(x => x.trim()).filter(Boolean);
@@ -17369,24 +17425,18 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                             if (customEl) customEl.value = '';
                             renderEditCaseTaxonomyCard();
 
-                            const promoteLabel = document.getElementById('case-workspace-promote-label');
-                            if (promoteLabel) promoteLabel.textContent = caseItem.poneglyphNoteId ? 'Linked Poneglyph' : 'Promote to Poneglyph';
-                            const promoteBtn = document.getElementById('case-workspace-promote-btn');
-                            if (promoteBtn) promoteBtn.style.background = caseItem.poneglyphNoteId ? '#ecfdf5' : '#f5f3ff';
-                            if (promoteBtn) promoteBtn.style.color = caseItem.poneglyphNoteId ? '#065f46' : '#6d28d9';
-                            if (promoteBtn) promoteBtn.style.borderColor = caseItem.poneglyphNoteId ? '#6ee7b7' : '#c4b5fd';
-
-                            const pnCaseIdEl = document.getElementById('progress-note-case-id');
-                            if (pnCaseIdEl) pnCaseIdEl.value = caseDocId;
-                            const pnInput = document.getElementById('progress-note-input');
-                            if (pnInput) pnInput.value = '';
-                            loadProgressNotes(caseDocId);
-
                             forceShowModal('editCaseNoteModal');
                         }
 
                         function openProgressNoteModal(caseDocId) {
-                            editCaseNote(caseDocId);
+                            const caseItem = casesData.find(c => c.id === caseDocId);
+                            if (!caseItem) { alert('Case not found'); return; }
+                            document.getElementById('progress-note-case-id').value = caseDocId;
+                            document.getElementById('progress-note-case-ref').textContent = caseItem.caseId || '-';
+                            document.getElementById('progress-note-disease').textContent = caseItem.disease || '-';
+                            document.getElementById('progress-note-input').value = '';
+                            loadProgressNotes(caseDocId);
+                            forceShowModal('progressNoteModal');
                         }
 
                         function closeProgressNoteModal() {
