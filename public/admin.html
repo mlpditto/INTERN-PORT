@@ -4,15 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.23</title>
-    <!-- V91.23: Structural Nesting & Modal Fix -->
-    <!-- Release: 2026-04-24 02:30 UTC+7 -->
+    <title>Nika V91.26</title>
+    <!-- V91.26: Admin Magic Link Fallback -->
+    <!-- Release: 2026-04-24 08:40 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
     <script>
-        // Force unregister service workers to fix persistent caching issues (V91.23)
+        // Force unregister service workers to fix persistent caching issues (V91.26)
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function (registrations) {
                 for (let registration of registrations) { registration.unregister(); }
@@ -20,6 +20,7 @@
         }
     </script>
 
+    <script>
         // V89.74: Global Early-Defined AI Toggles
         window.selectAiToolbarToggle = function (el, hiddenId) {
             console.log(`🔘 [AI Toggle] Early-Bound Selection: ${el.dataset.value} for ${hiddenId}`);
@@ -34,7 +35,7 @@
             }
         };
 
-        // V91.23: Improved Modal Control - Prevents overlap of nested modals
+        // V91.26: Improved Modal Control - Prevents overlap of nested modals
         window.forceShowModal = function(id, displayType) {
             console.log(`[Modal] forceShowModal triggered for: ${id}`);
             const m = document.getElementById(id);
@@ -58,6 +59,13 @@
                 'quickReviewModal'
             ];
             const isExclusive = exclusiveModals.includes(id);
+
+            // Keep overlays as body-level siblings. If malformed markup nests one modal
+            // inside another, opening the child must not un-hide the parent modal.
+            if (isExclusive && m.parentElement !== document.body) {
+                console.warn('forceShowModal: Moving nested modal to body:', id, 'from parent:', m.parentElement?.id || m.parentElement?.tagName);
+                document.body.appendChild(m);
+            }
 
             // Force hide siblings to prevent "เด้งซ้อนกัน" (overlapping)
             document.querySelectorAll('.modal').forEach(function(modal) {
@@ -85,6 +93,10 @@
 
             let p = m.parentElement;
             while (p && p !== document.body) {
+                if (p.classList && p.classList.contains('modal')) {
+                    console.warn('forceShowModal: Refusing to un-hide modal parent:', p.id || p.tagName);
+                    break;
+                }
                 if (window.getComputedStyle(p).display === 'none') {
                     p.style.setProperty('display', 'block', 'important');
                 }
@@ -100,7 +112,7 @@
             m.setAttribute('style', 'display:none;');
         };
 
-        // V91.23: Early definition to prevent ReferenceError
+        // V91.26: Early definition to prevent ReferenceError
         window.switchHubMode = window.switchHubMode || function (mode) { console.warn('switchHubMode not yet fully loaded:', mode); };
 
     </script>
@@ -3115,7 +3127,7 @@
             <p style="color:#666; font-size:0.9em; margin-bottom:20px;">Internal Use Only</p>
 
             <!-- Magic Link UI -->
-            <input type="email" id="email-input" value="" placeholder="Enter Admin Email" style="margin-bottom:10px;">
+            <input type="email" id="email-input" value="medlifeplus@gmail.com" placeholder="Enter Admin Email" style="margin-bottom:10px;">
             <button class="magic-btn" onclick="sendMagicLink()" style="width:100%;">
                 ✨ Send Login Link
             </button>
@@ -3144,14 +3156,6 @@
             <div id="login-error" style="color:red; margin-top:10px; font-size:0.9em;"></div>
 
             <div
-                style="margin-top: 20px; text-align: left; background: #fffde7; padding: 10px; border-radius: 8px; border: 1px solid #fff59d; font-size: 0.8em; color: #856404;">
-                <b>💡 Admin Login Instruction:</b><br>
-                1. If opening in LINE: Tap <b>"Open in Default Browser"</b> (Chrome/Safari) at the top right to use
-                Google Login.<br>
-                2. If using Magic Link: The system will send a link to your email (limited daily quota).
-            </div>
-
-            <div
                 style="margin-top: 20px; font-size: 0.75em; color: #999; border-top: 1px solid #eee; padding-top: 10px;">
                 Secure Access via Email, Google or LINE.<br>
             </div>
@@ -3167,7 +3171,7 @@
                         style="margin:0; background:linear-gradient(135deg, #f59e0b, #ef4444); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.6em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         ☀️ Nika
                         <span
-                            style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.23</span>
+                            style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.26</span>
                     </h1>
                     <span id="admin-email"
                         style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
@@ -7096,7 +7100,17 @@
                 <input type="hidden" id="reflective-review-id">
                 <input type="hidden" id="reflective-review-uid">
                 <input type="hidden" id="reflective-review-uname">
+                <input type="hidden" id="reflective-review-raw-content">
                 <input type="hidden" id="ai-model-review" value="gpt-4o">
+
+                <!-- Writing Analysis Card (shown after AI Suggest) -->
+                <div id="reflective-grammar-card" class="reflective-review-card reflective-review-field" style="display:none;">
+                    <div class="reflective-review-label-row" style="margin-bottom:8px;">
+                        <label class="reflective-review-label">✍️ Writing Analysis</label>
+                        <span id="reflective-grammar-score" style="font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; border:1px solid transparent;"></span>
+                    </div>
+                    <div id="reflective-grammar-content"></div>
+                </div>
 
                 <!-- Lean Feedback & Bonus Section (Image 2 Space Optimized) -->
                 <div style="display: grid; grid-template-columns: 1fr 130px; gap: 10px;">
@@ -7585,41 +7599,71 @@
             </div>
             <input type="hidden" id="gs-uid">
 
-            <div
-                style="margin-bottom:15px; background:#f8f9fa; padding:12px; border-radius:8px; border:1px solid #eee;">
-                <label style="font-size:0.85em; color:#666; font-weight:bold;">🇹🇭 ชื่อ-นามสกุล (ภาษาไทย)</label>
-                <input type="text" id="gs-fullname-th" placeholder="ชื่อ-นามสกุล ภาษาไทย (สำหรับแสดงผลบนหน้าต่างหลัก)"
-                    style="width:100%; margin-top:5px; margin-bottom:8px; font-size:0.9em; padding:10px; border-radius:8px; border:1px solid #ddd;">
+            <div style="margin-bottom:15px; background:#f8f9fa; padding:12px; border-radius:8px; border:1px solid #eee; display:flex; flex-direction:column; gap:8px;">
+                <!-- Row 1: ชื่อ-นามสกุล + ชื่อเล่น -->
+                <div style="display:flex; gap:8px;">
+                    <div style="flex:3;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">🇹🇭 ชื่อ-นามสกุล (ภาษาไทย)</label>
+                        <input type="text" id="gs-fullname-th" placeholder="ชื่อ-นามสกุล ภาษาไทย" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                    <div style="flex:1.5;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">😊 ชื่อเล่น</label>
+                        <input type="text" id="gs-cert-nickname" placeholder="ชื่อเล่น" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                </div>
 
-                <div style="display:flex; gap:10px; margin-bottom:12px;">
+                <!-- Row 2: เลขที่ใบอนุญาต + คุณวุฒิ -->
+                <div style="display:flex; gap:8px;">
                     <div style="flex:1;">
                         <label style="font-size:0.75em; color:#888; font-weight:bold;">🪪 เลขที่ใบอนุญาต</label>
-                        <input type="text" id="gs-license-id" placeholder="เลขที่ใบอนุญาต"
-                            style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em;">
+                        <input type="text" id="gs-license-id" placeholder="เลขที่ใบอนุญาต" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
                     </div>
                     <div style="flex:2;">
                         <label style="font-size:0.75em; color:#888; font-weight:bold;">📘 คุณวุฒิ</label>
-                        <input type="text" id="gs-qualification" placeholder="คุณวุฒิ / ระดับการศึกษา"
-                            style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em;">
+                        <input type="text" id="gs-qualification" placeholder="คุณวุฒิ / ระดับการศึกษา" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
                     </div>
                 </div>
 
-                <label style="font-size:0.85em; color:#666; font-weight:bold;">🎓 Certificate Info (English)</label>
-                <div style="display:flex; gap:5px; margin-top:5px;">
-                    <input type="text" id="gs-firstname-en" placeholder="FIRST NAME"
-                        style="flex:2; font-size:0.9em; padding:8px;">
-                    <input type="text" id="gs-middlename-en" placeholder="MIDDLE"
-                        style="flex:1; font-size:0.9em; padding:8px;">
-                    <input type="text" id="gs-lastname-en" placeholder="LAST NAME"
-                        style="flex:2; font-size:0.9em; padding:8px;">
+                <!-- Row 3: โทรศัพท์ + อีเมล -->
+                <div style="display:flex; gap:8px;">
+                    <div style="flex:1;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">📞 โทรศัพท์</label>
+                        <input type="tel" id="gs-tel" placeholder="08x-xxx-xxxx" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">📧 อีเมล</label>
+                        <input type="email" id="gs-email" placeholder="email@example.com" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
                 </div>
-                <input type="text" id="gs-cert-fullname" placeholder="Full Name (Combined Preview / Manual Override)"
-                    style="margin-top:8px; width:100%; box-sizing:border-box; margin-bottom:8px; font-size:0.9em; padding:8px; background:#fff; border:1px solid #ddd; border-radius:4px;"
-                    title="This field is used for Certificate Generation">
-                <input type="text" id="gs-cert-nickname" placeholder="Nickname/AKA..."
-                    style="width:100%; box-sizing:border-box; font-size:0.9em; padding:8px; margin-bottom:8px;">
-                <input type="text" id="gs-institute" placeholder="Institution / Workplace..."
-                    style="width:100%; box-sizing:border-box; font-size:0.9em; padding:8px;">
+
+                <!-- Row 4: วันเกิด + สถาบัน -->
+                <div style="display:flex; gap:8px;">
+                    <div style="flex:1;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">🎂 วันเกิด</label>
+                        <input type="date" id="gs-birthday" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                    <div style="flex:2;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">🏢 สถาบัน / ที่ทำงาน</label>
+                        <input type="text" id="gs-institute" placeholder="Institution / Workplace..." style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                </div>
+
+                <!-- Row 5: ที่อยู่ -->
+                <div>
+                    <label style="font-size:0.75em; color:#888; font-weight:bold;">📍 ที่อยู่</label>
+                    <input type="text" id="gs-address" placeholder="ที่อยู่..." style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                </div>
+
+                <!-- Certificate Info (English) -->
+                <div style="border-top:1px solid #e2e8f0; padding-top:8px;">
+                    <label style="font-size:0.75em; color:#888; font-weight:bold;">🎓 Certificate Info (English)</label>
+                    <div style="display:flex; gap:5px; margin-top:5px; margin-bottom:5px;">
+                        <input type="text" id="gs-firstname-en" placeholder="FIRST NAME" style="flex:2; font-size:0.85em; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <input type="text" id="gs-middlename-en" placeholder="MIDDLE" style="flex:1; font-size:0.85em; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <input type="text" id="gs-lastname-en" placeholder="LAST NAME" style="flex:2; font-size:0.85em; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                    </div>
+                    <input type="text" id="gs-cert-fullname" placeholder="Full Name (Combined Preview / Manual Override)" style="width:100%; box-sizing:border-box; font-size:0.85em; padding:8px; border:1px solid #ddd; border-radius:6px;" title="This field is used for Certificate Generation">
+                </div>
             </div>
 
             <div style="margin-bottom:15px;">
@@ -9620,7 +9664,7 @@
                             if (hiddenInput) hiddenInput.value = btn.dataset.value || 'gpt-4o';
                         };
 
-                        function setReflectiveReviewStatus(message, tone) {
+                        window.setReflectiveReviewStatus = function(message, tone) {
                             const el = document.getElementById('reflective-review-ai-status');
                             if (!el) return;
                             if (!message) {
@@ -9631,7 +9675,7 @@
                             const icon = tone === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check';
                             el.className = 'reflective-review-status show ' + (tone || 'success');
                             el.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
-                        }
+                        };
 
                         function getReflectiveReviewPresetInstruction(preset) {
                             const presetMap = {
@@ -9647,6 +9691,7 @@
 
                         window.getAISuggestion = async function (btn) {
                             const logContent = document.getElementById('reflective-review-user-info').innerText;
+                            const rawContent = document.getElementById('reflective-review-raw-content').value.trim();
                             if (!btn) btn = document.getElementById('btn-ai-suggest');
                             const textarea = document.getElementById('reflective-review-comment');
                             const modelSelect = document.getElementById('ai-model-review');
@@ -9661,14 +9706,13 @@
                             const existingDraft = textarea.value.trim();
 
                             try {
+                                setReflectiveReviewStatus('');
                                 btn.disabled = true;
-                                const originalHtml = btn.innerHTML;
                                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>' + (btn.offsetWidth > 60 ? ' Analyzing...' : '');
 
-                                let prompt;
+                                let feedbackPrompt;
                                 if (existingDraft && existingDraft.length >= 3) {
-                                    // V89.01: Thai draft → AI refine & output in target language
-                                    prompt = `You are a kind and expert Mentor.
+                                    feedbackPrompt = `You are a kind and expert Mentor.
 Here is a Reflective Log from an intern:
 "${logContent}"
 
@@ -9679,27 +9723,54 @@ Your task:
 1. Understand the admin's intent from the Thai draft above.
 2. Refine, polish, and expand it into a warm, professional feedback message.
 3. The final output MUST be in "${targetLang}" only.
-                                    4. Keep it 2-3 sentences max. Show empathy and encouragement.
-                                    5. Follow this style preset: ${presetInstruction}
-                                    6. Do not include any explanation other than the refined feedback text.`;
+4. Keep it 2-3 sentences max. Show empathy and encouragement.
+5. Follow this style preset: ${presetInstruction}
+6. Do not include any explanation other than the refined feedback text.`;
                                 } else {
-                                    // Original: Generate from scratch
-                                    prompt = `You are a kind and expert Mentor. 
+                                    feedbackPrompt = `You are a kind and expert Mentor.
 Here is a Reflective Log from an intern:
 "${logContent}"
 
 ${presetInstruction}
 
-Please write a short praise and feedback (max 2-3 sentences) showing empathy and encouragement. 
-Keep it friendly but professional. Response must be in "${targetLang}" only. 
+Please write a short praise and feedback (max 2-3 sentences) showing empathy and encouragement.
+Keep it friendly but professional. Response must be in "${targetLang}" only.
 Do not include any explanation other than the feedback body.`;
                                 }
 
-                                const { text } = await window.callUniversalAI(selectedModelName, prompt);
+                                const grammarSource = rawContent || logContent;
+                                const grammarPrompt = `You are an expert Thai-English writing coach. Analyze this reflective writing from a learner:
 
-                                textarea.value = text;
-                                setReflectiveReviewStatus(existingDraft ? `AI refined your draft in ${targetLang}.` : `AI suggestion ready in ${targetLang}.`, 'success');
-                                showToast(existingDraft ? "✨ AI refined your Thai draft → " + targetLang : "✨ AI suggested feedback!");
+"${grammarSource}"
+
+The learner may write in Thai, English, or mixed. Analyze grammar, sentence structure, and clarity.
+
+Respond ONLY with valid JSON (no markdown, no extra text):
+{
+  "grade": "ดี" or "พอใช้" or "ควรปรับ",
+  "issues": ["concise issue in Thai (max 3 items)"],
+  "suggestions": ["practical suggestion in Thai (max 3 items)"],
+  "improved": "improved rewrite in the same language as original"
+}
+
+If no issues, return empty array for issues. Keep suggestions kind and constructive.`;
+
+                                const [feedbackResult, grammarResult] = await Promise.allSettled([
+                                    window.callUniversalAI(selectedModelName, feedbackPrompt),
+                                    window.callUniversalAI('gemini-1.5-flash', grammarPrompt)
+                                ]);
+
+                                if (feedbackResult.status === 'fulfilled') {
+                                    textarea.value = feedbackResult.value.text;
+                                    setReflectiveReviewStatus(existingDraft ? `AI refined your draft in ${targetLang}.` : `AI suggestion ready in ${targetLang}.`, 'success');
+                                    showToast(existingDraft ? "✨ AI refined your Thai draft → " + targetLang : "✨ AI suggested feedback!");
+                                } else {
+                                    throw feedbackResult.reason;
+                                }
+
+                                if (grammarResult.status === 'fulfilled') {
+                                    renderGrammarAnalysis(grammarResult.value.text);
+                                }
 
                             } catch (error) {
                                 console.error("AI Error:", error);
@@ -9714,6 +9785,59 @@ Do not include any explanation other than the feedback body.`;
                                 btn.innerHTML = '<i class="fa-solid fa-robot"></i> <span class="btn-text">AI Suggest</span>';
                             }
                         };
+
+                        function renderGrammarAnalysis(rawText) {
+                            const card = document.getElementById('reflective-grammar-card');
+                            const content = document.getElementById('reflective-grammar-content');
+                            const badge = document.getElementById('reflective-grammar-score');
+                            if (!card || !content) return;
+
+                            let data;
+                            try {
+                                const match = rawText.match(/\{[\s\S]*\}/);
+                                data = JSON.parse(match ? match[0] : rawText);
+                            } catch (e) {
+                                card.style.display = '';
+                                content.innerHTML = `<div style="font-size:0.82em; color:#475569; line-height:1.6;">${rawText}</div>`;
+                                return;
+                            }
+
+                            const gradeMap = {
+                                'ดี':      { color:'#15803d', bg:'#f0fdf4', border:'#86efac' },
+                                'พอใช้':   { color:'#b45309', bg:'#fffbeb', border:'#fcd34d' },
+                                'ควรปรับ': { color:'#dc2626', bg:'#fef2f2', border:'#fca5a5' }
+                            };
+                            const g = gradeMap[data.grade] || gradeMap['พอใช้'];
+
+                            badge.textContent = data.grade || '';
+                            badge.style.cssText = `font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; background:${g.bg}; color:${g.color}; border:1px solid ${g.border};`;
+
+                            let html = '';
+
+                            if (data.issues && data.issues.length > 0) {
+                                html += `<div style="margin-bottom:8px;">
+                                    <div style="font-size:0.7em; font-weight:900; color:#ef4444; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">⚠ จุดที่ควรแก้ไข</div>
+                                    ${data.issues.map(i => `<div style="font-size:0.8em; color:#7f1d1d; background:#fef2f2; border-left:3px solid #ef4444; padding:5px 9px; border-radius:0 8px 8px 0; margin-bottom:4px; line-height:1.5;">${i}</div>`).join('')}
+                                </div>`;
+                            }
+
+                            if (data.suggestions && data.suggestions.length > 0) {
+                                html += `<div style="margin-bottom:8px;">
+                                    <div style="font-size:0.7em; font-weight:900; color:#b45309; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">💡 คำแนะนำการเขียน</div>
+                                    ${data.suggestions.map(s => `<div style="font-size:0.8em; color:#78350f; background:#fffbeb; border-left:3px solid #f59e0b; padding:5px 9px; border-radius:0 8px 8px 0; margin-bottom:4px; line-height:1.5;">${s}</div>`).join('')}
+                                </div>`;
+                            }
+
+                            if (data.improved) {
+                                html += `<div>
+                                    <div style="font-size:0.7em; font-weight:900; color:#15803d; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">✏ ตัวอย่างประโยคที่ดีขึ้น</div>
+                                    <div style="font-size:0.82em; color:#14532d; background:#f0fdf4; border:1px solid #bbf7d0; padding:9px 11px; border-radius:10px; line-height:1.6;">${data.improved}</div>
+                                </div>`;
+                            }
+
+                            content.innerHTML = html || `<div style="font-size:0.82em; color:#15803d;">✅ การเขียนดี ไม่พบจุดที่ต้องแก้ไข</div>`;
+                            card.style.display = '';
+                        }
 
                         window.copyQuestionToClipboard = function (btn) {
                             const item = btn.closest('.quiz-q-item');
@@ -10158,6 +10282,7 @@ Do not include any explanation other than the feedback body.`;
                         const MY_URL = window.location.origin + window.location.pathname; // V88.64: Auto-detect current URL for GitHub Pages/Firebase compatibility
 
                         var auth = firebase.auth();
+                        const GOOGLE_POPUP_TIMEOUT_MS = 7000;
 
                         var usersData = [], worksData = [], casesData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {}, questsSubList = [];
                         var knowledgeBaseCache = []; // Required by PDF-to-Quiz and Research grounding
@@ -10349,6 +10474,7 @@ Do not include any explanation other than the feedback body.`;
 
                         // 🔥 Google Sign-In Logic
                         let googleLoginInProgress = false;
+                        let googleFallbackMagicLinkSent = false;
 
                         function setGoogleLoginButtonState(isLoading) {
                             const btn = document.querySelector('#login-screen .btn-google');
@@ -10367,38 +10493,59 @@ Do not include any explanation other than the feedback body.`;
                             if (btn.dataset.originalHtml) btn.innerHTML = btn.dataset.originalHtml;
                         }
 
+                        function triggerMagicLinkFallback(reason = '') {
+                            if (googleFallbackMagicLinkSent) return;
+                            googleFallbackMagicLinkSent = true;
+                            const emailEl = document.getElementById('email-input');
+                            const loginErrorEl = document.getElementById('login-error');
+                            if (emailEl) emailEl.value = ALLOWED_EMAIL;
+                            if (loginErrorEl) {
+                                loginErrorEl.innerText = reason
+                                    ? `${reason} Sending a secure login link to ${ALLOWED_EMAIL}...`
+                                    : `Sending a secure login link to ${ALLOWED_EMAIL}...`;
+                            }
+                            sendMagicLink({ auto: true });
+                        }
+
                         async function loginWithGoogle() {
                             if (googleLoginInProgress) return;
                             googleLoginInProgress = true;
                             setGoogleLoginButtonState(true);
 
                             const provider = new firebase.auth.GoogleAuthProvider();
+                            provider.setCustomParameters({ prompt: 'select_account' });
+                            const resetIfPopupStalls = setTimeout(() => {
+                                googleLoginInProgress = false;
+                                setGoogleLoginButtonState(false);
+                                const loginErrorEl = document.getElementById('login-error');
+                                const emailEl = document.getElementById('email-input');
+                                if (emailEl) emailEl.value = ALLOWED_EMAIL;
+                                triggerMagicLinkFallback('Google sign-in is blocked or still waiting.');
+                            }, GOOGLE_POPUP_TIMEOUT_MS);
                             try {
                                 const result = await auth.signInWithPopup(provider);
-                                // Success handled by onAuthStateChanged
+                                clearTimeout(resetIfPopupStalls);
                                 console.log("Google Login Success:", result.user.email);
                             } catch (error) {
-                                const shouldFallbackToRedirect = error && (
-                                    error.code === 'auth/popup-blocked' ||
-                                    error.code === 'auth/cancelled-popup-request' ||
-                                    error.code === 'auth/popup-closed-by-user'
-                                );
-
-                                if (shouldFallbackToRedirect) {
-                                    try {
-                                        await auth.signInWithRedirect(provider);
-                                        return;
-                                    } catch (redirectError) {
-                                        console.error("Google Redirect Login Error:", redirectError);
-                                        alert("Google Redirect Login Error: " + redirectError.message);
-                                        document.getElementById('login-error').innerText = "Google Error: " + redirectError.message;
-                                    }
+                                clearTimeout(resetIfPopupStalls);
+                                const loginErrorEl = document.getElementById('login-error');
+                                const emailEl = document.getElementById('email-input');
+                                if (emailEl) emailEl.value = ALLOWED_EMAIL;
+                                const code = error && error.code ? error.code : '';
+                                if (code === 'auth/popup-blocked' || code === 'auth/cancelled-popup-request') {
+                                    const msg = 'Google popup was blocked.';
+                                    console.warn("Google Login Popup Blocked:", error);
+                                    if (loginErrorEl) loginErrorEl.innerText = `${msg} Sending Magic Link instead...`;
+                                    triggerMagicLinkFallback(msg);
+                                } else if (code === 'auth/popup-closed-by-user') {
+                                    const msg = 'Google sign-in was closed before completion. Please click Google again when ready.';
+                                    console.warn("Google Login Popup Closed:", error);
+                                    if (loginErrorEl) loginErrorEl.innerText = msg;
                                 } else {
                                     console.error("Google Login Error:", error);
                                     alert("Google Login Error: " + error.message);
-                                    document.getElementById('login-error').innerText = "Google Error: " + error.message;
+                                    if (loginErrorEl) loginErrorEl.innerText = "Google Error: " + error.message;
                                 }
-                            } finally {
                                 googleLoginInProgress = false;
                                 setGoogleLoginButtonState(false);
                             }
@@ -10433,7 +10580,7 @@ Do not include any explanation other than the feedback body.`;
                         }
 
                         // 🔥 Magic Link Logic (Replaces Google Sign-In)
-                        function sendMagicLink() {
+                        function sendMagicLink(options = {}) {
                             const email = document.getElementById('email-input').value;
                             if (email !== ALLOWED_EMAIL) {
                                 alert("❌ Access Denied: Email not authorized.");
@@ -14685,7 +14832,9 @@ Do not include any explanation other than the feedback body.`;
                                 const docRef = db.collection("quiz_attempts").doc(attemptId);
                                 const docSnap = await docRef.get();
                                 if (!docSnap.exists) return alert("Attempt data not found");
-                                const att = docSnap.data();
+                                                                const att = docSnap.data();
+                                if (att.status === 'approved') return alert("⚠️ This attempt has already been approved.");
+
                                 const quiz = quizzesData.find(x => x.id === att.quizId);
                                 if (!quiz) return alert("Quiz data not found");
 
@@ -14740,7 +14889,9 @@ Do not include any explanation other than the feedback body.`;
                                 const docRef = db.collection("quiz_attempts").doc(attemptId);
                                 const docSnap = await docRef.get();
                                 if (!docSnap.exists) return alert("Attempt data not found");
-                                const att = docSnap.data();
+                                                                const att = docSnap.data();
+                                if (att.status === 'approved') return alert("⚠️ This attempt has already been approved.");
+
                                 const quiz = quizzesData.find(x => x.id === att.quizId);
                                 if (!quiz) return alert("Quiz data not found");
 
@@ -14892,7 +15043,12 @@ Do not include any explanation other than the feedback body.`;
                                 if (!confirm(`Confirm approving ${score.toFixed(3)} points for this user?`)) return;
                             }
                             try {
+                                                                const docSnap = await db.collection("quiz_attempts").doc(attemptId).get();
+                                if (docSnap.exists && docSnap.data().status === 'approved') {
+                                    return alert("⚠️ This attempt has already been approved.");
+                                }
                                 const b = db.batch();
+
                                 b.update(db.collection("quiz_attempts").doc(attemptId), { status: 'approved', approvedAt: firebase.firestore.FieldValue.serverTimestamp() });
                                 b.update(db.collection("users").doc(uid), { score: firebase.firestore.FieldValue.increment(score) });
                                 const quizId = attemptId.split('_')[0];
@@ -16656,6 +16812,10 @@ Do not include any explanation other than the feedback body.`;
                             document.getElementById('gs-cert-fullname').value = user?.fullNameEn || '';
                             document.getElementById('gs-cert-nickname').value = user?.nickname || user?.nickName || '';
                             document.getElementById('gs-institute').value = user?.institute || '';
+                            document.getElementById('gs-tel').value = user?.phone || user?.tel || '';
+                            document.getElementById('gs-email').value = user?.email || '';
+                            document.getElementById('gs-birthday').value = user?.birthday || '';
+                            document.getElementById('gs-address').value = user?.address || '';
 
                             // Helper to update full name preview
                             const updateGsFullname = () => {
@@ -16761,6 +16921,10 @@ Do not include any explanation other than the feedback body.`;
                             const newInstitute = document.getElementById('gs-institute').value.trim();
                             const licenseId = document.getElementById('gs-license-id').value.trim();
                             const qualification = document.getElementById('gs-qualification').value.trim();
+                            const tel = document.getElementById('gs-tel').value.trim();
+                            const email = document.getElementById('gs-email').value.trim();
+                            const birthday = document.getElementById('gs-birthday').value.trim();
+                            const address = document.getElementById('gs-address').value.trim();
 
                             if (!uid) return;
 
@@ -16775,7 +16939,11 @@ Do not include any explanation other than the feedback body.`;
                                     nickname: newNickname,
                                     institute: newInstitute,
                                     licenseId: licenseId,
-                                    qualification: qualification
+                                    qualification: qualification,
+                                    phone: tel,
+                                    email: email,
+                                    birthday: birthday,
+                                    address: address
                                 });
                                 showToast("User updated successfully!");
                                 forceHideModal('groupSelectModal');
@@ -18588,8 +18756,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 const dash = { quizzes: 0, works: 0, logs: 0, bonus: 0, manual: 0, qc: 0, wc: 0, lc: 0, bc: 0, mc: 0 };
 
                                 const addP = (dateObj, score, type, note, extra = {}) => {
-                                    if (!dateObj || score === undefined) return;
-                                    const dRaw = dateObj.toDate();
+                                                                        const sVal = parseFloat(score) || 0;
+                                    const dRaw = (dateObj && typeof dateObj.toDate === 'function') ? dateObj.toDate() : new Date();
+
+                                    
                                     const dStr = dRaw.toISOString().split('T')[0];
                                     if (!pointsMap[dStr]) pointsMap[dStr] = 0;
                                     pointsMap[dStr] += parseFloat(score);
@@ -18610,7 +18780,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     const d = doc.data();
                                     const s = (d.earnedScore || 0) + (d.bonusGiven || 0);
                                     if (d.status !== 'none') {
-                                        addP(d.receivedAt, 0.1, 'bonus', `🚀 Receive: ${d.questTitle}`);
+                                        addP(d.receivedAt || d.startedAt, 0.1, 'bonus', `🚀 Receive: ${d.questTitle}`);
+
                                         dash.bonus += 0.1;
                                         dash.bc++;
                                     }
@@ -18629,12 +18800,22 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                         const caseItem = findAlabastaCaseForLog(d);
                                         hubCaseReviewLogTextByDocId[doc.id] = `📁 ${buildAlabastaReviewLogNote(caseItem, d)}`;
                                     }
-                                    const hubType = d.type === 'case_review_bonus' ? 'work' : (d.type || 'log');
-                                    const hubText = d.type === 'case_review_bonus' ? `📁 ${d.note || 'Alabasta Case Review'}` : (d.note || '-');
-                                    addP(d.timestamp, s, hubType, hubText, { docId: doc.id, source: 'checkin_logs' });
+                                    const isQuestLog = d.type === 'quest' || (d.note && d.note.includes('Quest Bonus'));
+                                    const hubType = (d.type === 'case_review_bonus' || isQuestLog) ? 'work' : (d.type || 'log');
+                                    let hubText = d.note || '-';
+                                    if (d.type === 'case_review_bonus') hubText = `📁 ${d.note || 'Alabasta Case Review'}`;
+                                    else if (isQuestLog && !hubText.startsWith('📁')) hubText = `📁 ${hubText}`;
+
+                                    addP(d.timestamp, s, hubType, hubText, { 
+                                        docId: doc.id, 
+                                        source: 'checkin_logs',
+                                        isQuest: isQuestLog || d.isQuest,
+                                        answer: d.answer,
+                                        questTitle: d.questTitle || (d.note ? d.note.replace('Quest Bonus: ', '') : '')
+                                    });
                                     if (d.type === 'streak') { dash.bonus += s; dash.bc++; }
                                     else if (d.type === 'manual' || d.type === 'manual_adjust') { dash.manual += s; dash.mc++; }
-                                    else if (d.type === 'case_review_bonus') { dash.works += s; dash.wc++; }
+                                    else if (d.type === 'case_review_bonus' || isQuestLog) { dash.works += s; dash.wc++; }
                                     else if (d.type === 'reflective_log' || d.type === 'reflective_bonus') { dash.logs += s; dash.lc++; }
                                 });
 
@@ -18671,11 +18852,24 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     }
                                 });
 
-                                allLogs.sort((a, b) => (b.t || 0) - (a.t || 0));
+                                                                allLogs.sort((a, b) => (b.t || 0) - (a.t || 0));
+                                const uniqueLogs = [];
+                                const seenQuizLogs = new Set();
+                                allLogs.forEach(log => {
+                                    if (log.type === 'quiz' || log.type === 'quest') {
+                                        const dKey = log.t ? log.t.toISOString().split('T')[0] : 'nodate';
+                                        const normalizedText = log.text.replace(/Quiz Approved \(Actual\): \d+\/\d+ - /, '').replace(/Quiz Approved: /, '').replace(/⚡ Submit: /, '').replace(/📝 Quiz: /, '');
+                                        const key = `${dKey}_${normalizedText}_${log.score.toFixed(2)}`;
+                                        if (!seenQuizLogs.has(key)) { seenQuizLogs.add(key); uniqueLogs.push(log); }
+                                    } else { uniqueLogs.push(log); }
+                                });
+                                window._hubUserCache[userId] = { pointsMap, detailsMap, allLogs: uniqueLogs, dash, user: u };
+                                historyCache = uniqueLogs;
+
 
                                 // Save to Hub Cache
-                                window._hubUserCache[userId] = { pointsMap, detailsMap, allLogs, dash, user: u };
-                                historyCache = allLogs;
+                                
+                                
                                 historyPage = 1;
 
                                 // Sync UI
@@ -18771,10 +18965,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         function getHubFilteredHistory() {
                             const mode = window._hubHistoryFilter || 'all';
                             if (mode === 'all') return historyCache;
-                            if (mode === 'quizzes') return historyCache.filter(e => e.type === 'quiz' || e.type === 'quest');
+                            if (mode === 'quizzes') return historyCache.filter(e => e.type === 'quiz');
                             if (mode === 'works') return historyCache.filter(e => e.type === 'work');
                             if (mode === 'logs') return historyCache.filter(e => e.type === 'reflective_log' || e.type === 'reflective_bonus');
-                            if (mode === 'bonus') return historyCache.filter(e => e.type === 'bonus' || e.type === 'streak');
+                            if (mode === 'bonus') return historyCache.filter(e => (e.type === 'bonus' && !e.isQuest) || e.type === 'streak');
+
                             if (mode === 'manual') return historyCache.filter(e => e.type === 'manual' || e.type === 'manual_adjust');
                             return historyCache;
                         }
@@ -19739,35 +19934,100 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             // 7. Render Active Daily Quests (Bounties) in "Backlog"
                             try {
                                 questsCache.forEach(q => {
-                                    const isLive = q.deadline && q.deadline.toDate() > new Date();
+                                    const now = new Date();
+                                    const questStatus = String(q.status || 'active').toLowerCase();
+                                    const startTime = q.startTime?.toDate ? q.startTime.toDate() : (q.scheduledStart?.toDate ? q.scheduledStart.toDate() : null);
+
+                                    // ── Closed quests → Done column ──
+                                    if (questStatus === 'closed') {
+                                        const title = q.question || "Untitled Quest";
+                                        if (filter && !title.toLowerCase().includes(filter)) return;
+                                        const subs = questsSubList.filter(s => s.questId === q.id && s.status !== 'none');
+                                        const closedAt = q.closedAt?.toDate ? q.closedAt.toDate() : null;
+                                        const closedStr = closedAt ? closedAt.toLocaleString('th-TH', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+                                        cnt["Done"]++;
+                                        const d = document.createElement('div');
+                                        d.className = 'kanban-card card-Done live-quest';
+                                        d.style.borderLeft = '4px solid #22c55e';
+                                        d.style.background = '#f0fdf4';
+                                        d.innerHTML = `
+                            <div class="card-header-row" style="margin-bottom:10px;">
+                                <span class="badge" style="background:linear-gradient(135deg,#22c55e,#16a34a);padding:4px 12px;border-radius:8px;font-size:0.7em;letter-spacing:0.5px;">DAILY QUEST</span>
+                                <span style="font-size:0.7em;font-weight:800;color:#15803d;background:#dcfce7;padding:3px 8px;border-radius:999px;">✅ Closed</span>
+                            </div>
+                            <div style="font-weight:800;font-size:1.05em;color:#1e293b;margin-bottom:8px;line-height:1.4;">${title}</div>
+                            <div style="font-size:0.8em;color:#15803d;background:white;padding:10px;border-radius:12px;border:1px solid #bbf7d0;">
+                                <div style="display:flex;justify-content:space-between;font-weight:700;">
+                                    <span>👥 ${subs.length} submitted</span>
+                                    <span>🔥 +${q.baseScore} PTS</span>
+                                </div>
+                                <div style="margin-top:4px;color:#64748b;font-size:0.88em;">Closed: ${closedStr}</div>
+                            </div>
+                        `;
+                                        cols["Done"].appendChild(d);
+                                        return;
+                                    }
+
+                                    const isLive = q.deadline && q.deadline.toDate() > now && questStatus !== 'draft' && (!startTime || startTime <= now);
                                     if (!isLive) return;
 
                                     const title = q.question || "Untitled Quest";
                                     if (filter && !title.toLowerCase().includes(filter)) return;
 
-                                    cnt["Backlog"]++;
+                                    const subs = questsSubList.filter(s => s.questId === q.id && s.status !== 'none');
+                                    const colName = subs.length > 0 ? "Doing" : "Backlog";
+
+                                    cnt[colName]++;
                                     const d = document.createElement('div');
-                                    d.className = 'kanban-card card-Backlog live-quest';
-                                    d.style.borderLeft = "4px solid #f59e0b";
-                                    d.style.background = "#fffaf5";
+                                    d.className = `kanban-card card-${colName} live-quest`;
+
+                                    const accentColor = colName === "Doing" ? "#3b82f6" : "#f59e0b";
+                                    const bgColor    = colName === "Doing" ? "#f0f7ff" : "#fffaf5";
+                                    const borderColor = colName === "Doing" ? "#bfdbfe" : "#ffe8d1";
+                                    d.style.borderLeft = `4px solid ${accentColor}`;
+                                    d.style.background = bgColor;
 
                                     const dlVal = q.deadline.toMillis ? q.deadline.toMillis() : new Date(q.deadline).getTime();
 
+                                    let avatarHtml = '';
+                                    if (subs.length > 0) {
+                                        const avatars = subs.slice(0, 5).map(s => {
+                                            const u = usersData.find(x => x.id === s.userId);
+                                            const pic = u?.pictureUrl || '';
+                                            const name = u?.displayName || 'User';
+                                            return pic
+                                                ? `<img src="${pic}" title="${name}" style="width:22px;height:22px;border-radius:50%;border:2px solid white;margin-left:-6px;object-fit:cover;">`
+                                                : `<span title="${name}" style="width:22px;height:22px;border-radius:50%;border:2px solid white;margin-left:-6px;background:#94a3b8;display:inline-flex;align-items:center;justify-content:center;font-size:0.6em;color:white;font-weight:800;">${name.charAt(0)}</span>`;
+                                        }).join('');
+                                        const extra = subs.length > 5 ? `<span style="font-size:0.7em;color:#3b82f6;font-weight:800;margin-left:4px;">+${subs.length - 5}</span>` : '';
+                                        avatarHtml = `<div style="display:flex;align-items:center;margin-bottom:6px;">
+                                            <span style="font-size:0.7em;font-weight:700;color:${accentColor};margin-right:6px;">${subs.length} submitted</span>
+                                            <div style="display:flex;padding-left:6px;">${avatars}${extra}</div>
+                                        </div>`;
+                                    }
+
+                                    const closeBtn = colName === 'Doing' ? `
+                                        <button class="btn-sm" style="width:100%;margin-top:8px;background:#dcfce7;color:#15803d;border:1px solid #86efac;border-radius:10px;padding:7px;font-weight:800;font-size:0.8em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:0.2s;" onmouseover="this.style.background='#bbf7d0'" onmouseout="this.style.background='#dcfce7'" onclick="event.stopPropagation();closeQuest('${q.id}')">
+                                            <i class="fa-solid fa-flag-checkered"></i> Close Quest
+                                        </button>` : '';
+
                                     d.innerHTML = `
-                        <div class="card-header-row" style="margin-bottom:12px;">
-                            <span class="badge" style="background:linear-gradient(135deg, #f59e0b, #d97706); padding:4px 12px; border-radius:8px; font-size:0.7em; letter-spacing:0.5px;">DAILY QUEST</span>
-                            <div class="card-header-right" onclick="recallQuest('${q.id}')" style="color:#f59e0b; cursor:pointer; font-size:1.1em; opacity:0.7; transition:0.2s;" onmouseover="this.style.opacity='1'; this.style.transform='scale(1.2)';" onmouseout="this.style.opacity='0.7'; this.style.transform='scale(1)'"><i class="fa-solid fa-pen-to-square"></i></div>
-                        </div>
-                        <div style="font-weight:800; font-size:1.05em; color:#1e293b; margin-bottom:8px; line-height:1.4;">${title}</div>
-                        <div style="font-size:0.8em; color:#64748b; background:white; padding:12px; border-radius:12px; border:1px solid #ffe8d1;">
-                            <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-weight:700;">
-                                <span>🔥 +${q.baseScore} PTS</span>
-                                <span>⏱️ ${q.durationMinutes || 30}m</span>
+                            <div class="card-header-row" style="margin-bottom:10px;">
+                                <span class="badge" style="background:linear-gradient(135deg, ${accentColor}, ${colName === 'Doing' ? '#2563eb' : '#d97706'}); padding:4px 12px; border-radius:8px; font-size:0.7em; letter-spacing:0.5px;">DAILY QUEST</span>
+                                <div class="card-header-right" onclick="recallQuest('${q.id}')" style="color:${accentColor}; cursor:pointer; font-size:1.1em; opacity:0.7; transition:0.2s;" onmouseover="this.style.opacity='1'; this.style.transform='scale(1.2)';" onmouseout="this.style.opacity='0.7'; this.style.transform='scale(1)'"><i class="fa-solid fa-pen-to-square"></i></div>
                             </div>
-                            <div class="timer-global" data-dead="${dlVal}" style="color:#d35400; font-weight:900; font-size:0.9em;">⏳ Exp: ...</div>
-                        </div>
-                    `;
-                                    cols["Backlog"].appendChild(d);
+                            <div style="font-weight:800; font-size:1.05em; color:#1e293b; margin-bottom:8px; line-height:1.4;">${title}</div>
+                            <div style="font-size:0.8em; color:#64748b; background:white; padding:12px; border-radius:12px; border:1px solid ${borderColor};">
+                                ${avatarHtml}
+                                <div style="display:flex; justify-content:space-between; font-weight:700;">
+                                    <span>🔥 +${q.baseScore} PTS</span>
+                                    <span>⏱️ ${q.durationMinutes || 30}m</span>
+                                </div>
+                                <div class="timer-global" data-dead="${dlVal}" style="color:#d35400; font-weight:900; font-size:0.9em; margin-top:6px;">⏳ Exp: ...</div>
+                            </div>
+                            ${closeBtn}
+                        `;
+                                    cols[colName].appendChild(d);
                                 });
                             } catch (e) { console.error("Kanban Section 7 (Quests) Error:", e); }
 
@@ -20155,6 +20415,50 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 `;
 
                                 alert("Work Details:\n\n" + (w.title || 'Work Item') + "\nScore: " + (w.score || 0).toFixed(2) + " pts\nStatus: " + (w.status || 'Not Submitted') + "\n\nFor full details, click OK to open detailed view.");
+                                const modal = document.getElementById('workDetailModal') || createWorkDetailModal();
+                                document.getElementById('work-detail-content').innerHTML = detailsHtml;
+                                modal.style.display = 'block';
+                            } else if (item.isQuest) {
+                                const d = item.t ? item.t.toLocaleString('th-TH') : '-';
+                                const detailsHtml = `
+                    <div style="padding:20px; border-radius:12px; background:white; border:1px solid #f1f5f9;">
+                        <h3 style="margin:0 0 15px 0; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:1.5em;">⚡</span> Daily Quest Submission
+                        </h3>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:15px;">
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #10b981;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Awarded Score</div>
+                                <div style="font-size:1.3em; font-weight:900; color:#10b981; margin-top:6px;">
+                                    ${(item.score || 0).toFixed(2)} pts
+                                </div>
+                            </div>
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #f59e0b;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Reviewed At</div>
+                                <div style="font-size:0.85em; color:#475569; margin-top:6px; font-weight:600;">
+                                    ${d}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:12px;">
+                            <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase; margin-bottom:8px;">Quest Title</div>
+                            <div style="color:#1e293b; font-weight:700; font-size:1em;">
+                                ${item.questTitle || 'Daily Quest'}
+                            </div>
+                        </div>
+                        ${item.answer ? `
+                            <div style="background:#eff6ff; padding:15px; border-radius:12px; border-left:4px solid #3b82f6; margin-bottom:12px;">
+                                <div style="font-size:0.75em; color:#1d4ed8; font-weight:700; text-transform:uppercase; margin-bottom:10px;">User Answer</div>
+                                <div style="color:#1e3a8a; font-size:0.95em; line-height:1.6; white-space:pre-wrap; font-family:inherit;">
+                                    ${item.answer}
+                                </div>
+                            </div>
+                        ` : `
+                            <div style="padding:15px; border-radius:12px; border:1px dashed #cbd5e1; color:#94a3b8; text-align:center; font-size:0.9em;">
+                                (No submission content found in this log)
+                            </div>
+                        `}
+                    </div>
+                `;
                                 const modal = document.getElementById('workDetailModal') || createWorkDetailModal();
                                 document.getElementById('work-detail-content').innerHTML = detailsHtml;
                                 modal.style.display = 'block';
@@ -20669,6 +20973,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         async function editQ(id, q) { const nq = prompt("Edit Q:", q); if (nq) await db.collection("quests").doc(id).update({ question: nq }); }
                         async function stopQ(id) { if (confirm("Stop?")) await db.collection("quests").doc(id).update({ deadline: new Date() }); }
                         async function delQ(id) { if (confirm("Del?")) await db.collection("quests").doc(id).delete(); }
+
+                        async function closeQuest(id) {
+                            if (!confirm("ปิด Quest นี้และย้ายไป Done?\n\nผู้ที่ยังไม่ได้ submit จะไม่สามารถส่งงานได้อีก")) return;
+                            try {
+                                await db.collection("quests").doc(id).update({
+                                    status: 'closed',
+                                    closedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+                                showToast("✅ Quest ปิดแล้ว → Done");
+                            } catch (e) { alert("Error: " + e.message); }
+                        }
                         function drawCertificate(ctx, name, dates, awards, level, score) {
                             console.log("Drawing Certificate for:", name);
                             // Handle both array (multiple) and string (legacy)
@@ -22854,6 +23169,9 @@ ${stories.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
 
                             document.getElementById('reflective-review-bonus').value = log.adminBonus !== undefined ? log.adminBonus : "0.5";
                             document.getElementById('reflective-review-comment').value = log.adminComment || "";
+                            document.getElementById('reflective-review-raw-content').value = log.content || '';
+                            const grammarCard = document.getElementById('reflective-grammar-card');
+                            if (grammarCard) { grammarCard.style.display = 'none'; document.getElementById('reflective-grammar-content').innerHTML = ''; document.getElementById('reflective-grammar-score').textContent = ''; }
                             setReflectiveReviewStatus('');
                             console.log("DEBUG: About to call forceShowModal for reflectiveReviewModal");
                             const modal = document.getElementById('reflectiveReviewModal');
@@ -23782,7 +24100,7 @@ ${stories.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
 
                         window.AI_CORE_READY = true;
                         if (window.loadAIKeys) window.loadAIKeys();
-                        console.log('%c V91.23 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+                        console.log('%c V91.26 loaded OK (Admin Magic Link Fallback) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
 
                         // --- V90.36: Quiz Feedback Panel ---
                         let _qfpCurrentId = null;
@@ -24173,8 +24491,13 @@ ${comment}
                                     });
                                     await db.collection("checkin_logs").add({
                                         userId: sub.userId,
-                                        type: 'bonus',
+                                        type: 'work',
+                                        isQuest: true,
                                         amount: bonus,
+                                        questId: sub.questId,
+                                        questSubId: subId,
+                                        questTitle: q ? q.question : 'Quest',
+                                        answer: sub.answer || '',
                                         note: `Quest Bonus: ${q ? q.question : 'Quest'}`,
                                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                                     });

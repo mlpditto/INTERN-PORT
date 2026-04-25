@@ -4,15 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.22</title>
-    <!-- [Version: V91.22] Permission Diagnostics & Log Deduplication -->
-    <!-- Release: 2026-04-24 01:00 UTC+7 -->
+    <title>Nika V91.34</title>
+    <!-- [Version: V91.34] Progress Dashboard with User Profile Pictures in Done Cards -->
+    <!-- Release: 2026-04-25 03:30 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
     <script>
-        // Force unregister service workers to fix persistent caching issues ([Version: V91.20])
+        // Force unregister service workers to fix persistent caching issues ([Version: V91.34])
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for(let registration of registrations) { registration.unregister(); }
@@ -21,20 +21,42 @@
     </script>
 
     <script>
-        // [Version: V89.02] Reconstructed helper with nested modal and parent visibility support
+        // [Version: V91.26] Reconstructed helper with exclusive modal and parent visibility support
         function forceShowModal(id, displayType) {
             const m = document.getElementById(id);
             if (!m) { console.error('forceShowModal: not found:', id); return; }
             displayType = displayType || 'block';
 
-            // Special handling for nested modals (Participants/Review on top of Manager)
-            const isNested = (id === 'quizParticipantsModal' || id === 'reflectiveReviewModal' || id === 'quizReviewModal' || id === 'exportQuizPdfModal');
+            const exclusiveModals = [
+                'quizParticipantsModal',
+                'reflectiveReviewModal',
+                'quizReviewModal',
+                'scoreAdjustmentModal',
+                'exportQuizPdfModal',
+                'knowledgeBaseModal',
+                'alabastaLaboonModal',
+                'alabastaPoneglyphModal',
+                'editCaseNoteModal',
+                'caseReviewScoreModal',
+                'aiStorytellerModal',
+                'liffPreviewModal',
+                'quickReviewModal'
+            ];
+            const isExclusive = exclusiveModals.includes(id);
+
+            // Keep overlays as body-level siblings. If malformed markup nests one modal
+            // inside another, opening the child must not un-hide the parent modal.
+            if (isExclusive && m.parentElement !== document.body) {
+                console.warn('forceShowModal: Moving nested modal to body:', id, 'from parent:', m.parentElement?.id || m.parentElement?.tagName);
+                document.body.appendChild(m);
+            }
             
-            // Hide other modals unless they are safe parents
+            // Hide sibling overlays unless they are safe parent containers for the modal being opened.
             document.querySelectorAll('.modal').forEach(function(modal) {
                 if (modal.id !== id) {
                     const isSafeParent = (modal.id === 'quizManageModal' || modal.id === 'archiveModal' || modal.id === 'assignmentsManageModal');
-                    if (!isNested || !isSafeParent) {
+                    const otherIsExclusive = exclusiveModals.includes(modal.id);
+                    if ((isExclusive && (otherIsExclusive || !isSafeParent)) || (!isExclusive && !isSafeParent)) {
                         modal.classList.remove('force-show');
                         modal.style.setProperty('display', 'none', 'important');
                         modal.setAttribute('style', 'display:none;');
@@ -43,13 +65,18 @@
             });
 
             // Ensure current modal is visible and positioned correctly
-            m.removeAttribute('style');
-            m.className = 'modal force-show';
+            m.classList.add('force-show');
             m.style.setProperty('display', displayType, 'important');
+            m.style.setProperty('visibility', 'visible', 'important');
+            m.style.setProperty('opacity', '1', 'important');
             
             // NEW: Ensure all parents are visible
             let p = m.parentElement;
             while (p && p !== document.body) {
+                if (p.classList && p.classList.contains('modal')) {
+                    console.warn('forceShowModal: Refusing to un-hide modal parent:', p.id || p.tagName);
+                    break;
+                }
                 if (window.getComputedStyle(p).display === 'none') {
                     console.warn('forceShowModal: Un-hiding parent:', p.id || p.tagName);
                     p.style.setProperty('display', 'block', 'important');
@@ -88,7 +115,7 @@
                 if (typeof showToast === 'function') showToast(`🤖 Model set to: ${el.innerText}`);
             }
         };
-        // [Version: V91.20] Early definition to prevent ReferenceError
+        // [Version: V91.26] Early definition to prevent ReferenceError
         window.switchHubMode = window.switchHubMode || function(mode) { console.warn('switchHubMode not yet fully loaded:', mode); };
 
     </script>
@@ -177,6 +204,10 @@
         .reflective-log-name { font-weight:900; color:#9a3412; }
         .reflective-log-date { font-size:0.76em; color:#94a3b8; }
         .reflective-log-content { font-size:0.98em; color:#334155; line-height:1.55; }
+
+        #form-quest-container > button.magic-btn[onclick="createQuest()"] {
+            display: none !important;
+        }
 
         .alabasta-genmage-model-rail {
             display:flex;
@@ -450,6 +481,10 @@
             .alabasta-genmage-toolbar-meta { flex-direction:column; align-items:flex-start; }
             .alabasta-genmage-image-meta { max-width:100%; padding-left:0; border-left:0; }
             .alabasta-genmage-toolbar .alabasta-casecard-btn.utility { width:100%; justify-content:center; }
+            .alabasta-casecard-actions { width:100%; justify-content:stretch; }
+            .alabasta-casecard-action-group { width:100%; flex-wrap:wrap; }
+            .alabasta-casecard-action-group.final { justify-content:flex-start; }
+            .alabasta-casecard-action-group .alabasta-casecard-btn { flex:1 1 150px; }
         }
         
         /* Hide Spinners/Controllers for q-timer */
@@ -801,9 +836,30 @@
         .alabasta-casecard-actions {
             display:flex;
             gap:10px;
-            flex-wrap:wrap;
+            flex-wrap:nowrap;
             align-items:center;
             justify-content:flex-end;
+        }
+
+        .alabasta-casecard-action-group {
+            display:flex;
+            gap:8px;
+            flex-wrap:nowrap;
+            align-items:center;
+        }
+
+        .alabasta-casecard-action-group.draft {
+            justify-content:flex-start;
+        }
+
+        .alabasta-casecard-action-group.final {
+            justify-content:flex-end;
+        }
+
+        .alabasta-casecard-actions .alabasta-casecard-btn {
+            min-height:42px;
+            padding:9px 13px;
+            font-size:0.82em;
         }
 
         .alabasta-casecard-btn {
@@ -818,6 +874,7 @@
             align-items:center;
             justify-content:center;
             gap:8px;
+            white-space:nowrap;
             transition:transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
             position:relative;
             overflow:hidden;
@@ -873,6 +930,12 @@
             background:#e5e7eb;
             color:#374151;
             font-weight:800;
+        }
+
+        .alabasta-casecard-btn.refine {
+            background:linear-gradient(135deg,#7c3aed,#ec4899);
+            color:#fff;
+            box-shadow:0 10px 22px rgba(124,58,237,0.18);
         }
 
         .alabasta-casecard-footer {
@@ -2019,6 +2082,9 @@
                 <button class="insight-tab-btn" onclick="switchInsightTab('quiz')" id="tab-btn-quiz" style="padding:8px 20px; border-radius:8px; border:none; font-weight:700; font-size:0.85em; cursor:pointer; transition:all 0.3s; background:transparent; color:#64748b;">
                     <i class="fa-solid fa-brain"></i> Quiz Insight
                 </button>
+                <button class="insight-tab-btn" onclick="switchInsightTab('backlog')" id="tab-btn-backlog" style="padding:8px 20px; border-radius:8px; border:none; font-weight:700; font-size:0.85em; cursor:pointer; transition:all 0.3s; background:transparent; color:#64748b;">
+                    <i class="fa-solid fa-inbox"></i> Backlog
+                </button>
                 <button class="insight-tab-btn" onclick="switchInsightTab('history')" id="tab-btn-history" style="padding:8px 20px; border-radius:8px; border:none; font-weight:700; font-size:0.85em; cursor:pointer; transition:all 0.3s; background:transparent; color:#64748b;">
                     <i class="fa-solid fa-list-ul"></i> History
                 </button>
@@ -2050,6 +2116,19 @@
                          <div id="quiz-summary-tips" style="font-size:0.8em; color:#64748b;">Analysis pending...</div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Backlog Container -->
+            <div id="insight-backlog-view" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div>
+                        <div style="font-weight:900; color:#334155;">Assigned Backlog</div>
+                        <div style="font-size:0.78em; color:#94a3b8; font-weight:700;">Daily Quest status for this user</div>
+                    </div>
+                    <button class="btn-sm" onclick="renderHubBacklog(window._currentPopupUser)" style="border:1px solid #dbe3ef; background:#f8fafc; color:#475569; border-radius:999px; padding:5px 12px; font-size:0.72em; font-weight:800;">Refresh</button>
+                </div>
+                <div id="hub-backlog-summary" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;"></div>
+                <div id="hub-backlog-list" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; max-height:620px; overflow-y:auto; padding-right:4px;"></div>
             </div>
 
             <!-- History Container (Merged [Version: V90.20]) -->
@@ -3418,7 +3497,7 @@
             <p style="color:#666; font-size:0.9em; margin-bottom:20px;">Internal Use Only</p>
 
             <!-- Magic Link UI -->
-            <input type="email" id="email-input" value="" placeholder="Enter Admin Email" style="margin-bottom:10px;">
+            <input type="email" id="email-input" value="medlifeplus@gmail.com" placeholder="Enter Admin Email" style="margin-bottom:10px;">
             <button class="magic-btn" onclick="sendMagicLink()" style="width:100%;">
                 ✨ Send Login Link
             </button>
@@ -3447,13 +3526,6 @@
             <div id="login-error" style="color:red; margin-top:10px; font-size:0.9em;"></div>
 
             <div
-                style="margin-top: 20px; text-align: left; background: #fffde7; padding: 10px; border-radius: 8px; border: 1px solid #fff59d; font-size: 0.8em; color: #856404;">
-                <b>💡 Admin Login Instruction:</b><br>
-                1. If opening in LINE: Tap <b>"Open in Default Browser"</b> (Chrome/Safari) at the top right to use Google Login.<br>
-                2. If using Magic Link: The system will send a link to your email (limited daily quota).
-            </div>
-
-            <div
                 style="margin-top: 20px; font-size: 0.75em; color: #999; border-top: 1px solid #eee; padding-top: 10px;">
                 Secure Access via Email, Google or LINE.<br>
             </div>
@@ -3466,7 +3538,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; background:linear-gradient(135deg, #f59e0b, #ef4444); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.6em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         ☀️ Nika
-                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.20</span>
+                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.34</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -6997,57 +7069,80 @@
 
                 <!-- 2. Daily Quest Form -->
                 <div id="form-quest-container" style="display:none; text-align:left;">
-                    <h2 style="margin-top:0;">New Daily Quest</h2>
+                    <!-- Header -->
+                    <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:14px; gap:10px;">
+                        <div>
+                            <h2 style="margin:0; color:#1e293b;">New Daily Quest</h2>
+                            <div style="font-size:0.78em; color:#94a3b8; font-weight:700; margin-top:3px;">Save as draft, schedule, or post now without changing score rules.</div>
+                        </div>
+                        <button onclick="openArchiveModal()" type="button" style="white-space:nowrap; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:7px 13px; font-size:0.75em; font-weight:800; color:#64748b; cursor:pointer; display:flex; align-items:center; gap:5px; flex-shrink:0; transition:0.15s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#f8fafc'">
+                            <i class="fa-solid fa-clock-rotate-left"></i> History
+                        </button>
+                    </div>
+
+                    <!-- Prompt textarea -->
                     <div style="margin-bottom:12px;">
-                        <textarea id="q-text" placeholder="📝 Enter mission content or required answer... (Supports new lines)" 
-                            style="width:100%; height:85px; padding:10px; border-radius:8px; border:1px solid #ddd; font-family:inherit; resize:vertical; font-size:0.95em;"></textarea>
+                        <textarea id="q-text" placeholder="📝 Enter mission content or required answer... (Supports new lines)"
+                            style="width:100%; height:105px; padding:14px; border-radius:14px; border:1px solid #dbe3ef; font-family:inherit; resize:vertical; font-size:0.95em; line-height:1.55; background:#fff; box-sizing:border-box;"></textarea>
                     </div>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
+
+                    <!-- Image URL + Reference Link -->
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:14px;">
                         <div>
-                            <label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:2px;">🖼️ Image URL</label>
-                            <input type="text" id="q-img" placeholder="https://..." style="width:100%; margin:0;">
+                            <label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:4px;">🖼️ Image URL</label>
+                            <input type="text" id="q-img" placeholder="https://..." style="width:100%; margin:0; border-radius:12px; box-sizing:border-box;">
                         </div>
                         <div>
-                            <label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:2px;">🔗 Reference Link</label>
-                            <input type="text" id="q-link" placeholder="Reference link..." style="width:100%; margin:0;">
-                        </div>
-                    </div>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
-                        <div>
-                            <label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:2px;">👥 Target Group</label>
-                            <input type="text" id="q-target-group-manual" placeholder="Public, IT..." list="group-list" style="width:100%; margin:0;">
-                        </div>
-                        <div>
-                            <label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:2px;">🏷️ Tag</label>
-                            <select id="q-tag" style="width:100%; font-size:0.9em; height:38px;">
-                                <option value="">-- Not Specified --</option>
-                                <option value="DIS">📋 DIS (Discussion)</option>
-                                <option value="INFOGRAPHIC">🎨 INFOGRAPHIC</option>
-                                <option value="WRITING">✍️ WRITING</option>
-                                <option value="CASE_STUDY">📖 CASE STUDY</option>
-                                <option value="PRESENTATION">🎤 PRESENTATION</option>
-                                <option value="RESEARCH">🔬 RESEARCH</option>
-                                <option value="REVIEW">📝 REVIEW</option>
-                                <option value="OTHER">📌 OTHER</option>
-                            </select>
+                            <label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:4px;">🔗 Reference Link</label>
+                            <input type="text" id="q-link" placeholder="Reference link..." style="width:100%; margin:0; border-radius:12px; box-sizing:border-box;">
                         </div>
                     </div>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
-                        <div>
-                            <label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:2px;">⏰ Scheduled Start</label>
-                            <input type="datetime-local" id="q-start-time" style="width:100%; margin:0; height:38px;">
+
+                    <!-- Target Group (card picker) -->
+                    <div style="margin-bottom:14px;">
+                        <label style="font-size:0.75em; font-weight:bold; color:#64748b; display:block; margin-bottom:6px;">
+                            👥 Target Group <span style="font-weight:500; color:#b0bec5; font-size:0.9em;">— active users only</span>
+                        </label>
+                        <input type="hidden" id="q-target-group-manual" value="Public">
+                        <div id="dq-group-cards" style="display:flex; flex-wrap:wrap; gap:8px; min-height:38px;">
+                            <span style="color:#94a3b8; font-size:0.8em; align-self:center;">Loading groups…</span>
                         </div>
-                        <div>
-                            <label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:2px;">🎨 UI Theme Hint</label>
-                            <div style="font-size:0.7em; color:#999; margin-top:8px;">Quest will be styled based on Tag.</div>
+                        <div id="dq-group-user-count" style="margin-top:6px; font-size:0.78em; color:#64748b; min-height:18px;"></div>
+                    </div>
+
+                    <!-- Tag (card picker) -->
+                    <div style="margin-bottom:14px;">
+                        <label style="font-size:0.75em; font-weight:bold; color:#64748b; display:block; margin-bottom:6px;">🏷️ Tag</label>
+                        <input type="hidden" id="q-tag" value="">
+                        <div id="dq-tag-cards" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+                    </div>
+
+                    <!-- Compact row: Scheduled · Expires · Duration · Score -->
+                    <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:8px; margin-bottom:16px;">
+                        <div style="background:#eff6ff; border:1.5px solid #bfdbfe; border-radius:14px; padding:10px 12px;">
+                            <label style="font-size:0.68em; font-weight:800; color:#3b82f6; display:block; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.05em;">⏰ Scheduled Start</label>
+                            <input type="datetime-local" id="q-start-time" style="width:100%; margin:0; border:none; background:transparent; font-size:0.85em; color:#1e3a8a; font-weight:700; padding:0; outline:none;">
+                        </div>
+                        <div style="background:#fefce8; border:1.5px solid #fde68a; border-radius:14px; padding:10px 12px; text-align:center;">
+                            <label style="font-size:0.68em; font-weight:800; color:#d97706; display:block; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.05em;">⏳ Expires (h)</label>
+                            <input type="number" id="q-hours" value="24" min="1" style="text-align:center; width:100%; margin:0; border:none; background:transparent; font-size:1.25em; font-weight:900; color:#92400e; padding:0; outline:none;">
+                        </div>
+                        <div style="background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:14px; padding:10px 12px; text-align:center;">
+                            <label style="font-size:0.68em; font-weight:800; color:#16a34a; display:block; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.05em;">⏱ Dur (min)</label>
+                            <input type="number" id="q-duration" value="60" min="1" style="text-align:center; width:100%; margin:0; border:none; background:transparent; font-size:1.25em; font-weight:900; color:#14532d; padding:0; outline:none;">
+                        </div>
+                        <div style="background:#fdf4ff; border:1.5px solid #e9d5ff; border-radius:14px; padding:10px 12px; text-align:center;">
+                            <label style="font-size:0.68em; font-weight:800; color:#9333ea; display:block; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.05em;">⭐ Score</label>
+                            <input type="number" id="q-score" value="1" step="0.1" min="0" style="text-align:center; width:100%; margin:0; border:none; background:transparent; font-size:1.25em; font-weight:900; color:#581c87; padding:0; outline:none;">
                         </div>
                     </div>
-                    <div style="display:flex; justify-content:space-between; gap:10px; margin-bottom:20px; background:#f9f9f9; padding:10px; border-radius:8px; border:1px dashed #ddd;">
-                        <div style="flex:1;"><label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:2px;">Expires (h)</label><input type="number" id="q-hours" value="24" style="text-align:center; width:100%;"></div>
-                        <div style="flex:1;"><label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:2px;">Dur (min)</label><input type="number" id="q-duration" value="30" style="text-align:center; width:100%;"></div>
-                        <div style="flex:1;"><label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:2px;">Score</label><input type="number" id="q-score" value="0.1" step="0.1" style="text-align:center; width:100%;"></div>
+
+                    <!-- Action buttons -->
+                    <div style="display:flex; gap:10px; justify-content:flex-end; align-items:center; border-top:1px solid #eef2f7; padding-top:14px;">
+                        <button class="btn-sm" onclick="createQuest('draft')" style="background:#f8fafc; color:#475569; border:1px solid #dbe3ef; padding:10px 16px; border-radius:12px; font-weight:900;">Save Draft</button>
+                        <button class="btn-sm" onclick="createQuest('schedule')" style="background:#111827; color:white; border:none; padding:10px 16px; border-radius:12px; font-weight:900;">Schedule</button>
+                        <button class="magic-btn" onclick="createQuest('post')" style="min-width:180px; background:#d35400; margin:0;">Post Now</button>
                     </div>
-                    <button class="magic-btn" onclick="createQuest()" style="width:100%; background:#d35400;">🚀 Post New Quest</button>
                 </div>
             </div>
         </div>
@@ -7143,6 +7238,7 @@
                                 <tr>
                                     <th>Quest</th>
                                     <th>Base Score</th>
+                                    <th>Participants</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -7690,6 +7786,16 @@
                 <input type="hidden" id="reflective-review-id">
                 <input type="hidden" id="reflective-review-uid">
                 <input type="hidden" id="reflective-review-uname">
+                <input type="hidden" id="reflective-review-raw-content">
+
+                <!-- Writing Analysis Card (shown after AI Suggest) -->
+                <div id="reflective-grammar-card" class="reflective-review-card reflective-review-field" style="display:none;">
+                    <div class="reflective-review-label-row" style="margin-bottom:8px;">
+                        <label class="reflective-review-label">✍️ Writing Analysis</label>
+                        <span id="reflective-grammar-score" style="font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; border:1px solid transparent;"></span>
+                    </div>
+                    <div id="reflective-grammar-content"></div>
+                </div>
 
                 <div style="display:grid; grid-template-columns: 1fr 1.2fr; gap:12px; margin-bottom:12px;">
                     <div class="reflective-review-card reflective-review-field">
@@ -7759,6 +7865,7 @@
         </div>
 
         <!-- 🔥 Score Adjustment Modal -->
+        </div>
         <div id="scoreAdjustmentModal" class="modal" style="z-index: 2503;">
             <div class="modal-content" style="max-width: 450px; border-top: 5px solid #f39c12; border-radius: 12px;">
                 <span class="close-modal" onclick="closeScoreAdjustmentModal()">&times;</span>
@@ -8108,38 +8215,71 @@
             </div>
             <input type="hidden" id="gs-uid">
 
-            <div
-                style="margin-bottom:15px; background:#f8f9fa; padding:12px; border-radius:8px; border:1px solid #eee;">
-                <label style="font-size:0.85em; color:#666; font-weight:bold;">🇹🇭 ชื่อ-นามสกุล (ภาษาไทย)</label>
-                <input type="text" id="gs-fullname-th" placeholder="ชื่อ-นามสกุล ภาษาไทย (สำหรับแสดงผลบนหน้าต่างหลัก)"
-                    style="width:100%; margin-top:5px; margin-bottom:8px; font-size:0.9em; padding:10px; border-radius:8px; border:1px solid #ddd;">
+            <div style="margin-bottom:15px; background:#f8f9fa; padding:12px; border-radius:8px; border:1px solid #eee; display:flex; flex-direction:column; gap:8px;">
+                <!-- Row 1: ชื่อ-นามสกุล + ชื่อเล่น -->
+                <div style="display:flex; gap:8px;">
+                    <div style="flex:3;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">🇹🇭 ชื่อ-นามสกุล (ภาษาไทย)</label>
+                        <input type="text" id="gs-fullname-th" placeholder="ชื่อ-นามสกุล ภาษาไทย" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                    <div style="flex:1.5;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">😊 ชื่อเล่น</label>
+                        <input type="text" id="gs-cert-nickname" placeholder="ชื่อเล่น" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                </div>
 
-                <div style="display:flex; gap:10px; margin-bottom:12px;">
+                <!-- Row 2: เลขที่ใบอนุญาต + คุณวุฒิ -->
+                <div style="display:flex; gap:8px;">
                     <div style="flex:1;">
                         <label style="font-size:0.75em; color:#888; font-weight:bold;">🪪 เลขที่ใบอนุญาต</label>
-                        <input type="text" id="gs-license-id" placeholder="เลขที่ใบอนุญาต" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em;">
+                        <input type="text" id="gs-license-id" placeholder="เลขที่ใบอนุญาต" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
                     </div>
                     <div style="flex:2;">
                         <label style="font-size:0.75em; color:#888; font-weight:bold;">📘 คุณวุฒิ</label>
-                        <input type="text" id="gs-qualification" placeholder="คุณวุฒิ / ระดับการศึกษา" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em;">
+                        <input type="text" id="gs-qualification" placeholder="คุณวุฒิ / ระดับการศึกษา" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
                     </div>
                 </div>
 
-                <label style="font-size:0.85em; color:#666; font-weight:bold;">🎓 Certificate Info (English)</label>
-                <div style="display:flex; gap:5px; margin-top:5px;">
-                    <input type="text" id="gs-firstname-en" placeholder="FIRST NAME"
-                        style="flex:2; font-size:0.9em; padding:8px;">
-                    <input type="text" id="gs-middlename-en" placeholder="MIDDLE"
-                        style="flex:1; font-size:0.9em; padding:8px;">
-                    <input type="text" id="gs-lastname-en" placeholder="LAST NAME"
-                        style="flex:2; font-size:0.9em; padding:8px;">
+                <!-- Row 3: โทรศัพท์ + อีเมล -->
+                <div style="display:flex; gap:8px;">
+                    <div style="flex:1;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">📞 โทรศัพท์</label>
+                        <input type="tel" id="gs-tel" placeholder="08x-xxx-xxxx" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">📧 อีเมล</label>
+                        <input type="email" id="gs-email" placeholder="email@example.com" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
                 </div>
-                <input type="text" id="gs-cert-fullname" placeholder="Full Name (Combined Preview / Manual Override)"
-                    style="margin-top:8px; width:100%; box-sizing:border-box; margin-bottom:8px; font-size:0.9em; padding:8px; background:#fff; border:1px solid #ddd; border-radius:4px;" title="This field is used for Certificate Generation">
-                <input type="text" id="gs-cert-nickname" placeholder="Nickname/AKA..."
-                    style="width:100%; box-sizing:border-box; font-size:0.9em; padding:8px; margin-bottom:8px;">
-                <input type="text" id="gs-institute" placeholder="Institution / Workplace..."
-                    style="width:100%; box-sizing:border-box; font-size:0.9em; padding:8px;">
+
+                <!-- Row 4: วันเกิด + สถาบัน -->
+                <div style="display:flex; gap:8px;">
+                    <div style="flex:1;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">🎂 วันเกิด</label>
+                        <input type="date" id="gs-birthday" style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                    <div style="flex:2;">
+                        <label style="font-size:0.75em; color:#888; font-weight:bold;">🏢 สถาบัน / ที่ทำงาน</label>
+                        <input type="text" id="gs-institute" placeholder="Institution / Workplace..." style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                </div>
+
+                <!-- Row 5: ที่อยู่ -->
+                <div>
+                    <label style="font-size:0.75em; color:#888; font-weight:bold;">📍 ที่อยู่</label>
+                    <input type="text" id="gs-address" placeholder="ที่อยู่..." style="width:100%; margin-top:3px; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:0.85em; box-sizing:border-box;">
+                </div>
+
+                <!-- Certificate Info (English) -->
+                <div style="border-top:1px solid #e2e8f0; padding-top:8px;">
+                    <label style="font-size:0.75em; color:#888; font-weight:bold;">🎓 Certificate Info (English)</label>
+                    <div style="display:flex; gap:5px; margin-top:5px; margin-bottom:5px;">
+                        <input type="text" id="gs-firstname-en" placeholder="FIRST NAME" style="flex:2; font-size:0.85em; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <input type="text" id="gs-middlename-en" placeholder="MIDDLE" style="flex:1; font-size:0.85em; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <input type="text" id="gs-lastname-en" placeholder="LAST NAME" style="flex:2; font-size:0.85em; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                    </div>
+                    <input type="text" id="gs-cert-fullname" placeholder="Full Name (Combined Preview / Manual Override)" style="width:100%; box-sizing:border-box; font-size:0.85em; padding:8px; border:1px solid #ddd; border-radius:6px;" title="This field is used for Certificate Generation">
+                </div>
             </div>
 
             <div style="margin-bottom:15px;">
@@ -8277,6 +8417,49 @@
                     <button type="button" class="btn-sm" onclick="closeEditCaseNoteModal()" style="min-width:110px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Cancel</button>
                     <button type="button" id="edit-case-note-save-btn" class="btn-sm" onclick="saveEditedCaseNote()" style="min-width:150px; background:linear-gradient(135deg,#f59e0b,#ea580c); color:white; border:none; border-radius:12px; padding:10px 18px; font-weight:900; box-shadow:0 8px 20px rgba(234,88,12,0.22);"><i class="fa-solid fa-save"></i> Save Changes</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quest Review Bonus Modal -->
+    <div id="questReviewBonusModal" class="modal" style="z-index:4303;">
+        <div class="modal-content case-score-modal-shell" style="border-color:rgba(99,102,241,0.28); background:linear-gradient(180deg,#fafafe 0%,#ffffff 100%);">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+                <div>
+                    <div style="font-size:1.08em; color:#3730a3; font-weight:900;">Review Quest Submission</div>
+                    <div id="quest-review-bonus-subtitle" style="margin-top:4px; font-size:0.84em; color:#78716c; line-height:1.5;"></div>
+                </div>
+                <button type="button" onclick="closeQuestReviewBonusModal(false)" style="border:none; background:transparent; color:#475569; font-size:1.45em; line-height:1; cursor:pointer;">&times;</button>
+            </div>
+
+            <div id="quest-review-bonus-meta" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0 4px;">
+                <div style="background:#ede9fe; border-radius:12px; padding:10px 12px;">
+                    <div style="font-size:0.72em; color:#5b21b6; font-weight:800; text-transform:uppercase;">Base Score</div>
+                    <div id="quest-review-base-score" style="font-size:1.3em; font-weight:900; color:#3730a3; margin-top:2px;">-</div>
+                </div>
+                <div style="background:#f0fdf4; border-radius:12px; padding:10px 12px;">
+                    <div style="font-size:0.72em; color:#166534; font-weight:800; text-transform:uppercase;">User</div>
+                    <div id="quest-review-user-name" style="font-size:1em; font-weight:900; color:#14532d; margin-top:2px; word-break:break-word;">-</div>
+                </div>
+            </div>
+
+            <div style="font-size:0.82em; color:#64748b; margin-bottom:6px; font-style:italic;" id="quest-review-question-text"></div>
+
+            <div style="font-weight:800; color:#374151; font-size:0.9em; margin-bottom:6px;">Quick Bonus</div>
+            <div class="case-score-chip-row">
+                <button type="button" class="case-score-chip quest-bonus-chip" data-score="-0.5" onclick="setQuestBonusValue(-0.5)" style="border-color:#f43f5e; background:#fff1f2; color:#be123c;">-0.5</button>
+                <button type="button" class="case-score-chip quest-bonus-chip" data-score="0" onclick="setQuestBonusValue(0)">0</button>
+                <button type="button" class="case-score-chip quest-bonus-chip" data-score="0.1" onclick="setQuestBonusValue(0.1)">+0.1</button>
+                <button type="button" class="case-score-chip quest-bonus-chip" data-score="0.5" onclick="setQuestBonusValue(0.5)">+0.5</button>
+                <button type="button" class="case-score-chip quest-bonus-chip" data-score="1" onclick="setQuestBonusValue(1)">+1.0</button>
+            </div>
+
+            <label for="quest-review-bonus-input" style="display:block; margin-bottom:8px; font-weight:800; color:#374151;">Custom Bonus <span style="font-weight:400; color:#94a3b8;">(can be negative)</span></label>
+            <input id="quest-review-bonus-input" type="number" step="0.1" inputmode="decimal" placeholder="0" style="margin:0; border-radius:14px; border-color:rgba(99,102,241,0.4);" oninput="syncQuestBonusChips()" onkeydown="if(event.key==='Enter'){event.preventDefault();closeQuestReviewBonusModal(true);}">
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px; flex-wrap:wrap;">
+                <button type="button" class="btn-sm" onclick="closeQuestReviewBonusModal(false)" style="min-width:96px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Cancel</button>
+                <button type="button" class="btn-sm" onclick="closeQuestReviewBonusModal(true)" style="min-width:110px; background:linear-gradient(135deg,#6366f1,#4f46e5); color:#fff; border:none; border-radius:12px; padding:10px 18px; font-weight:900;">Confirm & Award</button>
             </div>
         </div>
     </div>
@@ -8486,11 +8669,21 @@
             <div class="alabasta-casecard-footer">
                 <div id="alabasta-case-card-meta" class="alabasta-casecard-meta">No identifiers should appear in the safe summary or image prompt.</div>
                 <div class="alabasta-casecard-actions">
-                    <button type="button" class="btn-sm alabasta-casecard-btn ghost" onclick="refreshAlabastaCaseCardDraft()"><i class="fa-solid fa-wand-magic-sparkles"></i> Refresh Scaffold</button>
-                    <button type="button" class="btn-sm alabasta-casecard-btn primary" onclick="generateAlabastaCaseCardImage()" id="alabasta-case-card-generate-btn"><i class="fa-solid fa-image"></i> GenMage</button>
-                    <button type="button" class="btn-sm alabasta-casecard-btn utility" onclick="copyAlabastaCaseCardPrompt()"><i class="fa-solid fa-copy"></i> Copy Prompt</button>
-                    <button type="button" class="btn-sm alabasta-casecard-btn secondary" onclick="saveAlabastaCaseCardScaffold()" id="alabasta-case-card-save-btn"><i class="fa-solid fa-floppy-disk"></i> Save Scaffold</button>
-                    <button type="button" class="btn-sm alabasta-casecard-btn muted" onclick="closeAlabastaCaseCardModal()">Close</button>
+                    <div class="alabasta-casecard-action-group draft" aria-label="Draft tools">
+                        <button type="button" class="btn-sm alabasta-casecard-btn ghost" onclick="refreshAlabastaCaseCardDraft()"><i class="fa-solid fa-wand-magic-sparkles"></i> Refresh Scaffold</button>
+                        <select id="alabasta-case-card-refine-model" class="btn-sm alabasta-casecard-btn" style="margin-right:8px;">
+                            <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet</option>
+                            <option value="gpt-4-turbo">OpenAI GPT-4 Turbo</option>
+                            <option value="vertex-ai-model-name">Vertex AI</option>
+                        </select>
+                        <button type="button" id="alabasta-case-card-refine-btn" class="btn-sm alabasta-casecard-btn refine" onclick="refineAlabastaCaseCardPromptWithSelectedModel()" title="Refine this GenMage prompt with AI"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Refine</button>
+                        <button type="button" class="btn-sm alabasta-casecard-btn utility" onclick="copyAlabastaCaseCardPrompt()"><i class="fa-solid fa-copy"></i> Copy Prompt</button>
+                    </div>
+                    <div class="alabasta-casecard-action-group final" aria-label="Final actions">
+                        <button type="button" class="btn-sm alabasta-casecard-btn secondary" onclick="saveAlabastaCaseCardScaffold()" id="alabasta-case-card-save-btn"><i class="fa-solid fa-floppy-disk"></i> Save Scaffold</button>
+                        <button type="button" class="btn-sm alabasta-casecard-btn primary" onclick="generateAlabastaCaseCardImage()" id="alabasta-case-card-generate-btn"><i class="fa-solid fa-image"></i> GenMage</button>
+                        <button type="button" class="btn-sm alabasta-casecard-btn muted" onclick="closeAlabastaCaseCardModal()">Close</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -10239,7 +10432,7 @@
             if (hiddenInput) hiddenInput.value = btn.dataset.value || 'gpt-4o';
         };
 
-        function setReflectiveReviewStatus(message, tone) {
+        window.setReflectiveReviewStatus = function(message, tone) {
             const el = document.getElementById('reflective-review-ai-status');
             if (!el) return;
             if (!message) {
@@ -10250,7 +10443,7 @@
             const icon = tone === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check';
             el.className = 'reflective-review-status show ' + (tone || 'success');
             el.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
-        }
+        };
 
         function getReflectiveReviewPresetInstruction(preset) {
             const presetMap = {
@@ -10266,6 +10459,7 @@
 
         window.getAISuggestion = async function(btn) {
             const logContent = document.getElementById('reflective-review-user-info').innerText;
+            const rawContent = document.getElementById('reflective-review-raw-content').value.trim();
             if (!btn) btn = document.getElementById('btn-ai-suggest');
             const textarea = document.getElementById('reflective-review-comment');
             const modelSelect = document.getElementById('ai-model-review');
@@ -10274,21 +10468,19 @@
             const selectedModelName = modelSelect ? modelSelect.value : (document.getElementById("ai-analyzer-model-val") ? document.getElementById("ai-analyzer-model-val").value : "gemini-1.5-flash");
             const targetLang = langSelect ? langSelect.value : (document.getElementById("toolbar-ai-lang") ? document.getElementById("toolbar-ai-lang").value : "English");
             const presetInstruction = getReflectiveReviewPresetInstruction(presetSelect ? presetSelect.value : 'encourage');
-            
+
             if (!logContent || logContent.length < 5) return alert("No reflective log content found to analyze");
-            
+
             const existingDraft = textarea.value.trim();
-            
+
             try {
                 setReflectiveReviewStatus('');
                 btn.disabled = true;
-                const originalHtml = btn.innerHTML;
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>' + (btn.offsetWidth > 60 ? ' Analyzing...' : '');
-                
-                let prompt;
+
+                let feedbackPrompt;
                 if (existingDraft && existingDraft.length >= 3) {
-                    // [Version: V89.01] Thai draft → AI refine & output in target language
-                    prompt = `You are a kind and expert Mentor.
+                    feedbackPrompt = `You are a kind and expert Mentor.
 Here is a Reflective Log from an intern:
 "${logContent}"
 
@@ -10299,12 +10491,11 @@ Your task:
 1. Understand the admin's intent from the Thai draft above.
 2. Refine, polish, and expand it into a warm, professional feedback message.
 3. The final output MUST be in "${targetLang}" only.
-                    4. Keep it 2-3 sentences max. Show empathy and encouragement.
-                    5. Follow this style preset: ${presetInstruction}
-                    6. Do not include any explanation other than the refined feedback text.`;
+4. Keep it 2-3 sentences max. Show empathy and encouragement.
+5. Follow this style preset: ${presetInstruction}
+6. Do not include any explanation other than the refined feedback text.`;
                 } else {
-                    // Original: Generate from scratch
-                    prompt = `You are a kind and expert Mentor. 
+                    feedbackPrompt = `You are a kind and expert Mentor.
 Here is a Reflective Log from an intern:
 "${logContent}"
 
@@ -10314,13 +10505,42 @@ Please write a short praise and feedback (max 2-3 sentences) showing empathy and
 Keep it friendly but professional. Response must be in "${targetLang}" only.
 Do not include any explanation other than the feedback body.`;
                 }
-                
-                const { text } = await window.callUniversalAI(selectedModelName, prompt);
-                
-                textarea.value = text;
-                setReflectiveReviewStatus(existingDraft ? `AI refined your draft in ${targetLang}.` : `AI suggestion ready in ${targetLang}.`, 'success');
-                showToast(existingDraft ? "✨ AI refined your Thai draft → " + targetLang : "✨ AI suggested feedback!");
-                
+
+                const grammarSource = rawContent || logContent;
+                const grammarPrompt = `You are an expert Thai-English writing coach. Analyze this reflective writing from a learner:
+
+"${grammarSource}"
+
+The learner may write in Thai, English, or mixed. Analyze grammar, sentence structure, and clarity.
+
+Respond ONLY with valid JSON (no markdown, no extra text):
+{
+  "grade": "ดี" or "พอใช้" or "ควรปรับ",
+  "issues": ["concise issue in Thai (max 3 items)"],
+  "suggestions": ["practical suggestion in Thai (max 3 items)"],
+  "improved": "improved rewrite in the same language as original"
+}
+
+If no issues, return empty array for issues. Keep suggestions kind and constructive.`;
+
+                // Run admin feedback + grammar check in parallel
+                const [feedbackResult, grammarResult] = await Promise.allSettled([
+                    window.callUniversalAI(selectedModelName, feedbackPrompt),
+                    window.callUniversalAI('gemini-1.5-flash', grammarPrompt)
+                ]);
+
+                if (feedbackResult.status === 'fulfilled') {
+                    textarea.value = feedbackResult.value.text;
+                    setReflectiveReviewStatus(existingDraft ? `AI refined your draft in ${targetLang}.` : `AI suggestion ready in ${targetLang}.`, 'success');
+                    showToast(existingDraft ? "✨ AI refined your Thai draft → " + targetLang : "✨ AI suggested feedback!");
+                } else {
+                    throw feedbackResult.reason;
+                }
+
+                if (grammarResult.status === 'fulfilled') {
+                    renderGrammarAnalysis(grammarResult.value.text);
+                }
+
             } catch (error) {
                 console.error("AI Error:", error);
                 const rawMessage = error && error.message ? String(error.message) : 'Unknown error';
@@ -10334,6 +10554,59 @@ Do not include any explanation other than the feedback body.`;
                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <span class="btn-text">AI Suggest</span>';
             }
         };
+
+        function renderGrammarAnalysis(rawText) {
+            const card = document.getElementById('reflective-grammar-card');
+            const content = document.getElementById('reflective-grammar-content');
+            const badge = document.getElementById('reflective-grammar-score');
+            if (!card || !content) return;
+
+            let data;
+            try {
+                const match = rawText.match(/\{[\s\S]*\}/);
+                data = JSON.parse(match ? match[0] : rawText);
+            } catch (e) {
+                card.style.display = '';
+                content.innerHTML = `<div style="font-size:0.82em; color:#475569; line-height:1.6;">${rawText}</div>`;
+                return;
+            }
+
+            const gradeMap = {
+                'ดี':      { color:'#15803d', bg:'#f0fdf4', border:'#86efac' },
+                'พอใช้':   { color:'#b45309', bg:'#fffbeb', border:'#fcd34d' },
+                'ควรปรับ': { color:'#dc2626', bg:'#fef2f2', border:'#fca5a5' }
+            };
+            const g = gradeMap[data.grade] || gradeMap['พอใช้'];
+
+            badge.textContent = data.grade || '';
+            badge.style.cssText = `font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; background:${g.bg}; color:${g.color}; border:1px solid ${g.border};`;
+
+            let html = '';
+
+            if (data.issues && data.issues.length > 0) {
+                html += `<div style="margin-bottom:8px;">
+                    <div style="font-size:0.7em; font-weight:900; color:#ef4444; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">⚠ จุดที่ควรแก้ไข</div>
+                    ${data.issues.map(i => `<div style="font-size:0.8em; color:#7f1d1d; background:#fef2f2; border-left:3px solid #ef4444; padding:5px 9px; border-radius:0 8px 8px 0; margin-bottom:4px; line-height:1.5;">${i}</div>`).join('')}
+                </div>`;
+            }
+
+            if (data.suggestions && data.suggestions.length > 0) {
+                html += `<div style="margin-bottom:8px;">
+                    <div style="font-size:0.7em; font-weight:900; color:#b45309; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">💡 คำแนะนำการเขียน</div>
+                    ${data.suggestions.map(s => `<div style="font-size:0.8em; color:#78350f; background:#fffbeb; border-left:3px solid #f59e0b; padding:5px 9px; border-radius:0 8px 8px 0; margin-bottom:4px; line-height:1.5;">${s}</div>`).join('')}
+                </div>`;
+            }
+
+            if (data.improved) {
+                html += `<div>
+                    <div style="font-size:0.7em; font-weight:900; color:#15803d; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">✏ ตัวอย่างประโยคที่ดีขึ้น</div>
+                    <div style="font-size:0.82em; color:#14532d; background:#f0fdf4; border:1px solid #bbf7d0; padding:9px 11px; border-radius:10px; line-height:1.6;">${data.improved}</div>
+                </div>`;
+            }
+
+            content.innerHTML = html || `<div style="font-size:0.82em; color:#15803d;">✅ การเขียนดี ไม่พบจุดที่ต้องแก้ไข</div>`;
+            card.style.display = '';
+        }
 
         window.copyQuestionToClipboard = function(btn) {
             const item = btn.closest('.quiz-q-item');
@@ -10778,6 +11051,7 @@ Do not include any explanation other than the feedback body.`;
         const MY_URL = window.location.origin + window.location.pathname; // [Version: V88.64] Auto-detect current URL for GitHub Pages/Firebase compatibility
 
         var auth = firebase.auth();
+        const GOOGLE_POPUP_TIMEOUT_MS = 7000;
 
         var usersData = [], worksData = [], casesData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {}, questsSubList = [];
         var knowledgeBaseCache = []; // Required by PDF-to-Quiz and Research grounding
@@ -10969,6 +11243,7 @@ Do not include any explanation other than the feedback body.`;
 
         // 🔥 Google Sign-In Logic
         let googleLoginInProgress = false;
+        let googleFallbackMagicLinkSent = false;
 
         function setGoogleLoginButtonState(isLoading) {
             const btn = document.querySelector('#login-screen .btn-google');
@@ -10987,38 +11262,59 @@ Do not include any explanation other than the feedback body.`;
             if (btn.dataset.originalHtml) btn.innerHTML = btn.dataset.originalHtml;
         }
 
+        function triggerMagicLinkFallback(reason = '') {
+            if (googleFallbackMagicLinkSent) return;
+            googleFallbackMagicLinkSent = true;
+            const emailEl = document.getElementById('email-input');
+            const loginErrorEl = document.getElementById('login-error');
+            if (emailEl) emailEl.value = ALLOWED_EMAIL;
+            if (loginErrorEl) {
+                loginErrorEl.innerText = reason
+                    ? `${reason} Sending a secure login link to ${ALLOWED_EMAIL}...`
+                    : `Sending a secure login link to ${ALLOWED_EMAIL}...`;
+            }
+            sendMagicLink({ auto: true });
+        }
+
         async function loginWithGoogle() {
             if (googleLoginInProgress) return;
             googleLoginInProgress = true;
             setGoogleLoginButtonState(true);
 
             const provider = new firebase.auth.GoogleAuthProvider();
+            provider.setCustomParameters({ prompt: 'select_account' });
+            const resetIfPopupStalls = setTimeout(() => {
+                googleLoginInProgress = false;
+                setGoogleLoginButtonState(false);
+                const loginErrorEl = document.getElementById('login-error');
+                const emailEl = document.getElementById('email-input');
+                if (emailEl) emailEl.value = ALLOWED_EMAIL;
+                triggerMagicLinkFallback('Google sign-in is blocked or still waiting.');
+            }, GOOGLE_POPUP_TIMEOUT_MS);
             try {
                 const result = await auth.signInWithPopup(provider);
-                // Success handled by onAuthStateChanged
+                clearTimeout(resetIfPopupStalls);
                 console.log("Google Login Success:", result.user.email);
             } catch (error) {
-                const shouldFallbackToRedirect = error && (
-                    error.code === 'auth/popup-blocked' ||
-                    error.code === 'auth/cancelled-popup-request' ||
-                    error.code === 'auth/popup-closed-by-user'
-                );
-
-                if (shouldFallbackToRedirect) {
-                    try {
-                        await auth.signInWithRedirect(provider);
-                        return;
-                    } catch (redirectError) {
-                        console.error("Google Redirect Login Error:", redirectError);
-                        alert("Google Redirect Login Error: " + redirectError.message);
-                        document.getElementById('login-error').innerText = "Google Error: " + redirectError.message;
-                    }
+                clearTimeout(resetIfPopupStalls);
+                const loginErrorEl = document.getElementById('login-error');
+                const emailEl = document.getElementById('email-input');
+                if (emailEl) emailEl.value = ALLOWED_EMAIL;
+                const code = error && error.code ? error.code : '';
+                if (code === 'auth/popup-blocked' || code === 'auth/cancelled-popup-request') {
+                    const msg = 'Google popup was blocked.';
+                    console.warn("Google Login Popup Blocked:", error);
+                    if (loginErrorEl) loginErrorEl.innerText = `${msg} Sending Magic Link instead...`;
+                    triggerMagicLinkFallback(msg);
+                } else if (code === 'auth/popup-closed-by-user') {
+                    const msg = 'Google sign-in was closed before completion. Please click Google again when ready.';
+                    console.warn("Google Login Popup Closed:", error);
+                    if (loginErrorEl) loginErrorEl.innerText = msg;
                 } else {
                     console.error("Google Login Error:", error);
                     alert("Google Login Error: " + error.message);
-                    document.getElementById('login-error').innerText = "Google Error: " + error.message;
+                    if (loginErrorEl) loginErrorEl.innerText = "Google Error: " + error.message;
                 }
-            } finally {
                 googleLoginInProgress = false;
                 setGoogleLoginButtonState(false);
             }
@@ -11053,7 +11349,7 @@ Do not include any explanation other than the feedback body.`;
         }
 
         // 🔥 Magic Link Logic (Replaces Google Sign-In)
-        function sendMagicLink() {
+        function sendMagicLink(options = {}) {
             const email = document.getElementById('email-input').value;
             if (email !== ALLOWED_EMAIL) {
                 alert("❌ Access Denied: Email not authorized.");
@@ -17293,6 +17589,10 @@ async function saveQuiz() {
             document.getElementById('gs-cert-fullname').value = user?.fullNameEn || '';
             document.getElementById('gs-cert-nickname').value = user?.nickname || user?.nickName || '';
             document.getElementById('gs-institute').value = user?.institute || '';
+            document.getElementById('gs-tel').value = user?.phone || user?.tel || '';
+            document.getElementById('gs-email').value = user?.email || '';
+            document.getElementById('gs-birthday').value = user?.birthday || '';
+            document.getElementById('gs-address').value = user?.address || '';
 
             // Helper to update full name preview
             const updateGsFullname = () => {
@@ -17398,6 +17698,10 @@ async function saveQuiz() {
             const newInstitute = document.getElementById('gs-institute').value.trim();
             const licenseId = document.getElementById('gs-license-id').value.trim();
             const qualification = document.getElementById('gs-qualification').value.trim();
+            const tel = document.getElementById('gs-tel').value.trim();
+            const email = document.getElementById('gs-email').value.trim();
+            const birthday = document.getElementById('gs-birthday').value.trim();
+            const address = document.getElementById('gs-address').value.trim();
 
             if (!uid) return;
 
@@ -17412,7 +17716,11 @@ async function saveQuiz() {
                     nickname: newNickname,
                     institute: newInstitute,
                     licenseId: licenseId,
-                    qualification: qualification
+                    qualification: qualification,
+                    phone: tel,
+                    email: email,
+                    birthday: birthday,
+                    address: address
                 });
                 showToast("User updated successfully!");
                 forceHideModal('groupSelectModal');
@@ -17888,6 +18196,12 @@ async function saveQuiz() {
             const safeSummary = safeNote
                 ? `Educational case summary: ${safeNote}`
                 : `Educational case summary for ${taxonomy.primarySystemLabel} with tags: ${taxonomy.symptomTags.join(', ') || 'not specified'}.`;
+            const title = taxonomy.primarySystemLabel && taxonomy.primarySystemLabel !== 'Other'
+                ? `${taxonomy.primarySystemLabel} Case Brief`
+                : 'Medical Case Brief';
+            const subtitle = taxonomy.symptomTags.length
+                ? taxonomy.symptomTags.slice(0, 3).join(' / ')
+                : 'Privacy-safe clinical learning summary';
 
             return {
                 visualMode: 'educational_case_card',
@@ -17898,13 +18212,59 @@ async function saveQuiz() {
                 taxonomySummary: taxonomy.taxonomySummary,
                 safeSummary,
                 stylePreset: 'Miss Goldenweek / clean medical infographic',
+                imageBrief: {
+                    format: 'high-quality medical infographic poster',
+                    audience: 'pharmacy interns and clinical reviewers',
+                    language: 'English',
+                    layout: 'clean two-column infographic with a bottom review section',
+                    aspectRatio: 'square or portrait',
+                    tone: 'professional, calm, educational, patient-safe'
+                },
+                textContent: {
+                    title,
+                    subtitle,
+                    leftColumnTitle: 'Case Snapshot',
+                    rightColumnTitle: 'Clinical Review Cues',
+                    bottomSectionTitle: 'Counseling and Follow-up Points'
+                },
+                visualRequirements: [
+                    'perfect typography',
+                    'sharp readable English text',
+                    'no spelling errors',
+                    'clean infographic layout',
+                    'clear hierarchy',
+                    'minimal clutter',
+                    'balanced spacing',
+                    'warm medical editorial style'
+                ],
+                negativePrompt: [
+                    'no real patient photo',
+                    'no ID card',
+                    'no hospital form',
+                    'no prescription label with personal data',
+                    'no tiny unreadable text',
+                    'no misspelled medical terms',
+                    'no crowded poster',
+                    'no graphic or scary medical imagery'
+                ],
                 forbiddenIdentifiers: ['HN', 'case number', 'customer name', 'patient name', 'LINE name', 'user id', 'phone', 'email']
             };
         }
 
         function buildAlabastaCaseCardPrompt(payload) {
+            const textContent = payload.textContent || {};
+            const imageBrief = payload.imageBrief || {};
+            const visualRequirements = Array.isArray(payload.visualRequirements) ? payload.visualRequirements : [];
+            const negativePrompt = Array.isArray(payload.negativePrompt) ? payload.negativePrompt : [];
             return [
-                'Create a short educational visual case summary card for admin review.',
+                `Create a ${imageBrief.format || 'high-quality medical infographic poster'} about a privacy-safe educational medical case.`,
+                '',
+                'Text content:',
+                `Title: ${textContent.title || 'Medical Case Brief'}`,
+                `Subtitle: ${textContent.subtitle || 'Privacy-safe clinical learning summary'}`,
+                `Left column title: ${textContent.leftColumnTitle || 'Case Snapshot'}`,
+                `Right column title: ${textContent.rightColumnTitle || 'Clinical Review Cues'}`,
+                `Bottom section: ${textContent.bottomSectionTitle || 'Counseling and Follow-up Points'}`,
                 '',
                 `Primary system: ${payload.primarySystemLabel}`,
                 `Symptom tags: ${payload.symptomTags.length ? payload.symptomTags.join(', ') : 'not specified'}`,
@@ -17914,13 +18274,17 @@ async function saveQuiz() {
                 '- Clean medical infographic card',
                 '- Warm Alabasta theme with Miss Goldenweek visual direction',
                 '- English language with concise headings',
-                '- 1-page educational card, square or portrait layout',
+                `- ${imageBrief.layout || '1-page educational card, square or portrait layout'}`,
                 '- Focus on learning points, symptom pattern, counseling points, and review cues',
+                ...visualRequirements.map(item => `- ${item}`),
                 '',
                 'Privacy requirements:',
                 '- Do not include HN, Ref No., case number, customer name, patient name, user name, LINE name, phone, email, or any identifier',
                 '- Do not invent patient identity',
-                '- Keep the content educational and anonymized'
+                '- Keep the content educational and anonymized',
+                '',
+                'Avoid:',
+                ...negativePrompt.map(item => `- ${item}`)
             ].join('\n');
         }
 
@@ -17978,6 +18342,84 @@ async function saveQuiz() {
             return prompt;
         }
 
+
+        async function refineAlabastaCaseCardPromptWithSelectedModel() {
+            const modelSelect = document.getElementById('alabasta-case-card-refine-model');
+            const modelName = modelSelect ? modelSelect.value : 'claude-3-5-sonnet-latest';
+            await refineAlabastaCaseCardPromptWithModel(modelName);
+        }
+
+        async function refineAlabastaCaseCardPromptWithModel(modelName) {
+            const safeSummaryEl = document.getElementById('alabasta-case-card-safe-summary');
+            const taxonomyEl = document.getElementById('alabasta-case-card-taxonomy');
+            const safePayloadEl = document.getElementById('alabasta-case-card-safe-payload');
+            const promptEl = document.getElementById('alabasta-case-card-prompt');
+            const metaEl = document.getElementById('alabasta-case-card-meta');
+            const refineBtn = document.getElementById('alabasta-case-card-refine-btn');
+            if (!safeSummaryEl || !taxonomyEl || !safePayloadEl || !promptEl) return;
+
+            const safeSummary = String(safeSummaryEl.value || '').trim();
+            const taxonomySummary = String(taxonomyEl.value || '').trim();
+            const currentPrompt = String(promptEl.value || '').trim() || await rebuildAlabastaCaseCardPromptFromInputs({ quiet: true });
+            if (!safeSummary || !currentPrompt) return alert('Safe summary and GenMage prompt are required before AI Refine.');
+
+            const safePayload = (typeof safeJsonParse === 'function')
+                ? safeJsonParse(safePayloadEl.value)
+                : JSON.parse(safePayloadEl.value || '{}');
+            const originalHtml = refineBtn ? refineBtn.innerHTML : '';
+
+            const refinePrompt = [
+                'You are refining a privacy-safe medical infographic image prompt.',
+                'Return only the final English image-generation prompt. Do not explain your work.',
+                '',
+                'Inputs:',
+                '1) Anonymized Summary:',
+                safeSummary,
+                '',
+                '2) Taxonomy Summary:',
+                taxonomySummary || 'Not specified',
+                '',
+                '3) Safe Payload JSON:',
+                JSON.stringify(safePayload || {}, null, 2),
+                '',
+                '4) Current GenMage Prompt:',
+                currentPrompt,
+                '',
+                'Task:',
+                '- Rewrite these into one concise English prompt for an image generation model.',
+                '- Start with: Create a high-quality medical infographic poster about ...',
+                '- Include visible text sections when useful: Title, Subtitle, Left column title, Right column title, Bottom section.',
+                '- Preserve privacy. Do not include HN, Ref No., case number, customer name, patient name, LINE name, user ID, phone, email, or any identifier.',
+                '- Do not invent patient identity or extra clinical facts.',
+                '- Keep the wording short enough to render clearly inside a poster.',
+                '- Explicitly request perfect typography, sharp readable text, no spelling errors, clean infographic layout, clear hierarchy, minimal clutter, and balanced spacing.',
+                '- Avoid real patient photos, ID cards, hospital forms, prescription labels with personal data, tiny unreadable text, misspelled medical terms, crowded posters, or graphic medical imagery.'
+            ].join('\n');
+
+            try {
+                if (refineBtn) {
+                    refineBtn.disabled = true;
+                    refineBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Refining';
+                }
+                if (metaEl) metaEl.textContent = `${modelName} is refining the GenMage prompt...`;
+                const { text, model } = await window.callUniversalAI(modelName, refinePrompt);
+                const refinedPrompt = String(text || '').replace(/^```(?:text)?/i, '').replace(/```$/g, '').trim();
+                if (!refinedPrompt) throw new Error(`${modelName} returned an empty prompt.`);
+                promptEl.value = refinedPrompt;
+                if (metaEl) metaEl.textContent = `${modelName}-refined prompt ready${model ? ` (${model})` : ''}.`;
+                if (typeof showToast === 'function') showToast(`GenMage prompt refined with ${modelName}`, 'success');
+            } catch (e) {
+                console.error(`Failed to refine GenMage prompt with ${modelName}:`, e);
+                if (metaEl) metaEl.textContent = `AI Refine failed: ${e.message}`;
+                alert('AI Refine failed: ' + e.message);
+            } finally {
+                if (refineBtn) {
+                    refineBtn.disabled = false;
+                    refineBtn.innerHTML = originalHtml || '<i class="fa-solid fa-wand-magic-sparkles"></i> AI Refine';
+                }
+            }
+        }
+
         function setAlabastaCaseCardImageLoadingState(isLoading, modelLabel) {
             const imageWrap = document.getElementById('alabasta-case-card-image-wrap');
             const stageEl = document.getElementById('alabasta-case-card-image-stage');
@@ -18027,7 +18469,11 @@ async function saveQuiz() {
                 privacyStatus: payload.privacyStatus,
                 primarySystemKey: payload.primarySystemKey,
                 symptomTags: payload.symptomTags,
-                stylePreset: payload.stylePreset
+                stylePreset: payload.stylePreset,
+                imageBrief: payload.imageBrief,
+                textContent: payload.textContent,
+                visualRequirements: payload.visualRequirements,
+                negativePrompt: payload.negativePrompt
             }, null, 2);
             if (ids.original) ids.original.value = String(caseItem.note || '');
             if (ids.safeSummary) ids.safeSummary.value = payload.safeSummary;
@@ -18142,7 +18588,11 @@ async function saveQuiz() {
                         symptomTags: payload.symptomTags,
                         taxonomySummary: payload.taxonomySummary,
                         stylePreset: payload.stylePreset,
-                        privacyStatus: payload.privacyStatus
+                        privacyStatus: payload.privacyStatus,
+                        imageBrief: payload.imageBrief,
+                        textContent: payload.textContent,
+                        visualRequirements: payload.visualRequirements,
+                        negativePrompt: payload.negativePrompt
                     },
                     caseVisualPreparedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     caseVisualPreparedBy: ALLOWED_EMAIL || 'admin'
@@ -19603,11 +20053,172 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
             document.getElementById('insight-activity-view').style.display = tab === 'activity' ? 'block' : 'none';
             document.getElementById('insight-quiz-view').style.display = tab === 'quiz' ? 'block' : 'none';
+            document.getElementById('insight-backlog-view').style.display = tab === 'backlog' ? 'block' : 'none';
             document.getElementById('insight-history-view').style.display = tab === 'history' ? 'block' : 'none';
             
             if (tab === 'quiz' && window._currentPopupUser) renderQuizInsight(window._currentPopupUser);
+            if (tab === 'backlog' && window._currentPopupUser) renderHubBacklog(window._currentPopupUser);
             if (tab === 'history' && window._currentPopupUser) renderHubHistoryPage();
         };
+
+        function getHubQuizApprovalKey(log) {
+            const text = String(log?.text || '');
+            const isQuizApproval = /Quiz Approved/i.test(text) || /Quiz:/i.test(text);
+            if (!isQuizApproval) return '';
+
+            const normalizedTitle = text
+                .replace(/Quiz Approved \(Actual\):\s*\d+\s*\/\s*\d+\s*-\s*/i, '')
+                .replace(/Quiz Approved \(All Correct\):\s*/i, '')
+                .replace(/Quiz Approved:\s*/i, '')
+                .replace(/.*?Quiz:\s*/i, '')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .toLowerCase();
+
+            if (!normalizedTitle) return '';
+            const dayKey = log?.t instanceof Date ? log.t.toISOString().slice(0, 10) : 'nodate';
+            const scoreKey = Number(log?.score || 0).toFixed(2);
+            return `${dayKey}|${normalizedTitle}|${scoreKey}`;
+        }
+
+        function dedupeHubQuizApprovalLogs(logs) {
+            const uniqueLogs = [];
+            const seenIndexByKey = new Map();
+
+            logs.forEach(log => {
+                const key = getHubQuizApprovalKey(log);
+                if (!key) {
+                    uniqueLogs.push(log);
+                    return;
+                }
+
+                const existingIndex = seenIndexByKey.get(key);
+                if (existingIndex === undefined) {
+                    seenIndexByKey.set(key, uniqueLogs.length);
+                    uniqueLogs.push(log);
+                    return;
+                }
+
+                const existing = uniqueLogs[existingIndex];
+                const currentIsActual = /Quiz Approved \(Actual\)/i.test(String(log.text || ''));
+                const existingIsActual = /Quiz Approved \(Actual\)/i.test(String(existing.text || ''));
+                if (currentIsActual && !existingIsActual) {
+                    uniqueLogs[existingIndex] = log;
+                }
+            });
+
+            return uniqueLogs;
+        }
+
+        function getQuestLogDate(data) {
+            return data?.submittedAt || data?.reviewedAt || data?.receivedAt || data?.startedAt || data?.createdAt || data?.timestamp;
+        }
+
+        function getQuestLogTitle(data, fallback = 'Daily Quest') {
+            return data?.questTitle || data?.title || data?.question || fallback;
+        }
+
+        function toHubDate(dateObj) {
+            if (!dateObj) return null;
+            if (dateObj instanceof Date) return dateObj;
+            if (typeof dateObj.toDate === 'function') return dateObj.toDate();
+            const d = new Date(dateObj);
+            return Number.isNaN(d.getTime()) ? null : d;
+        }
+
+        function isQuestAssignedToUser(quest, user) {
+            const target = String(quest?.targetGroup || 'Public').trim();
+            if (!target || target.toLowerCase() === 'public' || target.toLowerCase() === 'all') return true;
+            const userGroup = String(user?.group || 'Public').trim();
+            if (target.toLowerCase() === userGroup.toLowerCase()) return true;
+            if (Array.isArray(quest?.assigneeIds) && quest.assigneeIds.includes(user?.id)) return true;
+            if (Array.isArray(quest?.assignedUsers) && quest.assignedUsers.includes(user?.id)) return true;
+            return false;
+        }
+
+        function getQuestLifecycleStatus(quest, submission) {
+            const now = new Date();
+            const status = String(quest?.status || 'active').toLowerCase();
+            const start = toHubDate(quest?.startTime || quest?.scheduledStart);
+            const deadline = toHubDate(quest?.deadline);
+            if (status === 'draft') return 'draft';
+            if (start && start > now) return 'scheduled';
+            if (submission && submission.status !== 'none') {
+                return submission.adminAcknowledged ? 'done' : 'review';
+            }
+            if (deadline && deadline < now) return 'expired';
+            return 'backlog';
+        }
+
+        function renderHubBacklog(userId) {
+            const list = document.getElementById('hub-backlog-list');
+            const summary = document.getElementById('hub-backlog-summary');
+            if (!list || !summary) return;
+
+            const user = (usersData || []).find(u => u.id === userId) || {};
+            const counts = { backlog: 0, scheduled: 0, review: 0, done: 0, expired: 0 };
+            const visible = (questsCache || [])
+                .filter(q => isQuestAssignedToUser(q, user))
+                .map(q => {
+                    const sub = (questsSubList || []).find(s => s.questId === q.id && s.userId === userId);
+                    return { quest: q, sub, status: getQuestLifecycleStatus(q, sub) };
+                })
+                .filter(item => item.status !== 'draft')
+                .sort((a, b) => {
+                    const ad = toHubDate(a.quest.deadline)?.getTime() || 0;
+                    const bd = toHubDate(b.quest.deadline)?.getTime() || 0;
+                    return ad - bd;
+                });
+
+            visible.forEach(item => { if (counts[item.status] !== undefined) counts[item.status]++; });
+            summary.innerHTML = Object.entries(counts).map(([key, val]) => {
+                const colors = {
+                    backlog: ['#fff7ed', '#c2410c'],
+                    scheduled: ['#eff6ff', '#1d4ed8'],
+                    review: ['#fef3c7', '#b45309'],
+                    done: ['#dcfce7', '#166534'],
+                    expired: ['#fee2e2', '#b91c1c']
+                }[key];
+                return `<span style="border-radius:999px; padding:5px 10px; background:${colors[0]}; color:${colors[1]}; font-size:0.74em; font-weight:900; text-transform:uppercase;">${key}: ${val}</span>`;
+            }).join('');
+
+            if (!visible.length) {
+                list.innerHTML = `<div style="grid-column:1/-1; padding:18px; border:1px dashed #cbd5e1; border-radius:14px; color:#64748b; text-align:center; font-weight:800; background:#f8fafc;">No assigned Daily Quest found for this user.</div>`;
+                return;
+            }
+
+            const statusStyles = {
+                backlog: ['Backlog', '#fff7ed', '#c2410c'],
+                scheduled: ['Scheduled', '#eff6ff', '#1d4ed8'],
+                review: ['Review', '#fef3c7', '#b45309'],
+                done: ['Done', '#dcfce7', '#166534'],
+                expired: ['Expired', '#fee2e2', '#b91c1c']
+            };
+
+            list.innerHTML = visible.map(({ quest, sub, status }) => {
+                const [label, bg, fg] = statusStyles[status] || statusStyles.backlog;
+                const deadline = toHubDate(quest.deadline);
+                const start = toHubDate(quest.startTime || quest.scheduledStart);
+                const submitted = toHubDate(sub?.submittedAt);
+                const title = String(quest.question || 'Untitled Daily Quest');
+                return `
+                    <div style="border:1px solid #e2e8f0; border-radius:14px; background:white; padding:14px; box-shadow:0 8px 18px rgba(15,23,42,0.04);">
+                        <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start; margin-bottom:10px;">
+                            <span style="border-radius:999px; padding:4px 9px; background:${bg}; color:${fg}; font-size:0.7em; font-weight:900; text-transform:uppercase;">${label}</span>
+                            <button class="btn-sm" onclick="recallQuest('${quest.id}')" style="border:none; background:#f8fafc; color:#64748b; border-radius:8px; padding:4px 8px; font-size:0.72em; font-weight:800;">Open</button>
+                        </div>
+                        <div style="font-weight:900; color:#1e293b; line-height:1.35; margin-bottom:10px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${title}</div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.76em; color:#64748b; font-weight:700;">
+                            <div>Score<br><b style="color:#10b981;">+${Number(quest.baseScore || 0).toFixed(2)}</b></div>
+                            <div>Duration<br><b>${quest.durationMinutes || 30}m</b></div>
+                            <div>Start<br><b>${start ? start.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : 'Now'}</b></div>
+                            <div>Deadline<br><b>${deadline ? deadline.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '-'}</b></div>
+                        </div>
+                        ${submitted ? `<div style="margin-top:10px; padding-top:10px; border-top:1px dashed #e2e8f0; font-size:0.76em; color:#94a3b8; font-weight:700;">Submitted: ${submitted.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
 
         window.openUserHub = async function(userId, initialTab = 'activity') {
             window._currentPopupUser = userId;
@@ -19670,6 +20281,69 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     }
                 });
 
+                const questDisplayLogs = [];
+                let questReceiveScore = 0;
+                let questReceiveCount = 0;
+                let questReviewScore = 0;
+                let questReviewCount = 0;
+
+                questsSnap.forEach(doc => {
+                    const d = doc.data();
+                    const questTitle = getQuestLogTitle(d);
+                    const questDate = toHubDate(getQuestLogDate(d));
+                    const answer = d.answer || d.submission || d.content || '';
+                    const questExtra = {
+                        isQuest: true,
+                        questSubId: doc.id,
+                        questTitle,
+                        answer,
+                        questData: d
+                    };
+
+                    if (d.status !== 'none') {
+                        questReceiveScore += 0.1;
+                        questReceiveCount++;
+                        questDisplayLogs.push({
+                            t: questDate,
+                            type: 'work',
+                            text: `Daily Quest: ${questTitle}`,
+                            score: 0.1,
+                            questScoreKind: 'received',
+                            ...questExtra
+                        });
+                    }
+
+                    const reviewedScore = (d.earnedScore || 0) + (d.bonusGiven || 0);
+                    if (reviewedScore > 0) {
+                        questReviewScore += reviewedScore;
+                        questReviewCount++;
+                        questDisplayLogs.push({
+                            t: questDate,
+                            type: 'work',
+                            text: `Daily Quest Reviewed: ${questTitle}`,
+                            score: reviewedScore,
+                            questScoreKind: 'reviewed',
+                            ...questExtra
+                        });
+                    }
+                });
+
+                for (let i = allLogs.length - 1; i >= 0; i--) {
+                    const log = allLogs[i];
+                    const text = String(log.text || '');
+                    if (log.type === 'quest' || (log.type === 'bonus' && text.includes('Receive:'))) {
+                        allLogs.splice(i, 1);
+                    }
+                }
+
+                allLogs.push(...questDisplayLogs);
+                dash.bonus = Math.max(0, dash.bonus - questReceiveScore);
+                dash.bc = Math.max(0, dash.bc - questReceiveCount);
+                dash.quizzes = Math.max(0, dash.quizzes - questReviewScore);
+                dash.qc = Math.max(0, dash.qc - questReviewCount);
+                dash.works += questReceiveScore + questReviewScore;
+                dash.wc += questReceiveCount + questReviewCount;
+
                 const hubCaseReviewLogTextByDocId = {};
                 logsSnap.forEach(doc => { 
                     const d = doc.data();
@@ -19724,10 +20398,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 });
 
                 allLogs.sort((a,b) => (b.t || 0) - (a.t || 0));
+                const displayLogs = dedupeHubQuizApprovalLogs(allLogs);
                 
                 // Save to Hub Cache
-                window._hubUserCache[userId] = { pointsMap, detailsMap, allLogs, dash, user: u };
-                historyCache = allLogs;
+                window._hubUserCache[userId] = { pointsMap, detailsMap, allLogs: displayLogs, dash, user: u };
+                historyCache = displayLogs;
                 historyPage = 1;
 
                 // Sync UI
@@ -19823,10 +20498,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function getHubFilteredHistory() {
             const mode = window._hubHistoryFilter || 'all';
             if (mode === 'all') return historyCache;
-            if (mode === 'quizzes') return historyCache.filter(e => e.type === 'quiz' || e.type === 'quest');
-            if (mode === 'works') return historyCache.filter(e => e.type === 'work');
+            if (mode === 'quizzes') return historyCache.filter(e => e.type === 'quiz');
+            if (mode === 'works') return historyCache.filter(e => e.type === 'work' || e.isQuest);
             if (mode === 'logs') return historyCache.filter(e => e.type === 'reflective_log' || e.type === 'reflective_bonus');
-            if (mode === 'bonus') return historyCache.filter(e => e.type === 'bonus' || e.type === 'streak');
+            if (mode === 'bonus') return historyCache.filter(e => (e.type === 'bonus' && !e.isQuest && !String(e.text || '').includes('Quest Bonus')) || e.type === 'streak');
             if (mode === 'manual') return historyCache.filter(e => e.type === 'manual' || e.type === 'manual_adjust');
             return historyCache;
         }
@@ -20788,38 +21463,105 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 });
             } catch (e) { console.error("Kanban Section 6 Error:", e); }
 
-            // 7. Render Active Daily Quests (Bounties) in "Backlog"
+            // 7. Render Active Daily Quests (Bounties) — Backlog if 0 subs, Doing if ≥1 sub
             try {
                 questsCache.forEach(q => {
-                    const isLive = q.deadline && q.deadline.toDate() > new Date();
+                    const now = new Date();
+                    const questStatus = String(q.status || 'active').toLowerCase();
+                    const startTime = q.startTime?.toDate ? q.startTime.toDate() : (q.scheduledStart?.toDate ? q.scheduledStart.toDate() : null);
+
+                    // ── Closed quests → Done column ──
+                    if (questStatus === 'closed') {
+                        const title = q.question || "Untitled Quest";
+                        if (filter && !title.toLowerCase().includes(filter)) return;
+                        const subs = questsSubList.filter(s => s.questId === q.id && s.status !== 'none');
+                        const closedAt = q.closedAt?.toDate ? q.closedAt.toDate() : null;
+                        const closedStr = closedAt ? closedAt.toLocaleString('th-TH', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+                        cnt["Done"]++;
+                        const d = document.createElement('div');
+                        d.className = 'kanban-card card-Done live-quest';
+                        d.style.borderLeft = '4px solid #22c55e';
+                        d.style.background = '#f0fdf4';
+                        d.innerHTML = `
+                            <div class="card-header-row" style="margin-bottom:10px;">
+                                <span class="badge" style="background:linear-gradient(135deg,#22c55e,#16a34a);padding:4px 12px;border-radius:8px;font-size:0.7em;letter-spacing:0.5px;">DAILY QUEST</span>
+                                <span style="font-size:0.7em;font-weight:800;color:#15803d;background:#dcfce7;padding:3px 8px;border-radius:999px;">✅ Closed</span>
+                            </div>
+                            <div style="font-weight:800;font-size:1.05em;color:#1e293b;margin-bottom:8px;line-height:1.4;">${title}</div>
+                            <div style="font-size:0.8em;color:#15803d;background:white;padding:10px;border-radius:12px;border:1px solid #bbf7d0;">
+                                <div style="display:flex;justify-content:space-between;font-weight:700;">
+                                    <span>👥 ${subs.length} submitted</span>
+                                    <span>🔥 +${q.baseScore} PTS</span>
+                                </div>
+                                <div style="margin-top:4px;color:#64748b;font-size:0.88em;">Closed: ${closedStr}</div>
+                            </div>
+                        `;
+                        cols["Done"].appendChild(d);
+                        return;
+                    }
+
+                    const isLive = q.deadline && q.deadline.toDate() > now && questStatus !== 'draft' && (!startTime || startTime <= now);
                     if (!isLive) return;
-                    
+
                     const title = q.question || "Untitled Quest";
                     if (filter && !title.toLowerCase().includes(filter)) return;
 
-                    cnt["Backlog"]++;
+                    // ── ตรวจว่ามี submission จริงๆ อย่างน้อย 1 คน ──
+                    const subs = questsSubList.filter(s => s.questId === q.id && s.status !== 'none');
+                    const colName = subs.length > 0 ? "Doing" : "Backlog";
+
+                    cnt[colName]++;
                     const d = document.createElement('div');
-                    d.className = 'kanban-card card-Backlog live-quest';
-                    d.style.borderLeft = "4px solid #f59e0b";
-                    d.style.background = "#fffaf5";
-                    
+                    d.className = `kanban-card card-${colName} live-quest`;
+
+                    const accentColor = colName === "Doing" ? "#3b82f6" : "#f59e0b";
+                    const bgColor    = colName === "Doing" ? "#f0f7ff" : "#fffaf5";
+                    const borderColor = colName === "Doing" ? "#bfdbfe" : "#ffe8d1";
+                    d.style.borderLeft = `4px solid ${accentColor}`;
+                    d.style.background = bgColor;
+
                     const dlVal = q.deadline.toMillis ? q.deadline.toMillis() : new Date(q.deadline).getTime();
-                    
+
+                    // ── แสดง avatar ของคนที่ submit แล้ว (สูงสุด 5 คน) ──
+                    let avatarHtml = '';
+                    if (subs.length > 0) {
+                        const avatars = subs.slice(0, 5).map(s => {
+                            const u = usersData.find(x => x.id === s.userId);
+                            const pic = u?.pictureUrl || '';
+                            const name = u?.displayName || 'User';
+                            return pic
+                                ? `<img src="${pic}" title="${name}" style="width:22px;height:22px;border-radius:50%;border:2px solid white;margin-left:-6px;object-fit:cover;">`
+                                : `<span title="${name}" style="width:22px;height:22px;border-radius:50%;border:2px solid white;margin-left:-6px;background:#94a3b8;display:inline-flex;align-items:center;justify-content:center;font-size:0.6em;color:white;font-weight:800;">${name.charAt(0)}</span>`;
+                        }).join('');
+                        const extra = subs.length > 5 ? `<span style="font-size:0.7em;color:#3b82f6;font-weight:800;margin-left:4px;">+${subs.length - 5}</span>` : '';
+                        avatarHtml = `<div style="display:flex;align-items:center;margin-bottom:6px;">
+                            <span style="font-size:0.7em;font-weight:700;color:${accentColor};margin-right:6px;">${subs.length} submitted</span>
+                            <div style="display:flex;padding-left:6px;">${avatars}${extra}</div>
+                        </div>`;
+                    }
+
+                    const closeBtn = colName === 'Doing' ? `
+                        <button class="btn-sm" style="width:100%;margin-top:8px;background:#dcfce7;color:#15803d;border:1px solid #86efac;border-radius:10px;padding:7px;font-weight:800;font-size:0.8em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:0.2s;" onmouseover="this.style.background='#bbf7d0'" onmouseout="this.style.background='#dcfce7'" onclick="event.stopPropagation();closeQuest('${q.id}')">
+                            <i class="fa-solid fa-flag-checkered"></i> Close Quest
+                        </button>` : '';
+
                     d.innerHTML = `
-                        <div class="card-header-row" style="margin-bottom:12px;">
-                            <span class="badge" style="background:linear-gradient(135deg, #f59e0b, #d97706); padding:4px 12px; border-radius:8px; font-size:0.7em; letter-spacing:0.5px;">DAILY QUEST</span>
-                            <div class="card-header-right" onclick="recallQuest('${q.id}')" style="color:#f59e0b; cursor:pointer; font-size:1.1em; opacity:0.7; transition:0.2s;" onmouseover="this.style.opacity='1'; this.style.transform='scale(1.2)';" onmouseout="this.style.opacity='0.7'; this.style.transform='scale(1)'"><i class="fa-solid fa-pen-to-square"></i></div>
+                        <div class="card-header-row" style="margin-bottom:10px;">
+                            <span class="badge" style="background:linear-gradient(135deg, ${accentColor}, ${colName === 'Doing' ? '#2563eb' : '#d97706'}); padding:4px 12px; border-radius:8px; font-size:0.7em; letter-spacing:0.5px;">DAILY QUEST</span>
+                            <div class="card-header-right" onclick="recallQuest('${q.id}')" style="color:${accentColor}; cursor:pointer; font-size:1.1em; opacity:0.7; transition:0.2s;" onmouseover="this.style.opacity='1'; this.style.transform='scale(1.2)';" onmouseout="this.style.opacity='0.7'; this.style.transform='scale(1)'"><i class="fa-solid fa-pen-to-square"></i></div>
                         </div>
                         <div style="font-weight:800; font-size:1.05em; color:#1e293b; margin-bottom:8px; line-height:1.4;">${title}</div>
-                        <div style="font-size:0.8em; color:#64748b; background:white; padding:12px; border-radius:12px; border:1px solid #ffe8d1;">
-                            <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-weight:700;">
+                        <div style="font-size:0.8em; color:#64748b; background:white; padding:12px; border-radius:12px; border:1px solid ${borderColor};">
+                            ${avatarHtml}
+                            <div style="display:flex; justify-content:space-between; font-weight:700;">
                                 <span>🔥 +${q.baseScore} PTS</span>
                                 <span>⏱️ ${q.durationMinutes || 30}m</span>
                             </div>
-                            <div class="timer-global" data-dead="${dlVal}" style="color:#d35400; font-weight:900; font-size:0.9em;">⏳ Exp: ...</div>
+                            <div class="timer-global" data-dead="${dlVal}" style="color:#d35400; font-weight:900; font-size:0.9em; margin-top:6px;">⏳ Exp: ...</div>
                         </div>
+                        ${closeBtn}
                     `;
-                    cols["Backlog"].appendChild(d);
+                    cols[colName].appendChild(d);
                 });
             } catch (e) { console.error("Kanban Section 7 (Quests) Error:", e); }
 
@@ -20848,6 +21590,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     d.style.borderLeft = "4px solid #f59e0b";
                     d.style.background = "#fffcf5";
 
+                    const submittedAtStr = sub.submittedAt ? sub.submittedAt.toDate().toLocaleString() : 'Recently';
+                    const submittedAtISO = sub.submittedAt ? sub.submittedAt.toDate().toISOString() : '';
                     d.innerHTML = `
                         <div class="card-header-row">
                             <span class="badge" style="background:#f59e0b;">QUEST SUBMIT</span>
@@ -20856,7 +21600,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         <div style="font-weight:bold; font-size:0.95em; margin-bottom:4px; color:#1e293b;">${u.displayName}</div>
                         <div style="font-size:0.85em; color:#64748b; background:white; padding:10px; border-radius:10px; border:1px solid #ffe8d1;">
                             <div style="font-weight:800; color:#d35400; margin-bottom:5px;">${qData.question}</div>
-                            <div style="font-size:0.8em; color:#94a3b8;">Submitted: ${sub.submittedAt ? sub.submittedAt.toDate().toLocaleString() : 'Recently'}</div>
+                            <div style="font-size:0.8em; color:#94a3b8;">Submitted: <span class="submitted-time" data-iso="${submittedAtISO}">${submittedAtStr}</span></div>
+                            <div style="font-size:0.8em; color:#d35400; margin-top:2px; font-weight:700;">
+                                <span class="countdown-timer" data-subid="${sub.id}"></span>
+                            </div>
                         </div>
                         <div style="margin-top:12px;">
                             <button class="btn-sm btn-warning" style="width:100%; font-weight:900;" onclick="reviewQuestSubmission('${sub.id}')">
@@ -20864,6 +21611,40 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             </button>
                         </div>
                     `;
+                                // === Countdown Timer for Quest Submissions ===
+                                // กำหนดเวลานับถอยหลัง (นาที)
+                                const QUEST_SUBMISSION_TIME_LIMIT_MINUTES = 10;
+                                function startQuestSubmissionCountdown(card) {
+                                    const timeSpan = card.querySelector('.submitted-time');
+                                    const timerSpan = card.querySelector('.countdown-timer');
+                                    if (!timeSpan || !timerSpan) return;
+                                    const iso = timeSpan.getAttribute('data-iso');
+                                    if (!iso) {
+                                        timerSpan.textContent = '';
+                                        return;
+                                    }
+                                    const submitTime = new Date(iso);
+                                    const endTime = new Date(submitTime.getTime() + QUEST_SUBMISSION_TIME_LIMIT_MINUTES * 60000);
+                                    function update() {
+                                        const now = new Date();
+                                        let diff = Math.max(0, endTime - now);
+                                        let min = Math.floor(diff / 60000);
+                                        let sec = Math.floor((diff % 60000) / 1000);
+                                        if (diff > 0) {
+                                            timerSpan.textContent = `เหลือเวลา ${min}:${sec.toString().padStart(2, '0')} นาที`;
+                                        } else {
+                                            timerSpan.textContent = 'หมดเวลาแล้ว';
+                                            clearInterval(timer);
+                                        }
+                                    }
+                                    update();
+                                    const timer = setInterval(update, 1000);
+                                }
+
+                                // เรียกใช้หลังจาก render การ์ด submission เสร็จ
+                                setTimeout(() => {
+                                    document.querySelectorAll('.quest-submission-card').forEach(startQuestSubmissionCountdown);
+                                }, 0);
                     cols["Review"].appendChild(d);
                 });
             } catch (e) { console.error("Kanban Section 8 (Quest Subs) Error:", e); }
@@ -20940,6 +21721,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 btnTask.style.background = 'transparent';
                 btnTask.style.color = '#666';
                 btnTask.style.boxShadow = 'none';
+                // Render card pickers
+                renderDQGroupCards();
+                renderDQTagCards();
             }
         }
         async function saveSideQuest() { const id = document.getElementById('edit-id').value; const t = document.getElementById('sq-title').value; if (!t) return alert("Title?"); const d = { title: t, description: document.getElementById('sq-desc').value, priority: document.getElementById('sq-priority').value, dueDate: document.getElementById('sq-due').value, isProject: document.getElementById('sq-isProject').checked, assigneeIds: [...document.querySelectorAll('.sq-user-check:checked')].map(c => c.value), assignees: [...document.querySelectorAll('.sq-user-check:checked')].map(c => ({ uid: c.value, name: c.dataset.name, pic: c.dataset.pic })) }; if (id) { await db.collection("side_quests").doc(id).update(d); showToast("Updated"); } else { d.status = "Backlog"; d.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").add(d); showToast("Created"); } document.getElementById('taskModal').style.display = 'none'; }
@@ -21138,7 +21922,51 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         function showHubItemDetails(item) {
-            if (item.type === 'work' && item.workData) {
+            if (item.isQuest) {
+                const d = item.t ? item.t.toLocaleString('th-TH') : '-';
+                const detailsHtml = `
+                    <div style="padding:20px; border-radius:12px; background:white; border:1px solid #f1f5f9;">
+                        <h3 style="margin:0 0 15px 0; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:1.5em;">⚡</span> Daily Quest Submission
+                        </h3>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:15px;">
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #10b981;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Awarded Score</div>
+                                <div style="font-size:1.3em; font-weight:900; color:#10b981; margin-top:6px;">
+                                    ${(item.score || 0).toFixed(2)} pts
+                                </div>
+                            </div>
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #f59e0b;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Date</div>
+                                <div style="font-size:0.85em; color:#475569; margin-top:6px; font-weight:600;">
+                                    ${d}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:12px;">
+                            <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase; margin-bottom:8px;">Quest Title</div>
+                            <div style="color:#1e293b; font-weight:700; font-size:1em;">
+                                ${item.questTitle || 'Daily Quest'}
+                            </div>
+                        </div>
+                        ${item.answer ? `
+                            <div style="background:#eff6ff; padding:15px; border-radius:12px; border-left:4px solid #3b82f6; margin-bottom:12px;">
+                                <div style="font-size:0.75em; color:#1d4ed8; font-weight:700; text-transform:uppercase; margin-bottom:10px;">User Answer</div>
+                                <div style="color:#1e3a8a; font-size:0.95em; line-height:1.6; white-space:pre-wrap; font-family:inherit;">
+                                    ${item.answer}
+                                </div>
+                            </div>
+                        ` : `
+                            <div style="padding:15px; border-radius:12px; border:1px dashed #cbd5e1; color:#94a3b8; text-align:center; font-size:0.9em;">
+                                No submission content found in this log.
+                            </div>
+                        `}
+                    </div>
+                `;
+                const modal = document.getElementById('workDetailModal') || createWorkDetailModal();
+                document.getElementById('work-detail-content').innerHTML = detailsHtml;
+                modal.style.display = 'block';
+            } else if (item.type === 'work' && item.workData) {
                 const w = item.workData;
                 const d = w.timestamp ? w.timestamp.toDate().toLocaleString('th-TH') : '-';
                 const statusColor = w.status === 'ตรวจแล้ว' ? '#10b981' : w.status === 'ตรวจปฏิเสธ' ? '#ef4444' : '#f59e0b';
@@ -21614,7 +22442,94 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 showToast("Saved");
             }
         }
-        async function createQuest() {
+        // ─── Daily Quest UI Helpers (V91.34) ───────────────────────────────────────
+
+        const DQ_TAGS = [
+            { val: '',            label: 'Auto',         icon: 'fa-wand-magic-sparkles', color: '#94a3b8' },
+            { val: 'DIS',         label: 'Discussion',   icon: 'fa-comments',            color: '#4361ee' },
+            { val: 'INFOGRAPHIC', label: 'Infographic',  icon: 'fa-chart-pie',           color: '#e83e8c' },
+            { val: 'CASE_STUDY',  label: 'Case',         icon: 'fa-stethoscope',         color: '#d35400' },
+            { val: 'WRITING',     label: 'Writing',      icon: 'fa-pen-nib',             color: '#20c997' },
+            { val: 'RESEARCH',    label: 'Research',     icon: 'fa-microscope',          color: '#0f9b8e' },
+            { val: 'PRESENTATION',label: 'Presentation', icon: 'fa-display',             color: '#7209b7' },
+            { val: 'REVIEW',      label: 'Review',       icon: 'fa-file-circle-check',   color: '#f59e0b' },
+            { val: 'OTHER',       label: 'Other',        icon: 'fa-tag',                 color: '#64748b' },
+        ];
+
+        function renderDQTagCards() {
+            const container = document.getElementById('dq-tag-cards');
+            if (!container) return;
+            const current = (document.getElementById('q-tag')?.value || '').trim();
+            container.innerHTML = DQ_TAGS.map(t => {
+                const sel = t.val === current;
+                return `<button type="button" onclick="setQuestTag('${t.val}')"
+                    style="border:2px solid ${sel ? t.color : '#e2e8f0'};
+                           background:${sel ? t.color : '#f8fafc'};
+                           color:${sel ? 'white' : '#64748b'};
+                           border-radius:10px; padding:7px 13px; font-size:0.78em; font-weight:800;
+                           cursor:pointer; display:inline-flex; align-items:center; gap:5px;
+                           transition:all 0.15s; white-space:nowrap;">
+                    <i class="fa-solid ${t.icon}" style="font-size:0.85em;"></i> ${t.label}
+                </button>`;
+            }).join('');
+        }
+
+        function setQuestTag(tag) {
+            const el = document.getElementById('q-tag');
+            if (el) el.value = (tag || '');
+            renderDQTagCards();
+        }
+
+        function renderDQGroupCards() {
+            const container = document.getElementById('dq-group-cards');
+            if (!container) return;
+
+            // Collect groups that have at least 1 active user; always include Public
+            const activeGroups = new Map();
+            activeGroups.set('Public', 0);
+            (usersData || []).filter(u => !u.isIgnored).forEach(u => {
+                const g = (u.group || 'Public').trim();
+                activeGroups.set(g, (activeGroups.get(g) || 0) + 1);
+            });
+
+            const current = (document.getElementById('q-target-group-manual')?.value || 'Public').trim();
+
+            container.innerHTML = [...activeGroups.entries()].map(([g, cnt]) => {
+                const color = getGroupColor(g);
+                const icon = getGroupIcon(g);
+                const sel = g.toLowerCase() === current.toLowerCase();
+                const countBadge = cnt > 0 ? `<span style="background:${sel ? 'rgba(255,255,255,0.3)' : color+'22'}; color:${sel ? 'white' : color}; border-radius:999px; padding:1px 6px; font-size:0.75em; margin-left:2px;">${cnt}</span>` : '';
+                return `<button type="button" onclick="setQuestGroup('${g}')"
+                    style="border:2px solid ${sel ? color : '#e2e8f0'};
+                           background:${sel ? color : '#f8fafc'};
+                           color:${sel ? 'white' : '#475569'};
+                           border-radius:12px; padding:8px 14px; font-size:0.8em; font-weight:800;
+                           cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+                           transition:all 0.15s; white-space:nowrap;">
+                    <i class="fa-solid ${icon}" style="font-size:0.9em;"></i> ${g}${countBadge}
+                </button>`;
+            }).join('');
+        }
+
+        function setQuestGroup(g) {
+            const input = document.getElementById('q-target-group-manual');
+            if (input) input.value = g;
+            renderDQGroupCards();
+            updateDQGroupUserCount(g);
+        }
+
+        function updateDQGroupUserCount(g) {
+            const el = document.getElementById('dq-group-user-count');
+            if (!el) return;
+            const members = (usersData || []).filter(u => !u.isIgnored && (g === 'Public' || (u.group || 'Public').trim() === g));
+            if (members.length === 0) { el.innerHTML = ''; return; }
+            const chips = members.map(u =>
+                `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.75em;font-weight:700;background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;">${u.displayName || u.id}</span>`
+            ).join('');
+            el.innerHTML = `<span style="font-weight:700;color:#475569;">จะส่งถึง ${members.length} คน:</span> <span style="display:inline-flex;flex-wrap:wrap;gap:4px;margin-left:4px;">${chips}</span>`;
+        }
+
+        async function createQuest(action = 'post') {
             const startTimeVal = document.getElementById('q-start-time').value;
             const hoursVal = parseFloat(document.getElementById('q-hours').value);
             let startTime = null;
@@ -21625,23 +22540,47 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             } else {
                 deadline = new Date(Date.now() + hoursVal * 3600000);
             }
+            const questionText = document.getElementById('q-text').value.trim();
+            if (!questionText) {
+                alert("Please enter Daily Quest prompt.");
+                return;
+            }
             const q = {
-                question: document.getElementById('q-text').value,
+                question: questionText,
                 imageUrl: document.getElementById('q-img').value,
                 questLink: document.getElementById('q-link').value,
-                targetGroup: document.getElementById('q-target-group-manual').value.trim() || "Public",
+                targetGroup: document.getElementById('q-target-group-manual').value.trim() || "",
                 tag: document.getElementById('q-tag').value || "",
                 baseScore: parseFloat(document.getElementById('q-score').value),
                 durationMinutes: parseInt(document.getElementById('q-duration').value),
                 deadline: deadline,
+                status: action === 'draft' ? 'draft' : (action === 'schedule' ? 'scheduled' : 'active'),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             };
-            if (startTime) q.startTime = startTime;
-            if (q.question) await db.collection("quests").add(q);
-            showToast(startTime ? `Scheduled for ${startTime.toLocaleString('en-US')}` : "Posted");
+            if (startTime) {
+                q.startTime = startTime;
+                q.scheduledStart = startTime;
+            }
+            if (action === 'schedule' && !startTime) {
+                alert("Please set Scheduled Start before scheduling.");
+                return;
+            }
+            if (action === 'post') q.publishedAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection("quests").add(q);
+            showToast(action === 'draft' ? "Draft saved" : action === 'schedule' ? `Scheduled for ${startTime.toLocaleString('en-US')}` : "Posted");
+            // Reset form fields
             document.getElementById('q-text').value = '';
+            document.getElementById('q-img').value = '';
+            document.getElementById('q-link').value = '';
             document.getElementById('q-start-time').value = '';
+            document.getElementById('q-hours').value = '24';
+            document.getElementById('q-duration').value = '60';
+            document.getElementById('q-score').value = '1';
+            document.getElementById('q-target-group-manual').value = 'Public';
             document.getElementById('q-tag').value = '';
+            // Re-render card pickers to reflect reset state
+            renderDQGroupCards();
+            renderDQTagCards();
             document.getElementById('taskModal').style.display = 'none';
         }
         function loadActiveQuests() { 
@@ -21652,7 +22591,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 let hasActive = false; 
                 s.forEach(d => { 
                     const q = d.data(); 
-                    if (q.deadline?.toDate() > new Date()) { 
+                    const qStatus = String(q.status || 'active').toLowerCase();
+                    const qStart = q.startTime?.toDate ? q.startTime.toDate() : (q.scheduledStart?.toDate ? q.scheduledStart.toDate() : null);
+                    if (q.deadline?.toDate() > new Date() && qStatus !== 'draft' && (!qStart || qStart <= new Date())) {
                         hasActive = true; 
                         t.innerHTML += `<tr><td>${q.question}</td><td><span class="quest-deadline" data-deadline="${q.deadline.toDate().getTime()}">Loading...</span></td><td>${q.durationMinutes || 30} min</td><td><button class="btn-sm btn-warning" onclick="editQ('${d.id}','${q.question.replace(/'/g, "")}')">✏️</button> <button class="btn-delete-icon" onclick="stopQ('${d.id}')">✕</button></td></tr>`; 
                     } 
@@ -21662,6 +22603,47 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }); 
         }
         function loadQuestHistory() { db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(s => { const t = document.querySelector("#questHistoryTable tbody"); t.innerHTML = ""; s.forEach(d => { const q = d.data(); if (q.deadline && q.deadline.toDate() > new Date()) return; t.innerHTML += `<tr><td>${q.question}</td><td>${q.baseScore}</td><td><div style="display:flex;gap:5px;"><button class="btn-sm btn-success" onclick="recallQuest('${d.id}')">♻️ Recall</button><button class="btn-delete-icon" onclick="delQ('${d.id}')">✕</button></div></td></tr>`; }) }); }
+        function loadQuestHistory() {
+            db.collection("quests").orderBy("createdAt", "desc").limit(20).onSnapshot(s => {
+                const t = document.querySelector("#questHistoryTable tbody");
+                if (!t) return;
+                t.innerHTML = "";
+                s.forEach(d => {
+                    const q = d.data();
+                    const qStatus = String(q.status || 'active').toLowerCase();
+                    const qStart = q.startTime?.toDate ? q.startTime.toDate() : (q.scheduledStart?.toDate ? q.scheduledStart.toDate() : null);
+                    const isLiveNow = q.deadline && q.deadline.toDate() > new Date() && qStatus !== 'draft' && (!qStart || qStart <= new Date());
+                    if (isLiveNow) return;
+                    const stateLabel = qStatus === 'draft' ? 'Draft' : (qStart && qStart > new Date() ? 'Scheduled' : 'Archived');
+
+                    const subs = (questsSubList || []).filter(s => s.questId === d.id && s.status !== 'none');
+                    let participantsHtml;
+                    if (subs.length === 0) {
+                        participantsHtml = `<span style="color:#94a3b8;font-size:0.78em;">—</span>`;
+                    } else {
+                        const avatarItems = subs.map(s => {
+                            const u = (usersData || []).find(u => u.id === s.userId);
+                            const name = u?.displayName || '?';
+                            const pic = u?.pictureUrl || '';
+                            const border = s.adminAcknowledged ? '2px solid #86efac' : '2px solid #fde047';
+                            const avatar = pic
+                                ? `<img src="${pic}" title="${name}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:${border};flex-shrink:0;">`
+                                : `<span title="${name}" style="width:28px;height:28px;border-radius:50%;border:${border};background:#94a3b8;display:inline-flex;align-items:center;justify-content:center;font-size:0.65em;color:white;font-weight:800;flex-shrink:0;">${name.charAt(0)}</span>`;
+                            return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:36px;">
+                                ${avatar}
+                                <span style="font-size:0.62em;font-weight:700;color:#475569;text-align:center;max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</span>
+                            </div>`;
+                        }).join('');
+                        participantsHtml = `<div style="display:flex;flex-direction:column;gap:6px;">
+                            <span style="font-size:0.72em;font-weight:900;color:#1d4ed8;">👥 ${subs.length} คน</span>
+                            <div style="display:flex;flex-wrap:wrap;gap:6px;">${avatarItems}</div>
+                        </div>`;
+                    }
+
+                    t.innerHTML += `<tr><td><span style="font-size:0.75em; font-weight:900; color:#64748b; text-transform:uppercase;">${stateLabel}</span><br>${q.question}</td><td>${q.baseScore}</td><td>${participantsHtml}</td><td><div style="display:flex;gap:5px;"><button class="btn-sm btn-success" onclick="recallQuest('${d.id}')">Recall</button><button class="btn-delete-icon" onclick="delQ('${d.id}')">X</button></div></td></tr>`;
+                });
+            });
+        }
         function updateQuestTimers() { document.querySelectorAll('.quest-deadline').forEach(el => { const d = parseInt(el.dataset.deadline); const now = Date.now(); if (d - now <= 0) el.innerText = "Expired"; else { const h = Math.floor((d - now) / 3600000); const m = Math.floor(((d - now) % 3600000) / 60000); el.innerText = `${h}h ${m}m left`; } }); }
         function recallQuest(id) {
             db.collection("quests").doc(id).get().then(doc => {
@@ -21670,19 +22652,31 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 document.getElementById('q-img').value = d.imageUrl || "";
                 document.getElementById('q-link').value = d.questLink || "";
                 document.getElementById('q-score').value = d.baseScore;
-                document.getElementById('q-duration').value = d.durationMinutes || 30;
-                document.getElementById('q-target-group-manual').value = d.targetGroup || "";
+                document.getElementById('q-duration').value = d.durationMinutes || 60;
+                // Set hidden inputs before rendering cards so selection is correct
+                document.getElementById('q-target-group-manual').value = d.targetGroup || "Public";
                 document.getElementById('q-tag').value = d.tag || "";
                 document.getElementById('q-start-time').value = "";
-                
+
                 openTaskModal(); // Open modal
-                switchModalTab('quest'); // Switch to quest tab
+                switchModalTab('quest'); // Switch to quest tab — also re-renders cards
                 showToast("Recalled to Form!");
             });
         }
         async function editQ(id, q) { const nq = prompt("Edit Q:", q); if (nq) await db.collection("quests").doc(id).update({ question: nq }); }
         async function stopQ(id) { if (confirm("Stop?")) await db.collection("quests").doc(id).update({ deadline: new Date() }); }
         async function delQ(id) { if (confirm("Del?")) await db.collection("quests").doc(id).delete(); }
+
+        async function closeQuest(id) {
+            if (!confirm("ปิด Quest นี้และย้ายไป Done?\n\nผู้ที่ยังไม่ได้ submit จะไม่สามารถส่งงานได้อีก")) return;
+            try {
+                await db.collection("quests").doc(id).update({
+                    status: 'closed',
+                    closedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                showToast("✅ Quest ปิดแล้ว → Done");
+            } catch (e) { alert("Error: " + e.message); }
+        }
         function drawCertificate(ctx, name, dates, awards, level, score) {
             console.log("Drawing Certificate for:", name);
             // Handle both array (multiple) and string (legacy)
@@ -22194,10 +23188,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function openLiffPreview(userId = '') {
             document.getElementById('liffPreviewModal').style.display = 'flex';
             // Use current origin + index.html + preview mode
-            let url = window.location.href.replace('admin.html', 'index.html?mode=preview');
+            let url = window.location.href.replace('admin.html', 'index.html?mode=preview&adminPreview=1');
             if (userId) {
-                url += `&userId=${userId}`;
+                url += `&userId=${encodeURIComponent(userId)}`;
             }
+            url += `&ts=${Date.now()}`;
             document.getElementById('liff-frame').src = url;
         }
 
@@ -23870,6 +24865,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
             document.getElementById('reflective-review-bonus').value = log.adminBonus !== undefined ? log.adminBonus : "0.5";
             document.getElementById('reflective-review-comment').value = log.adminComment || "";
+            document.getElementById('reflective-review-raw-content').value = log.content || '';
+            const grammarCard = document.getElementById('reflective-grammar-card');
+            if (grammarCard) { grammarCard.style.display = 'none'; document.getElementById('reflective-grammar-content').innerHTML = ''; document.getElementById('reflective-grammar-score').textContent = ''; }
             setReflectiveReviewStatus('');
             console.log("DEBUG: About to call forceShowModal for reflectiveReviewModal");
             const modal = document.getElementById('reflectiveReviewModal');
@@ -24798,7 +25796,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
         window.AI_CORE_READY = true;
         if (window.loadAIKeys) window.loadAIKeys();
-        console.log('%c V91.20 loaded OK (Version Sync Release) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
+        console.log('%c V91.34 loaded OK (Progress Dashboard with User Profile Pictures) ', 'background:#d35400;color:white;font-size:14px;border-radius:5px;padding:2px 8px;');
 
         // --- [Version: V90.36] Quiz Feedback Panel ---
         let _qfpCurrentId = null;
@@ -25166,15 +26164,59 @@ ${comment}
             }
         }
 
+        window.questReviewBonusModalState = { resolver: null };
+
+        function syncQuestBonusChips() {
+            const inputEl = document.getElementById('quest-review-bonus-input');
+            const current = inputEl ? Number(String(inputEl.value || '').trim()) : NaN;
+            document.querySelectorAll('#questReviewBonusModal .quest-bonus-chip').forEach(btn => {
+                btn.classList.toggle('active', Number.isFinite(current) && Number(btn.dataset.score) === current);
+            });
+        }
+
+        function setQuestBonusValue(value) {
+            const inputEl = document.getElementById('quest-review-bonus-input');
+            if (!inputEl) return;
+            inputEl.value = Number(value).toFixed(1);
+            syncQuestBonusChips();
+        }
+
+        function closeQuestReviewBonusModal(shouldSubmit) {
+            const state = window.questReviewBonusModalState || {};
+            const inputEl = document.getElementById('quest-review-bonus-input');
+            const resolver = typeof state.resolver === 'function' ? state.resolver : null;
+            const rawValue = inputEl ? String(inputEl.value || '').trim() : '';
+            window.questReviewBonusModalState = { resolver: null };
+            forceHideModal('questReviewBonusModal');
+            if (resolver) resolver(shouldSubmit ? rawValue : null);
+        }
+
+        function openQuestReviewBonusModal(sub, q, u) {
+            return new Promise(resolve => {
+                window.questReviewBonusModalState = { resolver: resolve };
+                const subtitleEl = document.getElementById('quest-review-bonus-subtitle');
+                const questionEl = document.getElementById('quest-review-question-text');
+                const baseEl = document.getElementById('quest-review-base-score');
+                const userEl = document.getElementById('quest-review-user-name');
+                const inputEl = document.getElementById('quest-review-bonus-input');
+                if (subtitleEl) subtitleEl.textContent = q ? (q.questId || q.id || '') : '';
+                if (questionEl) questionEl.textContent = q ? q.question : '';
+                if (baseEl) baseEl.textContent = q ? `${q.baseScore} pts` : '-';
+                if (userEl) userEl.textContent = u.displayName || u.id || '-';
+                if (inputEl) { inputEl.value = '0'; syncQuestBonusChips(); setTimeout(() => inputEl.focus(), 40); }
+                forceShowModal('questReviewBonusModal');
+            });
+        }
+
         async function reviewQuestSubmission(subId) {
             const sub = questsSubList.find(x => x.id === subId);
             if (!sub) return;
             const q = questsCache.find(x => x.id === sub.questId);
             const u = usersData.find(x => x.id === sub.userId) || {};
-            
-            const bonusStr = prompt(`Reviewing Quest: ${q ? q.question : '?'}\nUser: ${u.displayName}\n\nBase Score: ${q ? q.baseScore : '?'}\nEnter Bonus (can be negative or zero):`, "0");
+
+            const bonusStr = await openQuestReviewBonusModal(sub, q, u);
             if (bonusStr === null) return;
-            
+
             const bonus = parseFloat(bonusStr) || 0;
             try {
                 await db.collection("quest_submissions").doc(subId).update({

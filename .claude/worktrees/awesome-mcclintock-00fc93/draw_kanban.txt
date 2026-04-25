@@ -1,0 +1,101 @@
+>         function drawKanban() {
+              const cols = { 
+                  "Backlog": document.getElementById("Backlog"), 
+                  "Doing": document.getElementById("Doing"), 
+                  "Review": document.getElementById("Review"), 
+                  "Done": document.getElementById("Done") 
+              };
+              
+              // Safety Check
+              if (!cols.Backlog) return;
+  
+              Object.values(cols).forEach(e => e.innerHTML = "");
+              const cnt = { "Backlog": 0, "Doing": 0, "Review": 0, "Done": 0 };
+              const filter = document.getElementById('board-search').value.toLowerCase();
+  
+              // 1. Render Side Quests
+              Object.keys(sideQuestsCache).forEach(id => {
+                  const q = sideQuestsCache[id];
+                  if (q.status === 'Archived') return;
+  
+                  let match = q.title.toLowerCase().includes(filter);
+                  if (q.assignees) q.assignees.forEach(u => { if (u.name.toLowerCase().includes(filter)) match = true; });
+                  if (!match) return;
+  
+                  // Group filtering for Side Quests (If any assignee belongs to the group)
+                  if (activeBoardGroup !== 'All') {
+                      let groupMatch = false;
+                      if (q.assigneeIds) {
+                          q.assigneeIds.forEach(uid => {
+                              const u = usersData.find(x => x.id === uid);
+                              if ((u?.group || 'Public') === activeBoardGroup) groupMatch = true;
+                          });
+                      }
+                      if (!groupMatch) return;
+                  }
+  
+                  if (cols[q.status]) {
+                      cnt[q.status]++;
+                      const isProj = q.isProject === true;
+                      const d = document.createElement('div');
+                      d.className = `kanban-card card-${q.status} ${q.isScored ? 'scored' : ''} ${isProj ? 'project' : ''}`;
+                      d.dataset.id = id;
+  
+                      let imgs = '<div class="assignee-stack">';
+                      if (q.assignees) q.assignees.forEach(u => imgs += `<img src="${u.pic}" class="assignee-img" title="${u.name}">`);
+                      imgs += '</div>';
+  
+                      let timersHtml = "";
+                      if (q.deadline) {
+                          const dl = q.deadline.toMillis ? q.deadline.toMillis() : new Date(q.deadline).getTime();
+                          if (q.status !== 'Done') timersHtml += `<span class="timer-global" data-dead="${dl}">⏳ Exp: ...</span>`;
+                      }
+  
+                      let act = "";
+                      if (q.status === 'Done' && q.doneAt) act = `<button class="btn-sm btn-dark" style="width:100%;margin-top:5px;" onclick="archiveSQ('${id}')">📥 archive</button>`;
+                      else if (!q.isScored && q.status !== 'Backlog' && q.status !== 'Done') {
+                          if (q.linkedQuizId) {
+                              act = `<div style="width:100%;margin-top:5px;padding:6px;background:linear-gradient(135deg,#e8f5e9,#e3f2fd);border-radius:8px;text-align:center;font-size:0.78em;color:#555;"><i class="fa-solid fa-link" style="color:#4361ee;"></i> คะแนนจาก Quiz อัตโนมัติ</div>`;
+                          } else {
+                              act = `<button class="btn-sm btn-success" style="width:100%;margin-top:5px;" onclick="giveScore('${id}')">💰 ให้คะแนน</button>`;
+                          }
+                      }
+  
+                      let arrows = `<div class="arrow-controls">`;
+                      if (q.status !== 'Backlog') arrows += `<button class="btn-arrow" onclick="moveCard('${id}','prev')"><i class="fa-solid fa-chevron-left"></i></button>`;
+                      if (q.status !== 'Done') arrows += `<button class="btn-arrow" onclick="moveCard('${id}','next')"><i class="fa-solid fa-chevron-right"></i></button>`;
+                      arrows += `</div>`;
+  
+                      const pColor = q.priority === 'High' ? '#ef233c' : (q.priority === 'Medium' ? '#ff9f1c' : '#17a2b8');
+                      const descId = 'admin-sq-desc-' + id;
+                      const descHtml = q.description ? `
+                          <div onclick="toggleSqDesc('${descId}')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:#f1f3f5; padding:4px 8px; border-radius:6px; margin-top:5px; font-size:0.75em; color:#555;">
+                              <span><i class="fa-solid fa-align-left"></i> Description</span>
+                              <i id="icon-${descId}" class="fa-solid fa-chevron-down"></i>
+                          </div>
+                          <div id="${descId}" style="display:none; font-size:0.8em; color:#666; margin-bottom:5px; white-space:pre-wrap; background:#fafafa; padding:8px; border-radius:6px; border:1px solid #eee;">${q.description}</div>
+                      ` : "";
+  
+                      d.innerHTML = `
+                          <div class="card-header-row">
+                              <span class="badge" style="background:${pColor}">${q.priority}</span>
+                              <div class="card-header-right">${imgs} ${arrows}</div>
+                          </div>
+                          <div style="font-weight:bold;">${isProj ? '<span class="badge" style="background:#e83e8c;font-size:0.6em;">PROJ</span>' : ''} ${q.title}</div>
+                          <div class="card-timers">${timersHtml}</div>
+                          ${descHtml}
+                          <div class="card-tool-row">
+                              <button class="btn-sm btn-warning" onclick="openTaskModal('${id}')"><i class="fa-solid fa-pen"></i></button>
+                              <button class="btn-sm btn-danger" onclick="startDeleteCard('${id}')"><i class="fa-solid fa-trash"></i></button>
+                          </div>
+                          ${act}`;
+                      cols[q.status].appendChild(d);
+                  }
+              });
+  
+              // 2. Render Pending Reflective Logs in "Review"
+              reflectiveLogsCache.forEach(log => {
+                  const isPending = !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null);
+                  if (log.isArchived) return; // Never show archived in Kanban
+                  if (isPending) {
+                      const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
