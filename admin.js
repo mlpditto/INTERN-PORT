@@ -10604,6 +10604,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             <div class="card-header-right" onclick="recallQuest('${q.id}')" style="color:${accentColor}; cursor:pointer; font-size:1.1em; opacity:0.7; transition:0.2s;" onmouseover="this.style.opacity='1'; this.style.transform='scale(1.2)';" onmouseout="this.style.opacity='0.7'; this.style.transform='scale(1)'"><i class="fa-solid fa-pen-to-square"></i></div>
                         </div>
                         <div style="font-weight:800; font-size:1.05em; color:#1e293b; margin-bottom:8px; line-height:1.4;">${title}</div>
+                        ${q.promptFull ? `<div style="font-size:0.8em; color:#64748b; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px 10px; margin-bottom:8px; display:flex; align-items:flex-start; gap:8px;">
+                            <span style="flex:1; line-height:1.4; word-break:break-word;">${q.promptFull.slice(0,140)}${q.promptFull.length > 140 ? '…' : ''}</span>
+                            <button onclick="event.stopPropagation(); navigator.clipboard.writeText(${JSON.stringify(q.promptFull)}).then(()=>showToast('✅ Copied!'))" style="flex-shrink:0; background:#e0f2fe; border:none; border-radius:7px; padding:4px 8px; font-size:0.75em; font-weight:800; color:#0284c7; cursor:pointer; white-space:nowrap;">📋 Copy</button>
+                        </div>` : ''}
                         <div style="font-size:0.8em; color:#64748b; background:white; padding:12px; border-radius:12px; border:1px solid ${borderColor};">
                             ${avatarHtml}
                             <div style="display:flex; justify-content:space-between; font-weight:700;">
@@ -10751,33 +10755,96 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         function switchModalTab(type) {
-            const taskForm = document.getElementById('form-task-container');
-            const questForm = document.getElementById('form-quest-container');
-            const btnTask = document.getElementById('modal-tab-task');
-            const btnQuest = document.getElementById('modal-tab-quest');
-            
+            const taskForm    = document.getElementById('form-task-container');
+            const questForm   = document.getElementById('form-quest-container');
+            const historyForm = document.getElementById('form-history-container');
+            const btnTask     = document.getElementById('modal-tab-task');
+            const btnQuest    = document.getElementById('modal-tab-quest');
+            const btnHistory  = document.getElementById('modal-tab-history');
+
+            // Hide all, reset all buttons
+            [taskForm, questForm, historyForm].forEach(el => { if (el) el.style.display = 'none'; });
+            [btnTask, btnQuest, btnHistory].forEach(btn => {
+                if (!btn) return;
+                btn.style.background = 'transparent';
+                btn.style.color = '#666';
+                btn.style.boxShadow = 'none';
+            });
+
             if (type === 'task') {
                 taskForm.style.display = 'block';
-                questForm.style.display = 'none';
                 btnTask.style.background = 'white';
                 btnTask.style.color = 'var(--primary)';
                 btnTask.style.boxShadow = '0 2px 5px rgba(0,0,0,0.05)';
-                btnQuest.style.background = 'transparent';
-                btnQuest.style.color = '#666';
-                btnQuest.style.boxShadow = 'none';
+            } else if (type === 'history') {
+                historyForm.style.display = 'block';
+                btnHistory.style.background = 'white';
+                btnHistory.style.color = '#0f9b8e';
+                btnHistory.style.boxShadow = '0 2px 5px rgba(0,0,0,0.05)';
+                loadDQHistory();
             } else {
-                taskForm.style.display = 'none';
                 questForm.style.display = 'block';
                 btnQuest.style.background = 'white';
                 btnQuest.style.color = '#d35400';
                 btnQuest.style.boxShadow = '0 2px 5px rgba(0,0,0,0.05)';
-                btnTask.style.background = 'transparent';
-                btnTask.style.color = '#666';
-                btnTask.style.boxShadow = 'none';
-                // Render card pickers
                 renderDQGroupCards();
                 renderDQTagCards();
             }
+        }
+
+        async function loadDQHistory() {
+            const list = document.getElementById('dq-history-list');
+            if (!list) return;
+            list.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;">Loading...</div>';
+            try {
+                const snap = await db.collection('quests').orderBy('createdAt', 'desc').limit(15).get();
+                if (snap.empty) {
+                    list.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;">No quest history yet.</div>';
+                    return;
+                }
+                const TAG_COLOR = { DIS:'#4361ee', INFOGRAPHIC:'#e83e8c', CASE_STUDY:'#d35400', WRITING:'#20c997', RESEARCH:'#0f9b8e', PRESENTATION:'#7209b7', REVIEW:'#f59e0b', OTHER:'#64748b' };
+                list.innerHTML = snap.docs.map(doc => {
+                    const d = doc.data();
+                    const dateStr = d.createdAt?.toDate ? d.createdAt.toDate().toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' }) : '—';
+                    const tag = (d.tag || '').toUpperCase();
+                    const tagColor = TAG_COLOR[tag] || '#94a3b8';
+                    const tagBadge = tag ? `<span style="background:${tagColor};color:white;border-radius:6px;padding:2px 8px;font-size:0.72em;font-weight:800;">${tag}</span>` : '';
+                    const preview = (d.question || '').slice(0, 120).replace(/</g, '&lt;');
+                    const status = d.status === 'active' ? '🟢' : d.status === 'draft' ? '⚪' : d.status === 'scheduled' ? '🕐' : '🔴';
+                    const dataJson = encodeURIComponent(JSON.stringify({ question: d.question || '', promptFull: d.promptFull || '', tag: d.tag || 'DIS', targetGroup: d.targetGroup || 'Public', imageUrl: d.imageUrl || '', questLink: d.questLink || '', baseScore: d.baseScore || 1, durationMinutes: d.durationMinutes || 60 }));
+                    return `<div style="border:1px solid #e2e8f0;border-radius:14px;padding:13px 15px;background:#fafafa;display:flex;align-items:flex-start;gap:12px;">
+                        <div style="flex:1;min-width:0;">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap;">
+                                ${status} ${tagBadge}
+                                <span style="font-size:0.75em;color:#94a3b8;">${dateStr} · ${d.targetGroup || 'Public'} · ${d.baseScore || 1} pt · ${d.durationMinutes || 60}m</span>
+                            </div>
+                            <div style="font-size:0.88em;color:#334155;line-height:1.4;white-space:pre-wrap;">${preview}${(d.question||'').length > 120 ? '…' : ''}</div>
+                        </div>
+                        <button onclick="duplicateQuest(decodeURIComponent('${dataJson}'))" type="button"
+                            style="flex-shrink:0;background:#fff7ed;border:1px solid #fed7aa;color:#d35400;border-radius:10px;padding:7px 12px;font-size:0.78em;font-weight:800;cursor:pointer;white-space:nowrap;">
+                            📋 Duplicate
+                        </button>
+                    </div>`;
+                }).join('');
+            } catch(e) {
+                list.innerHTML = `<div style="text-align:center;padding:24px;color:#ef4444;">Error: ${e.message}</div>`;
+            }
+        }
+
+        function duplicateQuest(jsonStr) {
+            try {
+                const d = JSON.parse(jsonStr);
+                document.getElementById('q-text').value = d.question || '';
+                document.getElementById('q-prompt-full').value = d.promptFull || '';
+                document.getElementById('q-tag').value = d.tag || 'DIS';
+                document.getElementById('q-target-group-manual').value = d.targetGroup || 'Public';
+                document.getElementById('q-img').value = d.imageUrl || '';
+                document.getElementById('q-link').value = d.questLink || '';
+                document.getElementById('q-score').value = d.baseScore || 1;
+                document.getElementById('q-duration').value = d.durationMinutes || 60;
+                switchModalTab('quest');
+                showToast('✅ Quest duplicated — edit and post when ready.');
+            } catch(e) { showToast('❌ Could not duplicate quest.'); }
         }
         async function saveSideQuest() { const id = document.getElementById('edit-id').value; const t = document.getElementById('sq-title').value; if (!t) return alert("Title?"); const d = { title: t, description: document.getElementById('sq-desc').value, priority: document.getElementById('sq-priority').value, dueDate: document.getElementById('sq-due').value, isProject: document.getElementById('sq-isProject').checked, assigneeIds: [...document.querySelectorAll('.sq-user-check:checked')].map(c => c.value), assignees: [...document.querySelectorAll('.sq-user-check:checked')].map(c => ({ uid: c.value, name: c.dataset.name, pic: c.dataset.pic })) }; if (id) { await db.collection("side_quests").doc(id).update(d); showToast("Updated"); } else { d.status = "Backlog"; d.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").add(d); showToast("Created"); } document.getElementById('taskModal').style.display = 'none'; }
         let chatUnsub; 
@@ -11498,7 +11565,6 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // ─── Daily Quest UI Helpers (V91.34) ───────────────────────────────────────
 
         const DQ_TAGS = [
-            { val: '',            label: 'Auto',         icon: 'fa-wand-magic-sparkles', color: '#94a3b8' },
             { val: 'DIS',         label: 'Discussion',   icon: 'fa-comments',            color: '#4361ee' },
             { val: 'INFOGRAPHIC', label: 'Infographic',  icon: 'fa-chart-pie',           color: '#e83e8c' },
             { val: 'CASE_STUDY',  label: 'Case',         icon: 'fa-stethoscope',         color: '#d35400' },
@@ -11600,6 +11666,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
             const q = {
                 question: questionText,
+                promptFull: document.getElementById('q-prompt-full').value.trim(),
                 imageUrl: document.getElementById('q-img').value,
                 questLink: document.getElementById('q-link').value,
                 targetGroup: document.getElementById('q-target-group-manual').value.trim() || "",
@@ -11623,6 +11690,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             showToast(action === 'draft' ? "Draft saved" : action === 'schedule' ? `Scheduled for ${startTime.toLocaleString('en-US')}` : "Posted");
             // Reset form fields
             document.getElementById('q-text').value = '';
+            document.getElementById('q-prompt-full').value = '';
             document.getElementById('q-img').value = '';
             document.getElementById('q-link').value = '';
             document.getElementById('q-start-time').value = '';
@@ -11630,7 +11698,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.getElementById('q-duration').value = '60';
             document.getElementById('q-score').value = '1';
             document.getElementById('q-target-group-manual').value = 'Public';
-            document.getElementById('q-tag').value = '';
+            document.getElementById('q-tag').value = 'DIS';
             // Re-render card pickers to reflect reset state
             renderDQGroupCards();
             renderDQTagCards();
@@ -11702,13 +11770,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             db.collection("quests").doc(id).get().then(doc => {
                 const d = doc.data();
                 document.getElementById('q-text').value = d.question;
+                document.getElementById('q-prompt-full').value = d.promptFull || '';
                 document.getElementById('q-img').value = d.imageUrl || "";
                 document.getElementById('q-link').value = d.questLink || "";
                 document.getElementById('q-score').value = d.baseScore;
                 document.getElementById('q-duration').value = d.durationMinutes || 60;
                 // Set hidden inputs before rendering cards so selection is correct
                 document.getElementById('q-target-group-manual').value = d.targetGroup || "Public";
-                document.getElementById('q-tag').value = d.tag || "";
+                document.getElementById('q-tag').value = d.tag || "DIS";
                 document.getElementById('q-start-time').value = "";
 
                 openTaskModal(); // Open modal
