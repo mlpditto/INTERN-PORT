@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V91.49)</title>
-    <!-- V91.49: Phase 2.4 - Submit button enhanced states (loading/success/error) -->
-    <!-- Release: 2026-04-26 14:15 UTC+7 -->
+    <title>Internship Portfolio (V91.50)</title>
+    <!-- V91.50: Phase 2.5 - Form reset feature with confirmation -->
+    <!-- Release: 2026-04-26 14:30 UTC+7 -->
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -2609,6 +2609,15 @@
                                     style="width:100%; font-weight:bold; border-radius:12px; height:48px; margin-top:4px; opacity:0.5; cursor:not-allowed;"
                                     disabled>
                                     🚀 Submit Case
+                                </button>
+                                
+                                <!-- 🔥 V91.50: Clear Form button -->
+                                <button class="btn-secondary" onclick="clearCaseForm()"
+                                    id="case-clear-btn"
+                                    style="width:100%; font-weight:600; border-radius:12px; height:44px; margin-top:8px; background: #f1f5f9; border: 2px solid #e2e8f0; color: #64748b; cursor: pointer; transition: all 0.2s ease;"
+                                    onmouseover="this.style.background='#fee2e2'; this.style.borderColor='#ef4444'; this.style.color='#dc2626';"
+                                    onmouseout="this.style.background='#f1f5f9'; this.style.borderColor='#e2e8f0'; this.style.color='#64748b';">
+                                    🗑️ Clear Form
                                 </button>
                             </div>
                         </div>
@@ -5765,7 +5774,7 @@
                     if (Array.isArray(userAns)) {
                         userAnsText = userAns.join('\n\n');
                     } else if (typeof userAns === 'string' && userAns.includes("\n---\n")) {
-                        userAnsText = userAns.replace(/\\n---\\n/g, '\\n\\n');
+                        userAnsText = userAns.replace(/\n---\n/g, '\n\n');
                     } else {
                         userAnsText = userAns;
                     }
@@ -9059,6 +9068,89 @@ async function archiveDoneCard(cardId) {
             
             const errorEl = field.parentElement.querySelector('.validation-error');
             if (errorEl) errorEl.remove();
+        }
+        
+        // 🔥 V91.50: Clear entire form
+        function clearCaseForm() {
+            // Confirm before clearing
+            if (!confirm('Are you sure you want to clear the form? All data will be lost.')) {
+                return;
+            }
+            
+            // Clear all input fields
+            document.getElementById('c-id').value = '';
+            document.getElementById('c-customer').value = '';
+            document.getElementById('c-disease').value = '';
+            document.getElementById('c-note').value = '';
+            
+            // Reset disease system selection
+            const diseaseSystemSelect = document.getElementById('c-disease-system');
+            if (diseaseSystemSelect) {
+                diseaseSystemSelect.value = '';
+            }
+            
+            // Clear disease system cards
+            document.querySelectorAll('.cs-sys-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            // Hide symptom step
+            const symptomStep = document.getElementById('case-symptom-step');
+            if (symptomStep) {
+                symptomStep.style.display = 'none';
+            }
+            
+            // Clear selected symptoms
+            window.caseComposerState.selectedSymptoms = [];
+            
+            // Reset validation state
+            window.caseFormValidation.hn = false;
+            window.caseFormValidation.patientName = false;
+            window.caseFormValidation.diseaseSystem = false;
+            
+            // Clear validation styles
+            const hnInput = document.getElementById('c-id');
+            const nameInput = document.getElementById('c-customer');
+            if (hnInput) {
+                hnInput.classList.remove('valid', 'invalid');
+            }
+            if (nameInput) {
+                nameInput.classList.remove('valid', 'invalid');
+            }
+            
+            // Clear validation errors
+            clearValidationError('c-id');
+            clearValidationError('c-customer');
+            
+            // Reset character counter
+            const charCountEl = document.getElementById('note-char-count');
+            const charCounterEl = document.getElementById('note-char-counter');
+            if (charCountEl) {
+                charCountEl.textContent = '0';
+            }
+            if (charCounterEl) {
+                charCounterEl.style.color = '#64748b';
+            }
+            
+            // Update submit button state
+            updateSubmitButtonState();
+            
+            // Show feedback
+            const clearBtn = document.getElementById('case-clear-btn');
+            if (clearBtn) {
+                const originalText = clearBtn.innerHTML;
+                clearBtn.innerHTML = '✅ Cleared!';
+                clearBtn.style.background = '#dcfce7';
+                clearBtn.style.borderColor = '#22c55e';
+                clearBtn.style.color = '#16a34a';
+                
+                setTimeout(() => {
+                    clearBtn.innerHTML = originalText;
+                    clearBtn.style.background = '#f1f5f9';
+                    clearBtn.style.borderColor = '#e2e8f0';
+                    clearBtn.style.color = '#64748b';
+                }, 1500);
+            }
         }
 
         // 🔥 V91.47: Update submit button state
