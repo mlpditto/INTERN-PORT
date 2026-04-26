@@ -5160,10 +5160,9 @@ async function saveQuiz() {
                             <small style="color:#999; font-size: 0.72em; font-weight: bold; text-transform: uppercase;">pts</small>
                         </td>
                         <td>${statusInfo}</td>
-                        <td style="min-width:180px; vertical-align: middle;">
-                            <!-- Row 1: Primary Controls -->
+                        <td style="min-width:160px; vertical-align: middle;">
                             <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
-                                <button class="btn-sm" onclick="event.stopPropagation(); openQuizModal('${q.id}')" title="Edit Quiz Content" 
+                                <button class="btn-sm" onclick="event.stopPropagation(); openQuizModal('${q.id}')" title="Edit Quiz Content"
                                     style="background:#3b82f6; color:white; border:none; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1.1em; transition:0.2s; box-shadow:0 3px 6px rgba(59,130,246,0.2);">
                                     📝
                                 </button>
@@ -5171,43 +5170,27 @@ async function saveQuiz() {
                                     style="background:${q.isActive ? '#64748b' : 'linear-gradient(135deg, #10b981, #059669)'}; color:white; border:none; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1.1em; transition:0.2s; box-shadow:0 3px 6px rgba(0,0,0,0.1);">
                                     ${q.isActive ? '⏹️' : '🚀'}
                                 </button>
-                                <button class="btn-sm" style="background:#4361ee; color:white; border:none; width:45px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; gap:4px; cursor:pointer; font-weight:900; box-shadow:0 3px 6px rgba(67,97,238,0.2);" 
+                                <button class="btn-sm" style="background:#4361ee; color:white; border:none; width:45px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; gap:4px; cursor:pointer; font-weight:900; box-shadow:0 3px 6px rgba(67,97,238,0.2);"
                                     onclick="event.stopPropagation(); showQuizParticipants('${q.id}')" title="View Participants">
                                     👥 <span style="font-size:0.85em;">${(window.quizCounts && window.quizCounts[q.id]) || 0}</span>
                                 </button>
                                 ${timerMenu}
-                            </div>
-                            <!-- Row 2: Secondary Tools -->
-                            <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:8px;">
-                                <button class="btn-sm" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s;" 
-                                    onclick="duplicateQuiz('${q.id}')" title="Duplicate/Copy Quiz">
-                                    ♻️
-                                </button>
-                                <button class="btn-sm" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s;" 
-                                    onclick="openHomeworkAssignModal('${q.id}')" title="Assign as Homework">
-                                    📚
-                                </button>
-                                ${(q.isPoll || hasWriting) ? `
-                                <button class="btn-sm" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s;" 
-                                    onclick="showPollResults('${q.id}')" title="View Results/Analytics">
-                                    📊
-                                </button>` : ''}
-                                <button class="btn-sm" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s;" 
-                                    onclick="showQuizDiscussions('${q.id}')" title="View Discussion Board">
-                                    💬
-                                </button>
-                                <button class="btn-sm" style="background:#fff7ed; color:#b45309; border:1px solid #fed7aa; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s;" 
-                                    onclick="event.stopPropagation(); showQuizFeedbackPanel('${q.id}')" title="View User Feedback">
-                                    ⭐
-                                </button>
-                                <button class="btn-sm" style="background:${q.isTemplate ? '#fbbf24' : '#f1f5f9'}; color:${q.isTemplate ? 'white' : '#64748b'}; border:1px solid #e2e8f0; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s;" 
-                                    onclick="toggleTemplateStatus('${q.id}', ${q.isTemplate || false})" title="Toggle Master Template">
-                                    📌
-                                </button>
-                                <button class="btn-sm" style="background:#fee2e2; color:#ef4444; border:none; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1.1em; transition:0.2s; margin-left:auto;" 
-                                    onclick="deleteQuiz('${q.id}')" title="Delete Quiz Permanently">
-                                    🗑️
-                                </button>
+                                <div style="position:relative; display:inline-block;">
+                                    <button class="btn-sm" onclick="event.stopPropagation(); toggleMoreMenu('${q.id}')" title="More actions"
+                                        style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1.2em; font-weight:900; transition:0.2s;">
+                                        ⋯
+                                    </button>
+                                    <div id="more-menu-${q.id}" style="display:none; position:absolute; right:0; top:calc(100% + 4px); z-index:9999; background:white; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.13); padding:6px; min-width:175px; border:1px solid #e2e8f0;">
+                                        <button onclick="event.stopPropagation(); toggleMoreMenu('${q.id}'); duplicateQuiz('${q.id}')" style="width:100%; text-align:left; background:none; border:none; border-radius:8px; padding:7px 10px; cursor:pointer; font-size:0.88em; color:#374151; display:flex; align-items:center; gap:8px;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">♻️ Duplicate</button>
+                                        <button onclick="event.stopPropagation(); toggleMoreMenu('${q.id}'); openHomeworkAssignModal('${q.id}')" style="width:100%; text-align:left; background:none; border:none; border-radius:8px; padding:7px 10px; cursor:pointer; font-size:0.88em; color:#374151; display:flex; align-items:center; gap:8px;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">📚 Assign Homework</button>
+                                        ${(q.isPoll || hasWriting) ? `<button onclick="event.stopPropagation(); toggleMoreMenu('${q.id}'); showPollResults('${q.id}')" style="width:100%; text-align:left; background:none; border:none; border-radius:8px; padding:7px 10px; cursor:pointer; font-size:0.88em; color:#374151; display:flex; align-items:center; gap:8px;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">📊 Analytics</button>` : ''}
+                                        <button onclick="event.stopPropagation(); toggleMoreMenu('${q.id}'); showQuizDiscussions('${q.id}')" style="width:100%; text-align:left; background:none; border:none; border-radius:8px; padding:7px 10px; cursor:pointer; font-size:0.88em; color:#374151; display:flex; align-items:center; gap:8px;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">💬 Discussion</button>
+                                        <button onclick="event.stopPropagation(); toggleMoreMenu('${q.id}'); showQuizFeedbackPanel('${q.id}')" style="width:100%; text-align:left; background:none; border:none; border-radius:8px; padding:7px 10px; cursor:pointer; font-size:0.88em; color:#374151; display:flex; align-items:center; gap:8px;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">⭐ Feedback</button>
+                                        <button onclick="event.stopPropagation(); toggleMoreMenu('${q.id}'); toggleTemplateStatus('${q.id}', ${q.isTemplate || false})" style="width:100%; text-align:left; background:none; border:none; border-radius:8px; padding:7px 10px; cursor:pointer; font-size:0.88em; color:#374151; display:flex; align-items:center; gap:8px;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">📌 ${q.isTemplate ? 'Unpin Template' : 'Mark as Template'}</button>
+                                        <div style="height:1px; background:#f1f5f9; margin:4px 6px;"></div>
+                                        <button onclick="event.stopPropagation(); toggleMoreMenu('${q.id}'); deleteQuiz('${q.id}')" style="width:100%; text-align:left; background:none; border:none; border-radius:8px; padding:7px 10px; cursor:pointer; font-size:0.88em; color:#ef4444; display:flex; align-items:center; gap:8px;" onmouseover="this.style.background='#fff5f5'" onmouseout="this.style.background='none'">🗑️ Delete</button>
+                                    </div>
+                                </div>
                             </div>
                         </td>
                     </tr>
@@ -5512,6 +5495,17 @@ async function saveQuiz() {
         window.toggleTemplateStatus = toggleTemplateStatus;
         window.deleteQuiz = deleteQuiz;
         window.openHomeworkAssignModal = openHomeworkAssignModal;
+
+        window.toggleMoreMenu = function(id) {
+            const menu = document.getElementById('more-menu-' + id);
+            if (!menu) return;
+            const isOpen = menu.style.display !== 'none';
+            document.querySelectorAll('[id^="more-menu-"]').forEach(m => { m.style.display = 'none'; });
+            if (!isOpen) menu.style.display = 'block';
+        };
+        document.addEventListener('click', () => {
+            document.querySelectorAll('[id^="more-menu-"]').forEach(m => { m.style.display = 'none'; });
+        });
         window.diagnoseUserQuizVisibility = diagnoseUserQuizVisibility;
         window.diagnoseQuizVisibilityForUser = diagnoseUserQuizVisibility;
 
