@@ -5073,7 +5073,7 @@ async function saveQuiz() {
                     statusInfo = `<span class="badge" style="background:#6c757d; cursor:default;" title="Expired: ${dead.toLocaleString('en-US')}">Expired ${dead.getDate()}/${dead.getMonth()+1}</span>`;
                 } else {
                     if (start && now < start) {
-                        statusInfo = `<span class="badge" style="background:#ff9f1c">Scheduled: ${start.toLocaleString('en-US')}</span>`;
+                        statusInfo = `<span class="badge" style="background:#ff9f1c; cursor:default;" title="Scheduled: ${start.toLocaleString('en-US')}">Sched ${start.getDate()}/${start.getMonth()+1}</span>`;
                     } else {
                         statusInfo = `<span class="badge" style="background:#2ec4b6">Active</span> <br> <small class="quiz-countdown" data-deadline="${dead ? dead.toISOString() : ''}" style="font-weight:bold; color:#ef233c;"></small>`;
                     }
@@ -5128,7 +5128,7 @@ async function saveQuiz() {
                             </div>
                             <div style="margin-top:4px;"><small style="color:#999;">(${q.shortTitle || '-'})</small></div>
                         </td>
-                        <td style="text-align:center; vertical-align: middle;">
+                        <td class="hide-mobile" style="text-align:center; vertical-align: middle;">
                             <div style="
                                 display: inline-block;
                                 min-width: 40px;
@@ -5151,7 +5151,7 @@ async function saveQuiz() {
                             </div>
                             <br><small style="color:#999; font-size: 0.75em; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">Items</small>
                         </td>
-                        <td style="text-align:center; vertical-align: middle;">
+                        <td class="hide-mobile" style="text-align:center; vertical-align: middle;">
                             <div style="display:flex; align-items:center; justify-content:center; gap:6px;">
                                 <div style="
                                     display: inline-block;
