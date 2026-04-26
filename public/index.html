@@ -9810,6 +9810,7 @@ async function archiveDoneCard(cardId) {
             { key: 'msk', label: 'Musculoskeletal', symptoms: ['Back Pain', 'Joint Pain', 'Stiffness', 'Sprain', 'Swelling'] },
             { key: 'endocrine', label: 'Endocrine/NCDs', symptoms: ['Hyperglycemia', 'Polyuria', 'Weight Loss', 'Fatigue', 'Poor Adherence'] },
             { key: 'mental', label: 'Mental Health', symptoms: ['Stress', 'Anxiety', 'Low Mood', 'Poor Sleep', 'Panic'] },
+            { key: 'pain', label: 'Pain', symptoms: ['Acute Pain', 'Chronic Pain', 'Nociceptive', 'Neuropathic', 'Cancer Pain'] },
             { key: 'other', label: 'Other', symptoms: ['Follow-up', 'Medication Q', 'Unclear Symptom'] }
         ];
 
@@ -9829,7 +9830,7 @@ async function archiveDoneCard(cardId) {
             respiratory: '🫁', cardio: '❤️', gi: '🫃',
             neuro: '🧠', ent: '👂', skin: '🩹',
             msk: '🦴', endocrine: '💊', mental: '🧘',
-            other: '📋'
+            pain: '🩻', other: '📋'
         };
 
         const SYMPTOM_EMOJI = {
@@ -10344,8 +10345,9 @@ async function archiveDoneCard(cardId) {
                     caseId,
                     customer,
                     disease,
+                    diseaseSystem: systemKey || null,
                     diseaseSystemKey: systemKey || null,
-                    diseaseSystemLabel: systemEntry ? `${systemEntry.label} / ${systemEntry.thaiLabel}` : disease,
+                    diseaseSystemLabel: systemEntry ? systemEntry.label : disease,
                     symptomTags,
                     note,
                     status: "pending",
@@ -10374,7 +10376,7 @@ async function archiveDoneCard(cardId) {
                             customer,
                             disease,
                             diseaseSystemKey: systemKey || null,
-                            diseaseSystemLabel: systemEntry ? `${systemEntry.label} / ${systemEntry.thaiLabel}` : disease,
+                            diseaseSystemLabel: systemEntry ? systemEntry.label : disease,
                             symptomTags,
                             sourceType: 'cases',
                             sourceId: legacyRef.id
@@ -10441,7 +10443,7 @@ async function archiveDoneCard(cardId) {
                             customer,
                             disease,
                             diseaseSystemKey: systemKey || null,
-                            diseaseSystemLabel: systemEntry ? `${systemEntry.label} / ${systemEntry.thaiLabel}` : disease,
+                            diseaseSystemLabel: systemEntry ? systemEntry.label : disease,
                             symptomTags,
                             note,
                             status: "pending",
@@ -10578,11 +10580,11 @@ async function archiveDoneCard(cardId) {
             const filteredSystems = activeFilter === 'all' ? orderedSystems : orderedSystems.filter(sys => sys === activeFilter);
             const visibleCount = filteredSystems.reduce((sum, sys) => sum + groups[sys].length, 0);
 
-            // Compact stats chart — group by diseaseSystem key for emoji lookup
+            // Compact stats chart — group by diseaseSystemKey for emoji lookup
             const total = cases.length;
             const keyGroups = {};
             cases.forEach(c => {
-                const key = c.diseaseSystem || 'other';
+                const key = c.diseaseSystemKey || 'other';
                 keyGroups[key] = (keyGroups[key] || 0) + 1;
             });
             const sortedKeys = Object.entries(keyGroups).sort((a, b) => b[1] - a[1]);
