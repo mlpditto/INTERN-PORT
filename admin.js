@@ -5088,12 +5088,15 @@ async function saveQuiz() {
 
 
                 const timerOptions = [1, 2, 4, 8, 12, 24, 48, 72, 120, 168];
-                const timerMenu = isActiveSection ? `
-                    <select class="btn-sm" onchange="setQuizDuration('${q.id}', this.value)" style="width: auto; background: #e0f2f1; color: #00695c; border: 1px solid #b2dfdb; cursor: pointer; border-radius: 4px; padding: 2px 4px;">
+                const timerMenu = isActiveSection
+                    ? `<select class="btn-sm" onchange="setQuizDuration('${q.id}', this.value)" title="Extend timer" style="width:auto; background:#e0f2f1; color:#00695c; border:1px solid #b2dfdb; cursor:pointer; border-radius:4px; padding:2px 4px;">
                         <option value="">⏲️ Timer</option>
                         ${timerOptions.map(h => `<option value="${h}">${h}h</option>`).join('')}
-                    </select>
-                ` : '';
+                       </select>`
+                    : `<select class="btn-sm" onchange="setQuizDuration('${q.id}', this.value)" title="Set timer and go live" style="width:auto; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; cursor:pointer; border-radius:4px; padding:2px 4px;">
+                        <option value="">🚀 Go Live</option>
+                        ${timerOptions.map(h => `<option value="${h}">${h}h</option>`).join('')}
+                       </select>`;
 
                 const pointsVal = parseFloat(q.totalPoints) || 1.0;
                 const pointsColor = pointsVal > 5 ? '#d81b60' : (pointsVal > 1 ? '#8338ec' : '#444');
