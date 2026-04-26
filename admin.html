@@ -6933,6 +6933,11 @@
                         </div>
                     </div>
                 </div>
+                <!-- 🔀 Source Toggle [Quiz Feedback V1] -->
+                <div style="display:flex; gap:8px; margin-bottom:16px;">
+                    <button id="lt-src-btn-reflections" onclick="setLaughTaleSource('reflections')" style="padding:8px 22px; border-radius:20px; border:2px solid #4361ee; background:#4361ee; color:white; font-weight:900; font-size:0.85em; cursor:pointer; transition:0.3s;">📓 Reflections</button>
+                    <button id="lt-src-btn-quiz" onclick="setLaughTaleSource('quiz')" style="padding:8px 22px; border-radius:20px; border:2px solid #e2e8f0; background:white; color:#64748b; font-weight:900; font-size:0.85em; cursor:pointer; transition:0.3s;">🧠 Quiz Feedback</button>
+                </div>
                 <!-- 👥 User Filter Bar (Turbo V2) -->
                 <div id="laughtale-user-filter" style="display:flex; gap:8px; overflow-x:auto; padding:10px 0 20px 0; margin-bottom:10px; scrollbar-width:none; -ms-overflow-style:none;"></div>
                 
@@ -23549,11 +23554,91 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         window._laughTaleUserFilter = null;
-        function renderLaughTale() {
+        window._laughTaleSource = 'reflections';
+        window._quizFeedbackCache = null;
+
+        function setLaughTaleSource(src) {
+            window._laughTaleSource = src;
+            window._laughTaleUserFilter = null;
+            const btnR = document.getElementById('lt-src-btn-reflections');
+            const btnQ = document.getElementById('lt-src-btn-quiz');
+            const activeStyle = 'padding:8px 22px; border-radius:20px; border:2px solid #4361ee; background:#4361ee; color:white; font-weight:900; font-size:0.85em; cursor:pointer; transition:0.3s;';
+            const inactiveStyle = 'padding:8px 22px; border-radius:20px; border:2px solid #e2e8f0; background:white; color:#64748b; font-weight:900; font-size:0.85em; cursor:pointer; transition:0.3s;';
+            if (btnR) btnR.style.cssText = src === 'reflections' ? activeStyle : inactiveStyle;
+            if (btnQ) btnQ.style.cssText = src === 'quiz' ? activeStyle : inactiveStyle;
+            renderLaughTale();
+        }
+
+        async function renderQuizFeedbackCards() {
             const container = document.getElementById('laughtale-grid');
             const filterBar = document.getElementById('laughtale-user-filter');
             if (!container) return;
-            
+
+            if (!window._quizFeedbackCache) {
+                container.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:100px 20px;"><i class="fa-solid fa-spinner fa-spin" style="font-size:3em; color:#ccc;"></i></div>`;
+                const snap = await db.collection('quiz_feedback').orderBy('timestamp', 'desc').get();
+                window._quizFeedbackCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            }
+
+            const all = window._quizFeedbackCache;
+            if (all.length === 0) {
+                container.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:100px 20px;"><h3>No quiz feedback yet. 🧠</h3></div>`;
+                if (filterBar) filterBar.innerHTML = '';
+                return;
+            }
+
+            const userCounts = {};
+            all.forEach(f => { userCounts[f.userId] = (userCounts[f.userId] || 0) + 1; });
+
+            let filterHtml = `<button onclick="window._laughTaleUserFilter=null; renderQuizFeedbackCards()" style="flex:none; padding:8px 20px; border-radius:15px; border:none; font-weight:900; background:${!window._laughTaleUserFilter ? '#4361ee; color:white; transform:scale(1.05); box-shadow:0 5px 15px rgba(67,97,238,0.3);' : 'white; color:#64748b;'} cursor:pointer; transition:0.3s; box-shadow:0 4px 8px rgba(0,0,0,0.05); font-size:0.85em;">ALL (${all.length})</button>`;
+            Object.keys(userCounts).forEach(uid => {
+                const u = (usersData || []).find(x => x.id === uid) || { displayName: 'Intern' };
+                filterHtml += `<button onclick="window._laughTaleUserFilter='${uid}'; renderQuizFeedbackCards()" style="flex:none; padding:8px 20px; border-radius:15px; border:none; font-weight:900; background:${window._laughTaleUserFilter === uid ? '#4361ee; color:white; transform:scale(1.05); box-shadow:0 5px 15px rgba(67,97,238,0.3);' : 'white; color:#64748b;'} cursor:pointer; transition:0.3s; box-shadow:0 4px 8px rgba(0,0,0,0.05); font-size:0.85em;">${u.displayName} (${userCounts[uid]})</button>`;
+            });
+            if (filterBar) filterBar.innerHTML = filterHtml;
+
+            const filtered = window._laughTaleUserFilter ? all.filter(f => f.userId === window._laughTaleUserFilter) : all;
+            container.innerHTML = filtered.map(fb => {
+                const dateObj = fb.timestamp?.toDate() || new Date();
+                const user = (usersData || []).find(u => u.id === fb.userId) || {};
+                const groupColor = getGroupColor(user.group || 'Public');
+                const rating = Math.min(5, Math.max(0, fb.rating || 0));
+                const stars = '⭐'.repeat(rating) + '☆'.repeat(5 - rating);
+                const mins = fb.timeUsedSeconds ? Math.round(fb.timeUsedSeconds / 60) : null;
+                return `
+                    <div class="laugh-card" style="background:var(--bg-card); border-radius:30px; box-shadow:0 20px 50px rgba(0,0,0,0.07); padding:30px; position:relative; overflow:hidden; border:1px solid var(--border-color); transition:0.3s; height:100%; display:flex; flex-direction:column;">
+                        <div style="position:absolute; top:0; left:0; width:100%; height:10px; background:${groupColor};"></div>
+                        <div style="position:absolute; top:14px; left:50%; transform:translateX(-50%); background:#4361ee; color:white; font-size:0.68em; font-weight:900; padding:2px 10px; border-radius:8px; letter-spacing:1px; white-space:nowrap;">QUIZ</div>
+                        <div style="display:flex; align-items:center; gap:18px; margin-bottom:20px; margin-top:14px;">
+                            <img src="${user.pictureUrl || ''}" style="width:56px; height:56px; border-radius:50%; border:3px solid var(--bg-card); box-shadow:0 10px 20px rgba(0,0,0,0.12);" onerror="this.style.display='none'">
+                            <div style="flex:1;">
+                                <div style="font-weight:900; font-size:1.25em; color:var(--text-main); letter-spacing:-0.5px;">${user.displayName || fb.displayName || 'Intern'}</div>
+                                <div style="font-size:0.9em; color:var(--text-sub); font-weight:800; display:flex; align-items:center; gap:8px;">
+                                    ${dateObj.toLocaleDateString('en-US')}
+                                    ${mins !== null ? `<span style="opacity:0.3;">•</span> ⏱ ${mins} min` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="font-size:1.35em; letter-spacing:2px; margin-bottom:18px;">${stars}</div>
+                        <div class="lt-user-content" style="font-size:1.1em; color:var(--text-main); line-height:1.8; font-style:italic; margin-bottom:25px; background:var(--bg-body); padding:25px; border-radius:24px; border-left:8px solid #4361ee; position:relative; flex:1;">
+                            <span style="position:absolute; top:5px; left:15px; font-size:5em; opacity:0.04; font-family:serif; font-weight:900;">"</span>
+                            ${fb.comment || '<span style="opacity:0.4;">No comment</span>'}
+                        </div>
+                        <div style="border-top:2px solid var(--border-color); padding-top:20px; margin-top:auto;">
+                            ${fb.nextTopic ? `<div style="font-size:0.85em; color:#64748b; margin-bottom:10px;"><span style="font-weight:900; color:#4361ee;">NEXT:</span> ${fb.nextTopic}</div>` : ''}
+                            ${fb.pointsEarned ? `<div style="text-align:right;"><span style="background:rgba(16,185,129,0.15); color:#10b981; padding:8px 22px; border-radius:40px; font-weight:900; font-size:1em; box-shadow:0 4px 12px rgba(16,185,129,0.15);">+${fb.pointsEarned} PTS</span></div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderLaughTale() {
+            if (window._laughTaleSource === 'quiz') { renderQuizFeedbackCards(); return; }
+            const container = document.getElementById('laughtale-grid');
+            const filterBar = document.getElementById('laughtale-user-filter');
+            if (!container) return;
+
             if (reflectiveLogsCache.length === 0) {
                 loadReflectiveLogsAdmin();
                 container.innerHTML = `<div style="grid-column: 1 / -1; text-align:center; padding:100px 20px;"><i class="fa-solid fa-spinner fa-spin" style="font-size:3em; color:#ccc;"></i></div>`;
