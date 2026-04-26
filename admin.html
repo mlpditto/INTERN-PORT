@@ -6943,6 +6943,7 @@
                     });
                     const d = await resp.json();
                     if (d.error) throw new Error(`Ollama Cloud Error: ${d.error.message || d.error}`);
+                    if (!d.choices?.[0]) throw new Error(`Ollama returned no choices (status ${resp.status})`);
                     return { text: d.choices[0].message.content, tokens: d.usage?.total_tokens || 0, model: modelName };
                 } else if (modelName.toLowerCase().includes('claude')) {
                     const apiKey = quickApiKey || window.ANTHROPIC_API_KEY;
@@ -6977,6 +6978,7 @@
                     });
                     const d = await resp.json();
                     if (d.error) throw new Error(`OpenAI Local Error: ${d.error.message}`);
+                    if (!d.choices?.[0]) throw new Error(`OpenAI returned no choices (status ${resp.status})`);
                     return { text: d.choices[0].message.content, tokens: d.usage?.total_tokens || 0, model: actualModel };
                 }
                 throw new Error("No provider active for " + modelName + ". Please check API keys or Proxy status.");
