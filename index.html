@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V93.025)</title>
-    <!-- V93.025: Phase 2.5 - Learning Tools UI Improvement (Hybrid: 4-col grid, no bg, compact) -->
+    <title>Internship Portfolio (V94.02)</title>
+    <!-- V94.02: Merge Ranks+Badges — badge chips embedded in Me leaderboard row -->
     <!-- Release: 2026-04-26 16:00 UTC+7 -->
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -1531,6 +1531,36 @@
             }
         }
 
+        /* V94.01: Learning Tools Toggle Button */
+        .tools-toggle-btn {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            background: #fafafa;
+            border: 1.5px solid #eee;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.85em;
+            color: #555;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        .tools-toggle-btn:hover {
+            background: #fff7ed;
+            border-color: #e67e22;
+            color: #e67e22;
+        }
+        .tools-toggle-btn #rl-tools-chevron {
+            transition: transform 0.25s ease;
+            font-size: 0.8em;
+            color: #bbb;
+        }
+        .tools-toggle-btn.open #rl-tools-chevron {
+            transform: rotate(180deg);
+        }
+
         /* Character Counter */
         .char-counter {
             font-size: 0.7em;
@@ -1646,6 +1676,16 @@
                                     style="display:none; color:#e09f3e; font-size:0.95em; font-weight:bold; align-self:center; margin-left:2px;">
                                     <i class="fa-solid fa-circle-exclamation"></i> กรุณาระบุวันฝึกงานให้ครบ</div>
                             </div>
+                            <!-- V94.04: Internship Timeline Bar -->
+                            <div id="u-timeline-bar" style="display:none; margin-top:4px;">
+                                <div style="display:flex; justify-content:space-between; font-size:0.68em; color:#94a3b8; margin-bottom:3px;">
+                                    <span id="u-tl-label">Day 0 of 0</span>
+                                    <span id="u-tl-remaining">⏳ 0 days left</span>
+                                </div>
+                                <div style="height:5px; background:#e2e8f0; border-radius:999px; overflow:hidden;">
+                                    <div id="u-tl-bar" style="height:100%; width:0%; background:linear-gradient(90deg,#4361ee,#7c3aed); border-radius:999px; transition:width 0.4s ease;"></div>
+                                </div>
+                            </div>
                             <!-- 🔥 Unified Metrics Bar (V91.38) - Combines KPI + Voyage Metrics -->
                             <div class="unified-metrics-bar">
                                 <!-- Left: Compact Badges -->
@@ -1666,9 +1706,12 @@
                                     </span>
                                 </div>
                                 
+                                <!-- V94.04: Row 3 - Earned Badges (hidden until unlocked) -->
+                                <div id="u-earned-badges" style="display:none; flex-wrap:wrap; gap:5px; font-size:0.72em;"></div>
+
                                 <!-- Divider -->
                                 <span class="metrics-divider">|</span>
-                                
+
                                 <!-- Right: Voyage Metrics Summary -->
                                 <div class="voyage-summary">
                                     <div class="voyage-metric-item">
@@ -1706,23 +1749,13 @@
                         <div id="u-crew-rank"
                             style="font-size: 0.54em; color: #64748b; font-weight: 700; margin-top: 4px; white-space: nowrap;">
                             LV.1 Rookie Navigator</div>
+                        <div id="u-division-rank-badge" style="display:none; margin-top:3px;"></div>
                     </div>
                 </div>
 
-                <!-- 🔥 Profile Tabs (V91.47) - Ranks / Badges -->
-                <div class="profile-tabs-bar">
-                    <button class="profile-tab-btn active" id="ptab-ranks" onclick="switchProfileTab('ranks')">
-                        <i class="fa-solid fa-trophy"></i>
-                        <span>Ranks</span>
-                    </button>
-                    <button class="profile-tab-btn" id="ptab-badges" onclick="switchProfileTab('badges')">
-                        <i class="fa-solid fa-medal"></i>
-                        <span>Badges</span>
-                    </button>
-                </div>
-
+                <!-- V94.02: Merged Ranks + Badges — single pane -->
                 <div class="profile-tab-content">
-                    <!-- Tab 1: Ranks (Leaderboard) -->
+                    <!-- Merged pane: Leaderboard + Badge strip on Me row -->
                     <div id="pane-profile-ranks" class="profile-tab-pane active">
                         <div id="profile-leaderboard-container" style="padding: 10px 0;">
                             <div style="text-align:center; padding:15px; color:#999;">
@@ -1731,7 +1764,7 @@
                         </div>
                     </div>
 
-                    <!-- Tab 2: Badges -->
+                    <!-- Hidden: kept for compatibility, no longer shown as tab -->
                     <div id="pane-profile-badges" class="profile-tab-pane">
                         <div id="profile-badges-container" style="padding: 10px 0;">
                             <div style="text-align:center; padding:15px; color:#999;">
@@ -1806,23 +1839,21 @@
                 /* 🔥 Unified Metrics Bar (V91.39) - Enhanced Readability */
                 .unified-metrics-bar {
                     display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    padding: 6px 12px;
+                    flex-direction: column;
+                    gap: 5px;
+                    padding: 8px 12px;
                     background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
                     border: 1px solid #e2e8f0;
                     border-radius: 10px;
                     margin-top: 6px;
-                    min-height: 42px;
-                    flex-wrap: nowrap;
-                    overflow-x: auto;
+                    overflow-x: hidden;
                 }
 
                 .metrics-badges {
                     display: flex;
                     align-items: center;
                     gap: 6px;
-                    flex-shrink: 0;
+                    flex-wrap: wrap;
                 }
 
                 .metric-badge {
@@ -1888,17 +1919,14 @@
                 }
 
                 .metrics-divider {
-                    color: #cbd5e1;
-                    font-weight: 300;
-                    font-size: 1em;
-                    padding: 0 4px;
+                    display: none;
                 }
 
                 .voyage-summary {
                     display: flex;
                     align-items: center;
                     gap: 7px;
-                    flex-shrink: 0;
+                    flex-wrap: wrap;
                 }
 
                 .voyage-metric-item {
@@ -2478,23 +2506,17 @@
                             <!-- Tab 1: Daily Reflective Log & Tasks -->
                             <div id="pane-mission-log" class="mission-tab-pane active">
                                 <div id="rl-integrated-area" style="margin-bottom: 20px;">
-                                    <div
-                                        style="padding-bottom: 10px; border-bottom: 1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-                                        <h5 style="margin:0; color:#e67e22; display:flex; align-items:center; gap:8px;">
-                                            <i class="fa-solid fa-pen-fancy"></i> Daily Reflective Log
-                                        </h5>
-                                        <div style="display:flex; align-items:center; gap:8px;">
-                                            <button
-                                                onclick="document.getElementById('rl-history-area').style.display = document.getElementById('rl-history-area').style.display==='none'?'block':'none'"
-                                                style="background:none; border:none; color:#999; cursor:pointer; font-size:0.8em; display:flex; align-items:center; gap:4px; padding:0;"><i
-                                                    class="fa-solid fa-clock-rotate-left"></i> History</button>
-                                            <span id="rl-total-count"
-                                                style="font-size:0.75em; background:rgba(230, 126, 34, 0.1); color:#e67e22; padding:2px 10px; border-radius:12px; font-weight:bold;">0/?
-                                                Logs</span>
-                                        </div>
+                                    <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-bottom:12px;">
+                                        <button
+                                            onclick="document.getElementById('rl-history-area').style.display = document.getElementById('rl-history-area').style.display==='none'?'block':'none'"
+                                            style="background:none; border:none; color:#999; cursor:pointer; font-size:0.8em; display:flex; align-items:center; gap:4px; padding:0;"><i
+                                                class="fa-solid fa-clock-rotate-left"></i> History</button>
+                                        <span id="rl-total-count"
+                                            style="font-size:0.75em; background:rgba(230, 126, 34, 0.1); color:#e67e22; padding:2px 10px; border-radius:12px; font-weight:bold;">0/?
+                                            Logs</span>
                                     </div>
 
-                                    <div id="rl-form-area" style="padding-top: 12px;">
+                                    <div id="rl-form-area" style="padding-top: 0;">
                                         <!-- 🔥 V93.01: Enhanced Mood Picker - 3 Column Grid -->
                                         <div class="mood-picker" id="mood-picker">
                                             <button class="mood-btn" onclick="selectMood('😭', this)" title="Crying">
@@ -2528,23 +2550,35 @@
                                         </div>
                                         <input type="hidden" id="rl-mood" value="😊">
 
-                                        <!-- 🔥 V93.025: Learning Tools Section - Hybrid Design -->
-                                        <div id="rl-learning-tools" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
-                                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
-                                                <i class="fa-solid fa-toolbox" style="color: #e67e22;"></i>
-                                                <span style="font-size: 0.9em; font-weight: 600; color: #333;">Learning Tools Used</span>
-                                                <span style="font-size: 0.7em; color: #999; font-weight: normal;">(Optional)</span>
+                                        <!-- V94.01: Textarea + Submit (moved above Learning Tools) -->
+                                        <div style="position:relative; margin-top:15px;">
+                                            <textarea id="rl-content" rows="5"
+                                                placeholder="What did I learn today? What problems did I face? What's next?"
+                                                oninput="updateCharCount()"
+                                                style="margin:0; border-radius:12px; resize:none; font-size:0.95em; padding:15px; border:1px solid #ddd; width:100%;"></textarea>
+                                            <div class="char-counter"><span id="char-count">0</span> characters</div>
+                                            <div style="margin-top: 12px; display:flex; justify-content:flex-end; align-items:center;">
+                                                <button id="rl-submit-btn" class="btn-primary"
+                                                    onclick="submitReflectiveLog()"
+                                                    style="width:auto; height:36px; border-radius:18px; padding:0 20px; font-size:0.9em; font-weight:bold; background:linear-gradient(135deg, #ff9f1c 0%, #ffbf00 100%); border:none; display:flex; align-items:center; gap:8px; min-height:auto; box-shadow: 0 4px 12px rgba(255, 159, 28, 0.2);">
+                                                    <i class="fa-solid fa-paper-plane"></i> Submit
+                                                </button>
                                             </div>
-                                            
-                                            <!-- Selected Tools Display -->
-                                            <div id="rl-selected-tools" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; min-height: 32px;">
-                                                <!-- Selected tags will appear here -->
-                                            </div>
-                                            
-                                            <!-- Predefined Tools Grid - No Background -->
-                                            <div style="margin-bottom: 15px;">
-                                                <div style="font-size: 0.75em; color: #666; margin-bottom: 10px; font-weight: 500;">Quick Select:</div>
-                                                <div class="tool-tags-grid" id="rl-tool-tags">
+                                        </div>
+
+                                        <!-- V94.01: Learning Tools - Collapsible -->
+                                        <div id="rl-learning-tools" style="margin-top: 12px;">
+                                            <button onclick="toggleLearningToolsPanel()" class="tools-toggle-btn" id="rl-tools-toggle-btn">
+                                                <span><i class="fa-solid fa-toolbox"></i> Learning Tools <span style="color:#bbb; font-weight:400; font-size:0.85em;">(Optional)</span></span>
+                                                <i id="rl-tools-chevron" class="fa-solid fa-chevron-down"></i>
+                                            </button>
+                                            <div id="rl-tools-body" style="display:none; padding-top:12px;">
+                                                <!-- Selected Tools Display -->
+                                                <div id="rl-selected-tools" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; min-height:0;">
+                                                </div>
+                                                <!-- Quick Select Grid -->
+                                                <div style="font-size:0.75em; color:#666; margin-bottom:8px; font-weight:500;">Quick Select:</div>
+                                                <div class="tool-tags-grid" id="rl-tool-tags" style="margin-bottom:12px;">
                                                     <button class="tool-tag-btn" onclick="toggleLearningTool('BOTNOI', this)" data-tool="BOTNOI">
                                                         <span class="tool-emoji">🤖</span>
                                                         <span class="tool-text">BOTNOI</span>
@@ -2590,38 +2624,20 @@
                                                         <span class="tool-text">OTHER</span>
                                                     </button>
                                                 </div>
-                                            </div>
-                                            
-                                            <!-- Custom Tool Input - Enhanced -->
-                                            <div style="display: flex; gap: 8px; align-items: center;">
-                                                <input type="text" id="rl-custom-tool" placeholder="Add custom tool..." 
-                                                    style="flex: 1; padding: 10px 14px; border: 1.5px solid #ddd; border-radius: 10px; font-size: 0.85em; margin: 0; transition: all 0.2s;"
-                                                    onfocus="this.style.borderColor='#e67e22'; this.style.boxShadow='0 0 0 3px rgba(230, 126, 34, 0.1)'"
-                                                    onblur="this.style.borderColor='#ddd'; this.style.boxShadow='none'"
-                                                    onkeypress="if(event.key==='Enter'){event.preventDefault(); addCustomTool();}">
-                                                <button onclick="addCustomTool()" 
-                                                    style="padding: 10px 18px; background: linear-gradient(135deg, #ff9f1c 0%, #ffbf00 100%); border: none; border-radius: 10px; cursor: pointer; font-size: 0.85em; color: white; font-weight: 600; white-space: nowrap; box-shadow: 0 2px 8px rgba(255, 159, 28, 0.25); transition: all 0.2s;"
-                                                    onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(255, 159, 28, 0.35)'"
-                                                    onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(255, 159, 28, 0.25)'">
-                                                    <i class="fa-solid fa-plus"></i> Add
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div style="position:relative;">
-                                            <textarea id="rl-content" rows="5"
-                                                placeholder="What did I learn today? What problems did I face? What's next?"
-                                                oninput="updateCharCount()"
-                                                style="margin:0; border-radius:12px; resize:none; font-size:0.95em; padding:15px; border:1px solid #ddd; width:100%;"></textarea>
-                                            <div class="char-counter"><span id="char-count">0</span> characters</div>
-
-                                            <div
-                                                style="margin-top: 12px; display:flex; justify-content:flex-end; align-items:center;">
-                                                <button id="rl-submit-btn" class="btn-primary"
-                                                    onclick="submitReflectiveLog()"
-                                                    style="width:auto; height:36px; border-radius:18px; padding:0 20px; font-size:0.9em; font-weight:bold; background:linear-gradient(135deg, #ff9f1c 0%, #ffbf00 100%); border:none; display:flex; align-items:center; gap:8px; min-height:auto; box-shadow: 0 4px 12px rgba(255, 159, 28, 0.2);">
-                                                    <i class="fa-solid fa-paper-plane"></i> Submit
-                                                </button>
+                                                <!-- Custom Tool Input -->
+                                                <div style="display:flex; gap:8px; align-items:center;">
+                                                    <input type="text" id="rl-custom-tool" placeholder="Add custom tool..."
+                                                        style="flex:1; padding:10px 14px; border:1.5px solid #ddd; border-radius:10px; font-size:0.85em; margin:0; transition:all 0.2s;"
+                                                        onfocus="this.style.borderColor='#e67e22'; this.style.boxShadow='0 0 0 3px rgba(230,126,34,0.1)'"
+                                                        onblur="this.style.borderColor='#ddd'; this.style.boxShadow='none'"
+                                                        onkeypress="if(event.key==='Enter'){event.preventDefault(); addCustomTool();}">
+                                                    <button onclick="addCustomTool()"
+                                                        style="padding:10px 18px; background:linear-gradient(135deg,#ff9f1c 0%,#ffbf00 100%); border:none; border-radius:10px; cursor:pointer; font-size:0.85em; color:white; font-weight:600; white-space:nowrap; box-shadow:0 2px 8px rgba(255,159,28,0.25); transition:all 0.2s;"
+                                                        onmouseover="this.style.transform='translateY(-1px)'"
+                                                        onmouseout="this.style.transform='translateY(0)'">
+                                                        <i class="fa-solid fa-plus"></i> Add
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -4233,6 +4249,40 @@
             const s = document.getElementById('u-start-date').value;
             const e = document.getElementById('u-end-date').value;
             if (s || e) await db.collection("users").doc(userId).update({ startDate: s, endDate: e });
+            updateTimelineBar(s, e);
+        }
+
+        // V94.04: Timeline bar under Start/End Date
+        function updateTimelineBar(startVal, endVal) {
+            const wrap = document.getElementById('u-timeline-bar');
+            if (!wrap) return;
+            const start = startVal ? new Date(startVal) : null;
+            const end   = endVal   ? new Date(endVal)   : null;
+            if (!start || !end || end <= start) { wrap.style.display = 'none'; return; }
+            const now        = new Date();
+            const totalDays  = Math.ceil((end - start) / 86400000);
+            const daysPassed = Math.min(totalDays, Math.max(0, Math.ceil((now - start) / 86400000)));
+            const daysLeft   = Math.max(0, Math.ceil((end - now) / 86400000));
+            const pct        = Math.min(100, Math.round((daysPassed / totalDays) * 100));
+            const barColor   = pct >= 100 ? '#10b981' : pct >= 60 ? '#4361ee' : '#f59e0b';
+            document.getElementById('u-tl-label').textContent     = `Day ${daysPassed} of ${totalDays}`;
+            document.getElementById('u-tl-remaining').textContent  = pct >= 100 ? '🎓 Completed' : `⏳ ${daysLeft} days left`;
+            document.getElementById('u-tl-bar').style.width        = pct + '%';
+            document.getElementById('u-tl-bar').style.background   = `linear-gradient(90deg,${barColor},${barColor}cc)`;
+            wrap.style.display = 'block';
+        }
+
+        // V94.04: Earned badges as metrics bar row 3
+        function updateEarnedBadgesBar(unlockedIds) {
+            const container = document.getElementById('u-earned-badges');
+            if (!container) return;
+            const unlocked = new Set(unlockedIds || []);
+            const earned   = reflectiveBadgeCatalog.filter(b => unlocked.has(b.id));
+            if (!earned.length) { container.style.display = 'none'; return; }
+            container.innerHTML = earned.map(b =>
+                `<span style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:#fdf4ff;border:1px solid #e9d5ff;border-radius:20px;color:#7c3aed;font-weight:600;">${b.icon} ${b.title}</span>`
+            ).join('');
+            container.style.display = 'flex';
         }
 
         function checkGraduation(data) {
@@ -4385,8 +4435,11 @@
             db.collection("users").orderBy("score", "desc").onSnapshot(s => {
                 allUsersData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderReflectiveMiniLeaderboard();
+                renderProfileLeaderboard();
                 const me = allUsersData.find(u => u.id === userId) || {};
                 renderReflectiveBadgeCollection(me.reflectiveBadges || []);
+                updateTimelineBar(me.startDate, me.endDate);
+                updateEarnedBadgesBar(me.reflectiveBadges || me.reflectiveUnlockedBadgeIds || []);
             }, e => handleFirestoreListenerError('users leaderboard listener', e));
         }
 
@@ -6952,49 +7005,56 @@
             else if (tab === 'badges') renderProfileBadges();
         }
 
-        // 🔥 Render Leaderboard in Profile Tab
+        // V94.04: Profile Summary — Rank + Status only (Timeline→date row, Badges→metrics row 3)
         function renderProfileLeaderboard() {
             const container = document.getElementById('profile-leaderboard-container');
             if (!container) return;
 
-            // Reuse the existing renderReflectiveMiniLeaderboard logic
+            const myData = allUsersData.find(u => u.id === userId) || {};
+
+            // Rank position in division
             const myDiv = getMyDivision();
             const relevantGroups = divisionConfig[myDiv] || [myGroup];
-            let ranked = allUsersData.filter(u => relevantGroups.includes(u.group || 'Public') || (u.group === myGroup));
-            if (!ranked.length) ranked = allUsersData.filter(u => (u.group || 'Public') === myGroup);
-
-            ranked = ranked
+            let divUsers = allUsersData.filter(u => relevantGroups.includes(u.group || 'Public') || (u.group === myGroup));
+            if (!divUsers.length) divUsers = allUsersData.filter(u => (u.group || 'Public') === myGroup);
+            divUsers = divUsers
                 .filter(u => (u.reflectiveTotalLogs || 0) > 0 || u.id === userId)
-                .sort((a, b) => {
-                    const diff = (b.reflectiveTotalLogs || 0) - (a.reflectiveTotalLogs || 0);
-                    if (diff !== 0) return diff;
-                    return (b.reflectiveBestStreak || 0) - (a.reflectiveBestStreak || 0);
-                })
-                .slice(0, 5);
+                .sort((a, b) => (b.reflectiveTotalLogs || 0) - (a.reflectiveTotalLogs || 0));
+            const myRank   = divUsers.findIndex(u => u.id === userId) + 1;
+            const rankHtml = myRank > 0
+                ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:0.75em;font-weight:700;background:#fff7ed;border:1px solid #fdba74;border-radius:20px;padding:4px 10px;color:#c2410c;">🏆 #${myRank} in division</span>`
+                : '';
 
-            if (!ranked.length) {
-                container.innerHTML = '<div style="font-size:0.78em; color:#999; text-align:center; padding:20px;">No data yet in this division</div>';
-                return;
+            // Floating division rank badge in points section (Approach D)
+            const floatingBadge = document.getElementById('u-division-rank-badge');
+            if (floatingBadge) {
+                if (myRank > 0) {
+                    floatingBadge.innerHTML = `<span style="display:inline-flex;align-items:center;gap:3px;font-size:0.62em;font-weight:700;background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fdba74;border-radius:12px;padding:3px 8px;color:#c2410c;white-space:nowrap;">🏆 #${myRank} in division</span>`;
+                    floatingBadge.style.display = 'block';
+                } else {
+                    floatingBadge.style.display = 'none';
+                }
             }
 
-            container.innerHTML = ranked.map((u, idx) => {
-                const isMe = u.id === userId;
-                const name = isMe ? (u.displayName || 'Me') : `Intern #${idx + 1}`;
-                const bg = isMe ? '#f0f7ff' : (idx < 3 ? '#fffef0' : 'transparent');
-                const medal = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : ''));
+            // Status vs time progress
+            const start = myData.startDate ? new Date(myData.startDate) : null;
+            const end   = myData.endDate   ? new Date(myData.endDate)   : null;
+            const now   = new Date();
+            let statusHtml = '';
+            if (start && end && end > start) {
+                const pct   = Math.min(100, Math.round(((now - start) / (end - start)) * 100));
+                const score = myData.score || 0;
+                if (now >= end) {
+                    statusHtml = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:0.75em;font-weight:700;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:20px;padding:4px 10px;color:#065f46;">🎓 Completed</span>`;
+                } else if (score >= pct * 0.08) {
+                    statusHtml = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:0.75em;font-weight:700;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:20px;padding:4px 10px;color:#065f46;">✅ On track</span>`;
+                } else {
+                    statusHtml = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:0.75em;font-weight:700;background:#fff7ed;border:1px solid #fdba74;border-radius:20px;padding:4px 10px;color:#c2410c;">⚠️ Catch up</span>`;
+                }
+            }
 
-                return `<div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-radius:10px; margin-bottom:5px; background:${bg}; border:1px solid ${isMe ? '#dbeafe' : 'transparent'};">
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <div style="width:24px; text-align:center; font-weight:900; color:${idx < 3 ? '#b45309' : '#94a3b8'}; font-size:0.9em;">${medal || (idx + 1)}</div>
-                        <img src="${u.pictureUrl || 'https://via.placeholder.com/30'}" style="width:28px; height:28px; border-radius:50%; border:2px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
-                        <span style="font-weight:600; font-size:0.9em; color:${isMe ? '#1e40af' : '#4b5563'};">${name}${isMe ? ' <span style="font-size:0.8em;">(You)</span>' : ''}</span>
-                    </div>
-                    <div style="text-align:right;">
-                        <div style="font-weight:800; color:#111827; font-size:0.9em;">${u.reflectiveTotalLogs || 0} <small style="font-weight:400; color:#6b7280;">logs</small></div>
-                        <div style="font-size:0.7em; color:#e67e22; font-weight:bold;">🔥 Streak: ${u.reflectiveBestStreak || 0}</div>
-                    </div>
-                </div>`;
-            }).join('');
+            if (!rankHtml && !statusHtml) { container.innerHTML = ''; return; }
+            container.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 0;">${rankHtml}${statusHtml}</div>`;
         }
 
         // 🔥 Render Badges in Profile Tab
@@ -8135,6 +8195,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     pictureUrl: userProfile.pictureUrl || "",
                     content,
                     mood,
+                    learningTools: [...(window.rlSelectedTools || [])],
                     clientSubmittedAt: Date.now(),
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     status: 'pending',
@@ -8161,6 +8222,9 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
 
                 document.getElementById('rl-content').value = "";
                 updateCharCount();
+                window.rlSelectedTools = new Set();
+                renderSelectedTools();
+                document.querySelectorAll('#rl-tool-tags .tool-tag-btn').forEach(b => b.classList.remove('selected'));
                 const historyArea = document.getElementById('rl-history-area');
                 if (historyArea) historyArea.style.display = 'block';
 
@@ -8187,6 +8251,57 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             document.getElementById('rl-mood').value = mood;
             document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
+        }
+
+        // V94.01: Learning Tools state
+        window.rlSelectedTools = new Set();
+
+        function toggleLearningToolsPanel() {
+            const body = document.getElementById('rl-tools-body');
+            const btn = document.getElementById('rl-tools-toggle-btn');
+            const isOpen = body.style.display !== 'none';
+            body.style.display = isOpen ? 'none' : 'block';
+            btn.classList.toggle('open', !isOpen);
+        }
+
+        function toggleLearningTool(toolName, btn) {
+            if (window.rlSelectedTools.has(toolName)) {
+                window.rlSelectedTools.delete(toolName);
+                btn.classList.remove('selected');
+            } else {
+                window.rlSelectedTools.add(toolName);
+                btn.classList.add('selected');
+            }
+            renderSelectedTools();
+        }
+
+        function addCustomTool() {
+            const input = document.getElementById('rl-custom-tool');
+            const name = input.value.trim().toUpperCase();
+            if (!name) return;
+            window.rlSelectedTools.add(name);
+            input.value = '';
+            renderSelectedTools();
+        }
+
+        function removeSelectedTool(toolName) {
+            window.rlSelectedTools.delete(toolName);
+            // uncheck the grid button if it exists
+            const btn = document.querySelector(`#rl-tool-tags [data-tool="${toolName}"]`);
+            if (btn) btn.classList.remove('selected');
+            renderSelectedTools();
+        }
+
+        function renderSelectedTools() {
+            const container = document.getElementById('rl-selected-tools');
+            if (!container) return;
+            if (window.rlSelectedTools.size === 0) {
+                container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = [...window.rlSelectedTools].map(t =>
+                `<span class="selected-tool-tag">${t}<span class="tool-remove" onclick="removeSelectedTool('${t}')">&times;</span></span>`
+            ).join('');
         }
 
         function updateCharCount() {
@@ -9944,6 +10059,8 @@ async function archiveDoneCard(cardId) {
                 updateStatus('❌ Boot Load Error: ' + e.message);
                 revealBootActions();
             }
+            // V94.03: render summary immediately (shows empty state before Firebase loads)
+            renderProfileLeaderboard();
         }, { once: true });
 
         window.addEventListener('load', function () {
