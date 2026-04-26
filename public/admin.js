@@ -14963,17 +14963,32 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         }
 
         async function qfpCallAI(model, prompt) {
-            const resp = await window.callUniversalAI(model, prompt);
-            if (resp && typeof resp === 'object') {
-                return String(resp.text || resp.outputText || resp.response || '').trim();
+            const fallbackChain = [model, 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+            const tried = new Set();
+            for (const m of fallbackChain) {
+                if (tried.has(m)) continue;
+                tried.add(m);
+                try {
+                    const resp = await window.callUniversalAI(m, prompt);
+                    const text = String((resp && typeof resp === 'object') ? (resp.text || resp.outputText || resp.response || '') : (resp || '')).trim();
+                    if (m !== model) showToast(`Model ${model} ไม่พร้อม — ใช้ ${m} แทน`);
+                    return text;
+                } catch (e) {
+                    const isBlocked = e.message && (e.message.includes('403') || e.message.includes('BLOCKED') || e.message.includes('API_KEY'));
+                    if (!isBlocked || m === [...fallbackChain].pop()) throw e;
+                }
             }
-            return String(resp || '').trim();
         }
 
         async function showQuizFeedbackPanel(quizId) {
             _qfpCurrentId = quizId;
             _qfpFeedbacks = [];
             document.getElementById('qfp-ai-result').innerText = '';
+            const modelSel = document.getElementById('ai-model-selector');
+            if (modelSel) {
+                const saved = localStorage.getItem('qfp_ai_model');
+                if (saved) modelSel.value = saved;
+            }
             document.getElementById('qfp-summary').innerHTML = '';
             document.getElementById('qfp-comments').innerHTML = `<p style="text-align:center;color:#94a3b8;padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</p>`;
 
