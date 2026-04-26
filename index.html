@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V91.43)</title>
-    <!-- V91.43: Profile Card with Tabs - Leaderboard & Badges moved from Mission -->
+    <title>Internship Portfolio (V91.44)</title>
+    <!-- V91.44: Profile Card with Tabs - Leaderboard & Badges moved from Mission -->
     <!-- Release: 2026-04-25 03:30 UTC+7 -->
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -681,6 +681,62 @@
             color: #8e44ad;
             opacity: 1;
             box-shadow: 0 4px 12px rgba(142, 68, 173, 0.15);
+        }
+
+        /* 🔥 Avatar Stack for Quiz Completions (V91.44) */
+        .avatar-stack {
+            display: flex;
+            align-items: center;
+            margin-left: 8px;
+            flex-shrink: 0;
+        }
+
+        .avatar-circle {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 2px solid white;
+            margin-right: -8px;
+            object-fit: cover;
+            cursor: pointer;
+            transition: transform 0.2s, z-index 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .avatar-circle:hover {
+            transform: scale(1.15);
+            z-index: 10;
+        }
+
+        .avatar-more {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65em;
+            font-weight: bold;
+            color: #666;
+            margin-left: -8px;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            cursor: pointer;
+        }
+
+        .avatar-placeholder {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7em;
+            color: #adb5bd;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
 
         .quiz-tab-pane {
@@ -1456,7 +1512,7 @@
                     </div>
                 </div>
 
-                <!-- 🔥 Profile Tabs (V91.43) - Ranks / Badges -->
+                <!-- 🔥 Profile Tabs (V91.44) - Ranks / Badges -->
                 <div class="profile-tabs-bar">
                     <button class="profile-tab-btn active" id="ptab-ranks" onclick="switchProfileTab('ranks')">
                         <i class="fa-solid fa-trophy"></i>
@@ -1684,7 +1740,7 @@
                     font-size: 0.9em;
                 }
 
-                /* 🔥 Profile Tabs (V91.43) */
+                /* 🔥 Profile Tabs (V91.44) */
                 .profile-tabs-bar {
                     display: flex;
                     gap: 0;
@@ -4522,7 +4578,8 @@
 
                         let itemLabel = q.questions ? q.questions.length : '?';
                         let pointLabel = q.totalPoints || 1;
-                        quizMetaTitleSuffix = ` <span style="font-size:0.75em; font-weight:normal; color:#888; background:#f0f0f0; padding:2px 8px; border-radius:6px; margin-left:5px;"><i class="fa-solid fa-list-ol" style="font-size:0.8em;"></i> ${itemLabel} Items <i class="fa-solid fa-trophy" style="font-size:0.8em; margin-left:5px;"></i> ${pointLabel} pts</span>`;
+                        // 🔥 V91.44: Add Avatar Stack placeholder (will be populated by JS)
+                        quizMetaTitleSuffix = ` <span style="font-size:0.75em; font-weight:normal; color:#888; background:#f0f0f0; padding:2px 8px; border-radius:6px; margin-left:5px;"><i class="fa-solid fa-list-ol" style="font-size:0.8em;"></i> ${itemLabel} Items <i class="fa-solid fa-trophy" style="font-size:0.8em; margin-left:5px;"></i> ${pointLabel} pts</span><span class="quiz-avatar-stack" data-quiz-id="${q.id}" style="display:inline-flex; align-items:center;"></span>`;
 
                         // Clean up description if it's identical to title
                         let displayDesc = q.description || (q.quizType === 'read_only' ? "Learning Material" : "Quiz Assessment");
@@ -4585,6 +4642,9 @@
                     paginationContainer.innerHTML = "";
                 }
             }
+
+            // 🔥 V91.44: Populate Avatar Stacks for all quiz cards
+            populateQuizAvatarStacks();
         }
 
         function changeAssignmentPage(dir) {
@@ -4592,6 +4652,100 @@
             renderAssignments();
             // Scroll to top of assignments section smoothly
             document.getElementById('section-assignments').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 🔥 V91.44: Populate Quiz Avatar Stacks
+        async function populateQuizAvatarStacks() {
+            const stacks = document.querySelectorAll('.quiz-avatar-stack');
+            if (!stacks.length) return;
+
+            // Cache for user data to avoid repeated fetches
+            const userCache = {};
+
+            for (const stackEl of stacks) {
+                const quizId = stackEl.dataset.quizId;
+                if (!quizId) continue;
+
+                try {
+                    // Fetch completed attempts for this quiz
+                    const attemptsSnap = await db.collection('quiz_attempts')
+                        .where('quizId', '==', quizId)
+                        .where('status', 'in', ['approved', 'pending'])
+                        .limit(100)
+                        .get();
+
+                    const completedUsers = [];
+                    const userIds = new Set();
+
+                    attemptsSnap.forEach(doc => {
+                        const attempt = doc.data();
+                        if (attempt.userId && !userIds.has(attempt.userId)) {
+                            userIds.add(attempt.userId);
+                            completedUsers.push({
+                                userId: attempt.userId,
+                                timestamp: attempt.timestamp
+                            });
+                        }
+                    });
+
+                    // Sort by most recent first
+                    completedUsers.sort((a, b) => {
+                        const timeA = a.timestamp ? (a.timestamp.toMillis ? a.timestamp.toMillis() : new Date(a.timestamp).getTime()) : 0;
+                        const timeB = b.timestamp ? (b.timestamp.toMillis ? b.timestamp.toMillis() : new Date(b.timestamp).getTime()) : 0;
+                        return timeB - timeA;
+                    });
+
+                    // Fetch user profile data
+                    const usersWithData = [];
+                    for (const user of completedUsers.slice(0, 10)) { // Limit to 10 for performance
+                        if (userCache[user.userId]) {
+                            usersWithData.push(userCache[user.userId]);
+                        } else {
+                            try {
+                                const userDoc = await db.collection('users').doc(user.userId).get();
+                                if (userDoc.exists) {
+                                    const userData = userDoc.data();
+                                    const userWithPhoto = {
+                                        userId: user.userId,
+                                        pictureUrl: userData.pictureUrl || 'https://via.placeholder.com/28',
+                                        displayName: userData.displayName || 'User'
+                                    };
+                                    userCache[user.userId] = userWithPhoto;
+                                    usersWithData.push(userWithPhoto);
+                                }
+                            } catch (err) {
+                                console.warn(`Failed to fetch user ${user.userId}:`, err);
+                            }
+                        }
+                    }
+
+                    // Render avatar stack
+                    const maxAvatars = 5;
+                    const displayUsers = usersWithData.slice(0, maxAvatars);
+                    const remaining = usersWithData.length - maxAvatars;
+
+                    if (displayUsers.length > 0) {
+                        // Has completions - show avatar stack
+                        stackEl.innerHTML = displayUsers.map(user => `
+                            <img src="${user.pictureUrl}" 
+                                 title="${user.displayName}" 
+                                 class="avatar-circle"
+                                 onerror="this.src='https://via.placeholder.com/28'">
+                        `).join('');
+
+                        if (remaining > 0) {
+                            stackEl.innerHTML += `<div class="avatar-more" title="${remaining} more users">+${remaining}</div>`;
+                        }
+                    } else {
+                        // No completions yet - show placeholder
+                        stackEl.innerHTML = '<div class="avatar-placeholder" title="No completions yet"><i class="fa-solid fa-user"></i></div>';
+                    }
+
+                } catch (error) {
+                    console.error(`Error loading avatars for quiz ${quizId}:`, error);
+                    stackEl.innerHTML = '<div class="avatar-placeholder"><i class="fa-solid fa-user"></i></div>';
+                }
+            }
         }
 
         let quizTimerInterval = null;
@@ -6497,7 +6651,7 @@
             else if (tab === 'analytics') loadLearningAnalytics();
         }
 
-        // 🔥 Profile Tab Switching (V91.43)
+        // 🔥 Profile Tab Switching (V91.44)
         function switchProfileTab(tab) {
             // Update buttons
             document.querySelectorAll('.profile-tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -8085,7 +8239,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     if (el) el.innerText = count;
                 }
 
-                // 🔥 Show/Hide Task Board based on total tasks (V91.43)
+                // 🔥 Show/Hide Task Board based on total tasks (V91.44)
                 const totalTasks = Object.values(counts).reduce((sum, count) => sum + count, 0);
                 const taskBoardWrapper = document.getElementById('task-board-wrapper');
                 if (taskBoardWrapper) {
