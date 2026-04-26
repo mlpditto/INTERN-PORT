@@ -158,6 +158,7 @@ mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
         var pointsClaimedCache = [];   
         var quizAttemptsAllCache = []; // 🔥 [Version: V88.50] Global Cache for all attempts to fix visibility bug
         let hideCompletedWorks = true;
+        let showArchivedKanban = false;
         let historyCache = []; let historyPage = 1; const HISTORY_PER_PAGE = 10;
         let archiveCache = []; let archivePage = 1; const ARCHIVE_PER_PAGE = 10;
         let deleteCardId = null; let deleteTimer = null;
@@ -10565,6 +10566,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
                     // ── Closed quests → Done column ──
                     if (questStatus === 'closed') {
+                        if (q.isArchivedKanban && !showArchivedKanban) return;
                         const title = q.question || "Untitled Quest";
                         if (filter && !title.toLowerCase().includes(filter)) return;
                         const subs = questsSubList.filter(s => s.questId === q.id && s.status !== 'none');
@@ -10574,11 +10576,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         const d = document.createElement('div');
                         d.className = 'kanban-card card-Done live-quest';
                         d.style.borderLeft = '4px solid #22c55e';
-                        d.style.background = '#f0fdf4';
+                        d.style.background = q.isArchivedKanban ? '#f8fafc' : '#f0fdf4';
+                        if (q.isArchivedKanban) d.style.opacity = '0.65';
                         d.innerHTML = `
                             <div class="card-header-row" style="margin-bottom:10px;">
                                 <span class="badge" style="background:linear-gradient(135deg,#22c55e,#16a34a);padding:4px 12px;border-radius:8px;font-size:0.7em;letter-spacing:0.5px;">DAILY QUEST</span>
-                                <span style="font-size:0.7em;font-weight:800;color:#15803d;background:#dcfce7;padding:3px 8px;border-radius:999px;">✅ Closed</span>
+                                <span style="font-size:0.7em;font-weight:800;color:#15803d;background:#dcfce7;padding:3px 8px;border-radius:999px;">${q.isArchivedKanban ? '📥 Archived' : '✅ Closed'}</span>
                             </div>
                             <div style="font-weight:800;font-size:1.05em;color:#1e293b;margin-bottom:8px;line-height:1.4;">${title}</div>
                             <div style="font-size:0.8em;color:#15803d;background:white;padding:10px;border-radius:12px;border:1px solid #bbf7d0;">
@@ -10588,6 +10591,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 </div>
                                 <div style="margin-top:4px;color:#64748b;font-size:0.88em;">Closed: ${closedStr}</div>
                             </div>
+                            ${!q.isArchivedKanban ? `<button class="btn-sm btn-dark" style="width:100%;margin-top:8px;" onclick="event.stopPropagation();archiveClosedQuest('${q.id}')">📥 Archive</button>` : ''}
                         `;
                         cols["Done"].appendChild(d);
                         return;
@@ -11329,6 +11333,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         
         async function giveScore(id) { const q = sideQuestsCache[id]; if (!q) return; const s = prompt("Score:", "0.5"); if (!s) return; const n = prompt("Note:", q.title); const b = db.batch(); q.assigneeIds.forEach(u => { b.update(db.collection("users").doc(u), { score: firebase.firestore.FieldValue.increment(parseFloat(s)) }); b.set(db.collection("checkin_logs").doc(), { userId: u, type: 'manual', amount: parseFloat(s), note: n, timestamp: firebase.firestore.FieldValue.serverTimestamp() }) }); b.update(db.collection("side_quests").doc(id), { status: 'Done', isScored: true, archiveScore: parseFloat(s), doneAt: firebase.firestore.FieldValue.serverTimestamp() }); await b.commit(); showToast("Scored!"); }
         async function archiveSQ(id) { if (confirm("Archive?")) await db.collection("side_quests").doc(id).update({ status: 'Archived' }); }
+        async function archiveClosedQuest(id) { await db.collection("quests").doc(id).update({ isArchivedKanban: true }); drawKanban(); }
+        function toggleKanbanArchive() { showArchivedKanban = !showArchivedKanban; const btn = document.getElementById('btn-kanban-archive'); if (btn) { btn.style.background = showArchivedKanban ? '#4361ee' : ''; btn.style.color = showArchivedKanban ? 'white' : ''; } drawKanban(); }
         async function delUser(id) { if (confirm("Del?")) await db.collection("users").doc(id).delete(); }
         async function delWork(id) { if (confirm("Del?")) await db.collection("works").doc(id).delete(); }
         function toggleIgnoreUser(id, s) { db.collection("users").doc(id).update({ isIgnored: !s }); }
