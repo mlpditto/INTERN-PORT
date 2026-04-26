@@ -6489,11 +6489,14 @@ async function saveQuiz() {
                 window.pollData = polls;
                 if (!hideCompletedWorks) renderTable('works');
             });
-            db.collection("quest_submissions").onSnapshot(s => { 
-                questsSubCache = {}; 
+            db.collection("quest_submissions").onSnapshot(s => {
+                questsSubCache = {};
                 questsSubList = s.docs.map(d => ({ id: d.id, ...d.data() }));
-                s.forEach(d => { questsSubCache[`${d.data().questId}_${d.data().userId}`] = d.data(); }); 
-                filterBoard(); 
+                s.forEach(d => { questsSubCache[`${d.data().questId}_${d.data().userId}`] = d.data(); });
+                const pendingCount = questsSubList.filter(x => x.status === 'submitted' && !x.adminAcknowledged).length;
+                const badge = document.getElementById('tab-assignments-pending');
+                if (badge) { badge.textContent = pendingCount; badge.style.display = pendingCount > 0 ? 'inline' : 'none'; }
+                filterBoard();
             });
 
             // 🔥 Load Division Config ([Version: V77.8])
