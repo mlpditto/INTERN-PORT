@@ -2741,10 +2741,6 @@
                                 <i class="fa-solid fa-list-ul"></i>
                                 <span>My Cases</span>
                             </button>
-                            <button class="case-tab-btn" id="case-tab-stats" onclick="switchCaseTab('stats')">
-                                <i class="fa-solid fa-chart-bar"></i>
-                                <span>통계</span>
-                            </button>
                         </div>
                         <div id="case-pane-submit" class="case-tab-pane active">
                             <div class="case-pane-shell" style="border-bottom: 1px solid #f7f7f7;">
@@ -2852,11 +2848,6 @@
                                         style="font-size:0.78em; color:#64748b; font-weight:700;"></div>
                                 </div>
                                 <div id="case-list-grouped"></div>
-                            </div>
-                        </div>
-                        <div id="case-pane-stats" class="case-tab-pane">
-                            <div class="case-pane-shell">
-                                <div id="case-stats-pane-content"></div>
                             </div>
                         </div>
                     </div>
@@ -10132,13 +10123,12 @@ async function archiveDoneCard(cardId) {
 
         function switchCaseTab(tabName) {
             window.caseActiveTab = tabName;
-            ['submit', 'systems', 'stats'].forEach(t => {
+            ['submit', 'systems'].forEach(t => {
                 const btn = document.getElementById(`case-tab-${t}`);
                 const pane = document.getElementById(`case-pane-${t}`);
                 if (btn) btn.classList.toggle('active', t === tabName);
                 if (pane) pane.classList.toggle('active', t === tabName);
             });
-            if (tabName === 'stats') renderCaseStats(window.myCasesCache || []);
             if (tabName === 'systems') renderCaseGrouped(window.myCasesCache || []);
         }
 
@@ -10588,6 +10578,37 @@ async function archiveDoneCard(cardId) {
             const filteredSystems = activeFilter === 'all' ? orderedSystems : orderedSystems.filter(sys => sys === activeFilter);
             const visibleCount = filteredSystems.reduce((sum, sys) => sum + groups[sys].length, 0);
 
+            // Compact stats chart — group by diseaseSystem key for emoji lookup
+            const total = cases.length;
+            const keyGroups = {};
+            cases.forEach(c => {
+                const key = c.diseaseSystem || 'other';
+                keyGroups[key] = (keyGroups[key] || 0) + 1;
+            });
+            const sortedKeys = Object.entries(keyGroups).sort((a, b) => b[1] - a[1]);
+            const chartHtml = `
+                <div style="margin-bottom:14px; padding:10px 12px; background:linear-gradient(135deg,#f8fafc,#f1f5f9); border-radius:12px; border:1px solid #e2e8f0;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <span style="font-size:0.82em; font-weight:800; color:#334155;"><i class="fa-solid fa-chart-bar" style="color:#4361ee; margin-right:5px;"></i>สรุปเคส</span>
+                        <span style="font-size:0.75em; font-weight:700; background:#e8eeff; color:#4361ee; padding:2px 8px; border-radius:99px;">${total} total</span>
+                    </div>
+                    ${sortedKeys.map(([key, count]) => {
+                        const taxItem = caseTaxonomyCatalog.find(x => x.key === key);
+                        const label = taxItem ? taxItem.label : key;
+                        const emoji = CASE_SYSTEM_EMOJI[key] || '📋';
+                        const pct = Math.round((count / total) * 100);
+                        return `<div style="margin-bottom:8px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+                                <span style="font-size:0.78em; font-weight:700; color:#334155;">${emoji} ${label}</span>
+                                <span style="font-size:0.75em; font-weight:800; color:#4361ee;">${count}</span>
+                            </div>
+                            <div style="background:#dde4ff; border-radius:99px; height:5px; overflow:hidden;">
+                                <div style="width:${pct}%; background:linear-gradient(90deg,#4361ee,#7b93f8); height:100%; border-radius:99px; transition:width 0.4s ease;"></div>
+                            </div>
+                        </div>`;
+                    }).join('')}
+                </div>`;
+
             statsContainer.innerHTML =
                 `<button type="button" class="case-filter-pill ${activeFilter === 'all' ? 'active' : ''}" onclick="setCaseSystemFilter('all')">All (${cases.length})</button>` +
                 orderedSystems.map(sys => `<button type="button" class="case-filter-pill ${activeFilter === sys ? 'active' : ''}" onclick='setCaseSystemFilter(${JSON.stringify(sys)})'>${sys} (${groups[sys].length})</button>`).join('');
@@ -10599,7 +10620,7 @@ async function archiveDoneCard(cardId) {
                 return;
             }
 
-            listContainer.innerHTML = filteredSystems.map(sys => `
+            listContainer.innerHTML = chartHtml + filteredSystems.map(sys => `
                 <div class="case-group-block">
                     <div class="case-group-head">
                         <div class="case-group-title"><i class="fa-solid fa-folder-open" style="color:#4361ee;"></i> ${sys}</div>
