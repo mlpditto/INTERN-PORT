@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V91.48)</title>
-    <!-- V91.48: Phase 2.3 - Character counter for Additional Note -->
-    <!-- Release: 2026-04-26 14:00 UTC+7 -->
+    <title>Internship Portfolio (V91.49)</title>
+    <!-- V91.49: Phase 2.4 - Submit button enhanced states (loading/success/error) -->
+    <!-- Release: 2026-04-26 14:15 UTC+7 -->
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -1221,12 +1221,12 @@
             border-color: #22c55e !important;
             background: #f0fdf4;
         }
-
+                
         .cs-req-input.invalid {
             border-color: #ef4444 !important;
             background: #fef2f2;
         }
-
+                
         .validation-error {
             font-size: 0.75em;
             color: #ef4444;
@@ -1234,6 +1234,12 @@
             display: flex;
             align-items: center;
             gap: 4px;
+        }
+                
+        /* 🔥 V91.49: Spin animation for loading */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         .validation-error i {
@@ -5759,7 +5765,7 @@
                     if (Array.isArray(userAns)) {
                         userAnsText = userAns.join('\n\n');
                     } else if (typeof userAns === 'string' && userAns.includes("\n---\n")) {
-                        userAnsText = userAns.replace(/\n---\n/g, '\n\n');
+                        userAnsText = userAns.replace(/\\n---\\n/g, '\\n\\n');
                     } else {
                         userAnsText = userAns;
                     }
@@ -9299,8 +9305,16 @@ async function archiveDoneCard(cardId) {
 
             if (!caseId) return alert("Please specify Case No. (HN / Ref No.)");
 
-            const btn = document.querySelector('button[onclick="submitCase()"]');
-            if (btn) { btn.disabled = true; btn.innerText = "Saving..."; }
+            // 🔥 V91.49: Enhanced submit button with loading state
+            const submitBtn = document.getElementById('case-submit-btn');
+            const originalBtnText = submitBtn ? submitBtn.innerHTML : '🚀 Submit Case';
+            
+            if (submitBtn) { 
+                submitBtn.disabled = true; 
+                submitBtn.style.opacity = '0.7';
+                submitBtn.style.cursor = 'wait';
+                submitBtn.innerHTML = '<span style="display: inline-block; animation: spin 1s linear infinite;">⏳</span> Saving...';
+            }
 
             try {
                 const authUser = await ensureFirebaseAuthReady(10000);
@@ -9332,6 +9346,21 @@ async function archiveDoneCard(cardId) {
                 }
 
                 alert("Case saved successfully");
+                
+                // 🔥 V91.49: Success state
+                if (submitBtn) {
+                    submitBtn.style.opacity = '1';
+                    submitBtn.style.cursor = 'pointer';
+                    submitBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+                    submitBtn.innerHTML = '✅ Saved Successfully!';
+                    
+                    // Reset after 2 seconds
+                    setTimeout(() => {
+                        submitBtn.style.background = '';
+                        updateSubmitButtonState();
+                    }, 2000);
+                }
+                
                 document.getElementById('c-id').value = "";
                 document.getElementById('c-customer').value = "";
                 document.getElementById('c-disease').value = "";
@@ -9376,7 +9405,13 @@ async function archiveDoneCard(cardId) {
                 }
                 alert("Error: " + e.message);
             } finally {
-                if (btn) { btn.disabled = false; btn.innerText = "🚀 ยืนยันส่งเคส"; }
+                // 🔥 V91.49: Reset button state
+                if (submitBtn) { 
+                    submitBtn.disabled = false;
+                    submitBtn.style.opacity = '';
+                    submitBtn.style.cursor = '';
+                    updateSubmitButtonState();
+                }
             }
         }
 
