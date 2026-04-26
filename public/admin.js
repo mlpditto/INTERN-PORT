@@ -9297,11 +9297,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const start = toHubDate(quest.startTime || quest.scheduledStart);
                 const submitted = toHubDate(sub?.submittedAt);
                 const title = String(quest.question || 'Untitled Daily Quest');
+                const reviewBtn = (status === 'done' && sub?.id)
+                    ? `<button class="btn-sm" onclick="reviewQuestSubmission('${sub.id}')" style="border:none; background:#dcfce7; color:#166534; border-radius:8px; padding:4px 8px; font-size:0.72em; font-weight:800;">✅ Review</button>`
+                    : '';
                 return `
                     <div style="border:1px solid #e2e8f0; border-radius:14px; background:white; padding:14px; box-shadow:0 8px 18px rgba(15,23,42,0.04);">
                         <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start; margin-bottom:10px;">
                             <span style="border-radius:999px; padding:4px 9px; background:${bg}; color:${fg}; font-size:0.7em; font-weight:900; text-transform:uppercase;">${label}</span>
-                            <button class="btn-sm" onclick="recallQuest('${quest.id}')" style="border:none; background:#f8fafc; color:#64748b; border-radius:8px; padding:4px 8px; font-size:0.72em; font-weight:800;">Open</button>
+                            <div style="display:flex; gap:5px;">
+                                ${reviewBtn}
+                                <button class="btn-sm" onclick="recallQuest('${quest.id}')" style="border:none; background:#f8fafc; color:#64748b; border-radius:8px; padding:4px 8px; font-size:0.72em; font-weight:800;">Open</button>
+                            </div>
                         </div>
                         <div style="font-weight:900; color:#1e293b; line-height:1.35; margin-bottom:10px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${title}</div>
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.76em; color:#64748b; font-weight:700;">
