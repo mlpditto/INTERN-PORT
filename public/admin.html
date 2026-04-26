@@ -23576,8 +23576,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
             if (!window._quizFeedbackCache) {
                 container.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:100px 20px;"><i class="fa-solid fa-spinner fa-spin" style="font-size:3em; color:#ccc;"></i></div>`;
-                const snap = await db.collection('quiz_feedback').orderBy('timestamp', 'desc').get();
-                window._quizFeedbackCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                try {
+                    const snap = await db.collection('quiz_feedback').get();
+                    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    docs.sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
+                    window._quizFeedbackCache = docs;
+                } catch (err) {
+                    container.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:60px 20px; color:#ef4444;">⚠️ โหลด Quiz Feedback ไม่สำเร็จ: ${err.message}</div>`;
+                    window._quizFeedbackCache = null;
+                    return;
+                }
             }
 
             const all = window._quizFeedbackCache;
