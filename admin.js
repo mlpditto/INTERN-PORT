@@ -166,6 +166,7 @@ mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
         let activeUserGroup = 'All'; // 🔥 [Version: V79.5] Group filter for Users tab
         let activeBoardGroup = 'All'; // 🔥 Global for Dashboard/Kanban Filtering
         let inactiveQuizPage = 1; const INACTIVE_QUIZ_PER_PAGE = 10;
+        let quizFilterType = 'all';
         const ONE_PIECE_SCOPE_THEME_KEY = 'MLP_ONEPIECE_SCOPE_THEME';
 
         function toggleTheme() { document.body.classList.toggle('dark-mode'); }
@@ -4985,8 +4986,23 @@ async function saveQuiz() {
             // 🔥 [Version: V89.28] Smart Filtering & Grouping
             const activeList = [];
             const inactiveGroups = {};
-            const searchVal = (document.getElementById('inactive-quiz-search') ? document.getElementById('inactive-quiz-search').value : "").toLowerCase();
+            const searchEl = document.getElementById('quiz-global-search') || document.getElementById('inactive-quiz-search');
+            const searchVal = searchEl ? searchEl.value.toLowerCase() : "";
+            const sortMode = (document.getElementById('quiz-sort-mode') || {}).value || 'newest';
             const allTags = new Set();
+
+            const matchesFilter = (q) => {
+                if (quizFilterType === 'graded') return q.quizType !== 'read_only';
+                if (quizFilterType === 'template') return !!q.isTemplate;
+                if (quizFilterType === 'onetime') return !!q.oneTimeMode;
+                return true;
+            };
+            const matchesSearch = (q) => {
+                if (!searchVal) return true;
+                return (q.title || "").toLowerCase().includes(searchVal)
+                    || (q.shortTitle || "").toLowerCase().includes(searchVal)
+                    || (q.tags || "").toLowerCase().includes(searchVal);
+            };
 
             quizzesData.forEach(q => {
                 const getSafeDate = (ts) => {
@@ -5005,15 +5021,11 @@ async function saveQuiz() {
                     if (cleanT) allTags.add(cleanT);
                 });
 
+                if (!matchesFilter(q) || !matchesSearch(q)) return;
+
                 if (isActuallyActive) {
                     activeList.push(q);
                 } else {
-                    // Apply Search Filter (Title, ShortTitle, Tags)
-                    const titleMatch = (q.title || "").toLowerCase().includes(searchVal);
-                    const shortMatch = (q.shortTitle || "").toLowerCase().includes(searchVal);
-                    const tagMatch = (q.tags || "").toLowerCase().includes(searchVal);
-                    
-                    if (searchVal && !titleMatch && !shortMatch && !tagMatch) return;
 
                     // Version Grouping (by shortTitle or title)
                     const key = q.shortTitle || q.title || q.id;
@@ -5200,13 +5212,27 @@ async function saveQuiz() {
                 `;
             };
 
+            // Sort active list
+            const getSafeTime = (q) => {
+                const ts = q.updatedAt || q.createdAt;
+                if (!ts) return 0;
+                if (typeof ts.toMillis === 'function') return ts.toMillis();
+                if (ts.seconds) return ts.seconds * 1000;
+                return 0;
+            };
+            if (sortMode === 'az') activeList.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+            else if (sortMode === 'submissions') activeList.sort((a, b) => ((window.quizCounts && window.quizCounts[b.id]) || 0) - ((window.quizCounts && window.quizCounts[a.id]) || 0));
+
             // Render Active
-            activeList.forEach((q, index) => { 
-                tbodyActive.innerHTML += generateRow(q, true); 
+            activeList.forEach((q) => {
+                tbodyActive.innerHTML += generateRow(q, true);
             });
 
             // Render Inactive (Grouped & Sorted with Pagination)
-            const sortedInactive = Object.values(inactiveGroups).sort((a, b) => b.time - a.time);
+            let sortedInactive = Object.values(inactiveGroups);
+            if (sortMode === 'az') sortedInactive.sort((a, b) => (a.data.title || '').localeCompare(b.data.title || ''));
+            else if (sortMode === 'submissions') sortedInactive.sort((a, b) => ((window.quizCounts && window.quizCounts[b.data.id]) || 0) - ((window.quizCounts && window.quizCounts[a.data.id]) || 0));
+            else sortedInactive.sort((a, b) => b.time - a.time);
             
             const activeCount = activeList.length;
             const inactiveCount = sortedInactive.length;
@@ -5498,6 +5524,20 @@ async function saveQuiz() {
         window.toggleTemplateStatus = toggleTemplateStatus;
         window.deleteQuiz = deleteQuiz;
         window.openHomeworkAssignModal = openHomeworkAssignModal;
+
+        window.setQuizFilter = function(type) {
+            quizFilterType = type;
+            inactiveQuizPage = 1;
+            ['all','graded','template','onetime'].forEach(t => {
+                const btn = document.getElementById('qf-' + t);
+                if (!btn) return;
+                const active = t === type;
+                btn.style.background = active ? '#6366f1' : 'white';
+                btn.style.color = active ? 'white' : '#64748b';
+                btn.style.borderColor = active ? '#6366f1' : '#e2e8f0';
+            });
+            renderQuizzes();
+        };
 
         window.toggleMoreMenu = function(id) {
             const menu = document.getElementById('more-menu-' + id);
