@@ -1,6 +1,16 @@
 
 const admin = require("firebase-admin");
 admin.initializeApp();
+
+// Import migration function (wrapped in try-catch to prevent timeout)
+let migrateLegacyData;
+try {
+  migrateLegacyData = require("./migrate-legacy-data").migrateLegacyData;
+  exports.migrateLegacyData = migrateLegacyData;
+} catch (err) {
+  console.error('Failed to load migration function:', err.message);
+}
+
 // === Quest Submission API: รองรับ field poneglyphRef/linkedPoneglyphs ===
 const functionsV1 = require("firebase-functions");
 
@@ -26,6 +36,28 @@ exports.questSubmission = functionsV1.https.onRequest(async (req, res) => {
     }
     return res.status(405).json({ error: "Method not allowed" });
 });
+
+// === Admin Security: Custom Claims Bootstrap (one-time) ===
+exports.setAdminClaim = functionsV1.https.onCall(async (data, context) => {
+    if (!context.auth || context.auth.token.email !== 'medlifeplus@gmail.com') {
+        throw new functionsV1.https.HttpsError('permission-denied', 'Admin only');
+    }
+    await admin.auth().setCustomUserClaims(context.auth.uid, { admin: true });
+    return { success: true };
+});
+
+// === Admin Security: Generate Preview Token for cross-user LIFF preview ===
+exports.generatePreviewToken = functionsV1.https.onCall(async (data, context) => {
+    if (!context.auth || context.auth.token.admin !== true) {
+        throw new functionsV1.https.HttpsError('permission-denied', 'Admin required');
+    }
+    const token = await admin.auth().createCustomToken(context.auth.uid, {
+        admin: true,
+        previewMode: true
+    });
+    return { token };
+});
+
 const { onRequest } = require("firebase-functions/v2/https");
 const { GoogleAuth } = require("google-auth-library");
 const axios = require("axios");
