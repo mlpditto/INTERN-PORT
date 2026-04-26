@@ -5058,7 +5058,7 @@ async function saveQuiz() {
                 if (!q.isActive) {
                     statusInfo = '<span class="badge" style="background:#6c757d">Inactive</span>';
                 } else if (dead && now > dead) {
-                    statusInfo = `<span class="badge" style="background:#6c757d">Inactive (Expired): ${dead.toLocaleString('en-US')}</span>`;
+                    statusInfo = `<span class="badge" style="background:#6c757d; cursor:default;" title="Expired: ${dead.toLocaleString('en-US')}">Expired ${dead.getDate()}/${dead.getMonth()+1}</span>`;
                 } else {
                     if (start && now < start) {
                         statusInfo = `<span class="badge" style="background:#ff9f1c">Scheduled: ${start.toLocaleString('en-US')}</span>`;
@@ -5153,8 +5153,8 @@ async function saveQuiz() {
                                     ${pointsVal}
                                 </div>
                                 <div style="display:flex; flex-direction:column; gap:2px;">
-                                    <button onclick="adjustQuizPoints('${q.id}', 0.1)" style="border:none; background:#f0f7f4; color:#2e7d32; width:18px; height:18px; border-radius:4px; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-up"></i></button>
-                                    <button onclick="adjustQuizPoints('${q.id}', -0.1)" style="border:none; background:#fff5f5; color:#c62828; width:18px; height:18px; border-radius:4px; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-down"></i></button>
+                                    <button onclick="adjustQuizPoints('${q.id}', 0.1)" title="+0.1 pts" style="border:none; background:#f0f7f4; color:#2e7d32; width:18px; height:18px; border-radius:4px; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-up"></i></button>
+                                    <button onclick="adjustQuizPoints('${q.id}', -0.1)" title="-0.1 pts" style="border:none; background:#fff5f5; color:#c62828; width:18px; height:18px; border-radius:4px; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-down"></i></button>
                                 </div>
                             </div>
                             <small style="color:#999; font-size: 0.72em; font-weight: bold; text-transform: uppercase;">pts</small>
@@ -5205,7 +5205,7 @@ async function saveQuiz() {
                                     📌
                                 </button>
                                 <button class="btn-sm" style="background:#fee2e2; color:#ef4444; border:none; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1.1em; transition:0.2s; margin-left:auto;" 
-                                    onclick="deleteQuiz('${q.id}')" title="Delete Quiz Permamently">
+                                    onclick="deleteQuiz('${q.id}')" title="Delete Quiz Permanently">
                                     🗑️
                                 </button>
                             </div>
