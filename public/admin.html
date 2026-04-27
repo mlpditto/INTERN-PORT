@@ -8965,12 +8965,24 @@
                     
                     <div style="grid-column: 1 / -1;">
                         <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
-                            <label style="font-size:0.75em; font-weight:bold; color:#555; margin:0;">Llama (Together.ai)</label>
+                            <label style="font-size:0.75em; font-weight:bold; color:#555; margin:0;">Llama (Together.ai fallback)</label>
                             <button type="button" onclick="togglePasswordVisibility('local-llama-key')" style="background:none; border:none; color:#666; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key">
                                 <i class="fa-solid fa-eye" id="local-llama-key-toggle"></i>
                             </button>
                         </div>
                         <input type="password" id="local-llama-key" placeholder="Together.ai..." style="width:100%; margin-bottom:8px; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em;">
+                    </div>
+
+                    <div style="grid-column: 1 / -1; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px;">
+                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
+                            <label style="font-size:0.75em; font-weight:bold; color:#166534; margin:0;">🟢 OpenRouter</label>
+                            <button type="button" onclick="togglePasswordVisibility('local-openrouter-key')" style="background:none; border:none; color:#166534; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key">
+                                <i class="fa-solid fa-eye" id="local-openrouter-key-toggle"></i>
+                            </button>
+                            <span style="font-size:0.65em; color:#16a34a; background:#dcfce7; padding:1px 6px; border-radius:4px;">Routes Llama + or/ models</span>
+                        </div>
+                        <input type="password" id="local-openrouter-key" placeholder="sk-or-v1-..." style="width:100%; margin-bottom:4px; padding:6px; border:1px solid #86efac; border-radius:4px; font-size:0.8em;">
+                        <div style="font-size:0.65em; color:#16a34a;">Get key at <b>openrouter.ai/keys</b> — free tier available. Set Firebase secret: <code>firebase functions:secrets:set OPENROUTER_API_KEY</code></div>
                     </div>
 
                     <div style="grid-column: 1 / -1; background: rgba(0,0,0,0.02); padding: 10px; border-radius: 8px; border: 1px solid #eee; margin-top: 5px;">
@@ -9107,6 +9119,7 @@
             window.TYPHOON_API_KEY = locT || "__TYPHOON_API_KEY__";
             window.ANTHROPIC_API_KEY = locA || "__ANTHROPIC_API_KEY__";
             window.TOGETHER_API_KEY = locL || "__TOGETHER_API_KEY__";
+            window.OPENROUTER_API_KEY = localStorage.getItem('ai_openrouter_key') || "__OPENROUTER_API_KEY__";
 
             window.GCP_MODE = localStorage.getItem('gcp_mode') || 'auto';
             window.GCP_PROJECT_ID = localStorage.getItem('gcp_project_id') || "intern-port-edfa7";
@@ -9185,8 +9198,11 @@
                 proxyProvider = "openai";
             } else if (modelName.includes('typhoon')) {
                 proxyProvider = "typhoon";
+            } else if (modelName.startsWith('or/')) {
+                proxyProvider = "openrouter";
+                modelName = modelName.slice(3);
             } else if (modelName.includes('llama')) {
-                proxyProvider = "together";
+                proxyProvider = "openrouter";
             } else if (modelName.includes('glm-5.1') || modelName.includes('ollama')) {
                 proxyProvider = "ollama";
             }
@@ -9569,8 +9585,8 @@
                 }
                 
                 const allFields = [
-                    'local-gemini-key', 'local-openai-key', 'local-typhoon-key', 
-                    'local-anthropic-key', 'local-llama-key', 
+                    'local-gemini-key', 'local-openai-key', 'local-typhoon-key',
+                    'local-anthropic-key', 'local-llama-key', 'local-openrouter-key',
                     'local-qwen-url', 'local-qwen-key', 'local-qwen-vd-model', 'local-qwen-speaker-catalog',
                     'local-gcp-mode',
                     'local-gcp-project', 'local-gcp-location', 'local-gcp-token'
@@ -9590,6 +9606,7 @@
                 document.getElementById('local-typhoon-key').value = localStorage.getItem('ai_typhoon_key') || '';
                 document.getElementById('local-anthropic-key').value = localStorage.getItem('ai_anthropic_key') || '';
                 document.getElementById('local-llama-key').value = localStorage.getItem('ai_llama_key') || '';
+                document.getElementById('local-openrouter-key').value = localStorage.getItem('ai_openrouter_key') || '';
                 document.getElementById('local-qwen-url').value = localStorage.getItem('ai_qwen_url') || 'http://localhost:8880/v1';
                 document.getElementById('local-qwen-key').value = localStorage.getItem('ai_qwen_key') || '';
                 document.getElementById('local-qwen-vd-model').value = localStorage.getItem('ai_qwen_voice_design_model') || '';
@@ -9667,6 +9684,9 @@
                 } else if (trimmedLine.toLowerCase().includes('llama') || trimmedLine.includes('xxxx')) {
                     key = trimmedLine.includes(':') ? trimmedLine.split(':')[1].trim() : trimmedLine;
                     targetField = 'local-llama-key';
+                } else if (trimmedLine.toLowerCase().includes('openrouter') || trimmedLine.startsWith('sk-or-')) {
+                    key = trimmedLine.includes(':') ? trimmedLine.split(':')[1].trim() : trimmedLine;
+                    targetField = 'local-openrouter-key';
                 }
                 
                 if (targetField && key) {
@@ -9710,6 +9730,7 @@
                 typhoon: localStorage.getItem('ai_typhoon_key') || '',
                 anthropic: localStorage.getItem('ai_anthropic_key') || '',
                 llama: localStorage.getItem('ai_llama_key') || '',
+                openrouter: localStorage.getItem('ai_openrouter_key') || '',
                 qwen_url: localStorage.getItem('ai_qwen_url') || '',
                 qwen_key: localStorage.getItem('ai_qwen_key') || '',
                 qwen_voice_design_model: localStorage.getItem('ai_qwen_voice_design_model') || '',
@@ -9755,6 +9776,7 @@
                     if (keys.typhoon) localStorage.setItem('ai_typhoon_key', keys.typhoon);
                     if (keys.anthropic) localStorage.setItem('ai_anthropic_key', keys.anthropic);
                     if (keys.llama) localStorage.setItem('ai_llama_key', keys.llama);
+                    if (keys.openrouter) localStorage.setItem('ai_openrouter_key', keys.openrouter);
                     if (keys.qwen_url) localStorage.setItem('ai_qwen_url', keys.qwen_url);
                     if (keys.qwen_key) localStorage.setItem('ai_qwen_key', keys.qwen_key);
                     if (keys.qwen_voice_design_model) localStorage.setItem('ai_qwen_voice_design_model', keys.qwen_voice_design_model);
@@ -9768,7 +9790,7 @@
                     loadAIKeys();
                     
                     setTimeout(() => {
-                        const fields = ['local-gemini-key', 'local-openai-key', 'local-typhoon-key', 'local-anthropic-key', 'local-llama-key', 'local-qwen-url', 'local-qwen-key', 'local-qwen-vd-model', 'local-qwen-speaker-catalog'];
+                        const fields = ['local-gemini-key', 'local-openai-key', 'local-typhoon-key', 'local-anthropic-key', 'local-llama-key', 'local-openrouter-key', 'local-qwen-url', 'local-qwen-key', 'local-qwen-vd-model', 'local-qwen-speaker-catalog'];
                         fields.forEach(id => {
                             const f = document.getElementById(id);
                             if (f) {
@@ -9776,7 +9798,8 @@
                                     'local-qwen-url': 'ai_qwen_url',
                                     'local-qwen-key': 'ai_qwen_key',
                                     'local-qwen-vd-model': 'ai_qwen_voice_design_model',
-                                    'local-qwen-speaker-catalog': 'ai_qwen_speaker_catalog'
+                                    'local-qwen-speaker-catalog': 'ai_qwen_speaker_catalog',
+                                    'local-openrouter-key': 'ai_openrouter_key'
                                 }[id] || id.replace('local-', 'ai_').replace('-key', '_key');
                                 f.value = localStorage.getItem(storageKey) || '';
                                 if (f.tagName === 'INPUT') f.type = 'text';
@@ -9799,11 +9822,13 @@
             const t = document.getElementById('local-typhoon-key').value.trim();
             const a = document.getElementById('local-anthropic-key').value.trim();
             const l = document.getElementById('local-llama-key').value.trim();
+            const or2 = document.getElementById('local-openrouter-key').value.trim();
             if(g) localStorage.setItem('ai_gemini_key', g);
             if(o) localStorage.setItem('ai_openai_key', o);
             if(t) localStorage.setItem('ai_typhoon_key', t);
             if(a) localStorage.setItem('ai_anthropic_key', a);
             if(l) localStorage.setItem('ai_llama_key', l);
+            if(or2) localStorage.setItem('ai_openrouter_key', or2);
             
             localStorage.setItem('ai_qwen_url', document.getElementById('local-qwen-url').value.trim());
             localStorage.setItem('ai_qwen_key', document.getElementById('local-qwen-key').value.trim());
@@ -9819,7 +9844,7 @@
             showToast("✅ Keys saved locally!");
             
             setTimeout(() => {
-                const fields = ['local-gemini-key', 'local-openai-key', 'local-typhoon-key', 'local-anthropic-key', 'local-llama-key', 'local-qwen-url', 'local-qwen-key', 'local-qwen-vd-model', 'local-qwen-speaker-catalog'];
+                const fields = ['local-gemini-key', 'local-openai-key', 'local-typhoon-key', 'local-anthropic-key', 'local-llama-key', 'local-openrouter-key', 'local-qwen-url', 'local-qwen-key', 'local-qwen-vd-model', 'local-qwen-speaker-catalog'];
                 fields.forEach(id => {
                     const f = document.getElementById(id);
                     if (f) {
@@ -9827,7 +9852,8 @@
                             'local-qwen-url': 'ai_qwen_url',
                             'local-qwen-key': 'ai_qwen_key',
                             'local-qwen-vd-model': 'ai_qwen_voice_design_model',
-                            'local-qwen-speaker-catalog': 'ai_qwen_speaker_catalog'
+                            'local-qwen-speaker-catalog': 'ai_qwen_speaker_catalog',
+                            'local-openrouter-key': 'ai_openrouter_key'
                         }[id] || id.replace('local-', 'ai_').replace('-key', '_key');
                         f.value = localStorage.getItem(storageKey) || '';
                         if (f.tagName === 'INPUT') f.type = 'text';

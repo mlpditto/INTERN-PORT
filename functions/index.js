@@ -103,7 +103,7 @@ function getSafeProviderError(err) {
  * 🤖 AI Proxy Function (V89.19)
  * Handles: Gemini, OpenAI, and Vertex AI (Imagen 3)
  */
-exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"], timeoutSeconds: 300, memory: "512MiB" }, async (req, res) => {
+exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY"], timeoutSeconds: 300, memory: "512MiB" }, async (req, res) => {
     try {
         // 1. Basic Auth Check (Custom Header)
         const authHeader = req.headers["x-mlp-secret"];
@@ -388,6 +388,44 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 text: response.data.content[0].text, 
                 tokens: (response.data.usage.input_tokens + response.data.usage.output_tokens) || 0,
                 model: actualModel
+            });
+        }
+
+        // --- 🟢 OpenRouter (multi-model aggregator) ---
+        if (provider === "openrouter") {
+            const apiKey = process.env.OPENROUTER_API_KEY;
+            if (!apiKey) return res.status(500).json({ error: "OPENROUTER_API_KEY is not configured on server." });
+
+            let tailoredPrompt = prompt;
+            if (isJson && !prompt.toLowerCase().includes("json")) {
+                tailoredPrompt += "\n\n(Respond in strictly valid JSON format)";
+            }
+
+            // Normalize Together-format Llama names to OpenRouter format
+            let orModel = model || "openai/gpt-4o-mini";
+            if (orModel.includes('Llama-3.3') || orModel.includes('llama-3.3')) orModel = "meta-llama/llama-3.3-70b-instruct";
+            else if (orModel.includes('Llama-3.1') || orModel.includes('llama-3.1')) orModel = "meta-llama/llama-3.1-70b-instruct";
+            const body = {
+                model: orModel,
+                messages: [{ role: "user", content: tailoredPrompt }],
+                ...(isJson ? { response_format: { type: "json_object" } } : {}),
+                temperature: 0.7,
+                max_tokens: 4096
+            };
+
+            const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", body, {
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://mlpditto.github.io",
+                    "X-Title": "INTERN-PORT"
+                }
+            });
+
+            return res.json({
+                text: response.data.choices[0].message.content,
+                tokens: response.data.usage?.total_tokens || 0,
+                model: orModel
             });
         }
 
