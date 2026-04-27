@@ -113,6 +113,35 @@
         };
         window.switchHubMode = window.switchHubMode || function(mode) { console.warn('switchHubMode not yet fully loaded:', mode); };
 
+        window.toggleAiAccordion = function(id) {
+            const body = document.getElementById(id);
+            const arrow = document.getElementById(id + '-arrow');
+            if (!body) return;
+            const isOpen = body.style.display !== 'none';
+            body.style.display = isOpen ? 'none' : 'block';
+            if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
+        };
+
+        window.syncModelDefault = function(targetId, value) {
+            const hidden = document.getElementById(targetId);
+            if (hidden) hidden.value = value;
+            document.querySelectorAll(`[onclick*="'${targetId}'"]`).forEach(el => {
+                el.classList.toggle('active', el.dataset.value === value);
+            });
+            if (targetId === 'ai-model-review') {
+                document.querySelectorAll('.reflective-review-model-chip').forEach(chip => {
+                    chip.classList.toggle('active', chip.dataset.value === value);
+                });
+            }
+            const keyMap = {
+                'toolbar-ai-translate-model': 'ai_default_translate_model',
+                'ai-analyzer-model-val': 'ai_default_analyzer_model',
+                'ai-model-review': 'ai_default_review_model',
+                'ai-model-selector': 'ai_default_qfp_model'
+            };
+            if (keyMap[targetId]) localStorage.setItem(keyMap[targetId], value);
+        };
+
     </script>
 
     <style>
@@ -3621,7 +3650,7 @@
                     📱 <span class="hide-mobile">UI</span>
                 </button>
                 <button class="btn-sm" onclick="console.log('AI button clicked'); setTimeout(() => { if (document.getElementById('aiKeysModal')) { openAIKeysModal(); } else { alert('AI Settings Modal not loaded yet. Please refresh the page.'); } }, 100);" title="AI Engine Settings" style="background:linear-gradient(135deg, #8e44ad, #5b21b6); color:white; border:none; border-radius:12px; padding:6px 16px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s; box-shadow:0 4px 10px rgba(142,68,173,0.3);" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-                    🤖 <span class="hide-mobile">AI Config</span>
+                    🔮
                 </button>
 
                 <button id="btn-op-scope-theme" class="btn-sm" onclick="toggleOnePieceScopeTheme()" title="Toggle One Piece Theme for AI Digital Lab + Laugh Tale" style="background:#f8fafc; color:#475569; border:1px solid #cbd5e1; border-radius:12px; padding:6px 12px; font-size:0.9em; font-weight:800; cursor:pointer; transition:0.2s;">
@@ -8898,191 +8927,237 @@
 
     <!-- AI Keys Management Modal ([Version: V88.14]) -->
     <div id="aiKeysModal" class="modal" style="z-index:5000;">
-        <div class="modal-content" style="max-width:500px; max-height:90vh; overflow-y:auto; text-align: left;">
+        <div class="modal-content" style="max-width:760px; width:95vw; max-height:90vh; overflow-y:auto; text-align:left;">
             <span class="close-modal" onclick="document.getElementById('aiKeysModal').style.display='none'">&times;</span>
             <h3 style="margin-top:0;"><i class="fa-solid fa-gears"></i> AI API Settings</h3>
-            <p style="font-size:0.85em; color:#666; margin-bottom:10px;">
+            <p style="font-size:0.85em; color:#666; margin-bottom:12px;">
                 Enter your API keys here. They will be saved <b>locally in your browser</b>.
             </p>
-            
-            <!-- Quick Paste Section -->
-            <div style="margin-bottom:15px; padding:12px; background:#f8f9fa; border-radius:8px; border:1px solid #dee2e6;">
-                <h4 style="margin:0 0 8px 0; color:#495057; font-size:0.85em;">
-                    <i class="fa-solid fa-paste"></i> Quick Paste All Keys
-                </h4>
-                <textarea id="bulk-paste-keys" placeholder="Paste all API keys here (one per line):&#10;Gemini: AIza...&#10;OpenAI: sk-...&#10;Typhoon: ...&#10;Anthropic: sk-ant-...&#10;Llama: xxx..." style="width:100%; height:80px; padding:8px; border:1px solid #ced4da; border-radius:6px; font-family:monospace; font-size:0.8em; resize:vertical;"></textarea>
-                <button onclick="parseAndFillKeys()" class="btn-sm btn-primary" style="margin-top:8px; width:100%; background:#28a745;">
-                    <i class="fa-solid fa-magic"></i> Auto-Fill All Keys
-                </button>
+
+            <!-- Quick Paste (always visible) -->
+            <div style="margin-bottom:10px; padding:12px; background:#f8f9fa; border-radius:8px; border:1px solid #dee2e6;">
+                <h4 style="margin:0 0 8px 0; color:#495057; font-size:0.85em;"><i class="fa-solid fa-paste"></i> Quick Paste All Keys</h4>
+                <textarea id="bulk-paste-keys" placeholder="Paste all API keys here (one per line):&#10;Gemini: AIza...&#10;OpenAI: sk-...&#10;Typhoon: ...&#10;Anthropic: sk-ant-...&#10;Llama: xxx&#10;OpenRouter: sk-or-v1-..." style="width:100%; height:72px; padding:8px; border:1px solid #ced4da; border-radius:6px; font-family:monospace; font-size:0.8em; resize:vertical; box-sizing:border-box;"></textarea>
+                <button onclick="parseAndFillKeys()" class="btn-sm btn-primary" style="margin-top:8px; width:100%; background:#28a745;"><i class="fa-solid fa-magic"></i> Auto-Fill All Keys</button>
             </div>
 
-            <!-- Individual Keys Section -->
-            <div style="margin-bottom:15px; padding:12px; background:#fff3e0; border-radius:8px; border:1px solid #ffcc02;">
-                <h4 style="margin:0 0 12px 0; color:#e65100; font-size:0.85em;">
-                    <i class="fa-solid fa-key"></i> Individual API Keys
-                </h4>
-                
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-                    <div>
-                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
-                            <label style="font-size:0.75em; font-weight:bold; color:#555; margin:0;">Gemini</label>
-                            <button type="button" onclick="togglePasswordVisibility('local-gemini-key')" style="background:none; border:none; color:#666; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key">
-                                <i class="fa-solid fa-eye" id="local-gemini-key-toggle"></i>
-                            </button>
-                        </div>
-                        <input type="password" id="local-gemini-key" placeholder="AIza..." style="width:100%; margin-bottom:8px; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em;">
-                    </div>
-                    
-                    <div>
-                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
-                            <label style="font-size:0.75em; font-weight:bold; color:#555; margin:0;">OpenAI</label>
-                            <button type="button" onclick="togglePasswordVisibility('local-openai-key')" style="background:none; border:none; color:#666; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key">
-                                <i class="fa-solid fa-eye" id="local-openai-key-toggle"></i>
-                            </button>
-                        </div>
-                        <input type="password" id="local-openai-key" placeholder="sk-..." style="width:100%; margin-bottom:8px; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em;">
-                    </div>
-                    
-                    <div>
-                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
-                            <label style="font-size:0.75em; font-weight:bold; color:#555; margin:0;">Anthropic</label>
-                            <button type="button" onclick="togglePasswordVisibility('local-anthropic-key')" style="background:none; border:none; color:#666; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key">
-                                <i class="fa-solid fa-eye" id="local-anthropic-key-toggle"></i>
-                            </button>
-                        </div>
-                        <input type="password" id="local-anthropic-key" placeholder="sk-ant-..." style="width:100%; margin-bottom:8px; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em;">
-                    </div>
-                    
-                    <div>
-                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
-                            <label style="font-size:0.75em; font-weight:bold; color:#555; margin:0;">Typhoon</label>
-                            <button type="button" onclick="togglePasswordVisibility('local-typhoon-key')" style="background:none; border:none; color:#666; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key">
-                                <i class="fa-solid fa-eye" id="local-typhoon-key-toggle"></i>
-                            </button>
-                        </div>
-                        <input type="password" id="local-typhoon-key" placeholder="Typhoon..." style="width:100%; margin-bottom:8px; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em;">
-                    </div>
-                    
-                    <div style="grid-column: 1 / -1;">
-                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
-                            <label style="font-size:0.75em; font-weight:bold; color:#555; margin:0;">Llama (Together.ai)</label>
-                            <button type="button" onclick="togglePasswordVisibility('local-llama-key')" style="background:none; border:none; color:#666; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key">
-                                <i class="fa-solid fa-eye" id="local-llama-key-toggle"></i>
-                            </button>
-                        </div>
-                        <input type="password" id="local-llama-key" placeholder="Together.ai..." style="width:100%; margin-bottom:8px; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em;">
-                    </div>
-
-                    <div style="grid-column: 1 / -1; background: rgba(0,0,0,0.02); padding: 10px; border-radius: 8px; border: 1px solid #eee; margin-top: 5px;">
-                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
-                            <label style="font-size:0.75em; font-weight:bold; color:#2c3e50; margin:0;">🧪 Qwen / Local OpenAI API (v1)</label>
-                        </div>
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-                            <div>
-                                <label style="font-size:0.65em; display:block; margin-bottom:2px; color:#666;">Endpoint URL</label>
-                                <input type="text" id="local-qwen-url" placeholder="http://localhost:8880/v1" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em;">
+            <!-- ▼ Accordion 1: API Keys (open) -->
+            <div style="margin-bottom:6px; border:1px solid #ffcc02; border-radius:10px; overflow:hidden;">
+                <button type="button" onclick="toggleAiAccordion('acc-keys')" style="width:100%; display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#fff3e0; border:none; cursor:pointer; text-align:left;">
+                    <span style="font-size:0.85em; font-weight:800; color:#e65100;"><i class="fa-solid fa-key"></i> API Keys</span>
+                    <span id="acc-keys-arrow" style="font-size:0.75em; color:#e65100; transition:0.2s;">▼</span>
+                </button>
+                <div id="acc-keys" style="padding:12px; background:#fffbf0;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div>
+                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
+                                <label style="font-size:0.75em; font-weight:bold; color:#555; margin:0;">Gemini</label>
+                                <button type="button" onclick="togglePasswordVisibility('local-gemini-key')" style="background:none; border:none; color:#666; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key"><i class="fa-solid fa-eye" id="local-gemini-key-toggle"></i></button>
                             </div>
-                            <div>
-                                <label style="font-size:0.65em; display:block; margin-bottom:2px; color:#666;">API Key (Optional)</label>
-                                <input type="password" id="local-qwen-key" placeholder="key-if-needed" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em;">
-                            </div>
+                            <input type="password" id="local-gemini-key" placeholder="AIza..." style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
                         </div>
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px;">
-                            <div>
-                                <label style="font-size:0.65em; display:block; margin-bottom:2px; color:#666;">Voice Design Model Override (Optional)</label>
-                                <input type="text" id="local-qwen-vd-model" placeholder="qwen3-tts-vd or custom runtime model id" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em;">
+                        <div>
+                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
+                                <label style="font-size:0.75em; font-weight:bold; color:#555; margin:0;">OpenAI</label>
+                                <button type="button" onclick="togglePasswordVisibility('local-openai-key')" style="background:none; border:none; color:#666; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key"><i class="fa-solid fa-eye" id="local-openai-key-toggle"></i></button>
                             </div>
-                            <div style="font-size:0.68em; color:#64748b; line-height:1.45; background:#f8fbff; border:1px solid #dbeafe; border-radius:8px; padding:8px;">
-                                Optional speaker catalog JSON lets Laboon render runtime-specific Qwen speakers dynamically. Leave empty to use the built-in Qwen speaker list.
-                            </div>
+                            <input type="password" id="local-openai-key" placeholder="sk-..." style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
                         </div>
-                        <div style="margin-top:8px;">
-                            <label style="font-size:0.65em; display:block; margin-bottom:2px; color:#666;">Speaker Catalog JSON (Optional)</label>
-                            <textarea id="local-qwen-speaker-catalog" rows="4" placeholder='[{"id":"Vivian","label":"Vivian","lang":["zh-CN","en-US"],"desc":"Bright female"}]' style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.78em; resize:vertical;"></textarea>
+                        <div>
+                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
+                                <label style="font-size:0.75em; font-weight:bold; color:#555; margin:0;">Anthropic</label>
+                                <button type="button" onclick="togglePasswordVisibility('local-anthropic-key')" style="background:none; border:none; color:#666; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key"><i class="fa-solid fa-eye" id="local-anthropic-key-toggle"></i></button>
+                            </div>
+                            <input type="password" id="local-anthropic-key" placeholder="sk-ant-..." style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
+                                <label style="font-size:0.75em; font-weight:bold; color:#555; margin:0;">Typhoon</label>
+                                <button type="button" onclick="togglePasswordVisibility('local-typhoon-key')" style="background:none; border:none; color:#666; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key"><i class="fa-solid fa-eye" id="local-typhoon-key-toggle"></i></button>
+                            </div>
+                            <input type="password" id="local-typhoon-key" placeholder="Typhoon..." style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
+                        </div>
+                        <div style="grid-column:1/-1;">
+                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
+                                <label style="font-size:0.75em; font-weight:bold; color:#555; margin:0;">Llama (Together.ai fallback)</label>
+                                <button type="button" onclick="togglePasswordVisibility('local-llama-key')" style="background:none; border:none; color:#666; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key"><i class="fa-solid fa-eye" id="local-llama-key-toggle"></i></button>
+                            </div>
+                            <input type="password" id="local-llama-key" placeholder="Together.ai..." style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
+                        </div>
+                        <div style="grid-column:1/-1; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px;">
+                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
+                                <label style="font-size:0.75em; font-weight:bold; color:#166534; margin:0;">🟢 OpenRouter</label>
+                                <button type="button" onclick="togglePasswordVisibility('local-openrouter-key')" style="background:none; border:none; color:#166534; cursor:pointer; padding:1px 4px; border-radius:3px; font-size:0.7em;" title="Show/Hide Key"><i class="fa-solid fa-eye" id="local-openrouter-key-toggle"></i></button>
+                                <span style="font-size:0.65em; color:#16a34a; background:#dcfce7; padding:1px 6px; border-radius:4px;">Routes Llama + or/ models</span>
+                            </div>
+                            <input type="password" id="local-openrouter-key" placeholder="sk-or-v1-..." style="width:100%; margin-bottom:4px; padding:6px; border:1px solid #86efac; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
+                            <div style="font-size:0.65em; color:#16a34a;">Get key at <b>openrouter.ai/keys</b> — free tier available. Set Firebase secret: <code>firebase functions:secrets:set OPENROUTER_API_KEY</code></div>
+                        </div>
+                        <div style="grid-column:1/-1; background:rgba(0,0,0,0.02); padding:10px; border-radius:8px; border:1px solid #eee; margin-top:2px;">
+                            <label style="font-size:0.75em; font-weight:bold; color:#2c3e50; display:block; margin-bottom:8px;">🧪 Qwen / Local OpenAI API (v1)</label>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                                <div>
+                                    <label style="font-size:0.65em; display:block; margin-bottom:2px; color:#666;">Endpoint URL</label>
+                                    <input type="text" id="local-qwen-url" placeholder="http://localhost:8880/v1" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
+                                </div>
+                                <div>
+                                    <label style="font-size:0.65em; display:block; margin-bottom:2px; color:#666;">API Key (Optional)</label>
+                                    <input type="password" id="local-qwen-key" placeholder="key-if-needed" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
+                                </div>
+                            </div>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">
+                                <div>
+                                    <label style="font-size:0.65em; display:block; margin-bottom:2px; color:#666;">Voice Design Model Override (Optional)</label>
+                                    <input type="text" id="local-qwen-vd-model" placeholder="qwen3-tts-vd or custom runtime model id" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.8em; box-sizing:border-box;">
+                                </div>
+                                <div style="font-size:0.68em; color:#64748b; line-height:1.45; background:#f8fbff; border:1px solid #dbeafe; border-radius:8px; padding:8px;">Optional speaker catalog JSON lets Laboon render runtime-specific Qwen speakers dynamically. Leave empty to use the built-in Qwen speaker list.</div>
+                            </div>
+                            <div style="margin-top:8px;">
+                                <label style="font-size:0.65em; display:block; margin-bottom:2px; color:#666;">Speaker Catalog JSON (Optional)</label>
+                                <textarea id="local-qwen-speaker-catalog" rows="3" placeholder='[{"id":"Vivian","label":"Vivian","lang":["zh-CN","en-US"],"desc":"Bright female"}]' style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:0.78em; resize:vertical; box-sizing:border-box;"></textarea>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            
-            <hr style="border:0; border-top:1px dashed #eee; margin-bottom:15px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <label style="font-size:0.85em; font-weight:bold; color:var(--primary);"><i class="fa-solid fa-cloud"></i> Google Vertex AI (Imagen)</label>
-                <div class="glass-toggle-container" style="background:rgba(0,0,0,0.05); transform:scale(0.85); transform-origin:right center;">
-                    <div class="glass-toggle-item active" data-value="auto" onclick="selectAiToggle(this, 'auto'); toggleVertexManualFields();" title="Use Cloud Proxy (No Token Required)">Auto</div>
-                    <div class="glass-toggle-item" data-value="manual" onclick="selectAiToggle(this, 'manual'); toggleVertexManualFields();" title="Use Manual Token (Developer Only)">Manual</div>
+
+            <!-- ▼ Accordion 2: Model Defaults (open) -->
+            <div style="margin-bottom:6px; border:1px solid #c7d2fe; border-radius:10px; overflow:hidden;">
+                <button type="button" onclick="toggleAiAccordion('acc-models')" style="width:100%; display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#eef2ff; border:none; cursor:pointer; text-align:left;">
+                    <span style="font-size:0.85em; font-weight:800; color:#4338ca;"><i class="fa-solid fa-sliders"></i> Model Defaults</span>
+                    <span id="acc-models-arrow" style="font-size:0.75em; color:#4338ca; transition:0.2s;">▼</span>
+                </button>
+                <div id="acc-models" style="padding:12px; background:#f5f7ff;">
+                    <p style="font-size:0.72em; color:#64748b; margin:0 0 10px 0;">Default model for each feature. Toolbar selectors still override per session.</p>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:10px;">
+                            <div style="font-size:0.72em; font-weight:700; color:#0369a1; margin-bottom:6px;">🌐 Translate</div>
+                            <select id="default-translate-model" onchange="syncModelDefault('toolbar-ai-translate-model',this.value)" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:6px; font-size:0.8em; box-sizing:border-box;">
+                                <option value="gpt-4o">GPT-4o</option>
+                                <option value="gemini-1.5-flash-latest">Gemini Flash</option>
+                                <option value="gemini-1.5-pro-latest">Gemini Pro</option>
+                                <option value="claude-4-sonnet-latest">Claude Sonnet</option>
+                                <option value="typhoon-v2.5-30b-a3b-instruct">Typhoon 🌀</option>
+                                <option value="thaillm-openthaigpt">ThaiLLM</option>
+                                <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">Llama 3.3 🦙</option>
+                                <option value="glm-5.1:cloud">GLM-5.1</option>
+                            </select>
+                        </div>
+                        <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:10px;">
+                            <div style="font-size:0.72em; font-weight:700; color:#0369a1; margin-bottom:6px;">🔍 AI Analyzer</div>
+                            <select id="default-analyzer-model" onchange="syncModelDefault('ai-analyzer-model-val',this.value)" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:6px; font-size:0.8em; box-sizing:border-box;">
+                                <option value="gemini-1.5-flash-latest">Gemini Flash</option>
+                                <option value="gemini-1.5-pro-latest">Gemini Pro</option>
+                                <option value="gpt-4o">GPT-4o</option>
+                                <option value="claude-4-sonnet-latest">Claude Sonnet</option>
+                                <option value="typhoon-v2.5-30b-a3b-instruct">Typhoon 🌀</option>
+                                <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">Llama 3.3 🦙</option>
+                            </select>
+                        </div>
+                        <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:10px;">
+                            <div style="font-size:0.72em; font-weight:700; color:#0369a1; margin-bottom:6px;">📝 Reflective Review</div>
+                            <select id="default-review-model" onchange="syncModelDefault('ai-model-review',this.value)" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:6px; font-size:0.8em; box-sizing:border-box;">
+                                <option value="gpt-4o">GPT-4o (Frontier)</option>
+                                <option value="gpt-4o-mini">GPT-4o mini</option>
+                                <option value="gemini-1.5-flash">Gemini Flash</option>
+                                <option value="claude-3-5-sonnet-latest">Claude 3.5</option>
+                                <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">Llama 3.3 🦙</option>
+                            </select>
+                        </div>
+                        <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:10px;">
+                            <div style="font-size:0.72em; font-weight:700; color:#0369a1; margin-bottom:6px;">🗡️ Quiz Feedback</div>
+                            <select id="default-qfp-model" onchange="syncModelDefault('ai-model-selector',this.value)" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:6px; font-size:0.8em; box-sizing:border-box;">
+                                <option value="gpt-4o-mini">GPT-4o mini</option>
+                                <option value="gpt-4o">GPT-4o</option>
+                                <option value="claude-3-5-haiku-20241022">Claude Haiku</option>
+                                <option value="claude-4-sonnet-latest">Claude Sonnet</option>
+                                <option value="gemini-1.5-flash-latest">Gemini Flash</option>
+                                <option value="typhoon-v2.5-30b-a3b-instruct">Typhoon 🌀</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                <input type="hidden" id="local-gcp-mode" value="auto">
             </div>
 
-            <div id="vertex-manual-fields" style="display:none; background:#f0f7ff; padding:15px; border-radius:12px; border:1px solid #cce5ff; margin-bottom:15px;">
-                <label style="font-size:0.75em; font-weight:bold; color:#555;">GCP Project ID</label>
-                <input type="text" id="local-gcp-project" placeholder="GCP Project ID" value="intern-port-edfa7" style="width:100%; margin-bottom:10px; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em;">
-                
-                <label style="font-size:0.75em; font-weight:bold; color:#555;">Location</label>
-                <select id="local-gcp-location" style="width:100%; margin-bottom:10px; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em; font-weight:bold; color:var(--primary);">
-                    <option value="us-central1" selected>us-central1 (Primary)</option>
-                    <option value="asia-southeast1">asia-southeast1</option>
-                </select>
-                
-                <label style="font-size:0.75em; font-weight:bold; color:#555;">Access Token</label>
-                <input type="password" id="local-gcp-token" placeholder="ya29..." style="width:100%; margin-bottom:10px; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em;">
-            </div>
-            
-            <div id="vertex-auto-status" style="background:#f5f3ff; color:#7c3aed; padding:8px; border-radius:8px; border:1px solid #ddd6fe; margin-bottom:10px; font-size:0.75em; display:flex; align-items:center; gap:8px;">
-                <i class="fa-solid fa-wand-magic-sparkles" style="font-size:1em;"></i>
-                <span><b>Keyless Mode Active:</b> Cloud functions will handle auth automatically. No Token maintenance needed! </span>
-            </div>
-            
-            <div style="display:flex; justify-content:space-between; gap:10px; margin-top:15px;">
-                <button class="btn-primary" onclick="saveAIKeys()" style="width:48%; font-weight:700; padding:10px; border-radius:8px;">
-                    <i class="fa-solid fa-save"></i> Save All Settings
+            <!-- ▶ Accordion 3: Vertex AI (closed) -->
+            <div style="margin-bottom:6px; border:1px solid #bfdbfe; border-radius:10px; overflow:hidden;">
+                <button type="button" onclick="toggleAiAccordion('acc-vertex')" style="width:100%; display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#eff6ff; border:none; cursor:pointer; text-align:left;">
+                    <span style="font-size:0.85em; font-weight:800; color:#1d4ed8;"><i class="fa-solid fa-cloud"></i> Google Vertex AI (Imagen)</span>
+                    <span id="acc-vertex-arrow" style="font-size:0.75em; color:#1d4ed8; transition:0.2s;">▶</span>
                 </button>
-                <button class="btn-secondary" onclick="document.getElementById('aiKeysModal').style.display='none'" style="width:48%; font-weight:700; padding:10px; border-radius:8px; background:#6c757d;">
-                    <i class="fa-solid fa-times"></i> Close
-                </button>
+                <div id="acc-vertex" style="display:none; padding:12px; background:#f0f7ff;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <label style="font-size:0.8em; font-weight:bold; color:var(--primary); margin:0;">Auth Mode</label>
+                        <div class="glass-toggle-container" style="background:rgba(0,0,0,0.05); transform:scale(0.85); transform-origin:right center;">
+                            <div class="glass-toggle-item active" data-value="auto" onclick="selectAiToggle(this,'auto'); toggleVertexManualFields();" title="Use Cloud Proxy (No Token Required)">Auto</div>
+                            <div class="glass-toggle-item" data-value="manual" onclick="selectAiToggle(this,'manual'); toggleVertexManualFields();" title="Use Manual Token (Developer Only)">Manual</div>
+                        </div>
+                        <input type="hidden" id="local-gcp-mode" value="auto">
+                    </div>
+                    <div id="vertex-manual-fields" style="display:none; background:white; padding:12px; border-radius:10px; border:1px solid #cce5ff; margin-bottom:10px;">
+                        <label style="font-size:0.75em; font-weight:bold; color:#555;">GCP Project ID</label>
+                        <input type="text" id="local-gcp-project" placeholder="GCP Project ID" value="intern-port-edfa7" style="width:100%; margin-bottom:8px; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em; box-sizing:border-box;">
+                        <label style="font-size:0.75em; font-weight:bold; color:#555;">Location</label>
+                        <select id="local-gcp-location" style="width:100%; margin-bottom:8px; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em; font-weight:bold; color:var(--primary);">
+                            <option value="us-central1" selected>us-central1 (Primary)</option>
+                            <option value="asia-southeast1">asia-southeast1</option>
+                        </select>
+                        <label style="font-size:0.75em; font-weight:bold; color:#555;">Access Token</label>
+                        <input type="password" id="local-gcp-token" placeholder="ya29..." style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:0.85em; box-sizing:border-box;">
+                    </div>
+                    <div id="vertex-auto-status" style="background:#f5f3ff; color:#7c3aed; padding:8px; border-radius:8px; border:1px solid #ddd6fe; font-size:0.75em; display:flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <span><b>Keyless Mode Active:</b> Cloud functions handle auth automatically. No token maintenance needed!</span>
+                    </div>
+                </div>
             </div>
-            
-            <!-- Export/Import Section (Bottom) -->
+
+            <!-- ▶ Accordion 4: Usage & Quota (closed) -->
+            <div style="margin-bottom:10px; border:1px solid #e9d5ff; border-radius:10px; overflow:hidden;">
+                <button type="button" onclick="toggleAiAccordion('acc-usage')" style="width:100%; display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#faf5ff; border:none; cursor:pointer; text-align:left;">
+                    <span style="font-size:0.85em; font-weight:800; color:#7c3aed;"><i class="fa-solid fa-chart-line"></i> Usage & Quota</span>
+                    <span id="acc-usage-arrow" style="font-size:0.75em; color:#7c3aed; transition:0.2s;">▶</span>
+                </button>
+                <div id="acc-usage" style="display:none; padding:12px; background:#fdf9ff;">
+                    <div id="ai-usage-details" style="font-size:0.75em; color:#555;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                            <div style="font-weight:bold; color:#8e44ad;"><i class="fa-solid fa-chart-line"></i> Today's AI Usage (Tokens)</div>
+                            <div style="display:flex; align-items:center; gap:6px; background:rgba(250,204,21,0.12); border:1.5px solid rgba(245,158,11,0.4); border-radius:10px; padding:4px 10px;">
+                                <span style="font-size:1.1em;">⚡</span>
+                                <div style="line-height:1.2;">
+                                    <div style="color:#a16207; font-weight:900; font-size:0.65em; text-transform:uppercase; letter-spacing:0.8px;">Bounty Stacking</div>
+                                    <div id="ai-usage-breakdown" style="color:#7a6207; font-weight:900; font-size:1em;">T:0 G:0</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="usage-list">Loading usage...</div>
+                        <div style="border-top:1px solid #ddd; margin-top:10px; padding-top:10px;">
+                            <div style="font-weight:bold; margin-bottom:5px; color:#667eea;"><i class="fa-solid fa-gauge-high"></i> Quota Status</div>
+                            <div id="quota-list" style="font-size:0.9em;"><div style="color:#999; font-style:italic;">Click Check Quota to fetch limits...</div></div>
+                            <button onclick="checkAllQuota()" style="width:100%; margin-top:8px; background:linear-gradient(135deg,#667eea,#764ba2); color:white; border:none; font-size:0.9em; padding:6px; border-radius:6px; cursor:pointer;"><i class="fa-solid fa-rotate"></i> Check Quota</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Save / Close -->
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <button class="btn-primary" onclick="saveAIKeys()" style="flex:1; font-weight:700; padding:10px; border-radius:8px;"><i class="fa-solid fa-save"></i> Save All Settings</button>
+                <button class="btn-secondary" onclick="document.getElementById('aiKeysModal').style.display='none'" style="flex:1; font-weight:700; padding:10px; border-radius:8px; background:#6c757d;"><i class="fa-solid fa-times"></i> Close</button>
+            </div>
+
+            <!-- Backup & Restore -->
             <div style="padding:10px; background:#e3f2fd; border-radius:8px; border:1px solid #bbdefb;">
-                <h4 style="margin:0 0 8px 0; color:#1565c0; font-size:0.8em;">
-                    <i class="fa-solid fa-download"></i> Backup & Restore
-                </h4>
-                <div style="display:flex; gap:8px; margin-bottom:8px;">
-                    <button onclick="exportAIKeys()" class="btn-sm" style="flex:1; background:#1976d2; color:white; font-size:0.75em;">
-                        <i class="fa-solid fa-download"></i> Export
-                    </button>
-                    <button onclick="document.getElementById('import-file-input').click()" class="btn-sm" style="flex:1; background:#388e3c; color:white; font-size:0.75em;">
-                        <i class="fa-solid fa-upload"></i> Import
-                    </button>
+                <h4 style="margin:0 0 8px 0; color:#1565c0; font-size:0.8em;"><i class="fa-solid fa-download"></i> Backup & Restore</h4>
+                <div style="display:flex; gap:8px; margin-bottom:6px;">
+                    <button onclick="exportAIKeys()" class="btn-sm" style="flex:1; background:#1976d2; color:white; font-size:0.75em;"><i class="fa-solid fa-download"></i> Export</button>
+                    <button onclick="document.getElementById('import-file-input').click()" class="btn-sm" style="flex:1; background:#388e3c; color:white; font-size:0.75em;"><i class="fa-solid fa-upload"></i> Import</button>
                     <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="importAIKeys(event)">
                 </div>
-                <div style="font-size:0.7em; color:#666; font-style:italic;">
-                    Export saves keys to file for backup. Import restores from backup file.
-                </div>
+                <div style="font-size:0.7em; color:#666; font-style:italic;">Export saves keys to file for backup. Import restores from backup file.</div>
             </div>
-            
-            <div id="ai-usage-details" style="margin-top:15px; background:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #eee; font-size:0.75em; color:#555;">
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-                    <div style="font-weight:bold; color:#8e44ad;"><i class="fa-solid fa-chart-line"></i> Today's AI Usage (Tokens)</div>
-                    <div style="display:flex; align-items:center; gap:6px; background:rgba(250,204,21,0.12); border:1.5px solid rgba(245,158,11,0.4); border-radius:10px; padding:4px 10px;">
-                        <span style="font-size:1.1em;">⚡</span>
-                        <div style="line-height:1.2;">
-                            <div style="color:#a16207; font-weight:900; font-size:0.65em; text-transform:uppercase; letter-spacing:0.8px;">Bounty Stacking</div>
-                            <div id="ai-usage-breakdown" style="color:#7a6207; font-weight:900; font-size:1em;">T:0 G:0</div>
-                        </div>
-                    </div>
-                </div>
-                <div id="usage-list">Loading usage...</div>
-                
-                <!-- Quota Check Section ([Version: V88.36]) -->
-                <div style="border-top:1px solid #ddd; margin-top:10px; padding-top:10px;">
-                    <div style="font-weight:bold; margin-bottom:5px; color:#667eea;"><i class="fa-solid fa-gauge-high"></i> Quota Status</div>
-                    <div id="quota-list" style="font-size:0.9em;">
-                        <div style="color:#999; font-style:italic;">Click Check Quota to fetch limits...</div>
-                    </div>
-                    <button onclick="checkAllQuota()" style="width:100%; margin-top:8px; background:linear-gradient(135deg, #667eea, #764ba2); color:white; border:none; font-size:0.9em; padding:6px; border-radius:6px; cursor:pointer;">
-                        <i class="fa-solid fa-rotate"></i> Check Quota
-                    </button>
+        </div>
+    </div>
 <script type="importmap">
       {
         "imports": {
@@ -9107,6 +9182,7 @@
             window.TYPHOON_API_KEY = locT || "__TYPHOON_API_KEY__";
             window.ANTHROPIC_API_KEY = locA || "__ANTHROPIC_API_KEY__";
             window.TOGETHER_API_KEY = locL || "__TOGETHER_API_KEY__";
+            window.OPENROUTER_API_KEY = localStorage.getItem('ai_openrouter_key') || "__OPENROUTER_API_KEY__";
 
             window.GCP_MODE = localStorage.getItem('gcp_mode') || 'auto';
             window.GCP_PROJECT_ID = localStorage.getItem('gcp_project_id') || "intern-port-edfa7";
@@ -9115,6 +9191,10 @@
 
             window.OLLAMA_API_KEY = localStorage.getItem('OLLAMA_API_KEY') || window.OLLAMA_API_KEY || '';
             window.OLLAMA_ENDPOINT = localStorage.getItem('OLLAMA_ENDPOINT') || 'https://api.ollama.com/v1';
+            window.DEFAULT_TRANSLATE_MODEL = localStorage.getItem('ai_default_translate_model') || 'gpt-4o';
+            window.DEFAULT_ANALYZER_MODEL = localStorage.getItem('ai_default_analyzer_model') || 'gemini-1.5-flash-latest';
+            window.DEFAULT_REVIEW_MODEL = localStorage.getItem('ai_default_review_model') || 'gpt-4o';
+            window.DEFAULT_QFP_MODEL = localStorage.getItem('ai_default_qfp_model') || 'gpt-4o-mini';
         };
         window.loadAIKeys();
 
@@ -9185,8 +9265,11 @@
                 proxyProvider = "openai";
             } else if (modelName.includes('typhoon')) {
                 proxyProvider = "typhoon";
+            } else if (modelName.startsWith('or/')) {
+                proxyProvider = "openrouter";
+                modelName = modelName.slice(3);
             } else if (modelName.includes('llama')) {
-                proxyProvider = "together";
+                proxyProvider = "openrouter";
             } else if (modelName.includes('glm-5.1') || modelName.includes('ollama')) {
                 proxyProvider = "ollama";
             }
@@ -9569,8 +9652,8 @@
                 }
                 
                 const allFields = [
-                    'local-gemini-key', 'local-openai-key', 'local-typhoon-key', 
-                    'local-anthropic-key', 'local-llama-key', 
+                    'local-gemini-key', 'local-openai-key', 'local-typhoon-key',
+                    'local-anthropic-key', 'local-llama-key', 'local-openrouter-key',
                     'local-qwen-url', 'local-qwen-key', 'local-qwen-vd-model', 'local-qwen-speaker-catalog',
                     'local-gcp-mode',
                     'local-gcp-project', 'local-gcp-location', 'local-gcp-token'
@@ -9590,11 +9673,15 @@
                 document.getElementById('local-typhoon-key').value = localStorage.getItem('ai_typhoon_key') || '';
                 document.getElementById('local-anthropic-key').value = localStorage.getItem('ai_anthropic_key') || '';
                 document.getElementById('local-llama-key').value = localStorage.getItem('ai_llama_key') || '';
+                document.getElementById('local-openrouter-key').value = localStorage.getItem('ai_openrouter_key') || '';
                 document.getElementById('local-qwen-url').value = localStorage.getItem('ai_qwen_url') || 'http://localhost:8880/v1';
                 document.getElementById('local-qwen-key').value = localStorage.getItem('ai_qwen_key') || '';
                 document.getElementById('local-qwen-vd-model').value = localStorage.getItem('ai_qwen_voice_design_model') || '';
                 document.getElementById('local-qwen-speaker-catalog').value = localStorage.getItem('ai_qwen_speaker_catalog') || '';
-                
+                // Model Defaults selects
+                const _mdef = { 'default-translate-model': localStorage.getItem('ai_default_translate_model') || 'gpt-4o', 'default-analyzer-model': localStorage.getItem('ai_default_analyzer_model') || 'gemini-1.5-flash-latest', 'default-review-model': localStorage.getItem('ai_default_review_model') || 'gpt-4o', 'default-qfp-model': localStorage.getItem('ai_default_qfp_model') || 'gpt-4o-mini' };
+                Object.entries(_mdef).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val; });
+
                 document.getElementById('local-gcp-mode').value = window.GCP_MODE || "auto";
                 document.getElementById('local-gcp-project').value = window.GCP_PROJECT_ID || "intern-port-edfa7";
                 document.getElementById('local-gcp-location').value = window.GCP_LOCATION || "us-central1";
@@ -9667,6 +9754,9 @@
                 } else if (trimmedLine.toLowerCase().includes('llama') || trimmedLine.includes('xxxx')) {
                     key = trimmedLine.includes(':') ? trimmedLine.split(':')[1].trim() : trimmedLine;
                     targetField = 'local-llama-key';
+                } else if (trimmedLine.toLowerCase().includes('openrouter') || trimmedLine.startsWith('sk-or-')) {
+                    key = trimmedLine.includes(':') ? trimmedLine.split(':')[1].trim() : trimmedLine;
+                    targetField = 'local-openrouter-key';
                 }
                 
                 if (targetField && key) {
@@ -9710,6 +9800,7 @@
                 typhoon: localStorage.getItem('ai_typhoon_key') || '',
                 anthropic: localStorage.getItem('ai_anthropic_key') || '',
                 llama: localStorage.getItem('ai_llama_key') || '',
+                openrouter: localStorage.getItem('ai_openrouter_key') || '',
                 qwen_url: localStorage.getItem('ai_qwen_url') || '',
                 qwen_key: localStorage.getItem('ai_qwen_key') || '',
                 qwen_voice_design_model: localStorage.getItem('ai_qwen_voice_design_model') || '',
@@ -9755,6 +9846,7 @@
                     if (keys.typhoon) localStorage.setItem('ai_typhoon_key', keys.typhoon);
                     if (keys.anthropic) localStorage.setItem('ai_anthropic_key', keys.anthropic);
                     if (keys.llama) localStorage.setItem('ai_llama_key', keys.llama);
+                    if (keys.openrouter) localStorage.setItem('ai_openrouter_key', keys.openrouter);
                     if (keys.qwen_url) localStorage.setItem('ai_qwen_url', keys.qwen_url);
                     if (keys.qwen_key) localStorage.setItem('ai_qwen_key', keys.qwen_key);
                     if (keys.qwen_voice_design_model) localStorage.setItem('ai_qwen_voice_design_model', keys.qwen_voice_design_model);
@@ -9768,7 +9860,7 @@
                     loadAIKeys();
                     
                     setTimeout(() => {
-                        const fields = ['local-gemini-key', 'local-openai-key', 'local-typhoon-key', 'local-anthropic-key', 'local-llama-key', 'local-qwen-url', 'local-qwen-key', 'local-qwen-vd-model', 'local-qwen-speaker-catalog'];
+                        const fields = ['local-gemini-key', 'local-openai-key', 'local-typhoon-key', 'local-anthropic-key', 'local-llama-key', 'local-openrouter-key', 'local-qwen-url', 'local-qwen-key', 'local-qwen-vd-model', 'local-qwen-speaker-catalog'];
                         fields.forEach(id => {
                             const f = document.getElementById(id);
                             if (f) {
@@ -9776,7 +9868,8 @@
                                     'local-qwen-url': 'ai_qwen_url',
                                     'local-qwen-key': 'ai_qwen_key',
                                     'local-qwen-vd-model': 'ai_qwen_voice_design_model',
-                                    'local-qwen-speaker-catalog': 'ai_qwen_speaker_catalog'
+                                    'local-qwen-speaker-catalog': 'ai_qwen_speaker_catalog',
+                                    'local-openrouter-key': 'ai_openrouter_key'
                                 }[id] || id.replace('local-', 'ai_').replace('-key', '_key');
                                 f.value = localStorage.getItem(storageKey) || '';
                                 if (f.tagName === 'INPUT') f.type = 'text';
@@ -9799,12 +9892,16 @@
             const t = document.getElementById('local-typhoon-key').value.trim();
             const a = document.getElementById('local-anthropic-key').value.trim();
             const l = document.getElementById('local-llama-key').value.trim();
+            const or2 = document.getElementById('local-openrouter-key').value.trim();
             if(g) localStorage.setItem('ai_gemini_key', g);
             if(o) localStorage.setItem('ai_openai_key', o);
             if(t) localStorage.setItem('ai_typhoon_key', t);
             if(a) localStorage.setItem('ai_anthropic_key', a);
             if(l) localStorage.setItem('ai_llama_key', l);
-            
+            if(or2) localStorage.setItem('ai_openrouter_key', or2);
+            // Model Defaults
+            [['default-translate-model','ai_default_translate_model','toolbar-ai-translate-model'],['default-analyzer-model','ai_default_analyzer_model','ai-analyzer-model-val'],['default-review-model','ai_default_review_model','ai-model-review'],['default-qfp-model','ai_default_qfp_model','ai-model-selector']].forEach(([selId,storKey,targetId]) => { const el = document.getElementById(selId); if (el) { localStorage.setItem(storKey, el.value); syncModelDefault(targetId, el.value); } });
+
             localStorage.setItem('ai_qwen_url', document.getElementById('local-qwen-url').value.trim());
             localStorage.setItem('ai_qwen_key', document.getElementById('local-qwen-key').value.trim());
             localStorage.setItem('ai_qwen_voice_design_model', document.getElementById('local-qwen-vd-model').value.trim());
@@ -9819,7 +9916,7 @@
             showToast("✅ Keys saved locally!");
             
             setTimeout(() => {
-                const fields = ['local-gemini-key', 'local-openai-key', 'local-typhoon-key', 'local-anthropic-key', 'local-llama-key', 'local-qwen-url', 'local-qwen-key', 'local-qwen-vd-model', 'local-qwen-speaker-catalog'];
+                const fields = ['local-gemini-key', 'local-openai-key', 'local-typhoon-key', 'local-anthropic-key', 'local-llama-key', 'local-openrouter-key', 'local-qwen-url', 'local-qwen-key', 'local-qwen-vd-model', 'local-qwen-speaker-catalog'];
                 fields.forEach(id => {
                     const f = document.getElementById(id);
                     if (f) {
@@ -9827,7 +9924,8 @@
                             'local-qwen-url': 'ai_qwen_url',
                             'local-qwen-key': 'ai_qwen_key',
                             'local-qwen-vd-model': 'ai_qwen_voice_design_model',
-                            'local-qwen-speaker-catalog': 'ai_qwen_speaker_catalog'
+                            'local-qwen-speaker-catalog': 'ai_qwen_speaker_catalog',
+                            'local-openrouter-key': 'ai_openrouter_key'
                         }[id] || id.replace('local-', 'ai_').replace('-key', '_key');
                         f.value = localStorage.getItem(storageKey) || '';
                         if (f.tagName === 'INPUT') f.type = 'text';
