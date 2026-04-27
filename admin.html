@@ -24945,9 +24945,27 @@ Recommended Review: X days`;
                     const tRange = Math.max(tMax - tMin, 1);
                     const startLabel = new Date(tMin).toLocaleDateString('en', { month: 'short', day: 'numeric', year: '2-digit' });
 
-                    const pinsHtml = tlEvents.map((e, i) => {
-                        const pct = ((e.ts - tMin) / tRange) * 88 + 4;
-                        return `<button onclick="lpPinClick(this,${i})" style="position:absolute;left:${pct.toFixed(2)}%;top:50%;transform:translate(-50%,-50%);width:14px;height:14px;border-radius:50%;background:${e.color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);cursor:pointer;padding:0;transition:transform 0.12s,box-shadow 0.12s;z-index:2;" onmouseover="this.style.transform='translate(-50%,-50%) scale(1.6)';this.style.zIndex=10" onmouseout="this.style.transform='translate(-50%,-50%) scale(1)';this.style.zIndex=2"></button>`;
+                    // Assign position % then cluster pins within 3% of each other
+                    tlEvents.forEach(e => { e._pct = ((e.ts - tMin) / tRange) * 88 + 4; });
+                    const clusters = [];
+                    tlEvents.forEach((e, i) => {
+                        const last = clusters[clusters.length - 1];
+                        if (last && Math.abs(last.pct - e._pct) < 3) {
+                            last.indices.push(i);
+                            last.pct = last.indices.reduce((s, j) => s + tlEvents[j]._pct, 0) / last.indices.length;
+                        } else {
+                            clusters.push({ pct: e._pct, indices: [i] });
+                        }
+                    });
+                    const pinsHtml = clusters.map(cl => {
+                        if (cl.indices.length === 1) {
+                            const i = cl.indices[0]; const e = tlEvents[i];
+                            return `<button onclick="lpPinClick(this,${i})" data-pin="${i}" style="position:absolute;left:${e._pct.toFixed(2)}%;top:50%;transform:translate(-50%,-50%);width:14px;height:14px;border-radius:50%;background:${e.color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);cursor:pointer;padding:0;transition:transform 0.12s,box-shadow 0.12s;z-index:2;" onmouseover="this.style.transform='translate(-50%,-50%) scale(1.6)';this.style.zIndex=10" onmouseout="this.style.transform='translate(-50%,-50%) scale(1)';this.style.zIndex=2"></button>`;
+                        }
+                        const hasLP = cl.indices.some(i => tlEvents[i].type === 'lp');
+                        const hasQuiz = cl.indices.some(i => tlEvents[i].type === 'quiz');
+                        const sc = hasLP && hasQuiz ? '#a855f7' : hasLP ? '#1d4ed8' : '#7c3aed';
+                        return `<button onclick="lpStackClick(this,[${cl.indices.join(',')}])" style="position:absolute;left:${cl.pct.toFixed(2)}%;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:${sc};border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.25);cursor:pointer;padding:0;z-index:4;font-size:0.6em;font-weight:900;color:white;line-height:16px;text-align:center;transition:transform 0.12s;" onmouseover="this.style.transform='translate(-50%,-50%) scale(1.4)'" onmouseout="this.style.transform='translate(-50%,-50%) scale(1)'">${cl.indices.length}</button>`;
                     }).join('');
 
                     if (timelineEl) timelineEl.innerHTML = `
@@ -25016,9 +25034,9 @@ Recommended Review: X days`;
                 return;
             }
             document.querySelectorAll('#lp-intern-timeline button').forEach(b => b.style.outline = 'none');
-            btn.style.outline = `2px solid ${e.color}`;
-            btn.style.outlineOffset = '3px';
+            if (btn) { btn.style.outline = `2px solid ${e.color}`; btn.style.outlineOffset = '3px'; }
             detailEl.dataset.active = String(idx);
+            detailEl.dataset.activeStack = '';
             detailEl.style.display = 'block';
 
             if (e.type === 'lp') {
@@ -25055,7 +25073,7 @@ Recommended Review: X days`;
                 ${rawTags.map(t => `<span style="background:#f1f5f9;color:#475569;border-radius:5px;padding:2px 7px;font-size:0.72em;font-weight:600;">${t}</span>`).join('')}
             </div>` : '';
 
-            // Option A: per-question ✅/❌
+            // Per-question ✅/❌
             let perQHtml = '';
             if (quizDoc && quizDoc.questions && e.answers) {
                 const qItems = quizDoc.questions.map((q, i) => {
@@ -25069,7 +25087,7 @@ Recommended Review: X days`;
                     <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:12px;">${qItems}</div>`;
             }
 
-            // Option D: tag aggregate across all quiz attempts
+            // Tag aggregate — auto-switch C: filter to this quiz's topics when available
             const quizCache = window._lp.quizCache || {};
             const tagStats = {};
             (window._lp.timelineEvents || []).filter(ev => ev.type === 'quiz' && ev.score != null && ev.total).forEach(ev => {
@@ -25081,7 +25099,14 @@ Recommended Review: X days`;
                     tagStats[tag].count++;
                 });
             });
-            const tagEntries = Object.entries(tagStats).sort((a, b) => (a[1].sum / a[1].count) - (b[1].sum / b[1].count));
+            const thisTagSet = new Set(rawTags);
+            const isFiltered = thisTagSet.size > 0;
+            const tagEntries = Object.entries(tagStats)
+                .filter(([tag]) => !isFiltered || thisTagSet.has(tag))
+                .sort((a, b) => (a[1].sum / a[1].count) - (b[1].sum / b[1].count));
+            const topicLabel = isFiltered
+                ? `Performance by Topic · <span style="color:#7c3aed;">${title}</span>`
+                : 'Performance by Topic (All Quizzes)';
             let tagAggHtml = '';
             if (tagEntries.length) {
                 const bars = tagEntries.map(([tag, s]) => {
@@ -25095,7 +25120,7 @@ Recommended Review: X days`;
                         <div style="font-size:0.72em;font-weight:800;color:${c};min-width:42px;text-align:right;">${avg}%${avg<60?' ⚠️':''}</div>
                     </div>`;
                 }).join('');
-                tagAggHtml = `<div style="font-size:0.7em;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:6px;">Performance by Topic (all quizzes)</div>${bars}`;
+                tagAggHtml = `<div style="font-size:0.7em;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:6px;">${topicLabel}</div>${bars}`;
             }
 
             detailEl.innerHTML = `<div style="background:#7c3aed0d;border-left:3px solid #7c3aed;border-radius:0 10px 10px 0;padding:12px 14px;">
@@ -25103,6 +25128,44 @@ Recommended Review: X days`;
                 <div style="font-weight:800;font-size:0.92em;color:#0f172a;margin-bottom:2px;">${title}</div>
                 <div style="font-size:0.72em;color:#94a3b8;margin-bottom:2px;">${e.dateStr}</div>
                 ${scoreBarHtml}${tagsHtml}${perQHtml}${tagAggHtml}
+            </div>`;
+        };
+
+        window.lpStackClick = function(btn, indices) {
+            const detailEl = document.getElementById('lp-pin-detail');
+            if (!detailEl) return;
+            const events = window._lp.timelineEvents || [];
+            const key = indices.join(',');
+            if (detailEl.dataset.activeStack === key && detailEl.style.display !== 'none') {
+                detailEl.style.display = 'none';
+                detailEl.dataset.activeStack = '';
+                document.querySelectorAll('#lp-intern-timeline button').forEach(b => b.style.outline = 'none');
+                return;
+            }
+            document.querySelectorAll('#lp-intern-timeline button').forEach(b => b.style.outline = 'none');
+            btn.style.outline = '2px solid #a855f7';
+            btn.style.outlineOffset = '3px';
+            detailEl.dataset.active = '';
+            detailEl.dataset.activeStack = key;
+            detailEl.style.display = 'block';
+            const items = indices.map(i => {
+                const e = events[i];
+                if (!e) return '';
+                const icon = e.type === 'lp' ? '📓' : '🟣';
+                const score = e.type === 'quiz' && e.score != null ? ` · ${e.score}/${e.total}` : '';
+                return `<div onclick="lpPinClick(null,${i})" style="padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background 0.12s;" onmouseover="this.style.background='#f8f5ff'" onmouseout="this.style.background='transparent'">
+                    <span style="font-size:1em;">${icon}</span>
+                    <div>
+                        <div style="font-size:0.82em;font-weight:700;color:#0f172a;">${e.label}</div>
+                        <div style="font-size:0.7em;color:#94a3b8;">${e.dateStr}${score}</div>
+                    </div>
+                </div>`;
+            }).join('<div style="height:1px;background:#f1f5f9;margin:0 12px;"></div>');
+            detailEl.innerHTML = `<div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+                <div style="padding:8px 12px 6px;font-size:0.68em;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.4px;border-bottom:1px solid #f1f5f9;">
+                    ${indices.length} events · ${events[indices[0]] ? events[indices[0]].dateStr : ''}
+                </div>
+                ${items}
             </div>`;
         };
 
