@@ -4,14 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.56</title>
+    <title>Nika V91.57</title>
     <!-- Release: 2026-04-28 15:00 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
     <script>
-        // Force unregister service workers to fix persistent caching issues ([Version: V91.56])
+        // Force unregister service workers to fix persistent caching issues ([Version: V91.57])
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for(let registration of registrations) { registration.unregister(); }
@@ -3682,7 +3682,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; background:linear-gradient(135deg, #f59e0b, #ef4444); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.6em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         ☀️ Nika
-                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.56</span>
+                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.57</span>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -13380,16 +13380,45 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
         }
 
         
+        // [V91.57] Generate next available shortTitle suffix (A→Z, fallback timestamp)
+        window.generateBulkExportShortTitle = function(baseShort) {
+            const base = (baseShort || 'QUIZ').toString().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 20) || 'QUIZ';
+            const used = new Set();
+            const list = (typeof quizzesData !== 'undefined' && Array.isArray(quizzesData)) ? quizzesData : [];
+            list.forEach(qz => { if (qz && typeof qz.shortTitle === 'string') used.add(qz.shortTitle.toUpperCase()); });
+            for (let c = 65; c <= 90; c++) {
+                const candidate = `${base}-${String.fromCharCode(c)}`;
+                if (!used.has(candidate)) return candidate;
+            }
+            return `${base}-${Date.now().toString().slice(-4)}`;
+        };
+
+        // [V91.57] Esc + backdrop modal close handler reference
+        window._bulkExportEscHandler = null;
+        window.closeBulkExportModal = function() {
+            if (window._bulkExportEscHandler) {
+                document.removeEventListener('keydown', window._bulkExportEscHandler);
+                window._bulkExportEscHandler = null;
+            }
+            const m = document.getElementById('bulk-export-modal');
+            if (m) m.remove();
+        };
+
         window.openBulkExportModal = function() {
             const formData = getQuizFormData();
             const questions = formData.questions;
             if (!questions || questions.length === 0) return alert("No questions to export.");
-            
+
+            const oldTitle = formData.title || 'Untitled';
+            const oldShort = formData.shortTitle || 'QUIZ';
+            const defaultTitle = (oldTitle + ' · Split').replace(/"/g, '&quot;');
+            const defaultShort = generateBulkExportShortTitle(oldShort).replace(/"/g, '&quot;');
+
             const listHtml = questions.map((q, i) => `
                 <div style="display:flex; align-items:center; gap:10px; padding:10px; border-bottom:1px solid #334155; color:white; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
                     <input type="checkbox" class="bulk-q-check" value="${i}" id="bulk-q-${i}" onchange="updateBulkSelectCounter()" style="width:20px; height:20px; cursor:pointer; accent-color:#4338ca;">
                     <label for="bulk-q-${i}" style="font-size:0.88em; flex:1; cursor:pointer;">
-                        <span style="color:#94a3b8; font-weight:800; margin-right:8px;">Q${i+1}</span> 
+                        <span style="color:#94a3b8; font-weight:800; margin-right:8px;">Q${i+1}</span>
                         ${q.q.substring(0, 100)}${q.q.length > 100 ? '...' : ''}
                     </label>
                 </div>
@@ -13405,7 +13434,19 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                             <h3 style="margin:0; color:white; font-size:1.2em; display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-truck-fast" style="color:#6366f1;"></i> 📦 Split to New Quiz</h3>
                             <div style="font-size:0.75em; color:#94a3b8; margin-top:4px;">Select questions to export to a brand new quiz set</div>
                         </div>
-                        <button onclick="document.getElementById('bulk-export-modal').remove()" style="background:#334155; border:none; color:white; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">&times;</button>
+                        <button onclick="closeBulkExportModal()" title="Close (Esc)" style="background:#334155; border:none; color:white; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">&times;</button>
+                    </div>
+                    <div style="padding:14px 24px; border-bottom:1px solid #334155; background:rgba(0,0,0,0.05);">
+                        <div style="display:grid; grid-template-columns: 1fr 160px; gap:10px;">
+                            <div>
+                                <label style="display:block; font-size:0.65em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;">New Quiz Title</label>
+                                <input type="text" id="bulk-new-title" value="${defaultTitle}" placeholder="e.g. Pharma · GI" style="width:100%; padding:9px 12px; border-radius:10px; background:#0f172a; border:1px solid #475569; color:white; font-size:0.9em; font-weight:700; box-sizing:border-box; outline:none;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#475569'">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:0.65em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;">Short Title</label>
+                                <input type="text" id="bulk-new-short" value="${defaultShort}" placeholder="PHARMA-A" style="width:100%; padding:9px 12px; border-radius:10px; background:#0f172a; border:1px solid #475569; color:white; font-size:0.9em; font-weight:700; box-sizing:border-box; outline:none; font-family:monospace; letter-spacing:0.05em;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#475569'">
+                            </div>
+                        </div>
                     </div>
                     <div style="padding:15px 24px; border-bottom:1px solid #334155; display:flex; align-items:center; gap:10px; background:rgba(0,0,0,0.1);">
                         <button class="btn-sm" onclick="document.querySelectorAll('.bulk-q-check').forEach(c=>c.checked=true); updateBulkSelectCounter();" style="background:#334155; color:white; border:none; padding:6px 14px; border-radius:8px; font-size:0.75em; font-weight:700; cursor:pointer;">Select All</button>
@@ -13417,18 +13458,23 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                     </div>
                     <div style="padding:24px; border-top:1px solid #334155; background:#1e293b; border-radius:0 0 24px 24px;">
                         <label style="display:flex; align-items:center; gap:10px; color:#fb7185; font-size:0.85em; font-weight:800; margin-bottom:20px; cursor:pointer; background:rgba(251,113,133,0.05); padding:12px; border-radius:12px; border:1px dashed rgba(251,113,133,0.2);">
-                            <input type="checkbox" id="bulk-delete-original" style="width:18px; height:18px; cursor:pointer;"> 
+                            <input type="checkbox" id="bulk-delete-original" style="width:18px; height:18px; cursor:pointer;">
                             <span>Remove selected questions from CURRENT quiz (Cut/Move)</span>
                         </label>
                         <div style="display:flex; gap:12px;">
                             <button onclick="executeBulkExport(this)" style="flex:2; background:linear-gradient(135deg, #4f46e5, #4338ca); color:white; border:none; padding:14px; border-radius:14px; font-weight:800; font-size:0.95em; cursor:pointer; box-shadow:0 10px 15px -3px rgba(67, 56, 202, 0.4); display:flex; align-items:center; justify-content:center; gap:8px;"><i class="fa-solid fa-plus-circle"></i> Create New Quiz Set</button>
-                            <button onclick="document.getElementById('bulk-export-modal').remove()" style="flex:1; background:#334155; color:#94a3b8; border:none; padding:14px; border-radius:14px; font-weight:700; cursor:pointer;">Cancel</button>
+                            <button onclick="closeBulkExportModal()" style="flex:1; background:#334155; color:#94a3b8; border:none; padding:14px; border-radius:14px; font-weight:700; cursor:pointer;">Cancel</button>
                         </div>
                     </div>
                 </div>
             `;
             document.body.appendChild(modal);
             updateBulkSelectCounter();
+
+            // [V91.57] Esc + backdrop close
+            modal.addEventListener('click', (e) => { if (e.target === modal) closeBulkExportModal(); });
+            window._bulkExportEscHandler = (e) => { if (e.key === 'Escape') closeBulkExportModal(); };
+            document.addEventListener('keydown', window._bulkExportEscHandler);
         };
 
         window.updateBulkSelectCounter = function() {
@@ -13445,61 +13491,80 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
         window.executeBulkExport = async function(btn) {
             const checked = Array.from(document.querySelectorAll('.bulk-q-check:checked')).map(c => parseInt(c.value));
             const isCut = document.getElementById('bulk-delete-original').checked;
-            
+
             if (checked.length === 0) return alert("Please select at least one question to export.");
-            
+
             const formData = getQuizFormData();
             const selectedQuestions = checked.map(idx => formData.questions[idx]);
-            
-            const newTitle = prompt("Enter title for the NEW quiz:", "Exported from " + (formData.title || "Untitled"));
-            if (!newTitle) return;
-            
+
+            // [V91.57] Read title + shortTitle from inputs (no prompt)
+            const titleInput = document.getElementById('bulk-new-title');
+            const shortInput = document.getElementById('bulk-new-short');
+            const newTitle = titleInput ? titleInput.value.trim() : '';
+            const newShort = shortInput ? shortInput.value.trim() : '';
+            if (!newTitle) { if (titleInput) titleInput.focus(); return alert("Please enter a title for the new quiz."); }
+            if (!newShort) { if (shortInput) shortInput.focus(); return alert("Please enter a short title."); }
+
+            // [V91.57] Confirm Cut — destructive action
+            if (isCut) {
+                const sourceTitle = formData.title || 'this quiz';
+                const ok = confirm(
+                    `Move ${checked.length} question${checked.length > 1 ? 's' : ''} out of "${sourceTitle}"?\n\n` +
+                    `Existing quiz attempts that reference these questions will become orphaned.`
+                );
+                if (!ok) return;
+            }
+
+            const oldContent = btn.innerHTML;
             try {
-                const oldContent = btn.innerHTML;
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
 
-                // 1. Create NEW quiz in Firestore
                 const newQuiz = {
                     ...formData,
                     title: newTitle,
-                    shortTitle: (formData.shortTitle || "EXT") + "-" + (Math.floor(Math.random()*1000)),
+                    shortTitle: newShort,
                     questions: selectedQuestions,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    isDraft: true // Default as draft
+                    isDraft: true
                 };
-                delete newQuiz.id; // New unique ID will be assigned by Firestore
+                delete newQuiz.id;
 
-                const newDoc = await db.collection("quizzes").add(newQuiz);
-                
-                // 2. If Cut (Move), remove from current quiz
-                if (isCut) {
-                    const remainingQuestions = formData.questions.filter((_, idx) => !checked.includes(idx));
-                    
-                    const currentQuizId = document.getElementById('edit-quiz-id').value;
-                    if (currentQuizId) {
-                        await db.collection("quizzes").doc(currentQuizId).update({
-                            questions: remainingQuestions,
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                        
-                        // Update UI to reflect removed questions
-                        const container = document.getElementById('quiz-questions-container');
+                // [V91.57] Atomic batch — add new + (optional) update source in one commit
+                const batch = db.batch();
+                const newRef = db.collection("quizzes").doc(); // pre-allocate id
+                batch.set(newRef, newQuiz);
+
+                const currentQuizId = document.getElementById('edit-quiz-id').value;
+                let remainingQuestions = null;
+                if (isCut && currentQuizId) {
+                    remainingQuestions = formData.questions.filter((_, idx) => !checked.includes(idx));
+                    batch.update(db.collection("quizzes").doc(currentQuizId), {
+                        questions: remainingQuestions,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+                await batch.commit();
+
+                // Update editor UI after successful commit
+                if (isCut && remainingQuestions) {
+                    const container = document.getElementById('quiz-questions-container');
+                    if (container) {
                         container.innerHTML = "";
                         remainingQuestions.forEach(q => addQuestionUI(q));
-                        quizQPageIndex = 0;
-                        updateQuizPagination();
+                        if (typeof quizQPageIndex !== 'undefined') quizQPageIndex = 0;
+                        if (typeof updateQuizPagination === 'function') updateQuizPagination();
                     }
                 }
-                
-                document.getElementById('bulk-export-modal').remove();
-                showToast("✅ Successfully created new quiz with " + selectedQuestions.length + " questions!");
-                if (isCut) showToast("✂️ Questions moved out of current set.");
-                
+
+                closeBulkExportModal();
+                showToast(`✅ Created "${newTitle}" with ${selectedQuestions.length} question${selectedQuestions.length > 1 ? 's' : ''}!`);
+                if (isCut) showToast("✂️ Removed from current quiz");
+
             } catch(e) {
                 console.error("Bulk export error:", e);
-                alert("Error during export: " + e.message);
+                alert("Error during split: " + (e.message || 'Unknown error'));
                 btn.disabled = false;
                 btn.innerHTML = oldContent;
             }
@@ -25475,7 +25540,7 @@ Recommended Review: X days`;
                 const e = events[i];
                 if (!e) return '';
                 const icon = e.type === 'lp' ? '📓' : '🟣';
-                // [V91.56] Resolve quiz title from quizCache (quiz_attempts has only quizId)
+                // [V91.57] Resolve quiz title from quizCache (quiz_attempts has only quizId)
                 const quizDoc = e.type === 'quiz' && e.quizId ? quizCache[e.quizId] : null;
                 const label = (quizDoc && quizDoc.title) || e.label;
                 const score = e.type === 'quiz' && e.score != null ? ` · ${e.score}/${e.total}` : '';
