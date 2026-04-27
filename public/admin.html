@@ -24916,10 +24916,20 @@ Recommended Review: X days`;
                 quizzes.forEach(q => {
                     const ts = q.timestamp && q.timestamp.toDate ? q.timestamp.toDate() : null;
                     if (!ts) return;
-                    tlEvents.push({ type: 'quiz', ts: ts.getTime(), dateStr: ts.toISOString().split('T')[0], label: q.quizTitle || q.title || 'Quiz', score: q.correctCount ?? null, total: q.totalQuestions ?? null, color: '#7c3aed' });
+                    tlEvents.push({ type: 'quiz', ts: ts.getTime(), dateStr: ts.toISOString().split('T')[0], label: q.quizTitle || q.title || 'Quiz', score: q.correctCount ?? null, total: q.totalQuestions ?? null, quizId: q.quizId || null, answers: q.answers || null, color: '#7c3aed' });
                 });
                 tlEvents.sort((a, b) => a.ts - b.ts);
                 window._lp.timelineEvents = tlEvents;
+
+                // Batch-fetch quiz docs for rich pin detail (A + D)
+                const uniqueQids = [...new Set(quizzes.map(q => q.quizId).filter(Boolean))];
+                if (uniqueQids.length) {
+                    const qDocsArr = await Promise.allSettled(uniqueQids.map(qid => db.collection('quizzes').doc(qid).get()));
+                    window._lp.quizCache = {};
+                    qDocsArr.forEach((r, i) => {
+                        if (r.status === 'fulfilled' && r.value.exists) window._lp.quizCache[uniqueQids[i]] = { id: r.value.id, ...r.value.data() };
+                    });
+                } else { window._lp.quizCache = {}; }
 
                 if (!tlEvents.length) {
                     if (timelineEl) timelineEl.innerHTML = '<div style="padding:16px; text-align:center; color:#94a3b8; font-size:0.85em;">No activity yet.</div>';
@@ -24994,26 +25004,97 @@ Recommended Review: X days`;
             if (detailEl.dataset.active === String(idx) && detailEl.style.display !== 'none') {
                 detailEl.style.display = 'none';
                 detailEl.dataset.active = '';
-                document.querySelectorAll('#lp-intern-timeline button').forEach(b => { b.style.outline = 'none'; });
+                document.querySelectorAll('#lp-intern-timeline button').forEach(b => b.style.outline = 'none');
                 return;
             }
-            document.querySelectorAll('#lp-intern-timeline button').forEach(b => { b.style.outline = 'none'; });
+            document.querySelectorAll('#lp-intern-timeline button').forEach(b => b.style.outline = 'none');
             btn.style.outline = `2px solid ${e.color}`;
             btn.style.outlineOffset = '3px';
             detailEl.dataset.active = String(idx);
             detailEl.style.display = 'block';
-            const icon = e.type === 'quiz' ? '📝' : '📓';
-            const scoreHtml = e.type === 'quiz' && e.score != null && e.total != null
-                ? `<span style="background:#ede9fe;color:#7c3aed;border-radius:5px;padding:1px 7px;font-size:0.75em;font-weight:700;margin-left:6px;">${e.score}/${e.total}</span>`
-                : '';
-            const typeLabel = e.type === 'quiz' ? 'Quiz' : 'LP Entry';
-            detailEl.innerHTML = `<div style="background:${e.color}0d;border-left:3px solid ${e.color};border-radius:0 10px 10px 0;padding:10px 14px;display:flex;gap:10px;align-items:flex-start;">
-                <div style="font-size:1.1em;line-height:1;margin-top:1px;">${icon}</div>
-                <div>
-                    <div style="font-size:0.7em;font-weight:700;color:${e.color};text-transform:uppercase;letter-spacing:0.4px;margin-bottom:2px;">${typeLabel}</div>
-                    <div style="font-weight:800;font-size:0.9em;color:#0f172a;">${e.label}</div>
-                    <div style="font-size:0.75em;color:#64748b;margin-top:3px;">${e.dateStr}${scoreHtml}</div>
-                </div>
+
+            if (e.type === 'lp') {
+                detailEl.innerHTML = `<div style="background:#1d4ed80d;border-left:3px solid #1d4ed8;border-radius:0 10px 10px 0;padding:10px 14px;display:flex;gap:10px;align-items:flex-start;">
+                    <div style="font-size:1.1em;margin-top:1px;">📓</div>
+                    <div>
+                        <div style="font-size:0.7em;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:2px;">LP Entry</div>
+                        <div style="font-weight:800;font-size:0.9em;color:#0f172a;">${e.label}</div>
+                        <div style="font-size:0.75em;color:#64748b;margin-top:3px;">${e.dateStr}</div>
+                    </div>
+                </div>`;
+                return;
+            }
+
+            // Quiz pin — rich A+D detail
+            const quizDoc = e.quizId && window._lp.quizCache && window._lp.quizCache[e.quizId];
+            const title = (quizDoc && quizDoc.title) || e.label;
+            const scorePct = (e.score != null && e.total) ? Math.round((e.score / e.total) * 100) : null;
+            const scoreColor = scorePct == null ? '#64748b' : scorePct >= 80 ? '#16a34a' : scorePct >= 60 ? '#ca8a04' : '#dc2626';
+
+            const scoreBarHtml = scorePct != null ? `
+                <div style="margin:8px 0;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                        <span style="font-size:0.72em;font-weight:700;color:#64748b;">Score</span>
+                        <span style="font-size:0.8em;font-weight:900;color:${scoreColor};">${e.score}/${e.total} · ${scorePct}%</span>
+                    </div>
+                    <div style="height:5px;background:#f1f5f9;border-radius:3px;overflow:hidden;">
+                        <div style="height:100%;width:${scorePct}%;background:${scoreColor};border-radius:3px;"></div>
+                    </div>
+                </div>` : '';
+
+            const rawTags = quizDoc && quizDoc.tags ? quizDoc.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+            const tagsHtml = rawTags.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin:8px 0;">
+                ${rawTags.map(t => `<span style="background:#f1f5f9;color:#475569;border-radius:5px;padding:2px 7px;font-size:0.72em;font-weight:600;">${t}</span>`).join('')}
+            </div>` : '';
+
+            // Option A: per-question ✅/❌
+            let perQHtml = '';
+            if (quizDoc && quizDoc.questions && e.answers) {
+                const qItems = quizDoc.questions.map((q, i) => {
+                    const target = (Array.isArray(q.correct) ? q.correct : [q.correct]).map(String);
+                    const userAns = e.answers[i];
+                    const userArr = (Array.isArray(userAns) ? userAns : [userAns]).map(String);
+                    const ok = target.some(t => userArr.includes(t));
+                    return `<span title="Q${i+1}: ${(q.q||'').slice(0,60)}" style="display:inline-block;padding:2px 5px;border-radius:5px;font-size:0.7em;font-weight:700;background:${ok?'#dcfce7':'#fef2f2'};color:${ok?'#16a34a':'#dc2626'};cursor:default;">${ok?'✅':'❌'} Q${i+1}</span>`;
+                }).join(' ');
+                perQHtml = `<div style="font-size:0.7em;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.3px;margin:10px 0 5px;">Per Question</div>
+                    <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:12px;">${qItems}</div>`;
+            }
+
+            // Option D: tag aggregate across all quiz attempts
+            const quizCache = window._lp.quizCache || {};
+            const tagStats = {};
+            (window._lp.timelineEvents || []).filter(ev => ev.type === 'quiz' && ev.score != null && ev.total).forEach(ev => {
+                const qd = ev.quizId && quizCache[ev.quizId];
+                if (!qd || !qd.tags) return;
+                qd.tags.split(',').map(t => t.trim()).filter(Boolean).forEach(tag => {
+                    if (!tagStats[tag]) tagStats[tag] = { sum: 0, count: 0 };
+                    tagStats[tag].sum += Math.round((ev.score / ev.total) * 100);
+                    tagStats[tag].count++;
+                });
+            });
+            const tagEntries = Object.entries(tagStats).sort((a, b) => (a[1].sum / a[1].count) - (b[1].sum / b[1].count));
+            let tagAggHtml = '';
+            if (tagEntries.length) {
+                const bars = tagEntries.map(([tag, s]) => {
+                    const avg = Math.round(s.sum / s.count);
+                    const c = avg >= 80 ? '#16a34a' : avg >= 60 ? '#ca8a04' : '#dc2626';
+                    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+                        <div style="font-size:0.73em;color:#475569;font-weight:600;min-width:76px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${tag}</div>
+                        <div style="flex:1;height:5px;background:#f1f5f9;border-radius:3px;overflow:hidden;">
+                            <div style="height:100%;width:${avg}%;background:${c};border-radius:3px;"></div>
+                        </div>
+                        <div style="font-size:0.72em;font-weight:800;color:${c};min-width:42px;text-align:right;">${avg}%${avg<60?' ⚠️':''}</div>
+                    </div>`;
+                }).join('');
+                tagAggHtml = `<div style="font-size:0.7em;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:6px;">Performance by Topic (all quizzes)</div>${bars}`;
+            }
+
+            detailEl.innerHTML = `<div style="background:#7c3aed0d;border-left:3px solid #7c3aed;border-radius:0 10px 10px 0;padding:12px 14px;">
+                <div style="font-size:0.7em;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:2px;">Quiz</div>
+                <div style="font-weight:800;font-size:0.92em;color:#0f172a;margin-bottom:2px;">${title}</div>
+                <div style="font-size:0.72em;color:#94a3b8;margin-bottom:2px;">${e.dateStr}</div>
+                ${scoreBarHtml}${tagsHtml}${perQHtml}${tagAggHtml}
             </div>`;
         };
 
