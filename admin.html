@@ -7108,8 +7108,12 @@
                             <div id="lp-monitor-intern-name" style="font-weight:800; font-size:1em; color:#0f172a;"></div>
                             <button onclick="document.getElementById('lp-monitor-intern-detail').style.display='none'; document.querySelectorAll('.lp-intern-card').forEach(c=>c.classList.remove('active'));" style="background:#f1f5f9; border:none; border-radius:8px; padding:4px 12px; font-size:0.8em; cursor:pointer; color:#64748b; margin-left:auto;">✕</button>
                         </div>
-                        <div id="lp-intern-stats" style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px;"></div>
-                        <div id="lp-intern-feed" style="display:flex; flex-direction:column; gap:6px; max-height:45vh; overflow-y:auto;"></div>
+                        <div id="lp-intern-stats" style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px;"></div>
+                        <div id="lp-intern-timeline" style="margin-bottom:14px;"></div>
+                        <div id="lp-intern-feed-section" style="display:none;">
+                            <button onclick="lpToggleInternFeed()" id="lp-intern-feed-toggle" style="background:none; border:none; font-size:0.8em; font-weight:700; color:#64748b; cursor:pointer; padding:4px 0; margin-bottom:8px;">📓 LP Entries ▼</button>
+                            <div id="lp-intern-feed" style="display:flex; flex-direction:column; gap:4px; max-height:40vh; overflow-y:auto;"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -24860,9 +24864,17 @@ Recommended Review: X days`;
             if (btn) btn.textContent = isOpen ? '▼' : '▲';
         };
 
+        window.lpToggleInternFeed = function() {
+            const feed = document.getElementById('lp-intern-feed');
+            const btn = document.getElementById('lp-intern-feed-toggle');
+            if (!feed) return;
+            const hidden = feed.style.display === 'none';
+            feed.style.display = hidden ? 'flex' : 'none';
+            if (btn) btn.textContent = (hidden ? '📓 LP Entries ▲' : '📓 LP Entries ▼');
+        };
+
         window.lpSelectIntern = async function(uid, cardEl) {
             if (!uid || !db) return;
-            // Highlight selected card
             document.querySelectorAll('.lp-intern-card').forEach(c => {
                 c.classList.remove('active');
                 c.style.borderColor = '#e2e8f0'; c.style.background = '#fafafa';
@@ -24871,46 +24883,157 @@ Recommended Review: X days`;
 
             const detail = document.getElementById('lp-monitor-intern-detail');
             const nameEl = document.getElementById('lp-monitor-intern-name');
-            const feedEl = document.getElementById('lp-intern-feed');
             const statsEl = document.getElementById('lp-intern-stats');
+            const timelineEl = document.getElementById('lp-intern-timeline');
+            const feedEl = document.getElementById('lp-intern-feed');
+            const feedSection = document.getElementById('lp-intern-feed-section');
             if (detail) detail.style.display = 'block';
 
             const user = window._lp.internList.find(u => u.id === uid);
             if (nameEl) nameEl.textContent = (user && user.displayName) || uid;
-            if (feedEl) feedEl.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;">Loading...</div>';
+            if (timelineEl) timelineEl.innerHTML = '<div style="padding:12px 0; color:#94a3b8; font-size:0.82em;">Loading timeline...</div>';
+            if (feedSection) feedSection.style.display = 'none';
 
             try {
-                const snap = await db.collection('learning_path_entries').where('userId', '==', uid).orderBy('date', 'desc').get();
-                const entries = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 const todayStr = new Date().toISOString().split('T')[0];
+                const [lpSnap, quizSnap] = await Promise.all([
+                    db.collection('learning_path_entries').where('userId', '==', uid).orderBy('date', 'desc').get(),
+                    db.collection('quiz_attempts').where('userId', '==', uid).get()
+                ]);
+                const entries = lpSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                const quizzes = quizSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+                // Stats
                 const due = entries.filter(e => e.nextReviewDate && e.nextReviewDate <= todayStr).length;
-                const weeks = new Set(entries.map(e => { const d = new Date(e.date); return d.getFullYear() + '-W' + lpGetISOWeek(d); }));
+                const activeWeeks = new Set(entries.map(e => { const d = new Date(e.date + 'T00:00:00'); return d.getFullYear() + '-' + lpGetISOWeek(d); })).size;
                 if (statsEl) statsEl.innerHTML = [
-                    [entries.length, 'Entries', '#1d4ed8'],
-                    [weeks.size, 'Weeks Active', '#16a34a'],
+                    [entries.length, '📓 LP Entries', '#1d4ed8'],
+                    [quizzes.length, '📝 Quizzes', '#7c3aed'],
+                    [activeWeeks, 'Weeks Active', '#16a34a'],
                     [due, 'Due Reviews', '#dc2626']
-                ].map(([v, l, c]) => `<div style="background:#f1f5f9;border-radius:10px;padding:10px;text-align:center;"><div style="font-size:1.4em;font-weight:900;color:${c};">${v}</div><div style="font-size:0.72em;color:#64748b;font-weight:700;">${l}</div></div>`).join('');
-                // Update card badge too
-                const badge = document.getElementById('lp-card-badge-' + uid);
-                if (badge) badge.innerHTML = `<span style="color:#1d4ed8;">${entries.length} entries</span>${due ? ` · <span style="color:#dc2626;">${due} due</span>` : ''}`;
-                if (feedEl) feedEl.innerHTML = entries.length ? entries.map(e => {
-                    const isDue = e.nextReviewDate && e.nextReviewDate <= todayStr;
-                    const tags = (e.tags || []).map(t => `<span style="background:#e0e7ff;color:#3730a3;border-radius:5px;padding:1px 6px;font-size:0.72em;">${t}</span>`).join(' ');
-                    return `<div style="padding:10px 12px;border-radius:12px;border:1px solid ${isDue?'#fcd34d':'#e2e8f0'};background:${isDue?'#fffbeb':'#fafafa'};margin-bottom:4px;">
-                        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-                            <div style="font-size:0.88em;font-weight:700;">${e.title || 'Untitled'}</div>
-                            <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
-                                ${isDue ? '<span style="font-size:0.7em;color:#92400e;background:#fef3c7;border-radius:5px;padding:1px 6px;">📅 Review</span>' : ''}
-                                <span style="font-size:0.75em;color:#64748b;">${e.date || ''}</span>
+                ].map(([v, l, c]) => `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px;text-align:center;"><div style="font-size:1.3em;font-weight:900;color:${c};">${v}</div><div style="font-size:0.7em;color:#64748b;font-weight:700;">${l}</div></div>`).join('');
+
+                // Build week-keyed activity maps
+                const getWeekKey = dateStr => {
+                    const d = new Date(dateStr + 'T00:00:00');
+                    return d.getFullYear() + '-' + String(lpGetISOWeek(d)).padStart(2, '0');
+                };
+                const lpByWeek = {};
+                entries.forEach(e => {
+                    if (!e.date) return;
+                    const k = getWeekKey(e.date);
+                    if (!lpByWeek[k]) lpByWeek[k] = [];
+                    lpByWeek[k].push(e.title || 'Untitled');
+                });
+                const quizByWeek = {};
+                quizzes.forEach(q => {
+                    const ts = q.timestamp && q.timestamp.toDate ? q.timestamp.toDate() : null;
+                    if (!ts) return;
+                    const dateStr = ts.toISOString().split('T')[0];
+                    const k = getWeekKey(dateStr);
+                    if (!quizByWeek[k]) quizByWeek[k] = [];
+                    quizByWeek[k].push(q.quizTitle || q.title || 'Quiz');
+                });
+
+                // All dates to find start
+                const allDates = [
+                    ...entries.map(e => e.date),
+                    ...quizzes.map(q => { const ts = q.timestamp?.toDate?.(); return ts ? ts.toISOString().split('T')[0] : null; })
+                ].filter(Boolean).sort();
+
+                if (!allDates.length) {
+                    if (timelineEl) timelineEl.innerHTML = '<div style="padding:16px; text-align:center; color:#94a3b8; font-size:0.85em;">No activity yet.</div>';
+                } else {
+                    // Build weeks array from first activity to now
+                    const start = new Date(allDates[0] + 'T00:00:00');
+                    start.setDate(start.getDate() - ((start.getDay() + 6) % 7)); // back to Monday
+                    const now = new Date();
+                    const nowKey = now.getFullYear() + '-' + String(lpGetISOWeek(now)).padStart(2, '0');
+                    const weeks = [];
+                    let cur = new Date(start);
+                    while (cur <= now) {
+                        const wk = lpGetISOWeek(cur);
+                        const yr = cur.getFullYear();
+                        const key = yr + '-' + String(wk).padStart(2, '0');
+                        weeks.push({ key, wk, label: 'W' + wk, monthDay: cur.toLocaleDateString('en', { month: 'short', day: 'numeric' }), date: new Date(cur) });
+                        cur.setDate(cur.getDate() + 7);
+                    }
+
+                    const CELL = 32;
+                    const rows = [
+                        { label: '📓 Learning', byWeek: lpByWeek, base: '#1d4ed8', light: '#dbeafe' },
+                        { label: '📝 Quiz',     byWeek: quizByWeek, base: '#7c3aed', light: '#ede9fe' },
+                    ];
+
+                    // Show month label only on first week of each month
+                    let lastMonth = -1;
+                    const headerCells = weeks.map(w => {
+                        const mo = w.date.getMonth();
+                        const showLabel = mo !== lastMonth;
+                        if (showLabel) lastMonth = mo;
+                        const isCur = w.key === nowKey;
+                        return `<th style="min-width:${CELL}px;width:${CELL}px;padding:1px;text-align:center;font-size:0.6em;color:${isCur?'#1d4ed8':'#94a3b8'};font-weight:${isCur?900:600};border-bottom:${isCur?'2px solid #1d4ed8':'none'};white-space:nowrap;">${showLabel ? w.monthDay : w.label}</th>`;
+                    }).join('');
+
+                    const bodyRows = rows.map(row => {
+                        const cells = weeks.map(w => {
+                            const items = row.byWeek[w.key] || [];
+                            const n = items.length;
+                            const isCur = w.key === nowKey;
+                            const bg = n === 0 ? (isCur ? '#eff6ff' : '#f8fafc') : n === 1 ? row.light : row.base;
+                            const fg = n >= 2 ? '#fff' : n === 1 ? row.base : '#e2e8f0';
+                            const tip = items.join(', ');
+                            return `<td style="min-width:${CELL}px;width:${CELL}px;padding:2px 1px;" title="${tip}"><div style="width:26px;height:26px;border-radius:6px;background:${bg};margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:0.7em;font-weight:900;color:${fg};border:${isCur?'1px solid #93c5fd':'none'};">${n||''}</div></td>`;
+                        }).join('');
+                        return `<tr><td style="white-space:nowrap;font-size:0.75em;color:#64748b;font-weight:700;padding:3px 8px 3px 0;min-width:96px;">${row.label}</td>${cells}</tr>`;
+                    }).join('');
+
+                    if (timelineEl) timelineEl.innerHTML = `
+                        <div style="font-size:0.7em;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Activity Timeline · ${weeks.length} weeks</div>
+                        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+                            <table style="border-collapse:collapse;table-layout:fixed;">
+                                <thead><tr><th style="min-width:96px;"></th>${headerCells}</tr></thead>
+                                <tbody>${bodyRows}</tbody>
+                            </table>
+                        </div>`;
+
+                    // Scroll timeline to the right (current week)
+                    setTimeout(() => {
+                        const scrollEl = timelineEl && timelineEl.querySelector('div[style*="overflow-x"]');
+                        if (scrollEl) scrollEl.scrollLeft = scrollEl.scrollWidth;
+                    }, 50);
+                }
+
+                // LP entry list (collapsible, hidden by default)
+                if (feedSection) feedSection.style.display = 'block';
+                const feedToggle = document.getElementById('lp-intern-feed-toggle');
+                if (feedToggle) feedToggle.textContent = '📓 LP Entries ▼';
+                if (feedEl) {
+                    feedEl.style.display = 'none';
+                    feedEl.style.flexDirection = 'column';
+                    feedEl.innerHTML = entries.length ? entries.map(e => {
+                        const isDue = e.nextReviewDate && e.nextReviewDate <= todayStr;
+                        const tags = (e.tags || []).map(t => `<span style="background:#e0e7ff;color:#3730a3;border-radius:5px;padding:1px 6px;font-size:0.72em;">${t}</span>`).join(' ');
+                        return `<div style="padding:10px 12px;border-radius:12px;border:1px solid ${isDue?'#fcd34d':'#e2e8f0'};background:${isDue?'#fffbeb':'#fafafa'};margin-bottom:4px;">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                                <div style="font-size:0.88em;font-weight:700;">${e.title||'Untitled'}</div>
+                                <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
+                                    ${isDue?'<span style="font-size:0.7em;color:#92400e;background:#fef3c7;border-radius:5px;padding:1px 6px;">📅 Review</span>':''}
+                                    <span style="font-size:0.75em;color:#64748b;">${e.date||''}</span>
+                                </div>
                             </div>
-                        </div>
-                        ${tags ? `<div style="margin-top:4px;display:flex;gap:3px;flex-wrap:wrap;">${tags}</div>` : ''}
-                        <div style="font-size:0.82em;color:#475569;margin-top:4px;max-height:52px;overflow:hidden;">${(e.contentMarkdown || '').slice(0, 180)}</div>
-                    </div>`;
-                }).join('') : '<div style="padding:20px;text-align:center;color:#94a3b8;font-size:0.85em;">No entries yet.</div>';
-                // Scroll detail into view
+                            ${tags?`<div style="margin-top:4px;display:flex;gap:3px;flex-wrap:wrap;">${tags}</div>`:''}
+                            <div style="font-size:0.82em;color:#475569;margin-top:4px;max-height:52px;overflow:hidden;">${(e.contentMarkdown||'').slice(0,180)}</div>
+                        </div>`;
+                    }).join('') : '<div style="padding:16px;text-align:center;color:#94a3b8;font-size:0.85em;">No entries yet.</div>';
+                }
+
+                // Update card badge
+                const badge = document.getElementById('lp-card-badge-' + uid);
+                if (badge) badge.innerHTML = `<span style="color:#1d4ed8;">${entries.length} entries</span>${due?` · <span style="color:#dc2626;">${due} due</span>`:''}`;
+
                 if (detail) detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            } catch(e) { console.error('lpSelectIntern', e); }
+            } catch(e) { console.error('lpSelectIntern', e); if (timelineEl) timelineEl.innerHTML = '<div style="color:#dc2626;font-size:0.82em;padding:8px;">Failed to load.</div>'; }
         };
 
         window.loadInternPath = function() {}; // kept for backward-compat, replaced by lpSelectIntern
