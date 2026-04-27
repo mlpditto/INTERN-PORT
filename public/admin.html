@@ -24457,8 +24457,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const uid = window._lp.ownerId;
             if (!uid || !db) return;
             try {
-                const snap = await db.collection('learning_path_entries').where('userId', '==', uid).orderBy('date', 'desc').get();
-                window._lp.entries = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                const snap = await db.collection('learning_path_entries').where('userId', '==', uid).get();
+                window._lp.entries = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.date || '') > (a.date || '') ? 1 : -1);
                 computeLpStats();
                 renderLpFeed();
             } catch(e) { console.error('lpLoadEntries', e); }
@@ -24892,10 +24892,10 @@ Recommended Review: X days`;
             try {
                 const todayStr = new Date().toISOString().split('T')[0];
                 const [lpSnap, quizSnap] = await Promise.all([
-                    db.collection('learning_path_entries').where('userId', '==', uid).orderBy('date', 'desc').get(),
+                    db.collection('learning_path_entries').where('userId', '==', uid).get(),
                     db.collection('quiz_attempts').where('userId', '==', uid).get()
                 ]);
-                const entries = lpSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                const entries = lpSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.date || '') > (a.date || '') ? 1 : -1);
                 const quizzes = quizSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
                 const due = entries.filter(e => e.nextReviewDate && e.nextReviewDate <= todayStr).length;
