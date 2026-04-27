@@ -7093,14 +7093,20 @@
 
                 <!-- Monitor panel (hidden by default) -->
                 <div id="lp-monitor-panel" style="display:none; margin-top:16px; background:#fff; border:1px solid var(--border-color); border-radius:16px; padding:14px; box-shadow:0 8px 20px rgba(15,23,42,0.05);">
-                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
-                        <span style="font-weight:800; color:#1e1b4b; font-size:0.95em;">📊 Monitor: Intern Learning Paths</span>
-                        <select id="lp-intern-selector" onchange="loadInternPath()" style="width:auto; min-width:220px; margin:0; padding:8px 10px; border-radius:10px; font-size:0.86em;">
-                            <option value="">Select intern...</option>
-                        </select>
+                    <div style="font-weight:800; color:#1e1b4b; font-size:0.95em; margin-bottom:12px;">📊 Monitor: Intern Learning Paths</div>
+                    <!-- Group tabs -->
+                    <div id="lp-monitor-group-tabs" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; border-bottom:1px solid #f1f5f9; padding-bottom:12px;"></div>
+                    <!-- Intern cards -->
+                    <div id="lp-monitor-intern-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; margin-bottom:4px;"></div>
+                    <!-- Selected intern detail (hidden until a card is clicked) -->
+                    <div id="lp-monitor-intern-detail" style="display:none; border-top:1px solid #f1f5f9; padding-top:14px; margin-top:14px;">
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                            <div id="lp-monitor-intern-name" style="font-weight:800; font-size:1em; color:#0f172a;"></div>
+                            <button onclick="document.getElementById('lp-monitor-intern-detail').style.display='none'; document.querySelectorAll('.lp-intern-card').forEach(c=>c.classList.remove('active'));" style="background:#f1f5f9; border:none; border-radius:8px; padding:4px 12px; font-size:0.8em; cursor:pointer; color:#64748b; margin-left:auto;">✕</button>
+                        </div>
+                        <div id="lp-intern-stats" style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px;"></div>
+                        <div id="lp-intern-feed" style="display:flex; flex-direction:column; gap:6px; max-height:45vh; overflow-y:auto;"></div>
                     </div>
-                    <div id="lp-intern-stats" style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px;"></div>
-                    <div id="lp-intern-feed" style="display:flex; flex-direction:column; gap:6px; max-height:50vh; overflow-y:auto;"></div>
                 </div>
 
             </div>
@@ -24473,14 +24479,72 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         window.lpLoadInternList = async function() {
             if (!db) return;
-            try {
-                const snap = await db.collection('users').get();
-                window._lp.internList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                const sel = document.getElementById('lp-intern-selector');
-                if (!sel) return;
-                sel.innerHTML = '<option value="">Select intern...</option>' +
-                    window._lp.internList.map(u => `<option value="${u.id}">${u.displayName || u.id}</option>`).join('');
-            } catch(e) { console.error('lpLoadInternList', e); }
+            let users = (typeof usersData !== 'undefined' && usersData.length)
+                ? usersData.filter(u => !u.isIgnored)
+                : await db.collection('users').get().then(s => s.docs.map(d => ({ id: d.id, ...d.data() }))).catch(() => []);
+            window._lp.internList = users;
+            window._lp.monitorGroup = 'All';
+            lpRenderMonitorGroupTabs();
+            lpRenderInternGrid('All');
+        };
+
+        window.lpRenderMonitorGroupTabs = function() {
+            const tabsEl = document.getElementById('lp-monitor-group-tabs');
+            if (!tabsEl) return;
+            const groups = ['All', ...[...new Set(window._lp.internList.map(u => u.group || 'Public'))].sort()];
+            tabsEl.innerHTML = groups.map(g => {
+                const count = g === 'All' ? window._lp.internList.length : window._lp.internList.filter(u => (u.group || 'Public') === g).length;
+                const isActive = (window._lp.monitorGroup || 'All') === g;
+                return `<button onclick="lpSetMonitorGroup('${g}')" style="padding:7px 14px; border:none; border-radius:20px; font-size:0.82em; font-weight:700; cursor:pointer; background:${isActive ? '#1d4ed8' : '#f1f5f9'}; color:${isActive ? '#fff' : '#64748b'}; transition:all 0.15s;">
+                    ${g} <span style="font-size:0.85em; opacity:0.75;">(${count})</span>
+                </button>`;
+            }).join('');
+        };
+
+        window.lpSetMonitorGroup = function(group) {
+            window._lp.monitorGroup = group;
+            lpRenderMonitorGroupTabs();
+            lpRenderInternGrid(group);
+            const det = document.getElementById('lp-monitor-intern-detail');
+            if (det) det.style.display = 'none';
+            document.querySelectorAll('.lp-intern-card').forEach(c => c.classList.remove('active'));
+        };
+
+        window.lpRenderInternGrid = function(group) {
+            const grid = document.getElementById('lp-monitor-intern-grid');
+            if (!grid) return;
+            const list = group === 'All'
+                ? window._lp.internList
+                : window._lp.internList.filter(u => (u.group || 'Public') === group);
+            if (!list.length) {
+                grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#94a3b8; font-size:0.85em;">No interns in this group.</div>';
+                return;
+            }
+            grid.innerHTML = list.map(u => {
+                const name = u.displayName || u.id;
+                const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                const hue = [...name].reduce((h, c) => h + c.charCodeAt(0), 0) % 360;
+                const grp = u.group || 'Public';
+                return `<div class="lp-intern-card" onclick="lpSelectIntern('${u.id}', this)" style="background:#fafafa; border:1px solid #e2e8f0; border-radius:14px; padding:12px; text-align:center; cursor:pointer; transition:all 0.15s;" onmouseover="this.style.borderColor='#1d4ed8';this.style.background='#eff6ff'" onmouseout="if(!this.classList.contains('active')){this.style.borderColor='#e2e8f0';this.style.background='#fafafa'}">
+                    <div style="width:44px; height:44px; border-radius:50%; background:hsl(${hue},60%,55%); color:#fff; font-size:1em; font-weight:900; display:flex; align-items:center; justify-content:center; margin:0 auto 8px;">${initials}</div>
+                    <div style="font-size:0.85em; font-weight:700; color:#0f172a; line-height:1.3;">${name}</div>
+                    <div style="font-size:0.73em; color:#94a3b8; margin-top:2px;">${grp}</div>
+                    <div id="lp-card-badge-${u.id}" style="margin-top:6px; font-size:0.72em; color:#64748b;">...</div>
+                </div>`;
+            }).join('');
+            lpLoadInternBadges(list);
+        };
+
+        window.lpLoadInternBadges = async function(list) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            await Promise.allSettled(list.map(async u => {
+                try {
+                    const snap = await db.collection('learning_path_entries').where('userId', '==', u.id).get();
+                    const due = snap.docs.filter(d => { const nr = d.data().nextReviewDate; return nr && nr <= todayStr; }).length;
+                    const badge = document.getElementById('lp-card-badge-' + u.id);
+                    if (badge) badge.innerHTML = `<span style="color:#1d4ed8;">${snap.size} entries</span>${due ? ` · <span style="color:#dc2626;">${due} due</span>` : ''}`;
+                } catch(e) {}
+            }));
         };
 
         window.computeLpStats = function() {
@@ -24727,13 +24791,24 @@ Recommended Review: X days`;
             if (btn) btn.textContent = isOpen ? '▼' : '▲';
         };
 
-        window.loadInternPath = async function() {
-            const sel = document.getElementById('lp-intern-selector');
-            const uid = sel && sel.value;
+        window.lpSelectIntern = async function(uid, cardEl) {
             if (!uid || !db) return;
+            document.querySelectorAll('.lp-intern-card').forEach(c => {
+                c.classList.remove('active');
+                c.style.borderColor = '#e2e8f0'; c.style.background = '#fafafa';
+            });
+            if (cardEl) { cardEl.classList.add('active'); cardEl.style.borderColor = '#1d4ed8'; cardEl.style.background = '#eff6ff'; }
+
+            const detail = document.getElementById('lp-monitor-intern-detail');
+            const nameEl = document.getElementById('lp-monitor-intern-name');
             const feedEl = document.getElementById('lp-intern-feed');
             const statsEl = document.getElementById('lp-intern-stats');
+            if (detail) detail.style.display = 'block';
+
+            const user = window._lp.internList.find(u => u.id === uid);
+            if (nameEl) nameEl.textContent = (user && user.displayName) || uid;
             if (feedEl) feedEl.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;">Loading...</div>';
+
             try {
                 const snap = await db.collection('learning_path_entries').where('userId', '==', uid).orderBy('date', 'desc').get();
                 const entries = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -24745,17 +24820,28 @@ Recommended Review: X days`;
                     [weeks.size, 'Weeks Active', '#16a34a'],
                     [due, 'Due Reviews', '#dc2626']
                 ].map(([v, l, c]) => `<div style="background:#f1f5f9;border-radius:10px;padding:10px;text-align:center;"><div style="font-size:1.4em;font-weight:900;color:${c};">${v}</div><div style="font-size:0.72em;color:#64748b;font-weight:700;">${l}</div></div>`).join('');
-                if (feedEl) feedEl.innerHTML = entries.length ? entries.map(e =>
-                    `<div style="padding:10px 12px;border-radius:12px;border:1px solid #e2e8f0;background:#fafafa;margin-bottom:4px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                const badge = document.getElementById('lp-card-badge-' + uid);
+                if (badge) badge.innerHTML = `<span style="color:#1d4ed8;">${entries.length} entries</span>${due ? ` · <span style="color:#dc2626;">${due} due</span>` : ''}`;
+                if (feedEl) feedEl.innerHTML = entries.length ? entries.map(e => {
+                    const isDue = e.nextReviewDate && e.nextReviewDate <= todayStr;
+                    const tags = (e.tags || []).map(t => `<span style="background:#e0e7ff;color:#3730a3;border-radius:5px;padding:1px 6px;font-size:0.72em;">${t}</span>`).join(' ');
+                    return `<div style="padding:10px 12px;border-radius:12px;border:1px solid ${isDue?'#fcd34d':'#e2e8f0'};background:${isDue?'#fffbeb':'#fafafa'};margin-bottom:4px;">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
                             <div style="font-size:0.88em;font-weight:700;">${e.title || 'Untitled'}</div>
-                            <div style="font-size:0.75em;color:#64748b;">${e.date || ''}</div>
+                            <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
+                                ${isDue ? '<span style="font-size:0.7em;color:#92400e;background:#fef3c7;border-radius:5px;padding:1px 6px;">📅 Review</span>' : ''}
+                                <span style="font-size:0.75em;color:#64748b;">${e.date || ''}</span>
+                            </div>
                         </div>
-                        <div style="font-size:0.82em;color:#475569;margin-top:4px;max-height:60px;overflow:hidden;">${(e.contentMarkdown || '').slice(0, 200)}</div>
-                    </div>`
-                ).join('') : '<div style="padding:20px;text-align:center;color:#94a3b8;font-size:0.85em;">No entries yet.</div>';
-            } catch(e) { console.error('loadInternPath', e); }
+                        ${tags ? `<div style="margin-top:4px;display:flex;gap:3px;flex-wrap:wrap;">${tags}</div>` : ''}
+                        <div style="font-size:0.82em;color:#475569;margin-top:4px;max-height:52px;overflow:hidden;">${(e.contentMarkdown || '').slice(0, 180)}</div>
+                    </div>`;
+                }).join('') : '<div style="padding:20px;text-align:center;color:#94a3b8;font-size:0.85em;">No entries yet.</div>';
+                if (detail) detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } catch(e) { console.error('lpSelectIntern', e); }
         };
+
+        window.loadInternPath = function() {};
 
         window.lpAutoResize = function(el) {
             el.style.height = 'auto';
