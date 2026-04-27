@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.04)</title>
+    <title>Internship Portfolio (V94.02)</title>
     <!-- V94.02: Merge Ranks+Badges — badge chips embedded in Me leaderboard row -->
     <!-- Release: 2026-04-26 16:00 UTC+7 -->
 
@@ -2741,6 +2741,10 @@
                                 <i class="fa-solid fa-list-ul"></i>
                                 <span>My Cases</span>
                             </button>
+                            <button class="case-tab-btn" id="case-tab-stats" onclick="switchCaseTab('stats')">
+                                <i class="fa-solid fa-chart-bar"></i>
+                                <span>통계</span>
+                            </button>
                         </div>
                         <div id="case-pane-submit" class="case-tab-pane active">
                             <div class="case-pane-shell" style="border-bottom: 1px solid #f7f7f7;">
@@ -2850,6 +2854,11 @@
                                 <div id="case-list-grouped"></div>
                             </div>
                         </div>
+                        <div id="case-pane-stats" class="case-tab-pane">
+                            <div class="case-pane-shell">
+                                <div id="case-stats-pane-content"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2902,10 +2911,32 @@
                             </div>
                         </div>
 
-                        <!-- History pane -->
+                        <!-- History pane - Unified Timeline -->
                         <div id="work-pane-history" class="work-tab-pane">
                             <div class="work-pane-shell" style="background:#f9fdf9;">
-                                <div id="work-list"></div>
+                                <!-- 🔥 Unified Filter Buttons -->
+                                <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; padding:12px; background:white; border-radius:12px; border:1px solid #e2e8f0;">
+                                    <button class="unified-filter-btn active" data-filter="all" onclick="filterUnifiedHistory('all')"
+                                            style="padding:8px 16px; background:#4361ee; color:white; border:none; border-radius:20px; font-size:0.85em; font-weight:700; cursor:pointer; transition:all 0.2s;">
+                                        📋 All / 전체
+                                    </button>
+                                    <button class="unified-filter-btn" data-filter="work" onclick="filterUnifiedHistory('work')"
+                                            style="padding:8px 16px; background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; border-radius:20px; font-size:0.85em; font-weight:700; cursor:pointer; transition:all 0.2s;">
+                                        📝 Work / 워크
+                                    </button>
+                                    <button class="unified-filter-btn" data-filter="reflective" onclick="filterUnifiedHistory('reflective')"
+                                            style="padding:8px 16px; background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; border-radius:20px; font-size:0.85em; font-weight:700; cursor:pointer; transition:all 0.2s;">
+                                        😊 Log / 로그
+                                    </button>
+                                </div>
+                                
+                                <!-- 🔥 Unified Timeline Container -->
+                                <div id="unified-timeline">
+                                    <div style="text-align:center; color:#999; padding:40px 20px;">
+                                        <i class="fa-solid fa-spinner fa-spin" style="font-size:2em; margin-bottom:10px;"></i>
+                                        <p>Loading history...</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -6222,7 +6253,11 @@
                     if (Array.isArray(userAns)) {
                         userAnsText = userAns.join('\n\n');
                     } else if (typeof userAns === 'string' && userAns.includes("\n---\n")) {
-                        userAnsText = userAns.replace(/\n---\n/g, '\n\n');
+                        userAnsText = userAns.replace(/
+---
+/g, '
+
+');
                     } else {
                         userAnsText = userAns;
                     }
@@ -8389,7 +8424,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 }
 
                 // Step 1: Save reflective log first so user data is not lost even if score update is denied.
-                await db.collection("reflective_logs").add({
+                const legacyRef = await db.collection("reflective_logs").add({
                     userId,
                     displayName: userProfile.displayName,
                     pictureUrl: userProfile.pictureUrl || "",
@@ -8401,6 +8436,48 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     status: 'pending',
                     autoScore: 0.1
                 });
+
+                // Step 1.5: Dual-write to unified submissions collection
+                try {
+                    const toolsArray = [...(window.rlSelectedTools || [])];
+                    const moodEmojis = {
+                        'crying': '😢',
+                        'tired': '😴',
+                        'neutral': '😐',
+                        'happy': '😊',
+                        'love': '😍',
+                        'strong': '💪',
+                        'party': '🎉'
+                    };
+
+                    const unifiedData = {
+                        submissionType: 'reflective',
+                        authUid: authUser.uid,
+                        userId,
+                        displayName: userProfile.displayName,
+                        pictureUrl: userProfile.pictureUrl || "",
+                        title: `Reflective Log - ${mood.charAt(0).toUpperCase() + mood.slice(1)}`,
+                        description: content,
+                        status: 'pending',
+                        score: 0.1,
+                        metadata: {
+                            mood,
+                            moodEmoji: moodEmojis[mood] || '📝',
+                            learningTools: toolsArray,
+                            sourceType: 'reflective_logs',
+                            sourceId: legacyRef.id
+                        },
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        pointsAwarded: false,
+                        pointsAmount: 0.1
+                    };
+
+                    await db.collection("submissions").add(unifiedData);
+                    console.log('[Unified] Reflective log written to submissions collection');
+                } catch (unifiedErr) {
+                    console.warn('[Unified] Failed to write to submissions (non-critical):', unifiedErr);
+                }
 
                 let scoreGranted = true;
                 try {
@@ -9423,7 +9500,7 @@ async function archiveDoneCard(cardId) {
         }
 
         function renderUnifiedHistory() {
-            const container = document.getElementById('unified-history-list');
+            const container = document.getElementById('unified-timeline');
             if (!container) {
                 // Container doesn't exist yet, skip rendering
                 return;
@@ -9493,6 +9570,17 @@ async function archiveDoneCard(cardId) {
                             color: '#f1c40f',
                             link: sub.metadata?.link,
                             detail: 'Side quest completion'
+                        };
+                    
+                    case 'reflective':
+                        return {
+                            ...baseItem,
+                            title: `${sub.metadata?.moodEmoji || '📝'} Reflective Log - ${sub.metadata?.mood || 'Unknown'}`,
+                            type: 'Log 로그 / ล็อก',
+                            icon: 'fa-pen-fancy',
+                            color: '#f39c12',
+                            link: null,
+                            detail: sub.metadata?.learningTools?.length > 0 ? `Tools: ${sub.metadata.learningTools.join(', ')}` : 'Daily reflection'
                         };
                     
                     default:
@@ -9834,7 +9922,6 @@ async function archiveDoneCard(cardId) {
             { key: 'msk', label: 'Musculoskeletal', symptoms: ['Back Pain', 'Joint Pain', 'Stiffness', 'Sprain', 'Swelling'] },
             { key: 'endocrine', label: 'Endocrine/NCDs', symptoms: ['Hyperglycemia', 'Polyuria', 'Weight Loss', 'Fatigue', 'Poor Adherence'] },
             { key: 'mental', label: 'Mental Health', symptoms: ['Stress', 'Anxiety', 'Low Mood', 'Poor Sleep', 'Panic'] },
-            { key: 'pain', label: 'Pain', symptoms: ['Acute Pain', 'Chronic Pain', 'Nociceptive', 'Neuropathic', 'Cancer Pain'] },
             { key: 'other', label: 'Other', symptoms: ['Follow-up', 'Medication Q', 'Unclear Symptom'] }
         ];
 
@@ -9854,7 +9941,7 @@ async function archiveDoneCard(cardId) {
             respiratory: '🫁', cardio: '❤️', gi: '🫃',
             neuro: '🧠', ent: '👂', skin: '🩹',
             msk: '🦴', endocrine: '💊', mental: '🧘',
-            pain: '🩻', other: '📋'
+            other: '📋'
         };
 
         const SYMPTOM_EMOJI = {
@@ -10148,12 +10235,13 @@ async function archiveDoneCard(cardId) {
 
         function switchCaseTab(tabName) {
             window.caseActiveTab = tabName;
-            ['submit', 'systems'].forEach(t => {
+            ['submit', 'systems', 'stats'].forEach(t => {
                 const btn = document.getElementById(`case-tab-${t}`);
                 const pane = document.getElementById(`case-pane-${t}`);
                 if (btn) btn.classList.toggle('active', t === tabName);
                 if (pane) pane.classList.toggle('active', t === tabName);
             });
+            if (tabName === 'stats') renderCaseStats(window.myCasesCache || []);
             if (tabName === 'systems') renderCaseGrouped(window.myCasesCache || []);
         }
 
@@ -10369,9 +10457,8 @@ async function archiveDoneCard(cardId) {
                     caseId,
                     customer,
                     disease,
-                    diseaseSystem: systemKey || null,
                     diseaseSystemKey: systemKey || null,
-                    diseaseSystemLabel: systemEntry ? systemEntry.label : disease,
+                    diseaseSystemLabel: systemEntry ? `${systemEntry.label} / ${systemEntry.thaiLabel}` : disease,
                     symptomTags,
                     note,
                     status: "pending",
@@ -10400,7 +10487,7 @@ async function archiveDoneCard(cardId) {
                             customer,
                             disease,
                             diseaseSystemKey: systemKey || null,
-                            diseaseSystemLabel: systemEntry ? systemEntry.label : disease,
+                            diseaseSystemLabel: systemEntry ? `${systemEntry.label} / ${systemEntry.thaiLabel}` : disease,
                             symptomTags,
                             sourceType: 'cases',
                             sourceId: legacyRef.id
@@ -10467,7 +10554,7 @@ async function archiveDoneCard(cardId) {
                             customer,
                             disease,
                             diseaseSystemKey: systemKey || null,
-                            diseaseSystemLabel: systemEntry ? systemEntry.label : disease,
+                            diseaseSystemLabel: systemEntry ? `${systemEntry.label} / ${systemEntry.thaiLabel}` : disease,
                             symptomTags,
                             note,
                             status: "pending",
@@ -10541,6 +10628,56 @@ async function archiveDoneCard(cardId) {
             });
         }
 
+        function renderCaseGrouped(cases) {
+            const statsContainer = document.getElementById('case-stats-summary');
+            const listContainer = document.getElementById('case-list-grouped');
+            if (!statsContainer || !listContainer) return;
+
+            if (cases.length === 0) {
+                statsContainer.innerHTML = "";
+                listContainer.innerHTML = "<p style='text-align:center; color:#999; margin:20px 0;'>ยังไม่มีประวัติการส่งเคส</p>";
+                return;
+            }
+
+            // Grouping
+            const groups = {};
+            cases.forEach(c => {
+                const sys = c.disease || "อื่นๆ";
+                if (!groups[sys]) groups[sys] = [];
+                groups[sys].push(c);
+            });
+
+            // Stats
+            statsContainer.innerHTML = Object.keys(groups).sort().map(sys => `
+                <div style="background:#eef2ff; border:1px solid #dbeafe; padding:5px 12px; border-radius:20px; font-size:0.75em; color:#4361ee; font-weight:bold;">
+                    ${sys} (${groups[sys].length})
+                </div>
+            `).join('');
+
+            // List
+            listContainer.innerHTML = Object.keys(groups).sort().map(sys => `
+                <div style="margin-bottom:15px;">
+                    <div style="font-weight:bold; color:#444; font-size:0.9em; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-folder-open" style="color:#4361ee;"></i> ${sys}
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        ${groups[sys].map(c => `
+                            <div style="background:#fcfcfc; border:1px solid #eee; padding:10px; border-radius:10px;">
+                                <div style="display:flex; justify-content:space-between; font-size:0.85em;">
+                                    <b style="color:#333;">ID: ${c.caseId}</b>
+                                    <span style="color:#999; font-size:0.8em;">${c.timestamp ? c.timestamp.toDate().toLocaleDateString('th-TH') : ''}</span>
+                                </div>
+                                <div style="font-size:0.85em; color:#666; margin-top:4px;">
+                                    ${c.customer ? `👤 ${c.customer}` : ''}
+                                </div>
+                                ${c.note ? `<div style="font-size:0.8em; color:#888; margin-top:4px; padding-top:4px; border-top:1px dashed #eee;">📝 ${c.note}</div>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
         function renderCaseTaxonomyComposer() {
             const systemSelect = document.getElementById('c-disease-system');
             const suggestionWrap = document.getElementById('case-symptom-suggestions');
@@ -10604,37 +10741,6 @@ async function archiveDoneCard(cardId) {
             const filteredSystems = activeFilter === 'all' ? orderedSystems : orderedSystems.filter(sys => sys === activeFilter);
             const visibleCount = filteredSystems.reduce((sum, sys) => sum + groups[sys].length, 0);
 
-            // Compact stats chart — group by diseaseSystemKey for emoji lookup
-            const total = cases.length;
-            const keyGroups = {};
-            cases.forEach(c => {
-                const key = c.diseaseSystemKey || 'other';
-                keyGroups[key] = (keyGroups[key] || 0) + 1;
-            });
-            const sortedKeys = Object.entries(keyGroups).sort((a, b) => b[1] - a[1]);
-            const chartHtml = `
-                <div style="margin-bottom:14px; padding:10px 12px; background:linear-gradient(135deg,#f8fafc,#f1f5f9); border-radius:12px; border:1px solid #e2e8f0;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                        <span style="font-size:0.82em; font-weight:800; color:#334155;"><i class="fa-solid fa-chart-bar" style="color:#4361ee; margin-right:5px;"></i>สรุปเคส</span>
-                        <span style="font-size:0.75em; font-weight:700; background:#e8eeff; color:#4361ee; padding:2px 8px; border-radius:99px;">${total} total</span>
-                    </div>
-                    ${sortedKeys.map(([key, count]) => {
-                        const taxItem = caseTaxonomyCatalog.find(x => x.key === key);
-                        const label = taxItem ? taxItem.label : key;
-                        const emoji = CASE_SYSTEM_EMOJI[key] || '📋';
-                        const pct = Math.round((count / total) * 100);
-                        return `<div style="margin-bottom:8px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
-                                <span style="font-size:0.78em; font-weight:700; color:#334155;">${emoji} ${label}</span>
-                                <span style="font-size:0.75em; font-weight:800; color:#4361ee;">${count}</span>
-                            </div>
-                            <div style="background:#dde4ff; border-radius:99px; height:5px; overflow:hidden;">
-                                <div style="width:${pct}%; background:linear-gradient(90deg,#4361ee,#7b93f8); height:100%; border-radius:99px; transition:width 0.4s ease;"></div>
-                            </div>
-                        </div>`;
-                    }).join('')}
-                </div>`;
-
             statsContainer.innerHTML =
                 `<button type="button" class="case-filter-pill ${activeFilter === 'all' ? 'active' : ''}" onclick="setCaseSystemFilter('all')">All (${cases.length})</button>` +
                 orderedSystems.map(sys => `<button type="button" class="case-filter-pill ${activeFilter === sys ? 'active' : ''}" onclick='setCaseSystemFilter(${JSON.stringify(sys)})'>${sys} (${groups[sys].length})</button>`).join('');
@@ -10646,7 +10752,7 @@ async function archiveDoneCard(cardId) {
                 return;
             }
 
-            listContainer.innerHTML = chartHtml + filteredSystems.map(sys => `
+            listContainer.innerHTML = filteredSystems.map(sys => `
                 <div class="case-group-block">
                     <div class="case-group-head">
                         <div class="case-group-title"><i class="fa-solid fa-folder-open" style="color:#4361ee;"></i> ${sys}</div>

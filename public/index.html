@@ -2911,10 +2911,32 @@
                             </div>
                         </div>
 
-                        <!-- History pane -->
+                        <!-- History pane - Unified Timeline -->
                         <div id="work-pane-history" class="work-tab-pane">
                             <div class="work-pane-shell" style="background:#f9fdf9;">
-                                <div id="work-list"></div>
+                                <!-- 🔥 Unified Filter Buttons -->
+                                <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; padding:12px; background:white; border-radius:12px; border:1px solid #e2e8f0;">
+                                    <button class="unified-filter-btn active" data-filter="all" onclick="filterUnifiedHistory('all')"
+                                            style="padding:8px 16px; background:#4361ee; color:white; border:none; border-radius:20px; font-size:0.85em; font-weight:700; cursor:pointer; transition:all 0.2s;">
+                                        📋 All / 전체
+                                    </button>
+                                    <button class="unified-filter-btn" data-filter="work" onclick="filterUnifiedHistory('work')"
+                                            style="padding:8px 16px; background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; border-radius:20px; font-size:0.85em; font-weight:700; cursor:pointer; transition:all 0.2s;">
+                                        📝 Work / 워크
+                                    </button>
+                                    <button class="unified-filter-btn" data-filter="reflective" onclick="filterUnifiedHistory('reflective')"
+                                            style="padding:8px 16px; background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; border-radius:20px; font-size:0.85em; font-weight:700; cursor:pointer; transition:all 0.2s;">
+                                        😊 Log / 로그
+                                    </button>
+                                </div>
+                                
+                                <!-- 🔥 Unified Timeline Container -->
+                                <div id="unified-timeline">
+                                    <div style="text-align:center; color:#999; padding:40px 20px;">
+                                        <i class="fa-solid fa-spinner fa-spin" style="font-size:2em; margin-bottom:10px;"></i>
+                                        <p>Loading history...</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -6231,7 +6253,11 @@
                     if (Array.isArray(userAns)) {
                         userAnsText = userAns.join('\n\n');
                     } else if (typeof userAns === 'string' && userAns.includes("\n---\n")) {
-                        userAnsText = userAns.replace(/\n---\n/g, '\n\n');
+                        userAnsText = userAns.replace(/
+---
+/g, '
+
+');
                     } else {
                         userAnsText = userAns;
                     }
@@ -8398,7 +8424,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 }
 
                 // Step 1: Save reflective log first so user data is not lost even if score update is denied.
-                await db.collection("reflective_logs").add({
+                const legacyRef = await db.collection("reflective_logs").add({
                     userId,
                     displayName: userProfile.displayName,
                     pictureUrl: userProfile.pictureUrl || "",
@@ -8410,6 +8436,48 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     status: 'pending',
                     autoScore: 0.1
                 });
+
+                // Step 1.5: Dual-write to unified submissions collection
+                try {
+                    const toolsArray = [...(window.rlSelectedTools || [])];
+                    const moodEmojis = {
+                        'crying': '😢',
+                        'tired': '😴',
+                        'neutral': '😐',
+                        'happy': '😊',
+                        'love': '😍',
+                        'strong': '💪',
+                        'party': '🎉'
+                    };
+
+                    const unifiedData = {
+                        submissionType: 'reflective',
+                        authUid: authUser.uid,
+                        userId,
+                        displayName: userProfile.displayName,
+                        pictureUrl: userProfile.pictureUrl || "",
+                        title: `Reflective Log - ${mood.charAt(0).toUpperCase() + mood.slice(1)}`,
+                        description: content,
+                        status: 'pending',
+                        score: 0.1,
+                        metadata: {
+                            mood,
+                            moodEmoji: moodEmojis[mood] || '📝',
+                            learningTools: toolsArray,
+                            sourceType: 'reflective_logs',
+                            sourceId: legacyRef.id
+                        },
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        pointsAwarded: false,
+                        pointsAmount: 0.1
+                    };
+
+                    await db.collection("submissions").add(unifiedData);
+                    console.log('[Unified] Reflective log written to submissions collection');
+                } catch (unifiedErr) {
+                    console.warn('[Unified] Failed to write to submissions (non-critical):', unifiedErr);
+                }
 
                 let scoreGranted = true;
                 try {
@@ -9432,7 +9500,7 @@ async function archiveDoneCard(cardId) {
         }
 
         function renderUnifiedHistory() {
-            const container = document.getElementById('unified-history-list');
+            const container = document.getElementById('unified-timeline');
             if (!container) {
                 // Container doesn't exist yet, skip rendering
                 return;
@@ -9502,6 +9570,17 @@ async function archiveDoneCard(cardId) {
                             color: '#f1c40f',
                             link: sub.metadata?.link,
                             detail: 'Side quest completion'
+                        };
+                    
+                    case 'reflective':
+                        return {
+                            ...baseItem,
+                            title: `${sub.metadata?.moodEmoji || '📝'} Reflective Log - ${sub.metadata?.mood || 'Unknown'}`,
+                            type: 'Log 로그 / ล็อก',
+                            icon: 'fa-pen-fancy',
+                            color: '#f39c12',
+                            link: null,
+                            detail: sub.metadata?.learningTools?.length > 0 ? `Tools: ${sub.metadata.learningTools.join(', ')}` : 'Daily reflection'
                         };
                     
                     default:
