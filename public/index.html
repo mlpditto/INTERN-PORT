@@ -2516,6 +2516,44 @@
                             <div id="pane-mission-log" class="mission-tab-pane active">
                                 <div id="rl-integrated-area" style="margin-bottom: 20px;">
                                     <div id="rl-form-area" style="padding-top: 0;">
+                                        <!-- V97.01: A+B Sub-tabs -->
+                                        <div id="rl-subtabs" style="display:flex; gap:8px; margin-bottom:14px;">
+                                            <button id="rl-tab-reflection" onclick="switchRlTab('reflection')"
+                                                style="flex:1; padding:8px 12px; border-radius:20px; border:1.5px solid #e67e22; background:linear-gradient(135deg,#ff9f1c,#ffbf00); color:white; font-size:0.85em; font-weight:600; cursor:pointer; transition:all 0.2s;">
+                                                📓 Daily Reflection
+                                            </button>
+                                            <button id="rl-tab-lp" onclick="switchRlTab('lp')"
+                                                style="flex:1; padding:8px 12px; border-radius:20px; border:1.5px solid #6c5ce7; background:transparent; color:#6c5ce7; font-size:0.85em; font-weight:600; cursor:pointer; transition:all 0.2s;">
+                                                🎓 Learning Note
+                                            </button>
+                                        </div>
+
+                                        <!-- LP Standalone Pane (🎓 tab) -->
+                                        <div id="rl-lp-pane" style="display:none;">
+                                            <input type="text" id="lp-note-title" placeholder="หัวข้อที่เรียนรู้ เช่น Hypertension Management..."
+                                                style="width:100%; padding:12px 14px; border:1.5px solid #6c5ce7; border-radius:12px; font-size:0.9em; margin-bottom:10px; box-sizing:border-box;">
+                                            <div style="margin-bottom:10px;">
+                                                <div id="lp-note-tags" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; min-height:24px;"></div>
+                                                <div style="display:flex; gap:6px;">
+                                                    <input type="text" id="lp-note-tag-input" placeholder="เพิ่ม tag... เช่น cardiology"
+                                                        style="flex:1; padding:8px 12px; border:1px solid #c9b8f5; border-radius:10px; font-size:0.82em; margin:0;"
+                                                        onkeypress="if(event.key==='Enter'){event.preventDefault();lpAddTag('note',this.value.trim());this.value='';}">
+                                                    <button onclick="lpAddTag('note',document.getElementById('lp-note-tag-input').value.trim());document.getElementById('lp-note-tag-input').value='';"
+                                                        style="padding:8px 14px; background:#6c5ce7; border:none; border-radius:10px; color:white; font-size:0.82em; cursor:pointer;">+ Tag</button>
+                                                </div>
+                                            </div>
+                                            <textarea id="lp-note-content" rows="5" placeholder="เขียนสิ่งที่เรียนรู้วันนี้ เคล็ดลับ วิธีการ หรือ insight..."
+                                                style="width:100%; border-radius:12px; resize:none; font-size:0.92em; padding:14px; border:1.5px solid #6c5ce7; box-sizing:border-box;"></textarea>
+                                            <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+                                                <button onclick="submitLpNoteOnly()"
+                                                    style="padding:10px 22px; background:linear-gradient(135deg,#6c5ce7,#a29bfe); border:none; border-radius:18px; color:white; font-size:0.9em; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:8px; box-shadow:0 4px 12px rgba(108,92,231,0.3);">
+                                                    <i class="fa-solid fa-graduation-cap"></i> บันทึก Learning Note
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Daily Reflection Pane wrapper -->
+                                        <div id="rl-reflection-pane">
                                         <!-- 🔥 V93.01: Enhanced Mood Picker - 3 Column Grid -->
                                         <div class="mood-picker" id="mood-picker">
                                             <button class="mood-btn" onclick="selectMood('😭', this)" title="Crying">
@@ -2556,11 +2594,16 @@
                                                 oninput="updateCharCount()"
                                                 style="margin:0; border-radius:12px; resize:none; font-size:0.95em; padding:15px; border:1px solid #ddd; width:100%;"></textarea>
                                             <div class="char-counter"><span id="char-count">0</span> characters</div>
-                                            <div style="margin-top: 12px; display:flex; justify-content:flex-end; align-items:center;">
+                                            <div style="margin-top: 12px; display:flex; justify-content:flex-end; align-items:center; gap:8px;">
                                                 <button id="rl-submit-btn" class="btn-primary"
                                                     onclick="submitReflectiveLog()"
                                                     style="width:auto; height:36px; border-radius:18px; padding:0 20px; font-size:0.9em; font-weight:bold; background:linear-gradient(135deg, #ff9f1c 0%, #ffbf00 100%); border:none; display:flex; align-items:center; gap:8px; min-height:auto; box-shadow: 0 4px 12px rgba(255, 159, 28, 0.2);">
                                                     <i class="fa-solid fa-paper-plane"></i> Submit
+                                                </button>
+                                                <button id="rl-submit-both-btn"
+                                                    onclick="submitReflectionAndLP()"
+                                                    style="display:none; width:auto; height:36px; border-radius:18px; padding:0 20px; font-size:0.9em; font-weight:bold; background:linear-gradient(135deg,#6c5ce7 0%,#a29bfe 100%); border:none; color:white; cursor:pointer; align-items:center; gap:8px; min-height:auto; box-shadow:0 4px 12px rgba(108,92,231,0.2);">
+                                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Submit + LP
                                                 </button>
                                             </div>
                                         </div>
@@ -2639,7 +2682,29 @@
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
+
+                                        <!-- LP Quick-save Toggle -->
+                                        <div id="rl-lp-toggle-wrap" style="margin-top:10px;">
+                                            <button onclick="toggleLpQuickSave()"
+                                                style="width:100%; padding:10px 14px; background:rgba(108,92,231,0.07); border:1.5px dashed #a29bfe; border-radius:12px; color:#6c5ce7; font-size:0.85em; font-weight:600; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
+                                                <span>💡 บันทึกเป็น Learning Note ด้วย?</span>
+                                                <i id="lp-toggle-chevron" class="fa-solid fa-chevron-down" style="font-size:0.8em; transition:transform 0.2s;"></i>
+                                            </button>
+                                            <div id="rl-lp-toggle-body" style="display:none; padding:10px 0 4px;">
+                                                <input type="text" id="lp-inline-title" placeholder="หัวข้อ (ดึงจากบรรทัดแรกอัตโนมัติ)..."
+                                                    style="width:100%; padding:10px 14px; border:1.5px solid #a29bfe; border-radius:10px; font-size:0.85em; margin-bottom:8px; box-sizing:border-box;">
+                                                <div id="lp-inline-tags" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; min-height:24px;"></div>
+                                                <div style="display:flex; gap:6px;">
+                                                    <input type="text" id="lp-inline-tag-input" placeholder="เพิ่ม tag..."
+                                                        style="flex:1; padding:8px 12px; border:1px solid #ddd; border-radius:10px; font-size:0.82em; margin:0;"
+                                                        onkeypress="if(event.key==='Enter'){event.preventDefault();lpAddTag('inline',this.value.trim());this.value='';}">
+                                                    <button onclick="lpAddTag('inline',document.getElementById('lp-inline-tag-input').value.trim());document.getElementById('lp-inline-tag-input').value='';"
+                                                        style="padding:8px 14px; background:#6c5ce7; border:none; border-radius:10px; color:white; font-size:0.82em; cursor:pointer;">+ Tag</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        </div><!-- /rl-reflection-pane -->
+                                    </div><!-- /rl-form-area -->
 
                                     <div id="rl-history-area"
                                         style="display:none; padding: 15px; background: #fafafa; border-radius: 8px; margin-top: 10px; border: 1px solid #eee;">
@@ -8514,6 +8579,186 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             document.getElementById('rl-mood').value = mood;
             document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
+        }
+
+        // V97.01: A+B Hybrid — sub-tab + LP quick-save
+        window._lpNoteTags = [];
+        window._lpInlineTags = [];
+
+        function switchRlTab(tab) {
+            const reflPane = document.getElementById('rl-reflection-pane');
+            const lpPane = document.getElementById('rl-lp-pane');
+            const tabR = document.getElementById('rl-tab-reflection');
+            const tabL = document.getElementById('rl-tab-lp');
+            if (tab === 'lp') {
+                reflPane.style.display = 'none';
+                lpPane.style.display = 'block';
+                tabL.style.background = 'linear-gradient(135deg,#6c5ce7,#a29bfe)';
+                tabL.style.color = 'white';
+                tabR.style.background = 'transparent';
+                tabR.style.color = '#e67e22';
+            } else {
+                lpPane.style.display = 'none';
+                reflPane.style.display = 'block';
+                tabR.style.background = 'linear-gradient(135deg,#ff9f1c,#ffbf00)';
+                tabR.style.color = 'white';
+                tabL.style.background = 'transparent';
+                tabL.style.color = '#6c5ce7';
+            }
+        }
+
+        function toggleLpQuickSave() {
+            const body = document.getElementById('rl-lp-toggle-body');
+            const chevron = document.getElementById('lp-toggle-chevron');
+            const bothBtn = document.getElementById('rl-submit-both-btn');
+            const submitBtn = document.getElementById('rl-submit-btn');
+            const open = body.style.display === 'none';
+            body.style.display = open ? 'block' : 'none';
+            chevron.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
+            if (open) {
+                bothBtn.style.display = 'flex';
+                submitBtn.style.display = 'none';
+                // Auto-fill title from first line of reflection
+                const content = (document.getElementById('rl-content').value || '').trim();
+                const firstLine = content.split('\n')[0].slice(0, 80);
+                const titleEl = document.getElementById('lp-inline-title');
+                if (titleEl && !titleEl.value && firstLine) titleEl.value = firstLine;
+            } else {
+                bothBtn.style.display = 'none';
+                submitBtn.style.display = 'flex';
+            }
+        }
+
+        function lpAddTag(scope, tag) {
+            if (!tag) return;
+            const key = scope === 'note' ? '_lpNoteTags' : '_lpInlineTags';
+            if (!window[key].includes(tag)) {
+                window[key].push(tag);
+                renderLpTags(scope);
+            }
+        }
+
+        function lpRemoveTag(scope, tag) {
+            const key = scope === 'note' ? '_lpNoteTags' : '_lpInlineTags';
+            window[key] = window[key].filter(t => t !== tag);
+            renderLpTags(scope);
+        }
+
+        function renderLpTags(scope) {
+            const key = scope === 'note' ? '_lpNoteTags' : '_lpInlineTags';
+            const containerId = scope === 'note' ? 'lp-note-tags' : 'lp-inline-tags';
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.innerHTML = window[key].map(t =>
+                `<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(108,92,231,0.12);color:#6c5ce7;border-radius:20px;padding:3px 10px;font-size:0.78em;font-weight:600;">
+                    ${t}<button onclick="lpRemoveTag('${scope}','${t}')" style="background:none;border:none;cursor:pointer;color:#a29bfe;font-size:1em;padding:0;line-height:1;">&times;</button>
+                </span>`
+            ).join('');
+        }
+
+        function _lpBuildEntry(title, content, tags) {
+            const now = new Date();
+            const d = now.toISOString().slice(0, 10);
+            const week = Math.ceil((now - new Date(now.getFullYear(), 0, 1)) / 604800000);
+            const nextReview = new Date(now.getTime() + 3 * 86400000).toISOString().slice(0, 10);
+            return {
+                userId,
+                authUid: (window._fbAuthUser && window._fbAuthUser.uid) || '',
+                title: title || 'Untitled Note',
+                date: d,
+                contentMarkdown: content,
+                tags: tags || [],
+                weekNumber: week,
+                month: now.getMonth() + 1,
+                year: now.getFullYear(),
+                nextReviewDate: nextReview,
+                reviewCount: 0,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+        }
+
+        async function submitLpNoteOnly() {
+            const title = (document.getElementById('lp-note-title').value || '').trim();
+            const content = (document.getElementById('lp-note-content').value || '').trim();
+            if (!content) return alert('กรุณาเขียนเนื้อหา Learning Note ก่อนครับ');
+            const btn = document.querySelector('#rl-lp-pane button[onclick*="submitLpNoteOnly"]');
+            if (btn) { btn.disabled = true; btn.innerText = 'Saving...'; }
+            try {
+                const authUser = await ensureFirebaseAuthReady(10000);
+                if (!authUser) throw new Error('Missing Firebase auth');
+                window._fbAuthUser = authUser;
+                await db.collection('learning_path_entries').add(_lpBuildEntry(title, content, window._lpNoteTags));
+                document.getElementById('lp-note-title').value = '';
+                document.getElementById('lp-note-content').value = '';
+                window._lpNoteTags = [];
+                renderLpTags('note');
+                if (typeof showToast === 'function') showToast('🎓 บันทึก Learning Note สำเร็จ!');
+                else alert('🎓 บันทึก Learning Note สำเร็จ!');
+            } catch (e) {
+                console.error(e);
+                alert('Error: ' + e.message);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-graduation-cap"></i> บันทึก Learning Note'; }
+            }
+        }
+
+        async function submitReflectionAndLP() {
+            const content = document.getElementById('rl-content').value.trim();
+            const mood = document.getElementById('rl-mood').value;
+            const lpTitle = (document.getElementById('lp-inline-title').value || '').trim();
+            const bothBtn = document.getElementById('rl-submit-both-btn');
+            if (!content) return alert('กรุณาเขียน Daily Reflection ก่อนครับ');
+            if (content.length < 10) return alert('Please write a bit more (at least 10 characters).');
+            bothBtn.disabled = true;
+            bothBtn.innerText = 'Saving...';
+            try {
+                const authUser = await ensureFirebaseAuthReady(10000);
+                if (!authUser) throw new Error('Missing Firebase auth');
+                window._fbAuthUser = authUser;
+                const [rlResult, lpResult] = await Promise.allSettled([
+                    db.collection('reflective_logs').add({
+                        userId,
+                        displayName: userProfile.displayName,
+                        pictureUrl: userProfile.pictureUrl || '',
+                        content, mood,
+                        learningTools: [...(window.rlSelectedTools || [])],
+                        clientSubmittedAt: Date.now(),
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        status: 'pending', autoScore: 0.1
+                    }),
+                    db.collection('learning_path_entries').add(
+                        _lpBuildEntry(lpTitle || content.split('\n')[0].slice(0, 80), content, window._lpInlineTags)
+                    )
+                ]);
+                // Score + checkin (best-effort)
+                try {
+                    await db.collection('users').doc(userId).update({ score: firebase.firestore.FieldValue.increment(0.1) });
+                    await db.collection('checkin_logs').add({ userId, type: 'reflective_log', amount: 0.1, note: 'Daily Reflective Log', timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+                } catch (_) {}
+                // Reset form
+                document.getElementById('rl-content').value = '';
+                updateCharCount();
+                window.rlSelectedTools = new Set();
+                renderSelectedTools();
+                document.querySelectorAll('#rl-tool-tags .tool-tag-btn').forEach(b => b.classList.remove('selected'));
+                document.getElementById('lp-inline-title').value = '';
+                window._lpInlineTags = [];
+                renderLpTags('inline');
+                toggleLpQuickSave(); // collapse toggle
+                const historyArea = document.getElementById('rl-history-area');
+                if (historyArea) historyArea.style.display = 'block';
+                showFloatingPoints(bothBtn);
+                const lpOk = lpResult.status === 'fulfilled';
+                if (typeof showToast === 'function') showToast(lpOk ? '✨ บันทึกสำเร็จ! +0.1 pts + 🎓 LP' : '✨ บันทึกสำเร็จ! +0.1 pts (LP save failed)');
+                else alert(lpOk ? '✨ บันทึกสำเร็จ! และบันทึก Learning Note แล้วครับ' : '✨ บันทึก Daily Reflection สำเร็จ แต่ LP save ล้มเหลว');
+            } catch (e) {
+                console.error(e);
+                alert('Error: ' + e.message);
+            } finally {
+                bothBtn.disabled = false;
+                bothBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Submit + LP';
+            }
         }
 
         // V94.01: Learning Tools state
