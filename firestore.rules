@@ -156,6 +156,20 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // 23. Learning Path Entries (PONEGLYPH learning path system)
+    match /learning_path_entries/{docId} {
+      allow read: if isAdmin() || hasAuthLinkToUserId(resource.data.userId) || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isAdmin() || (isSignedIn() && (request.resource.data.userId == request.auth.uid || hasAuthLinkToUserId(request.resource.data.userId)));
+      allow update, delete: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || hasAuthLinkToUserId(resource.data.userId)));
+    }
+
+    // 24. Learning Paths (AI-generated paths)
+    match /learning_paths/{docId} {
+      allow read: if isAdmin() || hasAuthLinkToUserId(resource.data.userId) || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isAdmin() || (isSignedIn() && (request.resource.data.userId == request.auth.uid || hasAuthLinkToUserId(request.resource.data.userId)));
+      allow update, delete: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || hasAuthLinkToUserId(resource.data.userId)));
+    }
+
     // 21. Auth link registry for legacy data migration
     match /user_auth_links/{authUid} {
       allow read: if isAdmin() || (isSignedIn() && authUid == request.auth.uid);
