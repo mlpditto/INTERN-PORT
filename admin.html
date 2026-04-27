@@ -8064,17 +8064,18 @@
                 <div style="background:#fefce8; border:1px solid #fde68a; border-radius:12px; padding:14px; margin-bottom:18px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
                         <span style="font-weight:800; font-size:0.9em; color:#78350f;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Insight</span>
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <select id="ai-model-selector" style="font-size:0.78em; font-weight:700; padding:4px 8px; border-radius:8px; border:1px solid #fde68a; background:white; color:#78350f; cursor:pointer;">
-                                <option value="gpt-4o-mini">GPT-4o mini</option>
-                                <option value="gpt-4o">GPT-4o</option>
-                                <option value="typhoon-v2.5-30b-a3b-instruct">🌀 Typhoon</option>
-                                <option value="claude-4-sonnet-latest">Claude</option>
-                            </select>
+                        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                            <div id="qfp-model-pills" style="display:flex; gap:4px; flex-wrap:wrap;">
+                                <button onclick="selectQfpModel(this,'gpt-4o-mini')" data-model="gpt-4o-mini" style="padding:3px 10px; border-radius:20px; border:1.5px solid #f59e0b; background:#f59e0b; color:white; font-size:0.72em; font-weight:800; cursor:pointer; transition:0.2s;">GPT-4o mini</button>
+                                <button onclick="selectQfpModel(this,'gpt-4o')" data-model="gpt-4o" style="padding:3px 10px; border-radius:20px; border:1.5px solid #fde68a; background:transparent; color:#92400e; font-size:0.72em; font-weight:800; cursor:pointer; transition:0.2s;">GPT-4o</button>
+                                <button onclick="selectQfpModel(this,'typhoon-v2.5-30b-a3b-instruct')" data-model="typhoon-v2.5-30b-a3b-instruct" style="padding:3px 10px; border-radius:20px; border:1.5px solid #fde68a; background:transparent; color:#92400e; font-size:0.72em; font-weight:800; cursor:pointer; transition:0.2s;">🌀 Typhoon</button>
+                                <button onclick="selectQfpModel(this,'claude-4-sonnet-latest')" data-model="claude-4-sonnet-latest" style="padding:3px 10px; border-radius:20px; border:1.5px solid #fde68a; background:transparent; color:#92400e; font-size:0.72em; font-weight:800; cursor:pointer; transition:0.2s;">Claude</button>
+                            </div>
+                            <input type="hidden" id="ai-model-selector" value="gpt-4o-mini">
                             <button id="qfp-ai-btn" onclick="generateAIFeedbackInsight()" style="background:linear-gradient(135deg,#f59e0b,#d97706); color:white; border:none; border-radius:10px; padding:6px 16px; font-weight:800; font-size:0.8em; cursor:pointer;">✨ Generate</button>
                         </div>
                     </div>
-                    <div id="qfp-ai-result" style="font-size:0.88em; color:#78350f; line-height:1.6; min-height:30px; white-space:pre-wrap;"></div>
+                    <div id="qfp-ai-result" style="font-size:0.88em; color:#78350f; line-height:1.6; white-space:pre-wrap;"></div>
                 </div>
 
                 <!-- Comments Feed -->
@@ -26197,7 +26198,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                             </span>
                             <div style="display:flex; gap:6px; align-items:center;">
                                 <button id="qfp-ai-btn-${f.id}" class="btn-sm" onclick="runAIFeedbackScoring('${f.id}')" ${!rawComment ? 'disabled title="No feedback text to score"' : ''} style="background:${rawComment ? '#1d4ed8' : '#94a3b8'}; color:white; border:none; border-radius:8px; padding:5px 10px; ${!rawComment ? 'cursor:not-allowed; opacity:0.6;' : ''}">
-                                    🤖 AI Score
+                                    🗡️ Score
                                 </button>
                                 <button class="btn-sm" onclick="deleteQuizFeedbackItem('${f.id}')" style="background:#dc2626; color:white; border:none; border-radius:8px; padding:5px 10px;">
                                     <i class="fa-solid fa-trash"></i> Delete
@@ -26205,7 +26206,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                             </div>
                         </div>
                         <div id="qfp-ai-review-${f.id}" style="margin-top:8px; font-size:0.8em; color:#334155; background:#eef2ff; border:1px solid #c7d2fe; border-radius:8px; padding:8px 10px; line-height:1.5;">
-                            <div><b>AI Score:</b> ${aiScoreText}</div>
+                            <div><b>🗡️</b> ${aiScoreText}</div>
                             ${aiIssue ? `<div><b>Issue:</b> ${aiIssue}</div>` : ''}
                             ${aiSuggestion ? `<div><b>Suggestion:</b> ${aiSuggestion}</div>` : ''}
                         </div>
@@ -26238,25 +26239,25 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             }
-            if (reviewEl) reviewEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> AI กำลังประเมินคุณภาพ feedback...';
+            if (reviewEl) reviewEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Scoring...';
 
             const model = document.getElementById('ai-model-selector') ? document.getElementById('ai-model-selector').value : 'gpt-4o-mini';
-            const prompt = `คุณเป็นผู้ช่วย admin ประเมินคุณภาพ feedback ของผู้เรียน
-ให้คะแนน feedback แบบเข้มข้นจาก 0-10 โดยพิจารณา 4 ด้าน:
-1) ชัดเจนและเจาะจง
-2) มีคำแนะนำที่นำไปปรับปรุงข้อสอบได้จริง
-3) สะท้อนประสบการณ์ผู้เรียนอย่างเป็นรูปธรรม
-4) สุภาพและสร้างสรรค์
+            const prompt = `You are an admin assistant evaluating the quality of a learner's quiz feedback.
+Score the feedback strictly from 0-10 based on 4 criteria:
+1) Clarity and specificity
+2) Actionable suggestions for improving the quiz
+3) Concrete reflection of the learning experience
+4) Respectful and constructive tone
 
-ข้อมูล feedback:
-- rating เดิมของผู้เรียน: ${item.rating ?? 'N/A'}/10
-- ความยาวข้อความ: ${comment.length} ตัวอักษร
-- หัวข้อที่อยากทำต่อ: ${(item.nextTopic || 'ไม่มี').toString()}
-- ข้อความ feedback:
+Feedback data:
+- Learner rating: ${item.rating ?? 'N/A'}/10
+- Text length: ${comment.length} characters
+- Requested next topic: ${(item.nextTopic || 'none').toString()}
+- Feedback text:
 ${comment}
 
-ตอบกลับเป็น JSON เท่านั้น ห้ามมี markdown ตามรูปแบบนี้:
-{"score": 0-10, "issue": "จุดอ่อนหลักสั้นๆ", "suggestion": "คำแนะนำเชิงปฏิบัติสำหรับผู้เรียน"}`;
+Reply ONLY with raw JSON, no markdown:
+{"score": 0-10, "issue": "brief main weakness in English", "suggestion": "short actionable suggestion in English"}`;
 
             try {
                 const raw = await qfpCallAI(model, prompt);
@@ -26336,6 +26337,16 @@ ${comment}
                 alert('Failed to delete: ' + e.message);
             }
         }
+
+        window.selectQfpModel = function(btn, model) {
+            document.getElementById('ai-model-selector').value = model;
+            document.querySelectorAll('#qfp-model-pills button').forEach(b => {
+                b.style.background = 'transparent';
+                b.style.color = '#92400e';
+            });
+            btn.style.background = '#f59e0b';
+            btn.style.color = 'white';
+        };
 
         async function generateAIFeedbackInsight() {
             if (!_qfpFeedbacks.length) return;
