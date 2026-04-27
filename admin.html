@@ -26095,10 +26095,20 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             }
 
             if (!_qfpFeedbacks.length) {
-                document.getElementById('qfp-comments').innerHTML = `<p style="text-align:center;color:#94a3b8;padding:20px;">ยังไม่มี feedback สำหรับชุดข้อสอบนี้</p>`;
+                document.getElementById('qfp-comments').innerHTML = `<p style="text-align:center;color:#94a3b8;padding:20px;">No feedback for this quiz yet.</p>`;
                 document.getElementById('qfp-summary').innerHTML = `<span style="color:#94a3b8;font-size:0.85em;">No data yet.</span>`;
                 return;
             }
+
+            // Batch load quiz attempts for result display
+            window._qfpAttempts = {};
+            try {
+                const attSnap = await db.collection('quiz_attempts').where('quizId', '==', quizId).get();
+                attSnap.docs.forEach(d => {
+                    const data = d.data();
+                    if (data.userId) window._qfpAttempts[data.userId] = { id: d.id, ...data };
+                });
+            } catch (e) { /* optional — quiz result row simply won't show */ }
 
             // Compute summary
             const ratings = _qfpFeedbacks.map(f => f.rating).filter(r => typeof r === 'number');
@@ -26145,11 +26155,29 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 const safeComment = qfpEscapeHtml(rawComment);
                 const commentLength = rawComment.length;
                 const meetsMin = commentLength >= 100;
-                const aiScoreText = typeof f.aiFeedbackScore === 'number' ? `${f.aiFeedbackScore.toFixed(1)}/10` : 'ยังไม่ประเมิน';
+                const aiScoreText = typeof f.aiFeedbackScore === 'number' ? `${f.aiFeedbackScore.toFixed(1)}/10` : 'Not scored';
                 const aiIssue = qfpEscapeHtml(f.aiFeedbackIssue || '');
                 const aiSuggestion = qfpEscapeHtml(f.aiFeedbackSuggestion || '');
                 const adminScoreValue = typeof f.adminExtraScore === 'number' ? f.adminExtraScore : '';
                 const adminNoteValue = qfpEscapeHtml(f.adminScoreNote || '');
+                const att = (window._qfpAttempts || {})[f.userId];
+                let quizResultHtml = '';
+                if (att && att.status === 'approved' && typeof att.correctCount === 'number') {
+                    const correct = att.correctCount;
+                    const total = att.totalQuestions || 0;
+                    const pct = total > 0 ? Math.round(correct / total * 100) : null;
+                    const pts = typeof att.pointsEarned === 'number' ? parseFloat(att.pointsEarned).toFixed(1) : null;
+                    const resultText = [
+                        `${correct}/${total}`,
+                        pct !== null ? `${pct}%` : null,
+                        pts !== null ? `+${pts} pts` : null
+                    ].filter(Boolean).join(' · ');
+                    quizResultHtml = `<div style="margin-bottom:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <span style="font-size:0.75em; font-weight:700; color:#475569; white-space:nowrap;">📊 Quiz Result</span>
+                        <span id="qfp-res-${f.id}" onclick="this.style.filter='none'; this.nextElementSibling.style.display='none';" style="filter:blur(5px); cursor:pointer; font-size:0.82em; font-weight:800; color:#1e293b; background:#f1f5f9; padding:2px 10px; border-radius:6px; user-select:none; transition:filter 0.3s;" title="Click to reveal">${resultText}</span>
+                        <span onclick="document.getElementById('qfp-res-${f.id}').style.filter='none'; this.style.display='none';" style="font-size:0.7em; color:#94a3b8; cursor:pointer; white-space:nowrap;">🔒 reveal</span>
+                    </div>`;
+                }
                 return `
                     <div style="background:white;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;">
                         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
@@ -26160,15 +26188,16 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                             </div>
                             <div style="font-size:0.75em;color:#94a3b8;">${dateStr} · ⏱ ${mins}:${String(secs).padStart(2,'0')}</div>
                         </div>
-                        ${f.nextTopic ? `<div style="margin-bottom:6px;"><span style="font-size:0.75em;font-weight:700;color:#7c3aed;">🎯 อยากทำต่อ:</span> <span style="font-size:0.82em;color:#6d28d9;">${f.nextTopic}</span></div>` : ''}
+                        ${quizResultHtml}
+                        ${f.nextTopic ? `<div style="margin-bottom:6px;"><span style="font-size:0.75em;font-weight:700;color:#7c3aed;">🎯 Next Topic:</span> <span style="font-size:0.82em;color:#6d28d9;">${f.nextTopic}</span></div>` : ''}
                         ${rawComment ? `<div style="font-size:0.85em;color:#475569;background:#f8fafc;padding:8px 12px;border-radius:8px;border-left:3px solid #cbd5e1; white-space:pre-wrap;">${safeComment}</div>` : ''}
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap;">
                             <span style="font-size:0.76em; font-weight:700; color:${meetsMin ? '#166534' : '#b45309'}; background:${meetsMin ? '#dcfce7' : '#ffedd5'}; border:1px solid ${meetsMin ? '#86efac' : '#fdba74'}; border-radius:999px; padding:3px 10px;">
-                                ความยาว Feedback: ${commentLength} ตัวอักษร ${meetsMin ? 'ผ่านเกณฑ์' : 'ต่ำกว่าเกณฑ์ 100'}
+                                Feedback Length: ${commentLength} chars · ${meetsMin ? 'Meets minimum' : 'Below 100'}
                             </span>
                             <div style="display:flex; gap:6px; align-items:center;">
-                                <button id="qfp-ai-btn-${f.id}" class="btn-sm" onclick="runAIFeedbackScoring('${f.id}')" ${!rawComment ? 'disabled title="ไม่มีข้อความ feedback ให้ AI ประเมิน"' : ''} style="background:${rawComment ? '#1d4ed8' : '#94a3b8'}; color:white; border:none; border-radius:8px; padding:5px 10px; ${!rawComment ? 'cursor:not-allowed; opacity:0.6;' : ''}">
-                                    🤖 AI ช่วยให้คะแนน
+                                <button id="qfp-ai-btn-${f.id}" class="btn-sm" onclick="runAIFeedbackScoring('${f.id}')" ${!rawComment ? 'disabled title="No feedback text to score"' : ''} style="background:${rawComment ? '#1d4ed8' : '#94a3b8'}; color:white; border:none; border-radius:8px; padding:5px 10px; ${!rawComment ? 'cursor:not-allowed; opacity:0.6;' : ''}">
+                                    🤖 AI Score
                                 </button>
                                 <button class="btn-sm" onclick="deleteQuizFeedbackItem('${f.id}')" style="background:#dc2626; color:white; border:none; border-radius:8px; padding:5px 10px;">
                                     <i class="fa-solid fa-trash"></i> Delete
@@ -26181,11 +26210,11 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                             ${aiSuggestion ? `<div><b>Suggestion:</b> ${aiSuggestion}</div>` : ''}
                         </div>
                         <div style="margin-top:10px; padding:10px; border:1px dashed #cbd5e1; border-radius:8px; background:#f8fafc;">
-                            <div style="font-size:0.78em; font-weight:800; color:#334155; margin-bottom:8px;">คะแนนเพิ่มเติมโดย Admin (ให้ย้อนหลังได้)</div>
+                            <div style="font-size:0.78em; font-weight:800; color:#334155; margin-bottom:8px;">Bonus Score by Admin (retroactive)</div>
                             <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                                 <input id="qfp-admin-score-${f.id}" type="number" min="0" max="10" step="0.5" value="${adminScoreValue}" placeholder="0-10" style="width:90px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">
-                                <input id="qfp-admin-note-${f.id}" type="text" value="${adminNoteValue}" placeholder="เหตุผล/หมายเหตุ" style="flex:1; min-width:180px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">
-                                <button class="btn-sm" onclick="saveAdminFeedbackScore('${f.id}')" style="background:#0f766e; color:white; border:none; border-radius:8px; padding:6px 12px;">บันทึกคะแนนเพิ่ม</button>
+                                <input id="qfp-admin-note-${f.id}" type="text" value="${adminNoteValue}" placeholder="Reason / note" style="flex:1; min-width:180px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">
+                                <button class="btn-sm" onclick="saveAdminFeedbackScore('${f.id}')" style="background:#0f766e; color:white; border:none; border-radius:8px; padding:6px 12px;">Save Bonus</button>
                             </div>
                         </div>
                     </div>`;
@@ -26198,7 +26227,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
             const comment = (item.comment || '').trim();
             if (!comment) {
-                alert('Feedback นี้ไม่มีข้อความให้ AI ประเมิน');
+                alert('No feedback text to score');
                 return;
             }
 
@@ -26252,9 +26281,9 @@ ${comment}
                 if (reviewEl) {
                     reviewEl.innerHTML = `<div><b>AI Score:</b> ${score.toFixed(1)}/10</div>${issue ? `<div><b>Issue:</b> ${qfpEscapeHtml(issue)}</div>` : ''}${suggestion ? `<div><b>Suggestion:</b> ${qfpEscapeHtml(suggestion)}</div>` : ''}`;
                 }
-                showToast('AI ประเมิน feedback เรียบร้อยแล้ว');
+                showToast('AI scoring complete');
             } catch (e) {
-                if (reviewEl) reviewEl.innerText = 'AI วิเคราะห์ไม่สำเร็จ: ' + e.message;
+                if (reviewEl) reviewEl.innerText = 'AI scoring failed: ' + e.message;
             } finally {
                 if (btn) {
                     btn.disabled = false;
@@ -26271,7 +26300,7 @@ ${comment}
             const score = Number(scoreEl.value);
             const note = (noteEl.value || '').trim();
             if (Number.isNaN(score) || score < 0 || score > 10) {
-                alert('กรุณาระบุคะแนนเพิ่มเติมระหว่าง 0 ถึง 10');
+                alert('Please enter a bonus score between 0 and 10');
                 return;
             }
 
@@ -26286,25 +26315,25 @@ ${comment}
                     item.adminExtraScore = score;
                     item.adminScoreNote = note;
                 }
-                showToast('บันทึกคะแนนเพิ่มเติมเรียบร้อย');
+                showToast('Bonus score saved');
             } catch (e) {
-                alert('บันทึกคะแนนไม่สำเร็จ: ' + e.message);
+                alert('Failed to save score: ' + e.message);
             }
         }
 
         async function deleteQuizFeedbackItem(feedbackId) {
             if (!feedbackId) return;
-            if (!confirm('ยืนยันการลบ feedback รายการนี้? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
+            if (!confirm('Delete this feedback entry? This cannot be undone.')) return;
 
             try {
                 await db.collection('quiz_feedback').doc(feedbackId).delete();
                 _qfpFeedbacks = _qfpFeedbacks.filter(x => x.id !== feedbackId);
-                showToast('ลบ feedback เรียบร้อยแล้ว');
+                showToast('Feedback deleted');
                 if (_qfpCurrentId) {
                     await showQuizFeedbackPanel(_qfpCurrentId);
                 }
             } catch (e) {
-                alert('ลบ feedback ไม่สำเร็จ: ' + e.message);
+                alert('Failed to delete: ' + e.message);
             }
         }
 
@@ -26315,7 +26344,7 @@ ${comment}
             const oldText = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-            resultEl.innerText = 'กำลังวิเคราะห์...';
+            resultEl.innerText = 'Analyzing...';
 
             const quiz = quizzesData.find(x => x.id === _qfpCurrentId);
             const ratings = _qfpFeedbacks.map(f => f.rating).filter(r => typeof r === 'number');
@@ -26338,7 +26367,7 @@ ${comment}
             try {
                 const model = document.getElementById('ai-model-selector') ? document.getElementById('ai-model-selector').value : 'gpt-4o-mini';
                 const { text } = await window.callUniversalAI(model, prompt);
-                resultEl.innerText = text || '(ไม่มีคำตอบ)';
+                resultEl.innerText = text || '(No response)';
             } catch (e) {
                 resultEl.innerText = 'Error: ' + e.message;
             } finally {
