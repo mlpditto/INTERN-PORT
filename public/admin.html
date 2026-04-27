@@ -24907,90 +24907,51 @@ Recommended Review: X days`;
                     [due, 'Due Reviews', '#dc2626']
                 ].map(([v, l, c]) => `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px;text-align:center;"><div style="font-size:1.3em;font-weight:900;color:${c};">${v}</div><div style="font-size:0.7em;color:#64748b;font-weight:700;">${l}</div></div>`).join('');
 
-                const getWeekKey = dateStr => {
-                    const d = new Date(dateStr + 'T00:00:00');
-                    return d.getFullYear() + '-' + String(lpGetISOWeek(d)).padStart(2, '0');
-                };
-                const lpByWeek = {};
+                // Build chronological event list for pin timeline
+                const tlEvents = [];
                 entries.forEach(e => {
                     if (!e.date) return;
-                    const k = getWeekKey(e.date);
-                    if (!lpByWeek[k]) lpByWeek[k] = [];
-                    lpByWeek[k].push(e.title || 'Untitled');
+                    tlEvents.push({ type: 'lp', ts: new Date(e.date + 'T00:00:00').getTime(), dateStr: e.date, label: e.title || 'Untitled', color: '#1d4ed8' });
                 });
-                const quizByWeek = {};
                 quizzes.forEach(q => {
                     const ts = q.timestamp && q.timestamp.toDate ? q.timestamp.toDate() : null;
                     if (!ts) return;
-                    const dateStr = ts.toISOString().split('T')[0];
-                    const k = getWeekKey(dateStr);
-                    if (!quizByWeek[k]) quizByWeek[k] = [];
-                    quizByWeek[k].push(q.quizTitle || q.title || 'Quiz');
+                    tlEvents.push({ type: 'quiz', ts: ts.getTime(), dateStr: ts.toISOString().split('T')[0], label: q.quizTitle || q.title || 'Quiz', score: q.correctCount ?? null, total: q.totalQuestions ?? null, color: '#7c3aed' });
                 });
+                tlEvents.sort((a, b) => a.ts - b.ts);
+                window._lp.timelineEvents = tlEvents;
 
-                const allDates = [
-                    ...entries.map(e => e.date),
-                    ...quizzes.map(q => { const ts = q.timestamp?.toDate?.(); return ts ? ts.toISOString().split('T')[0] : null; })
-                ].filter(Boolean).sort();
-
-                if (!allDates.length) {
+                if (!tlEvents.length) {
                     if (timelineEl) timelineEl.innerHTML = '<div style="padding:16px; text-align:center; color:#94a3b8; font-size:0.85em;">No activity yet.</div>';
                 } else {
-                    const start = new Date(allDates[0] + 'T00:00:00');
-                    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-                    const now = new Date();
-                    const nowKey = now.getFullYear() + '-' + String(lpGetISOWeek(now)).padStart(2, '0');
-                    const weeks = [];
-                    let cur = new Date(start);
-                    while (cur <= now) {
-                        const wk = lpGetISOWeek(cur);
-                        const yr = cur.getFullYear();
-                        const key = yr + '-' + String(wk).padStart(2, '0');
-                        weeks.push({ key, wk, label: 'W' + wk, monthDay: cur.toLocaleDateString('en', { month: 'short', day: 'numeric' }), date: new Date(cur) });
-                        cur.setDate(cur.getDate() + 7);
-                    }
+                    const tMin = tlEvents[0].ts;
+                    const tMax = Date.now();
+                    const tRange = Math.max(tMax - tMin, 1);
+                    const startLabel = new Date(tMin).toLocaleDateString('en', { month: 'short', day: 'numeric', year: '2-digit' });
 
-                    const CELL = 32;
-                    const rows = [
-                        { label: '📓 Learning', byWeek: lpByWeek, base: '#1d4ed8', light: '#dbeafe' },
-                        { label: '📝 Quiz',     byWeek: quizByWeek, base: '#7c3aed', light: '#ede9fe' },
-                    ];
-
-                    let lastMonth = -1;
-                    const headerCells = weeks.map(w => {
-                        const mo = w.date.getMonth();
-                        const showLabel = mo !== lastMonth;
-                        if (showLabel) lastMonth = mo;
-                        const isCur = w.key === nowKey;
-                        return `<th style="min-width:${CELL}px;width:${CELL}px;padding:1px;text-align:center;font-size:0.6em;color:${isCur?'#1d4ed8':'#94a3b8'};font-weight:${isCur?900:600};border-bottom:${isCur?'2px solid #1d4ed8':'none'};white-space:nowrap;">${showLabel ? w.monthDay : w.label}</th>`;
-                    }).join('');
-
-                    const bodyRows = rows.map(row => {
-                        const cells = weeks.map(w => {
-                            const items = row.byWeek[w.key] || [];
-                            const n = items.length;
-                            const isCur = w.key === nowKey;
-                            const bg = n === 0 ? (isCur ? '#eff6ff' : '#f8fafc') : n === 1 ? row.light : row.base;
-                            const fg = n >= 2 ? '#fff' : n === 1 ? row.base : '#e2e8f0';
-                            const tip = items.join(', ');
-                            return `<td style="min-width:${CELL}px;width:${CELL}px;padding:2px 1px;" title="${tip}"><div style="width:26px;height:26px;border-radius:6px;background:${bg};margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:0.7em;font-weight:900;color:${fg};border:${isCur?'1px solid #93c5fd':'none'};">${n||''}</div></td>`;
-                        }).join('');
-                        return `<tr><td style="white-space:nowrap;font-size:0.75em;color:#64748b;font-weight:700;padding:3px 8px 3px 0;min-width:96px;">${row.label}</td>${cells}</tr>`;
+                    const pinsHtml = tlEvents.map((e, i) => {
+                        const pct = ((e.ts - tMin) / tRange) * 88 + 4;
+                        return `<button onclick="lpPinClick(this,${i})" style="position:absolute;left:${pct.toFixed(2)}%;top:50%;transform:translate(-50%,-50%);width:14px;height:14px;border-radius:50%;background:${e.color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);cursor:pointer;padding:0;transition:transform 0.12s,box-shadow 0.12s;z-index:2;" onmouseover="this.style.transform='translate(-50%,-50%) scale(1.6)';this.style.zIndex=10" onmouseout="this.style.transform='translate(-50%,-50%) scale(1)';this.style.zIndex=2"></button>`;
                     }).join('');
 
                     if (timelineEl) timelineEl.innerHTML = `
-                        <div style="font-size:0.7em;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Activity Timeline · ${weeks.length} weeks</div>
-                        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-                            <table style="border-collapse:collapse;table-layout:fixed;">
-                                <thead><tr><th style="min-width:96px;"></th>${headerCells}</tr></thead>
-                                <tbody>${bodyRows}</tbody>
-                            </table>
-                        </div>`;
-
-                    setTimeout(() => {
-                        const scrollEl = timelineEl && timelineEl.querySelector('div[style*="overflow-x"]');
-                        if (scrollEl) scrollEl.scrollLeft = scrollEl.scrollWidth;
-                    }, 50);
+                        <div style="font-size:0.7em;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;display:flex;align-items:center;gap:10px;">
+                            Activity Timeline · ${tlEvents.length} events
+                            <span style="font-weight:500;font-size:0.95em;">
+                                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#1d4ed8;margin-right:3px;vertical-align:middle;"></span>Learning
+                                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#7c3aed;margin:0 3px 0 8px;vertical-align:middle;"></span>Quiz
+                            </span>
+                        </div>
+                        <div style="position:relative;height:28px;margin:0 8px 6px;">
+                            <div style="position:absolute;left:0;right:0;top:50%;height:3px;background:linear-gradient(to right,#dbeafe,#e2e8f0);border-radius:2px;transform:translateY(-50%);"></div>
+                            <div style="position:absolute;left:0;top:50%;transform:translate(-50%,-50%);width:10px;height:10px;background:#16a34a;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);z-index:3;"></div>
+                            <div style="position:absolute;right:0;top:50%;transform:translate(50%,-50%);width:8px;height:8px;background:#94a3b8;border-radius:50%;border:2px solid #fff;z-index:3;"></div>
+                            ${pinsHtml}
+                        </div>
+                        <div style="display:flex;justify-content:space-between;font-size:0.65em;color:#94a3b8;margin:0 8px 10px;">
+                            <span>🏁 ${startLabel}</span><span>Today</span>
+                        </div>
+                        <div id="lp-pin-detail" style="display:none;margin-top:4px;"></div>`;
                 }
 
                 if (feedSection) feedSection.style.display = 'block';
@@ -25021,6 +24982,39 @@ Recommended Review: X days`;
 
                 if (detail) detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } catch(e) { console.error('lpSelectIntern', e); if (timelineEl) timelineEl.innerHTML = '<div style="color:#dc2626;font-size:0.82em;padding:8px;">Failed to load.</div>'; }
+        };
+
+        window.lpPinClick = function(btn, idx) {
+            const timelineEl = document.getElementById('lp-intern-timeline');
+            const detailEl = document.getElementById('lp-pin-detail');
+            if (!timelineEl || !detailEl) return;
+            const events = window._lp.timelineEvents || [];
+            const e = events[idx];
+            if (!e) return;
+            if (detailEl.dataset.active === String(idx) && detailEl.style.display !== 'none') {
+                detailEl.style.display = 'none';
+                detailEl.dataset.active = '';
+                document.querySelectorAll('#lp-intern-timeline button').forEach(b => { b.style.outline = 'none'; });
+                return;
+            }
+            document.querySelectorAll('#lp-intern-timeline button').forEach(b => { b.style.outline = 'none'; });
+            btn.style.outline = `2px solid ${e.color}`;
+            btn.style.outlineOffset = '3px';
+            detailEl.dataset.active = String(idx);
+            detailEl.style.display = 'block';
+            const icon = e.type === 'quiz' ? '📝' : '📓';
+            const scoreHtml = e.type === 'quiz' && e.score != null && e.total != null
+                ? `<span style="background:#ede9fe;color:#7c3aed;border-radius:5px;padding:1px 7px;font-size:0.75em;font-weight:700;margin-left:6px;">${e.score}/${e.total}</span>`
+                : '';
+            const typeLabel = e.type === 'quiz' ? 'Quiz' : 'LP Entry';
+            detailEl.innerHTML = `<div style="background:${e.color}0d;border-left:3px solid ${e.color};border-radius:0 10px 10px 0;padding:10px 14px;display:flex;gap:10px;align-items:flex-start;">
+                <div style="font-size:1.1em;line-height:1;margin-top:1px;">${icon}</div>
+                <div>
+                    <div style="font-size:0.7em;font-weight:700;color:${e.color};text-transform:uppercase;letter-spacing:0.4px;margin-bottom:2px;">${typeLabel}</div>
+                    <div style="font-weight:800;font-size:0.9em;color:#0f172a;">${e.label}</div>
+                    <div style="font-size:0.75em;color:#64748b;margin-top:3px;">${e.dateStr}${scoreHtml}</div>
+                </div>
+            </div>`;
         };
 
         window.loadInternPath = function() {};
