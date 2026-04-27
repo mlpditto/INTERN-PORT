@@ -6988,7 +6988,7 @@
                     </div>
                     <div style="display:flex; background:#f1f5f9; border-radius:12px; padding:3px; gap:3px;">
                         <button id="lp-btn-my" onclick="lpSetView('my')" style="padding:7px 16px; border:none; border-radius:10px; font-size:0.85em; font-weight:700; background:#1d4ed8; color:#fff; cursor:pointer;">My Path</button>
-                        <button id="lp-btn-interns" onclick="lpSetView('interns')" style="padding:7px 16px; border:none; border-radius:10px; font-size:0.85em; font-weight:700; background:transparent; color:#64748b; cursor:pointer;">ครู</button>
+                        <button id="lp-btn-interns" onclick="lpSetView('interns')" style="padding:7px 16px; border:none; border-radius:10px; font-size:0.85em; font-weight:700; background:transparent; color:#64748b; cursor:pointer;">kro͞o</button>
                     </div>
                 </div>
 
@@ -7095,7 +7095,9 @@
                 <div id="lp-monitor-panel" style="display:none; margin-top:16px; background:#fff; border:1px solid var(--border-color); border-radius:16px; padding:14px; box-shadow:0 8px 20px rgba(15,23,42,0.05);">
                     <div style="font-weight:800; color:#1e1b4b; font-size:0.95em; margin-bottom:12px;">📊 Monitor: Intern Learning Paths</div>
                     <!-- Group tabs -->
-                    <div id="lp-monitor-group-tabs" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; border-bottom:1px solid #f1f5f9; padding-bottom:12px;"></div>
+                    <div id="lp-monitor-group-tabs" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; border-bottom:1px solid #f1f5f9; padding-bottom:10px;"></div>
+                    <!-- Phase tabs (populated after badge data loads) -->
+                    <div id="lp-monitor-phase-tabs" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px;"></div>
                     <!-- Intern cards -->
                     <div id="lp-monitor-intern-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; margin-bottom:4px;"></div>
                     <!-- Selected intern detail (hidden until a card is clicked) -->
@@ -24393,7 +24395,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // 🧭 LEARNING PATH (PONEGLYPH redesign) — [Version: V91.00]
         // ═══════════════════════════════════════════════════════════════════
 
-        window._lp = { entries: [], current: null, view: 'my', timeline: 'week', ownerId: null, activePath: null, internList: [] };
+        window._lp = { entries: [], current: null, view: 'my', timeline: 'week', ownerId: null, activePath: null, internList: [], internBadgeData: {}, monitorGroup: 'All', phaseFilter: 'all' };
 
         function lpGetISOWeek(date) {
             const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -24483,8 +24485,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 ? usersData.filter(u => !u.isIgnored)
                 : await db.collection('users').get().then(s => s.docs.map(d => ({ id: d.id, ...d.data() }))).catch(() => []);
             window._lp.internList = users;
+            window._lp.internBadgeData = {};
             window._lp.monitorGroup = 'All';
+            window._lp.phaseFilter = 'all';
             lpRenderMonitorGroupTabs();
+            lpRenderPhaseTabs();
             lpRenderInternGrid('All');
         };
 
@@ -24503,19 +24508,62 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         window.lpSetMonitorGroup = function(group) {
             window._lp.monitorGroup = group;
+            window._lp.phaseFilter = 'all';
             lpRenderMonitorGroupTabs();
+            lpRenderPhaseTabs();
             lpRenderInternGrid(group);
             const det = document.getElementById('lp-monitor-intern-detail');
             if (det) det.style.display = 'none';
             document.querySelectorAll('.lp-intern-card').forEach(c => c.classList.remove('active'));
         };
 
+        window.lpGetInternPhase = function(uid) {
+            const d = window._lp.internBadgeData[uid];
+            if (!d) return 'unknown';
+            if (!d.count || !d.lastDate) return 'no-activity';
+            const days = Math.round((new Date() - new Date(d.lastDate)) / 86400000);
+            if (days <= 3) return 'active';
+            if (days <= 14) return 'at-risk';
+            return 'no-activity';
+        };
+
+        const LP_PHASES = [
+            { key: 'all',         label: 'All',           dot: '',   accent: '#1d4ed8', bg: '#eff6ff' },
+            { key: 'active',      label: 'Active',        dot: '🟢', accent: '#16a34a', bg: '#f0fdf4' },
+            { key: 'at-risk',     label: 'At Risk',       dot: '🟡', accent: '#ca8a04', bg: '#fefce8' },
+            { key: 'no-activity', label: 'No Activity',   dot: '🔴', accent: '#dc2626', bg: '#fef2f2' },
+        ];
+
+        window.lpRenderPhaseTabs = function() {
+            const tabsEl = document.getElementById('lp-monitor-phase-tabs');
+            if (!tabsEl) return;
+            const group = window._lp.monitorGroup || 'All';
+            const users = group === 'All' ? window._lp.internList : window._lp.internList.filter(u => (u.group || 'Public') === group);
+            const hasBadgeData = Object.keys(window._lp.internBadgeData).length > 0;
+            const current = window._lp.phaseFilter || 'all';
+            tabsEl.innerHTML = LP_PHASES.map(p => {
+                const count = p.key === 'all' ? users.length : (hasBadgeData ? users.filter(u => lpGetInternPhase(u.id) === p.key).length : '?');
+                const isActive = current === p.key;
+                return `<button onclick="lpSetPhaseFilter('${p.key}')" style="padding:5px 12px; border:1px solid ${isActive ? p.accent + '55' : '#e2e8f0'}; border-radius:16px; font-size:0.8em; font-weight:700; cursor:pointer; background:${isActive ? p.bg : '#f8fafc'}; color:${isActive ? p.accent : '#94a3b8'}; transition:all 0.15s;">
+                    ${p.dot ? p.dot + ' ' : ''}${p.label} <span style="opacity:0.7;">(${count})</span>
+                </button>`;
+            }).join('');
+        };
+
+        window.lpSetPhaseFilter = function(phase) {
+            window._lp.phaseFilter = phase;
+            lpRenderPhaseTabs();
+            lpRenderInternGrid(window._lp.monitorGroup || 'All');
+        };
+
         window.lpRenderInternGrid = function(group) {
             const grid = document.getElementById('lp-monitor-intern-grid');
             if (!grid) return;
-            const list = group === 'All'
-                ? window._lp.internList
-                : window._lp.internList.filter(u => (u.group || 'Public') === group);
+            let list = group === 'All' ? window._lp.internList : window._lp.internList.filter(u => (u.group || 'Public') === group);
+            const phase = window._lp.phaseFilter || 'all';
+            if (phase !== 'all' && Object.keys(window._lp.internBadgeData).length) {
+                list = list.filter(u => lpGetInternPhase(u.id) === phase);
+            }
             if (!list.length) {
                 grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#94a3b8; font-size:0.85em;">No interns in this group.</div>';
                 return;
@@ -24525,8 +24573,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
                 const hue = [...name].reduce((h, c) => h + c.charCodeAt(0), 0) % 360;
                 const grp = u.group || 'Public';
+                const phaseKey = lpGetInternPhase(u.id);
+                const phaseDot = { active: '🟢', 'at-risk': '🟡', 'no-activity': '🔴' }[phaseKey] || '';
                 return `<div class="lp-intern-card" onclick="lpSelectIntern('${u.id}', this)" style="background:#fafafa; border:1px solid #e2e8f0; border-radius:14px; padding:12px; text-align:center; cursor:pointer; transition:all 0.15s;" onmouseover="this.style.borderColor='#1d4ed8';this.style.background='#eff6ff'" onmouseout="if(!this.classList.contains('active')){this.style.borderColor='#e2e8f0';this.style.background='#fafafa'}">
-                    <div style="width:44px; height:44px; border-radius:50%; background:hsl(${hue},60%,55%); color:#fff; font-size:1em; font-weight:900; display:flex; align-items:center; justify-content:center; margin:0 auto 8px;">${initials}</div>
+                    <div style="position:relative; width:44px; height:44px; margin:0 auto 8px;">
+                        <div style="width:44px; height:44px; border-radius:50%; background:hsl(${hue},60%,55%); color:#fff; font-size:1em; font-weight:900; display:flex; align-items:center; justify-content:center;">${initials}</div>
+                        <span data-phase-dot style="position:absolute; bottom:-2px; right:-2px; font-size:0.85em; line-height:1;">${phaseDot}</span>
+                    </div>
                     <div style="font-size:0.85em; font-weight:700; color:#0f172a; line-height:1.3;">${name}</div>
                     <div style="font-size:0.73em; color:#94a3b8; margin-top:2px;">${grp}</div>
                     <div id="lp-card-badge-${u.id}" style="margin-top:6px; font-size:0.72em; color:#64748b;">...</div>
@@ -24541,12 +24594,21 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 try {
                     const snap = await db.collection('learning_path_entries').where('userId', '==', u.id).get();
                     const due = snap.docs.filter(d => { const nr = d.data().nextReviewDate; return nr && nr <= todayStr; }).length;
+                    const sorted = snap.docs.map(d => d.data().date || '').filter(Boolean).sort().reverse();
+                    const lastDate = sorted[0] || null;
+                    window._lp.internBadgeData[u.id] = { count: snap.size, due, lastDate };
                     const badge = document.getElementById('lp-card-badge-' + u.id);
                     if (badge) badge.innerHTML = snap.size === 0
                         ? `<span style="color:#cbd5e1;">No entries</span>`
                         : `<span style="color:#1d4ed8;">${snap.size} entries</span>${due ? ` · <span style="color:#dc2626;">${due} due</span>` : ''}`;
+                    // Update phase dot on card after data arrives
+                    const phaseKey = lpGetInternPhase(u.id);
+                    const phaseDot = { active: '🟢', 'at-risk': '🟡', 'no-activity': '🔴' }[phaseKey] || '';
+                    const dotEl = document.querySelector(`#lp-card-badge-${u.id}`)?.closest('.lp-intern-card')?.querySelector('[data-phase-dot]');
+                    if (dotEl) dotEl.textContent = phaseDot;
                 } catch(e) {}
             }));
+            lpRenderPhaseTabs();
         };
 
         window.computeLpStats = function() {
