@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.57</title>
+    <title>Nika V91.58</title>
     <!-- Release: 2026-04-28 15:00 UTC+7 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -3679,7 +3679,7 @@
                 <div style="display:flex; flex-direction:column; justify-content:center;">
                     <h1 style="margin:0; background:linear-gradient(135deg, #f59e0b, #ef4444); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:1.6em; display:flex; align-items:center; gap:12px; line-height:1.2; font-weight:900;">
                         ☀️ Nika
-                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.57</span>
+                        <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.58</span>
                     </h1>
                     <span id="admin-email" onclick="this.classList.toggle('revealed')" title="Click to reveal email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px; cursor:pointer; filter:blur(4px); transition:filter 0.2s;" class="">medlifeplus@gmail.com</span>
                     <style>#admin-email.revealed { filter:none; }</style>
@@ -13378,7 +13378,7 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
         }
 
         
-        // [V91.57] Generate next available shortTitle suffix (A→Z, fallback timestamp)
+        // [V91.58] Generate next available shortTitle suffix (A→Z, fallback timestamp)
         window.generateBulkExportShortTitle = function(baseShort) {
             const base = (baseShort || 'QUIZ').toString().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 20) || 'QUIZ';
             const used = new Set();
@@ -13391,7 +13391,7 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
             return `${base}-${Date.now().toString().slice(-4)}`;
         };
 
-        // [V91.57] Esc + backdrop modal close handler reference
+        // [V91.58] Esc + backdrop modal close handler reference
         window._bulkExportEscHandler = null;
         window.closeBulkExportModal = function() {
             if (window._bulkExportEscHandler) {
@@ -13412,15 +13412,33 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
             const defaultTitle = (oldTitle + ' · Split').replace(/"/g, '&quot;');
             const defaultShort = generateBulkExportShortTitle(oldShort).replace(/"/g, '&quot;');
 
-            const listHtml = questions.map((q, i) => `
-                <div style="display:flex; align-items:center; gap:10px; padding:10px; border-bottom:1px solid #334155; color:white; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
+            // [V91.58] HTML-escape helper for data attributes
+            const _bxEsc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+            // [V91.58] Count question types for filter chips
+            const _bxTypeCounts = {};
+            questions.forEach(q => { const t = q.type || 'choice'; _bxTypeCounts[t] = (_bxTypeCounts[t] || 0) + 1; });
+            const _bxTypeMeta = {
+                choice:       { icon: '🔘', label: 'Choice' },
+                ordering:     { icon: '📋', label: 'Ordering' },
+                flashcard:    { icon: '🎴', label: 'Flashcard' },
+                short_answer: { icon: '✍️', label: 'Short Answer' }
+            };
+            const typeChipsHtml = Object.keys(_bxTypeCounts).sort().map(t => {
+                const meta = _bxTypeMeta[t] || { icon: '❓', label: t };
+                return `<button class="bulk-type-chip" data-type="${t}" onclick="toggleBulkTypeChip(this)" style="background:#334155; color:#94a3b8; border:1px solid #475569; padding:5px 11px; border-radius:18px; font-size:0.74em; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:5px; transition:all 0.15s;">${meta.icon} ${meta.label} <span style="opacity:0.7;">(${_bxTypeCounts[t]})</span></button>`;
+            }).join('');
+
+            const listHtml = questions.map((q, i) => {
+                const qType = q.type || 'choice';
+                return `<div class="bulk-q-row" data-type="${qType}" data-text="${_bxEsc((q.q || '').toLowerCase())}" style="display:flex; align-items:center; gap:10px; padding:10px; border-bottom:1px solid #334155; color:white; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
                     <input type="checkbox" class="bulk-q-check" value="${i}" id="bulk-q-${i}" onchange="updateBulkSelectCounter()" style="width:20px; height:20px; cursor:pointer; accent-color:#4338ca;">
                     <label for="bulk-q-${i}" style="font-size:0.88em; flex:1; cursor:pointer;">
                         <span style="color:#94a3b8; font-weight:800; margin-right:8px;">Q${i+1}</span>
                         ${q.q.substring(0, 100)}${q.q.length > 100 ? '...' : ''}
                     </label>
-                </div>
-            `).join('');
+                </div>`;
+            }).join('');
 
             const modal = document.createElement('div');
             modal.id = 'bulk-export-modal';
@@ -13446,9 +13464,13 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                             </div>
                         </div>
                     </div>
-                    <div style="padding:15px 24px; border-bottom:1px solid #334155; display:flex; align-items:center; gap:10px; background:rgba(0,0,0,0.1);">
-                        <button class="btn-sm" onclick="document.querySelectorAll('.bulk-q-check').forEach(c=>c.checked=true); updateBulkSelectCounter();" style="background:#334155; color:white; border:none; padding:6px 14px; border-radius:8px; font-size:0.75em; font-weight:700; cursor:pointer;">Select All</button>
-                        <button class="btn-sm" onclick="document.querySelectorAll('.bulk-q-check').forEach(c=>c.checked=false); updateBulkSelectCounter();" style="background:#334155; color:white; border:none; padding:6px 14px; border-radius:8px; font-size:0.75em; font-weight:700; cursor:pointer;">Clear All</button>
+                    <div style="padding:12px 24px; border-bottom:1px solid #334155; background:rgba(0,0,0,0.05); display:flex; flex-direction:column; gap:8px;">
+                        <input type="text" id="bulk-search" placeholder="🔍 Search questions..." oninput="filterBulkExportList()" style="width:100%; padding:8px 12px; border-radius:10px; background:#0f172a; border:1px solid #475569; color:white; font-size:0.85em; box-sizing:border-box; outline:none;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#475569'">
+                        ${typeChipsHtml ? `<div style="display:flex; gap:6px; flex-wrap:wrap;">${typeChipsHtml}</div>` : ''}
+                    </div>
+                    <div style="padding:12px 24px; border-bottom:1px solid #334155; display:flex; align-items:center; gap:10px; background:rgba(0,0,0,0.1);">
+                        <button class="btn-sm" onclick="bulkSelectAllVisible()" title="Select all currently visible (filtered) questions" style="background:#334155; color:white; border:none; padding:6px 14px; border-radius:8px; font-size:0.75em; font-weight:700; cursor:pointer;">Select Visible</button>
+                        <button class="btn-sm" onclick="bulkClearAll()" style="background:#334155; color:white; border:none; padding:6px 14px; border-radius:8px; font-size:0.75em; font-weight:700; cursor:pointer;">Clear All</button>
                         <span id="bulk-selection-count" style="margin-left:auto; font-size:0.85em; color:#6366f1; font-weight:800; background:rgba(99,102,241,0.1); padding:4px 12px; border-radius:20px; border:1px solid rgba(99,102,241,0.2);">Selected: 0 / ${questions.length}</span>
                     </div>
                     <div style="padding:10px 14px; overflow-y:auto; flex:1; background:#0f172a;">
@@ -13469,7 +13491,7 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
             document.body.appendChild(modal);
             updateBulkSelectCounter();
 
-            // [V91.57] Esc + backdrop close
+            // [V91.58] Esc + backdrop close
             modal.addEventListener('click', (e) => { if (e.target === modal) closeBulkExportModal(); });
             window._bulkExportEscHandler = (e) => { if (e.key === 'Escape') closeBulkExportModal(); };
             document.addEventListener('keydown', window._bulkExportEscHandler);
@@ -13481,9 +13503,54 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
             const counter = document.getElementById('bulk-selection-count');
             if (counter) {
                 counter.innerText = `Selected: ${checked} / ${total}`;
-                // Optional: visual feedback if selection is non-zero
                 counter.style.background = checked > 0 ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.1)';
             }
+        };
+
+        // [V91.58] Filter list by search text + active type chips
+        window.filterBulkExportList = function() {
+            const searchEl = document.getElementById('bulk-search');
+            const search = searchEl ? searchEl.value.trim().toLowerCase() : '';
+            const activeTypes = Array.from(document.querySelectorAll('.bulk-type-chip.active')).map(c => c.dataset.type);
+            const rows = document.querySelectorAll('.bulk-q-row');
+            rows.forEach(row => {
+                const text = row.dataset.text || '';
+                const type = row.dataset.type || 'choice';
+                const matchSearch = !search || text.includes(search);
+                const matchType = activeTypes.length === 0 || activeTypes.includes(type);
+                row.style.display = (matchSearch && matchType) ? '' : 'none';
+            });
+        };
+
+        // [V91.58] Toggle a type filter chip on/off
+        window.toggleBulkTypeChip = function(chip) {
+            if (!chip) return;
+            const isActive = chip.classList.toggle('active');
+            if (isActive) {
+                chip.style.background = 'linear-gradient(135deg, #4f46e5, #4338ca)';
+                chip.style.color = 'white';
+                chip.style.borderColor = '#4338ca';
+            } else {
+                chip.style.background = '#334155';
+                chip.style.color = '#94a3b8';
+                chip.style.borderColor = '#475569';
+            }
+            filterBulkExportList();
+        };
+
+        // [V91.58] Select All visible (respects current filter)
+        window.bulkSelectAllVisible = function() {
+            document.querySelectorAll('.bulk-q-row').forEach(row => {
+                if (row.style.display === 'none') return;
+                const cb = row.querySelector('.bulk-q-check');
+                if (cb) cb.checked = true;
+            });
+            updateBulkSelectCounter();
+        };
+
+        window.bulkClearAll = function() {
+            document.querySelectorAll('.bulk-q-check').forEach(cb => { cb.checked = false; });
+            updateBulkSelectCounter();
         };
 
         window.executeBulkExport = async function(btn) {
@@ -13495,7 +13562,7 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
             const formData = getQuizFormData();
             const selectedQuestions = checked.map(idx => formData.questions[idx]);
 
-            // [V91.57] Read title + shortTitle from inputs (no prompt)
+            // [V91.58] Read title + shortTitle from inputs (no prompt)
             const titleInput = document.getElementById('bulk-new-title');
             const shortInput = document.getElementById('bulk-new-short');
             const newTitle = titleInput ? titleInput.value.trim() : '';
@@ -13503,7 +13570,7 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
             if (!newTitle) { if (titleInput) titleInput.focus(); return alert("Please enter a title for the new quiz."); }
             if (!newShort) { if (shortInput) shortInput.focus(); return alert("Please enter a short title."); }
 
-            // [V91.57] Confirm Cut — destructive action
+            // [V91.58] Confirm Cut — destructive action
             if (isCut) {
                 const sourceTitle = formData.title || 'this quiz';
                 const ok = confirm(
@@ -13529,7 +13596,7 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                 };
                 delete newQuiz.id;
 
-                // [V91.57] Atomic batch — add new + (optional) update source in one commit
+                // [V91.58] Atomic batch — add new + (optional) update source in one commit
                 const batch = db.batch();
                 const newRef = db.collection("quizzes").doc(); // pre-allocate id
                 batch.set(newRef, newQuiz);
@@ -25532,7 +25599,7 @@ Recommended Review: X days`;
                 const e = events[i];
                 if (!e) return '';
                 const icon = e.type === 'lp' ? '📓' : '🟣';
-                // [V91.57] Resolve quiz title from quizCache (quiz_attempts has only quizId)
+                // [V91.58] Resolve quiz title from quizCache (quiz_attempts has only quizId)
                 const quizDoc = e.type === 'quiz' && e.quizId ? quizCache[e.quizId] : null;
                 const label = (quizDoc && quizDoc.title) || e.label;
                 const score = e.type === 'quiz' && e.score != null ? ` · ${e.score}/${e.total}` : '';
