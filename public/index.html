@@ -2999,11 +2999,34 @@
                                     </div>
                                 </div>
                                 
-                                <!-- 🔥 Unified Timeline Container -->
-                                <div id="unified-timeline">
-                                    <div style="text-align:center; color:#999; padding:40px 20px;">
-                                        <i class="fa-solid fa-spinner fa-spin" style="font-size:2em; margin-bottom:10px;"></i>
-                                        <p>Loading history...</p>
+                                <!-- 🔥 Unified Timeline Container · [V91.66] skeleton loader on first render -->
+                                <div id="unified-timeline" role="list" aria-label="Submission history" aria-busy="true">
+                                    <div class="unified-skeleton-card" aria-hidden="true">
+                                        <div class="unified-skeleton-bar" style="width:50px; height:50px; border-radius:14px; flex-shrink:0;"></div>
+                                        <div style="flex:1; min-width:0;">
+                                            <div class="unified-skeleton-bar" style="width:65%; height:14px; border-radius:4px; margin-bottom:8px;"></div>
+                                            <div class="unified-skeleton-bar" style="width:45%; height:12px; border-radius:4px; margin-bottom:6px;"></div>
+                                            <div class="unified-skeleton-bar" style="width:80%; height:10px; border-radius:4px;"></div>
+                                        </div>
+                                        <div class="unified-skeleton-bar" style="width:40px; height:30px; border-radius:6px; flex-shrink:0;"></div>
+                                    </div>
+                                    <div class="unified-skeleton-card" aria-hidden="true">
+                                        <div class="unified-skeleton-bar" style="width:50px; height:50px; border-radius:14px; flex-shrink:0;"></div>
+                                        <div style="flex:1; min-width:0;">
+                                            <div class="unified-skeleton-bar" style="width:55%; height:14px; border-radius:4px; margin-bottom:8px;"></div>
+                                            <div class="unified-skeleton-bar" style="width:35%; height:12px; border-radius:4px; margin-bottom:6px;"></div>
+                                            <div class="unified-skeleton-bar" style="width:70%; height:10px; border-radius:4px;"></div>
+                                        </div>
+                                        <div class="unified-skeleton-bar" style="width:40px; height:30px; border-radius:6px; flex-shrink:0;"></div>
+                                    </div>
+                                    <div class="unified-skeleton-card" aria-hidden="true">
+                                        <div class="unified-skeleton-bar" style="width:50px; height:50px; border-radius:14px; flex-shrink:0;"></div>
+                                        <div style="flex:1; min-width:0;">
+                                            <div class="unified-skeleton-bar" style="width:60%; height:14px; border-radius:4px; margin-bottom:8px;"></div>
+                                            <div class="unified-skeleton-bar" style="width:40%; height:12px; border-radius:4px; margin-bottom:6px;"></div>
+                                            <div class="unified-skeleton-bar" style="width:75%; height:10px; border-radius:4px;"></div>
+                                        </div>
+                                        <div class="unified-skeleton-bar" style="width:40px; height:30px; border-radius:6px; flex-shrink:0;"></div>
                                     </div>
                                 </div>
                             </div>
@@ -3188,7 +3211,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V91.65 (Work History — streak + recent badge + pending reminder + sparkline)
+                V91.66 (Work History — skeleton + accent border + empty states + ARIA)
             </div>
         </div>
     </div>
@@ -9924,16 +9947,43 @@ async function archiveDoneCard(cardId) {
         }
 
         // 🔥 [V91.65] Inject pulse CSS for recently-graded cards (idempotent)
+        // 🔥 [V91.66] Also inject skeleton loader CSS
         function ensureUnifiedHistoryStyles() {
-            if (document.getElementById('unified-history-styles-v91-65')) return;
+            if (document.getElementById('unified-history-styles-v91-66')) return;
+            const old65 = document.getElementById('unified-history-styles-v91-65');
+            if (old65) old65.remove();
             const s = document.createElement('style');
-            s.id = 'unified-history-styles-v91-65';
+            s.id = 'unified-history-styles-v91-66';
             s.textContent = `
                 @keyframes recentlyGradedPulse {
                     0%, 100% { box-shadow: 0 4px 15px rgba(22,163,74,0.06); }
                     50% { box-shadow: 0 8px 24px rgba(22,163,74,0.32); }
                 }
                 .card-recently-graded { animation: recentlyGradedPulse 2.2s ease-in-out infinite; border-color: #86efac !important; }
+
+                /* [V91.66] Skeleton shimmer */
+                @keyframes unifiedSkeletonShimmer {
+                    0%   { background-position: 200% 0; }
+                    100% { background-position: -200% 0; }
+                }
+                .unified-skeleton-card {
+                    background:#fff; border:1px solid #f0f0f0; border-left:4px solid #e2e8f0;
+                    border-radius:14px; padding:16px; margin-bottom:12px;
+                    display:flex; align-items:center; gap:15px;
+                    box-shadow:0 4px 15px rgba(0,0,0,0.03);
+                }
+                .unified-skeleton-bar {
+                    background:linear-gradient(90deg,#f1f5f9 0%,#e2e8f0 50%,#f1f5f9 100%);
+                    background-size:200% 100%;
+                    animation: unifiedSkeletonShimmer 1.4s linear infinite;
+                }
+
+                /* [V91.66] Focus-visible outlines for keyboard users */
+                .unified-history-card:focus-visible,
+                .unified-filter-btn:focus-visible,
+                .unified-status-btn:focus-visible {
+                    outline: 2px solid #4361ee; outline-offset: 2px;
+                }
             `;
             document.head.appendChild(s);
         }
@@ -9944,6 +9994,7 @@ async function archiveDoneCard(cardId) {
         }
 
         // 🔥 [V91.64] Toggle card expanded state — does nothing if click was on a link/button
+        // 🔥 [V91.66] Also toggle aria-expanded for screen readers
         function toggleUnifiedCard(cardEl, event) {
             if (event && event.target && event.target.closest('a, button')) return;
             const detail = cardEl.querySelector('.card-detail');
@@ -9952,6 +10003,7 @@ async function archiveDoneCard(cardId) {
             const isHidden = detail.style.display === 'none';
             detail.style.display = isHidden ? '' : 'none';
             if (chevron) chevron.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+            cardEl.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
         }
 
         // 🔥 [V91.64] Type-specific expanded detail renderers
@@ -10183,25 +10235,49 @@ async function archiveDoneCard(cardId) {
             renderStreakChip();
             renderPendingBanner();
 
-            // No submissions at all → original empty state
+            // 🔥 [V91.66] Mark as no longer busy (skeleton state done)
+            container.setAttribute('aria-busy', 'false');
+
+            // No submissions at all → original empty state with CTA
             if (!unifiedSubmissionsCache || unifiedSubmissionsCache.length === 0) {
                 container.innerHTML = `
                     <div style="text-align:center; color:#999; padding:40px 20px;">
                         <i class="fa-solid fa-inbox" style="font-size:3em; margin-bottom:15px; opacity:0.3;"></i>
-                        <p>ยังไม่มีประวัติการส่งงาน</p>
-                        <p style="font-size:0.85em; opacity:0.7;">No submissions yet</p>
+                        <p style="font-weight:700; color:#475569; margin-bottom:6px;">ยังไม่มีประวัติการส่งงาน</p>
+                        <p style="font-size:0.85em; opacity:0.7; margin-bottom:14px;">No submissions yet</p>
+                        <p style="font-size:0.78em; color:#94a3b8;">Click the <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:#4361ee; color:white; border-radius:50%; font-size:0.85em; vertical-align:middle;">+</span> button below to add your first submission</p>
                     </div>`;
                 return;
             }
 
             // 🔥 [V91.62] Apply filters
+            // 🔥 [V91.66] Context-aware empty state per active filter
             const filtered = getFilteredUnifiedItems();
             if (filtered.length === 0) {
+                const typeLabels = {
+                    case: '🏥 case', work: '📝 work', quiz: '🧠 quiz',
+                    quest: '⭐ quest', reflective: '😊 reflective log'
+                };
+                let emptyTitle, emptyHint;
+                if (unifiedSearchQuery) {
+                    emptyTitle = `No matches for "${escapeUnifiedHtml(unifiedSearchQuery)}"`;
+                    emptyHint = 'Try a different search term or clear filters';
+                } else if (unifiedCurrentStatus !== 'all') {
+                    emptyTitle = unifiedCurrentStatus === 'pending' ? '🎉 Nothing pending review!' : 'Nothing reviewed in this scope';
+                    emptyHint = 'Try a different filter';
+                } else if (unifiedCurrentFilter !== 'all') {
+                    const label = typeLabels[unifiedCurrentFilter] || unifiedCurrentFilter;
+                    emptyTitle = `No ${label} submissions yet`;
+                    emptyHint = 'Switch to All to see your other items';
+                } else {
+                    emptyTitle = 'No matches';
+                    emptyHint = 'Try changing filter or status';
+                }
                 container.innerHTML = `
                     <div style="text-align:center; color:#999; padding:40px 20px;">
                         <i class="fa-solid fa-filter-circle-xmark" style="font-size:3em; margin-bottom:15px; opacity:0.3;"></i>
-                        <p>No matches for the current filter</p>
-                        <p style="font-size:0.85em; opacity:0.7;">ลองเปลี่ยน filter หรือ Status</p>
+                        <p style="font-weight:700; color:#475569; margin-bottom:6px;">${emptyTitle}</p>
+                        <p style="font-size:0.82em; opacity:0.7;">${emptyHint}</p>
                     </div>`;
                 return;
             }
@@ -10334,8 +10410,8 @@ async function archiveDoneCard(cardId) {
                     : '';
 
                 return `
-                    <div onclick="toggleUnifiedCard(this, event)" class="unified-history-card${recentClass}" style="background:#fff; border-radius:14px; padding:16px; margin-bottom:12px;
-                                border:1px solid #f0f0f0; box-shadow:0 4px 15px rgba(0,0,0,0.03); cursor:pointer; transition:border-color 0.15s, box-shadow 0.15s;" onmouseover="if(!this.classList.contains('card-recently-graded')){this.style.borderColor='${item.color}33'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.06)';}" onmouseout="if(!this.classList.contains('card-recently-graded')){this.style.borderColor='#f0f0f0'; this.style.boxShadow='0 4px 15px rgba(0,0,0,0.03)';}">
+                    <div onclick="toggleUnifiedCard(this, event)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); toggleUnifiedCard(this, event);}" class="unified-history-card${recentClass}" role="listitem" tabindex="0" aria-expanded="false" style="background:#fff; border-radius:14px; padding:16px; margin-bottom:12px;
+                                border:1px solid #f0f0f0; border-left:4px solid ${item.color}; box-shadow:0 4px 15px rgba(0,0,0,0.03); cursor:pointer; transition:border-color 0.15s, box-shadow 0.15s, transform 0.15s;" onmouseover="if(!this.classList.contains('card-recently-graded')){this.style.borderColor='${item.color}33'; this.style.borderLeftColor='${item.color}'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.06)';}" onmouseout="if(!this.classList.contains('card-recently-graded')){this.style.borderColor='#f0f0f0'; this.style.borderLeftColor='${item.color}'; this.style.boxShadow='0 4px 15px rgba(0,0,0,0.03)';}">
                         <div style="display:flex; align-items:center; gap:15px;">
                             <div style="width:50px; height:50px; border-radius:14px;
                                         background:${item.color}15; color:${item.color};
@@ -10364,7 +10440,7 @@ async function archiveDoneCard(cardId) {
                                 </div>
                                 ${linkHtml}
                             </div>
-                            <i class="card-chevron fa-solid fa-chevron-down" style="color:#cbd5e1; font-size:0.85em; transition:transform 0.2s; flex-shrink:0; align-self:center;" aria-hidden="true"></i>
+                            <i class="card-chevron fa-solid fa-chevron-down" style="color:#cbd5e1; font-size:0.85em; transition:transform 0.2s; flex-shrink:0; align-self:center; min-width:20px;" aria-label="Toggle details"></i>
                         </div>
                         ${commentHtml}
                         <div class="card-detail" style="display:none; padding-top:14px; margin-top:14px; border-top:1px solid #f1f5f9;">
