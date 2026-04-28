@@ -2969,20 +2969,14 @@
                         <!-- History pane - Unified Timeline -->
                         <div id="work-pane-history" class="work-tab-pane">
                             <div class="work-pane-shell" style="background:#f9fdf9;">
-                                <!-- 🔥 Unified Filter Buttons -->
-                                <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; padding:12px; background:white; border-radius:12px; border:1px solid #e2e8f0;">
-                                    <button class="unified-filter-btn active" data-filter="all" onclick="filterUnifiedHistory('all')"
-                                            style="padding:8px 16px; background:#4361ee; color:white; border:none; border-radius:20px; font-size:0.85em; font-weight:700; cursor:pointer; transition:all 0.2s;">
-                                        📋 All / 전체
-                                    </button>
-                                    <button class="unified-filter-btn" data-filter="work" onclick="filterUnifiedHistory('work')"
-                                            style="padding:8px 16px; background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; border-radius:20px; font-size:0.85em; font-weight:700; cursor:pointer; transition:all 0.2s;">
-                                        📝 Work / 워크
-                                    </button>
-                                    <button class="unified-filter-btn" data-filter="reflective" onclick="filterUnifiedHistory('reflective')"
-                                            style="padding:8px 16px; background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; border-radius:20px; font-size:0.85em; font-weight:700; cursor:pointer; transition:all 0.2s;">
-                                        😊 Log / 로그
-                                    </button>
+                                <!-- 🔥 [V91.62] Filter Bar — type pills (scroll snap) + status sub-filter -->
+                                <div style="margin-bottom:16px; padding:12px; background:white; border-radius:12px; border:1px solid #e2e8f0;">
+                                    <div id="unified-type-filters" style="display:flex; gap:8px; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; padding-bottom:4px; scrollbar-width:thin;">
+                                        <!-- Pills rendered by renderTypeFilterPills() -->
+                                    </div>
+                                    <div id="unified-status-filters" style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
+                                        <!-- Status pills rendered by renderStatusFilterPills() -->
+                                    </div>
                                 </div>
                                 
                                 <!-- 🔥 Unified Timeline Container -->
@@ -3174,7 +3168,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V91.34 (Progress Dashboard with User Profile Pictures)
+                V91.62 (Work History — filter fix + 5 type pills + status + pagination)
             </div>
         </div>
     </div>
@@ -9730,13 +9724,87 @@ async function archiveDoneCard(cardId) {
             });
         }
 
+        // 🔥 [V91.62] Pagination + status filter state
+        const UNIFIED_PAGE_SIZE = 10;
+        let unifiedRenderedCount = UNIFIED_PAGE_SIZE;
+        let unifiedCurrentStatus = 'all';
+
+        // 🔥 [V91.62] Count submissions per type (for pill badges)
+        function getUnifiedTypeCounts() {
+            const counts = { all: 0, case: 0, work: 0, quiz: 0, quest: 0, reflective: 0 };
+            (unifiedSubmissionsCache || []).forEach(s => {
+                counts.all++;
+                if (counts[s.submissionType] !== undefined) counts[s.submissionType]++;
+            });
+            return counts;
+        }
+
+        // 🔥 [V91.62] Apply type + status filter, return sorted submissions
+        function getFilteredUnifiedItems() {
+            let items = (unifiedSubmissionsCache || []).slice();
+            if (unifiedCurrentFilter !== 'all') {
+                items = items.filter(s => s.submissionType === unifiedCurrentFilter);
+            }
+            if (unifiedCurrentStatus === 'pending') {
+                items = items.filter(s => s.status === 'pending' || s.status === 'รอตรวจ');
+            } else if (unifiedCurrentStatus === 'reviewed') {
+                items = items.filter(s => s.status && s.status !== 'pending' && s.status !== 'รอตรวจ');
+            }
+            items.sort((a, b) => {
+                const tA = a.timestamp && a.timestamp.toMillis ? a.timestamp.toMillis() : 0;
+                const tB = b.timestamp && b.timestamp.toMillis ? b.timestamp.toMillis() : 0;
+                return tB - tA;
+            });
+            return items;
+        }
+
+        // 🔥 [V91.62] Render type filter pills with counts (mobile horizontal scroll snap)
+        function renderTypeFilterPills() {
+            const wrap = document.getElementById('unified-type-filters');
+            if (!wrap) return;
+            const counts = getUnifiedTypeCounts();
+            const meta = [
+                { key: 'all',        emoji: '📋', label: 'All / 전체' },
+                { key: 'case',       emoji: '🏥', label: 'Case / 케이스' },
+                { key: 'work',       emoji: '📝', label: 'Work / 워크' },
+                { key: 'quiz',       emoji: '🧠', label: 'Quiz / 퀴즈' },
+                { key: 'quest',      emoji: '⭐', label: 'Quest / 퀘스트' },
+                { key: 'reflective', emoji: '😊', label: 'Log / 로그' }
+            ];
+            wrap.innerHTML = meta.map(m => {
+                const active = unifiedCurrentFilter === m.key;
+                const c = counts[m.key] || 0;
+                return `<button class="unified-filter-btn${active ? ' active' : ''}" data-filter="${m.key}" onclick="filterUnifiedHistory('${m.key}')" style="padding:8px 14px; background:${active ? '#4361ee' : '#f1f5f9'}; color:${active ? 'white' : '#64748b'}; border:${active ? 'none' : '1px solid #e2e8f0'}; border-radius:20px; font-size:0.82em; font-weight:700; cursor:pointer; transition:all 0.2s; flex-shrink:0; scroll-snap-align:start; white-space:nowrap; min-height:36px;">${m.emoji} ${m.label} <span style="opacity:0.85;">(${c})</span></button>`;
+            }).join('');
+        }
+
+        // 🔥 [V91.62] Render status sub-filter pills (All / Pending / Reviewed)
+        function renderStatusFilterPills() {
+            const wrap = document.getElementById('unified-status-filters');
+            if (!wrap) return;
+            const meta = [
+                { key: 'all',      label: 'All' },
+                { key: 'pending',  label: '⏳ Pending' },
+                { key: 'reviewed', label: '✅ Reviewed' }
+            ];
+            wrap.innerHTML = meta.map(m => {
+                const active = unifiedCurrentStatus === m.key;
+                return `<button class="unified-status-btn${active ? ' active' : ''}" data-status="${m.key}" onclick="filterUnifiedStatus('${m.key}')" style="padding:5px 12px; background:${active ? '#1e293b' : 'transparent'}; color:${active ? 'white' : '#64748b'}; border:1px solid ${active ? '#1e293b' : '#e2e8f0'}; border-radius:14px; font-size:0.74em; font-weight:700; cursor:pointer; transition:all 0.15s;">${m.label}</button>`;
+            }).join('');
+        }
+
         function renderUnifiedHistory() {
             const container = document.getElementById('unified-timeline');
             if (!container) {
                 // Container doesn't exist yet, skip rendering
                 return;
             }
-            
+
+            // 🔥 [V91.62] Always refresh pills (counts may change as new items arrive)
+            renderTypeFilterPills();
+            renderStatusFilterPills();
+
+            // No submissions at all → original empty state
             if (!unifiedSubmissionsCache || unifiedSubmissionsCache.length === 0) {
                 container.innerHTML = `
                     <div style="text-align:center; color:#999; padding:40px 20px;">
@@ -9746,8 +9814,22 @@ async function archiveDoneCard(cardId) {
                     </div>`;
                 return;
             }
-            
-            const items = unifiedSubmissionsCache.map(sub => {
+
+            // 🔥 [V91.62] Apply filters
+            const filtered = getFilteredUnifiedItems();
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align:center; color:#999; padding:40px 20px;">
+                        <i class="fa-solid fa-filter-circle-xmark" style="font-size:3em; margin-bottom:15px; opacity:0.3;"></i>
+                        <p>No matches for the current filter</p>
+                        <p style="font-size:0.85em; opacity:0.7;">ลองเปลี่ยน filter หรือ Status</p>
+                    </div>`;
+                return;
+            }
+
+            // 🔥 [V91.62] Slice to current page size
+            const visible = filtered.slice(0, unifiedRenderedCount);
+            const items = visible.map(sub => {
                 const baseItem = {
                     id: sub.id,
                     timestamp: sub.timestamp,
@@ -9827,15 +9909,9 @@ async function archiveDoneCard(cardId) {
                 }
             });
             
-            // Sort by timestamp (newest first)
-            items.sort((a, b) => {
-                const tA = a.timestamp ? a.timestamp.toDate().getTime() : 0;
-                const tB = b.timestamp ? b.timestamp.toDate().getTime() : 0;
-                return tB - tA;
-            });
-            
-            // Render items
-            container.innerHTML = items.map(item => {
+            // 🔥 [V91.62] Sort already done in getFilteredUnifiedItems
+            // Render visible items (paginated)
+            const itemsHtml = items.map(item => {
                 const date = item.timestamp ? item.timestamp.toDate().toLocaleString('th-TH', {
                     day: 'numeric', month: 'short', year: 'numeric',
                     hour: '2-digit', minute: '2-digit'
@@ -9901,6 +9977,39 @@ async function archiveDoneCard(cardId) {
                     </div>
                 `;
             }).join('');
+
+            // 🔥 [V91.62] Append "Load more" button if more items remain
+            let loadMoreHtml = '';
+            const remaining = filtered.length - unifiedRenderedCount;
+            if (remaining > 0) {
+                const next = Math.min(remaining, UNIFIED_PAGE_SIZE);
+                loadMoreHtml = `
+                    <div style="text-align:center; margin-top:8px; margin-bottom:8px;">
+                        <button onclick="loadMoreUnifiedHistory()" style="padding:12px 28px; background:#fff; color:#4361ee; border:1.5px solid #4361ee; border-radius:14px; font-size:0.88em; font-weight:700; cursor:pointer; transition:all 0.15s; min-height:44px;" onmouseover="this.style.background='#4361ee'; this.style.color='#fff';" onmouseout="this.style.background='#fff'; this.style.color='#4361ee';">
+                            <i class="fa-solid fa-chevron-down" style="margin-right:6px;"></i>
+                            Load more (${next} more · ${remaining} left)
+                        </button>
+                    </div>`;
+            } else if (filtered.length > UNIFIED_PAGE_SIZE) {
+                loadMoreHtml = `
+                    <div style="text-align:center; margin-top:8px; color:#94a3b8; font-size:0.78em;">
+                        🎉 You've reached the end · ${filtered.length} items
+                    </div>`;
+            }
+            container.innerHTML = itemsHtml + loadMoreHtml;
+        }
+
+        // 🔥 [V91.62] Load next page (10 more)
+        function loadMoreUnifiedHistory() {
+            unifiedRenderedCount += UNIFIED_PAGE_SIZE;
+            renderUnifiedHistory();
+        }
+
+        // 🔥 [V91.62] Status sub-filter handler
+        function filterUnifiedStatus(statusKey) {
+            unifiedCurrentStatus = statusKey;
+            unifiedRenderedCount = UNIFIED_PAGE_SIZE; // reset pagination on filter change
+            renderUnifiedHistory();
         }
 
         // 🔥 Unified Section Toggle
@@ -9921,23 +10030,12 @@ async function archiveDoneCard(cardId) {
 
         // 🔥 Unified History Filter
         let unifiedCurrentFilter = 'all';
-        
+
+        // 🔥 [V91.62] Type filter handler — resets pagination, re-renders pills + list
         function filterUnifiedHistory(filterType) {
             unifiedCurrentFilter = filterType;
-            document.querySelectorAll('.unified-filter-btn').forEach(btn => {
-                const isActive = btn.dataset.filter === filterType;
-                btn.classList.toggle('active', isActive);
-                if (isActive) {
-                    btn.style.background = '#4361ee';
-                    btn.style.color = 'white';
-                    btn.style.border = 'none';
-                } else {
-                    btn.style.background = '#f1f5f9';
-                    btn.style.color = '#64748b';
-                    btn.style.border = '1px solid #e2e8f0';
-                }
-            });
-            renderUnifiedHistory();
+            unifiedRenderedCount = UNIFIED_PAGE_SIZE; // reset pagination on filter change
+            renderUnifiedHistory(); // calls renderTypeFilterPills internally
         }
 
         // 🔥 Phase 3: Unified Modal Functions
