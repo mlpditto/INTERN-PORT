@@ -2969,6 +2969,16 @@
                         <!-- History pane - Unified Timeline -->
                         <div id="work-pane-history" class="work-tab-pane">
                             <div class="work-pane-shell" style="background:#f9fdf9;">
+                                <!-- 🔥 [V91.63] Stats summary card -->
+                                <div id="unified-stats-card" style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; padding:14px 12px; background:white; border-radius:12px; border:1px solid #e2e8f0;">
+                                    <!-- Cells rendered by renderStatsCard() -->
+                                </div>
+
+                                <!-- 🔥 [V91.63] Search input -->
+                                <div style="margin-bottom:12px;">
+                                    <input type="text" id="unified-search" placeholder="🔍 Search submissions..." oninput="onUnifiedSearchInput(this.value)" style="width:100%; padding:10px 14px; border-radius:12px; border:1px solid #e2e8f0; font-size:0.9em; box-sizing:border-box; outline:none; background:white; min-height:44px;" onfocus="this.style.borderColor='#4361ee'" onblur="this.style.borderColor='#e2e8f0'">
+                                </div>
+
                                 <!-- 🔥 [V91.62] Filter Bar — type pills (scroll snap) + status sub-filter -->
                                 <div style="margin-bottom:16px; padding:12px; background:white; border-radius:12px; border:1px solid #e2e8f0;">
                                     <div id="unified-type-filters" style="display:flex; gap:8px; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; padding-bottom:4px; scrollbar-width:thin;">
@@ -3168,7 +3178,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V91.62 (Work History — filter fix + 5 type pills + status + pagination)
+                V91.63 (Work History — stats card + search + group by date)
             </div>
         </div>
     </div>
@@ -9729,6 +9739,76 @@ async function archiveDoneCard(cardId) {
         let unifiedRenderedCount = UNIFIED_PAGE_SIZE;
         let unifiedCurrentStatus = 'all';
 
+        // 🔥 [V91.63] Search state + debounce
+        let unifiedSearchQuery = '';
+        let unifiedSearchDebounce = null;
+
+        // 🔥 [V91.63] Search input handler with debounce
+        function onUnifiedSearchInput(value) {
+            clearTimeout(unifiedSearchDebounce);
+            unifiedSearchDebounce = setTimeout(() => {
+                unifiedSearchQuery = (value || '').trim().toLowerCase();
+                unifiedRenderedCount = UNIFIED_PAGE_SIZE; // reset pagination
+                renderUnifiedHistory();
+            }, 200);
+        }
+
+        // 🔥 [V91.63] Compute stats from filtered (post-filter) items
+        function getUnifiedStats() {
+            const filtered = getFilteredUnifiedItems();
+            const total = filtered.length;
+            const points = filtered.reduce((sum, s) => sum + (parseFloat(s.score) || 0) + (parseFloat(s.adminBonus) || 0), 0);
+            const pending = filtered.filter(s => s.status === 'pending' || s.status === 'รอตรวจ').length;
+            return { total, points, pending };
+        }
+
+        // 🔥 [V91.63] Render stats summary card
+        function renderStatsCard() {
+            const wrap = document.getElementById('unified-stats-card');
+            if (!wrap) return;
+            const s = getUnifiedStats();
+            const pendingColor = s.pending > 0 ? '#d97706' : '#94a3b8';
+            wrap.innerHTML = `
+                <div style="text-align:center;">
+                    <div style="font-size:1.4em; font-weight:900; color:#4361ee; line-height:1.1;">${s.total}</div>
+                    <div style="font-size:0.62em; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; margin-top:3px;">📊 Total</div>
+                </div>
+                <div style="text-align:center; border-left:1px solid #f1f5f9; border-right:1px solid #f1f5f9;">
+                    <div style="font-size:1.4em; font-weight:900; color:#16a34a; line-height:1.1;">${s.points.toFixed(1)}</div>
+                    <div style="font-size:0.62em; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; margin-top:3px;">💰 Points</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:1.4em; font-weight:900; color:${pendingColor}; line-height:1.1;">${s.pending}</div>
+                    <div style="font-size:0.62em; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; margin-top:3px;">⏳ Pending</div>
+                </div>
+            `;
+        }
+
+        // 🔥 [V91.63] Group items by date bucket (Today / Yesterday / Last 7 / Last 30 / Older)
+        function groupByDateBucket(items) {
+            const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+            const todayMs = startOfToday.getTime();
+            const yesterdayMs = todayMs - 86400000;
+            const last7Ms = todayMs - 7 * 86400000;
+            const last30Ms = todayMs - 30 * 86400000;
+            const buckets = {
+                today:     { label: 'Today / วันนี้',      items: [] },
+                yesterday: { label: 'Yesterday / เมื่อวาน',  items: [] },
+                last7:     { label: 'Last 7 days',         items: [] },
+                last30:    { label: 'Last 30 days',        items: [] },
+                older:     { label: 'Older',               items: [] }
+            };
+            items.forEach(item => {
+                const ts = (item.timestamp && item.timestamp.toMillis) ? item.timestamp.toMillis() : 0;
+                if (ts >= todayMs) buckets.today.items.push(item);
+                else if (ts >= yesterdayMs) buckets.yesterday.items.push(item);
+                else if (ts >= last7Ms) buckets.last7.items.push(item);
+                else if (ts >= last30Ms) buckets.last30.items.push(item);
+                else buckets.older.items.push(item);
+            });
+            return buckets;
+        }
+
         // 🔥 [V91.62] Count submissions per type (for pill badges)
         function getUnifiedTypeCounts() {
             const counts = { all: 0, case: 0, work: 0, quiz: 0, quest: 0, reflective: 0 };
@@ -9740,6 +9820,7 @@ async function archiveDoneCard(cardId) {
         }
 
         // 🔥 [V91.62] Apply type + status filter, return sorted submissions
+        // 🔥 [V91.63] Also apply search query
         function getFilteredUnifiedItems() {
             let items = (unifiedSubmissionsCache || []).slice();
             if (unifiedCurrentFilter !== 'all') {
@@ -9749,6 +9830,21 @@ async function archiveDoneCard(cardId) {
                 items = items.filter(s => s.status === 'pending' || s.status === 'รอตรวจ');
             } else if (unifiedCurrentStatus === 'reviewed') {
                 items = items.filter(s => s.status && s.status !== 'pending' && s.status !== 'รอตรวจ');
+            }
+            if (unifiedSearchQuery) {
+                const q = unifiedSearchQuery;
+                items = items.filter(s => {
+                    const m = s.metadata || {};
+                    return (
+                        (s.title || '').toLowerCase().includes(q) ||
+                        (m.disease || '').toLowerCase().includes(q) ||
+                        (m.customer || '').toLowerCase().includes(q) ||
+                        (m.content || '').toLowerCase().includes(q) ||
+                        (m.caseId || '').toLowerCase().includes(q) ||
+                        (s.adminComment || '').toLowerCase().includes(q) ||
+                        (s.submissionType || '').toLowerCase().includes(q)
+                    );
+                });
             }
             items.sort((a, b) => {
                 const tA = a.timestamp && a.timestamp.toMillis ? a.timestamp.toMillis() : 0;
@@ -9801,8 +9897,10 @@ async function archiveDoneCard(cardId) {
             }
 
             // 🔥 [V91.62] Always refresh pills (counts may change as new items arrive)
+            // 🔥 [V91.63] Also refresh stats summary card
             renderTypeFilterPills();
             renderStatusFilterPills();
+            renderStatsCard();
 
             // No submissions at all → original empty state
             if (!unifiedSubmissionsCache || unifiedSubmissionsCache.length === 0) {
@@ -9910,44 +10008,44 @@ async function archiveDoneCard(cardId) {
             });
             
             // 🔥 [V91.62] Sort already done in getFilteredUnifiedItems
-            // Render visible items (paginated)
-            const itemsHtml = items.map(item => {
+            // 🔥 [V91.63] Card render extracted as helper for date-bucket grouping
+            const renderUnifiedCard = (item) => {
                 const date = item.timestamp ? item.timestamp.toDate().toLocaleString('th-TH', {
                     day: 'numeric', month: 'short', year: 'numeric',
                     hour: '2-digit', minute: '2-digit'
                 }) : '-';
-                
+
                 const isPending = item.status === 'pending' || item.status === 'รอตรวจ';
                 const statusBadge = isPending
                     ? `<span class="badge" style="background:#fff3cd; color:#856404; font-size:0.75em;">⏳ รอตรวจ</span>`
                     : `<span class="badge" style="background:#d4edda; color:#155724; font-size:0.75em;">✅ ตรวจแล้ว</span>`;
-                
-                const scoreDisplay = isNaN(item.score) || item.score === 0 
-                    ? '-' 
+
+                const scoreDisplay = isNaN(item.score) || item.score === 0
+                    ? '-'
                     : item.score.toFixed(2);
-                
-                const linkHtml = item.link 
+
+                const linkHtml = item.link
                     ? `<a href="${item.link}" target="_blank" style="color:${item.color}; font-size:0.85em;">
                          <i class="fa-solid fa-link"></i> เปิดลิงก์
-                       </a>` 
+                       </a>`
                     : "";
-                
-                const commentHtml = item.adminComment 
-                    ? `<div style="margin-top:10px; padding:12px; background:${item.color}08; 
-                                    border-left:3px solid ${item.color}; border-radius:8px; 
+
+                const commentHtml = item.adminComment
+                    ? `<div style="margin-top:10px; padding:12px; background:${item.color}08;
+                                    border-left:3px solid ${item.color}; border-radius:8px;
                                     font-size:0.85em; color:#555;">
                          <i class="fa-solid fa-comment" style="color:${item.color}; margin-right:5px;"></i>
                          ${item.adminComment}
-                       </div>` 
+                       </div>`
                     : "";
-                
+
                 return `
-                    <div style="background:#fff; border-radius:14px; padding:16px; margin-bottom:12px; 
+                    <div style="background:#fff; border-radius:14px; padding:16px; margin-bottom:12px;
                                 border:1px solid #f0f0f0; box-shadow:0 4px 15px rgba(0,0,0,0.03);">
                         <div style="display:flex; align-items:center; gap:15px;">
-                            <div style="width:50px; height:50px; border-radius:14px; 
-                                        background:${item.color}15; color:${item.color}; 
-                                        display:flex; align-items:center; justify-content:center; 
+                            <div style="width:50px; height:50px; border-radius:14px;
+                                        background:${item.color}15; color:${item.color};
+                                        display:flex; align-items:center; justify-content:center;
                                         font-size:1.4em; flex-shrink:0;">
                                 <i class="fa-solid ${item.icon}"></i>
                             </div>
@@ -9976,7 +10074,23 @@ async function archiveDoneCard(cardId) {
                         ${commentHtml}
                     </div>
                 `;
-            }).join('');
+            };
+
+            // 🔥 [V91.63] Group visible items by date bucket and render with sticky-ish headers
+            const buckets = groupByDateBucket(items);
+            const order = ['today', 'yesterday', 'last7', 'last30', 'older'];
+            let groupedHtml = '';
+            order.forEach(k => {
+                const b = buckets[k];
+                if (!b.items.length) return;
+                groupedHtml += `<div style="display:flex; align-items:center; gap:8px; margin:14px 0 8px; padding:0 4px;">
+                    <div style="width:6px; height:6px; border-radius:50%; background:#4361ee;"></div>
+                    <div style="font-size:0.72em; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.06em;">${b.label}</div>
+                    <div style="font-size:0.72em; color:#94a3b8; font-weight:700;">(${b.items.length})</div>
+                    <div style="flex:1; height:1px; background:#f1f5f9;"></div>
+                </div>`;
+                groupedHtml += b.items.map(renderUnifiedCard).join('');
+            });
 
             // 🔥 [V91.62] Append "Load more" button if more items remain
             let loadMoreHtml = '';
@@ -9996,7 +10110,7 @@ async function archiveDoneCard(cardId) {
                         🎉 You've reached the end · ${filtered.length} items
                     </div>`;
             }
-            container.innerHTML = itemsHtml + loadMoreHtml;
+            container.innerHTML = groupedHtml + loadMoreHtml;
         }
 
         // 🔥 [V91.62] Load next page (10 more)
