@@ -2969,9 +2969,19 @@
                         <!-- History pane - Unified Timeline -->
                         <div id="work-pane-history" class="work-tab-pane">
                             <div class="work-pane-shell" style="background:#f9fdf9;">
-                                <!-- 🔥 [V91.63] Stats summary card -->
-                                <div id="unified-stats-card" style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; padding:14px 12px; background:white; border-radius:12px; border:1px solid #e2e8f0;">
-                                    <!-- Cells rendered by renderStatsCard() -->
+                                <!-- 🔥 [V91.65] Pending reminder banner (hidden by default) -->
+                                <div id="unified-pending-banner" style="display:none; margin-bottom:10px; padding:12px 14px; background:linear-gradient(135deg, #fef9c3, #fef3c7); border-left:4px solid #f59e0b; border-radius:10px; align-items:center; gap:10px;">
+                                    <!-- Rendered by renderPendingBanner() -->
+                                </div>
+
+                                <!-- 🔥 [V91.65] Reflective streak chip (hidden by default) -->
+                                <div id="unified-streak-chip" style="display:none; margin-bottom:10px; padding:10px 14px; background:linear-gradient(135deg, #fef3c7, #fde68a); border-radius:12px; border:1px solid #fcd34d; align-items:center; gap:10px;">
+                                    <!-- Rendered by renderStreakChip() -->
+                                </div>
+
+                                <!-- 🔥 [V91.63] Stats summary card · [V91.65] now contains 30-day sparkline below stats -->
+                                <div id="unified-stats-card" style="margin-bottom:12px; padding:14px 12px; background:white; border-radius:12px; border:1px solid #e2e8f0;">
+                                    <!-- Cells + sparkline rendered by renderStatsCard() -->
                                 </div>
 
                                 <!-- 🔥 [V91.63] Search input -->
@@ -3178,7 +3188,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                V91.64 (Work History — tap-to-expand + per-type rich detail)
+                V91.65 (Work History — streak + recent badge + pending reminder + sparkline)
             </div>
         </div>
     </div>
@@ -9762,26 +9772,170 @@ async function archiveDoneCard(cardId) {
             return { total, points, pending };
         }
 
-        // 🔥 [V91.63] Render stats summary card
+        // 🔥 [V91.63] Render stats summary card · [V91.65] now also renders 30-day sparkline
         function renderStatsCard() {
             const wrap = document.getElementById('unified-stats-card');
             if (!wrap) return;
             const s = getUnifiedStats();
             const pendingColor = s.pending > 0 ? '#d97706' : '#94a3b8';
+            const sparklineValues = getPointsSparkline();
+            const sparklineHasData = sparklineValues.some(v => v > 0);
+            const sparklineHtml = sparklineHasData ? renderSparkline(sparklineValues, 80, 28) : '<span style="font-size:0.7em; color:#cbd5e1; font-style:italic;">No activity yet</span>';
             wrap.innerHTML = `
-                <div style="text-align:center;">
-                    <div style="font-size:1.4em; font-weight:900; color:#4361ee; line-height:1.1;">${s.total}</div>
-                    <div style="font-size:0.62em; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; margin-top:3px;">📊 Total</div>
+                <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">
+                    <div style="text-align:center;">
+                        <div style="font-size:1.4em; font-weight:900; color:#4361ee; line-height:1.1;">${s.total}</div>
+                        <div style="font-size:0.62em; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; margin-top:3px;">📊 Total</div>
+                    </div>
+                    <div style="text-align:center; border-left:1px solid #f1f5f9; border-right:1px solid #f1f5f9;">
+                        <div style="font-size:1.4em; font-weight:900; color:#16a34a; line-height:1.1;">${s.points.toFixed(1)}</div>
+                        <div style="font-size:0.62em; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; margin-top:3px;">💰 Points</div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:1.4em; font-weight:900; color:${pendingColor}; line-height:1.1;">${s.pending}</div>
+                        <div style="font-size:0.62em; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; margin-top:3px;">⏳ Pending</div>
+                    </div>
                 </div>
-                <div style="text-align:center; border-left:1px solid #f1f5f9; border-right:1px solid #f1f5f9;">
-                    <div style="font-size:1.4em; font-weight:900; color:#16a34a; line-height:1.1;">${s.points.toFixed(1)}</div>
-                    <div style="font-size:0.62em; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; margin-top:3px;">💰 Points</div>
-                </div>
-                <div style="text-align:center;">
-                    <div style="font-size:1.4em; font-weight:900; color:${pendingColor}; line-height:1.1;">${s.pending}</div>
-                    <div style="font-size:0.62em; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; margin-top:3px;">⏳ Pending</div>
+                <div style="margin-top:10px; padding-top:10px; border-top:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                    <div style="font-size:0.66em; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">📈 30-day trend</div>
+                    <div style="display:flex; align-items:center; line-height:0;">${sparklineHtml}</div>
                 </div>
             `;
+        }
+
+        // 🔥 [V91.65] Reflective log streak (current run from today + longest ever)
+        function getReflectiveStreak() {
+            const logs = (unifiedSubmissionsCache || []).filter(s => s.submissionType === 'reflective' && s.timestamp && s.timestamp.toDate);
+            if (logs.length === 0) return { current: 0, longest: 0 };
+            const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            const dateSet = new Set();
+            logs.forEach(s => { const d = s.timestamp.toDate(); dateSet.add(fmt(d)); });
+            const dates = [...dateSet].sort();
+            let longest = 0, run = 1;
+            for (let i = 1; i < dates.length; i++) {
+                const prev = new Date(dates[i-1] + 'T00:00:00');
+                const curr = new Date(dates[i] + 'T00:00:00');
+                if (Math.round((curr - prev) / 86400000) === 1) run++;
+                else { longest = Math.max(longest, run); run = 1; }
+            }
+            longest = Math.max(longest, run);
+            const today = new Date(); today.setHours(0,0,0,0);
+            let cursor = new Date(today);
+            let current = 0;
+            const todayStr = fmt(today);
+            if (!dateSet.has(todayStr)) {
+                cursor.setDate(cursor.getDate() - 1);
+            }
+            while (dateSet.has(fmt(cursor))) {
+                current++;
+                cursor.setDate(cursor.getDate() - 1);
+            }
+            return { current, longest };
+        }
+
+        // 🔥 [V91.65] Detect if a submission was reviewed within last 24h (for "NEW" badge)
+        function isRecentlyReviewed(sub) {
+            if (!sub) return false;
+            const isReviewed = sub.status && sub.status !== 'pending' && sub.status !== 'รอตรวจ';
+            if (!isReviewed) return false;
+            const ts = (sub.reviewedAt && sub.reviewedAt.toMillis) ? sub.reviewedAt.toMillis()
+                     : (sub.updatedAt && sub.updatedAt.toMillis) ? sub.updatedAt.toMillis()
+                     : 0;
+            if (!ts) return false;
+            return (Date.now() - ts) < 24 * 60 * 60 * 1000;
+        }
+
+        // 🔥 [V91.65] Find oldest pending submission (for reminder banner)
+        function getOldestPending() {
+            const pending = (unifiedSubmissionsCache || []).filter(s => s.status === 'pending' || s.status === 'รอตรวจ');
+            if (pending.length === 0) return null;
+            let oldestTs = Infinity, oldest = null;
+            pending.forEach(s => {
+                const ts = (s.timestamp && s.timestamp.toMillis) ? s.timestamp.toMillis() : 0;
+                if (ts > 0 && ts < oldestTs) { oldest = s; oldestTs = ts; }
+            });
+            if (!oldest) return null;
+            const ageDays = Math.floor((Date.now() - oldestTs) / 86400000);
+            return ageDays >= 3 ? { sub: oldest, ageDays, count: pending.length } : null;
+        }
+
+        // 🔥 [V91.65] Compute points-per-day array for last 30 days
+        function getPointsSparkline() {
+            const today = new Date(); today.setHours(0,0,0,0);
+            const days = [];
+            for (let i = 29; i >= 0; i--) {
+                const d = new Date(today); d.setDate(d.getDate() - i);
+                days.push({ ts: d.getTime(), points: 0 });
+            }
+            (unifiedSubmissionsCache || []).forEach(s => {
+                if (!s.timestamp || !s.timestamp.toDate) return;
+                const d = s.timestamp.toDate(); d.setHours(0,0,0,0);
+                const idx = days.findIndex(b => b.ts === d.getTime());
+                if (idx >= 0) days[idx].points += (parseFloat(s.score) || 0) + (parseFloat(s.adminBonus) || 0);
+            });
+            return days.map(d => d.points);
+        }
+
+        // 🔥 [V91.65] Render mini SVG sparkline (no deps)
+        function renderSparkline(values, width, height) {
+            width = width || 80; height = height || 28;
+            if (!values || values.length === 0) return '';
+            const max = Math.max.apply(null, values.concat([0.5]));
+            const stepX = width / Math.max(values.length - 1, 1);
+            const points = values.map((v, i) => `${(i * stepX).toFixed(1)},${(height - (v / max) * (height - 2) - 1).toFixed(1)}`).join(' ');
+            const dots = values.map((v, i) => v > 0
+                ? `<circle cx="${(i * stepX).toFixed(1)}" cy="${(height - (v / max) * (height - 2) - 1).toFixed(1)}" r="1.4" fill="#16a34a"/>`
+                : ''
+            ).join('');
+            return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="overflow:visible;" aria-hidden="true">
+                <polyline points="${points}" stroke="#16a34a" stroke-width="1.5" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+                ${dots}
+            </svg>`;
+        }
+
+        // 🔥 [V91.65] Render streak chip (hidden if current = 0)
+        function renderStreakChip() {
+            const wrap = document.getElementById('unified-streak-chip');
+            if (!wrap) return;
+            const s = getReflectiveStreak();
+            if (s.current === 0) { wrap.style.display = 'none'; return; }
+            const longestText = s.longest > s.current ? `Personal best: ${s.longest} days` : (s.current === s.longest && s.current > 1 ? '🏆 New personal best!' : 'Keep going!');
+            wrap.style.display = 'flex';
+            wrap.innerHTML = `
+                <span style="font-size:1.4em; flex-shrink:0;">🔥</span>
+                <div style="flex:1; min-width:0;">
+                    <div style="font-size:0.92em; font-weight:800; color:#92400e;">${s.current} day${s.current > 1 ? 's' : ''} streak!</div>
+                    <div style="font-size:0.72em; color:#a16207;">${longestText}</div>
+                </div>`;
+        }
+
+        // 🔥 [V91.65] Render pending reminder banner (hidden if no pending > 3 days)
+        function renderPendingBanner() {
+            const wrap = document.getElementById('unified-pending-banner');
+            if (!wrap) return;
+            const data = getOldestPending();
+            if (!data) { wrap.style.display = 'none'; return; }
+            wrap.style.display = 'flex';
+            wrap.innerHTML = `
+                <span style="font-size:1.3em; flex-shrink:0;">💡</span>
+                <div style="flex:1; min-width:0; font-size:0.86em; color:#78350f;">
+                    You have <b>${data.count}</b> submission${data.count > 1 ? 's' : ''} pending review · oldest is <b>${data.ageDays} day${data.ageDays > 1 ? 's' : ''}</b> old
+                </div>`;
+        }
+
+        // 🔥 [V91.65] Inject pulse CSS for recently-graded cards (idempotent)
+        function ensureUnifiedHistoryStyles() {
+            if (document.getElementById('unified-history-styles-v91-65')) return;
+            const s = document.createElement('style');
+            s.id = 'unified-history-styles-v91-65';
+            s.textContent = `
+                @keyframes recentlyGradedPulse {
+                    0%, 100% { box-shadow: 0 4px 15px rgba(22,163,74,0.06); }
+                    50% { box-shadow: 0 8px 24px rgba(22,163,74,0.32); }
+                }
+                .card-recently-graded { animation: recentlyGradedPulse 2.2s ease-in-out infinite; border-color: #86efac !important; }
+            `;
+            document.head.appendChild(s);
         }
 
         // 🔥 [V91.64] HTML escape helper for user content
@@ -10021,9 +10175,13 @@ async function archiveDoneCard(cardId) {
 
             // 🔥 [V91.62] Always refresh pills (counts may change as new items arrive)
             // 🔥 [V91.63] Also refresh stats summary card
+            // 🔥 [V91.65] Also refresh streak chip + pending banner; inject pulse CSS
+            ensureUnifiedHistoryStyles();
             renderTypeFilterPills();
             renderStatusFilterPills();
             renderStatsCard();
+            renderStreakChip();
+            renderPendingBanner();
 
             // No submissions at all → original empty state
             if (!unifiedSubmissionsCache || unifiedSubmissionsCache.length === 0) {
@@ -10168,9 +10326,16 @@ async function archiveDoneCard(cardId) {
                 // 🔥 [V91.64] Per-type expanded detail (hidden by default)
                 const detailHtml = renderTypeDetailHtml(item._raw || {});
 
+                // 🔥 [V91.65] Recently-graded pulse + NEW chip (within last 24h)
+                const recentlyGraded = isRecentlyReviewed(item._raw);
+                const recentClass = recentlyGraded ? ' card-recently-graded' : '';
+                const newChip = recentlyGraded
+                    ? `<span style="display:inline-block; margin-left:6px; background:linear-gradient(135deg,#16a34a,#22c55e); color:white; font-size:0.62em; font-weight:900; padding:2px 7px; border-radius:999px; letter-spacing:0.04em;">NEW</span>`
+                    : '';
+
                 return `
-                    <div onclick="toggleUnifiedCard(this, event)" style="background:#fff; border-radius:14px; padding:16px; margin-bottom:12px;
-                                border:1px solid #f0f0f0; box-shadow:0 4px 15px rgba(0,0,0,0.03); cursor:pointer; transition:border-color 0.15s, box-shadow 0.15s;" onmouseover="this.style.borderColor='${item.color}33'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.06)';" onmouseout="this.style.borderColor='#f0f0f0'; this.style.boxShadow='0 4px 15px rgba(0,0,0,0.03)';">
+                    <div onclick="toggleUnifiedCard(this, event)" class="unified-history-card${recentClass}" style="background:#fff; border-radius:14px; padding:16px; margin-bottom:12px;
+                                border:1px solid #f0f0f0; box-shadow:0 4px 15px rgba(0,0,0,0.03); cursor:pointer; transition:border-color 0.15s, box-shadow 0.15s;" onmouseover="if(!this.classList.contains('card-recently-graded')){this.style.borderColor='${item.color}33'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.06)';}" onmouseout="if(!this.classList.contains('card-recently-graded')){this.style.borderColor='#f0f0f0'; this.style.boxShadow='0 4px 15px rgba(0,0,0,0.03)';}">
                         <div style="display:flex; align-items:center; gap:15px;">
                             <div style="width:50px; height:50px; border-radius:14px;
                                         background:${item.color}15; color:${item.color};
@@ -10180,7 +10345,7 @@ async function archiveDoneCard(cardId) {
                             </div>
                             <div style="flex:1; min-width:0;">
                                 <div style="font-weight:700; font-size:1em; color:#2d3436; margin-bottom:4px;">
-                                    ${item.title}
+                                    ${item.title}${newChip}
                                 </div>
                                 <div style="font-size:0.8em; color:#64748b; margin-bottom:4px;">
                                     ${item.detail}
