@@ -4,14 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.67</title>
-    <!-- Release: 2026-04-28 15:00 UTC+7 -->
+    <title>Nika V91.68</title>
+    <!-- Release: 2026-04-28 19:00 UTC+7 (Phase 1+2+4: Markdown editor for Quiz q-text/q-page-content/quiz-case-content + AI Magic prompt update) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
     <script>
-        // Force unregister service workers to fix persistent caching issues ([Version: V91.50])
+        // Force unregister service workers to fix persistent caching issues ([Version: V91.61])
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for(let registration of registrations) { registration.unregister(); }
@@ -125,14 +125,17 @@
         window.syncModelDefault = function(targetId, value) {
             const hidden = document.getElementById(targetId);
             if (hidden) hidden.value = value;
+            // Sync glass-toggle pills that target this input
             document.querySelectorAll(`[onclick*="'${targetId}'"]`).forEach(el => {
                 el.classList.toggle('active', el.dataset.value === value);
             });
+            // Sync review chips
             if (targetId === 'ai-model-review') {
                 document.querySelectorAll('.reflective-review-model-chip').forEach(chip => {
                     chip.classList.toggle('active', chip.dataset.value === value);
                 });
             }
+            // Persist
             const keyMap = {
                 'toolbar-ai-translate-model': 'ai_default_translate_model',
                 'ai-analyzer-model-val': 'ai_default_analyzer_model',
@@ -3624,9 +3627,107 @@
                 transform: translateY(0) scale(1);
             }
         }
+
+        /* Quiz Editor — Markdown split layout (Phase 1, V91.35) */
+        .q-text-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            position: relative;
+        }
+        .q-text-split .q-text-pane {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .q-text-split .q-text-pane-label {
+            font-size: 0.7em;
+            font-weight: 800;
+            color: #818cf8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+            padding-left: 4px;
+        }
+        .q-text-split .q-text-preview {
+            height: 140px;
+            overflow: auto;
+            padding: 15px;
+            border-radius: 16px;
+            border: 1.5px solid #334155;
+            background: #0a0f1a;
+            color: #e2e8f0;
+            font-size: 0.95em;
+            line-height: 1.6;
+            box-sizing: border-box;
+            word-wrap: break-word;
+        }
+        .q-text-split .q-text-preview > *:first-child { margin-top: 0; }
+        .q-text-split .q-text-preview > *:last-child { margin-bottom: 0; }
+        .q-text-split .q-text-preview p { margin: 0.4em 0; }
+        .q-text-split .q-text-preview h1,
+        .q-text-split .q-text-preview h2,
+        .q-text-split .q-text-preview h3 {
+            color: #f1f5f9;
+            margin: 0.6em 0 0.3em;
+            font-weight: 800;
+        }
+        .q-text-split .q-text-preview h1 { font-size: 1.25em; }
+        .q-text-split .q-text-preview h2 { font-size: 1.15em; }
+        .q-text-split .q-text-preview h3 { font-size: 1.05em; }
+        .q-text-split .q-text-preview strong { color: #fbbf24; font-weight: 800; }
+        .q-text-split .q-text-preview em { color: #c4b5fd; font-style: italic; }
+        .q-text-split .q-text-preview code {
+            background: #1e293b;
+            color: #fde68a;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-family: Consolas, monospace;
+            font-size: 0.9em;
+        }
+        .q-text-split .q-text-preview pre {
+            background: #1e293b;
+            padding: 10px 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 0.5em 0;
+        }
+        .q-text-split .q-text-preview pre code {
+            background: transparent;
+            padding: 0;
+            color: #e2e8f0;
+        }
+        .q-text-split .q-text-preview ul,
+        .q-text-split .q-text-preview ol {
+            margin: 0.4em 0;
+            padding-left: 1.4em;
+        }
+        .q-text-split .q-text-preview li { margin: 0.2em 0; }
+        .q-text-split .q-text-preview a {
+            color: #60a5fa;
+            text-decoration: underline;
+        }
+        .q-text-split .q-text-preview blockquote {
+            border-left: 3px solid #6366f1;
+            padding-left: 10px;
+            margin: 0.4em 0;
+            color: #cbd5e1;
+            font-style: italic;
+        }
+        .q-text-split .q-text-preview hr {
+            border: none;
+            border-top: 1px solid #334155;
+            margin: 0.7em 0;
+        }
+        @media (max-width: 720px) {
+            .q-text-split { grid-template-columns: 1fr; }
+            .q-text-split .q-text-preview { height: 100px; }
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script>mermaid.initialize({ startOnLoad: false, theme: 'neutral' });</script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 </head>
 
 <body>
@@ -3681,8 +3782,7 @@
                         ☀️ Nika
                         <span style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.61</span>
                     </h1>
-                    <span id="admin-email" onclick="this.classList.toggle('revealed')" title="Click to reveal email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px; cursor:pointer; filter:blur(4px); transition:filter 0.2s;" class="">medlifeplus@gmail.com</span>
-                    <style>#admin-email.revealed { filter:none; }</style>
+                    <span id="admin-email" style="font-size:0.7em; color:var(--text-sub); opacity:0.75; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
                 
                 <div style="display:flex; align-items:center; gap:8px; border-left:1px solid #eee; padding-left:12px;">
@@ -7764,10 +7864,19 @@
                                     .logic-chip input { cursor:pointer; width:14px; height:14px; accent-color:currentColor; }
                                 </style>
                             </div>
-                            <!-- Case Content Area -->
+                            <!-- Case Content Area (Markdown split, Phase 2 V91.36) -->
                             <div id="case-content-area" style="display:none; margin-bottom:8px;">
-                                <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:2px;"><i class="fa-solid fa-book-open"></i> Case Study Content</label>
-                                <textarea id="quiz-case-content" placeholder="Enter case study content..." style="width:100%; padding:5px 8px; border:1px solid #334155; border-radius:6px; font-size:0.85em; background:#0f172a; color:#f1f5f9; min-height:50px; resize:vertical;"></textarea>
+                                <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:6px;"><i class="fa-solid fa-book-open"></i> Case Study Content</label>
+                                <div class="q-text-split">
+                                    <div class="q-text-pane">
+                                        <div class="q-text-pane-label">📝 Markdown</div>
+                                        <textarea id="quiz-case-content" oninput="renderQTextPreview(this)" placeholder="Markdown supported: **bold**, *italic*, - list, [link](url)..." style="width:100%; padding:12px; border:1.5px solid #334155; border-radius:12px; font-size:0.85em; background:#0f172a; color:#f1f5f9; height:140px; resize:vertical; box-sizing:border-box; line-height:1.55;"></textarea>
+                                    </div>
+                                    <div class="q-text-pane">
+                                        <div class="q-text-pane-label">👁️ Preview</div>
+                                        <div class="q-text-preview"></div>
+                                    </div>
+                                </div>
                             </div>
                             <!-- Feedback Limit Area (for read_only mode) -->
                             <div id="feedback-limit-area" style="display:none; margin-bottom:8px;">
@@ -11484,6 +11593,36 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
             }
         };
 
+        // Markdown preview for q-text (Phase 1, V91.35)
+        window._qTextDebounce = window._qTextDebounce || new WeakMap();
+        window.renderQTextPreview = function(textarea) {
+            if (!textarea) return;
+            const wrap = textarea.closest('.q-text-split');
+            if (!wrap) return;
+            const preview = wrap.querySelector('.q-text-preview');
+            if (!preview) return;
+            const prev = window._qTextDebounce.get(textarea);
+            if (prev) clearTimeout(prev);
+            const t = setTimeout(() => {
+                const md = textarea.value || '';
+                if (!md.trim()) {
+                    preview.innerHTML = '<span style="color:#64748b; font-style:italic;">Preview will appear here...</span>';
+                    return;
+                }
+                try {
+                    if (window.marked && window.DOMPurify) {
+                        const html = window.DOMPurify.sanitize(window.marked.parse(md, { breaks: true, gfm: true }));
+                        preview.innerHTML = html;
+                    } else {
+                        preview.textContent = md;
+                    }
+                } catch (e) {
+                    preview.textContent = md;
+                }
+            }, 200);
+            window._qTextDebounce.set(textarea, t);
+        };
+
         window.aiEnhanceQuestion = async function(btn) {
             const item = btn.closest('.quiz-q-item');
             const questionTextarea = item.querySelector('.q-text');
@@ -11514,19 +11653,25 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
 
                 const prompt = `You are an expert educator and curriculum designer specializing in high-stakes professional assessments (e.g., Medical/Technical boards). Your task is to:
                 1. ${taskPrompt}
-                2. Apply Bloom's Taxonomy: Shift the question from simple recall to Higher-Order Thinking (Application, Analysis, or Evaluation) where possible. 
-                3. Create "Professional-Grade" Distractors: All options must be plausible and based on common misconceptions or logical alternatives. Avoid "obvious" wrong answers. 
+                2. Apply Bloom's Taxonomy: Shift the question from simple recall to Higher-Order Thinking (Application, Analysis, or Evaluation) where possible.
+                3. Create "Professional-Grade" Distractors: All options must be plausible and based on common misconceptions or logical alternatives. Avoid "obvious" wrong answers.
                 4. Maintain technical accuracy: Ensure the core medical/technical concept and the original correct answer(s) are preserved but expressed more robustly.
                 5. Conciseness: Keep the question and options professional, avoiding unnecessary padding.
-                
+                6. MARKDOWN FORMATTING (V91.37): Apply Markdown formatting INSIDE the "question" string ONLY to improve readability. Use:
+                   - **bold** for key clinical terms, findings, drug names, or critical numerical values
+                   - *italic* for emphasis or anatomical/Latin terms
+                   - bullet lists ("- ") for symptoms, criteria, lab parameters, or differentials
+                   - "\\n\\n" for paragraph breaks (e.g., between vignette and question stem)
+                   Keep markdown light and purposeful — do not over-format. The "options" array MUST remain plain text (NO markdown), so users cannot infer the correct answer from formatting cues.
+
                 Original Question: "${questionText}"
                 Original Options: ${JSON.stringify(options)}
                 The current correct option index is: ${JSON.stringify(correctIndices)} (0-indexed)
-                
-                IMPORTANT: YOUR OUTPUT MUST BE ONLY A RAW JSON STRING WITHOUT ANY MARKDOWN CODE BLOCKS OR OTHER EXPLANATIONS.
+
+                IMPORTANT: YOUR OUTPUT MUST BE ONLY A RAW JSON STRING. Do NOT wrap the JSON in code fences (\`\`\`json or \`\`\`). Do NOT add any explanation before or after the JSON. Markdown is allowed ONLY inside the "question" string value.
                 {
-                  "question": "Enhanced version of the question",
-                  "options": ["Enhanced Opt 1", "Enhanced Opt 2", ...],
+                  "question": "Enhanced version with **bold** key terms, *italic* emphasis, and \\n- bullet lists where appropriate",
+                  "options": ["Enhanced Opt 1 (plain text only)", "Enhanced Opt 2 (plain text only)", ...],
                   "correctIndices": [indices of correct answers in the new list]
                 }
                 If the order of options changes, make sure "correctIndices" points at the corresponding version of the original correct answers.`;
@@ -11566,6 +11711,7 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                 
                 // Update UI
                 questionTextarea.value = data.question;
+                if (window.renderQTextPreview) window.renderQTextPreview(questionTextarea);
                 
                 // If AI returned different number of options, we might need to adjust, 
                 // but for now let's assume it respects the count or we overwrite.
@@ -12084,6 +12230,7 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
             });
 
             document.getElementById('quiz-case-content').value = q.caseContent || "";
+            if (window.renderQTextPreview) window.renderQTextPreview(document.getElementById('quiz-case-content'));
             toggleCaseUI();
             updatePollUI();
 
@@ -12138,6 +12285,7 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                 else i.classList.remove('active');
             });
             document.getElementById('quiz-case-content').value = "";
+            if (window.renderQTextPreview) window.renderQTextPreview(document.getElementById('quiz-case-content'));
             toggleCaseUI();
             updatePollUI();
             document.getElementById('quiz-start-time').value = "";
@@ -12532,14 +12680,30 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                     <div class="glass-toggle-item ${qType === 'flashcard' ? 'active' : ''}" data-value="flashcard"></div>
                 </div>
                 <div style="background:#1e293b; border:1px solid #334155; border-radius:24px; padding:20px; box-shadow:0 8px 30px rgba(0,0,0,0.2);">
-                    <!-- Main Text Area -->
-                    <div style="margin-bottom:15px; position:relative;">
-                        <textarea class="q-text" onpaste="handleQuestionPaste(event, this)" placeholder="Type question or paste formatted content..." style="width:100%; height:100px; font-size:1.05em; border-radius:16px; border:1.5px solid #334155; padding:15px; background:#0f172a; color:#f1f5f9; box-shadow:inset 0 2px 4px rgba(0,0,0,0.2); line-height:1.6;"></textarea>
+                    <!-- Main Text Area + Markdown Preview (Phase 1, V91.35) -->
+                    <div class="q-text-split" style="margin-bottom:15px;">
+                        <div class="q-text-pane">
+                            <div class="q-text-pane-label">📝 Markdown</div>
+                            <textarea class="q-text" onpaste="handleQuestionPaste(event, this)" oninput="renderQTextPreview(this)" placeholder="Type question (Markdown supported: **bold**, *italic*, - list, [link](url))..." style="width:100%; height:140px; font-size:1.05em; border-radius:16px; border:1.5px solid #334155; padding:15px; background:#0f172a; color:#f1f5f9; box-shadow:inset 0 2px 4px rgba(0,0,0,0.2); line-height:1.6; box-sizing:border-box;"></textarea>
+                        </div>
+                        <div class="q-text-pane">
+                            <div class="q-text-pane-label">👁️ Preview</div>
+                            <div class="q-text-preview"></div>
+                        </div>
                     </div>
                 
-                <div class="q-page-content-area" style="display:none; margin-bottom:15px; position:relative;">
+                <div class="q-page-content-area" style="display:none; margin-bottom:15px; position:relative; padding-top:10px;">
                     <label style="position:absolute; top:-10px; left:20px; background:#1e293b; padding:0 10px; font-size:0.75em; font-weight:900; color:#818cf8; z-index:1; border-radius:4px; text-transform:uppercase; letter-spacing:0.5px;">📖 Page Details</label>
-                    <textarea class="q-page-content" placeholder="Enter content for this page... (HTML supported)" style="width:100%; height:140px; font-size:0.95em; border:1.5px solid #334155; border-radius:15px; padding:15px; background:#0f172a; color:#f1f5f9;">${data ? (data.content || '') : ''}</textarea>
+                    <div class="q-text-split">
+                        <div class="q-text-pane">
+                            <div class="q-text-pane-label">📝 Markdown</div>
+                            <textarea class="q-page-content" oninput="renderQTextPreview(this)" placeholder="Page content (Markdown supported: **bold**, *italic*, - list)..." style="width:100%; height:140px; font-size:0.95em; border:1.5px solid #334155; border-radius:15px; padding:15px; background:#0f172a; color:#f1f5f9; box-sizing:border-box; line-height:1.6;">${data ? (data.content || '') : ''}</textarea>
+                        </div>
+                        <div class="q-text-pane">
+                            <div class="q-text-pane-label">👁️ Preview</div>
+                            <div class="q-text-preview"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Options / Answers Section -->
@@ -12584,6 +12748,12 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
 
             // Sync text value
             if (data) div.querySelector('.q-text').value = data.q;
+            // Initial markdown preview render (Phase 1 V91.35, extended Phase 2 V91.36)
+            if (window.renderQTextPreview) {
+                window.renderQTextPreview(div.querySelector('.q-text'));
+                const pageEl = div.querySelector('.q-page-content');
+                if (pageEl) window.renderQTextPreview(pageEl);
+            }
 
             if (!data) {
                 const total = document.querySelectorAll('.quiz-q-item').length;
@@ -22436,7 +22606,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         const totalSubs = subs.length;
                         const avgScore = subs.reduce((sum, s) => sum + ((s.earnedScore || 0) + (s.bonusGiven || 0)), 0) / (totalSubs || 1);
                         const topSubmitters = subs.slice(0, 5); // Show top 5 avatars
-
+                        
                         d.innerHTML = `
                             <div class="card-header-row" style="margin-bottom:10px;">
                                 <span class="badge" style="background:linear-gradient(135deg,#22c55e,#16a34a);padding:4px 12px;border-radius:8px;font-size:0.7em;letter-spacing:0.5px;">DAILY QUEST</span>
@@ -25247,7 +25417,6 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             window._lp.monitorGroup = 'All';
             window._lp.phaseFilter = 'all';
             lpRenderMonitorGroupTabs();
-            lpRenderPhaseTabs();
             lpRenderInternGrid('All');
         };
 
@@ -25279,17 +25448,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const d = window._lp.internBadgeData[uid];
             if (!d) return 'unknown';
             if (!d.count || !d.lastDate) return 'no-activity';
-            const days = Math.round((new Date() - new Date(d.lastDate)) / 86400000);
-            if (days <= 3) return 'active';
-            if (days <= 14) return 'at-risk';
+            const diff = Math.round((new Date(new Date().toISOString().split('T')[0]) - new Date(d.lastDate)) / 86400000);
+            if (diff <= 3) return 'active';
+            if (diff <= 14) return 'at-risk';
             return 'no-activity';
         };
 
         const LP_PHASES = [
             { key: 'all',         label: 'All',           dot: '',   accent: '#1d4ed8', bg: '#eff6ff' },
             { key: 'active',      label: 'Active',        dot: '🟢', accent: '#16a34a', bg: '#f0fdf4' },
-            { key: 'at-risk',     label: 'At Risk',       dot: '🟡', accent: '#ca8a04', bg: '#fefce8' },
-            { key: 'no-activity', label: 'No Activity',   dot: '🔴', accent: '#dc2626', bg: '#fef2f2' },
+            { key: 'at-risk',     label: 'At Risk',       dot: '🟡', accent: '#d97706', bg: '#fffbeb' },
+            { key: 'no-activity', label: 'No Activity',   dot: '🔴', accent: '#dc2626', bg: '#fef2f2' }
         ];
 
         window.lpRenderPhaseTabs = function() {
@@ -25303,7 +25472,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const count = p.key === 'all' ? users.length : (hasBadgeData ? users.filter(u => lpGetInternPhase(u.id) === p.key).length : '?');
                 const isActive = current === p.key;
                 return `<button onclick="lpSetPhaseFilter('${p.key}')" style="padding:5px 12px; border:1px solid ${isActive ? p.accent + '55' : '#e2e8f0'}; border-radius:16px; font-size:0.8em; font-weight:700; cursor:pointer; background:${isActive ? p.bg : '#f8fafc'}; color:${isActive ? p.accent : '#94a3b8'}; transition:all 0.15s;">
-                    ${p.dot ? p.dot + ' ' : ''}${p.label} <span style="opacity:0.7;">(${count})</span>
+                    ${p.dot ? p.dot + ' ' : ''}${p.label} <span style="opacity:0.75;">(${count})</span>
                 </button>`;
             }).join('');
         };
@@ -25312,6 +25481,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             window._lp.phaseFilter = phase;
             lpRenderPhaseTabs();
             lpRenderInternGrid(window._lp.monitorGroup || 'All');
+            const det = document.getElementById('lp-monitor-intern-detail');
+            if (det) det.style.display = 'none';
+            document.querySelectorAll('.lp-intern-card').forEach(c => c.classList.remove('active'));
         };
 
         window.lpRenderInternGrid = function(group) {
@@ -25323,7 +25495,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 list = list.filter(u => lpGetInternPhase(u.id) === phase);
             }
             if (!list.length) {
-                grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#94a3b8; font-size:0.85em;">No interns in this group.</div>';
+                grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#94a3b8; font-size:0.85em;">No interns in this phase.</div>';
                 return;
             }
             grid.innerHTML = list.map(u => {
@@ -25334,9 +25506,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const phaseKey = lpGetInternPhase(u.id);
                 const phaseDot = { active: '🟢', 'at-risk': '🟡', 'no-activity': '🔴' }[phaseKey] || '';
                 return `<div class="lp-intern-card" onclick="lpSelectIntern('${u.id}', this)" style="background:#fafafa; border:1px solid #e2e8f0; border-radius:14px; padding:12px; text-align:center; cursor:pointer; transition:all 0.15s;" onmouseover="this.style.borderColor='#1d4ed8';this.style.background='#eff6ff'" onmouseout="if(!this.classList.contains('active')){this.style.borderColor='#e2e8f0';this.style.background='#fafafa'}">
-                    <div style="position:relative; width:44px; height:44px; margin:0 auto 8px;">
+                    <div style="position:relative; width:44px; margin:0 auto 8px;">
                         <div style="width:44px; height:44px; border-radius:50%; background:hsl(${hue},60%,55%); color:#fff; font-size:1em; font-weight:900; display:flex; align-items:center; justify-content:center;">${initials}</div>
-                        <span data-phase-dot style="position:absolute; bottom:-2px; right:-2px; font-size:0.85em; line-height:1;">${phaseDot}</span>
+                        ${phaseDot ? `<span style="position:absolute; bottom:-2px; right:-4px; font-size:0.9em;">${phaseDot}</span>` : ''}
                     </div>
                     <div style="font-size:0.85em; font-weight:700; color:#0f172a; line-height:1.3;">${name}</div>
                     <div style="font-size:0.73em; color:#94a3b8; margin-top:2px;">${grp}</div>
@@ -25366,6 +25538,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     if (dotEl) dotEl.textContent = phaseDot;
                 } catch(e) {}
             }));
+            // Render phase tabs with real counts now that data is loaded
             lpRenderPhaseTabs();
         };
 
@@ -25652,6 +25825,7 @@ Recommended Review: X days`;
                 const entries = lpSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.date || '') > (a.date || '') ? 1 : -1);
                 const quizzes = quizSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
+                // Stats
                 const due = entries.filter(e => e.nextReviewDate && e.nextReviewDate <= todayStr).length;
                 const activeWeeks = new Set(entries.map(e => { const d = new Date(e.date + 'T00:00:00'); return d.getFullYear() + '-' + lpGetISOWeek(d); })).size;
                 if (statsEl) statsEl.innerHTML = [
@@ -25736,6 +25910,7 @@ Recommended Review: X days`;
                         <div id="lp-pin-detail" style="display:none;margin-top:4px;"></div>`;
                 }
 
+                // LP entry list (collapsible, hidden by default)
                 if (feedSection) feedSection.style.display = 'block';
                 const feedToggle = document.getElementById('lp-intern-feed-toggle');
                 if (feedToggle) feedToggle.textContent = '📓 LP Entries ▼';
@@ -25759,6 +25934,7 @@ Recommended Review: X days`;
                     }).join('') : '<div style="padding:16px;text-align:center;color:#94a3b8;font-size:0.85em;">No entries yet.</div>';
                 }
 
+                // Update card badge
                 const badge = document.getElementById('lp-card-badge-' + uid);
                 if (badge) badge.innerHTML = `<span style="color:#1d4ed8;">${entries.length} entries</span>${due?` · <span style="color:#dc2626;">${due} due</span>`:''}`;
 
@@ -25919,7 +26095,7 @@ Recommended Review: X days`;
             </div>`;
         };
 
-        window.loadInternPath = function() {};
+        window.loadInternPath = function() {}; // kept for backward-compat, replaced by lpSelectIntern
 
         window.lpAutoResize = function(el) {
             el.style.height = 'auto';
@@ -27966,7 +28142,7 @@ Reply ONLY with raw JSON, no markdown:
                 item.aiFeedbackSuggestion = suggestion;
 
                 if (reviewEl) {
-                    reviewEl.innerHTML = `<div><b>🗡️</b> ${score.toFixed(1)}/10</div>${issue ? `<div><b>Issue:</b> ${qfpEscapeHtml(issue)}</div>` : ''}${suggestion ? `<div><b>Suggestion:</b> ${qfpEscapeHtml(suggestion)}</div>` : ''}`;
+                    reviewEl.innerHTML = `<div><b>AI Score:</b> ${score.toFixed(1)}/10</div>${issue ? `<div><b>Issue:</b> ${qfpEscapeHtml(issue)}</div>` : ''}${suggestion ? `<div><b>Suggestion:</b> ${qfpEscapeHtml(suggestion)}</div>` : ''}`;
                 }
                 showToast('AI scoring complete');
             } catch (e) {

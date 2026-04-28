@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.02)</title>
+    <title>Internship Portfolio (V94.03)</title>
     <!-- V94.02: Merge Ranks+Badges — badge chips embedded in Me leaderboard row -->
     <!-- Release: 2026-04-26 16:00 UTC+7 -->
 
@@ -19,7 +19,49 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
+    <!-- Markdown rendering for Quiz content (Phase 3, V94.03) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+
     <style>
+        /* Markdown render output for Quiz content (Phase 3, V94.03) */
+        .md-render > *:first-child { margin-top: 0; }
+        .md-render > *:last-child { margin-bottom: 0; }
+        .md-render p { margin: 0.4em 0; }
+        .md-render strong { font-weight: 800; }
+        .md-render em { font-style: italic; }
+        .md-render code {
+            background: rgba(99, 102, 241, 0.08);
+            color: #4338ca;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-family: Consolas, monospace;
+            font-size: 0.9em;
+        }
+        .md-render pre {
+            background: #f1f5f9;
+            padding: 10px 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 0.5em 0;
+        }
+        .md-render pre code { background: transparent; padding: 0; color: inherit; }
+        .md-render ul, .md-render ol { margin: 0.4em 0; padding-left: 1.4em; }
+        .md-render li { margin: 0.2em 0; }
+        .md-render a { color: #2563eb; text-decoration: underline; }
+        .md-render blockquote {
+            border-left: 3px solid #6366f1;
+            padding-left: 10px;
+            margin: 0.4em 0;
+            color: #4b5563;
+            font-style: italic;
+        }
+        .md-render hr { border: none; border-top: 1px solid #e5e7eb; margin: 0.7em 0; }
+        .md-render h1, .md-render h2, .md-render h3 { margin: 0.6em 0 0.3em; font-weight: 800; }
+        .md-render h1 { font-size: 1.25em; }
+        .md-render h2 { font-size: 1.15em; }
+        .md-render h3 { font-size: 1.05em; }
+
         @keyframes pulse {
             0% {
                 transform: scale(1);
@@ -3648,6 +3690,23 @@
     <script>
         const USER_LIFF_ID = "2008959998-yjcNpaGt"; // ✅ Updated ID
 
+        // Markdown renderer for Quiz content (Phase 3, V94.03)
+        // Returns sanitized HTML; safe for innerHTML / template literal interpolation.
+        // Backward-compatible: plain text without markdown syntax renders ~unchanged.
+        window.renderMd = function(text) {
+            if (text === null || text === undefined) return '';
+            const str = String(text);
+            if (!str.trim()) return '';
+            try {
+                if (window.marked && window.DOMPurify) {
+                    return window.DOMPurify.sanitize(window.marked.parse(str, { breaks: true, gfm: true }));
+                }
+            } catch (e) { /* fall through */ }
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML.replace(/\n/g, '<br>');
+        };
+
         let userId = "", userProfile = {}, userSubmissions = {};
         let questsCache = [], mySubmissionsCache = {}, myWorksCache = [], sideQuestsCache = {}, myGroup = "Public";
         let quizzesCache = [], quizAttemptsCache = {}, allUsersData = [], divisionConfig = {}, groupSettings = {}; // 🔥 Added Settings V69
@@ -5756,16 +5815,16 @@
                         </button>
                     </div>
 
-                    <h3 style="margin-top:0; color:var(--primary); font-size:1.15em; line-height:1.4; white-space: pre-wrap;">
-                        ${page.q}
+                    <h3 class="md-render" style="margin-top:0; color:var(--primary); font-size:1.15em; line-height:1.4;">
+                        ${window.renderMd(page.q)}
                     </h3>
-                    
+
                     ${pollHtml}
 
-                    <div id="read-only-content-reveal" class="${isAnswered || !isPoll ? 'reveal-active' : ''}" 
-                         style="display:${isAnswered || !isPoll ? 'block' : 'none'}; font-size:1.05em; line-height:1.7; color:#333; margin-top:15px; white-space:pre-wrap; text-align:justify;">
+                    <div id="read-only-content-reveal" class="md-render ${isAnswered || !isPoll ? 'reveal-active' : ''}"
+                         style="display:${isAnswered || !isPoll ? 'block' : 'none'}; font-size:1.05em; line-height:1.7; color:#333; margin-top:15px; text-align:justify;">
                         ${isPoll ? '<div style="font-weight:bold; color:var(--primary); margin-bottom:10px; border-top:1px solid #eee; padding-top:15px; font-size:0.9em;">✨ เฉลย/เนื้อหาเพิ่มเติม (The Revelation):</div>' : ''}
-                        ${(page.content || "เนื้อหาสำหรับหน้านี้...").trim()}
+                        ${window.renderMd((page.content || "เนื้อหาสำหรับหน้านี้...").trim())}
                     </div>
                 </div>
             `;
@@ -5927,7 +5986,8 @@
                 const passageBody = document.getElementById('quiz-case-content-body');
                 if (currentQuiz.quizType === 'case_study' && currentQuiz.caseContent) {
                     passageArea.style.display = 'block';
-                    passageBody.innerText = currentQuiz.caseContent;
+                    passageBody.innerHTML = window.renderMd(currentQuiz.caseContent);
+                    passageBody.classList.add('md-render');
                     // Auto-show on first step
                     if (currentStep === 0 && !useExistingTime) {
                         passageBody.style.display = 'block';
@@ -6057,7 +6117,7 @@
                 quizRunContainer.innerHTML = `
                 <div style="margin-bottom:15px;">
                     <span class="badge" style="background:#4361ee; margin-bottom:10px;">Q ${currentStep + 1}/${currentQuiz.questions.length} (${qType.toUpperCase()})</span>
-                    <div style="font-weight:bold; font-size:1.1em; color:#333; white-space: pre-wrap;">${question.q}</div>
+                    <div class="md-render" style="font-weight:bold; font-size:1.1em; color:#333;">${window.renderMd(question.q)}</div>
                 </div>
                 ${inputHtml}
             `;
@@ -6290,11 +6350,7 @@
                     if (Array.isArray(userAns)) {
                         userAnsText = userAns.join('\n\n');
                     } else if (typeof userAns === 'string' && userAns.includes("\n---\n")) {
-                        userAnsText = userAns.replace(/
----
-/g, '
-
-');
+                        userAnsText = userAns.replaceAll('\n---\n', '\n\n');
                     } else {
                         userAnsText = userAns;
                     }
@@ -6321,7 +6377,7 @@
                             <b style="color:#333;">Q ${i + 1}</b>
                             ${icon}
                         </div>
-                        <div style="font-size:1em; margin-bottom:5px;">${question.q}</div>
+                        <div class="md-render" style="font-size:1em; margin-bottom:5px;">${window.renderMd(question.q)}</div>
                         <div style="background:rgba(255,255,255,0.5); padding:8px; border-radius:6px; font-size:0.95em;">
                             <b>ตอบ:</b> ${userAnsText}
                         </div>
@@ -6692,7 +6748,7 @@
                                 <b style="color:#333;">Q ${i + 1}</b>
                                 <i class="fa-solid fa-check-circle" style="color:#155724;"></i>
                             </div>
-                            <div style="font-size:1em; margin-bottom:5px;">${question.q}</div>
+                            <div class="md-render" style="font-size:1em; margin-bottom:5px;">${window.renderMd(question.q)}</div>
                             <div style="background:rgba(255,255,255,0.5); padding:8px; border-radius:6px; font-size:0.95em;">
                                 <b>ตอบ:</b> ${userAnsText} ✅
                             </div>
@@ -6706,7 +6762,7 @@
                                 <b style="color:#333;">Q ${i + 1}</b>
                                 <i class="fa-solid fa-times-circle" style="color:#721c24;"></i>
                             </div>
-                            <div style="font-size:1em; margin-bottom:5px;">${question.q}</div>
+                            <div class="md-render" style="font-size:1em; margin-bottom:5px;">${window.renderMd(question.q)}</div>
                             <div style="background:rgba(255,255,255,0.5); padding:8px; border-radius:6px; font-size:0.95em; color:#721c24;">
                                 ❌ ตอบผิด — เฉลยจะแสดงหลังสอบจริงเท่านั้น
                             </div>
