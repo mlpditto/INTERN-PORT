@@ -101,10 +101,11 @@ LIFF ID source: `public/index.html:3747` (`USER_LIFF_ID = "2008959998-yjcNpaGt"`
 
 - **Notes:**
   - Tested: 2026-04-29
-  - Device: **Samsung S24** (Android)
+  - Device: **iPhone 17 Pro** (iOS)
   - LINE account: **Joeylive**
   - Tested against: **production V94.06 / commit `54c038d`** (drift from doc header V94.04 / `6a2c120` — V94.04 → V94.06 changes did not touch LIFF init / login / profile-fetch paths; only added write-side use of `userProfile.displayName` / `pictureUrl` in submission writes, gated downstream of this Phase 3)
   - **Result: 6/6 PASS** — auth init, profile fetch, no permission loop, no JS errors
+  - **#6 caveat (iOS):** native Safari Web Inspector cannot attach to LINE webview (per QA file's own iOS guidance, Phase 3 #6 bullet), so #6 was verified by absence of visible crash / blank-render / stuck-loading indicators rather than actual console inspection. Browser-emulator console (Phase 2) is the prior gating layer for raw JS errors.
   - Phase 4 (Work History deep test) **unblocked**
 
 ### Troubleshooting matrix
@@ -228,12 +229,12 @@ app_version: V94.04
 ## Result
 
 - **qa_result:** pending (Phase 3 done; Phase 4–6 outstanding)
-- **phase3_result:** pass (6/6, 2026-04-29, Samsung S24 / Joeylive, V94.06 commit `54c038d`)
+- **phase3_result:** pass (6/6, 2026-04-29, iPhone 17 Pro / Joeylive, V94.06 commit `54c038d`; #6 visual-only on iOS — see Notes caveat)
 - **Evidence:**
   - HEAD verified at `54c038d` (production tip V94.06, includes V94.04 footer auto-sync PR #30 + V94.05 mood grid PR #33 + V94.06 LP score PR #34)
   - All Work History phases (V91.62–V91.66) shipped on production
   - Footer auto-sync verified via PR #30 description
-  - Phase 3 auth-smoke gate cleared on Samsung S24 / LINE account `Joeylive`: in-app browser opens, 3-stage status text within 10s, real LINE displayName + pictureUrl rendered, no "Allow Access" loop, no fatal JS errors
+  - Phase 3 auth-smoke gate cleared on iPhone 17 Pro / LINE account `Joeylive`: in-app browser opens, 3-stage status text within 10s, real LINE displayName + pictureUrl rendered, no "Allow Access" loop, no visible JS-error symptoms (#6 visual-only on iOS — Safari Web Inspector cannot attach to LINE webview; see Notes caveat)
   - Code-level pre-verify (V94.06): `USER_LIFF_ID = "2008959998-yjcNpaGt"` at `public/index.html:3747`, `liff.init` 10s timeout at line 4161, `liff.getProfile()` at line 4177 — all unchanged in behavior from V94.04
 - **Blockers:**
   - Phase 4 (Work History 5 sub-tests) and Phase 5 (Quiz Editor markdown, admin-only) not yet performed
