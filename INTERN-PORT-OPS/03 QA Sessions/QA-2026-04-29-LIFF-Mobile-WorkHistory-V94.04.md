@@ -50,15 +50,71 @@ updated: 2026-04-29
 
 ## Phase 3 — LIFF Auth Smoke Test (gate)
 
-> **If any item here fails → STOP and fix before continuing.** ~10 min.
+> **If any item fails → STOP.** Phase 4+ depends on auth. ~10 min.
 
-- [ ] Open LINE → tap LIFF link → app loads inside LINE
-- [ ] Loading screen does NOT hang > 10 sec
-- [ ] User profile loads: `displayName` shown correctly
-- [ ] User profile loads: `pictureUrl` renders (not broken image)
-- [ ] No "Allow Access" loop / repeated permission prompts
-- [ ] DevTools (LINE remote debugging via chrome://inspect for Android, or `liff.print()` for inline log) — no fatal JS errors
+### LIFF URL
+
+```
+https://liff.line.me/2008959998-yjcNpaGt
+```
+
+Send this link to yourself in LINE (Keep Memo, or 1:1 chat with your own account), then tap from the device under test.
+
+LIFF ID source: `public/index.html:3747` (`USER_LIFF_ID = "2008959998-yjcNpaGt"`).
+
+### Pre-requisites
+
+- [ ] LINE app installed on device
+- [ ] Logged into LINE on this device
+- [ ] Stable internet (does not need to be fast — Slow 3G works for smoke)
+- [ ] (optional, Android) USB debugging on, device connected to PC, Chrome `chrome://inspect/#devices` open — gives you a live remote console for the LINE webview
+
+### Checks
+
+- [ ] **Tap LIFF link → app opens inside LINE**
+  - Pass: in-app browser opens; LINE channel/LIFF name shown at top of the webview
+  - Fail signs: opens in Safari/Chrome instead → LIFF ID disabled in LINE Console; "This page isn't available" → LIFF endpoint URL doesn't match Firebase deploy
+
+- [ ] **Loading screen does not hang > 10 sec**
+  - Code: `liff.init` has a 10s timeout at `public/index.html:4163`
+  - Pass: status text transitions "Initializing LIFF..." → "Checking Login Status..." → "Getting User Profile..." within 10s
+  - Fail signs: stuck on "Initializing..." > 10s → LIFF SDK can't load (LINE CDN issue or network); manual-login button appears → init flow incomplete
+
+- [ ] **`displayName` shows correctly**
+  - Pass: profile card at top of home shows your real LINE name
+  - Fail signs: "undefined" → `liff.getProfile()` returned wrong shape; default "ผู้ใช้งาน" → Firestore mapping ran but profile sync produced empty string
+
+- [ ] **`pictureUrl` renders (no broken image)**
+  - Pass: clear round profile picture in the profile card
+  - Fail signs: broken-image icon → LINE CDN URL expired or CORS; empty gray circle → CSS issue or `pictureUrl` is null
+
+- [ ] **No "Allow Access" loop**
+  - Pass: tap "Allow" once → enter app, no further permission prompts when navigating between sections
+  - Fail signs: prompt repeats every reload → permissions don't persist (LIFF endpoint URL mismatch); tap Allow bounces back to chat → callback URL wrong
+
+- [ ] **No fatal JS error in console**
+  - Verify via remote console (Android: USB debug + `chrome://inspect`)
+  - iOS: native Safari Web Inspector cannot attach to LINE webview — fall back to inline `alert()` patches in a dev branch only if a bug is suspected, or rely on visible status text
+  - Pass: no red errors during initial load
+  - Fail signs: `LIFF Init Timeout` / `LIFF SDK not found on window` / Firestore `permission-denied`
+
 - **Notes:**
+
+### Troubleshooting matrix
+
+| Symptom | Likely cause | Fix location |
+|---|---|---|
+| LIFF link opens in browser, not LINE | LIFF ID disabled | LINE Developers > Channel > LIFF tab |
+| Stuck on "Initializing LIFF..." | SDK URL or network | retry; try a different network |
+| "Allow Access" loop | Endpoint URL mismatch | LINE Console > LIFF > Endpoint URL must match the Firebase Hosting URL (`https://intern-port-edfa7.web.app/...`) |
+| `displayName` "undefined" | Missing scope | LINE Console > Channel > Scopes — must include `profile` |
+| Firestore `permission-denied` | Security rules block this user | Firestore > Rules — verify the rule that gates `request.auth.uid` |
+| Broken profile picture | LINE CDN URL expired (rare) | refresh — `liff.getProfile()` re-runs and gets a fresh URL |
+
+### After Phase 3
+
+- **All 6 pass:** mark all 6 checkboxes above, fill `Notes:` with device + LINE account label, then proceed to Phase 4.
+- **Any fail:** fill `Notes:` with the failing item + symptom; if it's a real bug, copy the Bug Report Template at the bottom of this file into `02 Bugs/BUG-2026-04-XX-LIFF-Auth-*.md`. **Do NOT proceed to Phase 4** — feature tests are meaningless without auth.
 
 ---
 
