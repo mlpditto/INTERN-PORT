@@ -5,9 +5,10 @@ qa_result: pending
 owner:
 date: 2026-04-29
 branch: production
-commit: 6a2c120
-version: V94.04
-liff_accounts_tested: 0
+commit: 54c038d
+version: V94.06
+liff_accounts_tested: 1
+phase3_result: pass
 updated: 2026-04-29
 ---
 
@@ -71,34 +72,41 @@ LIFF ID source: `public/index.html:3747` (`USER_LIFF_ID = "2008959998-yjcNpaGt"`
 
 ### Checks
 
-- [ ] **Tap LIFF link → app opens inside LINE**
+- [x] **Tap LIFF link → app opens inside LINE**
   - Pass: in-app browser opens; LINE channel/LIFF name shown at top of the webview
   - Fail signs: opens in Safari/Chrome instead → LIFF ID disabled in LINE Console; "This page isn't available" → LIFF endpoint URL doesn't match Firebase deploy
 
-- [ ] **Loading screen does not hang > 10 sec**
-  - Code: `liff.init` has a 10s timeout at `public/index.html:4163`
+- [x] **Loading screen does not hang > 10 sec**
+  - Code: `liff.init` has a 10s timeout at `public/index.html:4161` (V94.06; was 4163 in V94.04, off-by-2 from doc-only edits)
   - Pass: status text transitions "Initializing LIFF..." → "Checking Login Status..." → "Getting User Profile..." within 10s
   - Fail signs: stuck on "Initializing..." > 10s → LIFF SDK can't load (LINE CDN issue or network); manual-login button appears → init flow incomplete
 
-- [ ] **`displayName` shows correctly**
+- [x] **`displayName` shows correctly**
   - Pass: profile card at top of home shows your real LINE name
   - Fail signs: "undefined" → `liff.getProfile()` returned wrong shape; default "ผู้ใช้งาน" → Firestore mapping ran but profile sync produced empty string
 
-- [ ] **`pictureUrl` renders (no broken image)**
+- [x] **`pictureUrl` renders (no broken image)**
   - Pass: clear round profile picture in the profile card
   - Fail signs: broken-image icon → LINE CDN URL expired or CORS; empty gray circle → CSS issue or `pictureUrl` is null
 
-- [ ] **No "Allow Access" loop**
+- [x] **No "Allow Access" loop**
   - Pass: tap "Allow" once → enter app, no further permission prompts when navigating between sections
   - Fail signs: prompt repeats every reload → permissions don't persist (LIFF endpoint URL mismatch); tap Allow bounces back to chat → callback URL wrong
 
-- [ ] **No fatal JS error in console**
+- [x] **No fatal JS error in console**
   - Verify via remote console (Android: USB debug + `chrome://inspect`)
   - iOS: native Safari Web Inspector cannot attach to LINE webview — fall back to inline `alert()` patches in a dev branch only if a bug is suspected, or rely on visible status text
   - Pass: no red errors during initial load
   - Fail signs: `LIFF Init Timeout` / `LIFF SDK not found on window` / Firestore `permission-denied`
 
 - **Notes:**
+  - Tested: 2026-04-29
+  - Device: **iPhone 17 Pro** (iOS)
+  - LINE account: **Joeylive**
+  - Tested against: **production V94.06 / commit `54c038d`** (drift from doc header V94.04 / `6a2c120` — V94.04 → V94.06 changes did not touch LIFF init / login / profile-fetch paths; only added write-side use of `userProfile.displayName` / `pictureUrl` in submission writes, gated downstream of this Phase 3)
+  - **Result: 6/6 PASS** — auth init, profile fetch, no permission loop, no JS errors
+  - **#6 caveat (iOS):** native Safari Web Inspector cannot attach to LINE webview (per QA file's own iOS guidance, Phase 3 #6 bullet), so #6 was verified by absence of visible crash / blank-render / stuck-loading indicators rather than actual console inspection. Browser-emulator console (Phase 2) is the prior gating layer for raw JS errors.
+  - Phase 4 (Work History deep test) **unblocked**
 
 ### Troubleshooting matrix
 
@@ -220,14 +228,17 @@ app_version: V94.04
 
 ## Result
 
-- **qa_result:** pending
+- **qa_result:** pending (Phase 3 done; Phase 4–6 outstanding)
+- **phase3_result:** pass (6/6, 2026-04-29, iPhone 17 Pro / Joeylive, V94.06 commit `54c038d`; #6 visual-only on iOS — see Notes caveat)
 - **Evidence:**
-  - HEAD verified at `6a2c120` (production tip, includes Footer auto-sync PR #30)
+  - HEAD verified at `54c038d` (production tip V94.06, includes V94.04 footer auto-sync PR #30 + V94.05 mood grid PR #33 + V94.06 LP score PR #34)
   - All Work History phases (V91.62–V91.66) shipped on production
   - Footer auto-sync verified via PR #30 description
+  - Phase 3 auth-smoke gate cleared on iPhone 17 Pro / LINE account `Joeylive`: in-app browser opens, 3-stage status text within 10s, real LINE displayName + pictureUrl rendered, no "Allow Access" loop, no visible JS-error symptoms (#6 visual-only on iOS — Safari Web Inspector cannot attach to LINE webview; see Notes caveat)
+  - Code-level pre-verify (V94.06): `USER_LIFF_ID = "2008959998-yjcNpaGt"` at `public/index.html:3747`, `liff.init` 10s timeout at line 4161, `liff.getProfile()` at line 4177 — all unchanged in behavior from V94.04
 - **Blockers:**
-  - Real LIFF auth + 5-phase work-history test not yet performed
-  - AI Magic Quiz Editor markdown not yet tested on mobile keyboard
+  - Phase 4 (Work History 5 sub-tests) and Phase 5 (Quiz Editor markdown, admin-only) not yet performed
+  - Phase 6 edge cases (backgrounding, rotation, deep-link, init-race) not yet performed
 
 ## Next Actions
 
