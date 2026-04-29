@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.70</title>
+    <title>Nika V91.71</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -11758,7 +11758,8 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
 
         var usersData = [], worksData = [], casesData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {}, questsSubList = [];
         var knowledgeBaseCache = []; // Required by PDF-to-Quiz and Research grounding
-        var reflectiveLogsCache = []; 
+        var reflectiveLogsCache = [];
+        var learningNotesCache = []; // V91.71: Section 9 — Learning Note submissions for admin Kanban review
         var accessRequestsCache = []; 
         var pendingQuizzesCache = [];  
         var pointsClaimedCache = [];   
@@ -18511,11 +18512,12 @@ async function saveQuiz() {
 
             db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban, e => console.error("🔥 [Firestore Error] side_quests:", e));
 
-            db.collection("quests").onSnapshot(s => { 
-                questsCache = s.docs.map(d => ({ id: d.id, ...d.data() })); 
-                loadQuestHistory(); 
-                loadReflectiveLogsAdmin(); 
-                filterBoard(); 
+            db.collection("quests").onSnapshot(s => {
+                questsCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                loadQuestHistory();
+                loadReflectiveLogsAdmin();
+                loadLearningNotesAdmin(); // V91.71: Section 9 listener for Learning Note submissions
+                filterBoard();
             }, e => console.error("🔥 [Firestore Error] quests:", e));
 
             db.collection("knowledge_base").orderBy("createdAt", "desc").onSnapshot(s => {
@@ -22823,6 +22825,78 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 });
             } catch (e) { console.error("Kanban Section 8 (Quest Subs) Error:", e); }
 
+            // 9. V91.71: Render Learning Notes (pending → Review, reviewed → Done)
+            try {
+                learningNotesCache.forEach(note => {
+                    if (note.isArchived) return;
+                    const isPending = note.status !== 'reviewed' && (note.adminBonus === undefined || note.adminBonus === null);
+
+                    const title = note.title || "Untitled Learning Note";
+                    const content = note.description || "";
+                    const userName = note.displayName || 'Unknown';
+                    const tags = (note.metadata && Array.isArray(note.metadata.tags)) ? note.metadata.tags : [];
+                    const safeTitle = escapeKanbanText(title);
+                    const safeContent = escapeKanbanText(content);
+                    const safeUserName = escapeKanbanText(userName);
+
+                    if (filter && !title.toLowerCase().includes(filter) && !content.toLowerCase().includes(filter) && !userName.toLowerCase().includes(filter)) return;
+
+                    if (activeBoardGroup !== 'All') {
+                        const user = usersData.find(u => u.id === note.userId);
+                        if ((user?.group || 'Public') !== activeBoardGroup) return;
+                    }
+
+                    const status = isPending ? "Review" : "Done";
+                    cnt[status]++;
+
+                    const d = document.createElement('div');
+                    d.className = `kanban-card card-${status} learning-note-card`;
+                    d.style.borderLeft = isPending ? "4px solid #6c5ce7" : "4px solid #10b981";
+                    if (isPending) d.style.background = "#faf9ff";
+
+                    const tagChips = tags.length > 0
+                        ? `<div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:4px;">${tags.slice(0, 6).map(t => `<span style="background:rgba(108,92,231,0.1); color:#6c5ce7; padding:2px 8px; border-radius:8px; font-size:0.7em; font-weight:600;">${escapeKanbanText(t)}</span>`).join('')}${tags.length > 6 ? `<span style="font-size:0.7em; color:#94a3b8;">+${tags.length - 6}</span>` : ''}</div>`
+                        : '';
+
+                    let buttons = "";
+                    if (isPending) {
+                        buttons = `
+                            <button class="btn-sm" style="width:100%; background:linear-gradient(135deg, #6c5ce7, #a29bfe); color:white; border:none; padding:10px; border-radius:10px; font-weight:800; cursor:pointer; box-shadow:0 4px 12px rgba(108,92,231,0.2);" onclick="event.stopPropagation(); reviewLearningNote('${note.id}')">
+                                <i class="fa-solid fa-graduation-cap"></i> Review &amp; Score
+                            </button>
+                            <button class="btn-sm" style="width:100%; margin-top:8px; background:#ef4444; color:white; border:none; padding:8px; border-radius:10px; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); deleteLearningNote('${note.id}')">
+                                <i class="fa-solid fa-trash"></i> Delete
+                            </button>
+                        `;
+                    } else {
+                        buttons = `
+                            <div style="display:flex; gap:8px; margin-top:8px;">
+                                <button class="btn-sm" style="flex:1; background:var(--col-bg); color:var(--text-main); border:1px solid var(--border-color); padding:8px; border-radius:10px; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); archiveLearningNote('${note.id}')">
+                                    <i class="fa-solid fa-box-archive"></i> Archive
+                                </button>
+                                <button class="btn-sm" style="flex:1; background:#ef4444; color:white; border:none; padding:8px; border-radius:10px; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); deleteLearningNote('${note.id}')">
+                                    <i class="fa-solid fa-trash"></i> Delete
+                                </button>
+                            </div>
+                        `;
+                    }
+
+                    d.innerHTML = `
+                        <div class="card-header-row" style="margin-bottom:12px;">
+                            <span class="badge" style="background:${isPending ? 'linear-gradient(135deg, #6c5ce7, #a29bfe)' : 'linear-gradient(135deg, #10b981, #059669)'}; padding:4px 12px; border-radius:8px; font-size:0.7em; letter-spacing:0.5px;">🎓 LEARNING NOTE</span>
+                            <div class="card-header-right"><img class="lt-avatar" src="${note.pictureUrl || ''}" style="width:32px; height:32px; border-radius:10px; object-fit:cover; border:2px solid white; box-shadow:0 3px 6px rgba(0,0,0,0.1);" title="${safeUserName}"></div>
+                        </div>
+                        <div style="font-weight:800; font-size:1.05em; color:var(--text-main); margin-bottom:4px;">${safeUserName}</div>
+                        <div style="font-size:0.9em; font-weight:700; color:#6c5ce7; margin-bottom:6px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${safeTitle}</div>
+                        <div style="font-size:0.82em; color:var(--text-sub); line-height:1.5; background:var(--col-bg); padding:10px; border-radius:10px; margin-top:6px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${safeContent}</div>
+                        ${tagChips}
+                        ${!isPending ? `<div style="font-size:0.75em; color:var(--success); font-weight:700; margin-top:10px; display:flex; align-items:center; gap:5px;"><i class="fa-solid fa-circle-check"></i> Reviewed (+${note.adminBonus || 0} pts)</div>` : ''}
+                        <div style="margin-top:12px;">${buttons}</div>
+                    `;
+                    cols[status].appendChild(d);
+                });
+            } catch (e) { console.error("Kanban Section 9 (Learning Notes) Error:", e); }
+
             Object.keys(cnt).forEach(k => {
                 const badge = document.getElementById(`cnt-${k}`);
                 if (badge) badge.innerText = cnt[k];
@@ -24619,6 +24693,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 document.getElementById('show-reviewed-logs').checked = true; // Show all to find the specific user
                 loadReflectiveLogsAdmin(); // Trigger re-filter
             }
+        }
+
+        // V91.71: Listener for Learning Note submissions (Kanban Section 9)
+        // Subscribes to /submissions/ where submissionType='learning_note'.
+        // Pending → "Review" column; reviewed (status='reviewed' || adminBonus set) → "Done".
+        function loadLearningNotesAdmin() {
+            db.collection("submissions")
+                .where("submissionType", "==", "learning_note")
+                .onSnapshot(snapshot => {
+                    learningNotesCache = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                    learningNotesCache.sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
+                    drawKanban();
+                }, e => console.error("🔥 [Firestore Error] learning_note submissions:", e));
         }
 
         window._laughTaleUserFilter = null;
@@ -26867,6 +26954,102 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 await db.collection("reflective_logs").doc(id).update({ isArchived: false });
                 showToast("Moved back to Dashboard");
             } catch (e) { alert(e.message); }
+        }
+
+        // V91.71: Learning Note review handler (Section 9)
+        // Mirrors reviewReflective shape but uses inline prompt() instead of modal — simpler V1.
+        // On approval: marks status='reviewed', adminAcknowledged=true, adds adminBonus to user score immediately.
+        async function reviewLearningNote(id) {
+            const note = learningNotesCache.find(n => n.id === id);
+            if (!note) {
+                alert("Learning Note not found in cache. Please refresh.");
+                return;
+            }
+            const bonusStr = prompt(`Bonus points for "${note.title || 'Untitled'}" (0.1-2.0):`, "0.5");
+            if (bonusStr === null) return; // user cancelled
+            let bonus = parseFloat(bonusStr);
+            if (!Number.isFinite(bonus) || bonus < 0.1 || bonus > 2.0) {
+                alert("Invalid bonus. Must be 0.1 - 2.0.");
+                return;
+            }
+            const comment = prompt("Optional comment for student (or leave blank):", "") || "";
+            try {
+                const batch = db.batch();
+                batch.update(db.collection("submissions").doc(id), {
+                    status: 'reviewed',
+                    adminBonus: bonus,
+                    adminComment: comment.trim(),
+                    adminAcknowledged: true,
+                    reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    pointsAwarded: true,
+                    pointsAmount: firebase.firestore.FieldValue.increment(bonus)
+                });
+                if (note.userId && bonus > 0) {
+                    batch.update(db.collection("users").doc(note.userId), {
+                        score: firebase.firestore.FieldValue.increment(bonus)
+                    });
+                    batch.set(db.collection("checkin_logs").doc(), {
+                        userId: note.userId,
+                        type: 'learning_note_bonus',
+                        amount: bonus,
+                        note: `Admin bonus on Learning Note: ${note.title || id}`,
+                        relatedSubmissionId: id,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+                await batch.commit();
+                showToast(`🎓 Reviewed! +${bonus} pts to ${note.displayName || 'student'}`);
+            } catch (e) {
+                alert("Review failed: " + e.message);
+            }
+        }
+
+        async function archiveLearningNote(id) {
+            try {
+                await db.collection("submissions").doc(id).update({ isArchived: true });
+                showToast("Learning Note archived");
+            } catch (e) { alert(e.message); }
+        }
+
+        // Mirrors deleteReflectiveLog: also reverts the +0.1 autoScore granted at submit time
+        // and any adminBonus already awarded. Hard-deletes the submission doc.
+        async function deleteLearningNote(id) {
+            if (!confirm('Delete this Learning Note submission? คะแนนที่เคยให้ (autoScore + adminBonus) จะถูกลบอัตโนมัติ')) return;
+            try {
+                const ref = db.collection("submissions").doc(id);
+                const snap = await ref.get();
+                if (!snap.exists) {
+                    showToast('Submission not found (already deleted)');
+                    return;
+                }
+                const note = snap.data() || {};
+                const uid = note.userId || '';
+                const autoScore = Number.isFinite(parseFloat(note.score)) ? parseFloat(note.score) : 0.1;
+                const claimedBonus = note.adminAcknowledged === true ? (parseFloat(note.adminBonus) || 0) : 0;
+                const totalRevert = autoScore + claimedBonus;
+
+                const batch = db.batch();
+                if (uid && totalRevert > 0) {
+                    batch.update(db.collection("users").doc(uid), {
+                        score: firebase.firestore.FieldValue.increment(-totalRevert)
+                    });
+                    batch.set(db.collection("checkin_logs").doc(), {
+                        userId: uid,
+                        type: 'learning_note_delete_revert',
+                        amount: -totalRevert,
+                        note: `Admin deleted Learning Note: ${note.title || id}`,
+                        relatedSubmissionId: id,
+                        autoRevert: autoScore,
+                        bonusRevert: claimedBonus,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+                batch.delete(ref);
+                await batch.commit();
+                showToast(`Deleted Learning Note${totalRevert > 0 ? ` and reverted ${totalRevert.toFixed(2)} pts` : ''}`);
+            } catch (e) {
+                alert('Delete failed: ' + e.message);
+            }
         }
 
         async function deleteReflectiveLog(id) {
