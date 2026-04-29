@@ -14,11 +14,6 @@ concurrency:
   group: "pages"
   cancel-in-progress: true
 
-# Opt into Node.js 24 ahead of GitHub Actions Node 20 deprecation (effective 2026-09-16).
-# Removes warning: "Node.js 20 actions are deprecated".
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   deploy:
     environment:
@@ -29,22 +24,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       
-      # 🔥 Fix regex corruption before deploy
-      - name: Fix Regex Corruption
-        run: |
-          python scripts/fix-regex.py || echo "No corruption found or script not available"
-          git diff --quiet || (git config user.name "github-actions" && git config user.email "actions@github.com" && git add -A && git commit -m "ci: Auto-fix regex corruption" || true)
-
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
       - name: Disable Jekyll
-        run: touch public/.nojekyll
+        run: touch .nojekyll
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'public'
+          path: '.'
 
       - name: Deploy to GitHub Pages
         id: deployment
