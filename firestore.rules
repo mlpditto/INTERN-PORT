@@ -194,5 +194,15 @@ service cloud.firestore {
         && request.resource.data.dateKey == dateKey;
       allow update, delete: if isAdmin();
     }
+
+    // 25. Unified Submissions (V91.62+ Phase 2 — Case/Work/Quiz/Quest/Reflective/Learning Note)
+    // Same access pattern as /cases/ (rule 17): owner reads own, admin reviews/scores.
+    // Query path: db.collection('submissions').where('userId','==',userId) — covered by hasLinkedEffectiveUserId().
+    // Write path: code always sets request.resource.data.authUid = request.auth.uid on create.
+    match /submissions/{docId} {
+      allow read: if isAdmin() || isOwnerByAuthUid() || hasLinkedEffectiveUserId();
+      allow create: if isSignedIn() && request.resource.data.authUid == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
   }
 }
