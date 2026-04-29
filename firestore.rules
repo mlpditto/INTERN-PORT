@@ -196,12 +196,16 @@ service cloud.firestore {
     }
 
     // 25. Unified Submissions (V91.62+ Phase 2 — Case/Work/Quiz/Quest/Reflective/Learning Note)
-    // Same access pattern as /cases/ (rule 17): owner reads own, admin reviews/scores.
-    // Query path: db.collection('submissions').where('userId','==',userId) — covered by hasLinkedEffectiveUserId().
-    // Write path: code always sets request.resource.data.authUid = request.auth.uid on create.
+    // V94.09: Match reflective_logs (rule 13) pattern — single-query onSnapshot at
+    // loadUnifiedSubmissions() (public/index.html:9912) uses where('userId','==',userId)
+    // only. Stricter cases-style rule (V94.08 attempt) required TWO parallel queries
+    // (authUid + userId, see loadMyCases at line 11581-11583); single-query against the
+    // owner-or-linked OR rule was rejected by Firestore's query-alignment check.
+    // Privacy posture: same as reflective_logs — any signed-in user can read all
+    // submissions. Tightening would require allow-get/allow-list split or JS query
+    // refactor (out of scope for this hotfix).
     match /submissions/{docId} {
-      allow read: if isAdmin() || isOwnerByAuthUid() || hasLinkedEffectiveUserId();
-      allow create: if isSignedIn() && request.resource.data.authUid == request.auth.uid;
+      allow read, create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
   }
