@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.72</title>
+    <title>Nika V91.73</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1203,6 +1203,70 @@
             border-radius: 10px;
             font-size: 0.78em;
             font-weight: 600;
+        }
+
+        /* V91.73 PR γ.2: Removable tag chip with × button */
+        .lnr-tag-removable {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(108, 92, 231, 0.12);
+            color: #6c5ce7;
+            padding: 3px 4px 3px 10px;
+            border-radius: 12px;
+            font-size: 0.78em;
+            font-weight: 700;
+        }
+        .lnr-tag-removable .lnr-tag-x {
+            width: auto;
+            min-height: auto;
+            cursor: pointer;
+            background: rgba(108, 92, 231, 0.18);
+            color: #6c5ce7;
+            border: none;
+            border-radius: 8px;
+            padding: 1px 7px;
+            font-size: 0.95em;
+            font-weight: 800;
+            line-height: 1;
+        }
+        .lnr-tag-removable .lnr-tag-x:hover {
+            background: rgba(239, 68, 68, 0.22);
+            color: #b91c1c;
+        }
+
+        /* V91.73 PR γ.2: Quality star rating */
+        .lnr-star {
+            color: #d4d4d8;
+            transition: color 0.12s, transform 0.12s;
+            display: inline-block;
+        }
+        .lnr-star.active {
+            color: #f59e0b;
+        }
+        .lnr-star:hover {
+            transform: scale(1.18);
+        }
+
+        /* V91.73 PR γ.2: Quick feedback template chip */
+        .lnr-tpl {
+            width: auto;
+            min-height: auto;
+            border: 1px solid #c4b5fd;
+            background: #faf5ff;
+            color: #5b21b6;
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: 0.8em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+        .lnr-tpl:hover {
+            background: #ede9fe;
+            border-color: #a78bfa;
+            transform: translateY(-1px);
         }
 
         @media (max-width: 980px) {
@@ -3758,6 +3822,7 @@
     <script>mermaid.initialize({ startOnLoad: false, theme: 'neutral' });</script>
     <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <script src="taxonomy.js"></script>
 </head>
 
 <body>
@@ -8894,7 +8959,23 @@
                 <button type="button" onclick="closeLearningNoteReviewModal()" style="border:none; background:transparent; color:#475569; font-size:1.45em; line-height:1; cursor:pointer; padding:4px 10px;">&times;</button>
             </div>
 
-            <div id="lnr-tags-row" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; min-height:24px;"></div>
+            <!-- γ.2: Tag editor — admin can add/remove tags + suggest from Phase A taxonomy -->
+            <div style="margin-bottom:14px;">
+                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+                    <label style="font-weight:800; color:#374151; font-size:0.85em;">Tags 태그</label>
+                    <span style="font-size:0.7em; color:#94a3b8;">Add or remove tags before saving</span>
+                </div>
+                <div id="lnr-tags-selected" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; min-height:28px;"></div>
+                <div style="display:flex; gap:6px;">
+                    <input type="text" id="lnr-tag-input" placeholder="Type tag + Add..." style="flex:1; min-width:0; padding:8px 12px; border:1px solid #d8b4fe; border-radius:10px; font-size:0.82em; margin:0;" onkeypress="if(event.key==='Enter'){event.preventDefault();lnrAddTag();}">
+                    <button type="button" onclick="lnrAddTag()" style="width:auto; padding:8px 14px; background:#6c5ce7; border:none; border-radius:10px; color:white; font-size:0.82em; cursor:pointer; flex-shrink:0; white-space:nowrap;">+ Add</button>
+                </div>
+                <div id="lnr-tag-autosuggest" style="display:none; margin-top:8px; padding:8px 12px; background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; font-size:0.78em; color:#92400e;"></div>
+                <details style="margin-top:8px; background:#faf5ff; border:1px solid #d8b4fe; border-radius:10px; padding:8px 12px;">
+                    <summary style="cursor:pointer; font-size:0.8em; font-weight:600; color:#6b21a8; outline:none; user-select:none;">💡 Suggested taxonomy 추천 분류</summary>
+                    <div id="lnr-tag-suggested" style="padding-top:10px;"></div>
+                </details>
+            </div>
 
             <div style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:12px; padding:14px 16px; max-height:340px; overflow-y:auto; line-height:1.6; color:#1f2937;">
                 <div id="lnr-content" style="font-size:0.95em; word-break:break-word;"></div>
@@ -8912,6 +8993,36 @@
                     <button type="button" class="lnr-chip" data-score="2.0" onclick="setLearningNoteReviewScore(2.0)">2.0</button>
                 </div>
                 <input id="lnr-score-input" type="number" min="0.1" max="2.0" step="0.1" inputmode="decimal" placeholder="Custom (0.1 — 2.0)" style="width:auto; margin:0; border-radius:12px; padding:10px 14px; border:1.5px solid #d8b4fe; font-size:0.9em;" oninput="syncLearningNoteReviewChips()" onkeydown="if(event.key==='Enter'){event.preventDefault();saveLearningNoteReview();}">
+            </div>
+
+            <!-- γ.2: Quality star rating (separate signal from numeric score) -->
+            <div style="margin-top:14px;">
+                <label style="display:block; margin-bottom:6px; font-weight:800; color:#374151; font-size:0.9em;">
+                    Quality 품질 <span style="font-weight:400; color:#94a3b8; font-size:0.85em;">— how strong is this note overall? (optional)</span>
+                </label>
+                <div id="lnr-stars" style="display:inline-flex; gap:6px; font-size:1.6em; cursor:pointer; user-select:none; line-height:1;">
+                    <span class="lnr-star" data-rating="1" onclick="setLearningNoteStars(1)">☆</span>
+                    <span class="lnr-star" data-rating="2" onclick="setLearningNoteStars(2)">☆</span>
+                    <span class="lnr-star" data-rating="3" onclick="setLearningNoteStars(3)">☆</span>
+                    <span class="lnr-star" data-rating="4" onclick="setLearningNoteStars(4)">☆</span>
+                    <span class="lnr-star" data-rating="5" onclick="setLearningNoteStars(5)">☆</span>
+                </div>
+            </div>
+
+            <!-- γ.2: Quick feedback templates — click to append to comment -->
+            <div style="margin-top:14px;">
+                <label style="display:block; margin-bottom:6px; font-weight:800; color:#374151; font-size:0.9em;">
+                    Quick feedback 빠른 피드백 <span style="font-weight:400; color:#94a3b8; font-size:0.85em;">— click chip to append</span>
+                </label>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Great structure! 👍')">👍 Great structure</button>
+                    <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Strong reflection — keep going! 🌟')">🌟 Strong reflection</button>
+                    <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Excellent insight! 🎯')">🎯 Excellent insight</button>
+                    <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Add more examples 📝')">📝 More examples</button>
+                    <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Could expand on this 💭')">💭 Could expand</button>
+                    <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Check this reference 🔗')">🔗 Check reference</button>
+                    <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Consider adding tags 🏷️')">🏷️ Add tags</button>
+                </div>
             </div>
 
             <div style="margin-top:14px;">
@@ -27031,8 +27142,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         }
 
         // V91.72 PR γ.1: Learning Note review handler (Section 9)
-        // Opens content-visible modal instead of prompt() — admin can read full note + tags before scoring.
-        // Save logic identical to V91.71: marks status='reviewed', writes adminBonus + adminComment, increments user score.
+        // V91.73 PR γ.2: + tag editor + auto-suggest + star rating + templates
+        // Save logic preserves all V91.71 writes; γ.2 additionally writes adminQualityStars
+        // and syncs edited tags to BOTH submissions.metadata.tags AND learning_path_entries.tags.
         function reviewLearningNote(id) {
             const note = learningNotesCache.find(n => n.id === id);
             if (!note) {
@@ -27040,6 +27152,10 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 return;
             }
             window._lnrCurrent = note;
+            window._lnrTags = (note.metadata && Array.isArray(note.metadata.tags))
+                ? [...note.metadata.tags] : [];
+            window._lnrTagsOriginal = [...window._lnrTags];
+            window._lnrStars = (typeof note.adminQualityStars === 'number') ? note.adminQualityStars : 0;
 
             const escHtml = (val) => String(val || '')
                 .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -27047,10 +27163,10 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
             const titleEl = document.getElementById('lnr-title');
             const metaEl = document.getElementById('lnr-meta');
-            const tagsEl = document.getElementById('lnr-tags-row');
             const contentEl = document.getElementById('lnr-content');
             const scoreInput = document.getElementById('lnr-score-input');
             const commentEl = document.getElementById('lnr-comment');
+            const tagInputEl = document.getElementById('lnr-tag-input');
             const modal = document.getElementById('learningNoteReviewModal');
             if (!modal || !titleEl || !contentEl) return;
 
@@ -27061,11 +27177,6 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             const tsStr = ts ? ts.toLocaleString() : '—';
             metaEl.innerHTML = `<strong>${escHtml(note.displayName || 'Unknown')}</strong> · ${tsStr}`;
 
-            const tags = (note.metadata && Array.isArray(note.metadata.tags)) ? note.metadata.tags : [];
-            tagsEl.innerHTML = tags.length
-                ? tags.map(t => `<span class="lnr-tag">${escHtml(t)}</span>`).join('')
-                : '<span style="color:#94a3b8; font-size:0.85em;">No tags</span>';
-
             const content = note.description || '';
             if (window.marked && window.DOMPurify) {
                 contentEl.innerHTML = window.DOMPurify.sanitize(window.marked.parse(content, { breaks: true, gfm: true }));
@@ -27075,7 +27186,14 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
             scoreInput.value = '';
             commentEl.value = note.adminComment || '';
+            if (tagInputEl) tagInputEl.value = '';
             document.querySelectorAll('#learningNoteReviewModal .lnr-chip').forEach(c => c.classList.remove('active'));
+
+            // γ.2: Render new sections
+            lnrRenderSelectedTags();
+            lnrRenderSuggestedTaxonomy();
+            lnrAutoSuggestTags(content);
+            lnrRenderStars();
 
             modal.style.display = 'block';
             modal.classList.add('force-show');
@@ -27099,6 +27217,124 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         function closeLearningNoteReviewModal() {
             forceHideModal('learningNoteReviewModal');
             window._lnrCurrent = null;
+            window._lnrTags = [];
+            window._lnrTagsOriginal = [];
+            window._lnrStars = 0;
+        }
+
+        // V91.73 PR γ.2: Tag editor helpers
+        function lnrRenderSelectedTags() {
+            const el = document.getElementById('lnr-tags-selected');
+            if (!el) return;
+            const escHtml = (val) => String(val || '')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const tags = window._lnrTags || [];
+            if (!tags.length) {
+                el.innerHTML = '<span style="color:#94a3b8; font-size:0.78em;">No tags yet — type one below or pick from Suggested</span>';
+                return;
+            }
+            el.innerHTML = tags.map((t, i) =>
+                `<span class="lnr-tag-removable">${escHtml(t)}<button type="button" class="lnr-tag-x" onclick="lnrRemoveTag(${i})">&times;</button></span>`
+            ).join('');
+        }
+
+        function lnrAddTag(tag) {
+            if (!Array.isArray(window._lnrTags)) window._lnrTags = [];
+            const input = document.getElementById('lnr-tag-input');
+            const value = (typeof tag === 'string' && tag) ? tag.trim()
+                : (input ? input.value.trim() : '');
+            if (!value) return;
+            if (!window._lnrTags.includes(value)) {
+                window._lnrTags.push(value);
+                lnrRenderSelectedTags();
+                lnrRenderSuggestedTaxonomy(); // refresh hover/active state
+                const note = window._lnrCurrent;
+                if (note) lnrAutoSuggestTags(note.description || '');
+            }
+            if (input && (typeof tag !== 'string' || !tag)) input.value = '';
+        }
+
+        function lnrRemoveTag(index) {
+            if (!Array.isArray(window._lnrTags)) return;
+            window._lnrTags.splice(index, 1);
+            lnrRenderSelectedTags();
+            const note = window._lnrCurrent;
+            if (note) lnrAutoSuggestTags(note.description || '');
+        }
+
+        // V91.73 PR γ.2: Render Suggested taxonomy chips (3 axes from taxonomy.js with One Piece colors)
+        function lnrRenderSuggestedTaxonomy() {
+            const container = document.getElementById('lnr-tag-suggested');
+            if (!container) return;
+            if (!window.LP_TAXONOMY) {
+                container.innerHTML = '<span style="color:#94a3b8; font-size:0.78em;">taxonomy.js not loaded</span>';
+                return;
+            }
+            const html = Object.values(window.LP_TAXONOMY).map(axis => {
+                const c = axis.colors || { border: '#d8b4fe', text: '#6b21a8', hoverBg: '#f3e8ff' };
+                const egg = axis.easterEgg ? ` ${axis.easterEgg}` : '';
+                const axisLabel = `${axis.icon} ${axis.label.en} ${axis.label.ko} ${axis.label.th}${egg}`;
+                const allTags = axis.systems.reduce((acc, sys) => acc.concat(sys.tags), []);
+                const chips = allTags.map(tag => {
+                    const safe = String(tag).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
+                    return `<button type="button" onclick="lnrAddTag('${safe}')" style="width:auto; padding:4px 10px; background:#fff; border:1px solid ${c.border}; border-radius:14px; font-size:0.75em; color:${c.text}; cursor:pointer; flex-shrink:0; white-space:nowrap; min-height:auto;" onmouseover="this.style.background='${c.hoverBg}'" onmouseout="this.style.background='#fff'">${tag}</button>`;
+                }).join('');
+                return `<div style="margin-bottom:8px;"><div style="font-size:0.7em; color:#666; margin-bottom:4px; font-weight:600;">${axisLabel}</div><div style="display:flex; flex-wrap:wrap; gap:4px;">${chips}</div></div>`;
+            }).join('');
+            container.innerHTML = html;
+        }
+
+        // V91.73 PR γ.2: Auto-suggest — substring scan content against LP_ALL_TAGS
+        function lnrAutoSuggestTags(content) {
+            const hint = document.getElementById('lnr-tag-autosuggest');
+            if (!hint) return;
+            if (!content || !window.LP_ALL_TAGS) {
+                hint.style.display = 'none';
+                return;
+            }
+            const lower = String(content).toLowerCase();
+            const current = (window._lnrTags || []).map(t => String(t).toLowerCase());
+            const matches = window.LP_ALL_TAGS
+                .filter(t => lower.includes(t) && !current.includes(t))
+                .slice(0, 8);
+            if (!matches.length) {
+                hint.style.display = 'none';
+                return;
+            }
+            const chips = matches.map(t => {
+                const safe = t.replace(/'/g, "&#39;").replace(/"/g, '&quot;');
+                return `<button type="button" onclick="lnrAddTag('${safe}')" style="width:auto; min-height:auto; padding:3px 10px; background:#fcd34d; border:none; border-radius:10px; color:#78350f; font-size:0.78em; cursor:pointer; font-weight:700; margin:2px;">+ ${t}</button>`;
+            }).join('');
+            hint.innerHTML = `💡 Detected in content — admin add as tags?<div style="margin-top:6px;">${chips}</div>`;
+            hint.style.display = 'block';
+        }
+
+        // V91.73 PR γ.2: Star rating
+        function setLearningNoteStars(rating) {
+            const r = parseInt(rating, 10) || 0;
+            window._lnrStars = (window._lnrStars === r) ? 0 : r; // toggle off if same
+            lnrRenderStars();
+        }
+
+        function lnrRenderStars() {
+            const stars = document.querySelectorAll('#lnr-stars .lnr-star');
+            const n = window._lnrStars || 0;
+            stars.forEach(s => {
+                const r = parseInt(s.dataset.rating, 10);
+                const filled = r <= n;
+                s.classList.toggle('active', filled);
+                s.textContent = filled ? '★' : '☆';
+            });
+        }
+
+        // V91.73 PR γ.2: Template — append to comment with newline if not empty
+        function lnrAppendTemplate(text) {
+            const ta = document.getElementById('lnr-comment');
+            if (!ta) return;
+            const current = (ta.value || '').trim();
+            ta.value = current ? `${current}\n${text}` : text;
+            ta.focus();
         }
 
         async function saveLearningNoteReview() {
@@ -27116,18 +27352,35 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             }
             const comment = ((commentEl && commentEl.value) || '').trim();
             const id = note.id;
+            const editedTags = Array.isArray(window._lnrTags) ? [...window._lnrTags] : [];
+            const stars = (typeof window._lnrStars === 'number' && window._lnrStars >= 0 && window._lnrStars <= 5)
+                ? window._lnrStars : 0;
 
             try {
                 const batch = db.batch();
-                batch.update(db.collection("submissions").doc(id), {
+                const submissionUpdate = {
                     status: 'reviewed',
                     adminBonus: bonus,
                     adminComment: comment,
+                    adminQualityStars: stars,
                     adminAcknowledged: true,
                     reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     pointsAwarded: true,
                     pointsAmount: firebase.firestore.FieldValue.increment(bonus)
-                });
+                };
+                // γ.2: write edited tags back into submissions.metadata.tags via field path
+                submissionUpdate['metadata.tags'] = editedTags;
+                batch.update(db.collection("submissions").doc(id), submissionUpdate);
+
+                // γ.2: also sync to source learning_path_entries doc so intern history reflects edits
+                const sourceId = note.metadata && note.metadata.sourceId;
+                const sourceType = note.metadata && note.metadata.sourceType;
+                if (sourceId && sourceType === 'learning_path_entries') {
+                    batch.update(db.collection("learning_path_entries").doc(sourceId), {
+                        tags: editedTags
+                    });
+                }
+
                 if (note.userId && bonus > 0) {
                     batch.update(db.collection("users").doc(note.userId), {
                         score: firebase.firestore.FieldValue.increment(bonus)
@@ -27142,7 +27395,8 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     });
                 }
                 await batch.commit();
-                showToast(`🎓 Reviewed! +${bonus} pts to ${note.displayName || 'student'}`);
+                const starText = stars > 0 ? ` · ${stars}⭐` : '';
+                showToast(`🎓 Reviewed! +${bonus} pts${starText} to ${note.displayName || 'student'}`);
                 closeLearningNoteReviewModal();
             } catch (e) {
                 alert("Review failed: " + e.message);
