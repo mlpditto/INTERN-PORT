@@ -1,4 +1,4 @@
-// V94.14: Tri-lingual LP tag taxonomy (Phase A — hint-only multi-axis)
+// V94.15: Tri-lingual LP tag taxonomy + Straw Hat easter-egg colors (Phase A polish)
 // Data source for #rl-lp-pane and #rl-lp-toggle-body Suggested chips.
 // Schema unchanged — LP entries still write tags[] as flat string array.
 
@@ -9,6 +9,8 @@
         medical: {
             icon: '🩺',
             label: { en: 'Medical', ko: '의료', th: 'การแพทย์' },
+            easterEgg: '🦌',
+            colors: { border: '#fb7185', text: '#be123c', hoverBg: '#fff1f2' },
             systems: [
                 { key: 'respiratory', label: { en: 'Respiratory', ko: '호흡기', th: 'ระบบทางเดินหายใจ' },
                   tags: ['cough', 'dyspnea', 'sore throat', 'fever', 'runny nose'] },
@@ -33,6 +35,8 @@
         skill: {
             icon: '🎯',
             label: { en: 'Skill', ko: '스킬', th: 'ทักษะ' },
+            easterEgg: '🗡️',
+            colors: { border: '#4ade80', text: '#15803d', hoverBg: '#f0fdf4' },
             systems: [
                 { key: 'communication', label: { en: 'Communication', ko: '의사소통', th: 'การสื่อสาร' },
                   tags: ['presentation', 'listening', 'feedback', 'writing', 'public speaking', 'negotiation'] },
@@ -53,6 +57,8 @@
         tool: {
             icon: '🛠️',
             label: { en: 'Tool', ko: '도구', th: 'เครื่องมือ' },
+            easterEgg: '🤖',
+            colors: { border: '#38bdf8', text: '#0c4a6e', hoverBg: '#f0f9ff' },
             systems: [
                 { key: 'tool', label: { en: 'Tool', ko: '도구', th: 'เครื่องมือ' },
                   tags: ['BOTNOI', 'CANVA', 'FACEBOOK', 'IG', 'LINE', 'SHOPEE', 'TIKTOK', 'GPT', 'GEMINI', 'CLAUDE', 'OTHER'] }
