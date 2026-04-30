@@ -440,10 +440,94 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
 
     } catch (err) {
         console.error("AI Proxy Error:", { message: sanitizeProxyErrorMessage(err), ...getSafeProviderError(err) });
-        return res.status(500).json({ 
+        return res.status(500).json({
             error: sanitizeProxyErrorMessage(err),
             details: getSafeProviderError(err)
         });
     }
 });
+
+// ============================================================
+// V91.76 PR γ.4b.2: Skeleton trigger for LINE notify on Learning Note review messages.
+// γ.4a (PR #50) created the conversation thread. γ.4b.2 adds the Cloud Function that
+// will eventually push a LINE Messaging API notification to the student when admin
+// posts a message. THIS PHASE LOGS ONLY — γ.4b.3 wires the access token + γ.4b.4
+// replaces the log with the actual axios POST to api.line.me/v2/bot/message/push.
+//
+// Resolution path (verified γ.4b.1):
+//   submissions/{id}/messages/{msgId}.authorRole === 'admin'
+//     -> read submissions/{id}.authUid (student's Firebase auth uid)
+//     -> read user_auth_links/{authUid}.rawLiffUserId (LINE userId, format Uxxxx...)
+//     -> would push to LINE
+// ============================================================
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+
+exports.notifyOnReviewMessage = onDocumentCreated(
+    {
+        document: "submissions/{submissionId}/messages/{messageId}",
+        region: REGION
+    },
+    async (event) => {
+        const snap = event.data;
+        if (!snap) {
+            console.log("[notifyOnReviewMessage] no snap data on event; skipping");
+            return;
+        }
+        const msg = snap.data() || {};
+        const submissionId = event.params.submissionId;
+        const messageId = event.params.messageId;
+        const role = msg.authorRole || '(none)';
+
+        // Filter — only admin messages trigger notify (student-side replies don't notify back to admin via LINE)
+        if (role !== 'admin') {
+            console.log(`[notifyOnReviewMessage] skip — author role=${role} (only admin triggers notify)`);
+            return;
+        }
+
+        let submission;
+        try {
+            const submissionDoc = await admin.firestore()
+                .collection('submissions').doc(submissionId).get();
+            if (!submissionDoc.exists) {
+                console.warn(`[notifyOnReviewMessage] submission ${submissionId} not found`);
+                return;
+            }
+            submission = submissionDoc.data();
+        } catch (err) {
+            console.error(`[notifyOnReviewMessage] failed to read submission ${submissionId}:`, err.message);
+            return;
+        }
+
+        const studentAuthUid = submission.authUid;
+        if (!studentAuthUid) {
+            console.warn(`[notifyOnReviewMessage] submission ${submissionId} has no authUid field`);
+            return;
+        }
+
+        let lineUserId = null;
+        try {
+            const linkDoc = await admin.firestore()
+                .collection('user_auth_links').doc(studentAuthUid).get();
+            if (!linkDoc.exists) {
+                console.warn(`[notifyOnReviewMessage] no user_auth_links doc for authUid=${studentAuthUid}`);
+                return;
+            }
+            const link = linkDoc.data() || {};
+            lineUserId = link.rawLiffUserId;
+        } catch (err) {
+            console.error(`[notifyOnReviewMessage] failed to read user_auth_links/${studentAuthUid}:`, err.message);
+            return;
+        }
+
+        if (!lineUserId || typeof lineUserId !== 'string' || !lineUserId.startsWith('U')) {
+            console.warn(`[notifyOnReviewMessage] invalid rawLiffUserId for authUid=${studentAuthUid}: ${lineUserId}`);
+            return;
+        }
+
+        // γ.4b.2 — log only. γ.4b.4 will replace this with: axios.post('https://api.line.me/v2/bot/message/push', { to: lineUserId, messages: [...] }, { headers: { Authorization: `Bearer ${LINE_TOKEN}` } })
+        const bodyPreview = (msg.body || '').slice(0, 80);
+        console.log(`[notifyOnReviewMessage] WOULD NOTIFY  lineUserId=${lineUserId}  submission=${submissionId}  msg=${messageId}  body=${JSON.stringify(bodyPreview)}`);
+        return;
+    }
+);
 
