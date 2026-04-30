@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.81</title>
+    <title>Nika V91.82</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -3907,6 +3907,7 @@
     <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <script src="taxonomy.js"></script>
+    <script src="case-taxonomy.js"></script>
 </head>
 
 <body>
@@ -8881,17 +8882,9 @@
                         <div id="primary-system-btn-group" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;"></div>
                         <input type="hidden" id="edit-case-taxonomy-system" value="">
                         <script>
-                        // --- Primary System Button Group (Admin, LIFF-style) ---
-                        const PRIMARY_SYSTEMS = [
-                            { value: "gi", label: "🍽️ ระบบทางเดินอาหาร", code: "GI" },
-                            { value: "respiratory", label: "🌬️ ระบบหายใจ", code: "Respiratory" },
-                            { value: "neuro", label: "🧠 ระบบประสาท", code: "Neuro" },
-                            { value: "renal", label: "💧 ระบบทางเดินปัสสาวะ", code: "Renal" },
-                            { value: "cardio", label: "❤️ หัวใจและหลอดเลือด", code: "Cardio" },
-                            { value: "endo", label: "🦋 ต่อมไร้ท่อ", code: "Endo" },
-                            { value: "heme", label: "🩸 โลหิต/ภูมิคุ้มกัน", code: "Heme/Immune" },
-                            { value: "other", label: "🗂️ อื่นๆ", code: "Other" }
-                        ];
+                        // V91.82: PRIMARY_SYSTEMS now provided by public/case-taxonomy.js
+                        // (compat shim from CASE_SYSTEMS — 12 systems unified with LIFF.
+                        // Fixes the prior `endo` vs `endocrine` key mismatch.)
                         function renderPrimarySystemBtnGroup() {
                             const group = document.getElementById('primary-system-btn-group');
                             const hidden = document.getElementById('edit-case-taxonomy-system');
@@ -19340,17 +19333,9 @@ async function saveQuiz() {
             }).join('');
         }
 
-        const alabastaTaxonomyCatalog = [
-            { key: 'respiratory', label: 'Respiratory', thaiLabel: 'ระบบทางเดินหายใจ', tags: ['cough', 'dyspnea', 'sore throat', 'fever', 'runny nose'] },
-            { key: 'cardio', label: 'Cardiovascular', thaiLabel: 'ระบบหัวใจและหลอดเลือด', tags: ['chest pain', 'palpitations', 'edema', 'fatigue', 'high BP'] },
-            { key: 'gi', label: 'GI', thaiLabel: 'ระบบทางเดินอาหาร', tags: ['abdominal pain', 'nausea', 'vomiting', 'diarrhea', 'constipation', 'bloating'] },
-            { key: 'skin', label: 'Skin', thaiLabel: 'ระบบผิวหนัง', tags: ['rash', 'itching', 'redness', 'swelling', 'lesion'] },
-            { key: 'neuro', label: 'Neurological', thaiLabel: 'ระบบประสาท', tags: ['headache', 'dizziness', 'numbness', 'weakness', 'insomnia'] },
-            { key: 'msk', label: 'Musculoskeletal', thaiLabel: 'กล้ามเนื้อและกระดูก', tags: ['joint pain', 'back pain', 'stiffness', 'sprain', 'swelling'] },
-            { key: 'endocrine', label: 'Endocrine / NCDs', thaiLabel: 'โรคเรื้อรัง / ต่อมไร้ท่อ', tags: ['hyperglycemia', 'polyuria', 'weight loss', 'fatigue', 'poor adherence'] },
-            { key: 'mental', label: 'Mental Health', thaiLabel: 'สุขภาพจิต', tags: ['stress', 'anxiety', 'low mood', 'panic', 'poor sleep'] },
-            { key: 'other', label: 'Other', thaiLabel: 'อื่นๆ', tags: ['follow-up', 'medication question', 'unclear symptom'] }
-        ];
+        // V91.82: alabastaTaxonomyCatalog now provided by public/case-taxonomy.js
+        // (compat shim from CASE_SYSTEMS — 12 systems unified with LIFF, adds
+        // ent/renal/heme that were missing here.)
 
         window.editCaseTaxonomyState = window.editCaseTaxonomyState || { selectedTags: [] };
 
@@ -19359,15 +19344,23 @@ async function saveQuiz() {
         }
 
         function inferAlabastaTaxonomyKey(caseItem) {
-            if (caseItem?.diseaseSystemKey) return caseItem.diseaseSystemKey;
+            // V91.82: legacy `endo` key (from the old PRIMARY_SYSTEMS button group)
+            // is migrated to the canonical `endocrine` so existing Firestore docs
+            // light up the right button after unification.
+            const rawKey = caseItem?.diseaseSystemKey;
+            if (rawKey === 'endo') return 'endocrine';
+            if (rawKey) return rawKey;
             const text = String(caseItem?.disease || '').toLowerCase();
             if (text.includes('gi') || text.includes('ทางเดินอาหาร')) return 'gi';
             if (text.includes('หายใจ') || text.includes('respir')) return 'respiratory';
             if (text.includes('หัวใจ') || text.includes('cardio')) return 'cardio';
             if (text.includes('ผิวหนัง') || text.includes('skin')) return 'skin';
             if (text.includes('ประสาท') || text.includes('neuro')) return 'neuro';
+            if (text.includes('หู') || text.includes('คอ') || text.includes('จมูก') || text.includes('ent')) return 'ent';
             if (text.includes('กล้าม') || text.includes('กระดูก') || text.includes('musculo')) return 'msk';
+            if (text.includes('ปัสสาวะ') || text.includes('renal') || text.includes('urinary')) return 'renal';
             if (text.includes('เรื้อรัง') || text.includes('endocr') || text.includes('ncd')) return 'endocrine';
+            if (text.includes('โลหิต') || text.includes('immune') || text.includes('heme')) return 'heme';
             if (text.includes('จิต') || text.includes('mental')) return 'mental';
             return 'other';
         }
