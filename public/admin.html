@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.74</title>
+    <title>Nika V91.75</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1315,6 +1315,42 @@
         .lnr-rev-state-noscore  { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
         .lnr-rev-state-featured { background: #fef9c3; color: #a16207; border: 1px solid #fde68a; }
         .lnr-rev-state-escalated { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+
+        /* V91.75 PR γ.4a: Conversation thread message bubbles */
+        .lnr-msg-row {
+            display: flex;
+            margin-bottom: 8px;
+            gap: 8px;
+            align-items: flex-start;
+        }
+        .lnr-msg-row.admin { justify-content: flex-end; }
+        .lnr-msg-bubble {
+            max-width: 80%;
+            padding: 8px 12px;
+            border-radius: 12px;
+            line-height: 1.45;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+        .lnr-msg-row.admin .lnr-msg-bubble {
+            background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+            color: #4c1d95;
+            border: 1px solid #c4b5fd;
+            border-bottom-right-radius: 4px;
+        }
+        .lnr-msg-row.student .lnr-msg-bubble {
+            background: #fff;
+            color: #1f2937;
+            border: 1px solid #e5e7eb;
+            border-bottom-left-radius: 4px;
+        }
+        .lnr-msg-meta {
+            font-size: 0.7em;
+            color: #94a3b8;
+            margin-top: 4px;
+            font-weight: 600;
+        }
+        .lnr-msg-row.admin .lnr-msg-meta { text-align: right; }
 
         @media (max-width: 980px) {
             .alabasta-action-btn {
@@ -9026,6 +9062,21 @@
 
             <div style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:12px; padding:14px 16px; max-height:340px; overflow-y:auto; line-height:1.6; color:#1f2937;">
                 <div id="lnr-content" style="font-size:0.95em; word-break:break-word;"></div>
+            </div>
+
+            <!-- V91.75 γ.4a: Conversation thread between admin and student -->
+            <div style="margin-top:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+                    <label style="font-weight:800; color:#374151; font-size:0.9em;">💬 Conversation 대화</label>
+                    <span id="lnr-thread-count" style="font-size:0.7em; color:#94a3b8;"></span>
+                </div>
+                <div id="lnr-thread" style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:12px; padding:12px; max-height:200px; overflow-y:auto; min-height:80px; font-size:0.85em;">
+                    <div style="color:#94a3b8; font-style:italic; font-size:0.85em; text-align:center; padding:20px 0;">No messages yet — start the conversation below</div>
+                </div>
+                <div style="display:flex; gap:6px; margin-top:8px;">
+                    <textarea id="lnr-thread-input" rows="2" placeholder="Reply to student... (Ctrl+Enter to send)" style="flex:1; min-width:0; padding:8px 12px; border:1px solid #d8b4fe; border-radius:10px; font-size:0.85em; margin:0; resize:vertical; box-sizing:border-box;" onkeydown="lnrThreadInputKeydown(event)"></textarea>
+                    <button type="button" onclick="lnrSendMessage()" style="width:auto; min-width:90px; padding:8px 16px; background:#6c5ce7; border:none; border-radius:10px; color:white; font-size:0.85em; cursor:pointer; flex-shrink:0; white-space:nowrap; align-self:flex-end; min-height:auto; font-weight:700;">📨 Send</button>
+                </div>
             </div>
 
             <div style="margin-top:16px;">
@@ -27300,6 +27351,8 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             lnrRenderStars();
             // γ.3: Render Feature/Escalate toggles
             lnrRenderToggles();
+            // γ.4a: Load conversation thread
+            lnrLoadThread(note.id);
 
             modal.style.display = 'block';
             modal.classList.add('force-show');
@@ -27328,6 +27381,14 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             window._lnrStars = 0;
             window._lnrFeature = false;
             window._lnrEscalate = false;
+            // γ.4a: clear thread state
+            window._lnrThreadMessages = [];
+            const tEl = document.getElementById('lnr-thread');
+            if (tEl) tEl.innerHTML = '<div style="color:#94a3b8; font-style:italic; font-size:0.85em; text-align:center; padding:20px 0;">No messages yet — start the conversation below</div>';
+            const tInput = document.getElementById('lnr-thread-input');
+            if (tInput) tInput.value = '';
+            const tCount = document.getElementById('lnr-thread-count');
+            if (tCount) tCount.textContent = '';
         }
 
         // V91.73 PR γ.2: Tag editor helpers
@@ -27473,6 +27534,90 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 e.classList.toggle('escalate', on);
                 const check = e.querySelector('.lnr-toggle-check');
                 if (check) check.textContent = on ? '☑' : '☐';
+            }
+        }
+
+        // V91.75 PR γ.4a: Load + render conversation thread for the current submission
+        async function lnrLoadThread(submissionId) {
+            const threadEl = document.getElementById('lnr-thread');
+            const countEl = document.getElementById('lnr-thread-count');
+            if (!threadEl || !submissionId) return;
+            try {
+                const snap = await db.collection('submissions').doc(submissionId)
+                    .collection('messages').orderBy('timestamp', 'asc').get();
+                const msgs = [];
+                snap.forEach(doc => msgs.push({ id: doc.id, ...doc.data() }));
+                window._lnrThreadMessages = msgs;
+                lnrRenderThread();
+                if (countEl) countEl.textContent = msgs.length ? `${msgs.length} message${msgs.length === 1 ? '' : 's'}` : '';
+            } catch (e) {
+                console.warn('[lnrLoadThread] failed:', e);
+                threadEl.innerHTML = '<div style="color:#b91c1c; font-style:italic; font-size:0.85em; text-align:center; padding:20px 0;">Failed to load conversation. Refresh to retry.</div>';
+            }
+        }
+
+        function lnrRenderThread() {
+            const threadEl = document.getElementById('lnr-thread');
+            if (!threadEl) return;
+            const msgs = window._lnrThreadMessages || [];
+            if (!msgs.length) {
+                threadEl.innerHTML = '<div style="color:#94a3b8; font-style:italic; font-size:0.85em; text-align:center; padding:20px 0;">No messages yet — start the conversation below</div>';
+                return;
+            }
+            const escHtml = (val) => String(val || '')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            threadEl.innerHTML = msgs.map(m => {
+                const role = (m.authorRole === 'admin') ? 'admin' : 'student';
+                const roleLabel = role === 'admin' ? '👤 Admin' : `👤 ${escHtml(m.authorName || 'Student')}`;
+                const ts = (m.timestamp && typeof m.timestamp.toDate === 'function')
+                    ? m.timestamp.toDate() : null;
+                const tsStr = ts ? ts.toLocaleString() : '—';
+                return `<div class="lnr-msg-row ${role}"><div><div class="lnr-msg-bubble">${escHtml(m.body || '')}</div><div class="lnr-msg-meta">${roleLabel} · ${tsStr}</div></div></div>`;
+            }).join('');
+            // Auto-scroll to latest
+            threadEl.scrollTop = threadEl.scrollHeight;
+        }
+
+        async function lnrSendMessage() {
+            const note = window._lnrCurrent;
+            if (!note) {
+                alert('No note loaded. Please reopen.');
+                return;
+            }
+            const input = document.getElementById('lnr-thread-input');
+            const body = ((input && input.value) || '').trim();
+            if (!body) return;
+            if (body.length > 4000) {
+                alert('Message too long (max 4000 chars). Please shorten.');
+                return;
+            }
+            const authUser = firebase.auth().currentUser;
+            if (!authUser) {
+                alert('Not authenticated. Please refresh.');
+                return;
+            }
+            try {
+                await db.collection('submissions').doc(note.id)
+                    .collection('messages').add({
+                        authorUid: authUser.uid,
+                        authorRole: 'admin',
+                        authorName: authUser.displayName || authUser.email || 'Admin',
+                        body: body,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                if (input) input.value = '';
+                await lnrLoadThread(note.id);
+            } catch (e) {
+                alert('Send failed: ' + e.message);
+            }
+        }
+
+        function lnrThreadInputKeydown(event) {
+            // Ctrl/Cmd + Enter sends
+            if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+                event.preventDefault();
+                lnrSendMessage();
             }
         }
 
