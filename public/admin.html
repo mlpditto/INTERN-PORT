@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.73</title>
+    <title>Nika V91.74</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1268,6 +1268,53 @@
             border-color: #a78bfa;
             transform: translateY(-1px);
         }
+
+        /* V91.74 PR γ.3: Feature/Escalate toggle pills + reviewState badges */
+        .lnr-toggle {
+            width: auto;
+            min-height: auto;
+            border: 1.5px dashed #cbd5e1;
+            background: #fff;
+            color: #475569;
+            border-radius: 999px;
+            padding: 6px 14px;
+            font-size: 0.8em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .lnr-toggle:hover {
+            border-color: #94a3b8;
+            background: #f8fafc;
+        }
+        .lnr-toggle.active {
+            border-style: solid;
+            border-color: #f59e0b;
+            background: #fff7ed;
+            color: #b45309;
+        }
+        .lnr-toggle.active.escalate {
+            border-color: #dc2626;
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+        .lnr-rev-state-badge {
+            display: inline-block;
+            font-size: 0.7em;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 8px;
+            margin-left: 6px;
+            letter-spacing: 0.3px;
+        }
+        .lnr-rev-state-revision { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+        .lnr-rev-state-noscore  { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+        .lnr-rev-state-featured { background: #fef9c3; color: #a16207; border: 1px solid #fde68a; }
+        .lnr-rev-state-escalated { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
 
         @media (max-width: 980px) {
             .alabasta-action-btn {
@@ -9026,13 +9073,26 @@
             </div>
 
             <div style="margin-top:14px;">
-                <label for="lnr-comment" style="display:block; margin-bottom:8px; font-weight:800; color:#374151;">Comment for student (optional)</label>
+                <label for="lnr-comment" style="display:block; margin-bottom:8px; font-weight:800; color:#374151;">Comment for student (optional, <em>required for Request Revision</em>)</label>
                 <textarea id="lnr-comment" rows="3" placeholder="Feedback shown to the student alongside their note..." style="width:100%; border-radius:12px; padding:12px 14px; border:1.5px solid #d8b4fe; font-size:0.9em; resize:vertical; box-sizing:border-box;"></textarea>
             </div>
 
-            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px; flex-wrap:wrap;">
-                <button type="button" class="btn-sm" onclick="closeLearningNoteReviewModal()" style="width:auto; min-width:96px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Cancel</button>
-                <button type="button" class="btn-sm" onclick="saveLearningNoteReview()" style="width:auto; min-width:140px; background:linear-gradient(135deg,#6c5ce7,#a29bfe); color:#fff; border:none; border-radius:12px; padding:10px 18px; font-weight:900;">Save &amp; Award</button>
+            <!-- γ.3: Feature + Escalate toggle pills (modify Save & Award outcome) -->
+            <div style="margin-top:14px; display:flex; flex-wrap:wrap; gap:8px;">
+                <button type="button" id="lnr-feature-toggle" class="lnr-toggle" onclick="toggleLnrFeature()">
+                    <span class="lnr-toggle-check">☐</span> ⭐ Feature this note
+                </button>
+                <button type="button" id="lnr-escalate-toggle" class="lnr-toggle" onclick="toggleLnrEscalate()">
+                    <span class="lnr-toggle-check">☐</span> 🚀 Escalate to Case Study
+                </button>
+            </div>
+
+            <!-- γ.3: 4 outcome buttons replace single Save & Award -->
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:18px; flex-wrap:wrap;">
+                <button type="button" class="btn-sm" onclick="closeLearningNoteReviewModal()" style="width:auto; min-width:88px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 14px; font-weight:800; min-height:auto;">Cancel</button>
+                <button type="button" class="btn-sm" onclick="requestLearningNoteRevision()" title="Send back to student for edits — no points awarded" style="width:auto; min-width:140px; background:#fff; color:#92400e; border:1.5px solid #fcd34d; border-radius:12px; padding:10px 14px; font-weight:800; min-height:auto;">🔄 Request Revision</button>
+                <button type="button" class="btn-sm" onclick="approveLearningNoteNoScore()" title="Mark reviewed without awarding points" style="width:auto; min-width:130px; background:#fff; color:#475569; border:1.5px solid #cbd5e1; border-radius:12px; padding:10px 14px; font-weight:800; min-height:auto;">Approve no pts</button>
+                <button type="button" class="btn-sm" onclick="saveLearningNoteReview()" style="width:auto; min-width:140px; background:linear-gradient(135deg,#6c5ce7,#a29bfe); color:#fff; border:none; border-radius:12px; padding:10px 18px; font-weight:900; min-height:auto;">Save &amp; Award</button>
             </div>
         </div>
     </div>
@@ -23011,10 +23071,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             } catch (e) { console.error("Kanban Section 8 (Quest Subs) Error:", e); }
 
             // 9. V91.71: Render Learning Notes (pending → Review, reviewed → Done)
+            // V91.74 γ.3: also support reviewState — revision_requested stays in Review with badge
             try {
                 learningNotesCache.forEach(note => {
                     if (note.isArchived) return;
+                    const reviewState = note.reviewState
+                        || (note.status === 'reviewed' ? 'reviewed' : 'pending');
+                    const isRevisionRequested = reviewState === 'revision_requested';
                     const isPending = note.status !== 'reviewed' && (note.adminBonus === undefined || note.adminBonus === null);
+                    // Revision-requested cards stay in Review (student needs to edit) even though admin already touched them
+                    const goesToReview = isPending || isRevisionRequested;
 
                     const title = note.title || "Untitled Learning Note";
                     const content = note.description || "";
@@ -23031,23 +23097,44 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         if ((user?.group || 'Public') !== activeBoardGroup) return;
                     }
 
-                    const status = isPending ? "Review" : "Done";
+                    const status = goesToReview ? "Review" : "Done";
                     cnt[status]++;
+
+                    // V91.74 γ.3: per-state border-left color
+                    let borderColor = '#6c5ce7'; // pending
+                    if (reviewState === 'revision_requested') borderColor = '#f59e0b';
+                    else if (reviewState === 'approved_no_score') borderColor = '#94a3b8';
+                    else if (reviewState === 'featured') borderColor = '#f59e0b';
+                    else if (reviewState === 'escalated') borderColor = '#ef4444';
+                    else if (!isPending) borderColor = '#10b981'; // plain reviewed
 
                     const d = document.createElement('div');
                     d.className = `kanban-card card-${status} learning-note-card`;
-                    d.style.borderLeft = isPending ? "4px solid #6c5ce7" : "4px solid #10b981";
+                    d.style.borderLeft = `4px solid ${borderColor}`;
                     if (isPending) d.style.background = "#faf9ff";
 
                     const tagChips = tags.length > 0
                         ? `<div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:4px;">${tags.slice(0, 6).map(t => `<span style="background:rgba(108,92,231,0.1); color:#6c5ce7; padding:2px 8px; border-radius:8px; font-size:0.7em; font-weight:600;">${escapeKanbanText(t)}</span>`).join('')}${tags.length > 6 ? `<span style="font-size:0.7em; color:#94a3b8;">+${tags.length - 6}</span>` : ''}</div>`
                         : '';
 
+                    // V91.74 γ.3: reviewState badge (only for non-default states)
+                    let revBadge = '';
+                    if (reviewState === 'revision_requested') revBadge = `<span class="lnr-rev-state-badge lnr-rev-state-revision">🔄 REVISION</span>`;
+                    else if (reviewState === 'approved_no_score') revBadge = `<span class="lnr-rev-state-badge lnr-rev-state-noscore">✓ NO PTS</span>`;
+                    else if (reviewState === 'featured') revBadge = `<span class="lnr-rev-state-badge lnr-rev-state-featured">⭐ FEATURED</span>`;
+                    else if (reviewState === 'escalated') revBadge = `<span class="lnr-rev-state-badge lnr-rev-state-escalated">🚀 ESCALATED</span>`;
+
+                    // V91.74 γ.3: revision request preview shows admin's reason inline
+                    const revPreview = (isRevisionRequested && note.adminComment)
+                        ? `<div style="margin-top:8px; padding:8px 10px; background:#fef3c7; border-left:3px solid #f59e0b; border-radius:6px; font-size:0.78em; color:#92400e; font-style:italic;"><strong>Revision asked:</strong> ${escapeKanbanText(note.adminComment)}</div>`
+                        : '';
+
                     let buttons = "";
-                    if (isPending) {
+                    if (goesToReview) {
+                        const reviewLabel = isRevisionRequested ? 'Re-review &amp; Score' : 'Review &amp; Score';
                         buttons = `
                             <button class="btn-sm" style="width:100%; background:linear-gradient(135deg, #6c5ce7, #a29bfe); color:white; border:none; padding:10px; border-radius:10px; font-weight:800; cursor:pointer; box-shadow:0 4px 12px rgba(108,92,231,0.2);" onclick="event.stopPropagation(); reviewLearningNote('${note.id}')">
-                                <i class="fa-solid fa-graduation-cap"></i> Review &amp; Score
+                                <i class="fa-solid fa-graduation-cap"></i> ${reviewLabel}
                             </button>
                             <button class="btn-sm" style="width:100%; margin-top:8px; background:#ef4444; color:white; border:none; padding:8px; border-radius:10px; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); deleteLearningNote('${note.id}')">
                                 <i class="fa-solid fa-trash"></i> Delete
@@ -23066,16 +23153,30 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         `;
                     }
 
+                    // V91.74 γ.3: footer summary line per reviewState
+                    let summaryLine = '';
+                    if (!isPending && !isRevisionRequested) {
+                        if (reviewState === 'approved_no_score') {
+                            summaryLine = `<div style="font-size:0.75em; color:#475569; font-weight:700; margin-top:10px; display:flex; align-items:center; gap:5px;"><i class="fa-solid fa-circle-check"></i> Approved (no pts)</div>`;
+                        } else {
+                            const tag = (reviewState === 'featured') ? '⭐ Featured'
+                                : (reviewState === 'escalated') ? '🚀 Escalated'
+                                : 'Reviewed';
+                            summaryLine = `<div style="font-size:0.75em; color:var(--success); font-weight:700; margin-top:10px; display:flex; align-items:center; gap:5px;"><i class="fa-solid fa-circle-check"></i> ${tag} (+${note.adminBonus || 0} pts)</div>`;
+                        }
+                    }
+
                     d.innerHTML = `
                         <div class="card-header-row" style="margin-bottom:12px;">
-                            <span class="badge" style="background:${isPending ? 'linear-gradient(135deg, #6c5ce7, #a29bfe)' : 'linear-gradient(135deg, #10b981, #059669)'}; padding:4px 12px; border-radius:8px; font-size:0.7em; letter-spacing:0.5px;">🎓 LEARNING NOTE</span>
+                            <span class="badge" style="background:${goesToReview ? 'linear-gradient(135deg, #6c5ce7, #a29bfe)' : 'linear-gradient(135deg, #10b981, #059669)'}; padding:4px 12px; border-radius:8px; font-size:0.7em; letter-spacing:0.5px;">🎓 LEARNING NOTE</span>${revBadge}
                             <div class="card-header-right"><img class="lt-avatar" src="${note.pictureUrl || ''}" style="width:32px; height:32px; border-radius:10px; object-fit:cover; border:2px solid white; box-shadow:0 3px 6px rgba(0,0,0,0.1);" title="${safeUserName}"></div>
                         </div>
                         <div style="font-weight:800; font-size:1.05em; color:var(--text-main); margin-bottom:4px;">${safeUserName}</div>
                         <div style="font-size:0.9em; font-weight:700; color:#6c5ce7; margin-bottom:6px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${safeTitle}</div>
                         <div style="font-size:0.82em; color:var(--text-sub); line-height:1.5; background:var(--col-bg); padding:10px; border-radius:10px; margin-top:6px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${safeContent}</div>
                         ${tagChips}
-                        ${!isPending ? `<div style="font-size:0.75em; color:var(--success); font-weight:700; margin-top:10px; display:flex; align-items:center; gap:5px;"><i class="fa-solid fa-circle-check"></i> Reviewed (+${note.adminBonus || 0} pts)</div>` : ''}
+                        ${revPreview}
+                        ${summaryLine}
                         <div style="margin-top:12px;">${buttons}</div>
                     `;
                     cols[status].appendChild(d);
@@ -27156,6 +27257,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 ? [...note.metadata.tags] : [];
             window._lnrTagsOriginal = [...window._lnrTags];
             window._lnrStars = (typeof note.adminQualityStars === 'number') ? note.adminQualityStars : 0;
+            // V91.74 γ.3: pre-populate Feature/Escalate from existing reviewState
+            window._lnrFeature = (note.reviewState === 'featured');
+            window._lnrEscalate = (note.reviewState === 'escalated');
 
             const escHtml = (val) => String(val || '')
                 .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -27194,6 +27298,8 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             lnrRenderSuggestedTaxonomy();
             lnrAutoSuggestTags(content);
             lnrRenderStars();
+            // γ.3: Render Feature/Escalate toggles
+            lnrRenderToggles();
 
             modal.style.display = 'block';
             modal.classList.add('force-show');
@@ -27220,6 +27326,8 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             window._lnrTags = [];
             window._lnrTagsOriginal = [];
             window._lnrStars = 0;
+            window._lnrFeature = false;
+            window._lnrEscalate = false;
         }
 
         // V91.73 PR γ.2: Tag editor helpers
@@ -27337,42 +27445,105 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             ta.focus();
         }
 
-        async function saveLearningNoteReview() {
+        // V91.74 PR γ.3: Feature/Escalate toggles — mutually exclusive at save time
+        function toggleLnrFeature() {
+            window._lnrFeature = !window._lnrFeature;
+            // Feature and Escalate are alternatives, not stackable — clear the other
+            if (window._lnrFeature) window._lnrEscalate = false;
+            lnrRenderToggles();
+        }
+        function toggleLnrEscalate() {
+            window._lnrEscalate = !window._lnrEscalate;
+            if (window._lnrEscalate) window._lnrFeature = false;
+            lnrRenderToggles();
+        }
+        function lnrRenderToggles() {
+            const f = document.getElementById('lnr-feature-toggle');
+            const e = document.getElementById('lnr-escalate-toggle');
+            if (f) {
+                const on = !!window._lnrFeature;
+                f.classList.toggle('active', on);
+                f.classList.remove('escalate');
+                const check = f.querySelector('.lnr-toggle-check');
+                if (check) check.textContent = on ? '☑' : '☐';
+            }
+            if (e) {
+                const on = !!window._lnrEscalate;
+                e.classList.toggle('active', on);
+                e.classList.toggle('escalate', on);
+                const check = e.querySelector('.lnr-toggle-check');
+                if (check) check.textContent = on ? '☑' : '☐';
+            }
+        }
+
+        // V91.74 PR γ.3: Shared writer — performs the Firestore batch for one of three outcomes.
+        // outcome: 'reviewed' | 'revision_requested' | 'approved_no_score'
+        // Feature/Escalate flags are read from window state and override 'reviewed' to 'featured'/'escalated'.
+        async function _lnrCommitReview(outcome) {
             const note = window._lnrCurrent;
             if (!note) {
                 alert("No note loaded. Please reopen.");
                 return;
             }
-            const scoreInput = document.getElementById('lnr-score-input');
-            const commentEl = document.getElementById('lnr-comment');
-            const bonus = parseFloat(scoreInput ? scoreInput.value : '');
-            if (!Number.isFinite(bonus) || bonus < 0.1 || bonus > 2.0) {
-                alert("Please pick a score chip or enter a custom value between 0.1 and 2.0.");
-                return;
-            }
-            const comment = ((commentEl && commentEl.value) || '').trim();
             const id = note.id;
+            const commentEl = document.getElementById('lnr-comment');
+            const comment = ((commentEl && commentEl.value) || '').trim();
             const editedTags = Array.isArray(window._lnrTags) ? [...window._lnrTags] : [];
             const stars = (typeof window._lnrStars === 'number' && window._lnrStars >= 0 && window._lnrStars <= 5)
                 ? window._lnrStars : 0;
 
+            let bonus = 0;
+            let reviewState = outcome;
+            let awardPoints = false;
+            let kanbanStatus = null; // null = leave existing 'pending' if revision request; 'reviewed' otherwise
+
+            if (outcome === 'reviewed') {
+                const scoreInput = document.getElementById('lnr-score-input');
+                bonus = parseFloat(scoreInput ? scoreInput.value : '');
+                if (!Number.isFinite(bonus) || bonus < 0.1 || bonus > 2.0) {
+                    alert("Please pick a score chip or enter a custom value between 0.1 and 2.0.");
+                    return;
+                }
+                awardPoints = true;
+                kanbanStatus = 'reviewed';
+                if (window._lnrEscalate) reviewState = 'escalated';
+                else if (window._lnrFeature) reviewState = 'featured';
+            } else if (outcome === 'revision_requested') {
+                if (!comment) {
+                    alert("Request Revision needs a comment so the student knows what to fix.");
+                    return;
+                }
+                bonus = 0;
+                awardPoints = false;
+                // Keep status='pending' so kanban shows it in Review with the revision badge
+                kanbanStatus = null;
+            } else if (outcome === 'approved_no_score') {
+                bonus = 0;
+                awardPoints = false;
+                kanbanStatus = 'reviewed';
+            } else {
+                console.error('Unknown reviewLearningNote outcome:', outcome);
+                return;
+            }
+
             try {
                 const batch = db.batch();
                 const submissionUpdate = {
-                    status: 'reviewed',
+                    reviewState: reviewState,
                     adminBonus: bonus,
                     adminComment: comment,
                     adminQualityStars: stars,
                     adminAcknowledged: true,
                     reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    pointsAwarded: true,
-                    pointsAmount: firebase.firestore.FieldValue.increment(bonus)
+                    pointsAwarded: awardPoints,
                 };
-                // γ.2: write edited tags back into submissions.metadata.tags via field path
+                if (kanbanStatus) submissionUpdate.status = kanbanStatus;
+                if (awardPoints && bonus > 0) {
+                    submissionUpdate.pointsAmount = firebase.firestore.FieldValue.increment(bonus);
+                }
                 submissionUpdate['metadata.tags'] = editedTags;
                 batch.update(db.collection("submissions").doc(id), submissionUpdate);
 
-                // γ.2: also sync to source learning_path_entries doc so intern history reflects edits
                 const sourceId = note.metadata && note.metadata.sourceId;
                 const sourceType = note.metadata && note.metadata.sourceType;
                 if (sourceId && sourceType === 'learning_path_entries') {
@@ -27381,26 +27552,55 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     });
                 }
 
-                if (note.userId && bonus > 0) {
+                if (awardPoints && note.userId && bonus > 0) {
                     batch.update(db.collection("users").doc(note.userId), {
                         score: firebase.firestore.FieldValue.increment(bonus)
                     });
+                    const checkinType = (reviewState === 'featured') ? 'learning_note_featured'
+                        : (reviewState === 'escalated') ? 'learning_note_escalated'
+                        : 'learning_note_bonus';
                     batch.set(db.collection("checkin_logs").doc(), {
                         userId: note.userId,
-                        type: 'learning_note_bonus',
+                        type: checkinType,
                         amount: bonus,
-                        note: `Admin bonus on Learning Note: ${note.title || id}`,
+                        note: `Admin ${reviewState} on Learning Note: ${note.title || id}`,
                         relatedSubmissionId: id,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 }
                 await batch.commit();
-                const starText = stars > 0 ? ` · ${stars}⭐` : '';
-                showToast(`🎓 Reviewed! +${bonus} pts${starText} to ${note.displayName || 'student'}`);
+
+                let toastMsg;
+                const who = note.displayName || 'student';
+                const starText = (awardPoints && stars > 0) ? ` · ${stars}⭐` : '';
+                if (outcome === 'reviewed') {
+                    const tag = (reviewState === 'featured') ? '⭐ Featured'
+                        : (reviewState === 'escalated') ? '🚀 Escalated'
+                        : '🎓 Reviewed';
+                    toastMsg = `${tag}! +${bonus} pts${starText} to ${who}`;
+                } else if (outcome === 'revision_requested') {
+                    toastMsg = `🔄 Revision requested from ${who}`;
+                } else {
+                    toastMsg = `✓ Approved (no pts) for ${who}${starText}`;
+                }
+                showToast(toastMsg);
                 closeLearningNoteReviewModal();
             } catch (e) {
-                alert("Review failed: " + e.message);
+                alert("Save failed: " + e.message);
             }
+        }
+
+        async function requestLearningNoteRevision() {
+            return _lnrCommitReview('revision_requested');
+        }
+
+        async function approveLearningNoteNoScore() {
+            return _lnrCommitReview('approved_no_score');
+        }
+
+        async function saveLearningNoteReview() {
+            // V91.74 γ.3: delegates to shared writer; Feature/Escalate flags are read inside.
+            return _lnrCommitReview('reviewed');
         }
 
         async function archiveLearningNote(id) {
