@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.71</title>
+    <title>Nika V91.72</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1173,6 +1173,36 @@
             background: linear-gradient(135deg, #f59e0b, #ea580c);
             color: #fff;
             box-shadow: 0 10px 24px rgba(234, 88, 12, 0.18);
+        }
+
+        /* V91.72 PR γ.1: Learning Note review chips (purple variant of case-score-chip) */
+        .lnr-chip {
+            width: auto;
+            border: 1px solid #a855f7;
+            background: #faf5ff;
+            color: #6b21a8;
+            border-radius: 999px;
+            padding: 8px 14px;
+            font-size: 0.88em;
+            font-weight: 900;
+            cursor: pointer;
+            transition: all 0.18s ease;
+            min-height: auto;
+        }
+        .lnr-chip:hover,
+        .lnr-chip.active {
+            background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+            color: #fff;
+            box-shadow: 0 10px 24px rgba(108, 92, 231, 0.22);
+        }
+        .lnr-tag {
+            display: inline-block;
+            background: rgba(108, 92, 231, 0.1);
+            color: #6c5ce7;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 0.78em;
+            font-weight: 600;
         }
 
         @media (max-width: 980px) {
@@ -8848,6 +8878,50 @@
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px; flex-wrap:wrap;">
                 <button type="button" class="btn-sm" onclick="closeCaseReviewScoreModal(false)" style="min-width:96px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Cancel</button>
                 <button type="button" class="btn-sm" onclick="closeCaseReviewScoreModal(true)" style="min-width:110px; background:linear-gradient(135deg,#f59e0b,#ea580c); color:#fff; border:none; border-radius:12px; padding:10px 18px; font-weight:900;">Save Score</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- V91.72 PR γ.1: Learning Note Review Modal — replaces prompt() with content-visible modal -->
+    <div id="learningNoteReviewModal" class="modal" style="z-index:4303;">
+        <div class="modal-content" style="max-width:920px;">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px;">
+                <div style="flex:1; min-width:0;">
+                    <span style="display:inline-block; background:linear-gradient(135deg,#6c5ce7,#a29bfe); color:white; padding:4px 12px; border-radius:8px; font-size:0.7em; font-weight:800; letter-spacing:0.5px;">🎓 LEARNING NOTE</span>
+                    <h2 id="lnr-title" style="margin:8px 0 4px; color:#4c1d95; font-size:1.2em; font-weight:900; word-break:break-word;">—</h2>
+                    <div id="lnr-meta" style="font-size:0.8em; color:#666;">—</div>
+                </div>
+                <button type="button" onclick="closeLearningNoteReviewModal()" style="border:none; background:transparent; color:#475569; font-size:1.45em; line-height:1; cursor:pointer; padding:4px 10px;">&times;</button>
+            </div>
+
+            <div id="lnr-tags-row" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; min-height:24px;"></div>
+
+            <div style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:12px; padding:14px 16px; max-height:340px; overflow-y:auto; line-height:1.6; color:#1f2937;">
+                <div id="lnr-content" style="font-size:0.95em; word-break:break-word;"></div>
+            </div>
+
+            <div style="margin-top:16px;">
+                <label style="display:block; margin-bottom:8px; font-weight:800; color:#374151;">Score (pts) — choose or type custom</label>
+                <div id="lnr-chip-row" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+                    <button type="button" class="lnr-chip" data-score="0.1" onclick="setLearningNoteReviewScore(0.1)">0.1</button>
+                    <button type="button" class="lnr-chip" data-score="0.2" onclick="setLearningNoteReviewScore(0.2)">0.2</button>
+                    <button type="button" class="lnr-chip" data-score="0.5" onclick="setLearningNoteReviewScore(0.5)">0.5</button>
+                    <button type="button" class="lnr-chip" data-score="0.7" onclick="setLearningNoteReviewScore(0.7)">0.7</button>
+                    <button type="button" class="lnr-chip" data-score="1.0" onclick="setLearningNoteReviewScore(1.0)">1.0</button>
+                    <button type="button" class="lnr-chip" data-score="1.5" onclick="setLearningNoteReviewScore(1.5)">1.5</button>
+                    <button type="button" class="lnr-chip" data-score="2.0" onclick="setLearningNoteReviewScore(2.0)">2.0</button>
+                </div>
+                <input id="lnr-score-input" type="number" min="0.1" max="2.0" step="0.1" inputmode="decimal" placeholder="Custom (0.1 — 2.0)" style="width:auto; margin:0; border-radius:12px; padding:10px 14px; border:1.5px solid #d8b4fe; font-size:0.9em;" oninput="syncLearningNoteReviewChips()" onkeydown="if(event.key==='Enter'){event.preventDefault();saveLearningNoteReview();}">
+            </div>
+
+            <div style="margin-top:14px;">
+                <label for="lnr-comment" style="display:block; margin-bottom:8px; font-weight:800; color:#374151;">Comment for student (optional)</label>
+                <textarea id="lnr-comment" rows="3" placeholder="Feedback shown to the student alongside their note..." style="width:100%; border-radius:12px; padding:12px 14px; border:1.5px solid #d8b4fe; font-size:0.9em; resize:vertical; box-sizing:border-box;"></textarea>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px; flex-wrap:wrap;">
+                <button type="button" class="btn-sm" onclick="closeLearningNoteReviewModal()" style="width:auto; min-width:96px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Cancel</button>
+                <button type="button" class="btn-sm" onclick="saveLearningNoteReview()" style="width:auto; min-width:140px; background:linear-gradient(135deg,#6c5ce7,#a29bfe); color:#fff; border:none; border-radius:12px; padding:10px 18px; font-weight:900;">Save &amp; Award</button>
             </div>
         </div>
     </div>
@@ -26956,29 +27030,99 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             } catch (e) { alert(e.message); }
         }
 
-        // V91.71: Learning Note review handler (Section 9)
-        // Mirrors reviewReflective shape but uses inline prompt() instead of modal — simpler V1.
-        // On approval: marks status='reviewed', adminAcknowledged=true, adds adminBonus to user score immediately.
-        async function reviewLearningNote(id) {
+        // V91.72 PR γ.1: Learning Note review handler (Section 9)
+        // Opens content-visible modal instead of prompt() — admin can read full note + tags before scoring.
+        // Save logic identical to V91.71: marks status='reviewed', writes adminBonus + adminComment, increments user score.
+        function reviewLearningNote(id) {
             const note = learningNotesCache.find(n => n.id === id);
             if (!note) {
                 alert("Learning Note not found in cache. Please refresh.");
                 return;
             }
-            const bonusStr = prompt(`Bonus points for "${note.title || 'Untitled'}" (0.1-2.0):`, "0.5");
-            if (bonusStr === null) return; // user cancelled
-            let bonus = parseFloat(bonusStr);
-            if (!Number.isFinite(bonus) || bonus < 0.1 || bonus > 2.0) {
-                alert("Invalid bonus. Must be 0.1 - 2.0.");
+            window._lnrCurrent = note;
+
+            const escHtml = (val) => String(val || '')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+            const titleEl = document.getElementById('lnr-title');
+            const metaEl = document.getElementById('lnr-meta');
+            const tagsEl = document.getElementById('lnr-tags-row');
+            const contentEl = document.getElementById('lnr-content');
+            const scoreInput = document.getElementById('lnr-score-input');
+            const commentEl = document.getElementById('lnr-comment');
+            const modal = document.getElementById('learningNoteReviewModal');
+            if (!modal || !titleEl || !contentEl) return;
+
+            titleEl.textContent = note.title || 'Untitled Learning Note';
+            const ts = (note.timestamp && typeof note.timestamp.toDate === 'function')
+                ? note.timestamp.toDate()
+                : (note.clientSubmittedAt ? new Date(note.clientSubmittedAt) : null);
+            const tsStr = ts ? ts.toLocaleString() : '—';
+            metaEl.innerHTML = `<strong>${escHtml(note.displayName || 'Unknown')}</strong> · ${tsStr}`;
+
+            const tags = (note.metadata && Array.isArray(note.metadata.tags)) ? note.metadata.tags : [];
+            tagsEl.innerHTML = tags.length
+                ? tags.map(t => `<span class="lnr-tag">${escHtml(t)}</span>`).join('')
+                : '<span style="color:#94a3b8; font-size:0.85em;">No tags</span>';
+
+            const content = note.description || '';
+            if (window.marked && window.DOMPurify) {
+                contentEl.innerHTML = window.DOMPurify.sanitize(window.marked.parse(content, { breaks: true, gfm: true }));
+            } else {
+                contentEl.textContent = content;
+            }
+
+            scoreInput.value = '';
+            commentEl.value = note.adminComment || '';
+            document.querySelectorAll('#learningNoteReviewModal .lnr-chip').forEach(c => c.classList.remove('active'));
+
+            modal.style.display = 'block';
+            modal.classList.add('force-show');
+        }
+
+        function setLearningNoteReviewScore(value) {
+            const input = document.getElementById('lnr-score-input');
+            if (!input) return;
+            input.value = String(value);
+            syncLearningNoteReviewChips();
+        }
+
+        function syncLearningNoteReviewChips() {
+            const input = document.getElementById('lnr-score-input');
+            const v = parseFloat(input ? input.value : '');
+            document.querySelectorAll('#learningNoteReviewModal .lnr-chip').forEach(c => {
+                c.classList.toggle('active', Number.isFinite(v) && parseFloat(c.dataset.score) === v);
+            });
+        }
+
+        function closeLearningNoteReviewModal() {
+            forceHideModal('learningNoteReviewModal');
+            window._lnrCurrent = null;
+        }
+
+        async function saveLearningNoteReview() {
+            const note = window._lnrCurrent;
+            if (!note) {
+                alert("No note loaded. Please reopen.");
                 return;
             }
-            const comment = prompt("Optional comment for student (or leave blank):", "") || "";
+            const scoreInput = document.getElementById('lnr-score-input');
+            const commentEl = document.getElementById('lnr-comment');
+            const bonus = parseFloat(scoreInput ? scoreInput.value : '');
+            if (!Number.isFinite(bonus) || bonus < 0.1 || bonus > 2.0) {
+                alert("Please pick a score chip or enter a custom value between 0.1 and 2.0.");
+                return;
+            }
+            const comment = ((commentEl && commentEl.value) || '').trim();
+            const id = note.id;
+
             try {
                 const batch = db.batch();
                 batch.update(db.collection("submissions").doc(id), {
                     status: 'reviewed',
                     adminBonus: bonus,
-                    adminComment: comment.trim(),
+                    adminComment: comment,
                     adminAcknowledged: true,
                     reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     pointsAwarded: true,
@@ -26999,6 +27143,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 }
                 await batch.commit();
                 showToast(`🎓 Reviewed! +${bonus} pts to ${note.displayName || 'student'}`);
+                closeLearningNoteReviewModal();
             } catch (e) {
                 alert("Review failed: " + e.message);
             }
