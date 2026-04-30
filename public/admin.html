@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.76</title>
+    <title>Nika V91.77</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -27598,7 +27598,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 return;
             }
             try {
-                await db.collection('submissions').doc(note.id)
+                const msgRef = await db.collection('submissions').doc(note.id)
                     .collection('messages').add({
                         authorUid: authUser.uid,
                         authorRole: 'admin',
@@ -27608,6 +27608,16 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     });
                 if (input) input.value = '';
                 await lnrLoadThread(note.id);
+                // V91.77 PR γ.4b.2.1: invoke notify callable AFTER commit (replaces onDocumentCreated trigger).
+                // Fire-and-forget — UI must not block on LINE push result.
+                try {
+                    const notify = firebase.functions().httpsCallable('notifyOnReviewMessage');
+                    notify({ submissionId: note.id, messageId: msgRef.id }).catch(err => {
+                        console.warn('[lnrSendMessage] notifyOnReviewMessage failed:', err && err.message);
+                    });
+                } catch (notifyErr) {
+                    console.warn('[lnrSendMessage] could not invoke notify callable:', notifyErr && notifyErr.message);
+                }
             } catch (e) {
                 alert('Send failed: ' + e.message);
             }
