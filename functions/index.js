@@ -448,22 +448,30 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
 });
 
 // ============================================================
+// V91.78 PR γ.4b.3: Wire LINE_CHANNEL_ACCESS_TOKEN secret via .runWith({ secrets }) —
+// still log-only. Function now verifies the secret is loaded into process.env at
+// runtime; γ.4b.4 will replace WOULD-NOTIFY log with the actual axios POST.
+//
 // V91.77 PR γ.4b.2.1: Refactor LINE notify trigger from onDocumentCreated → onCall.
 // Why: deploying v2 Firestore triggers requires Eventarc + region config that conflicts
 // with the existing v1 onCall pattern in this file. HTTP callables are region-agnostic
 // and deploy cleanly alongside setAdminClaim/generatePreviewToken. Admin-side
 // lnrSendMessage now invokes this callable AFTER its Firestore .add() commits.
 //
-// Originally V91.76 PR γ.4b.2 (skeleton). Phase progression: γ.4b.3 wires access token,
-// γ.4b.4 replaces the log with the actual axios POST to api.line.me/v2/bot/message/push.
+// Originally V91.76 PR γ.4b.2 (skeleton). Phase progression: γ.4b.4 replaces the log
+// with the actual axios POST to api.line.me/v2/bot/message/push using
+// process.env.LINE_CHANNEL_ACCESS_TOKEN.
 //
 // Resolution path (unchanged from γ.4b.1):
 //   submissions/{id}/messages/{msgId}.authorRole === 'admin'
 //     -> read submissions/{id}.authUid (student's Firebase auth uid)
 //     -> read user_auth_links/{authUid}.rawLiffUserId (LINE userId, format Uxxxx...)
+//     -> verify LINE_CHANNEL_ACCESS_TOKEN loaded
 //     -> would push to LINE
 // ============================================================
-exports.notifyOnReviewMessage = functionsV1.https.onCall(async (data, context) => {
+exports.notifyOnReviewMessage = functionsV1
+    .runWith({ secrets: ['LINE_CHANNEL_ACCESS_TOKEN'] })
+    .https.onCall(async (data, context) => {
     if (!context.auth || context.auth.token.admin !== true) {
         throw new functionsV1.https.HttpsError('permission-denied', 'Admin required');
     }
@@ -535,9 +543,16 @@ exports.notifyOnReviewMessage = functionsV1.https.onCall(async (data, context) =
         return { skipped: true, reason: 'invalid-lineUserId' };
     }
 
-    // γ.4b.2.1 — log only. γ.4b.4 will replace this with the actual axios POST to LINE Messaging API.
+    // γ.4b.3 — verify LINE_CHANNEL_ACCESS_TOKEN secret is loaded (γ.4b.4 will use it for the actual push).
+    const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    if (!accessToken) {
+        console.warn(`[notifyOnReviewMessage] LINE_CHANNEL_ACCESS_TOKEN secret missing — would-notify lineUserId=${lineUserId} but skipping`);
+        return { skipped: true, reason: 'token-missing' };
+    }
+
+    // γ.4b.3 — log only (token loaded, ready for γ.4b.4 axios POST). Don't log token content; tokenLen confirms reasonable length.
     const bodyPreview = (msg.body || '').slice(0, 80);
-    console.log(`[notifyOnReviewMessage] WOULD NOTIFY  lineUserId=${lineUserId}  submission=${submissionId}  msg=${messageId}  body=${JSON.stringify(bodyPreview)}`);
-    return { ok: true, lineUserId, submissionId, messageId };
+    console.log(`[notifyOnReviewMessage] WOULD NOTIFY  lineUserId=${lineUserId}  submission=${submissionId}  msg=${messageId}  tokenLen=${accessToken.length}  body=${JSON.stringify(bodyPreview)}`);
+    return { ok: true, lineUserId, submissionId, messageId, tokenLoaded: true };
 });
 
