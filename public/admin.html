@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.78</title>
+    <title>Nika V91.80</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -19393,7 +19393,8 @@ async function saveQuiz() {
 
         function initEditCaseTaxonomyOptions() {
             const selectEl = document.getElementById('edit-case-taxonomy-system');
-            if (!selectEl || selectEl.options.length > 1) return;
+            // V91.80: markup is <input type="hidden"> + button group; legacy <select> bootstrap is no-op.
+            if (!selectEl || selectEl.tagName !== 'SELECT' || selectEl.options.length > 1) return;
             selectEl.innerHTML = `<option value="">Select system...</option>` + alabastaTaxonomyCatalog.map(item => (
                 `<option value="${item.key}">${item.thaiLabel} (${item.label})</option>`
             )).join('');
@@ -19528,6 +19529,8 @@ async function saveQuiz() {
                 selectedTags: Array.isArray(caseItem.symptomTags) ? [...caseItem.symptomTags] : []
             };
             if (taxonomySelectEl) taxonomySelectEl.value = inferAlabastaTaxonomyKey(caseItem);
+            // V91.80: re-render button group so the active state matches the loaded case's system.
+            if (typeof renderPrimarySystemBtnGroup === 'function') renderPrimarySystemBtnGroup();
             const taxonomySummary = String(caseItem.taxonomySummary || '').trim();
             if (!window.editCaseTaxonomyState.selectedTags.length && taxonomySummary.includes(' - ')) {
                 window.editCaseTaxonomyState.selectedTags = taxonomySummary.split(' - ').slice(1).join(' - ').split(',').map(x => x.trim()).filter(Boolean);
