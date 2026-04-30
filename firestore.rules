@@ -207,6 +207,20 @@ service cloud.firestore {
     match /submissions/{docId} {
       allow read, create: if isSignedIn();
       allow update, delete: if isAdmin();
+
+      // V91.75 γ.4a: Conversation thread between admin and student on a review.
+      // Each message records its author so a student can never impersonate admin.
+      // Read is open to any signed-in user (matches parent rule); create requires
+      // authorUid == request.auth.uid; update/delete admin-only.
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn()
+          && request.resource.data.authorUid == request.auth.uid
+          && request.resource.data.body is string
+          && request.resource.data.body.size() > 0
+          && request.resource.data.body.size() <= 4000;
+        allow update, delete: if isAdmin();
+      }
     }
   }
 }
