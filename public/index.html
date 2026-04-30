@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.18)</title>
+    <title>Internship Portfolio (V94.19)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2856,6 +2856,18 @@
                         <div id="case-pane-submit" class="case-tab-pane active">
                             <div class="case-pane-shell" style="border-bottom: 1px solid #f7f7f7;">
 
+                                <!-- V94.19: Draft restored banner (hidden by default) -->
+                                <div id="case-draft-banner" style="display:none; margin-bottom:14px; padding:10px 14px; background:linear-gradient(135deg,#fef9c3,#fef3c7); border:1px solid #fcd34d; border-radius:10px; align-items:center; gap:10px; font-size:0.82em;">
+                                    <span style="flex:1; color:#92400e; line-height:1.4;">
+                                        📝 Draft restored · 초안 복구됨
+                                        <span class="draft-age" style="display:inline-block; margin-left:6px; padding:1px 8px; background:rgba(146,64,14,0.12); border-radius:999px; font-size:0.85em; font-weight:700;">just now</span>
+                                    </span>
+                                    <button type="button" onclick="discardCaseDraft()"
+                                        style="height:32px; padding:0 12px; background:white; border:1px solid #fcd34d; border-radius:8px; color:#92400e; font-size:0.78em; font-weight:700; cursor:pointer; flex-shrink:0;">
+                                        🗑️ Discard 삭제
+                                    </button>
+                                </div>
+
                                 <!-- STEP 1: Patient Info (Required) -->
                                 <div class="cs-step">
                                     <div class="cs-step-head">
@@ -2946,8 +2958,8 @@
                                     </div>
                                 </div>
 
-                                <!-- V94.17: Clear (left) + Submit (right) side-by-side, 50/50 -->
-                                <div style="display:flex; gap:8px; margin-top:4px;">
+                                <!-- V94.17: Clear (left) + Submit (right) side-by-side, 50/50 · V94.19: id added for show/hide -->
+                                <div id="case-cta-row" class="cs-cta-row" style="display:flex; gap:8px; margin-top:4px;">
                                     <button class="btn-secondary" onclick="clearCaseForm()"
                                         id="case-clear-btn"
                                         style="flex:1; font-weight:600; border-radius:12px; height:48px; background: #f1f5f9; border: 2px solid #e2e8f0; color: #64748b; cursor: pointer; transition: all 0.2s ease;"
@@ -2961,6 +2973,28 @@
                                         disabled>
                                         🚀 Submit 제출
                                     </button>
+                                </div>
+
+                                <!-- V94.19: Inline success card (replaces alert + tab auto-switch) -->
+                                <div id="case-success-card" style="display:none; margin-top:8px; padding:18px; background:linear-gradient(135deg,#f0fdf4,#dcfce7); border:1px solid #22c55e; border-radius:12px; text-align:center;">
+                                    <div style="font-size:1.8em; line-height:1; margin-bottom:6px;">✅</div>
+                                    <div style="font-weight:800; color:#15803d; font-size:1.05em; margin-bottom:6px;">Case logged · 케이스 등록됨</div>
+                                    <div id="case-success-summary" style="font-size:0.85em; color:#166534; margin-bottom:14px; line-height:1.55;">
+                                        <!-- populated by showCaseSuccess() -->
+                                    </div>
+                                    <div style="display:flex; gap:8px;">
+                                        <button type="button" onclick="caseSuccessLogAnother()"
+                                            style="flex:1; height:44px; border-radius:10px; font-weight:700; background:#22c55e; color:white; border:none; cursor:pointer; font-size:0.88em;">
+                                            📝 Log another · 새로 등록
+                                        </button>
+                                        <button type="button" onclick="caseSuccessViewList()"
+                                            style="flex:1; height:44px; border-radius:10px; font-weight:700; background:white; color:#15803d; border:1.5px solid #22c55e; cursor:pointer; font-size:0.88em;">
+                                            📋 View My Cases →
+                                        </button>
+                                    </div>
+                                    <div style="margin-top:10px; font-size:0.72em; color:#16a34a;">
+                                        Auto-clears in <span id="case-success-countdown">8</span>s · 8초 후 자동
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -3297,7 +3331,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V94.18 (Case section bilingual EN+KR — labels, badges, buttons, hints)
+                <span id="intern-version-current">V94.04</span> — Last feature: V94.19 (Case form draft persistence + inline success card)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -11108,6 +11142,260 @@ async function archiveDoneCard(cardId) {
             'Follow-up': '📅', 'Medication Q': '💊', 'Unclear Symptom': '❓',
         };
 
+        // ── V94.19: Case form draft persistence ─────────────────────────────────
+        // Saves the in-progress form to localStorage so accidental tab switches /
+        // reloads don't lose work. Per-user key, 24h TTL, debounced writes.
+        const CASE_DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
+        let _caseDraftSaveTimer = null;
+
+        function caseDraftKey() {
+            return `case_draft_${userId || 'anon'}`;
+        }
+
+        function saveCaseDraft() {
+            if (!userId) return;
+            clearTimeout(_caseDraftSaveTimer);
+            _caseDraftSaveTimer = setTimeout(() => {
+                try {
+                    const draft = {
+                        caseId: (document.getElementById('c-id')?.value || '').trim(),
+                        customer: (document.getElementById('c-customer')?.value || '').trim(),
+                        customerTel: (document.getElementById('c-tel')?.value || '').trim(),
+                        systemKey: (document.getElementById('c-disease-system')?.value || '').trim(),
+                        note: (document.getElementById('c-note')?.value || '').trim(),
+                        symptomTags: [...((window.caseComposerState && window.caseComposerState.selectedSymptoms) || [])],
+                        savedAt: Date.now()
+                    };
+                    const hasContent = draft.caseId || draft.customer || draft.customerTel || draft.systemKey || draft.note || draft.symptomTags.length;
+                    if (!hasContent) {
+                        localStorage.removeItem(caseDraftKey());
+                        return;
+                    }
+                    localStorage.setItem(caseDraftKey(), JSON.stringify(draft));
+                } catch (e) { /* quota / serialization — silently ignore */ }
+            }, 500);
+        }
+
+        function loadCaseDraft() {
+            if (!userId) return null;
+            try {
+                const raw = localStorage.getItem(caseDraftKey());
+                if (!raw) return null;
+                const draft = JSON.parse(raw);
+                if (!draft || !draft.savedAt) return null;
+                if (Date.now() - draft.savedAt > CASE_DRAFT_TTL_MS) {
+                    localStorage.removeItem(caseDraftKey());
+                    return null;
+                }
+                return draft;
+            } catch (e) { return null; }
+        }
+
+        function clearCaseDraft() {
+            try { localStorage.removeItem(caseDraftKey()); } catch (e) {}
+        }
+
+        function formatDraftAge(ms) {
+            const min = Math.floor(ms / 60000);
+            if (min < 1) return 'just now · 방금';
+            if (min < 60) return `${min}m ago · ${min}분 전`;
+            const hr = Math.floor(min / 60);
+            return `${hr}h ago · ${hr}시간 전`;
+        }
+
+        function restoreCaseDraft() {
+            const banner = document.getElementById('case-draft-banner');
+            const draft = loadCaseDraft();
+            if (!draft) {
+                if (banner) banner.style.display = 'none';
+                return;
+            }
+            const idEl = document.getElementById('c-id');
+            const customerEl = document.getElementById('c-customer');
+            const telEl = document.getElementById('c-tel');
+            const noteEl = document.getElementById('c-note');
+            if (idEl) idEl.value = draft.caseId || '';
+            if (customerEl) customerEl.value = draft.customer || '';
+            if (telEl) telEl.value = draft.customerTel || '';
+            if (noteEl) noteEl.value = draft.note || '';
+
+            // Trigger HN validation listener so the submit button updates
+            if (idEl) idEl.dispatchEvent(new Event('input'));
+
+            // Restore selected symptoms
+            window.caseComposerState = window.caseComposerState || {};
+            window.caseComposerState.selectedSymptoms = Array.isArray(draft.symptomTags) ? [...draft.symptomTags] : [];
+
+            // Restore system selection without auto-scrolling
+            if (draft.systemKey) {
+                selectCaseSystem(draft.systemKey, { autoScroll: false });
+            }
+
+            // Sync char counter for note
+            const noteCharEl = document.getElementById('note-char-count');
+            if (noteCharEl && noteEl) noteCharEl.textContent = String(noteEl.value.length);
+
+            // Show banner with relative age
+            if (banner) {
+                const ageEl = banner.querySelector('.draft-age');
+                if (ageEl) ageEl.textContent = formatDraftAge(Date.now() - draft.savedAt);
+                banner.style.display = 'flex';
+            }
+        }
+
+        function discardCaseDraft() {
+            if (!confirm('Discard saved draft? · 저장된 초안을 삭제하시겠습니까?')) return;
+            clearCaseDraft();
+            _silentClearCaseForm();
+            const banner = document.getElementById('case-draft-banner');
+            if (banner) banner.style.display = 'none';
+        }
+
+        // Silent reset (skips the user-facing confirm dialog) — used by discard,
+        // success-card actions, and restored drafts.
+        function _silentClearCaseForm() {
+            const idEl = document.getElementById('c-id');
+            const customerEl = document.getElementById('c-customer');
+            const telEl = document.getElementById('c-tel');
+            const diseaseEl = document.getElementById('c-disease');
+            const noteEl = document.getElementById('c-note');
+            if (idEl) idEl.value = '';
+            if (customerEl) customerEl.value = '';
+            if (telEl) telEl.value = '';
+            if (diseaseEl) diseaseEl.value = '';
+            if (noteEl) noteEl.value = '';
+
+            const ds = document.getElementById('c-disease-system');
+            if (ds) ds.value = '';
+            document.querySelectorAll('.cs-sys-card').forEach(c => c.classList.remove('selected'));
+
+            const symptomStep = document.getElementById('case-symptom-step');
+            if (symptomStep) symptomStep.style.display = 'none';
+            const hintEl = document.getElementById('case-system-hint');
+            if (hintEl) hintEl.style.display = 'block';
+            if (typeof renumberCaseSteps === 'function') renumberCaseSteps();
+
+            window.caseComposerState = window.caseComposerState || {};
+            window.caseComposerState.selectedSymptoms = [];
+            window.caseFormValidation.hn = false;
+            window.caseFormValidation.diseaseSystem = false;
+
+            if (idEl) idEl.classList.remove('valid', 'invalid');
+            if (typeof clearValidationError === 'function') clearValidationError('c-id');
+
+            const charCountEl = document.getElementById('note-char-count');
+            if (charCountEl) charCountEl.textContent = '0';
+            const charCounterEl = document.getElementById('note-char-counter');
+            if (charCounterEl) charCounterEl.style.color = '#64748b';
+
+            updateSubmitButtonState();
+            if (typeof renderCaseTaxonomyComposer === 'function') renderCaseTaxonomyComposer();
+        }
+
+        // Wire input listeners on form fields so typing triggers a debounced
+        // localStorage save. Idempotent — re-running won't double-attach.
+        function attachCaseDraftAutoSave() {
+            ['c-id', 'c-customer', 'c-tel', 'c-note'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el && !el.dataset.draftWired) {
+                    el.addEventListener('input', saveCaseDraft);
+                    el.dataset.draftWired = '1';
+                }
+            });
+        }
+
+        // ── V94.19: Inline success card (replaces alert + tab auto-switch) ─────
+        let _caseSuccessTimer = null;
+        let _caseSuccessCountdownTimer = null;
+        const CASE_SUCCESS_AUTO_DISMISS_S = 8;
+
+        function showCaseSuccess({ caseId, systemKey, symptomTags, customer }) {
+            const card = document.getElementById('case-success-card');
+            const summaryEl = document.getElementById('case-success-summary');
+            if (!card || !summaryEl) return;
+
+            // Hide form parts (preserve their previous display so we can restore)
+            const parts = [
+                ...document.querySelectorAll('#case-pane-submit .cs-step'),
+                document.getElementById('case-cta-row'),
+                document.getElementById('case-system-hint'),
+                document.getElementById('case-draft-banner')
+            ].filter(Boolean);
+            parts.forEach(el => {
+                el.dataset.prevDisplay = el.style.display || '';
+                el.style.display = 'none';
+            });
+
+            // Build summary
+            const sys = caseTaxonomyCatalog.find(c => c.key === systemKey);
+            const emoji = CASE_SYSTEM_EMOJI[systemKey] || '🏥';
+            const sysLabel = sys ? `${emoji} ${sys.label}` : '🏥 General';
+            const tagPreview = (symptomTags || []).slice(0, 3).join(', ');
+            const tagOverflow = (symptomTags || []).length > 3 ? '…' : '';
+            summaryEl.innerHTML = `
+                <div><strong>HN ${escapeHtml(caseId)}</strong> · ${sysLabel}</div>
+                ${tagPreview ? `<div style="margin-top:4px;">${escapeHtml(tagPreview)}${tagOverflow}</div>` : ''}
+                ${customer ? `<div style="margin-top:4px;">👤 ${escapeHtml(customer)}</div>` : ''}
+            `;
+
+            card.style.display = 'block';
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // Countdown + auto-dismiss
+            let remaining = CASE_SUCCESS_AUTO_DISMISS_S;
+            const countdownEl = document.getElementById('case-success-countdown');
+            if (countdownEl) countdownEl.textContent = String(remaining);
+            clearInterval(_caseSuccessCountdownTimer);
+            clearTimeout(_caseSuccessTimer);
+            _caseSuccessCountdownTimer = setInterval(() => {
+                remaining -= 1;
+                if (countdownEl) countdownEl.textContent = String(Math.max(0, remaining));
+                if (remaining <= 0) clearInterval(_caseSuccessCountdownTimer);
+            }, 1000);
+            _caseSuccessTimer = setTimeout(() => {
+                caseSuccessLogAnother();
+            }, CASE_SUCCESS_AUTO_DISMISS_S * 1000);
+        }
+
+        function hideCaseSuccess() {
+            const card = document.getElementById('case-success-card');
+            if (card) card.style.display = 'none';
+            const parts = [
+                ...document.querySelectorAll('#case-pane-submit .cs-step'),
+                document.getElementById('case-cta-row'),
+                document.getElementById('case-system-hint'),
+                document.getElementById('case-draft-banner')
+            ].filter(Boolean);
+            parts.forEach(el => {
+                if ('prevDisplay' in el.dataset) {
+                    el.style.display = el.dataset.prevDisplay;
+                    delete el.dataset.prevDisplay;
+                }
+            });
+            clearTimeout(_caseSuccessTimer);
+            clearInterval(_caseSuccessCountdownTimer);
+        }
+
+        function caseSuccessLogAnother() {
+            hideCaseSuccess();
+            _silentClearCaseForm();
+        }
+
+        function caseSuccessViewList() {
+            hideCaseSuccess();
+            _silentClearCaseForm();
+            switchCaseTab('systems');
+            if (typeof loadMyCases === 'function') loadMyCases();
+        }
+
+        // Lightweight HTML escaper for the success summary.
+        function escapeHtml(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+        // ────────────────────────────────────────────────────────────────────────
+
         function renderCaseSystemCards() {
             const container = document.getElementById('case-system-cards');
             if (!container) return;
@@ -11121,7 +11409,7 @@ async function archiveDoneCard(cardId) {
                 </div>`).join('');
         }
 
-        function selectCaseSystem(key) {
+        function selectCaseSystem(key, opts = {}) {
             const select = document.getElementById('c-disease-system');
             if (select) select.value = key;
 
@@ -11146,9 +11434,13 @@ async function archiveDoneCard(cardId) {
 
             // V94.17: renumber visible steps and bring Step 3 into view
             renumberCaseSteps();
-            if (key && symptomStep) {
+            // V94.19: callers (e.g. draft restore) can opt out of the auto-scroll
+            if (key && symptomStep && opts.autoScroll !== false) {
                 symptomStep.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
+
+            // V94.19: persist the new system pick to the draft
+            saveCaseDraft();
         }
 
         // V94.17: dynamic numbering — only count visible .cs-step inside the Log Case pane
@@ -11252,7 +11544,13 @@ async function archiveDoneCard(cardId) {
             if (!confirm('Clear all fields? 모든 필드를 초기화하시겠습니까?\n\nAll data will be lost. 모든 데이터가 사라집니다.')) {
                 return;
             }
-            
+
+            // V94.19: also wipe the saved draft so a reload won't restore the
+            // form the user just chose to discard.
+            if (typeof clearCaseDraft === 'function') clearCaseDraft();
+            const draftBanner = document.getElementById('case-draft-banner');
+            if (draftBanner) draftBanner.style.display = 'none';
+
             // Clear all input fields
             document.getElementById('c-id').value = '';
             document.getElementById('c-customer').value = '';
@@ -11446,10 +11744,14 @@ async function archiveDoneCard(cardId) {
             // Render emoji system cards (new UI)
             renderCaseSystemCards();
             renderCaseTaxonomyComposer();
-            
+
             // 🔥 V91.47: Initialize form validation
             initCaseFormValidation();
             updateSubmitButtonState();
+
+            // V94.19: wire draft auto-save listeners and restore any saved draft
+            attachCaseDraftAutoSave();
+            restoreCaseDraft();
         }
 
         function renderCaseTaxonomyComposer() {
@@ -11502,6 +11804,7 @@ async function archiveDoneCard(cardId) {
             if (idx >= 0) selectedSymptoms.splice(idx, 1);
             else selectedSymptoms.push(tag);
             renderCaseTaxonomyComposer();
+            saveCaseDraft(); // V94.19: persist symptom changes
         }
 
         function addCustomCaseSymptom() {
@@ -11514,6 +11817,7 @@ async function archiveDoneCard(cardId) {
             if (!selectedSymptoms.includes(tag)) selectedSymptoms.push(tag);
             input.value = '';
             renderCaseTaxonomyComposer();
+            saveCaseDraft(); // V94.19: persist new custom symptom
         }
 
         function handleCaseCustomSymptomKeydown(event) {
@@ -11658,31 +11962,19 @@ async function archiveDoneCard(cardId) {
                     } catch (err) { console.error("LINE Notify Error:", err); }
                 }
 
-                alert("Case saved successfully ✅\n케이스가 저장되었습니다.");
-                
-                // 🔥 V91.49: Success state
+                // V94.19: replace blocking alert + auto tab-switch with inline
+                // success card. Form fields are kept in DOM (the card overlays the
+                // form parts) so caseSuccessLogAnother / caseSuccessViewList can
+                // do a silent reset.
+                clearCaseDraft();
                 if (submitBtn) {
-                    submitBtn.style.opacity = '1';
-                    submitBtn.style.cursor = 'pointer';
-                    submitBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
-                    submitBtn.innerHTML = '✅ Saved Successfully!';
-                    
-                    // Reset after 2 seconds
-                    setTimeout(() => {
-                        submitBtn.style.background = '';
-                        updateSubmitButtonState();
-                    }, 2000);
+                    submitBtn.style.opacity = '';
+                    submitBtn.style.cursor = '';
+                    submitBtn.style.background = '';
+                    submitBtn.innerHTML = '🚀 Submit 제출';
                 }
-                
-                document.getElementById('c-id').value = "";
-                document.getElementById('c-customer').value = "";
-                const telElPost = document.getElementById('c-tel');
-                if (telElPost) telElPost.value = "";
-                document.getElementById('c-disease').value = "";
-                document.getElementById('c-note').value = "";
-                resetCaseComposer();
-                switchCaseTab('systems');
-                loadMyCases();
+                showCaseSuccess({ caseId, systemKey, symptomTags, customer });
+                if (typeof loadMyCases === 'function') loadMyCases();
             } catch (e) {
                 if (e && e.code === 'permission-denied') {
                     try {
@@ -11709,14 +12001,16 @@ async function archiveDoneCard(cardId) {
                         
                         await db.collection("cases").add(caseData);
                         await awardCaseSubmitBonus();
-                        alert("บันทึกข้อมูลเคสเรียบร้อยแล้ว ✅\n케이스가 저장되었습니다.");
-                        document.getElementById('c-id').value = "";
-                        document.getElementById('c-customer').value = "";
-                        document.getElementById('c-disease').value = "";
-                        document.getElementById('c-note').value = "";
-                        resetCaseComposer();
-                        switchCaseTab('systems');
-                        loadMyCases();
+                        // V94.19: same inline success card as the main path
+                        clearCaseDraft();
+                        if (submitBtn) {
+                            submitBtn.style.opacity = '';
+                            submitBtn.style.cursor = '';
+                            submitBtn.style.background = '';
+                            submitBtn.innerHTML = '🚀 Submit 제출';
+                        }
+                        showCaseSuccess({ caseId, systemKey, symptomTags, customer });
+                        if (typeof loadMyCases === 'function') loadMyCases();
                         return;
                     } catch (retryErr) {
                         alert("Error: Missing or insufficient permissions. กรุณาติดต่อ Admin เพื่อตรวจสอบ Firebase Auth (Anonymous) และ Firestore Rules");
