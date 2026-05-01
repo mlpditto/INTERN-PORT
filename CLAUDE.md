@@ -126,13 +126,19 @@ For multi-step tasks, state a brief plan:
 - **Performance**: Monitor for slow queries or DOM operations
 - **Cross-browser**: Test in Chrome, Safari, Firefox when applicable
 
-### Deployment Process
+### Branching & Deployment
+
+- **Trunk branch: `production`** (default branch on GitHub as of 2026-05-01). Base every feature branch from `origin/production`, target PRs at `production`.
+- **`main` is legacy** — kept temporarily for safety. Do not branch from it. Dependabot may still target it; cherry-pick to `production` when needed.
+- **GitHub Pages** deploys via `.github/workflows/deploy.yml` on push to `production` (serves `public/`).
+- **Live URLs**: https://mlpditto.github.io/INTERN-PORT/ (intern, LIFF-gated) and https://mlpditto.github.io/INTERN-PORT/admin.html (admin).
+
 ```
-1. Update version numbers → verify: consistent in index.html, admin.html
+1. Update version numbers → verify: consistent in public/index.html, public/admin.html
 2. Test locally → verify: all features work, no console errors
 3. Commit changes → verify: descriptive commit message
-4. Deploy to Firebase → verify: successful deployment
-5. Test live site → verify: propagated correctly, functional
+4. Open PR against production → verify: CI green
+5. Merge → workflow deploys → verify: live site updated
 ```
 
 ### Security Considerations
