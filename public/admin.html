@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.93</title>
+    <title>Nika V91.94</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15904,6 +15904,23 @@ async function saveQuiz() {
                     return false;
                 };
 
+                // V91.94: jsPDF helvetica (WinAnsi) can't render smart quotes / en-em dashes /
+                // NBSP / zero-width chars — they break splitTextToSize width measurement,
+                // causing line overflow past margin and kerning artifacts. Normalize to ASCII-safe.
+                const RE_SMART_SINGLE_QUOTE = /[‘’]/g;
+                const RE_SMART_DOUBLE_QUOTE = /[“”]/g;
+                const RE_DASH = /[–—]/g;
+                const RE_ELLIPSIS = /…/g;
+                const RE_NBSP = / /g;
+                const RE_ZERO_WIDTH = /[​-‏﻿]/g;
+                const normalizeForPdf = (s) => String(s || '')
+                    .replace(RE_SMART_SINGLE_QUOTE, "'")
+                    .replace(RE_SMART_DOUBLE_QUOTE, '"')
+                    .replace(RE_DASH, '-')
+                    .replace(RE_ELLIPSIS, '...')
+                    .replace(RE_NBSP, ' ')
+                    .replace(RE_ZERO_WIDTH, '');
+
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(18);
                 doc.setTextColor(220, 53, 69);
@@ -15947,7 +15964,7 @@ async function saveQuiz() {
 
                         doc.setFont('helvetica', 'bold');
                         doc.setTextColor(30);
-                        const qLines = doc.splitTextToSize(`Q${i + 1}: ${q.q}`, maxW);
+                        const qLines = doc.splitTextToSize(normalizeForPdf(`Q${i + 1}: ${q.q}`), maxW);
                         qLines.forEach(line => {
                             ensureSpace(6);
                             doc.text(line, margin, y);
@@ -15968,7 +15985,7 @@ async function saveQuiz() {
                             studentText += ans || "None";
                         }
                         
-                        const sLines = doc.splitTextToSize(studentText, maxW);
+                        const sLines = doc.splitTextToSize(normalizeForPdf(studentText), maxW);
                         sLines.forEach(line => {
                             ensureSpace(5);
                             doc.text(line, margin, y);
@@ -15985,7 +16002,7 @@ async function saveQuiz() {
                             correctText += "(Refer to answer key)";
                         }
                         
-                        const cLines = doc.splitTextToSize(correctText, maxW);
+                        const cLines = doc.splitTextToSize(normalizeForPdf(correctText), maxW);
                         cLines.forEach(line => {
                             ensureSpace(5);
                             doc.text(line, margin, y);
@@ -15996,7 +16013,7 @@ async function saveQuiz() {
                             y += 2;
                             doc.setTextColor(100);
                             doc.setFont('helvetica', 'italic');
-                            const eLines = doc.splitTextToSize(`Explanation: ${q.explanation}`, maxW);
+                            const eLines = doc.splitTextToSize(normalizeForPdf(`Explanation: ${q.explanation}`), maxW);
                             eLines.forEach(line => {
                                 ensureSpace(5);
                                 doc.text(line, margin, y);
