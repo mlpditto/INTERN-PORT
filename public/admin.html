@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.91</title>
+    <title>Nika V91.92</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -734,6 +734,57 @@
             width: 16px; height: 16px;
             cursor: pointer;
             accent-color: #d97706;
+        }
+
+        /* V91.92: date range inputs in Alabasta toolbar — match the warm-orange pill aesthetic */
+        .alabasta-date-input {
+            font-size: 0.75em;
+            padding: 4px 10px;
+            border-radius: 14px;
+            border: 1px solid #fcd34d;
+            background: #fff;
+            color: #92400e;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .alabasta-date-input:focus {
+            outline: none;
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 2px rgba(245,158,11,0.15);
+        }
+
+        .alabasta-date-label {
+            font-size: 0.7em;
+            color: #92400e;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .alabasta-date-preset {
+            font-size: 0.72em;
+            font-weight: 700;
+            padding: 4px 11px;
+            border-radius: 999px;
+            border: 1px solid #fcd34d;
+            background: #fff;
+            color: #92400e;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .alabasta-date-preset:hover {
+            background: #fef3c7;
+            border-color: #f59e0b;
+        }
+
+        .alabasta-date-preset.active {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #fff;
+            border-color: transparent;
         }
 
         /* V91.90: Alabasta system filter pills (matches LIFF My Cases pattern, warm-orange theme) */
@@ -4347,6 +4398,17 @@
                         <span style="font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:3px 10px;">Pending · 대기 <b id="alabasta-case-pending">0</b></span>
                         <span style="font-size:0.72em; color:#166534; font-weight:700; background:#fff; border:1px solid #86efac; border-radius:999px; padding:3px 10px;">Reviewed · 검토 완료 <b id="alabasta-case-reviewed">0</b></span>
                     </div>
+                </div>
+                <!-- V91.92: Date range filter · 날짜 범위 필터 — filters cases by timestamp -->
+                <div class="alabasta-filter-pills-row" aria-label="Date range filter">
+                    <span class="alabasta-date-label">📅 Date · 날짜:</span>
+                    <input type="date" id="alabasta-date-from" class="alabasta-date-input" onchange="onAlabastaDateChange()" aria-label="From date · 시작일">
+                    <span style="color:#92400e; font-weight:700;">→</span>
+                    <input type="date" id="alabasta-date-to" class="alabasta-date-input" onchange="onAlabastaDateChange()" aria-label="To date · 종료일">
+                    <button type="button" class="alabasta-date-preset" data-preset="7d" onclick="setAlabastaDatePreset('7d')">Last 7 days · 7일</button>
+                    <button type="button" class="alabasta-date-preset" data-preset="30d" onclick="setAlabastaDatePreset('30d')">Last 30 days · 30일</button>
+                    <button type="button" class="alabasta-date-preset" data-preset="month" onclick="setAlabastaDatePreset('month')">This month · 이번 달</button>
+                    <button type="button" class="alabasta-date-preset" data-preset="all" onclick="setAlabastaDatePreset('all')">All · 전체</button>
                 </div>
                 <!-- V91.90: System filter pills · 시스템 필터 — populated by renderAlabastaSystemFilterPills() -->
                 <div id="alabasta-system-filter-pills" class="alabasta-filter-pills-row" aria-label="Filter by disease system"></div>
@@ -19402,6 +19464,53 @@ async function saveQuiz() {
             renderAlabastaCases();
         }
 
+        // V91.92: Date filter — date range comes from the two <input type="date"> fields
+        // (no separate state needed; the inputs ARE the state). Preset chips are convenience
+        // shortcuts that set the inputs to common ranges.
+        function onAlabastaDateChange() {
+            // User edited from/to manually — clear any active preset highlight and re-render.
+            document.querySelectorAll('.alabasta-date-preset').forEach(b => b.classList.remove('active'));
+            renderAlabastaCases();
+        }
+
+        function setAlabastaDatePreset(preset) {
+            const fromEl = document.getElementById('alabasta-date-from');
+            const toEl = document.getElementById('alabasta-date-to');
+            if (!fromEl || !toEl) return;
+
+            const today = new Date();
+            const fmt = (d) => {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+            };
+
+            if (preset === 'all') {
+                fromEl.value = '';
+                toEl.value = '';
+            } else if (preset === '7d') {
+                const start = new Date(today);
+                start.setDate(start.getDate() - 6); // last 7 days inclusive of today
+                fromEl.value = fmt(start);
+                toEl.value = fmt(today);
+            } else if (preset === '30d') {
+                const start = new Date(today);
+                start.setDate(start.getDate() - 29);
+                fromEl.value = fmt(start);
+                toEl.value = fmt(today);
+            } else if (preset === 'month') {
+                const start = new Date(today.getFullYear(), today.getMonth(), 1);
+                fromEl.value = fmt(start);
+                toEl.value = fmt(today);
+            }
+
+            document.querySelectorAll('.alabasta-date-preset').forEach(b => {
+                b.classList.toggle('active', b.dataset.preset === preset);
+            });
+            renderAlabastaCases();
+        }
+
         // V91.91: Bulk selection state — Set of case doc IDs across the whole table.
         // Persists across re-renders (filter/search changes don't clear it) so admins
         // can build a selection while narrowing the view; explicit Clear button only.
@@ -19513,12 +19622,30 @@ async function saveQuiz() {
             const keyword = ((document.getElementById('alabasta-case-search') || {}).value || '').toLowerCase().trim();
 
             const safe = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+            // V91.92: read date range from inputs. `to` extends to end-of-day so the cutoff is inclusive.
+            const fromVal = (document.getElementById('alabasta-date-from') || {}).value || '';
+            const toVal = (document.getElementById('alabasta-date-to') || {}).value || '';
+            const fromDate = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+            const toDate = toVal ? new Date(toVal + 'T23:59:59.999') : null;
+
             // V91.90: split filtering — `baseFiltered` is what the system-filter pills count against
             // (so picking one pill doesn't zero out the others). `filtered` is what actually renders.
+            // V91.92: date range filter folded into baseFiltered so pill counts respect the date scope.
             const baseFiltered = casesData.filter(c => showArchived || !c.isArchived).filter(c => {
                 if (activeBoardGroup !== 'All') {
                     const user = usersData.find(u => u.id === c.userId);
                     if ((user?.group || 'Public') !== activeBoardGroup) return false;
+                }
+
+                // Date range filter (V91.92). Cases without a real timestamp slip through —
+                // safer to show than to silently hide them.
+                if (fromDate || toDate) {
+                    const ts = c.timestamp && typeof c.timestamp.toDate === 'function' ? c.timestamp.toDate() : null;
+                    if (ts) {
+                        if (fromDate && ts < fromDate) return false;
+                        if (toDate && ts > toDate) return false;
+                    }
                 }
 
                 if (!keyword) return true;
