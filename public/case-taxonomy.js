@@ -65,9 +65,13 @@
     // the gap. New code should prefer CASE_SYSTEMS / CASE_SYSTEM_BY_KEY.
 
     // index.html:  caseTaxonomyCatalog (was 10 entries; now 12 incl. renal/heme)
+    // V91.83: also expose `thaiLabel` so submitCase's
+    // `${entry.label} / ${entry.thaiLabel}` produces a real string instead of
+    // the pre-existing "X / undefined" that the prior inline catalog also had.
     window.caseTaxonomyCatalog = CASE_SYSTEMS.map(s => ({
         key: s.key,
         label: s.label.en,
+        thaiLabel: s.label.th,
         symptoms: s.symptoms
     }));
 
@@ -85,9 +89,11 @@
     // admin.html:  PRIMARY_SYSTEMS (button group; previously had 8 items with
     // a different `endo` key vs the rest of the codebase's `endocrine`.
     // Unified to `endocrine` so all code paths agree.)
+    // V91.83: button label is now bilingual EN+KR (was Thai-only) to match
+    // the LIFF Disease System buttons and the rest of the EN+KR Edit modal.
     window.PRIMARY_SYSTEMS = CASE_SYSTEMS.map(s => ({
         value: s.key,
-        label: `${s.emoji} ${s.label.th}`,
+        label: `${s.emoji} ${s.label.en} ${s.label.ko}`,
         code: s.label.en
     }));
 })();
