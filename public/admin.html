@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.90</title>
+    <title>Nika V91.91</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -676,6 +676,64 @@
             align-items: center;
             gap: 6px;
             flex-wrap: wrap;
+        }
+
+        /* V91.91: Alabasta bulk action toolbar — appears below the filter pills when ≥1 case is selected */
+        .alabasta-bulk-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding: 10px 14px;
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            border: 1px solid #f59e0b;
+            border-radius: 12px;
+            font-size: 0.82em;
+            color: #78350f;
+            font-weight: 700;
+        }
+
+        .alabasta-bulk-toolbar .alabasta-bulk-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.95em;
+        }
+
+        .alabasta-bulk-toolbar .alabasta-bulk-count b {
+            font-size: 1.05em;
+            color: #92400e;
+            font-weight: 900;
+        }
+
+        .alabasta-bulk-toolbar .alabasta-bulk-spacer {
+            flex: 1;
+        }
+
+        .alabasta-bulk-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            border: none;
+            font-weight: 800;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: filter 0.15s ease;
+        }
+
+        .alabasta-bulk-btn:hover { filter: brightness(0.92); }
+
+        .alabasta-bulk-btn.is-review { background: #16a34a; color: #fff; }
+        .alabasta-bulk-btn.is-delete { background: #dc2626; color: #fff; }
+        .alabasta-bulk-btn.is-clear  { background: #fff; color: #92400e; border: 1px solid #fcd34d; }
+
+        .alabasta-row-checkbox {
+            width: 16px; height: 16px;
+            cursor: pointer;
+            accent-color: #d97706;
         }
 
         /* V91.90: Alabasta system filter pills (matches LIFF My Cases pattern, warm-orange theme) */
@@ -4292,10 +4350,22 @@
                 </div>
                 <!-- V91.90: System filter pills · 시스템 필터 — populated by renderAlabastaSystemFilterPills() -->
                 <div id="alabasta-system-filter-pills" class="alabasta-filter-pills-row" aria-label="Filter by disease system"></div>
+                <!-- V91.91: Bulk action toolbar — visible only when ≥1 case is selected via row checkboxes -->
+                <div id="alabasta-bulk-toolbar" class="alabasta-bulk-toolbar" style="display:none;" aria-label="Bulk actions for selected cases">
+                    <span class="alabasta-bulk-count">
+                        <i class="fa-solid fa-square-check"></i>
+                        <b id="alabasta-bulk-count-num">0</b> selected · 선택됨
+                    </span>
+                    <span class="alabasta-bulk-spacer"></span>
+                    <button type="button" class="alabasta-bulk-btn is-review" onclick="bulkAlabastaReview()">✅ Bulk Review · 일괄 검토</button>
+                    <button type="button" class="alabasta-bulk-btn is-delete" onclick="bulkAlabastaDelete()">🗑️ Bulk Delete · 일괄 삭제</button>
+                    <button type="button" class="alabasta-bulk-btn is-clear" onclick="clearAlabastaSelection()">✕ Clear · 해제</button>
+                </div>
                 <div style="overflow-x:auto;">
                     <table id="alabastaCaseTable" class="admin-table">
                         <thead>
                             <tr style="background:#fef3c7;">
+                                <th style="width:36px; text-align:center;"><input type="checkbox" id="alabasta-select-all" class="alabasta-row-checkbox" onchange="setAlabastaSelectAll(this.checked)" aria-label="Select all visible cases"></th>
                                 <th>Time · 시간</th>
                                 <th>User · 사용자</th>
                                 <th>HN / Ref · 참조</th>
@@ -19332,6 +19402,74 @@ async function saveQuiz() {
             renderAlabastaCases();
         }
 
+        // V91.91: Bulk selection state — Set of case doc IDs across the whole table.
+        // Persists across re-renders (filter/search changes don't clear it) so admins
+        // can build a selection while narrowing the view; explicit Clear button only.
+        window.alabastaSelectedIds = window.alabastaSelectedIds || new Set();
+
+        function toggleAlabastaSelection(id, checked) {
+            if (checked) window.alabastaSelectedIds.add(id);
+            else window.alabastaSelectedIds.delete(id);
+            renderAlabastaBulkToolbar();
+            // Re-sync the select-all checkbox state without re-rendering the whole table.
+            syncAlabastaSelectAllCheckbox();
+        }
+
+        function setAlabastaSelectAll(checked) {
+            // Operates on the currently VISIBLE cases (after all filters), not all of casesData.
+            const visibleIds = Array.from(document.querySelectorAll('#alabastaCaseTable tbody .alabasta-row-checkbox'))
+                .map(el => el.dataset.id).filter(Boolean);
+            visibleIds.forEach(id => {
+                if (checked) window.alabastaSelectedIds.add(id);
+                else window.alabastaSelectedIds.delete(id);
+            });
+            // Reflect immediately on visible row checkboxes.
+            document.querySelectorAll('#alabastaCaseTable tbody .alabasta-row-checkbox').forEach(el => {
+                el.checked = checked;
+            });
+            renderAlabastaBulkToolbar();
+        }
+
+        function clearAlabastaSelection() {
+            window.alabastaSelectedIds = new Set();
+            document.querySelectorAll('#alabastaCaseTable tbody .alabasta-row-checkbox').forEach(el => {
+                el.checked = false;
+            });
+            renderAlabastaBulkToolbar();
+            syncAlabastaSelectAllCheckbox();
+        }
+
+        function renderAlabastaBulkToolbar() {
+            const bar = document.getElementById('alabasta-bulk-toolbar');
+            const num = document.getElementById('alabasta-bulk-count-num');
+            if (!bar) return;
+            const n = window.alabastaSelectedIds.size;
+            if (num) num.textContent = String(n);
+            bar.style.display = n > 0 ? 'flex' : 'none';
+        }
+
+        function syncAlabastaSelectAllCheckbox() {
+            const selectAll = document.getElementById('alabasta-select-all');
+            if (!selectAll) return;
+            const visible = Array.from(document.querySelectorAll('#alabastaCaseTable tbody .alabasta-row-checkbox'));
+            if (!visible.length) {
+                selectAll.checked = false;
+                selectAll.indeterminate = false;
+                return;
+            }
+            const selectedVisible = visible.filter(el => window.alabastaSelectedIds.has(el.dataset.id)).length;
+            if (selectedVisible === 0) {
+                selectAll.checked = false;
+                selectAll.indeterminate = false;
+            } else if (selectedVisible === visible.length) {
+                selectAll.checked = true;
+                selectAll.indeterminate = false;
+            } else {
+                selectAll.checked = false;
+                selectAll.indeterminate = true;
+            }
+        }
+
         function renderAlabastaSystemFilterPills(baseFiltered) {
             const container = document.getElementById('alabasta-system-filter-pills');
             if (!container) return;
@@ -19413,7 +19551,9 @@ async function saveQuiz() {
                 const emptyMsg = systemFilter === 'all'
                     ? 'No case submissions found · 케이스가 없습니다'
                     : `No cases for the selected system · 선택된 시스템에 해당하는 케이스가 없습니다`;
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:#94a3b8; padding:14px;">${emptyMsg}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#94a3b8; padding:14px;">${emptyMsg}</td></tr>`;
+                renderAlabastaBulkToolbar();
+                syncAlabastaSelectAllCheckbox();
                 return;
             }
 
@@ -19438,8 +19578,10 @@ async function saveQuiz() {
                 const deleteBtn = `<button class="btn-sm alabasta-action-btn is-delete" title="Delete case · 케이스 삭제" onclick="deleteCaseSubmission('${c.id}')"><span class="alabasta-emoji">🗑️</span></button>`;
                 const actionBtn = `<div class="alabasta-action-row">${editBtn}${laboonBtn}${caseCardBtn}${poneglyphBtn}${statusBtn}${deleteBtn}</div>`;
 
+                const isSelected = window.alabastaSelectedIds.has(c.id);
                 return `
                     <tr>
+                        <td style="text-align:center;"><input type="checkbox" class="alabasta-row-checkbox" data-id="${c.id}" ${isSelected ? 'checked' : ''} onchange="toggleAlabastaSelection('${c.id}', this.checked)" aria-label="Select case ${safe(c.caseId || c.id)}"></td>
                         <td style="font-size:0.8em; white-space:nowrap;">${safe(ts)}</td>
                         <td>
                             <div style="display:flex; align-items:center; gap:8px;">
@@ -19457,6 +19599,10 @@ async function saveQuiz() {
                     </tr>
                 `;
             }).join('');
+
+            // V91.91: keep bulk toolbar count + select-all tri-state in sync after every render.
+            renderAlabastaBulkToolbar();
+            syncAlabastaSelectAllCheckbox();
         }
 
         // V91.82: alabastaTaxonomyCatalog now provided by public/case-taxonomy.js
@@ -20607,6 +20753,129 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             } catch (e) {
                 console.error('Failed to delete case:', e);
                 alert('Failed to delete case: ' + e.message);
+            }
+        }
+
+        // V91.91: Bulk-review handler — reuses the score modal but applies one bonus value
+        // to every selected case. Single Firestore batch covers all updates + per-user score
+        // increments + per-user case_review_bonus log writes. Firestore batch limit is 500
+        // operations; with ~3 ops per case (case update + user inc + log set + reviewLogId
+        // update = up to 4), this comfortably handles ~120 cases per batch. Beyond that the
+        // commit would error and the user would see the failure — admins can split batches
+        // by hand for now (no chunking yet).
+        async function bulkAlabastaReview() {
+            const ids = Array.from(window.alabastaSelectedIds || []);
+            if (!ids.length) return;
+
+            const input = await openCaseReviewScoreModal({ caseId: `${ids.length} selected · ${ids.length}건 선택됨` });
+            if (input === null) return;
+
+            const bonus = parseFloat(String(input).trim());
+            if (!Number.isFinite(bonus) || bonus < 0) {
+                alert('Please enter a non-negative number for the bonus. · 점수는 0 이상의 숫자여야 합니다.');
+                return;
+            }
+
+            const ok = confirm(`Apply ${bonus.toFixed(2)} pts to ${ids.length} case(s) and mark all as reviewed?\n${ids.length}건의 케이스에 ${bonus.toFixed(2)}점을 적용하고 모두 검토 완료로 표시하시겠습니까?`);
+            if (!ok) return;
+
+            try {
+                const batch = db.batch();
+                let succeeded = 0;
+                ids.forEach(id => {
+                    const caseItem = casesData.find(c => c.id === id);
+                    if (!caseItem) return;
+                    const caseRef = db.collection('cases').doc(id);
+                    batch.update(caseRef, {
+                        status: 'reviewed',
+                        isArchived: true,
+                        archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        adminBonus: bonus,
+                        adminUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        adminReviewedBy: ALLOWED_EMAIL || 'admin'
+                    });
+
+                    if (bonus > 0 && caseItem.userId) {
+                        const primarySystemKey = caseItem.diseaseSystemKey || inferAlabastaTaxonomyKey(caseItem);
+                        const primarySystemLabel = getAlabastaPrimarySystemLabel(caseItem, { primarySystemKey });
+                        batch.update(db.collection('users').doc(caseItem.userId), {
+                            score: firebase.firestore.FieldValue.increment(bonus)
+                        });
+                        const reviewLogRef = db.collection('checkin_logs').doc();
+                        batch.set(reviewLogRef, {
+                            userId: caseItem.userId,
+                            type: 'case_review_bonus',
+                            amount: bonus,
+                            note: buildAlabastaReviewLogNote(caseItem, { sourceCaseDocId: id, sourceCaseRef: caseItem.caseId || '', primarySystemKey, primarySystemLabel }),
+                            primarySystemKey,
+                            primarySystemLabel,
+                            taxonomySummary: caseItem.taxonomySummary || primarySystemLabel,
+                            sourceCaseDocId: id,
+                            sourceCaseRef: caseItem.caseId || '',
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        batch.update(caseRef, { reviewLogId: reviewLogRef.id });
+                    }
+                    succeeded++;
+                });
+
+                await batch.commit();
+                clearAlabastaSelection();
+                if (typeof showToast === 'function') showToast(`Bulk reviewed ${succeeded} case(s) +${bonus.toFixed(2)} pts each · ${succeeded}건 일괄 검토 (각 +${bonus.toFixed(2)}점)`, 'success');
+            } catch (e) {
+                console.error('Bulk review failed:', e);
+                alert(`Bulk review failed · 일괄 검토 실패: ${e.message}`);
+            }
+        }
+
+        // V91.91: Bulk-delete handler — single Firestore batch deletes selected case docs
+        // and decrements user scores by the previously-awarded bonuses. Unlike the single
+        // deleteCaseSubmission path, we do NOT scan checkin_logs to retire the matching
+        // bonus entries — that requires async per-case lookups which would explode the
+        // operation count. The bonus logs become orphans (point at deleted case docs); the
+        // user's score is still correctly reverted. Trade-off: lose audit trail symmetry to
+        // get a fast batch commit. Single-case delete via 🗑️ still does the full cleanup.
+        async function bulkAlabastaDelete() {
+            const ids = Array.from(window.alabastaSelectedIds || []);
+            if (!ids.length) return;
+
+            const totalRevert = ids.reduce((sum, id) => {
+                const c = casesData.find(x => x.id === id);
+                return sum + Number(c?.adminBonus || 0);
+            }, 0);
+
+            const warn = totalRevert > 0
+                ? `Delete ${ids.length} case(s) and revert ${totalRevert.toFixed(2)} pts total? This cannot be undone.\n${ids.length}건의 케이스를 삭제하고 총 ${totalRevert.toFixed(2)}점을 회수하시겠습니까? 되돌릴 수 없습니다.`
+                : `Delete ${ids.length} case(s)? This cannot be undone.\n${ids.length}건의 케이스를 삭제하시겠습니까? 되돌릴 수 없습니다.`;
+            if (!confirm(warn)) return;
+
+            try {
+                const batch = db.batch();
+                ids.forEach(id => {
+                    const caseItem = casesData.find(c => c.id === id);
+                    if (!caseItem) return;
+                    const bonus = Number(caseItem.adminBonus || 0);
+                    batch.delete(db.collection('cases').doc(id));
+                    if (bonus > 0 && caseItem.userId) {
+                        batch.update(db.collection('users').doc(caseItem.userId), {
+                            score: firebase.firestore.FieldValue.increment(-bonus)
+                        });
+                    }
+                });
+
+                await batch.commit();
+                const deletedSet = new Set(ids);
+                casesData = casesData.filter(c => !deletedSet.has(c.id));
+                clearAlabastaSelection();
+                renderAlabastaCases();
+                const toastMsg = totalRevert > 0
+                    ? `Bulk deleted ${ids.length} case(s), reverted ${totalRevert.toFixed(2)} pts · ${ids.length}건 삭제 / ${totalRevert.toFixed(2)}점 회수`
+                    : `Bulk deleted ${ids.length} case(s) · ${ids.length}건 일괄 삭제`;
+                if (typeof showToast === 'function') showToast(toastMsg, 'success');
+            } catch (e) {
+                console.error('Bulk delete failed:', e);
+                alert(`Bulk delete failed · 일괄 삭제 실패: ${e.message}`);
             }
         }
 
