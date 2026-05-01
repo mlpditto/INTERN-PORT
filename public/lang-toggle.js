@@ -124,11 +124,15 @@
     }
 
     // --- Toggle state (3-state: '1'=ON, '0'=OFF, missing=default) ---
-    // Phase α transition: default ON (preserves existing bilingual UI).
-    // Phase β will flip DEFAULT_ON_KR / DEFAULT_ON_TH to false once EN
-    // translations are authored for standalone Thai text.
-    var DEFAULT_ON_KR = true;
-    var DEFAULT_ON_TH = true;
+    // Page-aware defaults (Phase β.1):
+    //   - index.html (LIFF user-facing): default OFF — high-visibility
+    //     standalone Thai now has EN equivalents, EN-only is the new default.
+    //   - admin.html (still Phase α): default ON until Phase δ adds EN
+    //     translations for admin's standalone Thai. Existing admin users
+    //     see no change on first load.
+    var IS_ADMIN_PAGE = /admin\.html$/i.test(location.pathname);
+    var DEFAULT_ON_KR = IS_ADMIN_PAGE;
+    var DEFAULT_ON_TH = IS_ADMIN_PAGE;
 
     function isLangOn(lang) {
         var key = lang === 'kr' ? 'uiLangKR' : 'uiLangTH';
