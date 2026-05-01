@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.86</title>
+    <title>Nika V91.87</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -20593,13 +20593,61 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     return;
                 }
 
-                await caseRef.update({
+                // V91.87: Reopen path now reverts the previously-awarded score and
+                // writes a compensating `case_review_revert` log entry. Without this,
+                // reopening left the user with bonus pts that no longer matched any
+                // active review — and re-reviewing would stack a new bonus on top.
+                // Original `case_review_bonus` log is kept for audit trail; the new
+                // compensating entry has a negative amount and references the
+                // original via `revertOfLogId`.
+                const previousBonus = parseFloat(caseItem.adminBonus) || 0;
+                const previousReviewLogId = caseItem.reviewLogId || null;
+                const reopenUserId = caseItem.userId;
+
+                if (previousBonus > 0 && reopenUserId) {
+                    const ok = confirm(`Reopen this case? · 케이스를 재개하시겠습니까?\n\nThis will revert ${previousBonus.toFixed(2)} pts from the user. · 사용자에게서 ${previousBonus.toFixed(2)}점이 회수됩니다.`);
+                    if (!ok) return;
+                }
+
+                const reopenBatch = db.batch();
+                const reopenUpdate = {
                     status,
                     isArchived: false,
+                    adminBonus: 0,
                     adminUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     adminReviewedBy: ALLOWED_EMAIL || 'admin'
-                });
-                if (typeof showToast === 'function') showToast(`Case marked as ${status} · 케이스를 ${status}로 표시`, 'success');
+                };
+                if (previousReviewLogId) {
+                    reopenUpdate.reviewLogId = firebase.firestore.FieldValue.delete();
+                }
+                reopenBatch.update(caseRef, reopenUpdate);
+
+                if (previousBonus > 0 && reopenUserId) {
+                    const primarySystemKey = caseItem.diseaseSystemKey || inferAlabastaTaxonomyKey(caseItem);
+                    const primarySystemLabel = getAlabastaPrimarySystemLabel(caseItem, { primarySystemKey });
+                    reopenBatch.update(db.collection('users').doc(reopenUserId), {
+                        score: firebase.firestore.FieldValue.increment(-previousBonus)
+                    });
+                    reopenBatch.set(db.collection('checkin_logs').doc(), {
+                        userId: reopenUserId,
+                        type: 'case_review_revert',
+                        amount: -previousBonus,
+                        note: `Reopened: ${buildAlabastaReviewLogNote(caseItem, { sourceCaseDocId: caseDocId, sourceCaseRef: caseItem.caseId || '', primarySystemKey, primarySystemLabel })}`,
+                        primarySystemKey,
+                        primarySystemLabel,
+                        sourceCaseDocId: caseDocId,
+                        sourceCaseRef: caseItem.caseId || '',
+                        revertOfLogId: previousReviewLogId,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+
+                await reopenBatch.commit();
+
+                const revertSuffix = previousBonus > 0 && reopenUserId
+                    ? ` · −${previousBonus.toFixed(2)} pts reverted · ${previousBonus.toFixed(2)}점 회수`
+                    : '';
+                if (typeof showToast === 'function') showToast(`Case marked as ${status} · 케이스를 ${status}로 표시${revertSuffix}`, 'success');
             } catch (e) {
                 console.error('Failed to update case status:', e);
                 alert('Failed to update case status: ' + e.message);
