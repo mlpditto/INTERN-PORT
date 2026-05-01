@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.89</title>
+    <title>Nika V91.90</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -676,6 +676,48 @@
             align-items: center;
             gap: 6px;
             flex-wrap: wrap;
+        }
+
+        /* V91.90: Alabasta system filter pills (matches LIFF My Cases pattern, warm-orange theme) */
+        .alabasta-filter-pills-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .alabasta-filter-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.74em;
+            font-weight: 700;
+            padding: 5px 12px;
+            border-radius: 999px;
+            border: 1px solid #fcd34d;
+            background: #fff;
+            color: #92400e;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .alabasta-filter-pill:hover {
+            background: #fef3c7;
+            border-color: #f59e0b;
+        }
+
+        .alabasta-filter-pill.active {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #fff;
+            border-color: transparent;
+        }
+
+        .alabasta-filter-pill .pill-count {
+            font-size: 0.85em;
+            font-weight: 900;
+            opacity: 0.85;
         }
 
         .alabasta-action-btn {
@@ -4248,6 +4290,8 @@
                         <span style="font-size:0.72em; color:#166534; font-weight:700; background:#fff; border:1px solid #86efac; border-radius:999px; padding:3px 10px;">Reviewed · 검토 완료 <b id="alabasta-case-reviewed">0</b></span>
                     </div>
                 </div>
+                <!-- V91.90: System filter pills · 시스템 필터 — populated by renderAlabastaSystemFilterPills() -->
+                <div id="alabasta-system-filter-pills" class="alabasta-filter-pills-row" aria-label="Filter by disease system"></div>
                 <div style="overflow-x:auto;">
                     <table id="alabastaCaseTable" class="admin-table">
                         <thead>
@@ -19280,6 +19324,46 @@ async function saveQuiz() {
             renderLeaderboard();
         }
 
+        // V91.90: System filter state — 'all' or any key from CASE_SYSTEMS
+        window.alabastaSystemFilter = window.alabastaSystemFilter || 'all';
+
+        function setAlabastaSystemFilter(key) {
+            window.alabastaSystemFilter = key || 'all';
+            renderAlabastaCases();
+        }
+
+        function renderAlabastaSystemFilterPills(baseFiltered) {
+            const container = document.getElementById('alabasta-system-filter-pills');
+            if (!container) return;
+
+            // Count cases per system in the BASE-filtered set (before system filter applied),
+            // so pill counts don't all collapse to 0 when a single pill is active.
+            const counts = {};
+            baseFiltered.forEach(c => {
+                const key = c.diseaseSystemKey || 'other';
+                counts[key] = (counts[key] || 0) + 1;
+            });
+
+            const active = window.alabastaSystemFilter || 'all';
+            const catalog = window.CASE_SYSTEMS || [];
+
+            // "All" pill always first
+            const pills = [
+                `<button type="button" class="alabasta-filter-pill ${active === 'all' ? 'active' : ''}" onclick="setAlabastaSystemFilter('all')">All · 전체 <span class="pill-count">${baseFiltered.length}</span></button>`
+            ];
+
+            // Then one pill per system that has ≥1 case (skip empty systems to keep UI clean)
+            catalog.forEach(sys => {
+                const n = counts[sys.key] || 0;
+                if (n === 0) return;
+                pills.push(
+                    `<button type="button" class="alabasta-filter-pill ${active === sys.key ? 'active' : ''}" onclick="setAlabastaSystemFilter('${sys.key}')" title="${sys.label.en} · ${sys.label.ko}">${sys.emoji} ${sys.label.en} <span class="pill-count">${n}</span></button>`
+                );
+            });
+
+            container.innerHTML = pills.join('');
+        }
+
         function renderAlabastaCases() {
             const tbody = document.querySelector('#alabastaCaseTable tbody');
             if (!tbody) return;
@@ -19291,7 +19375,9 @@ async function saveQuiz() {
             const keyword = ((document.getElementById('alabasta-case-search') || {}).value || '').toLowerCase().trim();
 
             const safe = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-            const filtered = casesData.filter(c => showArchived || !c.isArchived).filter(c => {
+            // V91.90: split filtering — `baseFiltered` is what the system-filter pills count against
+            // (so picking one pill doesn't zero out the others). `filtered` is what actually renders.
+            const baseFiltered = casesData.filter(c => showArchived || !c.isArchived).filter(c => {
                 if (activeBoardGroup !== 'All') {
                     const user = usersData.find(u => u.id === c.userId);
                     if ((user?.group || 'Public') !== activeBoardGroup) return false;
@@ -19310,6 +19396,13 @@ async function saveQuiz() {
                 return text.includes(keyword);
             });
 
+            const systemFilter = window.alabastaSystemFilter || 'all';
+            const filtered = systemFilter === 'all'
+                ? baseFiltered
+                : baseFiltered.filter(c => (c.diseaseSystemKey || 'other') === systemFilter);
+
+            renderAlabastaSystemFilterPills(baseFiltered);
+
             const pendingCount = filtered.filter(c => !c.isArchived && (c.status || 'pending') !== 'reviewed').length;
             const reviewedCount = filtered.filter(c => c.isArchived || (c.status || '') === 'reviewed').length;
             if (totalEl) totalEl.textContent = filtered.length;
@@ -19317,7 +19410,10 @@ async function saveQuiz() {
             if (reviewedEl) reviewedEl.textContent = reviewedCount;
 
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:#94a3b8; padding:14px;">No case submissions found</td></tr>`;
+                const emptyMsg = systemFilter === 'all'
+                    ? 'No case submissions found · 케이스가 없습니다'
+                    : `No cases for the selected system · 선택된 시스템에 해당하는 케이스가 없습니다`;
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:#94a3b8; padding:14px;">${emptyMsg}</td></tr>`;
                 return;
             }
 
