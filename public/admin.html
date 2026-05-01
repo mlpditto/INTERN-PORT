@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.94</title>
+    <title>Nika V91.95</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15904,22 +15904,23 @@ async function saveQuiz() {
                     return false;
                 };
 
-                // V91.94: jsPDF helvetica (WinAnsi) can't render smart quotes / en-em dashes /
-                // NBSP / zero-width chars — they break splitTextToSize width measurement,
-                // causing line overflow past margin and kerning artifacts. Normalize to ASCII-safe.
-                const RE_SMART_SINGLE_QUOTE = /[‘’]/g;
-                const RE_SMART_DOUBLE_QUOTE = /[“”]/g;
-                const RE_DASH = /[–—]/g;
+                // V91.95: Expanded from V91.94 — V91.94 only covered U+2013/U+2014 dashes,
+                // missing non-breaking hyphen U+2011 (likely culprit for Q7 "life-threatening").
+                // V91.95 covers ALL Unicode dash variants (U+2010-U+2015), all unicode whitespace,
+                // and bidi/format invisibles.
+                const RE_SMART_SINGLE_QUOTE = /[‘-‛]/g;
+                const RE_SMART_DOUBLE_QUOTE = /[“-‟]/g;
+                const RE_DASH = /[‐-―]/g;
                 const RE_ELLIPSIS = /…/g;
-                const RE_NBSP = / /g;
-                const RE_ZERO_WIDTH = /[​-‏﻿]/g;
+                const RE_UNICODE_SPACE = /[   -   　]/g;
+                const RE_INVISIBLE = /[​-‏ -‮⁠-⁯﻿]/g;
                 const normalizeForPdf = (s) => String(s || '')
                     .replace(RE_SMART_SINGLE_QUOTE, "'")
                     .replace(RE_SMART_DOUBLE_QUOTE, '"')
                     .replace(RE_DASH, '-')
                     .replace(RE_ELLIPSIS, '...')
-                    .replace(RE_NBSP, ' ')
-                    .replace(RE_ZERO_WIDTH, '');
+                    .replace(RE_UNICODE_SPACE, ' ')
+                    .replace(RE_INVISIBLE, '');
 
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(18);
