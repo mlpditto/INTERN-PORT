@@ -78,11 +78,15 @@
     // index.html:  CASE_SYSTEM_EMOJI (was object {key: emoji})
     window.CASE_SYSTEM_EMOJI = Object.fromEntries(CASE_SYSTEMS.map(s => [s.key, s.emoji]));
 
-    // admin.html:  alabastaTaxonomyCatalog (had thaiLabel + tags fields)
+    // admin.html:  alabastaTaxonomyCatalog (had thaiLabel + tags fields).
+    // V91.84: also expose koLabel so admin.html label generators can render
+    // EN+KR ("Neurological 신경계") instead of the prior Thai-prefix
+    // ("ระบบประสาท (Neurological)") format the user flagged.
     window.alabastaTaxonomyCatalog = CASE_SYSTEMS.map(s => ({
         key: s.key,
         label: s.label.en,
         thaiLabel: s.label.th,
+        koLabel: s.label.ko,
         tags: s.symptoms
     }));
 

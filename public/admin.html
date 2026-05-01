@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.83</title>
+    <title>Nika V91.84</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -3907,7 +3907,8 @@
     <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <script src="taxonomy.js"></script>
-    <script src="case-taxonomy.js"></script>
+    <!-- V91.84: cache-busting on case-taxonomy.js so browser refetches when shim changes (script URL is otherwise constant) -->
+    <script src="case-taxonomy.js?v=V91.84"></script>
 </head>
 
 <body>
@@ -19371,7 +19372,7 @@ async function saveQuiz() {
             if (directLabel) return directLabel;
             const key = logData.primarySystemKey || caseItem.diseaseSystemKey || inferAlabastaTaxonomyKey(caseItem);
             const entry = getAlabastaTaxonomyEntry(key) || getAlabastaTaxonomyEntry('other');
-            return entry ? `${entry.thaiLabel} (${entry.label})` : 'Other';
+            return entry ? `${entry.label} ${entry.koLabel}` : 'Other';
         }
 
         function findAlabastaCaseForLog(logData = {}) {
@@ -19391,7 +19392,7 @@ async function saveQuiz() {
             // V91.80: markup is <input type="hidden"> + button group; legacy <select> bootstrap is no-op.
             if (!selectEl || selectEl.tagName !== 'SELECT' || selectEl.options.length > 1) return;
             selectEl.innerHTML = `<option value="">Select system...</option>` + alabastaTaxonomyCatalog.map(item => (
-                `<option value="${item.key}">${item.thaiLabel} (${item.label})</option>`
+                `<option value="${item.key}">${item.label} ${item.koLabel}</option>`
             )).join('');
         }
 
@@ -19422,7 +19423,7 @@ async function saveQuiz() {
                 : `<span class="edit-case-taxonomy-chip muted">No tags selected yet</span>`;
 
             const summary = entry
-                ? `${entry.thaiLabel} (${entry.label})${selectedTags.length ? ` - ${selectedTags.join(', ')}` : ''}`
+                ? `${entry.label} ${entry.koLabel}${selectedTags.length ? ` - ${selectedTags.join(', ')}` : ''}`
                 : 'Choose a primary system to generate a canonical taxonomy summary. · 주요 계통을 선택하면 정규 분류 요약이 생성됩니다.';
             previewEl.innerHTML = entry
                 ? `<strong>Canonical Summary · 정규 요약:</strong> ${summary}`
@@ -19599,9 +19600,9 @@ async function saveQuiz() {
                 : [];
             return {
                 primarySystemKey: entry?.key || 'other',
-                primarySystemLabel: caseItem.diseaseSystemLabel || (entry ? `${entry.thaiLabel} (${entry.label})` : 'Other'),
+                primarySystemLabel: caseItem.diseaseSystemLabel || (entry ? `${entry.label} ${entry.koLabel}` : 'Other'),
                 symptomTags,
-                taxonomySummary: caseItem.taxonomySummary || `${entry?.thaiLabel || 'อื่นๆ'} (${entry?.label || 'Other'})${symptomTags.length ? ` - ${symptomTags.join(', ')}` : ''}`
+                taxonomySummary: caseItem.taxonomySummary || `${entry?.label || 'Other'} ${entry?.koLabel || '기타'}${symptomTags.length ? ` - ${symptomTags.join(', ')}` : ''}`
             };
         }
 
@@ -20383,7 +20384,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!caseDocId) return;
             const taxonomyEntry = getAlabastaTaxonomyEntry(taxonomySelectEl.value) || getAlabastaTaxonomyEntry('other');
             const symptomTags = [...getEditCaseSelectedTags()];
-            const diseaseLabel = `${taxonomyEntry.thaiLabel} (${taxonomyEntry.label})`;
+            const diseaseLabel = `${taxonomyEntry.label} ${taxonomyEntry.koLabel}`;
             const taxonomySummary = `${diseaseLabel}${symptomTags.length ? ` - ${symptomTags.join(', ')}` : ''}`;
 
             const originalHtml = saveBtn.innerHTML;
