@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.105</title>
+    <title>Nika V91.106</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -2736,7 +2736,7 @@
                 <div id="hub-dash-box" style="display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; margin-bottom:10px; background:#fcfdff; padding:12px; border-radius:15px; border:1px solid #eef2f7; text-align:center;">
                     <div id="hub-filter-quizzes" onclick="setHubHistoryFilter('quizzes')" title="Show Quizzes only" style="cursor:pointer; border-radius:10px; padding:8px 4px; transition:all 0.2s;"><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Quizzes</span><br><b id="hub-dash-quizzes" style="color:#4361ee; font-size:1.1em;">0</b> <small id="hub-dash-quizzes-count" style="font-size:0.7em; color:#94a3b8; font-weight:700;">(0)</small></div>
                     <div id="hub-filter-works" onclick="setHubHistoryFilter('works')" title="Show Works only" style="cursor:pointer; border-radius:10px; padding:8px 4px; transition:all 0.2s;"><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Works</span><br><b id="hub-dash-works" style="color:#10b981; font-size:1.1em;">0</b> <small id="hub-dash-works-count" style="font-size:0.7em; color:#94a3b8; font-weight:700;">(0)</small></div>
-                    <div id="hub-filter-logs" onclick="setHubHistoryFilter('logs')" title="Show Logs only" style="cursor:pointer; border-radius:10px; padding:8px 4px; transition:all 0.2s;"><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Logs</span><br><b id="hub-dash-logs" style="color:#f43f5e; font-size:1.1em;">0</b> <small id="hub-dash-logs-count" style="font-size:0.7em; color:#94a3b8; font-weight:700;">(0)</small></div>
+                    <div id="hub-filter-logs" onclick="setHubHistoryFilter('logs')" title="Show Logs only (📓 Daily Reflection + 🎓 Learning Note)" style="cursor:pointer; border-radius:10px; padding:8px 4px; transition:all 0.2s;"><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Logs</span><br><b id="hub-dash-logs" style="color:#f43f5e; font-size:1.1em;">0</b> <small id="hub-dash-logs-count" style="font-size:0.7em; color:#94a3b8; font-weight:700;">(0)</small><div id="hub-dash-logs-breakdown" style="font-size:0.62em; color:#94a3b8; font-weight:700; margin-top:2px;">📓 0 · 🎓 0</div></div>
                     <div id="hub-filter-bonus" onclick="setHubHistoryFilter('bonus')" title="Show Bonus only" style="cursor:pointer; border-radius:10px; padding:8px 4px; transition:all 0.2s;"><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Bonus</span><br><b id="hub-dash-bonus" style="color:#f59e0b; font-size:1.1em;">0</b> <small id="hub-dash-bonus-count" style="font-size:0.7em; color:#94a3b8; font-weight:700;">(0)</small></div>
                     <div id="hub-filter-manual" onclick="setHubHistoryFilter('manual')" title="Show Manual only" style="cursor:pointer; border-radius:10px; padding:8px 4px; transition:all 0.2s;"><span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Manual</span><br><b id="hub-dash-manual" style="color:#8b5cf6; font-size:1.1em;">0</b> <small id="hub-dash-manual-count" style="font-size:0.7em; color:#94a3b8; font-weight:700;">(0)</small></div>
                 </div>
@@ -22537,18 +22537,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.getElementById('lb-popup-header').innerHTML = `<div style="padding:20px; color:#94a3b8;"><i class="fa-solid fa-spinner fa-spin"></i> Initializing User Hub for ${u.displayName || 'User'}...</div>`;
             
             try {
-                const [worksSnap, questsSnap, logsSnap, qAzSnap, rLogsSnap] = await Promise.all([
+                const [worksSnap, questsSnap, logsSnap, qAzSnap, rLogsSnap, lpSnap] = await Promise.all([
                     db.collection("works").where("userId", "==", userId).get(),
                     db.collection("quest_submissions").where("userId", "==", userId).get(),
                     db.collection("checkin_logs").where("userId", "==", userId).get(),
                     db.collection("quiz_attempts").where("userId", "==", userId).where("status", "==", "approved").get(),
-                    db.collection("reflective_logs").where("userId", "==", userId).get()
+                    db.collection("reflective_logs").where("userId", "==", userId).get(),
+                    db.collection("learning_path_entries").where("userId", "==", userId).get()
                 ]);
 
                 const pointsMap = {};
                 const detailsMap = {};
                 const allLogs = [];
-                const dash = { quizzes: 0, works: 0, logs: 0, bonus: 0, manual: 0, qc:0, wc:0, lc:0, bc:0, mc:0 };
+                // V91.106: dash.logs = total (DR + LN); add logsDR/logsLN/lcDR/lcLN for breakdown
+                const dash = { quizzes: 0, works: 0, logs: 0, bonus: 0, manual: 0, qc:0, wc:0, lc:0, bc:0, mc:0, logsDR:0, logsLN:0, lcDR:0, lcLN:0 };
 
                 const addP = (dateObj, score, type, note, extra = {}) => {
                     if (!dateObj || score === undefined) return;
@@ -22690,10 +22692,35 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         fullContent: x.content,
                         adminComment: x.adminComment || "",
                         mood: x.mood || null,
+                        moodSecondary: x.moodSecondary || null,
                         learningTools: Array.isArray(x.learningTools) ? x.learningTools : []
                     });
                     dash.logs += score;
+                    dash.logsDR += score;
                     dash.lc++;
+                    dash.lcDR++;
+                });
+
+                // V91.106: Learning Note entries — included in LOGS bucket
+                lpSnap.forEach(doc => {
+                    const x = doc.data();
+                    const score = x.adminBonus || 0;
+                    const dateRaw = x.createdAt?.toDate ? x.createdAt.toDate() : (x.createdAt ? new Date(x.createdAt) : null);
+                    allLogs.push({
+                        t: dateRaw,
+                        type: 'learning_note',
+                        text: `🎓 ${x.title || 'Learning Note'}`,
+                        score: score,
+                        isLearningNote: true,
+                        docId: doc.id,
+                        fullContent: x.contentMarkdown || '',
+                        adminComment: x.adminComment || '',
+                        tags: Array.isArray(x.tags) ? x.tags : []
+                    });
+                    dash.logs += score;
+                    dash.logsLN += score;
+                    dash.lc++;
+                    dash.lcLN++;
                 });
 
                 allLogs.forEach(item => {
@@ -22816,6 +22843,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.getElementById('hub-dash-works-count').innerText = `(${dash.wc})`;
             document.getElementById('hub-dash-logs').innerText = dash.logs.toFixed(2);
             document.getElementById('hub-dash-logs-count').innerText = `(${dash.lc})`;
+            const logsBreakdownEl = document.getElementById('hub-dash-logs-breakdown');
+            if (logsBreakdownEl) logsBreakdownEl.innerText = `📓 ${(dash.logsDR || 0).toFixed(2)}/${dash.lcDR || 0} · 🎓 ${(dash.logsLN || 0).toFixed(2)}/${dash.lcLN || 0}`;
             document.getElementById('hub-dash-bonus').innerText = dash.bonus.toFixed(2);
             document.getElementById('hub-dash-bonus-count').innerText = `(${dash.bc})`;
             document.getElementById('hub-dash-manual').innerText = dash.manual.toFixed(2);
@@ -22839,7 +22868,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (mode === 'all') return historyCache;
             if (mode === 'quizzes') return historyCache.filter(e => e.type === 'quiz');
             if (mode === 'works') return historyCache.filter(e => e.type === 'work' || e.isQuest);
-            if (mode === 'logs') return historyCache.filter(e => e.type === 'reflective_log' || e.type === 'reflective_bonus');
+            if (mode === 'logs') return historyCache.filter(e => e.type === 'reflective_log' || e.type === 'reflective_bonus' || e.type === 'learning_note');
             if (mode === 'bonus') return historyCache.filter(e => (e.type === 'bonus' && !e.isQuest && !String(e.text || '').includes('Quest Bonus')) || e.type === 'streak');
             if (mode === 'manual') return historyCache.filter(e => e.type === 'manual' || e.type === 'manual_adjust');
             return historyCache;
@@ -23016,17 +23045,26 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const seqNum = filteredLogs.length - globalIdx;
                 const d = e.t ? e.t.toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
                 let delBtn = (e.source === 'checkin_logs' && e.docId) ? `<button class="btn-sm" style="background:none; color:#ef4444; border:none; padding:0; margin-left:8px; cursor:pointer;" onclick="deleteHubHistoryLog('${e.docId}', ${e.score})"><i class="fa-solid fa-trash-can"></i></button>` : "";
-                const isClickable = e.type === 'work' || e.isReflective;
+                const isClickable = e.type === 'work' || e.isReflective || e.isLearningNote;
                 const onClickAttr = isClickable ? ` onclick="showHubItemDetails(${JSON.stringify(e).replace(/"/g, '&quot;')})" ` : '';
 
-                // V91.102: per-entry word count + content preview for reflective_log
+                // V91.102/V91.106: per-entry word count + content preview for reflective_log + learning_note
                 let wordsBadge = '';
                 let previewBlock = '';
-                if (e.isReflective && e.fullContent && typeof window._wpWordCount === 'function') {
+                if ((e.isReflective || e.isLearningNote) && e.fullContent && typeof window._wpWordCount === 'function') {
                     const w = window._wpWordCount(e.fullContent);
-                    wordsBadge = ` <span style="margin-left:5px; color:#e2e8f0;">|</span> <span style="margin-left:5px; text-transform:uppercase; font-weight:900; color:#4361ee;">${w}w</span>`;
+                    wordsBadge = ` <span style="margin-left:5px; color:#e2e8f0;">|</span> <span style="margin-left:5px; text-transform:uppercase; font-weight:900; color:${e.isLearningNote ? '#7c3aed' : '#4361ee'};">${w}w</span>`;
                     const escaped = String(e.fullContent).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    previewBlock = `<div style="font-size:0.78em; color:#475569; margin-top:8px; padding:8px 10px; background:#fafbfc; border-radius:8px; border-left:3px solid #cbd5e1; line-height:1.5; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; white-space:pre-wrap;">${escaped}</div>`;
+                    const accentColor = e.isLearningNote ? '#a29bfe' : '#cbd5e1';
+                    previewBlock = `<div style="font-size:0.78em; color:#475569; margin-top:8px; padding:8px 10px; background:#fafbfc; border-radius:8px; border-left:3px solid ${accentColor}; line-height:1.5; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; white-space:pre-wrap;">${escaped}</div>`;
+                }
+                // V91.106: tag chips for LN entries
+                if (e.isLearningNote && Array.isArray(e.tags) && e.tags.length > 0) {
+                    const tagsHtml = e.tags.slice(0, 5).map(t => {
+                        const safeTag = String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        return `<span style="background:#eef2ff; color:#4361ee; padding:2px 8px; border-radius:999px; font-size:0.68em; font-weight:800;">${safeTag}</span>`;
+                    }).join(' ');
+                    wordsBadge += ` <span style="display:inline-flex; gap:4px; flex-wrap:wrap; vertical-align:middle; margin-left:6px;">${tagsHtml}</span>`;
                 }
 
                 l.innerHTML += `
@@ -24747,6 +24785,106 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const modal = document.getElementById('workDetailModal') || createWorkDetailModal();
                 document.getElementById('work-detail-content').innerHTML = detailsHtml;
                 modal.style.display = 'block';
+            } else if (item.type === 'learning_note' || item.isLearningNote) {
+                // V91.106: Learning Note detail with inline grading (Model α)
+                const d = item.t ? item.t.toLocaleString('th-TH') : '-';
+                const _w = (typeof window._wpWordCount === 'function') ? window._wpWordCount(item.fullContent) : 0;
+                const _ch = String(item.fullContent || '').length;
+                const tags = Array.isArray(item.tags) ? item.tags : [];
+                const tagsHtml = tags.length ? tags.map(t => {
+                    const safe = String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    return `<span style="background:#eef2ff; color:#4361ee; padding:3px 10px; border-radius:999px; font-size:0.72em; font-weight:800;">${safe}</span>`;
+                }).join(' ') : '';
+                const escapedContent = String(item.fullContent || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const escapedComment = String(item.adminComment || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const detailsHtml = `
+                    <div style="padding:20px; border-radius:12px; background:white; border:1px solid #f1f5f9;">
+                        <h3 style="margin:0 0 15px 0; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:1.5em;">🎓</span> Learning Note
+                        </h3>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:15px;">
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #7c3aed;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Bonus Points</div>
+                                <div style="font-size:1.3em; font-weight:900; color:#7c3aed; margin-top:6px;">${(item.score || 0).toFixed(2)} pts</div>
+                            </div>
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #f59e0b;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Date</div>
+                                <div style="font-size:0.85em; color:#475569; margin-top:6px; font-weight:600;">${d}</div>
+                            </div>
+                        </div>
+                        <div style="background:#faf5ff; padding:12px; border-radius:8px; border:1px dashed #d8b4fe; margin-bottom:12px;">
+                            <div style="font-size:0.75em; color:#6b21a8; font-weight:700; text-transform:uppercase; margin-bottom:8px;">⭐ Set Admin Bonus</div>
+                            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                                <input type="number" id="ln-grade-input-${item.docId}" value="${(item.score || 0).toFixed(2)}" step="0.05" min="0" max="2" style="width:90px; padding:8px 10px; border:1.5px solid #d8b4fe; border-radius:8px; font-size:0.9em; font-weight:700;">
+                                <input type="text" id="ln-grade-comment-${item.docId}" placeholder="Optional comment..." style="flex:1; min-width:150px; padding:8px 10px; border:1px solid #c9b8f5; border-radius:8px; font-size:0.85em;" value="${escapedComment.replace(/"/g, '&quot;')}">
+                                <button onclick="saveLnBonus('${item.docId}', ${item.score || 0})" style="padding:8px 14px; background:linear-gradient(135deg, #6c5ce7, #a29bfe); color:white; border:none; border-radius:8px; font-size:0.85em; font-weight:800; cursor:pointer; white-space:nowrap;"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+                            </div>
+                            <div style="font-size:0.7em; color:#7c3aed; margin-top:6px; font-weight:700;">Range 0–2.0 pts. Saving updates user score by the delta.</div>
+                        </div>
+                        ${tagsHtml ? `
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:12px;">
+                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase; margin-bottom:8px;">Tags</div>
+                                <div style="display:flex; gap:6px; flex-wrap:wrap;">${tagsHtml}</div>
+                            </div>
+                        ` : ''}
+                        ${item.fullContent ? `
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:12px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                                    <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Note Content</div>
+                                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                        <span style="background:#eef2ff; color:#4361ee; padding:3px 10px; border-radius:999px; font-size:0.7em; font-weight:800;">📝 ${_w}w</span>
+                                        <span style="background:#fef3c7; color:#92400e; padding:3px 10px; border-radius:999px; font-size:0.7em; font-weight:800;">🔡 ${_ch}ch</span>
+                                    </div>
+                                </div>
+                                <div style="color:#475569; font-size:0.9em; line-height:1.6; max-height:300px; overflow-y:auto; white-space:pre-wrap; word-break:break-word;">${escapedContent}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                const modal = document.getElementById('workDetailModal') || createWorkDetailModal();
+                document.getElementById('work-detail-content').innerHTML = detailsHtml;
+                modal.style.display = 'block';
+            }
+        }
+
+        // V91.106: Save admin bonus to learning_path_entries + sync user.score by delta
+        async function saveLnBonus(docId, previousBonus) {
+            const inputEl = document.getElementById(`ln-grade-input-${docId}`);
+            const commentEl = document.getElementById(`ln-grade-comment-${docId}`);
+            if (!inputEl) return;
+            const newBonus = parseFloat(inputEl.value || '0') || 0;
+            if (newBonus < 0 || newBonus > 2) {
+                showToast('⚠️ Bonus must be between 0 and 2.0', 'error');
+                return;
+            }
+            const newComment = (commentEl?.value || '').trim();
+            try {
+                await db.collection('learning_path_entries').doc(docId).update({
+                    adminBonus: newBonus,
+                    adminComment: newComment,
+                    adminGradedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    adminGradedBy: 'admin'
+                });
+                // Sync user.score by delta
+                const delta = newBonus - (parseFloat(previousBonus) || 0);
+                const lpDoc = await db.collection('learning_path_entries').doc(docId).get();
+                const userId = lpDoc.exists ? (lpDoc.data().userId || null) : null;
+                if (userId && Math.abs(delta) > 0.0001) {
+                    await db.collection('users').doc(userId).update({
+                        score: firebase.firestore.FieldValue.increment(delta)
+                    });
+                }
+                showToast(`✅ Saved! ${delta >= 0 ? '+' : ''}${delta.toFixed(2)} pts to user`);
+                // Close modal — admin can re-open user hub for fresh data
+                const modal = document.getElementById('workDetailModal');
+                if (modal) modal.style.display = 'none';
+                // Refresh User Hub if open
+                if (typeof openUserHub === 'function' && window._currentPopupUser) {
+                    openUserHub(window._currentPopupUser, 'history');
+                }
+            } catch (e) {
+                console.error(e);
+                showToast(`❌ Save failed: ${e.message}`, 'error');
             }
         }
 
