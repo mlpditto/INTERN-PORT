@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.101</title>
+    <title>Nika V91.102</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -2768,7 +2768,8 @@
                         </div>
                         <div style="background:white; padding:10px; border-radius:10px; border:1px solid #f1f5f9;">
                             <div style="font-size:0.7em; color:#94a3b8; font-weight:800; text-transform:uppercase;">😊 Mood</div>
-                            <div id="wp-mood-row" style="font-size:1em; margin-top:6px; font-weight:800; color:#334155;">-</div>
+                            <div id="wp-mood-top" style="font-size:1.4em; font-weight:900; color:#f59e0b; margin-top:2px;">-</div>
+                            <div id="wp-mood-rest" style="font-size:0.7em; color:#64748b; font-weight:700;">-</div>
                         </div>
                     </div>
                     <div id="wp-tools-row" style="margin-top:10px; padding-top:10px; border-top:1px dashed #f1f5f9; display:none;">
@@ -2781,7 +2782,7 @@
                     <button id="hub-filter-all" class="btn-sm" onclick="setHubHistoryFilter('all')" style="border:1px solid #dbe3ef; background:#f8fafc; color:#475569; border-radius:999px; padding:4px 12px; font-size:0.72em; font-weight:800;">All</button>
                 </div>
 
-                <div id="hub-history-list" style="margin-bottom:15px; max-height:600px; overflow-y:auto; padding-right:5px;"></div>
+                <div id="hub-history-list" style="margin-bottom:15px;"></div>
                 
                 <div id="hub-history-pagination" style="display:flex; justify-content:center; align-items:center; gap:6px; flex-wrap:wrap; padding-top:10px; border-top:1px dashed #f1f5f9; min-height:40px;"></div>
             </div>
@@ -22847,6 +22848,21 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         }
 
+        // Writing Profile word counter — Thai-aware via Intl.Segmenter, regex fallback
+        window._wpWordCount = function(text) {
+            const t = String(text || '');
+            try {
+                const seg = new Intl.Segmenter('th', { granularity: 'word' });
+                let n = 0;
+                for (const s of seg.segment(t)) if (s.isWordLike) n++;
+                return n;
+            } catch (e) {
+                const en = (t.match(/[a-zA-Z]+/g) || []).length;
+                const th = (t.match(/[฀-๿]/g) || []).length;
+                return en + Math.ceil(th / 4);
+            }
+        };
+
         // Writing Profile (V91.100) — Phase 1: read-only stats from reflective_logs
         window.renderWritingProfile = function() {
             const card = document.getElementById('hub-writing-profile');
@@ -22858,21 +22874,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!visibleHere || logs.length === 0) { card.style.display = 'none'; return; }
             card.style.display = 'block';
 
-            // Word count: Intl.Segmenter (Thai-aware) with regex fallback
-            let segmenter = null;
-            try { segmenter = new Intl.Segmenter('th', { granularity: 'word' }); } catch (e) {}
-            const wordCount = (text) => {
-                const t = String(text || '');
-                if (segmenter) {
-                    let n = 0;
-                    for (const seg of segmenter.segment(t)) if (seg.isWordLike) n++;
-                    return n;
-                }
-                const en = (t.match(/[a-zA-Z]+/g) || []).length;
-                const th = (t.match(/[฀-๿]/g) || []).length;
-                return en + Math.ceil(th / 4);
-            };
-            const wc = logs.map(l => wordCount(l.fullContent));
+            // Word count via shared helper (Thai-aware Intl.Segmenter)
+            const wc = logs.map(l => window._wpWordCount(l.fullContent));
             const totalWords = wc.reduce((a, b) => a + b, 0);
             const avgWords = Math.round(totalWords / logs.length);
             const maxWords = Math.max(...wc);
@@ -22907,10 +22910,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const moodCount = {};
             logs.forEach(l => { const m = l.mood || 'unknown'; moodCount[m] = (moodCount[m] || 0) + 1; });
             const moodEmoji = { happy: '😊', normal: '😐', sad: '😢', tired: '😴', unknown: '❓' };
-            const moodRow = Object.entries(moodCount)
-                .sort((a, b) => b[1] - a[1])
+            const moodSorted = Object.entries(moodCount).sort((a, b) => b[1] - a[1]);
+            const moodTop = moodSorted[0] ? `${moodEmoji[moodSorted[0][0]] || moodSorted[0][0] || '❓'} ${moodSorted[0][1]}` : '-';
+            const moodRest = moodSorted.slice(1)
                 .map(([m, n]) => `${moodEmoji[m] || m || '❓'} ${n}`)
-                .join('  ·  ');
+                .join('  ');
 
             // Top 5 learning tools
             const toolCount = {};
@@ -22932,7 +22936,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 `<span style="width:${thPct}%; background:#4361ee;" title="Thai ${thPct}%"></span>` +
                 `<span style="width:${enPct}%; background:#10b981;" title="English ${enPct}%"></span>`;
             setText('wp-lang-sub', `TH ${thPct}% · EN ${enPct}%`);
-            setText('wp-mood-row', moodRow || '-');
+            setText('wp-mood-top', moodTop);
+            setText('wp-mood-rest', moodRest || (moodSorted.length === 1 ? `top mood (${logs.length} log${logs.length > 1 ? 's' : ''})` : '-'));
             const toolsRow = document.getElementById('wp-tools-row');
             const toolsList = document.getElementById('wp-tools-list');
             if (toolsRow && toolsList) {
@@ -22962,7 +22967,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     : `Activity Logs (${filteredLogs.length}/${historyCache.length})`;
             }
             
-            const logsPerPage = 20; // Increased to 20 items per page as requested
+            const logsPerPage = 10; // V91.102: 10/page + no inner scroll for compact modal
             const s = (historyPage - 1) * logsPerPage;
             const p = filteredLogs.slice(s, s + logsPerPage);
             const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
@@ -22978,19 +22983,29 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const d = e.t ? e.t.toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
                 let delBtn = (e.source === 'checkin_logs' && e.docId) ? `<button class="btn-sm" style="background:none; color:#ef4444; border:none; padding:0; margin-left:8px; cursor:pointer;" onclick="deleteHubHistoryLog('${e.docId}', ${e.score})"><i class="fa-solid fa-trash-can"></i></button>` : "";
                 const isClickable = e.type === 'work' || e.isReflective;
-                const clickClass = isClickable ? 'cursor-pointer' : '';
                 const onClickAttr = isClickable ? ` onclick="showHubItemDetails(${JSON.stringify(e).replace(/"/g, '&quot;')})" ` : '';
-                
+
+                // V91.102: per-entry word count + content preview for reflective_log
+                let wordsBadge = '';
+                let previewBlock = '';
+                if (e.isReflective && e.fullContent && typeof window._wpWordCount === 'function') {
+                    const w = window._wpWordCount(e.fullContent);
+                    wordsBadge = ` <span style="margin-left:5px; color:#e2e8f0;">|</span> <span style="margin-left:5px; text-transform:uppercase; font-weight:900; color:#4361ee;">${w}w</span>`;
+                    const escaped = String(e.fullContent).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    previewBlock = `<div style="font-size:0.78em; color:#475569; margin-top:8px; padding:8px 10px; background:#fafbfc; border-radius:8px; border-left:3px solid #cbd5e1; line-height:1.5; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; white-space:pre-wrap;">${escaped}</div>`;
+                }
+
                 l.innerHTML += `
-                    <div style="padding:12px 15px; border-radius:12px; border:1px solid #f1f5f9; margin-bottom:10px; background:white; display:flex; justify-content:space-between; align-items:center; transition:0.2s; ${isClickable ? 'cursor:pointer;' : ''}" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='#f1f5f9'" ${onClickAttr}>
-                        <div style="flex:1">
-                            <div style="font-size:0.9em; font-weight:800; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                    <div style="padding:12px 15px; border-radius:12px; border:1px solid #f1f5f9; margin-bottom:10px; background:white; display:flex; justify-content:space-between; align-items:flex-start; gap:10px; transition:0.2s; ${isClickable ? 'cursor:pointer;' : ''}" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='#f1f5f9'" ${onClickAttr}>
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-size:0.9em; font-weight:800; color:#1e293b; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                                 <span style="background:#f1f5f9; color:#94a3b8; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:900;">#${seqNum}</span>
                                 ${e.text}${isClickable ? ' <i class="fa-solid fa-arrow-up-right" style="font-size:0.7em; color:#94a3b8; margin-left:4px;"></i>' : ''} ${delBtn}
                             </div>
-                            <div style="font-size:0.75em; color:#94a3b8; margin-top:4px;">${d} <span style="margin-left:5px; color:#e2e8f0;">|</span> <span style="margin-left:5px; text-transform:uppercase; font-weight:900; color:${e.type === 'quiz' ? '#4361ee' : '#64748b'}">${e.type}</span></div>
+                            <div style="font-size:0.75em; color:#94a3b8; margin-top:4px;">${d} <span style="margin-left:5px; color:#e2e8f0;">|</span> <span style="margin-left:5px; text-transform:uppercase; font-weight:900; color:${e.type === 'quiz' ? '#4361ee' : '#64748b'}">${e.type}</span>${wordsBadge}</div>
+                            ${previewBlock}
                         </div>
-                        <div style="font-size:1em; font-weight:900; color:${e.score >=0 ? '#10b981' : '#ef4444'}">${e.score >=0 ? '+' : ''}${e.score.toFixed(2)}</div>
+                        <div style="font-size:1em; font-weight:900; color:${e.score >=0 ? '#10b981' : '#ef4444'}; flex-shrink:0;">${e.score >=0 ? '+' : ''}${e.score.toFixed(2)}</div>
                     </div>
                 `;
             });
