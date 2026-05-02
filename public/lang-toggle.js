@@ -159,6 +159,48 @@
             thBtn.classList.toggle('active', thOn);
             thBtn.setAttribute('aria-pressed', thOn ? 'true' : 'false');
         }
+        applyAttrLangSwap(body);
+    }
+
+    // V94.28 Phase ε: HTML attribute (placeholder/title/aria-label) language
+    // swap. DOM walker can't reach attributes, so use data-th-{attr} /
+    // data-kr-{attr} markup and rebuild the live attribute on toggle change
+    // and on dynamically-inserted elements (via MutationObserver below).
+    var ATTR_LANGS = ['placeholder', 'title', 'aria-label'];
+
+    function processAttrEl(el, krOn, thOn) {
+        if (!el || !el.hasAttribute) return;
+        for (var a = 0; a < ATTR_LANGS.length; a++) {
+            var attr = ATTR_LANGS[a];
+            var thKey = 'data-th-' + attr;
+            var krKey = 'data-kr-' + attr;
+            if (!el.hasAttribute(thKey) && !el.hasAttribute(krKey)) continue;
+            var enKey = 'data-en-' + attr;
+            // Save EN baseline on first visit (current attr value is EN per Phase ε convention).
+            if (!el.hasAttribute(enKey)) {
+                el.setAttribute(enKey, el.getAttribute(attr) || '');
+            }
+            var en = el.getAttribute(enKey);
+            var th = el.getAttribute(thKey);
+            var kr = el.getAttribute(krKey);
+            var parts = [en];
+            if (krOn && kr) parts.push(kr);
+            if (thOn && th) parts.push(th);
+            el.setAttribute(attr, parts.filter(Boolean).join(' '));
+        }
+    }
+
+    function applyAttrLangSwap(root) {
+        if (!root || root.nodeType !== 1) return;
+        var krOn = isLangOn('kr');
+        var thOn = isLangOn('th');
+        // Process root itself (in case the inserted node is the target element).
+        processAttrEl(root, krOn, thOn);
+        // Process descendants with any data-{lang}-{attr} marker.
+        if (!root.querySelectorAll) return;
+        var sel = '[data-th-placeholder],[data-kr-placeholder],[data-th-title],[data-kr-title],[data-th-aria-label],[data-kr-aria-label]';
+        var nested = root.querySelectorAll(sel);
+        for (var i = 0; i < nested.length; i++) processAttrEl(nested[i], krOn, thOn);
     }
 
     window.toggleLang = function (lang) {
@@ -182,6 +224,7 @@
                 if (m.type !== 'childList') continue;
                 for (var k = 0; k < m.addedNodes.length; k++) {
                     walkAndWrap(m.addedNodes[k]);
+                    applyAttrLangSwap(m.addedNodes[k]);
                 }
             }
         });
