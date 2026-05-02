@@ -159,6 +159,20 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // 23. Learning Path Entries (PONEGLYPH learning path system)
+    match /learning_path_entries/{docId} {
+      allow read: if isAdmin() || hasAuthLinkToUserId(resource.data.userId) || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isAdmin() || (isSignedIn() && (request.resource.data.userId == request.auth.uid || hasAuthLinkToUserId(request.resource.data.userId)));
+      allow update, delete: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || hasAuthLinkToUserId(resource.data.userId)));
+    }
+
+    // 24. Learning Paths (AI-generated paths)
+    match /learning_paths/{docId} {
+      allow read: if isAdmin() || hasAuthLinkToUserId(resource.data.userId) || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isAdmin() || (isSignedIn() && (request.resource.data.userId == request.auth.uid || hasAuthLinkToUserId(request.resource.data.userId)));
+      allow update, delete: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || hasAuthLinkToUserId(resource.data.userId)));
+    }
+
     // 21. Auth link registry for legacy data migration
     match /user_auth_links/{authUid} {
       allow read: if isAdmin() || (isSignedIn() && authUid == request.auth.uid);
@@ -179,6 +193,34 @@ service cloud.firestore {
         && request.resource.data.amount == 0.1
         && request.resource.data.dateKey == dateKey;
       allow update, delete: if isAdmin();
+    }
+
+    // 25. Unified Submissions (V91.62+ Phase 2 — Case/Work/Quiz/Quest/Reflective/Learning Note)
+    // V94.09: Match reflective_logs (rule 13) pattern — single-query onSnapshot at
+    // loadUnifiedSubmissions() (public/index.html:9912) uses where('userId','==',userId)
+    // only. Stricter cases-style rule (V94.08 attempt) required TWO parallel queries
+    // (authUid + userId, see loadMyCases at line 11581-11583); single-query against the
+    // owner-or-linked OR rule was rejected by Firestore's query-alignment check.
+    // Privacy posture: same as reflective_logs — any signed-in user can read all
+    // submissions. Tightening would require allow-get/allow-list split or JS query
+    // refactor (out of scope for this hotfix).
+    match /submissions/{docId} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if isAdmin();
+
+      // V91.75 γ.4a: Conversation thread between admin and student on a review.
+      // Each message records its author so a student can never impersonate admin.
+      // Read is open to any signed-in user (matches parent rule); create requires
+      // authorUid == request.auth.uid; update/delete admin-only.
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn()
+          && request.resource.data.authorUid == request.auth.uid
+          && request.resource.data.body is string
+          && request.resource.data.body.size() > 0
+          && request.resource.data.body.size() <= 4000;
+        allow update, delete: if isAdmin();
+      }
     }
   }
 }

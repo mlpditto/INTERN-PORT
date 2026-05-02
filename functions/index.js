@@ -359,9 +359,16 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             const apiKey = process.env.ANTHROPIC_API_KEY;
             if (!apiKey) return res.status(500).json({ error: "Anthropic API Key not configured on server." });
 
-            // Robust model mapping (V88.40)
-            let actualModel = "claude-3-5-sonnet-20241022"; 
-            if (model.includes('haiku')) actualModel = "claude-3-5-haiku-20241022";
+            // Robust model mapping (V88.40 + Claude 4 family routing)
+            let actualModel = "claude-3-5-sonnet-20241022";
+            // Claude 4 family — checked first so "claude-4-haiku" routes to 4.x haiku, not 3.5
+            if (model.includes('claude-4') || model.includes('sonnet-4') || model.includes('haiku-4') || model.includes('opus-4')) {
+                if (model.includes('haiku')) actualModel = "claude-haiku-4-5";
+                else if (model.includes('opus')) actualModel = "claude-opus-4-7";
+                else actualModel = "claude-sonnet-4-6"; // default Claude 4 = Sonnet 4.6
+            }
+            // Legacy Claude 3.x family
+            else if (model.includes('haiku')) actualModel = "claude-3-5-haiku-20241022";
             else if (model.includes('opus')) actualModel = "claude-3-opus-20240229";
 
             // If isJson is true, we must NOT use response_format for Claude. 
@@ -433,10 +440,203 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
 
     } catch (err) {
         console.error("AI Proxy Error:", { message: sanitizeProxyErrorMessage(err), ...getSafeProviderError(err) });
-        return res.status(500).json({ 
+        return res.status(500).json({
             error: sanitizeProxyErrorMessage(err),
             details: getSafeProviderError(err)
         });
+    }
+});
+
+// ============================================================
+// V91.78 PR γ.4b.3: Wire LINE_CHANNEL_ACCESS_TOKEN secret via .runWith({ secrets }) —
+// still log-only. Function now verifies the secret is loaded into process.env at
+// runtime; γ.4b.4 will replace WOULD-NOTIFY log with the actual axios POST.
+//
+// V91.77 PR γ.4b.2.1: Refactor LINE notify trigger from onDocumentCreated → onCall.
+// Why: deploying v2 Firestore triggers requires Eventarc + region config that conflicts
+// with the existing v1 onCall pattern in this file. HTTP callables are region-agnostic
+// and deploy cleanly alongside setAdminClaim/generatePreviewToken. Admin-side
+// lnrSendMessage now invokes this callable AFTER its Firestore .add() commits.
+//
+// Originally V91.76 PR γ.4b.2 (skeleton). Phase progression: γ.4b.4 replaces the log
+// with the actual axios POST to api.line.me/v2/bot/message/push using
+// process.env.LINE_CHANNEL_ACCESS_TOKEN.
+//
+// Resolution path (unchanged from γ.4b.1):
+//   submissions/{id}/messages/{msgId}.authorRole === 'admin'
+//     -> read submissions/{id}.authUid (student's Firebase auth uid)
+//     -> read user_auth_links/{authUid}.rawLiffUserId (LINE userId, format Uxxxx...)
+//     -> verify LINE_CHANNEL_ACCESS_TOKEN loaded
+//     -> would push to LINE
+// ============================================================
+exports.notifyOnReviewMessage = functionsV1
+    .runWith({ secrets: ['LINE_CHANNEL_ACCESS_TOKEN'] })
+    .https.onCall(async (data, context) => {
+    if (!context.auth || context.auth.token.admin !== true) {
+        throw new functionsV1.https.HttpsError('permission-denied', 'Admin required');
+    }
+
+    const submissionId = (data && data.submissionId) || '';
+    const messageId = (data && data.messageId) || '';
+    if (!submissionId || !messageId) {
+        throw new functionsV1.https.HttpsError('invalid-argument', 'submissionId and messageId required');
+    }
+
+    let msg;
+    try {
+        const msgDoc = await admin.firestore()
+            .collection('submissions').doc(submissionId)
+            .collection('messages').doc(messageId).get();
+        if (!msgDoc.exists) {
+            console.warn(`[notifyOnReviewMessage] message ${submissionId}/${messageId} not found`);
+            return { skipped: true, reason: 'message-not-found' };
+        }
+        msg = msgDoc.data() || {};
+    } catch (err) {
+        console.error(`[notifyOnReviewMessage] failed to read message ${submissionId}/${messageId}:`, err.message);
+        throw new functionsV1.https.HttpsError('internal', 'failed to read message');
+    }
+
+    const role = msg.authorRole || '(none)';
+    if (role !== 'admin') {
+        console.log(`[notifyOnReviewMessage] skip — author role=${role} (only admin triggers notify)`);
+        return { skipped: true, reason: 'not-admin-author' };
+    }
+
+    let submission;
+    try {
+        const submissionDoc = await admin.firestore()
+            .collection('submissions').doc(submissionId).get();
+        if (!submissionDoc.exists) {
+            console.warn(`[notifyOnReviewMessage] submission ${submissionId} not found`);
+            return { skipped: true, reason: 'submission-not-found' };
+        }
+        submission = submissionDoc.data();
+    } catch (err) {
+        console.error(`[notifyOnReviewMessage] failed to read submission ${submissionId}:`, err.message);
+        throw new functionsV1.https.HttpsError('internal', 'failed to read submission');
+    }
+
+    const studentAuthUid = submission.authUid;
+    if (!studentAuthUid) {
+        console.warn(`[notifyOnReviewMessage] submission ${submissionId} has no authUid field`);
+        return { skipped: true, reason: 'no-student-authUid' };
+    }
+
+    let lineUserId = null;
+    try {
+        const linkDoc = await admin.firestore()
+            .collection('user_auth_links').doc(studentAuthUid).get();
+        if (!linkDoc.exists) {
+            console.warn(`[notifyOnReviewMessage] no user_auth_links doc for authUid=${studentAuthUid}`);
+            return { skipped: true, reason: 'no-auth-link' };
+        }
+        const link = linkDoc.data() || {};
+        lineUserId = link.rawLiffUserId;
+    } catch (err) {
+        console.error(`[notifyOnReviewMessage] failed to read user_auth_links/${studentAuthUid}:`, err.message);
+        throw new functionsV1.https.HttpsError('internal', 'failed to read user_auth_links');
+    }
+
+    if (!lineUserId || typeof lineUserId !== 'string' || !lineUserId.startsWith('U')) {
+        console.warn(`[notifyOnReviewMessage] invalid rawLiffUserId for authUid=${studentAuthUid}: ${lineUserId}`);
+        return { skipped: true, reason: 'invalid-lineUserId' };
+    }
+
+    const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    if (!accessToken) {
+        console.warn(`[notifyOnReviewMessage] LINE_CHANNEL_ACCESS_TOKEN secret missing — skipping push for lineUserId=${lineUserId}`);
+        return { skipped: true, reason: 'token-missing' };
+    }
+
+    // γ.4b.4 — build Flex Message and push to LINE. Best-effort: log + return structured error code, no retry.
+    const adminName = (typeof msg.authorName === 'string' && msg.authorName.trim()) ? msg.authorName.trim() : 'Admin';
+    const bonus = Number(submission.adminBonus) || 0;
+    const stars = Math.max(0, Math.min(5, Number(submission.adminQualityStars) || 0));
+    const reviewState = submission.reviewState || '';
+
+    const subtitleParts = [];
+    if (reviewState === 'featured') subtitleParts.push('⭐ Featured');
+    else if (reviewState === 'escalated') subtitleParts.push('🚀 Escalated');
+    else if (reviewState === 'revision_requested') subtitleParts.push('🔄 Revision');
+    if (bonus > 0) subtitleParts.push(`+${bonus} pts`);
+    if (stars > 0) subtitleParts.push('⭐'.repeat(stars));
+    const subtitle = subtitleParts.length ? `${adminName} · ${subtitleParts.join(' · ')}` : adminName;
+
+    const rawBody = String(msg.body || '').replace(/\s+/g, ' ').trim();
+    const bodyText = rawBody.length > 280 ? rawBody.slice(0, 277) + '…' : (rawBody || '(no content)');
+    const altText = `Admin replied: ${rawBody.slice(0, 100)}`.slice(0, 400);
+    const liffUri = 'https://liff.line.me/2008959998-yjcNpaGt?tab=history';
+
+    const flex = {
+        type: 'flex',
+        altText: altText,
+        contents: {
+            type: 'bubble',
+            size: 'kilo',
+            header: {
+                type: 'box',
+                layout: 'vertical',
+                backgroundColor: '#7c3aed',
+                paddingAll: '12px',
+                contents: [
+                    { type: 'text', text: '💬 Admin Review Reply', weight: 'bold', size: 'sm', color: '#ffffff' },
+                    { type: 'text', text: subtitle, size: 'xs', color: '#e9d5ff', margin: 'xs', wrap: true }
+                ]
+            },
+            body: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '16px',
+                contents: [
+                    { type: 'text', text: bodyText, wrap: true, size: 'sm', color: '#1f2937' }
+                ]
+            },
+            footer: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '12px',
+                contents: [
+                    {
+                        type: 'button',
+                        style: 'primary',
+                        color: '#7c3aed',
+                        height: 'sm',
+                        action: { type: 'uri', label: 'Open in LIFF →', uri: liffUri }
+                    }
+                ]
+            }
+        }
+    };
+
+    try {
+        await axios.post('https://api.line.me/v2/bot/message/push', {
+            to: lineUserId,
+            messages: [flex]
+        }, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 8000
+        });
+
+        console.log(`[notifyOnReviewMessage] PUSHED  lineUserId=${lineUserId}  submission=${submissionId}  msg=${messageId}  bonus=${bonus}  stars=${stars}  state=${reviewState || '(none)'}`);
+        return { ok: true, pushed: true, lineUserId, submissionId, messageId };
+    } catch (err) {
+        const status = err && err.response ? err.response.status : null;
+        const lineMessage = (err && err.response && err.response.data && err.response.data.message) || (err && err.message) || 'unknown';
+        let code;
+        if (status === 400) code = 'invalid';
+        else if (status === 401) code = 'token';
+        else if (status === 403) code = 'no-friend';
+        else if (status === 404) code = 'invalid-user';
+        else if (status === 429) code = 'rate-limit';
+        else if (status >= 500 && status < 600) code = 'transient';
+        else code = 'network';
+
+        console.error(`[notifyOnReviewMessage] PUSH_FAILED  code=${code}  status=${status || 'no-response'}  lineUserId=${lineUserId}  submission=${submissionId}  msg=${messageId}  message=${JSON.stringify(lineMessage)}`);
+        return { ok: false, code, status: status || null, lineUserId, submissionId, messageId };
     }
 });
 
