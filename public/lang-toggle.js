@@ -88,6 +88,21 @@
         // Skip if already inside a lang span (re-entry guard).
         if (parent.classList && (parent.classList.contains('lang-kr') || parent.classList.contains('lang-th'))) return;
 
+        // V94.29 fix: skip subtrees that render user content as-typed
+        // (markdown previews, quiz content displays). The walker would
+        // otherwise wrap Thai chars and absorb adjacent punctuation —
+        // surfaced as Quiz Editor preview missing closing parens / Thai
+        // when admin toggled TH off.
+        var ancestor = parent;
+        while (ancestor && ancestor.nodeType === 1) {
+            if (ancestor.classList && (
+                ancestor.classList.contains('lang-no-toggle') ||
+                ancestor.classList.contains('md-render') ||
+                ancestor.classList.contains('q-text-preview')
+            )) return;
+            ancestor = ancestor.parentNode;
+        }
+
         var text = textNode.nodeValue;
         if (!RE_HAS_KR_OR_TH.test(text)) return;
 
