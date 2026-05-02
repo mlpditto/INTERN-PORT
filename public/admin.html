@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.103</title>
+    <title>Nika V91.104</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -22747,6 +22747,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
 
             if (certRequested) {
+                // V91.104: warn if pending request was made when score later dropped below threshold
+                if (score < 30) {
+                    return `<button onclick="openCertModal('${u.id}')" style="${baseStyle} background:#fef2f2; color:#b91c1c; border:1px solid #fca5a5; cursor:pointer;" title="Score ${score.toFixed(2)} below 30 threshold — request may need review"><i class="fa-solid fa-triangle-exclamation"></i> Pending (Below 30)</button>`;
+                }
                 return `<button onclick="openCertModal('${u.id}')" style="${baseStyle} background:#fff7ed; color:#c2410c; border:1px solid #fdba74; cursor:pointer;" title="Open certificate issuer"><i class="fa-solid fa-clock"></i> Request Pending</button>`;
             }
 
@@ -22757,18 +22761,48 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return '';
         }
 
+        // Training day indicator (V91.104) — computes Day X/Y · N days left from start/end dates
+        window._hubTrainingDays = function(startStr, endStr) {
+            if (!startStr || !endStr) return null;
+            const start = new Date(startStr);
+            const end = new Date(endStr);
+            const today = new Date();
+            if (isNaN(start) || isNaN(end) || start > end) return null;
+            const ms = 86400000;
+            const sd = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+            const ed = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+            const td = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const totalDays = Math.round((ed - sd) / ms) + 1;
+            const dayNum = Math.round((td - sd) / ms) + 1;
+            const daysLeft = Math.round((ed - td) / ms);
+            if (td < sd) {
+                const startsIn = Math.round((sd - td) / ms);
+                return { label: `📅 Starts in ${startsIn} day${startsIn > 1 ? 's' : ''}`, color: '#94a3b8' };
+            }
+            if (td > ed) {
+                const endedAgo = Math.round((td - ed) / ms);
+                return { label: `✅ Completed (${endedAgo} day${endedAgo > 1 ? 's' : ''} ago)`, color: '#10b981' };
+            }
+            if (dayNum === totalDays) {
+                return { label: `🔥 Last day · Day ${dayNum}/${totalDays}`, color: '#ef4444' };
+            }
+            return { label: `📍 Day ${dayNum}/${totalDays} · ${daysLeft} day${daysLeft > 1 ? 's' : ''} left`, color: '#475569' };
+        };
+
         function renderHubHeader(u) {
             const crewRank = getCrewRankByScore(u.score || 0);
+            const td = window._hubTrainingDays(u.startDate, u.endDate);
+            const trainingHtml = td ? ` <span style="margin:0 10px; color:#cbd5e1;">|</span> <span style="color:${td.color}; font-weight:700;">${td.label}</span>` : '';
             document.getElementById('lb-popup-header').innerHTML = `
                 <img src="${u.pictureUrl}" style="width:65px; height:65px; border-radius:50%; object-fit:cover; border:3px solid #4361ee; box-shadow:0 8px 20px rgba(67,97,238,0.2);">
                 <div style="flex:1">
                     <div style="font-size:1.4em; font-weight:900; color:#1e293b; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                        ${u.displayName} 
+                        ${u.displayName}
                         <span style="font-size:11px; background:linear-gradient(135deg, #4361ee, #7209b7); color:white; padding:4px 12px; border-radius:30px; letter-spacing:1px; font-weight:900;">${crewRank}</span>
                     </div>
                     <div style="font-size:0.85em; color:#64748b; margin-top:4px;">
-                        <i class="fa-regular fa-calendar" style="margin-right:4px;"></i> ${u.startDate || '?'} — ${u.endDate || '?'} 
-                        <span style="margin:0 10px; color:#cbd5e1;">|</span> 
+                        <i class="fa-regular fa-calendar" style="margin-right:4px;"></i> ${u.startDate || '?'} — ${u.endDate || '?'}${trainingHtml}
+                        <span style="margin:0 10px; color:#cbd5e1;">|</span>
                         <i class="fa-solid fa-star" style="color:#f59e0b; margin-right:4px;"></i> Total Score: <b style="color:#4361ee; font-size:1.1em;">${(u.score || 0).toFixed(2)}</b>${buildHubCertificateAction(u)}
                     </div>
                 </div>
