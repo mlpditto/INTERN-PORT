@@ -543,16 +543,100 @@ exports.notifyOnReviewMessage = functionsV1
         return { skipped: true, reason: 'invalid-lineUserId' };
     }
 
-    // γ.4b.3 — verify LINE_CHANNEL_ACCESS_TOKEN secret is loaded (γ.4b.4 will use it for the actual push).
     const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (!accessToken) {
-        console.warn(`[notifyOnReviewMessage] LINE_CHANNEL_ACCESS_TOKEN secret missing — would-notify lineUserId=${lineUserId} but skipping`);
+        console.warn(`[notifyOnReviewMessage] LINE_CHANNEL_ACCESS_TOKEN secret missing — skipping push for lineUserId=${lineUserId}`);
         return { skipped: true, reason: 'token-missing' };
     }
 
-    // γ.4b.3 — log only (token loaded, ready for γ.4b.4 axios POST). Don't log token content; tokenLen confirms reasonable length.
-    const bodyPreview = (msg.body || '').slice(0, 80);
-    console.log(`[notifyOnReviewMessage] WOULD NOTIFY  lineUserId=${lineUserId}  submission=${submissionId}  msg=${messageId}  tokenLen=${accessToken.length}  body=${JSON.stringify(bodyPreview)}`);
-    return { ok: true, lineUserId, submissionId, messageId, tokenLoaded: true };
+    // γ.4b.4 — build Flex Message and push to LINE. Best-effort: log + return structured error code, no retry.
+    const adminName = (typeof msg.authorName === 'string' && msg.authorName.trim()) ? msg.authorName.trim() : 'Admin';
+    const bonus = Number(submission.adminBonus) || 0;
+    const stars = Math.max(0, Math.min(5, Number(submission.adminQualityStars) || 0));
+    const reviewState = submission.reviewState || '';
+
+    const subtitleParts = [];
+    if (reviewState === 'featured') subtitleParts.push('⭐ Featured');
+    else if (reviewState === 'escalated') subtitleParts.push('🚀 Escalated');
+    else if (reviewState === 'revision_requested') subtitleParts.push('🔄 Revision');
+    if (bonus > 0) subtitleParts.push(`+${bonus} pts`);
+    if (stars > 0) subtitleParts.push('⭐'.repeat(stars));
+    const subtitle = subtitleParts.length ? `${adminName} · ${subtitleParts.join(' · ')}` : adminName;
+
+    const rawBody = String(msg.body || '').replace(/\s+/g, ' ').trim();
+    const bodyText = rawBody.length > 280 ? rawBody.slice(0, 277) + '…' : (rawBody || '(no content)');
+    const altText = `Admin replied: ${rawBody.slice(0, 100)}`.slice(0, 400);
+    const liffUri = 'https://liff.line.me/2008959998-yjcNpaGt?tab=history';
+
+    const flex = {
+        type: 'flex',
+        altText: altText,
+        contents: {
+            type: 'bubble',
+            size: 'kilo',
+            header: {
+                type: 'box',
+                layout: 'vertical',
+                backgroundColor: '#7c3aed',
+                paddingAll: '12px',
+                contents: [
+                    { type: 'text', text: '💬 Admin Review Reply', weight: 'bold', size: 'sm', color: '#ffffff' },
+                    { type: 'text', text: subtitle, size: 'xs', color: '#e9d5ff', margin: 'xs', wrap: true }
+                ]
+            },
+            body: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '16px',
+                contents: [
+                    { type: 'text', text: bodyText, wrap: true, size: 'sm', color: '#1f2937' }
+                ]
+            },
+            footer: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '12px',
+                contents: [
+                    {
+                        type: 'button',
+                        style: 'primary',
+                        color: '#7c3aed',
+                        height: 'sm',
+                        action: { type: 'uri', label: 'Open in LIFF →', uri: liffUri }
+                    }
+                ]
+            }
+        }
+    };
+
+    try {
+        await axios.post('https://api.line.me/v2/bot/message/push', {
+            to: lineUserId,
+            messages: [flex]
+        }, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 8000
+        });
+
+        console.log(`[notifyOnReviewMessage] PUSHED  lineUserId=${lineUserId}  submission=${submissionId}  msg=${messageId}  bonus=${bonus}  stars=${stars}  state=${reviewState || '(none)'}`);
+        return { ok: true, pushed: true, lineUserId, submissionId, messageId };
+    } catch (err) {
+        const status = err && err.response ? err.response.status : null;
+        const lineMessage = (err && err.response && err.response.data && err.response.data.message) || (err && err.message) || 'unknown';
+        let code;
+        if (status === 400) code = 'invalid';
+        else if (status === 401) code = 'token';
+        else if (status === 403) code = 'no-friend';
+        else if (status === 404) code = 'invalid-user';
+        else if (status === 429) code = 'rate-limit';
+        else if (status >= 500 && status < 600) code = 'transient';
+        else code = 'network';
+
+        console.error(`[notifyOnReviewMessage] PUSH_FAILED  code=${code}  status=${status || 'no-response'}  lineUserId=${lineUserId}  submission=${submissionId}  msg=${messageId}  message=${JSON.stringify(lineMessage)}`);
+        return { ok: false, code, status: status || null, lineUserId, submissionId, messageId };
+    }
 });
 
