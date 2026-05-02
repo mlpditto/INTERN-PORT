@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.29)</title>
+    <title>Internship Portfolio (V94.30)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3370,7 +3370,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V94.29 fix (walker skips user-content subtrees — Quiz Editor preview, md-render — so they display as-typed)
+                <span id="intern-version-current">V94.04</span> — Last feature: V94.30 (LINE push notification with Flex Message + ?tab=history deep link for admin Review Reply)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -4246,6 +4246,8 @@
                     loadMorningQuizBonusStatus();
                     loadUnifiedSubmissions(); // 🔥 V94.07: parity with real LIFF init — fix orphan unified-history listener
 
+                    applyTabDeepLink(urlParams);
+
                     // Exit main after loading data for preview
                     setInterval(checkExpiry, 1000);
                     return;
@@ -4340,6 +4342,8 @@
                 loadReflectiveLogs(); // 🔥 Added V84.8
                 loadMorningQuizBonusStatus();
                 loadUnifiedSubmissions(); // 🔥 V94.07: previously orphan — wires unified-history listener (Work > History tab; stats card / filter pills / streak chip / sparkline depend on this)
+
+                applyTabDeepLink(urlParams);
 
                 // Start Timer Loop
                 setInterval(checkExpiry, 1000);
@@ -9731,6 +9735,18 @@ async function archiveDoneCard(cardId) {
                 document.getElementById(`work-pane-${t}`)?.classList.toggle('active', t === tab);
             });
             if (tab === 'analytics') loadLearningAnalytics && loadLearningAnalytics();
+        }
+
+        // V94.30 — deep link from LINE notification (γ.4b.4): expand Work section + switch to History sub-tab + scroll into view.
+        function applyTabDeepLink(urlParams) {
+            const tab = urlParams && urlParams.get && urlParams.get('tab');
+            if (tab !== 'history') return;
+            setTimeout(() => {
+                const content = document.getElementById('work-section-content');
+                if (content && content.style.display === 'none') toggleWorkSection();
+                switchWorkTab('history');
+                document.getElementById('section-general-work')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 400);
         }
 
         async function submitWork() {
