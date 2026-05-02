@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.26)</title>
+    <title>Internship Portfolio (V94.27)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3370,7 +3370,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V94.26 Phase β.3 (JS string EN translations: alerts, toasts, achievements, status messages)
+                <span id="intern-version-current">V94.04</span> — Last feature: V94.27 Phase β.3.2 (quiz/assignment cards + answer feedback EN translations)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -5193,7 +5193,7 @@
                 assignmentContainer.innerHTML = `
                     <div style="text-align:center; padding:40px 20px; color:#999; opacity:0.8;">
                         <i class="fa-solid fa-mug-hot" style="font-size:3em; margin-bottom:10px;"></i><br>
-                        🎉 เย้! ไม่มีภารกิจค้างแล้ว<br><small>พักผ่อนได้เลย</small>
+                        🎉 No pending missions! เย้! ไม่มีภารกิจค้างแล้ว<br><small>You can relax พักผ่อนได้เลย</small>
                     </div>`;
                 if (paginationContainer) paginationContainer.innerHTML = "";
                 return;
@@ -5231,7 +5231,7 @@
                         if (diff > 0) {
                             const h = Math.floor(diff / 3600000);
                             const m = Math.floor((diff % 3600000) / 60000);
-                            deadlineText = `<span style="color:#f39c12;"><i class="fa-solid fa-hourglass-half"></i> เหลือเวลา ${h}ชม. ${m}น.</span>`;
+                            deadlineText = `<span style="color:#f39c12;"><i class="fa-solid fa-hourglass-half"></i> ${h}h ${m}m left เหลือเวลา ${h}ชม. ${m}น.</span>`;
                         } else {
                             deadlineText = `<span style="color:#ef233c;">Expired</span>`;
                         }
@@ -5255,7 +5255,7 @@
                         let timerAttr = "", linkHint = "";
                         if (q.questLink) {
                             timerAttr = `onclick="window.open('${q.questLink}','_blank')" style="cursor:pointer; text-decoration:underline; color:#fff; background:#4361ee; padding:2px 8px; border-radius:4px;"`;
-                            linkHint = `<div style="font-size:0.8em; margin-top:5px; color:#4361ee;"><i class="fa-solid fa-link"></i> แตะที่เวลาเพื่อเปิดลิงก์</div>`;
+                            linkHint = `<div style="font-size:0.8em; margin-top:5px; color:#4361ee;"><i class="fa-solid fa-link"></i> Tap the timer to open the link แตะที่เวลาเพื่อเปิดลิงก์</div>`;
                         }
 
                         bodyHtml = `
@@ -5265,14 +5265,14 @@
                             </div>
                             <textarea id="ans-${qId}" rows="3" placeholder="✍️ พิมพ์คำตอบ..." style="width:100%; border-color:#eee;"></textarea>
                          `;
-                        actionHtml = `<button class="btn-success" id="btn-sub-${qId}" onclick="subQ('${qId}',${q.baseScore})">ส่งคำตอบ (Submit)</button>`;
+                        actionHtml = `<button class="btn-success" id="btn-sub-${qId}" onclick="subQ('${qId}',${q.baseScore})">Submit ส่งคำตอบ</button>`;
                     } else if (status === 'unsuccessful') {
-                        bodyHtml = `<div style="color:#ef233c; font-weight:bold; text-align:center;">❌ ภารกิจล้มเหลว (Failed)</div>`;
+                        bodyHtml = `<div style="color:#ef233c; font-weight:bold; text-align:center;">❌ Failed ภารกิจล้มเหลว</div>`;
                         const cd = myQ.cooldownUntil ? myQ.cooldownUntil.toDate() : null;
                         if (cd && now >= cd) {
-                            actionHtml = `<button class="btn-warning" onclick="openConfirmStart('${qId}', '${q.question.replaceAll("'", "").replaceAll("\n", " ")}', ${q.durationMinutes || 30})">🔄 เริ่มใหม่ (Retry)</button>`;
+                            actionHtml = `<button class="btn-warning" onclick="openConfirmStart('${qId}', '${q.question.replaceAll("'", "").replaceAll("\n", " ")}', ${q.durationMinutes || 30})">🔄 Retry เริ่มใหม่</button>`;
                         } else {
-                            actionHtml = `<button class="btn-dark" disabled>🚫 ติด Cooldown</button>`;
+                            actionHtml = `<button class="btn-dark" disabled>🚫 Cooldown ติด</button>`;
                         }
                     }
 
@@ -5332,48 +5332,48 @@
                         const isStarted = attempt.status === 'started';
 
                         if (isStarted) {
-                            statusBadge = `<span class="assign-tag" style="background:#fff3cd; color:#856404;">⏳ กำลังทำ (In Progress)</span>`;
-                            bodyHtml = `<div style="color:#666;">คุณกำลังทำแบบทดสอบนี้อยู่...</div>`;
-                            actionHtml = `<button class="btn-warning" onclick="runQuiz('${q.id}')">▶️ ทำต่อ (Resume)</button>`;
+                            statusBadge = `<span class="assign-tag" style="background:#fff3cd; color:#856404;">⏳ In Progress กำลังทำ</span>`;
+                            bodyHtml = `<div style="color:#666;">You're working on this quiz... คุณกำลังทำแบบทดสอบนี้อยู่...</div>`;
+                            actionHtml = `<button class="btn-warning" onclick="runQuiz('${q.id}')">▶️ Resume ทำต่อ</button>`;
                         } else if (attempt.status === 'practice_done') {
                             // 🔥 V78: ONE-TIME practice completed
-                            statusBadge = `<span class="assign-tag" style="background:#fff3cd; color:#856404;">🔄 ฝึกซ้อมเสร็จแล้ว</span>`;
+                            statusBadge = `<span class="assign-tag" style="background:#fff3cd; color:#856404;">🔄 Practice complete ฝึกซ้อมเสร็จแล้ว</span>`;
                             bodyHtml = `
                                 <div style="color:#666; font-size:0.9em;">
-                                    คุณได้ฝึกซ้อมแล้ว ✅<br>
+                                    Practice completed ✅ คุณได้ฝึกซ้อมแล้ว<br>
                                     <span style="font-weight:bold;">Practice Score: ${attempt.practiceScore || 0}/${attempt.practiceTotalQ || '?'}</span>
                                 </div>
                             `;
                             actionHtml = `
-                                <button class="btn-sm btn-info" onclick="viewPracticeAnswers('${q.id}')" style="width:100%; margin-bottom:5px; border-radius:6px;">👁️ ดูผลฝึกซ้อม</button>
-                                <button class="btn-primary" onclick="requestRealExam('${q.id}')" style="width:100%; background:linear-gradient(135deg, #e67e22 0%, #d35400 100%); border:none;">📨 ขออนุญาตสอบจริง</button>
+                                <button class="btn-sm btn-info" onclick="viewPracticeAnswers('${q.id}')" style="width:100%; margin-bottom:5px; border-radius:6px;">👁️ View Practice Results ดูผลฝึกซ้อม</button>
+                                <button class="btn-primary" onclick="requestRealExam('${q.id}')" style="width:100%; background:linear-gradient(135deg, #e67e22 0%, #d35400 100%); border:none;">📨 Request Real Exam ขออนุญาตสอบจริง</button>
                             `;
                         } else if (attempt.status === 'requesting') {
-                            statusBadge = `<span class="assign-tag" style="background:#e9ecef; color:#495057;">📨 รออนุมัติ${isOneTime ? 'สอบจริง' : 'ให้ทำเลท'}</span>`;
-                            bodyHtml = `<div style="color:#666; font-size:0.9em;">ส่งคำขอ${isOneTime ? 'สอบจริง' : 'ทำแบบทดสอบหลังกำหนด'}แล้ว รอแอดมินอนุมัติครับ</div>`;
+                            statusBadge = `<span class="assign-tag" style="background:#e9ecef; color:#495057;">📨 Awaiting ${isOneTime ? 'real exam' : 'late submission'} approval รออนุมัติ${isOneTime ? 'สอบจริง' : 'ให้ทำเลท'}</span>`;
+                            bodyHtml = `<div style="color:#666; font-size:0.9em;">${isOneTime ? 'Real exam' : 'Late submission'} request sent — awaiting admin approval ส่งคำขอ${isOneTime ? 'สอบจริง' : 'ทำแบบทดสอบหลังกำหนด'}แล้ว รอแอดมินอนุมัติครับ</div>`;
                             actionHtml = `<button class="btn-dark" disabled>🚫 Waiting for Admin</button>`;
                         } else if (attempt.status === 'allowed') {
-                            statusBadge = `<span class="assign-tag" style="background:#d1e7dd; color:#0f5132;">✅ อนุมัติ${isOneTime ? 'สอบจริง' : 'ให้ทำเลท'}ได้</span>`;
-                            bodyHtml = `<div style="color:#0f5132; font-weight:bold;">แอดมินอนุญาตให้คุณ${isOneTime ? 'สอบจริง' : 'ทำแบบทดสอบนี้'}แล้วครับ!</div>`;
-                            actionHtml = `<button class="btn-primary" onclick="confirmRunQuiz('${q.id}')">🚀 เริ่ม${isOneTime ? 'สอบจริง' : 'ทำแบบทดสอบ'}</button>`;
+                            statusBadge = `<span class="assign-tag" style="background:#d1e7dd; color:#0f5132;">✅ ${isOneTime ? 'Real exam' : 'Late submission'} approved อนุมัติ${isOneTime ? 'สอบจริง' : 'ให้ทำเลท'}ได้</span>`;
+                            bodyHtml = `<div style="color:#0f5132; font-weight:bold;">Admin has approved your ${isOneTime ? 'real exam' : 'late attempt'}! แอดมินอนุญาตให้คุณ${isOneTime ? 'สอบจริง' : 'ทำแบบทดสอบนี้'}แล้วครับ!</div>`;
+                            actionHtml = `<button class="btn-primary" onclick="confirmRunQuiz('${q.id}')">🚀 Start ${isOneTime ? 'Real Exam' : 'Quiz'} เริ่ม${isOneTime ? 'สอบจริง' : 'ทำแบบทดสอบ'}</button>`;
                         } else {
                             // Pending/Done
                             const score = attempt.totalQuestions ? (attempt.correctCount / attempt.totalQuestions) * (q.totalPoints || 1.0) : 0;
                             const isApproved = attempt.status === 'approved';
                             const color = isPending ? '#ff9f1c' : '#2ec4b6';
-                            const text = isPending ? 'รอตรวจ (Pending)' : 'อนุมัติแล้ว (Approved)';
+                            const text = isPending ? 'Pending รอตรวจ' : 'Approved อนุมัติแล้ว';
                             statusBadge = `<span class="assign-tag" style="background:${isPending ? '#fff3cd' : '#d4edda'}; color:${isPending ? '#856404' : '#155724'}">${text}</span>`;
 
                             let retryBtn = "";
                             const isExpired = (dead && new Date() > dead);
                             // 🔥 V78.92: Show Retake button if score is 0.00 or expired
                             if ((isExpired && !isApproved) || (isApproved && score <= 0)) {
-                                retryBtn = `<button class="btn-sm btn-warning" onclick="requestLateQuiz('${q.id}', ${score <= 0})" style="margin-top:5px; width:100%;">🔄 ขอสอบใหม่ (Request Retake)</button>`;
+                                retryBtn = `<button class="btn-sm btn-warning" onclick="requestLateQuiz('${q.id}', ${score <= 0})" style="margin-top:5px; width:100%;">🔄 Request Retake ขอสอบใหม่</button>`;
                             }
 
                             bodyHtml = `
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <span>คะแนนที่ได้ (Score)</span>
+                                    <span>Score คะแนนที่ได้</span>
                                     <span style="font-size:1.5em; font-weight:bold; color:${color};">${score.toFixed(2)}</span>
                                 </div>
                                 ${retryBtn}
@@ -5382,18 +5382,18 @@
                             // 🔥 Feature: View Answers Button (Only if Approved and score > 0)
                             let viewBtn = "";
                             if (!isPending && score > 0) {
-                                viewBtn = `<button class="btn-sm btn-info" onclick="viewQuizAnswers('${q.id}')" style="margin-top:5px; width:100%; border-radius:6px;">👁️ ดูเฉลย (View Answers)</button>`;
+                                viewBtn = `<button class="btn-sm btn-info" onclick="viewQuizAnswers('${q.id}')" style="margin-top:5px; width:100%; border-radius:6px;">👁️ View Answers ดูเฉลย</button>`;
                             }
 
                             actionHtml = `
-                                <div style="text-align:right; font-size:0.85em; color:#999; margin-bottom:5px;">ส่งเมื่อ: ${attempt.timestamp ? attempt.timestamp.toDate().toLocaleString('th-TH') : '-'}</div>
+                                <div style="text-align:right; font-size:0.85em; color:#999; margin-bottom:5px;">Submitted ส่งเมื่อ: ${attempt.timestamp ? attempt.timestamp.toDate().toLocaleString('th-TH') : '-'}</div>
                                 ${viewBtn}
                             `;
                         }
 
                     } else {
                         // Not Started
-                        statusBadge = `<span class="assign-tag" style="background:#e2e6ea;">ยังไม่ทำ (Not Started)</span>`;
+                        statusBadge = `<span class="assign-tag" style="background:#e2e6ea;">Not Started ยังไม่ทำ</span>`;
                         let deadlineHtml = "";
                         if (dead) {
                             deadlineHtml = `<div class="meta-item quiz-global-expiry" data-dead="${dead.getTime()}" style="color:#ef233c; font-weight:bold;"><i class="fa-solid fa-circle-exclamation"></i> Loading...</div>`;
@@ -5401,7 +5401,7 @@
 
                         // 🔥 V78: Show ONE-TIME badge
                         const oneTimeBadge = isOneTime ? '<span class="badge" style="background:#f57f17; color:white; font-size:0.75em; margin-left:5px;">🔄 ONE-TIME</span>' : '';
-                        const homeworkBadge = isHomework ? '<span class="badge" style="background:#2e7d32; color:white; font-size:0.75em; margin-left:5px;">📚 การบ้าน</span>' : '';
+                        const homeworkBadge = isHomework ? '<span class="badge" style="background:#2e7d32; color:white; font-size:0.75em; margin-left:5px;">📚 Homework การบ้าน</span>' : '';
 
                         let itemLabel = q.questions ? q.questions.length : '?';
                         let pointLabel = q.totalPoints || 1;
@@ -5438,7 +5438,7 @@
                                 <h4 style="${isCollapsed ? 'font-size:0.95em; color:#666;' : ''} white-space:normal; line-height:1.2;">
                                     ${q.title} 
                                     ${quizMetaTitleSuffix || ''}
-                                    ${isCollapsed ? '<small style="color:#ef233c; font-weight:normal; margin-left:5px;">(หมดเวลา)</small>' : ''}
+                                    ${isCollapsed ? '<small style="color:#ef233c; font-weight:normal; margin-left:5px;">Expired หมดเวลา</small>' : ''}
                                 </h4>
                                 <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
                                     ${statusBadge}
@@ -5461,9 +5461,9 @@
                     const prevDisabled = assignmentPage === 1 ? 'disabled' : '';
                     const nextDisabled = assignmentPage === totalPages ? 'disabled' : '';
                     paginationContainer.innerHTML = `
-                        <button class="btn-sm" style="flex:1; background:${assignmentPage === 1 ? '#f8f9fa' : '#fff'}; color:${assignmentPage === 1 ? '#aaa' : '#333'}; border:1px solid #ddd;" onclick="changeAssignmentPage(-1)" ${prevDisabled}><i class="fa-solid fa-chevron-left"></i> ย้อนกลับ</button>
-                        <div style="font-size:0.85em; font-weight:bold; color:#666; padding:0 10px;">หน้า ${assignmentPage} / ${totalPages}</div>
-                        <button class="btn-sm" style="flex:1; background:${assignmentPage === totalPages ? '#f8f9fa' : '#fff'}; color:${assignmentPage === totalPages ? '#aaa' : '#333'}; border:1px solid #ddd;" onclick="changeAssignmentPage(1)" ${nextDisabled}>ถัดไป <i class="fa-solid fa-chevron-right"></i></button>
+                        <button class="btn-sm" style="flex:1; background:${assignmentPage === 1 ? '#f8f9fa' : '#fff'}; color:${assignmentPage === 1 ? '#aaa' : '#333'}; border:1px solid #ddd;" onclick="changeAssignmentPage(-1)" ${prevDisabled}><i class="fa-solid fa-chevron-left"></i> Back ย้อนกลับ</button>
+                        <div style="font-size:0.85em; font-weight:bold; color:#666; padding:0 10px;">Page ${assignmentPage} / ${totalPages} หน้า</div>
+                        <button class="btn-sm" style="flex:1; background:${assignmentPage === totalPages ? '#f8f9fa' : '#fff'}; color:${assignmentPage === totalPages ? '#aaa' : '#333'}; border:1px solid #ddd;" onclick="changeAssignmentPage(1)" ${nextDisabled}>Next ถัดไป <i class="fa-solid fa-chevron-right"></i></button>
                     `;
                 } else {
                     paginationContainer.innerHTML = "";
@@ -5637,7 +5637,7 @@
         async function requestRealExam(quizId) {
             const q = quizzesCache.find(x => x.id === quizId);
             if (!q) return;
-            if (!confirm(`ยืนยันขออนุญาตสอบจริง "${q.title}"?\n(แอดมินจะเห็นคะแนนฝึกซ้อมของคุณ)`)) return;
+            if (!confirm(`Request real exam "${q.title}"?\n(Admin will see your practice score)`)) return;
 
             try {
                 const attempt = quizAttemptsCache[quizId];
@@ -5771,7 +5771,7 @@
                 }
             });
 
-            document.getElementById('quiz-run-title').innerText = currentQuiz.title + (isPracticeMode ? ' (ฝึกซ้อม)' : '');
+            document.getElementById('quiz-run-title').innerText = currentQuiz.title + (isPracticeMode ? ' (Practice ฝึกซ้อม)' : '');
             document.getElementById('quizModal').style.display = 'flex';
             renderQuizStep(isResuming);
             initCheatDetector();
@@ -5792,8 +5792,8 @@
             const q = quizzesCache.find(x => x.id === quizId);
             if (!q) return;
             const msg = isRetake
-                ? `ยืนยันการขอสอบใหม่ "${q.title}"?\n(แอดมินจะได้รับแจ้งและต้องอนุมัติก่อนเริ่มทำอีกครั้ง)`
-                : `ยืนยันการขออนุญาตทำแบบทดสอบ "${q.title}" หลังกำหนดเวลา?\n(แอดมินจะได้รับแจ้งและต้องอนุมัติก่อนเริ่มทำ)`;
+                ? `Request retake of "${q.title}"?\n(Admin will be notified and must approve before you can start again)`
+                : `Request late submission for "${q.title}"?\n(Admin will be notified and must approve before you can start)`;
 
             if (!confirm(msg)) return;
 
@@ -5872,18 +5872,18 @@
                 if (hasCorrect) {
                     const isRight = (Array.isArray(page.correct) ? page.correct.includes(currentAns) : page.correct == currentAns);
                     statusBadge = isRight
-                        ? '<span style="background:#dcfce7; color:#15803d; padding:2px 8px; border-radius:10px; font-size:0.8em; font-weight:bold;">✅ ถูกต้อง!</span>'
-                        : '<span style="background:#fee2e2; color:#b91c1c; padding:2px 8px; border-radius:10px; font-size:0.8em; font-weight:bold;">❌ ผิดไปนิดเดียว!</span>';
+                        ? '<span style="background:#dcfce7; color:#15803d; padding:2px 8px; border-radius:10px; font-size:0.8em; font-weight:bold;">✅ Correct! ถูกต้อง!</span>'
+                        : '<span style="background:#fee2e2; color:#b91c1c; padding:2px 8px; border-radius:10px; font-size:0.8em; font-weight:bold;">❌ Almost! ผิดไปนิดเดียว!</span>';
 
                     const correctText = Array.isArray(page.correct)
                         ? page.correct.map(idx => page.options[idx]).join(', ')
                         : page.options[page.correct];
 
                     if (!isRight) {
-                        pollFeedback = `<div style="margin-top:10px; font-size:0.85em; color:#b91c1c;">เฉลยคือ: <b>${correctText}</b></div>`;
+                        pollFeedback = `<div style="margin-top:10px; font-size:0.85em; color:#b91c1c;">Correct answer เฉลยคือ: <b>${correctText}</b></div>`;
                     }
                 } else {
-                    statusBadge = '<span style="background:#fdf2f8; color:#d81b60; padding:2px 8px; border-radius:10px; font-size:0.8em; font-weight:bold;">📮 บันทึกโพลแล้ว</span>';
+                    statusBadge = '<span style="background:#fdf2f8; color:#d81b60; padding:2px 8px; border-radius:10px; font-size:0.8em; font-weight:bold;">📮 Poll saved บันทึกโพลแล้ว</span>';
                 }
             }
 
@@ -5893,7 +5893,7 @@
                 if (page.type === 'ordering') {
                     const ansArr = Array.isArray(currentAns) ? currentAns : [];
                     innerHtml = `
-                        <div style="margin-bottom:10px; font-size:0.85em; color:#666;">📝 เรียงลำดับขั้นตอนเพื่ออ่านต่อ:</div>
+                        <div style="margin-bottom:10px; font-size:0.85em; color:#666;">📝 Order the steps to continue reading เรียงลำดับขั้นตอนเพื่ออ่านต่อ:</div>
                         <div style="display:flex; flex-direction:column; gap:10px;">
                             ${page.options.map((opt, idx) => {
                         const orderIdx = ansArr.indexOf(idx);
@@ -5908,18 +5908,18 @@
                                 `;
                     }).join('')}
                         </div>
-                        ${!isAnswered ? `<button class="btn-sm btn-primary" onclick="selectReadOnlyOrdering()" style="margin-top:10px; width:100%;">ยืนยันลำดับ (Confirm Order)</button>` : ''}
+                        ${!isAnswered ? `<button class="btn-sm btn-primary" onclick="selectReadOnlyOrdering()" style="margin-top:10px; width:100%;">Confirm Order ยืนยันลำดับ</button>` : ''}
                     `;
                 } else if (page.type === 'flashcard') {
                     innerHtml = `
                         <div class="flash-container">
                             <button class="flash-btn flash-true" onclick="selectReadOnlyPoll(0)" ${isAnswered ? 'disabled' : ''}>
                                 <i class="fa-solid fa-circle-check"></i>
-                                <span>ถูก (TRUE)</span>
+                                <span>TRUE ถูก</span>
                             </button>
                             <button class="flash-btn flash-false" onclick="selectReadOnlyPoll(1)" ${isAnswered ? 'disabled' : ''}>
                                 <i class="fa-solid fa-circle-xmark"></i>
-                                <span>ผิด (FALSE)</span>
+                                <span>FALSE ผิด</span>
                             </button>
                         </div>
                     `;
@@ -5958,7 +5958,7 @@
                         <div style="font-weight:bold; color:#d81b60; margin-bottom:12px; font-size:0.9em; display:flex; align-items:center; justify-content:space-between;">
                             <div style="display:flex; align-items:center; gap:8px;">
                                 <i class="fa-solid fa-square-poll-vertical"></i> 
-                                ${isAnswered ? 'บันทึกคำตอบแล้ว:' : 'แชร์ความเห็นหรือทดสอบเพื่ออ่านต่อ:'}
+                                ${isAnswered ? 'Answer saved บันทึกคำตอบแล้ว:' : 'Share or answer to continue reading แชร์ความเห็นหรือทดสอบเพื่ออ่านต่อ:'}
                             </div>
                             ${statusBadge}
                         </div>
@@ -5987,8 +5987,8 @@
 
                     <div id="read-only-content-reveal" class="md-render ${isAnswered || !isPoll ? 'reveal-active' : ''}"
                          style="display:${isAnswered || !isPoll ? 'block' : 'none'}; font-size:1.05em; line-height:1.7; color:#333; margin-top:15px; text-align:justify;">
-                        ${isPoll ? '<div style="font-weight:bold; color:var(--primary); margin-bottom:10px; border-top:1px solid #eee; padding-top:15px; font-size:0.9em;">✨ เฉลย/เนื้อหาเพิ่มเติม (The Revelation):</div>' : ''}
-                        ${window.renderMd((page.content || "เนื้อหาสำหรับหน้านี้...").trim())}
+                        ${isPoll ? '<div style="font-weight:bold; color:var(--primary); margin-bottom:10px; border-top:1px solid #eee; padding-top:15px; font-size:0.9em;">✨ The Revelation — answer & extra content เฉลย/เนื้อหาเพิ่มเติม:</div>' : ''}
+                        ${window.renderMd((page.content || "Content for this page... เนื้อหาสำหรับหน้านี้...").trim())}
                     </div>
                 </div>
             `;
@@ -6001,7 +6001,7 @@
             if (btnPrev) btnPrev.style.display = currentStep > 0 ? 'inline-block' : 'none';
             if (btnNext) {
                 btnNext.style.display = 'inline-block';
-                btnNext.innerText = (currentStep === totalSteps - 1) ? "📚 ไปยังหน้าสรุป (Next)" : "ถัดไป (Next)";
+                btnNext.innerText = (currentStep === totalSteps - 1) ? "📚 Next (Summary) ไปยังหน้าสรุป" : "Next ถัดไป";
                 // V82: Lock Next if poll not answered
                 if (isPoll && !isAnswered) {
                     btnNext.disabled = true;
@@ -6255,11 +6255,11 @@
                         <div class="flash-container">
                             <button class="flash-btn flash-true" onclick="confirmFlashAnswer(0)">
                                 <i class="fa-solid fa-circle-check"></i>
-                                <span>ถูก (TRUE)</span>
+                                <span>TRUE ถูก</span>
                             </button>
                             <button class="flash-btn flash-false" onclick="confirmFlashAnswer(1)">
                                 <i class="fa-solid fa-circle-xmark"></i>
-                                <span>ผิด (FALSE)</span>
+                                <span>FALSE ผิด</span>
                             </button>
                         </div>
                     `;
