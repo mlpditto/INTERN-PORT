@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V91.104</title>
+    <title>Nika V91.105</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -22749,7 +22749,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (certRequested) {
                 // V91.104: warn if pending request was made when score later dropped below threshold
                 if (score < 30) {
-                    return `<button onclick="openCertModal('${u.id}')" style="${baseStyle} background:#fef2f2; color:#b91c1c; border:1px solid #fca5a5; cursor:pointer;" title="Score ${score.toFixed(2)} below 30 threshold — request may need review"><i class="fa-solid fa-triangle-exclamation"></i> Pending (Below 30)</button>`;
+                    return `<button onclick="openCertModal('${u.id}')" style="${baseStyle} background:#fef2f2; color:#b91c1c; border:1px solid #fca5a5; cursor:pointer;" title="Score ${score.toFixed(2)} below 30 threshold — request may need review"><i class="fa-solid fa-triangle-exclamation"></i> Pending (< 30)</button>`;
                 }
                 return `<button onclick="openCertModal('${u.id}')" style="${baseStyle} background:#fff7ed; color:#c2410c; border:1px solid #fdba74; cursor:pointer;" title="Open certificate issuer"><i class="fa-solid fa-clock"></i> Request Pending</button>`;
             }
@@ -22786,7 +22786,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (dayNum === totalDays) {
                 return { label: `🔥 Last day · Day ${dayNum}/${totalDays}`, color: '#ef4444' };
             }
-            return { label: `📍 Day ${dayNum}/${totalDays} · ${daysLeft} day${daysLeft > 1 ? 's' : ''} left`, color: '#475569' };
+            return { label: `📍 D ${dayNum}/${totalDays} · ${daysLeft} d left`, color: '#475569' };
         };
 
         function renderHubHeader(u) {
@@ -22803,7 +22803,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     <div style="font-size:0.85em; color:#64748b; margin-top:4px;">
                         <i class="fa-regular fa-calendar" style="margin-right:4px;"></i> ${u.startDate || '?'} — ${u.endDate || '?'}${trainingHtml}
                         <span style="margin:0 10px; color:#cbd5e1;">|</span>
-                        <i class="fa-solid fa-star" style="color:#f59e0b; margin-right:4px;"></i> Total Score: <b style="color:#4361ee; font-size:1.1em;">${(u.score || 0).toFixed(2)}</b>${buildHubCertificateAction(u)}
+                        <i class="fa-solid fa-star" style="color:#f59e0b; margin-right:4px;"></i> Now: <b style="color:#4361ee; font-size:1.1em;">${(u.score || 0).toFixed(2)}</b>${buildHubCertificateAction(u)}
                     </div>
                 </div>
             `;
@@ -23039,7 +23039,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             <div style="font-size:0.75em; color:#94a3b8; margin-top:4px;">${d} <span style="margin-left:5px; color:#e2e8f0;">|</span> <span style="margin-left:5px; text-transform:uppercase; font-weight:900; color:${e.type === 'quiz' ? '#4361ee' : '#64748b'}">${e.type}</span>${wordsBadge}</div>
                             ${previewBlock}
                         </div>
-                        <div style="font-size:1em; font-weight:900; color:${e.score >=0 ? '#10b981' : '#ef4444'}; flex-shrink:0;">${e.score >=0 ? '+' : ''}${e.score.toFixed(2)}</div>
+                        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0;">
+                            <div style="font-size:1em; font-weight:900; color:${e.score >=0 ? '#10b981' : '#ef4444'};">${e.score >=0 ? '+' : ''}${e.score.toFixed(2)}</div>
+                            ${e.isReflective && e.mood ? `<div style="font-size:1.1em; line-height:1;" title="Mood">${e.mood}</div>` : ''}
+                        </div>
                     </div>
                 `;
             });
@@ -24712,14 +24715,25 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 </div>
                             </div>
                         </div>
-                        ${item.fullContent ? `
+                        ${item.fullContent ? (() => {
+                            const _w = (typeof window._wpWordCount === 'function') ? window._wpWordCount(item.fullContent) : 0;
+                            const _ch = String(item.fullContent || '').length;
+                            return `
                             <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:12px;">
-                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase; margin-bottom:8px;">Log Content</div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                                    <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Log Content</div>
+                                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                        <span style="background:#eef2ff; color:#4361ee; padding:3px 10px; border-radius:999px; font-size:0.7em; font-weight:800;">📝 ${_w}w</span>
+                                        <span style="background:#fef3c7; color:#92400e; padding:3px 10px; border-radius:999px; font-size:0.7em; font-weight:800;">🔡 ${_ch}ch</span>
+                                        ${item.mood ? `<span style="background:white; border:1px solid #e2e8f0; padding:3px 10px; border-radius:999px; font-size:0.85em; font-weight:800;" title="Mood">${item.mood}</span>` : ''}
+                                    </div>
+                                </div>
                                 <div style="color:#475569; font-size:0.9em; line-height:1.6; max-height:300px; overflow-y:auto;">
                                     ${item.fullContent.replace(/\\n/g, '<br/>')}
                                 </div>
                             </div>
-                        ` : ''}
+                            `;
+                        })() : ''}
                         ${item.adminComment ? `
                             <div style="background:#ede9fe; padding:12px; border-radius:8px; border-left:3px solid #7c3aed; margin-bottom:12px;">
                                 <div style="font-size:0.75em; color:#5b21b6; font-weight:700; text-transform:uppercase; margin-bottom:8px;">Admin Comment</div>
