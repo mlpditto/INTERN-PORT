@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.11</title>
+    <title>Nika V92.12</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -27885,6 +27885,17 @@ Recommended Review: X days`;
         // for a reason the admin should know about (missing LINE link, no friend, token issue).
         // Silent for benign skips (no editHistory yet, etc.). Never blocks the save path.
         window.lpAdminNotifyEdit = function(entryId, eventLabel) {
+            // V92.12: PAUSED — Phase 3.2 backend deploy blocked. Existing v1-syntax functions
+            // were auto-promoted to GCF Gen 2 by an earlier firebase-tools version; current
+            // firebase-tools (15.x) classifies v1 syntax as Gen 1 and refuses to "downgrade",
+            // failing every redeploy. Fix path: standalone PR migrating all functions in
+            // functions/index.js + migrate-legacy-data.js from v1 syntax (functionsV1.https.*)
+            // to v2 syntax (firebase-functions/v2/https). Once deployed, remove this early
+            // return to re-enable LINE pushes. The intern still sees full edit history in-app
+            // (PR #98) — they just won't get a real-time push notification yet.
+            console.log(`[lpAdminNotifyEdit] paused — would notify entry=${entryId} event=${eventLabel}`);
+            return;
+            // eslint-disable-next-line no-unreachable
             if (!entryId) return;
             try {
                 const callable = firebase.functions().httpsCallable('notifyOnAdminEdit');
