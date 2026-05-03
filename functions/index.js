@@ -640,3 +640,177 @@ exports.notifyOnReviewMessage = functionsV1
     }
 });
 
+// ============================================================
+// notifyOnAdminEdit (V92.11 / Phase 3.2 of admin-edits-intern-work)
+// ------------------------------------------------------------
+// Pushes a LINE Flex Message to the entry owner whenever an admin
+// edits or reverts their LP entry. Caller-side invocation (not an
+// Eventarc trigger — asia-southeast3 doesn't support those, see
+// memory `feedback_firestore_trigger_region_limitation.md`).
+//
+// Caller: public/admin.html  lpAdminSaveEdit() / lpAdminRevert()
+//
+// Input:  { entryId: string }
+// Auth:   admin custom claim required
+// Body:   reads learning_path_entries/{entryId}.userId (LINE userId,
+//         intern app stores rawLiffUserId here directly — see
+//         index.html:4289 `userId = rawLiffUserId`) and
+//         lastAdminEdit{} + editHistory[last] for message contents.
+// Output: { ok, pushed?, code?, status?, ... }  (best-effort,
+//         no retry; admin UI shows toast on non-ok)
+//
+// Language: EN-only for now. Phase 3.3 plan parked: add
+// preferredLanguage to user doc + sync from localStorage so this
+// function can pick TH/EN/KR per intern.
+// ============================================================
+exports.notifyOnAdminEdit = functionsV1
+    .runWith({ secrets: ['LINE_CHANNEL_ACCESS_TOKEN'] })
+    .https.onCall(async (data, context) => {
+    if (!context.auth || context.auth.token.admin !== true) {
+        throw new functionsV1.https.HttpsError('permission-denied', 'Admin required');
+    }
+
+    const entryId = (data && data.entryId) || '';
+    if (!entryId) {
+        throw new functionsV1.https.HttpsError('invalid-argument', 'entryId required');
+    }
+
+    let entry;
+    try {
+        const entryDoc = await admin.firestore().collection('learning_path_entries').doc(entryId).get();
+        if (!entryDoc.exists) {
+            console.warn(`[notifyOnAdminEdit] entry ${entryId} not found`);
+            return { skipped: true, reason: 'entry-not-found' };
+        }
+        entry = entryDoc.data() || {};
+    } catch (err) {
+        console.error(`[notifyOnAdminEdit] failed to read entry ${entryId}:`, err.message);
+        throw new functionsV1.https.HttpsError('internal', 'failed to read entry');
+    }
+
+    const lineUserId = entry.userId;
+    if (!lineUserId || typeof lineUserId !== 'string' || !lineUserId.startsWith('U')) {
+        console.warn(`[notifyOnAdminEdit] entry ${entryId} userId is not a LINE userId: ${lineUserId}`);
+        return { skipped: true, reason: 'invalid-lineUserId' };
+    }
+
+    const history = Array.isArray(entry.editHistory) ? entry.editHistory : [];
+    const lastEdit = history[history.length - 1] || null;
+    const lastAdminEdit = entry.lastAdminEdit || {};
+    if (!lastEdit) {
+        console.warn(`[notifyOnAdminEdit] entry ${entryId} has empty editHistory — nothing to notify`);
+        return { skipped: true, reason: 'no-history' };
+    }
+
+    const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    if (!accessToken) {
+        console.warn(`[notifyOnAdminEdit] LINE_CHANNEL_ACCESS_TOKEN secret missing — skipping push`);
+        return { skipped: true, reason: 'token-missing' };
+    }
+
+    // Compute changed-field summary
+    const FIELD_LABELS = { title: 'title', date: 'date', nextReviewDate: 'next review', tags: 'tags', contentMarkdown: 'content' };
+    const before = lastEdit.fieldsBefore || {};
+    const after = lastEdit.fieldsAfter || {};
+    const changedFields = Object.keys(FIELD_LABELS).filter(k => {
+        const a = before[k];
+        const b = after[k];
+        if (Array.isArray(a) && Array.isArray(b)) return JSON.stringify(a) !== JSON.stringify(b);
+        return a !== b;
+    });
+    const changedCount = changedFields.length;
+    const changedLabel = changedFields.map(k => FIELD_LABELS[k]).join(', ') || '(none)';
+    const isRevert = lastEdit.type === 'revert';
+
+    const title = (entry.title || '').slice(0, 80) || 'Untitled';
+    const reasonRaw = (lastAdminEdit.reason || lastEdit.reason || '').replace(/\s+/g, ' ').trim();
+    const reason = reasonRaw.length > 200 ? reasonRaw.slice(0, 197) + '…' : (reasonRaw || '(no reason)');
+    const editorEmail = (lastAdminEdit.editorEmail || lastEdit.editorEmail || 'admin').replace(/\s+/g, ' ').trim();
+
+    const headerText = isRevert ? '↩️ Admin Reverted Your Note' : '✏️ Admin Edited Your Note';
+    const headerColor = isRevert ? '#d97706' : '#7c3aed';
+    const subFooterColor = isRevert ? '#fde68a' : '#e9d5ff';
+    const altText = `${headerText}: "${title.slice(0, 60)}" — ${changedCount} field${changedCount === 1 ? '' : 's'} changed`;
+    const liffUri = `https://liff.line.me/2008959998-yjcNpaGt?entryId=${encodeURIComponent(entryId)}&showHistory=1`;
+
+    const flex = {
+        type: 'flex',
+        altText: altText.slice(0, 400),
+        contents: {
+            type: 'bubble',
+            size: 'kilo',
+            header: {
+                type: 'box',
+                layout: 'vertical',
+                backgroundColor: headerColor,
+                paddingAll: '12px',
+                contents: [
+                    { type: 'text', text: headerText, weight: 'bold', size: 'sm', color: '#ffffff' },
+                    { type: 'text', text: editorEmail, size: 'xs', color: subFooterColor, margin: 'xs', wrap: true }
+                ]
+            },
+            body: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '16px',
+                spacing: 'sm',
+                contents: [
+                    { type: 'text', text: title, weight: 'bold', size: 'sm', color: '#1f2937', wrap: true },
+                    { type: 'text', text: `"${reason}"`, size: 'xs', color: '#475569', style: 'italic', wrap: true },
+                    {
+                        type: 'box',
+                        layout: 'horizontal',
+                        backgroundColor: '#f8fafc',
+                        cornerRadius: '6px',
+                        paddingAll: '8px',
+                        margin: 'sm',
+                        contents: [
+                            { type: 'text', text: `${changedCount} field${changedCount === 1 ? '' : 's'} changed:`, size: 'xs', color: '#64748b', weight: 'bold', flex: 0 },
+                            { type: 'text', text: changedLabel, size: 'xs', color: '#0f172a', margin: 'sm', wrap: true }
+                        ]
+                    }
+                ]
+            },
+            footer: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '12px',
+                contents: [
+                    {
+                        type: 'button',
+                        style: 'primary',
+                        color: headerColor,
+                        height: 'sm',
+                        action: { type: 'uri', label: 'View Edit →', uri: liffUri }
+                    }
+                ]
+            }
+        }
+    };
+
+    try {
+        await axios.post('https://api.line.me/v2/bot/message/push', {
+            to: lineUserId,
+            messages: [flex]
+        }, {
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            timeout: 8000
+        });
+        console.log(`[notifyOnAdminEdit] PUSHED  lineUserId=${lineUserId}  entry=${entryId}  type=${isRevert ? 'revert' : 'edit'}  changed=${changedCount}`);
+        return { ok: true, pushed: true, lineUserId, entryId, type: isRevert ? 'revert' : 'edit', changedCount };
+    } catch (err) {
+        const status = err && err.response ? err.response.status : null;
+        const lineMessage = (err && err.response && err.response.data && err.response.data.message) || (err && err.message) || 'unknown';
+        let code;
+        if (status === 400) code = 'invalid';
+        else if (status === 401) code = 'token';
+        else if (status === 403) code = 'no-friend';
+        else if (status === 404) code = 'invalid-user';
+        else if (status === 429) code = 'rate-limit';
+        else if (status >= 500 && status < 600) code = 'transient';
+        else code = 'network';
+        console.error(`[notifyOnAdminEdit] PUSH_FAILED  code=${code}  status=${status || 'no-response'}  lineUserId=${lineUserId}  entry=${entryId}  message=${JSON.stringify(lineMessage)}`);
+        return { ok: false, code, status: status || null, lineUserId, entryId };
+    }
+});
+
