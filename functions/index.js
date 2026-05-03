@@ -11,14 +11,17 @@ try {
   console.error('Failed to load migration function:', err.message);
 }
 
-// === Quest Submission API: รองรับ field poneglyphRef/linkedPoneglyphs ===
-// V87.67 bumped firebase-functions to v7, which changed the default export from v1 to v2.
-// All callsites in this file use v1 syntax (.runWith, .https.onCall with context.auth, etc),
-// so we must import the v1 namespace explicitly. Without this, deploys fail with
-// "TypeError: functionsV1.runWith is not a function" during source analysis.
-const functionsV1 = require("firebase-functions/v1");
+// === V92.13: All functions migrated v1 → v2 syntax ===
+// All v1-syntax functions (functionsV1.https.*) were already deployed as GCF Gen 2 in
+// cloud (auto-promoted by an earlier firebase-tools version). Current firebase-tools 15.x
+// classifies v1 syntax as Gen 1 from local source and refuses to "downgrade" the cloud
+// functions, failing every redeploy with "Cannot set CPU on the functions … because they
+// are GCF gen 1". Migrating to v2 syntax aligns local spec with cloud (gcfv2).
+// See memory `feedback_firebase_functions_v1_v2_gen_mismatch.md`.
+const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 
-exports.questSubmission = functionsV1.https.onRequest(async (req, res) => {
+// === Quest Submission API: รองรับ field poneglyphRef/linkedPoneglyphs ===
+exports.questSubmission = onRequest(async (req, res) => {
     if (req.method === "POST") {
         const { userId, questId, answer, poneglyphRef, linkedPoneglyphs } = req.body;
         if (!userId || !questId) return res.status(400).json({ error: "Missing userId or questId" });
@@ -42,27 +45,25 @@ exports.questSubmission = functionsV1.https.onRequest(async (req, res) => {
 });
 
 // === Admin Security: Custom Claims Bootstrap (one-time) ===
-exports.setAdminClaim = functionsV1.https.onCall(async (data, context) => {
-    if (!context.auth || context.auth.token.email !== 'medlifeplus@gmail.com') {
-        throw new functionsV1.https.HttpsError('permission-denied', 'Admin only');
+exports.setAdminClaim = onCall(async (request) => {
+    if (!request.auth || request.auth.token.email !== 'medlifeplus@gmail.com') {
+        throw new HttpsError('permission-denied', 'Admin only');
     }
-    await admin.auth().setCustomUserClaims(context.auth.uid, { admin: true });
+    await admin.auth().setCustomUserClaims(request.auth.uid, { admin: true });
     return { success: true };
 });
 
 // === Admin Security: Generate Preview Token for cross-user LIFF preview ===
-exports.generatePreviewToken = functionsV1.https.onCall(async (data, context) => {
-    if (!context.auth || context.auth.token.admin !== true) {
-        throw new functionsV1.https.HttpsError('permission-denied', 'Admin required');
+exports.generatePreviewToken = onCall(async (request) => {
+    if (!request.auth || request.auth.token.admin !== true) {
+        throw new HttpsError('permission-denied', 'Admin required');
     }
-    const token = await admin.auth().createCustomToken(context.auth.uid, {
+    const token = await admin.auth().createCustomToken(request.auth.uid, {
         admin: true,
         previewMode: true
     });
     return { token };
 });
-
-const { onRequest } = require("firebase-functions/v2/https");
 const { GoogleAuth } = require("google-auth-library");
 const axios = require("axios");
 
@@ -473,17 +474,18 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
 //     -> verify LINE_CHANNEL_ACCESS_TOKEN loaded
 //     -> would push to LINE
 // ============================================================
-exports.notifyOnReviewMessage = functionsV1
-    .runWith({ secrets: ['LINE_CHANNEL_ACCESS_TOKEN'] })
-    .https.onCall(async (data, context) => {
-    if (!context.auth || context.auth.token.admin !== true) {
-        throw new functionsV1.https.HttpsError('permission-denied', 'Admin required');
+exports.notifyOnReviewMessage = onCall(
+    { secrets: ['LINE_CHANNEL_ACCESS_TOKEN'] },
+    async (request) => {
+    if (!request.auth || request.auth.token.admin !== true) {
+        throw new HttpsError('permission-denied', 'Admin required');
     }
 
-    const submissionId = (data && data.submissionId) || '';
-    const messageId = (data && data.messageId) || '';
+    const data = request.data || {};
+    const submissionId = data.submissionId || '';
+    const messageId = data.messageId || '';
     if (!submissionId || !messageId) {
-        throw new functionsV1.https.HttpsError('invalid-argument', 'submissionId and messageId required');
+        throw new HttpsError('invalid-argument', 'submissionId and messageId required');
     }
 
     let msg;
@@ -498,7 +500,7 @@ exports.notifyOnReviewMessage = functionsV1
         msg = msgDoc.data() || {};
     } catch (err) {
         console.error(`[notifyOnReviewMessage] failed to read message ${submissionId}/${messageId}:`, err.message);
-        throw new functionsV1.https.HttpsError('internal', 'failed to read message');
+        throw new HttpsError('internal', 'failed to read message');
     }
 
     const role = msg.authorRole || '(none)';
@@ -518,7 +520,7 @@ exports.notifyOnReviewMessage = functionsV1
         submission = submissionDoc.data();
     } catch (err) {
         console.error(`[notifyOnReviewMessage] failed to read submission ${submissionId}:`, err.message);
-        throw new functionsV1.https.HttpsError('internal', 'failed to read submission');
+        throw new HttpsError('internal', 'failed to read submission');
     }
 
     const studentAuthUid = submission.authUid;
@@ -539,7 +541,7 @@ exports.notifyOnReviewMessage = functionsV1
         lineUserId = link.rawLiffUserId;
     } catch (err) {
         console.error(`[notifyOnReviewMessage] failed to read user_auth_links/${studentAuthUid}:`, err.message);
-        throw new functionsV1.https.HttpsError('internal', 'failed to read user_auth_links');
+        throw new HttpsError('internal', 'failed to read user_auth_links');
     }
 
     if (!lineUserId || typeof lineUserId !== 'string' || !lineUserId.startsWith('U')) {
@@ -667,16 +669,17 @@ exports.notifyOnReviewMessage = functionsV1
 // preferredLanguage to user doc + sync from localStorage so this
 // function can pick TH/EN/KR per intern.
 // ============================================================
-exports.notifyOnAdminEdit = functionsV1
-    .runWith({ secrets: ['LINE_CHANNEL_ACCESS_TOKEN'] })
-    .https.onCall(async (data, context) => {
-    if (!context.auth || context.auth.token.admin !== true) {
-        throw new functionsV1.https.HttpsError('permission-denied', 'Admin required');
+exports.notifyOnAdminEdit = onCall(
+    { secrets: ['LINE_CHANNEL_ACCESS_TOKEN'] },
+    async (request) => {
+    if (!request.auth || request.auth.token.admin !== true) {
+        throw new HttpsError('permission-denied', 'Admin required');
     }
 
-    const entryId = (data && data.entryId) || '';
+    const data = request.data || {};
+    const entryId = data.entryId || '';
     if (!entryId) {
-        throw new functionsV1.https.HttpsError('invalid-argument', 'entryId required');
+        throw new HttpsError('invalid-argument', 'entryId required');
     }
 
     let entry;
@@ -689,7 +692,7 @@ exports.notifyOnAdminEdit = functionsV1
         entry = entryDoc.data() || {};
     } catch (err) {
         console.error(`[notifyOnAdminEdit] failed to read entry ${entryId}:`, err.message);
-        throw new functionsV1.https.HttpsError('internal', 'failed to read entry');
+        throw new HttpsError('internal', 'failed to read entry');
     }
 
     const lineUserId = entry.userId;
