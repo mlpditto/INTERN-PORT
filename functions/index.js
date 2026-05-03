@@ -12,7 +12,11 @@ try {
 }
 
 // === Quest Submission API: รองรับ field poneglyphRef/linkedPoneglyphs ===
-const functionsV1 = require("firebase-functions");
+// V87.67 bumped firebase-functions to v7, which changed the default export from v1 to v2.
+// All callsites in this file use v1 syntax (.runWith, .https.onCall with context.auth, etc),
+// so we must import the v1 namespace explicitly. Without this, deploys fail with
+// "TypeError: functionsV1.runWith is not a function" during source analysis.
+const functionsV1 = require("firebase-functions/v1");
 
 exports.questSubmission = functionsV1.https.onRequest(async (req, res) => {
     if (req.method === "POST") {
