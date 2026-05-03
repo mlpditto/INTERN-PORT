@@ -160,10 +160,24 @@ service cloud.firestore {
     }
 
     // 23. Learning Path Entries (PONEGLYPH learning path system)
+    // V92.09: Admin inline edit + audit trail. editHistory[] and lastAdminEdit{} are
+    // append-only audit fields — non-admin writers (the entry owner) cannot create or
+    // modify them. Admin can append to editHistory but cannot shrink it.
     match /learning_path_entries/{docId} {
+      function auditFieldsUnchanged() {
+        return request.resource.data.get('editHistory', []) == resource.data.get('editHistory', [])
+          && request.resource.data.get('lastAdminEdit', null) == resource.data.get('lastAdminEdit', null);
+      }
+      function auditAppendOnly() {
+        return request.resource.data.get('editHistory', []).size() >= resource.data.get('editHistory', []).size();
+      }
       allow read: if isAdmin() || hasAuthLinkToUserId(resource.data.userId) || (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow create: if isAdmin() || (isSignedIn() && (request.resource.data.userId == request.auth.uid || hasAuthLinkToUserId(request.resource.data.userId)));
-      allow update, delete: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || hasAuthLinkToUserId(resource.data.userId)));
+      allow create: if (isAdmin() || (isSignedIn() && (request.resource.data.userId == request.auth.uid || hasAuthLinkToUserId(request.resource.data.userId))))
+        && !('editHistory' in request.resource.data)
+        && !('lastAdminEdit' in request.resource.data);
+      allow update: if (isAdmin() && auditAppendOnly())
+        || (isSignedIn() && (resource.data.userId == request.auth.uid || hasAuthLinkToUserId(resource.data.userId)) && auditFieldsUnchanged());
+      allow delete: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || hasAuthLinkToUserId(resource.data.userId)));
     }
 
     // 24. Learning Paths (AI-generated paths)

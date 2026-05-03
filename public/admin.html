@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.08</title>
+    <title>Nika V92.09</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -7893,6 +7893,45 @@
                     </div>
                 </div>
 
+            </div>
+        </div>
+
+        <!-- ✏️ Admin LP Edit Modal (V92.09) — inline edit + audit trail for intern's LP entry -->
+        <div id="lpAdminEditModal" class="modal" style="z-index:6100;">
+            <div class="modal-content" style="max-width:720px; width:95%; text-align:left; border-radius:18px;">
+                <span class="close-modal" onclick="document.getElementById('lpAdminEditModal').style.display='none'">&times;</span>
+                <h3 style="margin:0 0 4px 0; color:#0f172a; font-size:1.2em;">✏️ Admin Edit · LP Entry</h3>
+                <div id="lp-admin-edit-meta" style="font-size:0.78em; color:#64748b; margin-bottom:14px;"></div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                    <div>
+                        <label style="font-size:0.75em; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">Title</label>
+                        <input id="lp-admin-edit-title" type="text" style="margin:4px 0 0; padding:8px 10px; border-radius:10px; width:100%; box-sizing:border-box;">
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                        <div>
+                            <label style="font-size:0.75em; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">Date</label>
+                            <input id="lp-admin-edit-date" type="date" style="margin:4px 0 0; padding:8px 10px; border-radius:10px; width:100%; box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label style="font-size:0.75em; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">Next Review</label>
+                            <input id="lp-admin-edit-nextreview" type="date" style="margin:4px 0 0; padding:8px 10px; border-radius:10px; width:100%; box-sizing:border-box;">
+                        </div>
+                    </div>
+                </div>
+                <label style="font-size:0.75em; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">Tags (comma separated)</label>
+                <input id="lp-admin-edit-tags" type="text" placeholder="tag1, tag2" style="margin:4px 0 10px; padding:8px 10px; border-radius:10px; width:100%; box-sizing:border-box;">
+                <label style="font-size:0.75em; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">Content (markdown)</label>
+                <textarea id="lp-admin-edit-content" style="margin:4px 0 10px; min-height:200px; padding:10px 12px; border-radius:10px; width:100%; box-sizing:border-box; font-family:Consolas, monospace; font-size:0.88em; line-height:1.55;"></textarea>
+                <div style="background:#fef3c7; border:1px solid #fcd34d; border-radius:10px; padding:10px 12px; margin:6px 0 10px;">
+                    <label style="font-size:0.75em; font-weight:800; color:#92400e; text-transform:uppercase; letter-spacing:0.5px; display:block;">⚠️ Reason for edit (required)</label>
+                    <input id="lp-admin-edit-reason" type="text" placeholder="e.g. แก้ typo, ปรับ tag ให้ตรง taxonomy, เพิ่ม link reference" maxlength="240" style="margin:6px 0 0; padding:8px 10px; border-radius:8px; width:100%; box-sizing:border-box; background:#fff; border:1px solid #fcd34d;">
+                    <div id="lp-admin-edit-reason-error" style="display:none; font-size:0.75em; color:#dc2626; margin-top:4px; font-weight:700;">Reason is required to create an audit log entry.</div>
+                </div>
+                <div id="lp-admin-edit-status" style="font-size:0.78em; color:#64748b; margin-bottom:8px; min-height:1.2em;"></div>
+                <div style="display:flex; gap:8px; justify-content:flex-end;">
+                    <button onclick="document.getElementById('lpAdminEditModal').style.display='none'" style="background:#f1f5f9; color:#475569; border:none; padding:10px 18px; border-radius:10px; font-weight:700; cursor:pointer;">Cancel</button>
+                    <button id="lp-admin-edit-save-btn" onclick="lpAdminSaveEdit()" style="background:#1d4ed8; color:#fff; border:none; padding:10px 22px; border-radius:10px; font-weight:800; cursor:pointer;">💾 Save with Audit</button>
+                </div>
             </div>
         </div>
 
@@ -27535,6 +27574,9 @@ Recommended Review: X days`;
                 }
 
                 // LP entry list (collapsible, hidden by default)
+                // V92.09: cache entries on window so the admin edit modal can recover field values without a refetch
+                window._lp.currentInternEntries = entries;
+                window._lp.currentInternUid = uid;
                 if (feedSection) feedSection.style.display = 'block';
                 const feedToggle = document.getElementById('lp-intern-feed-toggle');
                 if (feedToggle) feedToggle.textContent = '📓 LP Entries ▼';
@@ -27544,12 +27586,16 @@ Recommended Review: X days`;
                     feedEl.innerHTML = entries.length ? entries.map(e => {
                         const isDue = e.nextReviewDate && e.nextReviewDate <= todayStr;
                         const tags = (e.tags || []).map(t => `<span style="background:#e0e7ff;color:#3730a3;border-radius:5px;padding:1px 6px;font-size:0.72em;">${t}</span>`).join(' ');
-                        return `<div style="padding:10px 12px;border-radius:12px;border:1px solid ${isDue?'#fcd34d':'#e2e8f0'};background:${isDue?'#fffbeb':'#fafafa'};margin-bottom:4px;">
+                        const editCount = (e.editHistory || []).length;
+                        const editedBadge = editCount > 0 ? `<span title="Edited by admin ${editCount} time${editCount>1?'s':''}" style="font-size:0.7em;color:#5b21b6;background:#ede9fe;border-radius:5px;padding:1px 6px;font-weight:700;">✏️ ${editCount}</span>` : '';
+                        return `<div data-lp-id="${e.id}" style="padding:10px 12px;border-radius:12px;border:1px solid ${isDue?'#fcd34d':'#e2e8f0'};background:${isDue?'#fffbeb':'#fafafa'};margin-bottom:4px;">
                             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
                                 <div style="font-size:0.88em;font-weight:700;">${e.title||'Untitled'}</div>
                                 <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
+                                    ${editedBadge}
                                     ${isDue?'<span style="font-size:0.7em;color:#92400e;background:#fef3c7;border-radius:5px;padding:1px 6px;">📅 Review</span>':''}
                                     <span style="font-size:0.75em;color:#64748b;">${e.date||''}</span>
+                                    <button onclick="lpAdminOpenEdit('${e.id}')" title="Edit this entry (audit logged)" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:2px 8px;font-size:0.72em;font-weight:700;cursor:pointer;">✏️ Edit</button>
                                 </div>
                             </div>
                             ${tags?`<div style="margin-top:4px;display:flex;gap:3px;flex-wrap:wrap;">${tags}</div>`:''}
@@ -27564,6 +27610,120 @@ Recommended Review: X days`;
 
                 if (detail) detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } catch(e) { console.error('lpSelectIntern', e); if (timelineEl) timelineEl.innerHTML = '<div style="color:#dc2626;font-size:0.82em;padding:8px;">Failed to load.</div>'; }
+        };
+
+        // ═══════════════════════════════════════════════════════════════════
+        // V92.09 — Admin inline edit + audit trail for intern's LP entry
+        // ═══════════════════════════════════════════════════════════════════
+        window.lpAdminOpenEdit = function(entryId) {
+            const entries = (window._lp && window._lp.currentInternEntries) || [];
+            const e = entries.find(x => x.id === entryId);
+            if (!e) { alert('Entry not found. Reload the panel and try again.'); return; }
+            window._lp.editTargetId = entryId;
+            const userName = (window._lp.internList || []).find(u => u.id === e.userId)?.displayName || e.userId;
+            document.getElementById('lp-admin-edit-meta').innerHTML = `Owner: <strong>${userName}</strong> · Entry ID: <code>${entryId}</code> · Edits so far: <strong>${(e.editHistory || []).length}</strong>`;
+            document.getElementById('lp-admin-edit-title').value = e.title || '';
+            document.getElementById('lp-admin-edit-date').value = e.date || '';
+            document.getElementById('lp-admin-edit-nextreview').value = e.nextReviewDate || '';
+            document.getElementById('lp-admin-edit-tags').value = (e.tags || []).join(', ');
+            document.getElementById('lp-admin-edit-content').value = e.contentMarkdown || '';
+            document.getElementById('lp-admin-edit-reason').value = '';
+            document.getElementById('lp-admin-edit-reason-error').style.display = 'none';
+            document.getElementById('lp-admin-edit-status').textContent = '';
+            document.getElementById('lp-admin-edit-save-btn').disabled = false;
+            forceShowModal('lpAdminEditModal');
+        };
+
+        window.lpAdminSaveEdit = async function() {
+            const entryId = window._lp && window._lp.editTargetId;
+            if (!entryId || !db) return;
+            const reason = document.getElementById('lp-admin-edit-reason').value.trim();
+            const reasonErr = document.getElementById('lp-admin-edit-reason-error');
+            if (!reason) {
+                reasonErr.style.display = 'block';
+                document.getElementById('lp-admin-edit-reason').focus();
+                return;
+            }
+            reasonErr.style.display = 'none';
+
+            const entries = (window._lp && window._lp.currentInternEntries) || [];
+            const before = entries.find(x => x.id === entryId);
+            if (!before) { alert('Original entry not in cache. Reload and retry.'); return; }
+
+            const newTitle = document.getElementById('lp-admin-edit-title').value.trim();
+            const newDate = document.getElementById('lp-admin-edit-date').value;
+            const newNextReview = document.getElementById('lp-admin-edit-nextreview').value || null;
+            const newTags = document.getElementById('lp-admin-edit-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+            const newContent = document.getElementById('lp-admin-edit-content').value;
+            if (!newDate) { alert('Date is required.'); return; }
+
+            const fieldsBefore = {
+                title: before.title || '',
+                contentMarkdown: before.contentMarkdown || '',
+                tags: before.tags || [],
+                date: before.date || '',
+                nextReviewDate: before.nextReviewDate || null
+            };
+            const fieldsAfter = {
+                title: newTitle,
+                contentMarkdown: newContent,
+                tags: newTags,
+                date: newDate,
+                nextReviewDate: newNextReview
+            };
+            const noChange = JSON.stringify(fieldsBefore) === JSON.stringify(fieldsAfter);
+            if (noChange) { alert('No fields changed. Edit a field or cancel.'); return; }
+
+            const statusEl = document.getElementById('lp-admin-edit-status');
+            const saveBtn = document.getElementById('lp-admin-edit-save-btn');
+            statusEl.textContent = 'Saving with audit log...';
+            saveBtn.disabled = true;
+
+            try {
+                const editor = (auth && auth.currentUser) || {};
+                const editEntry = {
+                    editorUid: editor.uid || 'unknown',
+                    editorEmail: editor.email || ALLOWED_EMAIL,
+                    editedAt: new Date().toISOString(),
+                    reason,
+                    fieldsBefore,
+                    fieldsAfter,
+                    type: 'edit'
+                };
+                // Cap editHistory at 10 most recent — drop oldest if exceeded.
+                const prevHistory = Array.isArray(before.editHistory) ? before.editHistory : [];
+                const nextHistory = [...prevHistory, editEntry].slice(-10);
+
+                await db.collection('learning_path_entries').doc(entryId).update({
+                    title: newTitle,
+                    contentMarkdown: newContent,
+                    tags: newTags,
+                    date: newDate,
+                    nextReviewDate: newNextReview,
+                    editHistory: nextHistory,
+                    lastAdminEdit: {
+                        editorEmail: editEntry.editorEmail,
+                        editedAt: editEntry.editedAt,
+                        reason
+                    },
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                // Patch local cache so subsequent edits in the same session see the new state.
+                Object.assign(before, fieldsAfter, { editHistory: nextHistory });
+
+                statusEl.textContent = 'Saved ✓ Audit logged.';
+                setTimeout(() => {
+                    document.getElementById('lpAdminEditModal').style.display = 'none';
+                    if (typeof lpSelectIntern === 'function' && window._lp.currentInternUid) {
+                        lpSelectIntern(window._lp.currentInternUid);
+                    }
+                }, 600);
+            } catch (err) {
+                console.error('lpAdminSaveEdit', err);
+                statusEl.textContent = 'Error: ' + (err.message || 'unknown');
+                saveBtn.disabled = false;
+            }
         };
 
         window.lpPinClick = function(btn, idx) {
