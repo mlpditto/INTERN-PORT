@@ -728,16 +728,21 @@ exports.notifyOnAdminEdit = onCall(
     const changedCount = changedFields.length;
     const changedLabel = changedFields.map(k => FIELD_LABELS[k]).join(', ') || '(none)';
     const isRevert = lastEdit.type === 'revert';
+    const isDelete = lastEdit.type === 'delete';
+    const isRestore = lastEdit.type === 'restore';
 
     const title = (entry.title || '').slice(0, 80) || 'Untitled';
     const reasonRaw = (lastAdminEdit.reason || lastEdit.reason || '').replace(/\s+/g, ' ').trim();
     const reason = reasonRaw.length > 200 ? reasonRaw.slice(0, 197) + '…' : (reasonRaw || '(no reason)');
     const editorEmail = (lastAdminEdit.editorEmail || lastEdit.editorEmail || 'admin').replace(/\s+/g, ' ').trim();
 
-    const headerText = isRevert ? '↩️ Admin Reverted Your Note' : '✏️ Admin Edited Your Note';
-    const headerColor = isRevert ? '#d97706' : '#7c3aed';
-    const subFooterColor = isRevert ? '#fde68a' : '#e9d5ff';
-    const altText = `${headerText}: "${title.slice(0, 60)}" — ${changedCount} field${changedCount === 1 ? '' : 's'} changed`;
+    // V92.16: extend headers for soft-delete + restore types
+    let headerText, headerColor, subFooterColor;
+    if (isDelete)        { headerText = '🗑️ Admin Deleted Your Note';   headerColor = '#dc2626'; subFooterColor = '#fecaca'; }
+    else if (isRestore)  { headerText = '↩️ Admin Restored Your Note';   headerColor = '#16a34a'; subFooterColor = '#bbf7d0'; }
+    else if (isRevert)   { headerText = '↩️ Admin Reverted Your Note';   headerColor = '#d97706'; subFooterColor = '#fde68a'; }
+    else                 { headerText = '✏️ Admin Edited Your Note';     headerColor = '#7c3aed'; subFooterColor = '#e9d5ff'; }
+    const altText = `${headerText}: "${title.slice(0, 60)}"` + (isDelete || isRestore ? '' : ` — ${changedCount} field${changedCount === 1 ? '' : 's'} changed`);
     const liffUri = `https://liff.line.me/2008959998-yjcNpaGt?entryId=${encodeURIComponent(entryId)}&showHistory=1`;
 
     const flex = {
@@ -761,22 +766,29 @@ exports.notifyOnAdminEdit = onCall(
                 layout: 'vertical',
                 paddingAll: '16px',
                 spacing: 'sm',
-                contents: [
-                    { type: 'text', text: title, weight: 'bold', size: 'sm', color: '#1f2937', wrap: true },
-                    { type: 'text', text: `"${reason}"`, size: 'xs', color: '#475569', style: 'italic', wrap: true },
-                    {
-                        type: 'box',
-                        layout: 'horizontal',
-                        backgroundColor: '#f8fafc',
-                        cornerRadius: '6px',
-                        paddingAll: '8px',
-                        margin: 'sm',
-                        contents: [
-                            { type: 'text', text: `${changedCount} field${changedCount === 1 ? '' : 's'} changed:`, size: 'xs', color: '#64748b', weight: 'bold', flex: 0 },
-                            { type: 'text', text: changedLabel, size: 'xs', color: '#0f172a', margin: 'sm', wrap: true }
-                        ]
-                    }
-                ]
+                // V92.16: for delete/restore the "fields changed" box is meaningless — drop it.
+                contents: (isDelete || isRestore)
+                    ? [
+                        { type: 'text', text: title, weight: 'bold', size: 'sm', color: '#1f2937', wrap: true, decoration: isDelete ? 'line-through' : 'none' },
+                        { type: 'text', text: `"${reason}"`, size: 'xs', color: '#475569', style: 'italic', wrap: true },
+                        { type: 'text', text: isDelete ? 'Hidden from your view. The admin can restore it from Trash.' : 'Now visible in your view again.', size: 'xs', color: headerColor, weight: 'bold', wrap: true, margin: 'sm' }
+                    ]
+                    : [
+                        { type: 'text', text: title, weight: 'bold', size: 'sm', color: '#1f2937', wrap: true },
+                        { type: 'text', text: `"${reason}"`, size: 'xs', color: '#475569', style: 'italic', wrap: true },
+                        {
+                            type: 'box',
+                            layout: 'horizontal',
+                            backgroundColor: '#f8fafc',
+                            cornerRadius: '6px',
+                            paddingAll: '8px',
+                            margin: 'sm',
+                            contents: [
+                                { type: 'text', text: `${changedCount} field${changedCount === 1 ? '' : 's'} changed:`, size: 'xs', color: '#64748b', weight: 'bold', flex: 0 },
+                                { type: 'text', text: changedLabel, size: 'xs', color: '#0f172a', margin: 'sm', wrap: true }
+                            ]
+                        }
+                    ]
             },
             footer: {
                 type: 'box',
@@ -788,7 +800,7 @@ exports.notifyOnAdminEdit = onCall(
                         style: 'primary',
                         color: headerColor,
                         height: 'sm',
-                        action: { type: 'uri', label: 'View Edit →', uri: liffUri }
+                        action: { type: 'uri', label: isDelete ? 'View History →' : (isRestore ? 'View Note →' : 'View Edit →'), uri: liffUri }
                     }
                 ]
             }
@@ -803,8 +815,9 @@ exports.notifyOnAdminEdit = onCall(
             headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
             timeout: 8000
         });
-        console.log(`[notifyOnAdminEdit] PUSHED  lineUserId=${lineUserId}  entry=${entryId}  type=${isRevert ? 'revert' : 'edit'}  changed=${changedCount}`);
-        return { ok: true, pushed: true, lineUserId, entryId, type: isRevert ? 'revert' : 'edit', changedCount };
+        const typeLabel = isDelete ? 'delete' : isRestore ? 'restore' : isRevert ? 'revert' : 'edit';
+        console.log(`[notifyOnAdminEdit] PUSHED  lineUserId=${lineUserId}  entry=${entryId}  type=${typeLabel}  changed=${changedCount}`);
+        return { ok: true, pushed: true, lineUserId, entryId, type: typeLabel, changedCount };
     } catch (err) {
         const status = err && err.response ? err.response.status : null;
         const lineMessage = (err && err.response && err.response.data && err.response.data.message) || (err && err.message) || 'unknown';
