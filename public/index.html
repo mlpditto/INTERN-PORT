@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.32)</title>
+    <title>Internship Portfolio (V94.33)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3359,7 +3359,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V94.30 (LINE push notification with Flex Message + ?tab=history deep link for admin Review Reply)
+                <span id="intern-version-current">V94.04</span> — Last feature: V94.33 (Read-only admin edit history viewer + ?entryId/showHistory deep link for LP entries)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -3576,6 +3576,19 @@
                 <button class="btn-primary" onclick="document.getElementById('leaderboardModal').style.display='none'"
                     style="width: 100%; border-radius: 12px; margin: 0;">Awesome!</button>
             </div>
+        </div>
+    </div>
+
+    <!-- V94.33: Read-only LP edit history modal — shows admin's audit trail to the entry owner -->
+    <div id="lnEditHistoryModal" class="modal" style="z-index:10004;">
+        <div class="modal-content" style="max-width:680px; width:95%; text-align:left; border-radius:18px; padding:22px;">
+            <span class="close-modal" onclick="document.getElementById('lnEditHistoryModal').style.display='none'" style="float:right; font-size:24px; cursor:pointer; color:#64748b;">&times;</span>
+            <h3 style="margin:0 0 4px; color:#5b21b6; font-size:1.15em;">📜 Edit History · Learning Note</h3>
+            <div id="ln-history-modal-meta" style="font-size:0.78em; color:#64748b; margin-bottom:6px;"></div>
+            <div style="background:#f5f3ff; border:1px solid #ddd6fe; border-radius:8px; padding:8px 10px; font-size:0.78em; color:#5b21b6; margin-bottom:12px; line-height:1.5;">
+                <span class="lang-en">An admin reviewed and edited this entry. The full change log is shown below for transparency.</span><span class="lang-th">ผู้ดูแลได้แก้ไขบันทึกนี้ บันทึกการเปลี่ยนแปลงทั้งหมดแสดงด้านล่างเพื่อความโปร่งใส</span>
+            </div>
+            <div id="ln-history-modal-list" style="display:flex; flex-direction:column; gap:10px; max-height:55vh; overflow-y:auto;"></div>
         </div>
     </div>
 
@@ -9048,11 +9061,17 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 const scoreHtml = score > 0
                     ? `<span style="background:#ecfdf5; color:#059669; padding:2px 8px; border-radius:999px; font-size:0.7em; font-weight:800;">+${score.toFixed(2)}</span>`
                     : `<span style="background:#f1f5f9; color:#64748b; padding:2px 8px; border-radius:999px; font-size:0.7em; font-weight:700;">pending</span>`;
+                // V94.33: Show admin-edit badge so intern knows their entry was modified by an admin
+                const editCount = Array.isArray(e.editHistory) ? e.editHistory.length : 0;
+                const editedBadgeHtml = editCount > 0
+                    ? `<button onclick="lnInternOpenHistory('${e.id}')" title="Admin edited this entry ${editCount} time${editCount > 1 ? 's' : ''} — tap to view history" style="background:#ede9fe; color:#5b21b6; border:none; padding:3px 9px; border-radius:999px; font-size:0.7em; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:3px;">✏️ Edited by admin · ${editCount}</button>`
+                    : '';
                 return `<div style="padding:10px 12px; border:1px solid #f1f5f9; border-radius:10px; background:white;">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
                         <div style="flex:1; min-width:0; font-weight:800; color:#1e293b; font-size:0.9em;">🎓 ${escapeHtml(e.title || 'Untitled')}</div>
                         ${scoreHtml}
                     </div>
+                    ${editedBadgeHtml ? `<div style="margin-bottom:6px;">${editedBadgeHtml}</div>` : ''}
                     ${tagsHtml ? `<div style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:6px;">${tagsHtml}</div>` : ''}
                     ${content ? `<div style="font-size:0.78em; color:#475569; line-height:1.5; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; white-space:pre-wrap; margin-bottom:6px;">${content}</div>` : ''}
                     <div style="font-size:0.7em; color:#94a3b8; font-weight:600;">${dateStr}</div>
@@ -9075,6 +9094,103 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     if (window._lnHistoryPage < totalPages) addBtn('›', window._lnHistoryPage + 1);
                 }
             }
+        };
+
+        // ═══════════════════════════════════════════════════════════════════
+        // V94.33 — Read-only admin edit history viewer for the entry owner
+        // ═══════════════════════════════════════════════════════════════════
+        window.lnInternOpenHistory = function(entryId) {
+            const cache = window.myLpEntriesCache || [];
+            const entry = cache.find(x => x.id === entryId);
+            if (!entry) { alert('Entry not found in your history.'); return; }
+            const history = Array.isArray(entry.editHistory) ? entry.editHistory : [];
+            const meta = document.getElementById('ln-history-modal-meta');
+            const listEl = document.getElementById('ln-history-modal-list');
+            const escapeHtml = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            if (meta) meta.innerHTML = `<strong>${escapeHtml(entry.title || 'Untitled')}</strong> · ${history.length} change${history.length === 1 ? '' : 's'}`;
+            if (!listEl) return;
+            if (!history.length) {
+                listEl.innerHTML = '<div style="padding:14px; text-align:center; color:#94a3b8; font-size:0.85em;">No edit history.</div>';
+            } else {
+                const indexed = history.map((h, i) => ({ ...h, _idx: i })).reverse();
+                listEl.innerHTML = indexed.map(h => {
+                    const when = h.editedAt ? new Date(h.editedAt).toLocaleString() : '—';
+                    const isRevert = h.type === 'revert';
+                    const typeBadge = isRevert
+                        ? '<span style="background:#fef3c7;color:#92400e;border-radius:5px;padding:1px 6px;font-size:0.7em;font-weight:800;">↩️ REVERT</span>'
+                        : '<span style="background:#dbeafe;color:#1e3a8a;border-radius:5px;padding:1px 6px;font-size:0.7em;font-weight:800;">✏️ EDIT</span>';
+                    const reasonHtml = h.reason ? `<div style="font-size:0.82em; color:#0f172a; margin-top:4px; font-style:italic;">"${escapeHtml(h.reason)}"</div>` : '';
+                    return `<div style="background:#fff; border:1px solid #e9d5ff; border-radius:10px; padding:10px 12px;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">
+                            <div style="flex:1; min-width:200px;">
+                                <div style="display:flex; gap:6px; align-items:center; margin-bottom:3px;">
+                                    ${typeBadge}
+                                    <span style="font-size:0.78em; font-weight:700; color:#0f172a;">#${h._idx + 1}</span>
+                                </div>
+                                <div style="font-size:0.78em; color:#475569;"><strong>${escapeHtml(h.editorEmail || 'admin')}</strong> · ${when}</div>
+                                ${reasonHtml}
+                            </div>
+                            <button onclick="lnInternToggleDiff(${h._idx})" style="background:#ede9fe; color:#5b21b6; border:none; border-radius:6px; padding:4px 10px; font-size:0.72em; font-weight:700; cursor:pointer; flex-shrink:0;">🔍 Diff</button>
+                        </div>
+                        <div id="ln-intern-history-diff-${h._idx}" style="display:none; margin-top:8px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px;"></div>
+                    </div>`;
+                }).join('');
+            }
+            window._lnHistoryEntry = entry;
+            const modal = document.getElementById('lnEditHistoryModal');
+            if (modal) modal.style.display = 'flex';
+        };
+
+        window.lnInternToggleDiff = function(idx) {
+            const entry = window._lnHistoryEntry;
+            const h = entry && (entry.editHistory || [])[idx];
+            const diffEl = document.getElementById('ln-intern-history-diff-' + idx);
+            if (!diffEl || !h) return;
+            if (diffEl.style.display !== 'none') { diffEl.style.display = 'none'; return; }
+            diffEl.innerHTML = lnInternRenderDiff(h.fieldsBefore || {}, h.fieldsAfter || {});
+            diffEl.style.display = 'block';
+        };
+
+        window.lnInternRenderDiff = function(before, after) {
+            const FIELD_LABELS = { title: 'Title', date: 'Date', nextReviewDate: 'Next Review', tags: 'Tags', contentMarkdown: 'Content' };
+            const fmt = (v) => {
+                if (v == null || v === '') return '<span style="color:#94a3b8;">(empty)</span>';
+                if (Array.isArray(v)) return v.length ? v.map(t => `<code style="background:#e0e7ff; color:#3730a3; border-radius:4px; padding:0 4px; font-size:0.85em;">${String(t).replace(/</g,'&lt;')}</code>`).join(' ') : '<span style="color:#94a3b8;">(none)</span>';
+                const s = String(v);
+                const truncated = s.length > 200 ? s.slice(0, 200) + '…' : s;
+                return `<span style="white-space:pre-wrap; word-break:break-word;">${truncated.replace(/</g, '&lt;')}</span>`;
+            };
+            const eq = (a, b) => Array.isArray(a) && Array.isArray(b) ? JSON.stringify(a) === JSON.stringify(b) : a === b;
+            return Object.keys(FIELD_LABELS).map(k => {
+                const same = eq(before[k], after[k]);
+                const opacity = same ? '0.45' : '1';
+                const bg = same ? 'transparent' : '#fef9c3';
+                return `<div style="display:grid; grid-template-columns:90px 1fr 1fr; gap:8px; padding:6px; opacity:${opacity}; background:${bg}; border-radius:6px; margin-bottom:4px; font-size:0.78em;">
+                    <div style="font-weight:800; color:#475569; align-self:start;">${FIELD_LABELS[k]}${same ? '' : ' *'}</div>
+                    <div style="color:#7c2d12;">${fmt(before[k])}</div>
+                    <div style="color:#14532d;">${fmt(after[k])}</div>
+                </div>`;
+            }).join('') + '<div style="font-size:0.7em; color:#94a3b8; text-align:right; margin-top:4px;">← before · after → · * = changed</div>';
+        };
+
+        // V94.33 — Deep-link handler: ?entryId=xxx&showHistory=1 auto-opens the history modal.
+        // Used by PR 3.2's notifyOnAdminEdit LINE Flex Message "View Edit" button.
+        // Listens for both initial load and the LP entries cache being populated (async listener).
+        window._lnHistoryDeepLinkHandled = false;
+        window.lnInternHandleDeepLink = function() {
+            if (window._lnHistoryDeepLinkHandled) return;
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const entryId = params.get('entryId');
+                const showHistory = params.get('showHistory') === '1';
+                if (!entryId || !showHistory) return;
+                const cache = window.myLpEntriesCache || [];
+                if (!cache.length) return; // wait for cache to populate; will retry on next render
+                const entry = cache.find(x => x.id === entryId);
+                if (!entry) { console.warn('[deep-link] entry not found in cache:', entryId); window._lnHistoryDeepLinkHandled = true; return; }
+                window._lnHistoryDeepLinkHandled = true;
+                lnInternOpenHistory(entryId);
+            } catch (err) { console.error('lnInternHandleDeepLink', err); }
         };
 
         function lpAddTag(scope, tag) {
@@ -9986,6 +10102,8 @@ async function archiveDoneCard(cardId) {
                     window.myLpEntriesCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
                     if (typeof renderLnCounter === 'function') renderLnCounter();
                     if (typeof renderLnHistory === 'function') renderLnHistory();
+                    // V94.33: try deep-link once entries are available (PR 3.2 LINE Flex Message target)
+                    if (typeof lnInternHandleDeepLink === 'function') lnInternHandleDeepLink();
                 }, e => {
                     console.warn('Error loading my LN entries:', e);
                 });
