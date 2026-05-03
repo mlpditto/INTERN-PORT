@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.15</title>
+    <title>Nika V92.16</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -7895,6 +7895,11 @@
                             <button onclick="lpToggleInternFeed()" id="lp-intern-feed-toggle" style="background:none; border:none; font-size:0.8em; font-weight:700; color:#64748b; cursor:pointer; padding:4px 0; margin-bottom:8px;">📓 LP Entries ▼</button>
                             <div id="lp-intern-feed" style="display:flex; flex-direction:column; gap:4px; max-height:40vh; overflow-y:auto;"></div>
                         </div>
+                        <!-- V92.16: Trash bin — soft-deleted entries with restore action -->
+                        <div id="lp-intern-trash-section" style="display:none; margin-top:6px;">
+                            <button onclick="lpToggleInternTrash()" id="lp-intern-trash-toggle" style="background:none; border:none; font-size:0.8em; font-weight:700; color:#b91c1c; cursor:pointer; padding:4px 0; margin-bottom:8px;">🗑️ Trash (0) ▼</button>
+                            <div id="lp-intern-trash" style="display:none; flex-direction:column; gap:4px; max-height:40vh; overflow-y:auto;"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -7933,15 +7938,40 @@
                     <div id="lp-admin-edit-reason-error" style="display:none; font-size:0.75em; color:#dc2626; margin-top:4px; font-weight:700;">Reason is required to create an audit log entry.</div>
                 </div>
                 <div id="lp-admin-edit-status" style="font-size:0.78em; color:#64748b; margin-bottom:8px; min-height:1.2em;"></div>
-                <div style="display:flex; gap:8px; justify-content:flex-end;">
-                    <button onclick="forceHideModal('lpAdminEditModal')" style="background:#f1f5f9; color:#475569; border:none; padding:10px 18px; border-radius:10px; font-weight:700; cursor:pointer;">Cancel</button>
-                    <button id="lp-admin-edit-save-btn" onclick="lpAdminSaveEdit()" style="background:#1d4ed8; color:#fff; border:none; padding:10px 22px; border-radius:10px; font-weight:800; cursor:pointer;">💾 Save with Audit</button>
+                <div style="display:flex; gap:8px; justify-content:space-between; align-items:center;">
+                    <button onclick="lpAdminConfirmDelete()" title="Soft-delete this entry (audit logged, restorable from Trash)" style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; padding:10px 16px; border-radius:10px; font-weight:800; cursor:pointer;">🗑️ Delete</button>
+                    <div style="display:flex; gap:8px;">
+                        <button onclick="forceHideModal('lpAdminEditModal')" style="background:#f1f5f9; color:#475569; border:none; padding:10px 18px; border-radius:10px; font-weight:700; cursor:pointer;">Cancel</button>
+                        <button id="lp-admin-edit-save-btn" onclick="lpAdminSaveEdit()" style="background:#1d4ed8; color:#fff; border:none; padding:10px 22px; border-radius:10px; font-weight:800; cursor:pointer;">💾 Save with Audit</button>
+                    </div>
                 </div>
                 <!-- V92.10: Edit history viewer + revert (admin only) -->
                 <details style="margin-top:14px; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:10px; padding:10px 12px;">
                     <summary style="cursor:pointer; font-weight:800; color:#5b21b6; font-size:0.9em; user-select:none;">📜 Edit History (<span id="lp-admin-history-count">0</span>)</summary>
                     <div id="lp-admin-history-list" style="margin-top:10px; display:flex; flex-direction:column; gap:8px; max-height:340px; overflow-y:auto;"></div>
                 </details>
+            </div>
+        </div>
+
+        <!-- 🗑️ Admin LP Soft-Delete Confirmation Modal (V92.16) -->
+        <div id="lpAdminDeleteConfirmModal" class="modal" style="z-index:6200;">
+            <div class="modal-content" style="max-width:520px; width:95%; text-align:left; border-radius:18px;">
+                <span class="close-modal" onclick="forceHideModal('lpAdminDeleteConfirmModal')">&times;</span>
+                <h3 style="margin:0 0 4px 0; color:#991b1b; font-size:1.15em;">🗑️ Confirm Soft Delete</h3>
+                <div id="lp-admin-delete-meta" style="font-size:0.78em; color:#64748b; margin-bottom:14px;"></div>
+                <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:10px 12px; margin-bottom:12px; font-size:0.84em; color:#7f1d1d;">
+                    <strong>This will hide the entry from the intern's view</strong> but it stays recoverable from the Trash. The intern will receive a LINE notification. Audit-logged with your email.
+                </div>
+                <div style="background:#fef3c7; border:1px solid #fcd34d; border-radius:10px; padding:10px 12px; margin-bottom:12px;">
+                    <label style="font-size:0.75em; font-weight:800; color:#92400e; text-transform:uppercase; letter-spacing:0.5px; display:block;">⚠️ Reason for delete (required)</label>
+                    <input id="lp-admin-delete-reason" type="text" placeholder="e.g. duplicate entry, wrong intern, requested by user" maxlength="240" style="margin:6px 0 0; padding:8px 10px; border-radius:8px; width:100%; box-sizing:border-box; background:#fff; border:1px solid #fcd34d;">
+                    <div id="lp-admin-delete-reason-error" style="display:none; font-size:0.75em; color:#dc2626; margin-top:4px; font-weight:700;">Reason is required.</div>
+                </div>
+                <div id="lp-admin-delete-status" style="font-size:0.78em; color:#64748b; margin-bottom:8px; min-height:1.2em;"></div>
+                <div style="display:flex; gap:8px; justify-content:flex-end;">
+                    <button onclick="forceHideModal('lpAdminDeleteConfirmModal')" style="background:#f1f5f9; color:#475569; border:none; padding:10px 18px; border-radius:10px; font-weight:700; cursor:pointer;">Cancel</button>
+                    <button id="lp-admin-delete-confirm-btn" onclick="lpAdminSoftDelete()" style="background:#dc2626; color:#fff; border:none; padding:10px 22px; border-radius:10px; font-weight:800; cursor:pointer;">🗑️ Confirm Soft Delete</button>
+                </div>
             </div>
         </div>
 
@@ -27482,6 +27512,19 @@ Recommended Review: X days`;
             if (btn) btn.textContent = (hidden ? '📓 LP Entries ▲' : '📓 LP Entries ▼');
         };
 
+        // V92.16: toggle the Trash bin section (deleted entries with restore action)
+        window.lpToggleInternTrash = function() {
+            const trash = document.getElementById('lp-intern-trash');
+            const btn = document.getElementById('lp-intern-trash-toggle');
+            if (!trash) return;
+            const hidden = trash.style.display === 'none';
+            trash.style.display = hidden ? 'flex' : 'none';
+            if (btn) {
+                const count = (window._lp && window._lp.currentInternDeletedEntries || []).length;
+                btn.textContent = (hidden ? `🗑️ Trash (${count}) ▲` : `🗑️ Trash (${count}) ▼`);
+            }
+        };
+
         window.lpSelectIntern = async function(uid, cardEl) {
             if (!uid || !db) return;
             document.querySelectorAll('.lp-intern-card').forEach(c => {
@@ -27509,7 +27552,10 @@ Recommended Review: X days`;
                     db.collection('learning_path_entries').where('userId', '==', uid).get(),
                     db.collection('quiz_attempts').where('userId', '==', uid).get()
                 ]);
-                const entries = lpSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.date || '') > (a.date || '') ? 1 : -1);
+                // V92.16: separate active vs soft-deleted entries; trash bin section renders the deleted list
+                const allEntries = lpSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.date || '') > (a.date || '') ? 1 : -1);
+                const entries = allEntries.filter(e => !e.deleted);
+                const deletedEntries = allEntries.filter(e => e.deleted);
                 const quizzes = quizSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
                 // Stats
@@ -27599,7 +27645,9 @@ Recommended Review: X days`;
 
                 // LP entry list (collapsible, hidden by default)
                 // V92.09: cache entries on window so the admin edit modal can recover field values without a refetch
+                // V92.16: also cache the soft-deleted set for the Trash bin restore action
                 window._lp.currentInternEntries = entries;
+                window._lp.currentInternDeletedEntries = deletedEntries;
                 window._lp.currentInternUid = uid;
                 if (feedSection) feedSection.style.display = 'block';
                 const feedToggle = document.getElementById('lp-intern-feed-toggle');
@@ -27626,6 +27674,34 @@ Recommended Review: X days`;
                             <div style="font-size:0.82em;color:#475569;margin-top:4px;max-height:52px;overflow:hidden;">${(e.contentMarkdown||'').slice(0,180)}</div>
                         </div>`;
                     }).join('') : '<div style="padding:16px;text-align:center;color:#94a3b8;font-size:0.85em;">No entries yet.</div>';
+                }
+
+                // V92.16: Trash bin — render soft-deleted entries with restore action
+                const trashSection = document.getElementById('lp-intern-trash-section');
+                const trashEl = document.getElementById('lp-intern-trash');
+                const trashToggle = document.getElementById('lp-intern-trash-toggle');
+                if (trashSection) trashSection.style.display = deletedEntries.length ? 'block' : 'none';
+                if (trashToggle) trashToggle.textContent = `🗑️ Trash (${deletedEntries.length}) ▼`;
+                if (trashEl) {
+                    trashEl.style.display = 'none';
+                    trashEl.style.flexDirection = 'column';
+                    trashEl.innerHTML = deletedEntries.length ? deletedEntries.map(e => {
+                        const deletedAt = e.deletedAt ? new Date(e.deletedAt).toLocaleString() : '—';
+                        const tags = (e.tags || []).map(t => `<span style="background:#fee2e2;color:#991b1b;border-radius:5px;padding:1px 6px;font-size:0.72em;">${t}</span>`).join(' ');
+                        const reason = (e.deleteReason || '(no reason)').replace(/\s+/g, ' ').trim().slice(0, 200);
+                        return `<div data-lp-id="${e.id}" style="padding:10px 12px;border-radius:12px;border:1px solid #fecaca;background:#fef2f2;margin-bottom:4px;opacity:0.95;">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                                <div style="font-size:0.88em;font-weight:700;color:#7f1d1d;text-decoration:line-through;">${e.title||'Untitled'}</div>
+                                <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
+                                    <span style="font-size:0.7em;color:#7f1d1d;background:#fecaca;border-radius:5px;padding:1px 6px;font-weight:700;">DELETED</span>
+                                    <button onclick="lpAdminRestoreFromTrash('${e.id}')" title="Restore this entry (audit logged)" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:2px 8px;font-size:0.72em;font-weight:700;cursor:pointer;">↩️ Restore</button>
+                                </div>
+                            </div>
+                            <div style="font-size:0.72em;color:#991b1b;margin-top:4px;">Deleted by <strong>${e.deletedBy || 'admin'}</strong> · ${deletedAt}</div>
+                            <div style="font-size:0.74em;color:#7f1d1d;font-style:italic;margin-top:2px;">"${reason}"</div>
+                            ${tags?`<div style="margin-top:4px;display:flex;gap:3px;flex-wrap:wrap;">${tags}</div>`:''}
+                        </div>`;
+                    }).join('') : '';
                 }
 
                 // Update card badge
@@ -27897,6 +27973,148 @@ Recommended Review: X days`;
                 console.error('lpAdminSaveEdit', err);
                 statusEl.textContent = 'Error: ' + (err.message || 'unknown');
                 saveBtn.disabled = false;
+            }
+        };
+
+        // V92.16: Soft-delete + Restore for LP entries
+        //   - Delete writes deleted:true + audit append (type:'delete'); intern view + admin active list filter it out.
+        //   - Restore clears the deleted marker fields + audit append (type:'restore').
+        //   Both fire LINE push via lpAdminNotifyEdit.
+        window.lpAdminConfirmDelete = function() {
+            const entryId = window._lp && window._lp.editTargetId;
+            if (!entryId) return;
+            const entries = (window._lp && window._lp.currentInternEntries) || [];
+            const e = entries.find(x => x.id === entryId);
+            if (!e) { alert('Entry not in cache. Reload the panel and retry.'); return; }
+            const userName = (window._lp.internList || []).find(u => u.id === e.userId)?.displayName || e.userId;
+            document.getElementById('lp-admin-delete-meta').innerHTML = `Owner: <strong>${userName}</strong> · Title: <em>"${(e.title || 'Untitled').slice(0, 80)}"</em> · Date: ${e.date || '—'}`;
+            document.getElementById('lp-admin-delete-reason').value = '';
+            document.getElementById('lp-admin-delete-reason-error').style.display = 'none';
+            document.getElementById('lp-admin-delete-status').textContent = '';
+            document.getElementById('lp-admin-delete-confirm-btn').disabled = false;
+            forceShowModal('lpAdminDeleteConfirmModal');
+        };
+
+        window.lpAdminSoftDelete = async function() {
+            const entryId = window._lp && window._lp.editTargetId;
+            if (!entryId || !db) return;
+            const reason = document.getElementById('lp-admin-delete-reason').value.trim();
+            const reasonErr = document.getElementById('lp-admin-delete-reason-error');
+            if (!reason) {
+                reasonErr.style.display = 'block';
+                document.getElementById('lp-admin-delete-reason').focus();
+                return;
+            }
+            reasonErr.style.display = 'none';
+
+            const entries = (window._lp && window._lp.currentInternEntries) || [];
+            const before = entries.find(x => x.id === entryId);
+            if (!before) { alert('Original entry not in cache. Reload and retry.'); return; }
+
+            const statusEl = document.getElementById('lp-admin-delete-status');
+            const btn = document.getElementById('lp-admin-delete-confirm-btn');
+            statusEl.textContent = 'Soft-deleting + audit log...';
+            btn.disabled = true;
+
+            try {
+                const editor = (auth && auth.currentUser) || {};
+                const editEntry = {
+                    editorUid: editor.uid || 'unknown',
+                    editorEmail: editor.email || ALLOWED_EMAIL,
+                    editedAt: new Date().toISOString(),
+                    reason,
+                    fieldsBefore: {
+                        title: before.title || '',
+                        contentMarkdown: before.contentMarkdown || '',
+                        tags: before.tags || [],
+                        date: before.date || '',
+                        nextReviewDate: before.nextReviewDate || null
+                    },
+                    fieldsAfter: {},
+                    type: 'delete'
+                };
+                const prevHistory = Array.isArray(before.editHistory) ? before.editHistory : [];
+                const nextHistory = [...prevHistory, editEntry].slice(-10);
+
+                await db.collection('learning_path_entries').doc(entryId).update({
+                    deleted: true,
+                    deletedAt: editEntry.editedAt,
+                    deletedBy: editEntry.editorEmail,
+                    deleteReason: reason,
+                    editHistory: nextHistory,
+                    lastAdminEdit: {
+                        editorEmail: editEntry.editorEmail,
+                        editedAt: editEntry.editedAt,
+                        reason
+                    },
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                statusEl.textContent = 'Deleted ✓ Moved to trash.';
+                lpAdminNotifyEdit(entryId, 'delete');  // LINE push
+                setTimeout(() => {
+                    forceHideModal('lpAdminDeleteConfirmModal');
+                    forceHideModal('lpAdminEditModal');
+                    if (typeof lpSelectIntern === 'function' && window._lp.currentInternUid) {
+                        lpSelectIntern(window._lp.currentInternUid);
+                    }
+                }, 600);
+            } catch (err) {
+                console.error('lpAdminSoftDelete', err);
+                statusEl.textContent = 'Error: ' + (err.message || 'unknown');
+                btn.disabled = false;
+            }
+        };
+
+        window.lpAdminRestoreFromTrash = async function(entryId) {
+            if (!entryId || !db) return;
+            const entries = (window._lp && window._lp.currentInternDeletedEntries) || [];
+            const before = entries.find(x => x.id === entryId);
+            if (!before) { alert('Entry not in trash cache. Reload and retry.'); return; }
+            if (!confirm(`Restore "${(before.title || 'Untitled').slice(0, 60)}" from trash? The intern will see it again and receive a LINE notification.`)) return;
+
+            try {
+                const editor = (auth && auth.currentUser) || {};
+                const editEntry = {
+                    editorUid: editor.uid || 'unknown',
+                    editorEmail: editor.email || ALLOWED_EMAIL,
+                    editedAt: new Date().toISOString(),
+                    reason: 'Restored from trash',
+                    fieldsBefore: {},
+                    fieldsAfter: {
+                        title: before.title || '',
+                        contentMarkdown: before.contentMarkdown || '',
+                        tags: before.tags || [],
+                        date: before.date || '',
+                        nextReviewDate: before.nextReviewDate || null
+                    },
+                    type: 'restore'
+                };
+                const prevHistory = Array.isArray(before.editHistory) ? before.editHistory : [];
+                const nextHistory = [...prevHistory, editEntry].slice(-10);
+
+                await db.collection('learning_path_entries').doc(entryId).update({
+                    deleted: firebase.firestore.FieldValue.delete(),
+                    deletedAt: firebase.firestore.FieldValue.delete(),
+                    deletedBy: firebase.firestore.FieldValue.delete(),
+                    deleteReason: firebase.firestore.FieldValue.delete(),
+                    editHistory: nextHistory,
+                    lastAdminEdit: {
+                        editorEmail: editEntry.editorEmail,
+                        editedAt: editEntry.editedAt,
+                        reason: editEntry.reason
+                    },
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                lpAdminNotifyEdit(entryId, 'restore');  // LINE push
+                if (typeof showToast === 'function') showToast('↩️ Restored from trash');
+                if (typeof lpSelectIntern === 'function' && window._lp.currentInternUid) {
+                    lpSelectIntern(window._lp.currentInternUid);
+                }
+            } catch (err) {
+                console.error('lpAdminRestoreFromTrash', err);
+                alert('Restore failed: ' + (err.message || 'unknown'));
             }
         };
 
