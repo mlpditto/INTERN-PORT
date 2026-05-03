@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.10</title>
+    <title>Nika V92.11</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -27775,6 +27775,7 @@ Recommended Review: X days`;
                 });
                 Object.assign(entry, fieldsAfter, { editHistory: nextHistory });
                 statusEl.textContent = 'Reverted ✓';
+                lpAdminNotifyEdit(entryId, 'revert');  // V92.11: fire-and-forget LINE push
                 setTimeout(() => {
                     document.getElementById('lpAdminEditModal').style.display = 'none';
                     if (typeof lpSelectIntern === 'function' && window._lp.currentInternUid) {
@@ -27866,6 +27867,7 @@ Recommended Review: X days`;
                 Object.assign(before, fieldsAfter, { editHistory: nextHistory });
 
                 statusEl.textContent = 'Saved ✓ Audit logged.';
+                lpAdminNotifyEdit(entryId, 'edit');  // V92.11: fire-and-forget LINE push
                 setTimeout(() => {
                     document.getElementById('lpAdminEditModal').style.display = 'none';
                     if (typeof lpSelectIntern === 'function' && window._lp.currentInternUid) {
@@ -27876,6 +27878,36 @@ Recommended Review: X days`;
                 console.error('lpAdminSaveEdit', err);
                 statusEl.textContent = 'Error: ' + (err.message || 'unknown');
                 saveBtn.disabled = false;
+            }
+        };
+
+        // V92.11: Fire-and-forget LINE push to entry owner. Toast-warns admin if push fails or is skipped
+        // for a reason the admin should know about (missing LINE link, no friend, token issue).
+        // Silent for benign skips (no editHistory yet, etc.). Never blocks the save path.
+        window.lpAdminNotifyEdit = function(entryId, eventLabel) {
+            if (!entryId) return;
+            try {
+                const callable = firebase.functions().httpsCallable('notifyOnAdminEdit');
+                callable({ entryId }).then(res => {
+                    const data = res && res.data;
+                    if (!data) { showToast('⚠️ LINE notify: empty response'); return; }
+                    if (data.ok) return; // silent success
+                    if (data.skipped) {
+                        // Surface only skips that the admin can act on
+                        const ACTIONABLE = ['invalid-lineUserId', 'token-missing', 'no-friend', 'invalid-user'];
+                        if (ACTIONABLE.includes(data.reason)) {
+                            showToast(`⚠️ LINE notify skipped: ${data.reason}`);
+                        }
+                        return;
+                    }
+                    const code = data.code || 'unknown';
+                    showToast(`⚠️ LINE ${eventLabel} push failed: ${code}`);
+                }).catch(err => {
+                    console.error('notifyOnAdminEdit failed', err);
+                    showToast('⚠️ LINE notify error: ' + (err.message || 'unknown'));
+                });
+            } catch (err) {
+                console.error('lpAdminNotifyEdit setup failed', err);
             }
         };
 
