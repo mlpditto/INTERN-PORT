@@ -11,13 +11,16 @@
  * 4. Return migration statistics
  */
 
-const functions = require('firebase-functions');
+// V92.13: Migrated v1 → v2 syntax. admin.initializeApp() removed because index.js
+// already calls it; calling twice throws "default Firebase app already exists" which
+// was previously swallowed by the try/catch in index.js (causing this fn to silently
+// not export). Now both files share the same default app correctly.
+const { onRequest } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
 
-admin.initializeApp();
 const db = admin.firestore();
 
-exports.migrateLegacyData = functions.https.onRequest(async (req, res) => {
+exports.migrateLegacyData = onRequest(async (req, res) => {
   // Enable CORS
   res.set('Access-Control-Allow-Origin', '*');
   
