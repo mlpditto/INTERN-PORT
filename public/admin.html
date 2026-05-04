@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.27</title>
+    <title>Nika V92.28</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -8623,6 +8623,7 @@
                             <div style="position: relative; display: flex; align-items: center; justify-content: center;">
                                 <span id="quiz-missing-answer-summary" style="display:none; position: absolute; bottom: calc(100% + 4px); right: 0; padding:4px 10px; border-radius:999px; background:rgba(239,68,68,0.18); border:1px solid rgba(248,113,113,0.45); color:#fecaca; font-size:0.68em; font-weight:800; white-space:nowrap; z-index: 10;">Unanswered: 0</span>
                                 <button class="btn-sm" onclick="addQuestionUI()" title="Add New Question" style="width:36px; height:36px; border-radius:12px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#0f172a; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1.05em; transition:0.2s; margin-left:4px;"><i class="fa-solid fa-plus"></i></button>
+                                <button class="btn-sm" onclick="openBulkTagModal()" title="Bulk tag editor (V92.28)" style="width:36px; height:36px; border-radius:12px; background:linear-gradient(135deg,#6366f1,#4f46e5); color:#fff; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s; margin-left:4px;"><i class="fa-solid fa-tags"></i></button>
                             </div>
                         </div>
                         <span id="auto-save-status" style="font-size:0.6em; font-weight:bold; color:#fb7185; display:none; margin-left:8px;">Saving...</span>
@@ -9335,6 +9336,45 @@
                 style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; margin-top:5px; margin-bottom:15px; font-size:0.9em;">
             </select>
             <button class="magic-btn" style="width:100%;" onclick="executeImportQuiz()">➕ Import Selected</button>
+        </div>
+    </div>
+
+    <!-- V92.28: Bulk Tag Editor (Phase B) -->
+    <div id="bulkTagModal" class="modal" style="z-index:4250;">
+        <div class="modal-content" style="max-width:780px; width:95%; max-height:85vh; display:flex; flex-direction:column; text-align:left;">
+            <span class="close-modal" onclick="document.getElementById('bulkTagModal').style.display='none'">&times;</span>
+            <h3 style="margin-top:0; display:flex; align-items:center; gap:10px; color:#1e293b;">
+                <i class="fa-solid fa-tags" style="color:#6366f1;"></i> Bulk Tag Editor
+            </h3>
+            <p style="font-size:0.85em; color:#666; margin:0 0 15px;">
+                Tag multiple questions at once. Per-question tags override the quiz-level tag list.
+            </p>
+
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px; margin-bottom:12px;">
+                <label style="font-size:0.7em; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.5px;">Add tag to selected questions</label>
+                <div style="display:flex; gap:8px; margin-top:6px;">
+                    <input id="bulk-tag-input" type="text" placeholder="Type a tag…" style="flex:1; padding:8px 12px; border:1px solid #e2e8f0; border-radius:10px; font-size:0.9em; outline:none; background:#fff;">
+                    <button onclick="applyBulkTag()" style="padding:8px 18px; background:linear-gradient(135deg,#6366f1,#4f46e5); color:#fff; border:none; border-radius:10px; font-weight:800; font-size:0.85em; cursor:pointer; white-space:nowrap;"><i class="fa-solid fa-check"></i> Apply</button>
+                </div>
+                <div style="margin-top:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <span style="font-size:0.7em; color:#94a3b8; font-weight:700;">Quick:</span>
+                    <div id="bulk-tag-quick" style="display:flex; gap:5px; flex-wrap:wrap; flex:1;"></div>
+                </div>
+            </div>
+
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:8px;">
+                <label style="display:flex; align-items:center; gap:8px; font-size:0.85em; font-weight:700; color:#334155; cursor:pointer;">
+                    <input type="checkbox" id="bulk-tag-select-all" onchange="toggleBulkSelectAll(this)">
+                    Select all
+                </label>
+                <span id="bulk-tag-selected-count" style="font-size:0.75em; color:#64748b; font-weight:700;">0 selected</span>
+            </div>
+
+            <div id="bulk-tag-list" style="flex:1; overflow-y:auto; max-height:50vh; padding-right:5px; min-height:200px;"></div>
+
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid #f1f5f9;">
+                <button onclick="document.getElementById('bulkTagModal').style.display='none'" style="padding:8px 18px; background:#f1f5f9; color:#475569; border:none; border-radius:10px; font-weight:700; font-size:0.85em; cursor:pointer;">Close</button>
+            </div>
         </div>
     </div>
 
@@ -13323,7 +13363,10 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                 }
 
                 const timer = parseInt(item.querySelector('.q-timer').value) || 60;
-                questions.push({ q: qText, content: qContent, type: qType, options: opts, correct, timer });
+                // V92.28: per-question tags (Phase B). Empty string = fall back to quiz.tags at read time.
+                const qTagsEl = item.querySelector('.q-tags');
+                const qTags = qTagsEl ? (qTagsEl.value || '').trim() : '';
+                questions.push({ q: qText, content: qContent, type: qType, options: opts, correct, timer, tags: qTags });
             });
 
             return {
@@ -13474,6 +13517,9 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
             const qType = data ? data.type : 'choice';
             const options = data ? data.options : ["Option 1", "Option 2"];
             const correct = data ? (Array.isArray(data.correct) ? data.correct : [data.correct]) : [];
+            // V92.28: per-question tags (Phase B)
+            const initialTags = (data && data.tags) ? String(data.tags).trim() : '';
+            const initialTagCount = initialTags ? initialTags.split(',').map(t => t.trim()).filter(Boolean).length : 0;
 
             const div = document.createElement('div');
             div.className = 'quiz-q-item';
@@ -13532,6 +13578,13 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                 </div>
                 </div>
 
+                <!-- V92.28: per-question tags (collapsible, fallback to quiz.tags if blank) -->
+                <div class="q-tags-row" style="display:${initialTagCount > 0 ? 'block' : 'none'}; margin-bottom:10px; padding:10px 12px; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1;">
+                    <label style="display:block; font-size:0.7em; font-weight:800; color:#64748b; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;"><i class="fa-solid fa-tags" style="color:#6366f1;"></i> Question tags</label>
+                    <input type="text" class="q-tags" placeholder="e.g. Retail Pharmacy, Inventory Management" value="${initialTags.replace(/"/g, '&quot;')}" oninput="onQTagsInput(this)" style="width:100%; padding:7px 10px; border-radius:8px; border:1px solid #e2e8f0; font-size:0.85em; outline:none; background:#fff; box-sizing:border-box;">
+                    <div style="font-size:0.65em; color:#94a3b8; margin-top:5px; line-height:1.4;">Comma-separated. Falls back to quiz-level tags when blank.</div>
+                </div>
+
                 <div class="options-actions" style="margin-top:15px; margin-bottom:10px;">
                     <div style="display:flex; align-items:center; gap:12px; justify-content:space-between;">
                         <div class="q-type-actions" style="display:flex; align-items:center; gap:8px;">
@@ -13539,6 +13592,7 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                                 <button type="button" class="btn-sm" onclick="addOption(this)" style="padding:6px 20px; background:#fff; color:var(--primary); border:1.5px solid var(--primary); border-radius:12px; font-weight:900; font-size:0.8em; transition:all 0.2s; box-shadow:0 4px 10px rgba(99,102,241,0.05);" onmouseover="this.style.background='var(--primary)'; this.style.color='white';"><i class="fa-solid fa-plus"></i> Add Option</button>
                                 <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Magic - enhance this question" style="padding:4px 12px; background:linear-gradient(135deg, #8b5cf6, #7c3aed); color:white; border:none; border-radius:12px; font-weight:900; font-size:0.75em; transition:all 0.2s;"><i class="fa-solid fa-wand-magic-sparkles"></i> Magic</button>
                             ` : ''}
+                            <button type="button" class="btn-sm btn-q-tags-toggle" onclick="toggleQTags(this)" title="Per-question tags" style="padding:4px 12px; background:${initialTagCount > 0 ? '#eef2ff' : '#f1f5f9'}; color:${initialTagCount > 0 ? '#4338ca' : '#475569'}; border:1px solid ${initialTagCount > 0 ? '#c7d2fe' : '#e2e8f0'}; border-radius:12px; font-weight:800; font-size:0.75em; transition:all 0.2s; display:flex; align-items:center; gap:5px;"><i class="fa-solid fa-tags"></i> Tags<span class="q-tags-count" style="padding:1px 6px; background:#6366f1; color:white; border-radius:6px; font-size:0.7em; font-weight:900; ${initialTagCount > 0 ? '' : 'display:none;'}">${initialTagCount > 0 ? initialTagCount : ''}</span></button>
                         </div>
                         <div style="display:flex; align-items:center; gap:8px;">
                             <button type="button" class="btn-sm" onclick="forceHideModal('quizManageModal')" style="padding:6px 16px; background:#334155; color:#f1f5f9; border:none; border-radius:10px; font-weight:700; font-size:0.75em; height:32px;">Cancel</button>
@@ -13569,6 +13623,167 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
             }
             updateQuizPagination();
         }
+
+        // V92.28 — per-question tag toggle helpers
+        window.toggleQTags = function(btn) {
+            const item = btn.closest('.quiz-q-item');
+            if (!item) return;
+            const row = item.querySelector('.q-tags-row');
+            if (!row) return;
+            const isHidden = row.style.display === 'none' || !row.style.display;
+            row.style.display = isHidden ? 'block' : 'none';
+            if (isHidden) {
+                const input = row.querySelector('.q-tags');
+                if (input) input.focus();
+            }
+        };
+
+        window.onQTagsInput = function(input) {
+            const item = input.closest('.quiz-q-item');
+            if (!item) return;
+            const count = (input.value || '').split(',').map(t => t.trim()).filter(Boolean).length;
+            const badge = item.querySelector('.q-tags-count');
+            const btn = item.querySelector('.btn-q-tags-toggle');
+            if (badge) {
+                if (count > 0) { badge.textContent = count; badge.style.display = ''; }
+                else { badge.style.display = 'none'; }
+            }
+            if (btn) {
+                btn.style.background = count > 0 ? '#eef2ff' : '#f1f5f9';
+                btn.style.color = count > 0 ? '#4338ca' : '#475569';
+                btn.style.borderColor = count > 0 ? '#c7d2fe' : '#e2e8f0';
+            }
+            if (typeof triggerAutoSave === 'function') triggerAutoSave();
+        };
+
+        // V92.28 — Bulk Tag Editor (Phase B)
+        window.openBulkTagModal = function() {
+            const modal = document.getElementById('bulkTagModal');
+            if (!modal) return;
+            const items = document.querySelectorAll('.quiz-q-item');
+            if (items.length === 0) { alert('Add at least one question before bulk-tagging.'); return; }
+            const input = document.getElementById('bulk-tag-input');
+            if (input) input.value = '';
+            const sa = document.getElementById('bulk-tag-select-all');
+            if (sa) sa.checked = false;
+            renderBulkTagList();
+            renderBulkTagQuickChips();
+            updateBulkSelectedCount();
+            modal.style.display = 'flex';
+        };
+
+        function renderBulkTagList() {
+            const listEl = document.getElementById('bulk-tag-list');
+            if (!listEl) return;
+            const items = [...document.querySelectorAll('.quiz-q-item')];
+            if (items.length === 0) {
+                listEl.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:20px; font-size:0.85em;">No questions yet.</div>';
+                return;
+            }
+            listEl.innerHTML = items.map((item, i) => {
+                const text = (item.querySelector('.q-text') ? item.querySelector('.q-text').value : '').trim();
+                const preview = text.slice(0, 100);
+                const truncated = text.length > 100;
+                const tagsRaw = item.querySelector('.q-tags') ? (item.querySelector('.q-tags').value || '').trim() : '';
+                const tags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean);
+                const chipsHtml = tags.length > 0
+                    ? tags.map(t => {
+                        const tagAttr = escapeHtml(t).replace(/'/g, "\\'");
+                        return `<span style="display:inline-flex; align-items:center; gap:4px; background:#eef2ff; color:#4338ca; padding:2px 8px; border-radius:6px; font-size:0.7em; font-weight:700; margin:2px 4px 2px 0;">${escapeHtml(t)} <span onclick="removeTagFromQuestion(${i}, '${tagAttr}')" style="cursor:pointer; color:#6366f1; font-weight:900;" title="Remove tag">×</span></span>`;
+                    }).join('')
+                    : '<span style="font-size:0.7em; color:#94a3b8; font-style:italic;">(no tags · falls back to quiz-level)</span>';
+                return `
+                    <div style="display:flex; gap:10px; padding:10px 12px; border:1px solid #f1f5f9; border-radius:10px; margin-bottom:6px; background:#fff;">
+                        <input type="checkbox" class="bulk-q-check" data-qidx="${i}" onchange="updateBulkSelectedCount()" style="margin-top:2px; flex-shrink:0; cursor:pointer; width:16px; height:16px;">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-size:0.8em; font-weight:700; color:#1e293b; line-height:1.4; word-break:break-word;">Q${i+1}: ${escapeHtml(preview)}${truncated ? '…' : ''}</div>
+                            <div style="margin-top:5px; line-height:1.6;">${chipsHtml}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderBulkTagQuickChips() {
+            const el = document.getElementById('bulk-tag-quick');
+            if (!el) return;
+            const quizTagsEl = document.getElementById('quiz-tags');
+            const quizTagsRaw = quizTagsEl ? (quizTagsEl.value || '').trim() : '';
+            const quizTags = quizTagsRaw.split(',').map(t => t.trim()).filter(Boolean);
+            if (quizTags.length === 0) {
+                el.innerHTML = '<span style="font-size:0.7em; color:#94a3b8; font-style:italic;">(set quiz-level tags to enable quick-pick)</span>';
+                return;
+            }
+            el.innerHTML = quizTags.map(t => {
+                const tagAttr = escapeHtml(t).replace(/'/g, "\\'");
+                return `<button onclick="bulkTagInputSet('${tagAttr}')" style="background:#f1f5f9; border:1px solid #e2e8f0; color:#475569; padding:3px 10px; border-radius:6px; font-size:0.7em; font-weight:700; cursor:pointer;">${escapeHtml(t)}</button>`;
+            }).join('');
+        }
+
+        window.bulkTagInputSet = function(tag) {
+            const input = document.getElementById('bulk-tag-input');
+            if (input) { input.value = tag; input.focus(); }
+        };
+
+        window.applyBulkTag = function() {
+            const inputEl = document.getElementById('bulk-tag-input');
+            const tag = inputEl ? (inputEl.value || '').trim() : '';
+            if (!tag) { alert('Type a tag to apply.'); return; }
+            const checks = [...document.querySelectorAll('.bulk-q-check:checked')];
+            if (checks.length === 0) { alert('Select at least one question.'); return; }
+            const items = document.querySelectorAll('.quiz-q-item');
+            let added = 0;
+            checks.forEach(cb => {
+                const qi = parseInt(cb.dataset.qidx);
+                const item = items[qi];
+                if (!item) return;
+                const ti = item.querySelector('.q-tags');
+                if (!ti) return;
+                const current = (ti.value || '').split(',').map(t => t.trim()).filter(Boolean);
+                if (!current.includes(tag)) {
+                    current.push(tag);
+                    ti.value = current.join(', ');
+                    added++;
+                    if (typeof onQTagsInput === 'function') onQTagsInput(ti);
+                    const row = item.querySelector('.q-tags-row');
+                    if (row) row.style.display = 'block';
+                }
+            });
+            if (typeof showToast === 'function') showToast(`Tagged ${added} of ${checks.length} question(s) with "${tag}"`);
+            inputEl.value = '';
+            renderBulkTagList();
+            updateBulkSelectedCount();
+            if (typeof triggerAutoSave === 'function') triggerAutoSave();
+        };
+
+        window.removeTagFromQuestion = function(qIdx, tag) {
+            const items = document.querySelectorAll('.quiz-q-item');
+            const item = items[qIdx];
+            if (!item) return;
+            const ti = item.querySelector('.q-tags');
+            if (!ti) return;
+            const current = (ti.value || '').split(',').map(t => t.trim()).filter(Boolean);
+            const next = current.filter(t => t !== tag);
+            ti.value = next.join(', ');
+            if (typeof onQTagsInput === 'function') onQTagsInput(ti);
+            renderBulkTagList();
+            if (typeof triggerAutoSave === 'function') triggerAutoSave();
+        };
+
+        window.toggleBulkSelectAll = function(cb) {
+            const checks = document.querySelectorAll('.bulk-q-check');
+            checks.forEach(c => { c.checked = cb.checked; });
+            updateBulkSelectedCount();
+        };
+
+        window.updateBulkSelectedCount = function() {
+            const total = document.querySelectorAll('.bulk-q-check').length;
+            const checked = document.querySelectorAll('.bulk-q-check:checked').length;
+            const el = document.getElementById('bulk-tag-selected-count');
+            if (el) el.textContent = `${checked} of ${total} selected`;
+            const sa = document.getElementById('bulk-tag-select-all');
+            if (sa) sa.checked = total > 0 && checked === total;
+        };
 
         window.selectAiToggle = function(el, val) {
             const container = el.parentElement;
@@ -23676,46 +23891,70 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // 1. Render Trend SVG
                 chartBox.innerHTML = drawQuizTrendLine(attempts);
 
-                // 2. Tag Performance — V92.27: group co-occurring tags, weight by question totals
-                // Tags live at quiz level (q.tags), not per-question. So tags that always appear together
-                // on the same set of attempts have mathematically identical scores. We group them to avoid
-                // showing duplicated bars, and aggregate using total-correct / total-questions instead of
-                // averaging per-quiz percentages (correct weighting when quizzes have different lengths).
-                const tagAttemptIdx = {}; // tag -> Set<attemptIndexInValid>
-                const validAttempts = []; // attempts whose quiz carries tags
-                attempts.forEach(att => {
+                // 2. Tag Performance — V92.28 (Phase B): per-question aggregation with quiz-tag fallback
+                // Each question's tags take priority; if blank, fall back to the quiz's tag list.
+                // We aggregate at the (attempt, question) granularity, then group tags whose set of
+                // (attempt, question) coverage is identical (so two tags placed on exactly the same
+                // questions still collapse into one row instead of duplicating).
+                const tagSig = {};   // tag -> Set<"attemptIdx:qIdx">
+                const tagStats = {}; // tag -> { correct, total }
+
+                attempts.forEach((att, attIdx) => {
                     const qData = quizzesData.find(x => x.id === att.quizId);
-                    if (!qData || !qData.tags) return;
-                    const tags = qData.tags.split(',').map(t => t.trim()).filter(Boolean);
-                    if (tags.length === 0) return;
-                    const idx = validAttempts.length;
-                    validAttempts.push(att);
-                    tags.forEach(t => {
-                        if (!tagAttemptIdx[t]) tagAttemptIdx[t] = new Set();
-                        tagAttemptIdx[t].add(idx);
+                    if (!qData || !Array.isArray(qData.questions)) return;
+                    const manualCorrect = att.manualCorrect || {};
+                    const gradedAnswers = att.gradedAnswers || {};
+                    const answers = att.answers || [];
+                    const quizFallbackRaw = qData.tags ? String(qData.tags).trim() : '';
+
+                    qData.questions.forEach((q, qi) => {
+                        const perQRaw = (q && q.tags) ? String(q.tags).trim() : '';
+                        const tagStr = perQRaw || quizFallbackRaw;
+                        if (!tagStr) return;
+                        const tags = tagStr.split(',').map(t => t.trim()).filter(Boolean);
+                        if (tags.length === 0) return;
+
+                        // Per-question correctness (mirrors calculateAttemptScoring)
+                        let isCorrect = false;
+                        if (manualCorrect[qi] === true) {
+                            isCorrect = true;
+                        } else if ((q.type || 'choice') === 'choice') {
+                            const userAns = answers[qi];
+                            const target = q.correct;
+                            const sAns = Array.isArray(userAns) ? userAns : (userAns !== undefined && userAns !== null ? [userAns] : []);
+                            const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
+                            isCorrect = sAns.length > 0 && sAns.length === tAns.length && sAns.every(v => tAns.includes(v));
+                        } else {
+                            isCorrect = !!gradedAnswers[qi];
+                        }
+
+                        const sigEntry = attIdx + ':' + qi;
+                        tags.forEach(t => {
+                            if (!tagSig[t]) tagSig[t] = new Set();
+                            if (!tagStats[t]) tagStats[t] = { correct: 0, total: 0 };
+                            tagSig[t].add(sigEntry);
+                            tagStats[t].correct += isCorrect ? 1 : 0;
+                            tagStats[t].total += 1;
+                        });
                     });
                 });
 
                 const sigGroups = new Map();
-                Object.entries(tagAttemptIdx).forEach(([tag, set]) => {
-                    const sig = [...set].sort((a, b) => a - b).join(',');
-                    if (!sigGroups.has(sig)) sigGroups.set(sig, { tags: [], attemptIdxs: set });
+                Object.entries(tagSig).forEach(([tag, set]) => {
+                    const sig = [...set].sort().join('|');
+                    if (!sigGroups.has(sig)) sigGroups.set(sig, { tags: [], stats: tagStats[tag], sigEntries: set });
                     sigGroups.get(sig).tags.push(tag);
                 });
 
                 const groups = [...sigGroups.values()].map(g => {
-                    let totalCorrect = 0, totalQ = 0;
-                    g.attemptIdxs.forEach(idx => {
-                        const a = validAttempts[idx];
-                        totalCorrect += Number(a.correctCount) || 0;
-                        totalQ += Number(a.totalQuestions) || 0;
-                    });
+                    const attemptsTouched = new Set();
+                    g.sigEntries.forEach(s => attemptsTouched.add(s.split(':')[0]));
                     return {
                         tags: g.tags.sort(),
-                        avg: totalQ > 0 ? (totalCorrect / totalQ) * 100 : 0,
-                        correct: totalCorrect,
-                        total: totalQ,
-                        attempts: g.attemptIdxs.size
+                        avg: g.stats.total > 0 ? (g.stats.correct / g.stats.total) * 100 : 0,
+                        correct: g.stats.correct,
+                        total: g.stats.total,
+                        attempts: attemptsTouched.size
                     };
                 }).sort((a, b) => b.avg - a.avg);
 
@@ -23728,7 +23967,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (groups.length === 0) {
                     tagHtml = "(No tagged quizzes found)";
                 } else {
-                    tagHtml += `<div style="font-size:0.7em; color:#94a3b8; margin-bottom:10px; line-height:1.45; padding:6px 10px; background:#f1f5f9; border-radius:8px;"><i class="fa-solid fa-circle-info"></i> Tags are quiz-level. Tags that always co-occur on the same quizzes are grouped together since they share the same score.</div>`;
+                    tagHtml += `<div style="font-size:0.7em; color:#94a3b8; margin-bottom:10px; line-height:1.45; padding:6px 10px; background:#f1f5f9; border-radius:8px;"><i class="fa-solid fa-circle-info"></i> Per-question tags take priority; questions without their own tags fall back to the quiz-level tag list. Tags that always cover the same questions are grouped.</div>`;
                     const startIdx = (window._hubTagPage - 1) * groupsPerPage;
                     const paginated = groups.slice(startIdx, startIdx + groupsPerPage);
                     paginated.forEach((g, i) => {
