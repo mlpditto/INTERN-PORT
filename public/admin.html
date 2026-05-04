@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.22</title>
+    <title>Nika V92.23</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -22501,6 +22501,31 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return Number.isNaN(d.getTime()) ? null : d;
         }
 
+        // V92.23: unified date formatter for User Hub views.
+        // mode='auto' (default): relative ("2h ago") wrapped in <span title="absolute">…</span> for dates < 7 days;
+        //   absolute string for older dates. Returns HTML — only safe inside element bodies.
+        // mode='absolute': plain absolute string ("Apr 25, 2026, 18:02"). Use this inside attribute values
+        //   like title="..." where embedded HTML would break the markup.
+        window._fmtDate = function(d, mode) {
+            const date = toHubDate(d);
+            if (!date) return '—';
+            const abs = date.toLocaleString('en-US', {
+                month: 'short', day: 'numeric', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', hour12: false
+            });
+            if (mode === 'absolute') return abs;
+            const sec = Math.round((Date.now() - date.getTime()) / 1000);
+            let rel;
+            if (sec < 0) return abs;                          // future → absolute
+            else if (sec < 45) rel = 'just now';
+            else if (sec < 3600) rel = `${Math.round(sec / 60)}m ago`;
+            else if (sec < 86400) rel = `${Math.round(sec / 3600)}h ago`;
+            else if (sec < 172800) rel = 'yesterday';
+            else if (sec < 604800) rel = `${Math.round(sec / 86400)}d ago`;
+            else return abs;                                   // > 7 days → absolute, no tooltip
+            return `<span title="${abs}" style="cursor:help; border-bottom:1px dotted currentColor;">${rel}</span>`;
+        };
+
         function isQuestAssignedToUser(quest, user) {
             const target = String(quest?.targetGroup || 'Public').trim();
             if (!target || target.toLowerCase() === 'public' || target.toLowerCase() === 'all') return true;
@@ -22594,10 +22619,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.76em; color:#64748b; font-weight:700;">
                             <div>Score<br><b style="color:#10b981;">+${Number(quest.baseScore || 0).toFixed(2)}</b></div>
                             <div>Duration<br><b>${quest.durationMinutes || 30}m</b></div>
-                            <div>Start<br><b>${start ? start.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : 'Now'}</b></div>
-                            <div>Deadline<br><b>${deadline ? deadline.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '-'}</b></div>
+                            <div>Start<br><b>${start ? window._fmtDate(start) : 'Now'}</b></div>
+                            <div>Deadline<br><b>${window._fmtDate(deadline)}</b></div>
                         </div>
-                        ${submitted ? `<div style="margin-top:10px; padding-top:10px; border-top:1px dashed #e2e8f0; font-size:0.76em; color:#94a3b8; font-weight:700;">Submitted: ${submitted.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</div>` : ''}
+                        ${submitted ? `<div style="margin-top:10px; padding-top:10px; border-top:1px dashed #e2e8f0; font-size:0.76em; color:#94a3b8; font-weight:700;">Submitted: ${window._fmtDate(submitted)}</div>` : ''}
                     </div>
                 `;
             }).join('');
@@ -22695,7 +22720,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             const indexed = history.map((h, i) => ({ ...h, _idx: i })).reverse();
             hist.innerHTML = indexed.map(h => {
-                const when = h.editedAt ? new Date(h.editedAt).toLocaleString() : '—';
+                const when = window._fmtDate(h.editedAt);
                 const isRevert = h.type === 'revert';
                 const typeBadge = isRevert
                     ? '<span style="background:#fef3c7;color:#92400e;border-radius:5px;padding:1px 6px;font-size:0.7em;font-weight:800;">↩️ REVERT</span>'
@@ -22793,10 +22818,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const editCount = editHistory.length;
             const lastEdit = sub?.lastAdminEdit;
             const editBadge = editCount > 0
-                ? `<span title="Edited ${editCount}× by admin${lastEdit ? ` — last by ${lastEdit.editorEmail || '?'} ${lastEdit.editedAt ? new Date(lastEdit.editedAt).toLocaleString() : ''}` : ''}" style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:999px; font-size:0.7em; font-weight:800; cursor:help;">✏️ ${editCount}×</span>`
+                ? `<span title="Edited ${editCount}× by admin${lastEdit ? ` — last by ${lastEdit.editorEmail || '?'} ${lastEdit.editedAt ? window._fmtDate(lastEdit.editedAt, 'absolute') : ''}` : ''}" style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:999px; font-size:0.7em; font-weight:800; cursor:help;">✏️ ${editCount}×</span>`
                 : '';
             const escAnswerForTextarea = answer.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            const fmt = d => d ? d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '-';
             const earnedScore = sub ? Number(sub.earnedScore || 0) : 0;
             const bonusGiven = sub ? Number(sub.bonusGiven || 0) : 0;
 
@@ -22814,15 +22838,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:8px; font-size:0.76em; color:#64748b; font-weight:700; margin-bottom:12px;">
                         <div style="background:#f8fafc; padding:8px 10px; border-radius:8px;">Base Score<br><b style="color:#10b981; font-size:1.1em;">+${Number(quest.baseScore || 0).toFixed(2)}</b></div>
                         <div style="background:#f8fafc; padding:8px 10px; border-radius:8px;">Duration<br><b style="color:#1e293b; font-size:1.1em;">${quest.durationMinutes || 30}m</b></div>
-                        <div style="background:#f8fafc; padding:8px 10px; border-radius:8px;">Start<br><b style="color:#1e293b;">${fmt(start) || 'Now'}</b></div>
-                        <div style="background:#f8fafc; padding:8px 10px; border-radius:8px;">Deadline<br><b style="color:#1e293b;">${fmt(deadline)}</b></div>
+                        <div style="background:#f8fafc; padding:8px 10px; border-radius:8px;">Start<br><b style="color:#1e293b;">${start ? window._fmtDate(start) : 'Now'}</b></div>
+                        <div style="background:#f8fafc; padding:8px 10px; border-radius:8px;">Deadline<br><b style="color:#1e293b;">${window._fmtDate(deadline)}</b></div>
                     </div>
                     ${submitted ? `
                         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:8px; font-size:0.76em; color:#64748b; font-weight:700; margin-bottom:12px;">
-                            <div style="background:#ecfdf5; padding:8px 10px; border-radius:8px;">Submitted<br><b style="color:#065f46;">${fmt(submitted)}</b></div>
+                            <div style="background:#ecfdf5; padding:8px 10px; border-radius:8px;">Submitted<br><b style="color:#065f46;">${window._fmtDate(submitted)}</b></div>
                             <div style="background:#ecfdf5; padding:8px 10px; border-radius:8px;">Earned<br><b style="color:#065f46; font-size:1.05em;">+${earnedScore.toFixed(2)}</b></div>
                             ${bonusGiven ? `<div style="background:#fef3c7; padding:8px 10px; border-radius:8px;">Admin Bonus<br><b style="color:#b45309; font-size:1.05em;">+${bonusGiven.toFixed(2)}</b></div>` : ''}
-                            ${reviewed ? `<div style="background:#ecfdf5; padding:8px 10px; border-radius:8px;">Reviewed<br><b style="color:#065f46;">${fmt(reviewed)}</b></div>` : ''}
+                            ${reviewed ? `<div style="background:#ecfdf5; padding:8px 10px; border-radius:8px;">Reviewed<br><b style="color:#065f46;">${window._fmtDate(reviewed)}</b></div>` : ''}
                         </div>
                     ` : ''}
                     ${sub ? `
@@ -23388,7 +23412,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             p.forEach((e, idx) => {
                 const globalIdx = s + idx;
                 const seqNum = filteredLogs.length - globalIdx;
-                const d = e.t ? e.t.toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
+                const d = window._fmtDate(e.t);
                 let delBtn = (e.source === 'checkin_logs' && e.docId) ? `<button class="btn-sm" style="background:none; color:#ef4444; border:none; padding:0; margin-left:8px; cursor:pointer;" onclick="deleteHubHistoryLog('${e.docId}', ${e.score})"><i class="fa-solid fa-trash-can"></i></button>` : "";
                 const isClickable = e.type === 'work' || e.isReflective || e.isLearningNote;
                 const onClickAttr = isClickable ? ` onclick="showHubItemDetails(${JSON.stringify(e).replace(/"/g, '&quot;')})" ` : '';
