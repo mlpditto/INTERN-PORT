@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.28</title>
+    <title>Nika V92.29</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -23987,7 +23987,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 <div style="width:100%; height:6px; background:#e2e8f0; border-radius:10px; overflow:hidden;">
                                     <div style="width:${g.avg}%; height:100%; background:${color}; border-radius:10px; transition:width 0.5s ease-out;"></div>
                                 </div>
-                                <div style="font-size:0.7em; color:#94a3b8; margin-top:5px; font-weight:600;">${g.correct}/${g.total} correct &middot; ${g.attempts} ${g.attempts === 1 ? 'attempt' : 'attempts'}</div>
+                                <div style="font-size:0.7em; color:#94a3b8; margin-top:5px; font-weight:600;">${g.correct}/${g.total} correct &middot; ${g.attempts} ${g.attempts === 1 ? 'attempt' : 'attempts'}${g.total < 10 ? ` &middot; <span style="color:#92400e; font-weight:800;" title="Score based on only ${g.total} question${g.total !== 1 ? 's' : ''} — interpret with caution">⚠ low N</span>` : ''}</div>
                                 ${chips}
                             </div>
                         `;
@@ -24018,18 +24018,37 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         </div>
                     `;
                 } else {
-                    const best = groups[0];
-                    const worst = groups[groups.length - 1];
-                    const bestLabel = best.tags.length > 1 ? `${best.tags[0]} <span style="font-size:0.85em; color:#64748b;">(+${best.tags.length - 1} more)</span>` : best.tags[0];
-                    const worstLabel = worst.tags.length > 1 ? `${worst.tags[0]} <span style="font-size:0.85em; color:#64748b;">(+${worst.tags.length - 1} more)</span>` : worst.tags[0];
+                    // V92.29 Tier 1 — top 3 strengths + bottom 3 weaknesses, low-N badge, click-to-jump
+                    const N = groups.length;
+                    const half = Math.min(3, Math.floor(N / 2));
+                    const strengths = groups.slice(0, half);
+                    const weaknesses = groups.slice(N - half).reverse(); // worst first
+                    const renderSWRow = (g, globalIdx, color) => {
+                        const label = g.tags.length > 1
+                            ? `${g.tags[0]} <span style="font-size:0.78em; color:#64748b; font-weight:600;">+${g.tags.length - 1} more</span>`
+                            : g.tags[0];
+                        const lowN = g.total < 10;
+                        const lowNBadge = lowN
+                            ? ` <span title="Score based on only ${g.total} question${g.total !== 1 ? 's' : ''} — interpret with caution" style="background:#fef3c7; color:#92400e; padding:1px 7px; border-radius:6px; font-size:0.62em; font-weight:800; margin-left:6px; vertical-align:middle;">⚠ low N</span>`
+                            : '';
+                        const targetPage = Math.floor(globalIdx / groupsPerPage) + 1;
+                        return `
+                            <div onclick="jumpToTagPage('${userId}', ${targetPage})" title="Jump to this tag in Performance by Tags" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; border-radius:8px; margin-bottom:3px; cursor:pointer; transition:background 0.15s; gap:8px;" onmouseover="this.style.background='rgba(0,0,0,0.04)'" onmouseout="this.style.background='transparent'">
+                                <div style="font-size:0.82em; font-weight:700; color:#475569; line-height:1.4; min-width:0; flex:1;">${label}${lowNBadge}</div>
+                                <div style="font-size:0.82em; font-weight:800; color:${color}; white-space:nowrap;">${g.avg.toFixed(1)}% <span style="color:#94a3b8; font-weight:600; font-size:0.88em;">(${g.correct}/${g.total})</span></div>
+                            </div>
+                        `;
+                    };
+                    const strengthsHtml = strengths.map((g, i) => renderSWRow(g, i, '#10b981')).join('');
+                    const weaknessesHtml = weaknesses.map((g, i) => renderSWRow(g, N - 1 - i, '#ef4444')).join('');
                     summaryBox.innerHTML = `
-                        <div style="margin-bottom:10px; padding:10px; background:rgba(16,185,129,0.05); border-radius:10px; border-left:4px solid #10b981;">
-                            <div style="font-weight:bold; color:#065f46; font-size:0.9em;">🌟 Strength</div>
-                            <div style="font-size:0.85em;">Excellent performance in <b>${bestLabel}</b> &mdash; ${best.correct}/${best.total} = ${best.avg.toFixed(1)}%.</div>
+                        <div style="margin-bottom:14px; padding:10px 12px; background:rgba(16,185,129,0.05); border-radius:10px; border-left:4px solid #10b981;">
+                            <div style="font-weight:bold; color:#065f46; font-size:0.9em; margin-bottom:6px;">🌟 Strengths <span style="font-size:0.7em; color:#94a3b8; font-weight:600;">(top ${half})</span></div>
+                            ${strengthsHtml}
                         </div>
-                        <div style="padding:10px; background:rgba(239,68,68,0.05); border-radius:10px; border-left:4px solid #ef4444;">
-                            <div style="font-weight:bold; color:#991b1b; font-size:0.9em;">⚠️ Area for Improvement</div>
-                            <div style="font-size:0.85em;">Consider reviewing <b>${worstLabel}</b> &mdash; ${worst.correct}/${worst.total} = ${worst.avg.toFixed(1)}%.</div>
+                        <div style="padding:10px 12px; background:rgba(239,68,68,0.05); border-radius:10px; border-left:4px solid #ef4444;">
+                            <div style="font-weight:bold; color:#991b1b; font-size:0.9em; margin-bottom:6px;">⚠️ Areas for Improvement <span style="font-size:0.7em; color:#94a3b8; font-weight:600;">(bottom ${half})</span></div>
+                            ${weaknessesHtml}
                         </div>
                     `;
                 }
@@ -24042,6 +24061,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         window.changeTagPage = function(userId, dir) {
             window._hubTagPage = (window._hubTagPage || 1) + dir;
+            renderQuizInsight(userId);
+        }
+
+        // V92.29 — click Strength/Weakness row to jump to that page in Performance by Tags
+        window.jumpToTagPage = function(userId, page) {
+            const target = Math.max(1, parseInt(page) || 1);
+            if (window._hubTagPage === target) return;
+            window._hubTagPage = target;
             renderQuizInsight(userId);
         }
 
