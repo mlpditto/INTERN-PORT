@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.20</title>
+    <title>Nika V92.21</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -24799,47 +24799,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         function showHubItemDetails(item) {
             if (item.isQuest) {
-                const d = item.t ? item.t.toLocaleString('th-TH') : '-';
-                const detailsHtml = `
-                    <div style="padding:20px; border-radius:12px; background:white; border:1px solid #f1f5f9;">
-                        <h3 style="margin:0 0 15px 0; color:#1e293b; display:flex; align-items:center; gap:8px;">
-                            <span style="font-size:1.5em;">⚡</span> Daily Quest Submission
-                        </h3>
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:15px;">
-                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #10b981;">
-                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Awarded Score</div>
-                                <div style="font-size:1.3em; font-weight:900; color:#10b981; margin-top:6px;">
-                                    ${(item.score || 0).toFixed(2)} pts
-                                </div>
-                            </div>
-                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:3px solid #f59e0b;">
-                                <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase;">Date</div>
-                                <div style="font-size:0.85em; color:#475569; margin-top:6px; font-weight:600;">
-                                    ${d}
-                                </div>
-                            </div>
-                        </div>
-                        <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:12px;">
-                            <div style="font-size:0.75em; color:#64748b; font-weight:700; text-transform:uppercase; margin-bottom:8px;">Quest Title</div>
-                            <div style="color:#1e293b; font-weight:700; font-size:1em;">
-                                ${item.questTitle || 'Daily Quest'}
-                            </div>
-                        </div>
-                        ${item.answer ? `
-                            <div style="background:#eff6ff; padding:15px; border-radius:12px; border-left:4px solid #3b82f6; margin-bottom:12px;">
-                                <div style="font-size:0.75em; color:#1d4ed8; font-weight:700; text-transform:uppercase; margin-bottom:10px;">User Answer</div>
-                                <div style="color:#1e3a8a; font-size:0.95em; line-height:1.6; white-space:pre-wrap; font-family:inherit;">${window._formatUserAnswer(String(item.answer || '').trim())}</div>
-                            </div>
-                        ` : `
-                            <div style="padding:15px; border-radius:12px; border:1px dashed #cbd5e1; color:#94a3b8; text-align:center; font-size:0.9em;">
-                                No submission content found in this log.
-                            </div>
-                        `}
-                    </div>
-                `;
-                const modal = document.getElementById('workDetailModal') || createWorkDetailModal();
-                document.getElementById('work-detail-content').innerHTML = detailsHtml;
-                modal.style.display = 'block';
+                // V92.21: delegate to V92.19 backlog modal — unifies layout + brings Grade/Edit actions
+                const qid = item.questData?.questId;
+                if (qid && typeof window.showHubBacklogDetails === 'function') {
+                    window.showHubBacklogDetails(qid);
+                    return;
+                }
+                showToast('Quest reference missing — submission may be orphaned');
+                return;
             } else if (item.type === 'work' && item.workData) {
                 const w = item.workData;
                 const d = w.timestamp ? w.timestamp.toDate().toLocaleString('th-TH') : '-';
