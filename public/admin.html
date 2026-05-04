@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.24</title>
+    <title>Nika V92.25</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -22956,6 +22956,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 let questReceiveCount = 0;
                 let questReviewScore = 0;
                 let questReviewCount = 0;
+                let questMergedCount = 0;  // V92.25: count of merged display entries (one per submission)
 
                 questsSnap.forEach(doc => {
                     const d = doc.data();
@@ -22970,32 +22971,33 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         questData: d
                     };
 
-                    if (d.status !== 'none') {
-                        questReceiveScore += 0.1;
-                        questReceiveCount++;
-                        questDisplayLogs.push({
-                            t: questDate,
-                            type: 'work',
-                            text: `Daily Quest: ${questTitle}`,
-                            score: 0.1,
-                            questScoreKind: 'received',
-                            ...questExtra
-                        });
-                    }
-
+                    // V92.25: collapse receive + reviewed into a single entry per submission.
+                    // Receive/review counters still tracked separately so the dash bonus/quiz
+                    // subtraction stays accurate (addP earlier added to those buckets); merged
+                    // count drives the works (W) entry count so it matches the visible list.
+                    const receiveScore = (d.status !== 'none') ? 0.1 : 0;
                     const reviewedScore = (d.earnedScore || 0) + (d.bonusGiven || 0);
-                    if (reviewedScore > 0) {
-                        questReviewScore += reviewedScore;
-                        questReviewCount++;
-                        questDisplayLogs.push({
-                            t: questDate,
-                            type: 'work',
-                            text: `Daily Quest Reviewed: ${questTitle}`,
-                            score: reviewedScore,
-                            questScoreKind: 'reviewed',
-                            ...questExtra
-                        });
-                    }
+                    const totalScore = receiveScore + reviewedScore;
+                    if (receiveScore > 0) { questReceiveScore += receiveScore; questReceiveCount++; }
+                    if (reviewedScore > 0) { questReviewScore += reviewedScore; questReviewCount++; }
+                    if (totalScore <= 0) return;
+
+                    questMergedCount++;
+                    const isReviewed = reviewedScore > 0;
+                    // Avoid the "Daily Quest: Daily Quest" double-label when questTitle is the generic fallback
+                    const labelTitle = (questTitle && questTitle !== 'Daily Quest') ? `: ${questTitle}` : '';
+                    const text = isReviewed
+                        ? `⚡ Daily Quest ✓${labelTitle}`
+                        : `⚡ Daily Quest${labelTitle}`;
+                    questDisplayLogs.push({
+                        t: questDate,
+                        type: 'work',
+                        text,
+                        score: totalScore,
+                        questScoreKind: isReviewed ? 'reviewed' : 'received',
+                        scoreBreakdown: { receive: receiveScore, review: reviewedScore },
+                        ...questExtra
+                    });
                 });
 
                 for (let i = allLogs.length - 1; i >= 0; i--) {
@@ -23012,7 +23014,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 dash.quizzes = Math.max(0, dash.quizzes - questReviewScore);
                 dash.qc = Math.max(0, dash.qc - questReviewCount);
                 dash.works += questReceiveScore + questReviewScore;
-                dash.wc += questReceiveCount + questReviewCount;
+                dash.wc += questMergedCount;  // V92.25: count merged entries, not raw events
 
                 const hubCaseReviewLogTextByDocId = {};
                 logsSnap.forEach(doc => { 
@@ -23460,7 +23462,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             ${previewBlock}
                         </div>
                         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0;">
-                            <div style="font-size:1em; font-weight:900; color:${e.score >=0 ? '#10b981' : '#ef4444'};">${e.score >=0 ? '+' : ''}${e.score.toFixed(2)}</div>
+                            <div title="${e.scoreBreakdown ? `Receive +${e.scoreBreakdown.receive.toFixed(2)} · Review +${e.scoreBreakdown.review.toFixed(2)}` : ''}" style="font-size:1em; font-weight:900; color:${e.score >=0 ? '#10b981' : '#ef4444'}; ${e.scoreBreakdown && e.scoreBreakdown.review > 0 ? 'cursor:help; border-bottom:1px dotted currentColor;' : ''}">${e.score >=0 ? '+' : ''}${e.score.toFixed(2)}</div>
                             ${e.isReflective && e.mood ? `<div style="font-size:1.1em; line-height:1;" title="Mood">${e.mood}</div>` : ''}
                         </div>
                     </div>
