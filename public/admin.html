@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.21</title>
+    <title>Nika V92.22</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -22613,6 +22613,159 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             );
         };
 
+        // V92.22: edit/audit/revert handlers for the User Answer block in the V92.19 modal.
+        // Mirrors the LP V92.09-V92.10 editHistory pattern: append-only audit array on the doc,
+        // capped at 10 most recent entries; lastAdminEdit holds the latest summary.
+        window.enterHubAnswerEdit = function() {
+            const view = document.getElementById('hub-answer-view');
+            const edit = document.getElementById('hub-answer-edit');
+            const hist = document.getElementById('hub-answer-history');
+            if (!view || !edit) return;
+            view.style.display = 'none';
+            edit.style.display = 'block';
+            if (hist) hist.style.display = 'none';
+            const ta = document.getElementById('hub-answer-textarea');
+            if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+        };
+
+        window.exitHubAnswerEdit = function() {
+            const view = document.getElementById('hub-answer-view');
+            const edit = document.getElementById('hub-answer-edit');
+            if (!view || !edit) return;
+            edit.style.display = 'none';
+            view.style.display = 'block';
+        };
+
+        window.saveHubAnswerEdit = async function(subId) {
+            const ta = document.getElementById('hub-answer-textarea');
+            const reasonEl = document.getElementById('hub-answer-reason');
+            if (!ta || !reasonEl) return;
+            const newAnswer = String(ta.value || '').trim();
+            const reason = String(reasonEl.value || '').trim();
+            if (!reason) { alert('Please enter a reason for the edit.'); reasonEl.focus(); return; }
+            const sub = (questsSubList || []).find(s => s.id === subId);
+            if (!sub) { showToast('Submission not found in cache'); return; }
+            const oldAnswer = String(sub.answer || sub.submission || sub.content || '');
+            if (oldAnswer === newAnswer) { alert('Answer is unchanged.'); return; }
+
+            try {
+                const editor = (typeof auth !== 'undefined' && auth.currentUser) || {};
+                const editEntry = {
+                    editorUid: editor.uid || 'unknown',
+                    editorEmail: editor.email || ALLOWED_EMAIL,
+                    editedAt: new Date().toISOString(),
+                    reason,
+                    fieldsBefore: { answer: oldAnswer },
+                    fieldsAfter: { answer: newAnswer },
+                    type: 'edit'
+                };
+                const prev = Array.isArray(sub.editHistory) ? sub.editHistory : [];
+                const next = [...prev, editEntry].slice(-10);
+                await db.collection('quest_submissions').doc(subId).update({
+                    answer: newAnswer,
+                    editHistory: next,
+                    lastAdminEdit: { editorEmail: editEntry.editorEmail, editedAt: editEntry.editedAt, reason },
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                sub.answer = newAnswer;
+                sub.editHistory = next;
+                sub.lastAdminEdit = { editorEmail: editEntry.editorEmail, editedAt: editEntry.editedAt, reason };
+                showToast('✓ Answer saved & audit logged');
+                window.showHubBacklogDetails(sub.questId);
+            } catch (err) {
+                console.error('saveHubAnswerEdit', err);
+                alert('Save failed: ' + (err.message || err));
+            }
+        };
+
+        window.toggleHubAnswerHistory = function(subId) {
+            const hist = document.getElementById('hub-answer-history');
+            const edit = document.getElementById('hub-answer-edit');
+            if (!hist) return;
+            if (hist.style.display === 'block') { hist.style.display = 'none'; return; }
+            if (edit) edit.style.display = 'none';
+
+            const sub = (questsSubList || []).find(s => s.id === subId);
+            const history = (sub && Array.isArray(sub.editHistory)) ? sub.editHistory : [];
+            if (!history.length) {
+                hist.innerHTML = '<div style="padding:12px; text-align:center; color:#94a3b8; font-size:0.85em;">No prior edits.</div>';
+                hist.style.display = 'block';
+                return;
+            }
+            const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const indexed = history.map((h, i) => ({ ...h, _idx: i })).reverse();
+            hist.innerHTML = indexed.map(h => {
+                const when = h.editedAt ? new Date(h.editedAt).toLocaleString() : '—';
+                const isRevert = h.type === 'revert';
+                const typeBadge = isRevert
+                    ? '<span style="background:#fef3c7;color:#92400e;border-radius:5px;padding:1px 6px;font-size:0.7em;font-weight:800;">↩️ REVERT</span>'
+                    : '<span style="background:#dbeafe;color:#1e3a8a;border-radius:5px;padding:1px 6px;font-size:0.7em;font-weight:800;">✏️ EDIT</span>';
+                const beforeText = esc(((h.fieldsBefore || {}).answer || '').slice(0, 400));
+                const afterText = esc(((h.fieldsAfter || {}).answer || '').slice(0, 400));
+                return `<div style="background:#fff; border:1px solid #c7d2fe; border-radius:10px; padding:10px 12px; margin-bottom:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:200px;">
+                            <div style="display:flex; gap:6px; align-items:center; margin-bottom:3px;">
+                                ${typeBadge}
+                                <span style="font-size:0.78em; font-weight:700; color:#0f172a;">#${h._idx + 1}</span>
+                            </div>
+                            <div style="font-size:0.78em; color:#475569;"><strong>${esc(h.editorEmail || '—')}</strong> · ${when}</div>
+                            <div style="font-size:0.82em; color:#0f172a; margin-top:4px; font-style:italic;">"${esc(h.reason || '')}"</div>
+                        </div>
+                        <button onclick="revertHubAnswer('${subId}', ${h._idx})" title="Restore the answer state BEFORE this edit" style="background:#fef3c7; color:#92400e; border:none; border-radius:6px; padding:4px 10px; font-size:0.72em; font-weight:700; cursor:pointer; flex-shrink:0;">↩️ Revert to before</button>
+                    </div>
+                    <details style="margin-top:6px;">
+                        <summary style="cursor:pointer; font-size:0.75em; color:#475569; font-weight:700;">🔍 Show diff</summary>
+                        <div style="margin-top:6px; display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.78em;">
+                            <div><div style="color:#dc2626; font-weight:700; margin-bottom:3px;">Before</div><div style="background:#fef2f2; padding:6px 8px; border-radius:6px; white-space:pre-wrap; max-height:160px; overflow-y:auto;">${beforeText}${beforeText.length === 400 ? '…' : ''}</div></div>
+                            <div><div style="color:#16a34a; font-weight:700; margin-bottom:3px;">After</div><div style="background:#f0fdf4; padding:6px 8px; border-radius:6px; white-space:pre-wrap; max-height:160px; overflow-y:auto;">${afterText}${afterText.length === 400 ? '…' : ''}</div></div>
+                        </div>
+                    </details>
+                </div>`;
+            }).join('');
+            hist.style.display = 'block';
+        };
+
+        window.revertHubAnswer = async function(subId, idx) {
+            const sub = (questsSubList || []).find(s => s.id === subId);
+            const history = (sub && Array.isArray(sub.editHistory)) ? sub.editHistory : [];
+            const target = history[idx];
+            if (!target || !target.fieldsBefore) { showToast('Cannot revert: snapshot missing'); return; }
+            const beforeAnswer = String(target.fieldsBefore.answer || '');
+            const currentAnswer = String(sub.answer || '');
+            if (beforeAnswer === currentAnswer) { alert('Already at that state.'); return; }
+            if (!confirm(`Revert answer to the state before edit #${idx + 1}?\n\nThis will be audit-logged as a REVERT entry.`)) return;
+
+            try {
+                const editor = (typeof auth !== 'undefined' && auth.currentUser) || {};
+                const reason = `Reverted to state before edit #${idx + 1}`;
+                const revertEntry = {
+                    editorUid: editor.uid || 'unknown',
+                    editorEmail: editor.email || ALLOWED_EMAIL,
+                    editedAt: new Date().toISOString(),
+                    reason,
+                    fieldsBefore: { answer: currentAnswer },
+                    fieldsAfter: { answer: beforeAnswer },
+                    type: 'revert'
+                };
+                const next = [...history, revertEntry].slice(-10);
+                await db.collection('quest_submissions').doc(subId).update({
+                    answer: beforeAnswer,
+                    editHistory: next,
+                    lastAdminEdit: { editorEmail: revertEntry.editorEmail, editedAt: revertEntry.editedAt, reason },
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                sub.answer = beforeAnswer;
+                sub.editHistory = next;
+                sub.lastAdminEdit = { editorEmail: revertEntry.editorEmail, editedAt: revertEntry.editedAt, reason };
+                showToast('✓ Reverted & audit logged');
+                window.showHubBacklogDetails(sub.questId);
+            } catch (err) {
+                console.error('revertHubAnswer', err);
+                alert('Revert failed: ' + (err.message || err));
+            }
+        };
+
         // V92.19: detail modal for backlog cards — quest text + user submission + admin actions
         window.showHubBacklogDetails = function(questId) {
             const userId = window._currentPopupUser;
@@ -22635,6 +22788,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const answer = sub ? String(sub.answer || sub.submission || sub.content || '').trim() : '';
             const renderedAnswer = window._formatUserAnswer(answer);
             const escTitle = String(quest.question || 'Untitled Daily Quest').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            // V92.22: edit + audit affordance for the user answer (mirrors LP V92.09 editHistory pattern)
+            const editHistory = Array.isArray(sub?.editHistory) ? sub.editHistory : [];
+            const editCount = editHistory.length;
+            const lastEdit = sub?.lastAdminEdit;
+            const editBadge = editCount > 0
+                ? `<span title="Edited ${editCount}× by admin${lastEdit ? ` — last by ${lastEdit.editorEmail || '?'} ${lastEdit.editedAt ? new Date(lastEdit.editedAt).toLocaleString() : ''}` : ''}" style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:999px; font-size:0.7em; font-weight:800; cursor:help;">✏️ ${editCount}×</span>`
+                : '';
+            const escAnswerForTextarea = answer.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             const fmt = d => d ? d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '-';
             const earnedScore = sub ? Number(sub.earnedScore || 0) : 0;
             const bonusGiven = sub ? Number(sub.bonusGiven || 0) : 0;
@@ -22664,16 +22825,32 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             ${reviewed ? `<div style="background:#ecfdf5; padding:8px 10px; border-radius:8px;">Reviewed<br><b style="color:#065f46;">${fmt(reviewed)}</b></div>` : ''}
                         </div>
                     ` : ''}
-                    ${answer ? `
+                    ${sub ? `
                         <div style="background:#eff6ff; padding:15px; border-radius:12px; border-left:4px solid #3b82f6; margin-bottom:14px;">
-                            <div style="font-size:0.75em; color:#1d4ed8; font-weight:800; text-transform:uppercase; margin-bottom:10px;">User Answer</div>
-                            <div style="color:#1e3a8a; font-size:0.95em; line-height:1.6; white-space:pre-wrap; max-height:320px; overflow-y:auto;">${renderedAnswer}</div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="font-size:0.75em; color:#1d4ed8; font-weight:800; text-transform:uppercase;">User Answer</span>
+                                    ${editBadge}
+                                </div>
+                                <div style="display:flex; gap:6px;">
+                                    ${editCount > 0 ? `<button onclick="toggleHubAnswerHistory('${sub.id}')" title="View edit history" style="border:none; background:#fef3c7; color:#92400e; border-radius:6px; padding:3px 8px; font-size:0.72em; font-weight:800; cursor:pointer;">📜 History</button>` : ''}
+                                    <button onclick="enterHubAnswerEdit()" title="Edit answer (audit-logged)" style="border:none; background:#1d4ed8; color:white; border-radius:6px; padding:3px 10px; font-size:0.72em; font-weight:800; cursor:pointer;">✏️ Edit</button>
+                                </div>
+                            </div>
+                            <div id="hub-answer-view" style="color:#1e3a8a; font-size:0.95em; line-height:1.6; white-space:pre-wrap; max-height:320px; overflow-y:auto;">${answer ? renderedAnswer : '<span style="color:#94a3b8; font-style:italic;">(no answer text)</span>'}</div>
+                            <div id="hub-answer-edit" style="display:none;">
+                                <textarea id="hub-answer-textarea" style="width:100%; min-height:140px; padding:10px; border:1.5px solid #93c5fd; border-radius:8px; font-family:inherit; font-size:0.95em; line-height:1.5; resize:vertical; box-sizing:border-box;">${escAnswerForTextarea}</textarea>
+                                <input id="hub-answer-reason" type="text" placeholder="Reason for edit (required) — e.g. fix typo, restore truncated content..." style="width:100%; margin-top:8px; padding:8px 10px; border:1px solid #c9b8f5; border-radius:8px; font-size:0.85em; box-sizing:border-box;">
+                                <div style="display:flex; gap:6px; justify-content:flex-end; margin-top:8px;">
+                                    <button onclick="exitHubAnswerEdit()" style="border:none; background:#f8fafc; color:#64748b; border:1px solid #e2e8f0; border-radius:8px; padding:6px 14px; font-size:0.78em; font-weight:800; cursor:pointer;">Cancel</button>
+                                    <button onclick="saveHubAnswerEdit('${sub.id}')" style="border:none; background:#1d4ed8; color:white; border-radius:8px; padding:6px 14px; font-size:0.78em; font-weight:800; cursor:pointer;">💾 Save with Audit</button>
+                                </div>
+                            </div>
+                            <div id="hub-answer-history" style="display:none; margin-top:10px; padding-top:10px; border-top:1px dashed #c7d2fe;"></div>
                         </div>
-                    ` : (sub ? `
-                        <div style="padding:14px; border-radius:10px; border:1px dashed #cbd5e1; color:#94a3b8; text-align:center; font-size:0.85em; margin-bottom:14px;">Submission exists but contains no answer text.</div>
                     ` : `
                         <div style="padding:14px; border-radius:10px; border:1px dashed #cbd5e1; color:#94a3b8; text-align:center; font-size:0.85em; margin-bottom:14px;">User has not submitted yet.</div>
-                    `)}
+                    `}
                     <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; padding-top:12px; border-top:1px solid #f1f5f9;">
                         ${(status === 'review' && sub?.id) ? `<button class="btn-sm" onclick="document.getElementById('workDetailModal').style.display='none'; reviewQuestSubmission('${sub.id}')" style="border:none; background:#f59e0b; color:white; border-radius:10px; padding:8px 16px; font-weight:800; cursor:pointer;">✅ Grade Submission</button>` : ''}
                         <button class="btn-sm" onclick="document.getElementById('workDetailModal').style.display='none'; recallQuest('${quest.id}')" style="border:none; background:#f8fafc; color:#64748b; border-radius:10px; padding:8px 16px; font-weight:800; cursor:pointer; border:1px solid #e2e8f0;">✏️ Edit Quest Template</button>
