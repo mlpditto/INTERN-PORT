@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.19</title>
+    <title>Nika V92.20</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -22603,6 +22603,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }).join('');
         }
 
+        // V92.20: HTML-escape user-submitted text and convert bare http(s) URLs to clickable links.
+        // Trailing sentence punctuation (.,!?;:)]) is kept outside the anchor.
+        window._formatUserAnswer = function(text) {
+            const escaped = String(text || '')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return escaped.replace(/(https?:\/\/\S+?)([.,!?;:)\]]*)(?=\s|$)/g,
+                '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#2563eb; text-decoration:underline; word-break:break-all;">$1</a>$2'
+            );
+        };
+
         // V92.19: detail modal for backlog cards — quest text + user submission + admin actions
         window.showHubBacklogDetails = function(questId) {
             const userId = window._currentPopupUser;
@@ -22623,7 +22633,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const submitted = toHubDate(sub?.submittedAt);
             const reviewed = toHubDate(sub?.reviewedAt);
             const answer = sub ? String(sub.answer || sub.submission || sub.content || '').trim() : '';
-            const escAnswer = answer.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const renderedAnswer = window._formatUserAnswer(answer);
             const escTitle = String(quest.question || 'Untitled Daily Quest').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             const fmt = d => d ? d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '-';
             const earnedScore = sub ? Number(sub.earnedScore || 0) : 0;
@@ -22657,7 +22667,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     ${answer ? `
                         <div style="background:#eff6ff; padding:15px; border-radius:12px; border-left:4px solid #3b82f6; margin-bottom:14px;">
                             <div style="font-size:0.75em; color:#1d4ed8; font-weight:800; text-transform:uppercase; margin-bottom:10px;">User Answer</div>
-                            <div style="color:#1e3a8a; font-size:0.95em; line-height:1.6; white-space:pre-wrap; max-height:320px; overflow-y:auto;">${escAnswer}</div>
+                            <div style="color:#1e3a8a; font-size:0.95em; line-height:1.6; white-space:pre-wrap; max-height:320px; overflow-y:auto;">${renderedAnswer}</div>
                         </div>
                     ` : (sub ? `
                         <div style="padding:14px; border-radius:10px; border:1px dashed #cbd5e1; color:#94a3b8; text-align:center; font-size:0.85em; margin-bottom:14px;">Submission exists but contains no answer text.</div>
@@ -24818,7 +24828,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         ${item.answer ? `
                             <div style="background:#eff6ff; padding:15px; border-radius:12px; border-left:4px solid #3b82f6; margin-bottom:12px;">
                                 <div style="font-size:0.75em; color:#1d4ed8; font-weight:700; text-transform:uppercase; margin-bottom:10px;">User Answer</div>
-                                <div style="color:#1e3a8a; font-size:0.95em; line-height:1.6; white-space:pre-wrap; font-family:inherit;">${String(item.answer || '').trim()}</div>
+                                <div style="color:#1e3a8a; font-size:0.95em; line-height:1.6; white-space:pre-wrap; font-family:inherit;">${window._formatUserAnswer(String(item.answer || '').trim())}</div>
                             </div>
                         ` : `
                             <div style="padding:15px; border-radius:12px; border:1px dashed #cbd5e1; color:#94a3b8; text-align:center; font-size:0.9em;">
