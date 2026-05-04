@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.26</title>
+    <title>Nika V92.27</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -23676,53 +23676,87 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // 1. Render Trend SVG
                 chartBox.innerHTML = drawQuizTrendLine(attempts);
 
-                // 2. Tag Performance
-                const tagScores = {}; // {tag: {sumPct, count}}
+                // 2. Tag Performance — V92.27: group co-occurring tags, weight by question totals
+                // Tags live at quiz level (q.tags), not per-question. So tags that always appear together
+                // on the same set of attempts have mathematically identical scores. We group them to avoid
+                // showing duplicated bars, and aggregate using total-correct / total-questions instead of
+                // averaging per-quiz percentages (correct weighting when quizzes have different lengths).
+                const tagAttemptIdx = {}; // tag -> Set<attemptIndexInValid>
+                const validAttempts = []; // attempts whose quiz carries tags
                 attempts.forEach(att => {
                     const qData = quizzesData.find(x => x.id === att.quizId);
-                    if (qData && qData.tags) {
-                        const tags = qData.tags.split(',').map(t => t.trim()).filter(t => t);
-                        const pct = (att.correctCount / att.totalQuestions) * 100;
-                        tags.forEach(t => {
-                            if (!tagScores[t]) tagScores[t] = { sum: 0, count: 0 };
-                            tagScores[t].sum += pct;
-                            tagScores[t].count++;
-                        });
-                    }
+                    if (!qData || !qData.tags) return;
+                    const tags = qData.tags.split(',').map(t => t.trim()).filter(Boolean);
+                    if (tags.length === 0) return;
+                    const idx = validAttempts.length;
+                    validAttempts.push(att);
+                    tags.forEach(t => {
+                        if (!tagAttemptIdx[t]) tagAttemptIdx[t] = new Set();
+                        tagAttemptIdx[t].add(idx);
+                    });
                 });
 
+                const sigGroups = new Map();
+                Object.entries(tagAttemptIdx).forEach(([tag, set]) => {
+                    const sig = [...set].sort((a, b) => a - b).join(',');
+                    if (!sigGroups.has(sig)) sigGroups.set(sig, { tags: [], attemptIdxs: set });
+                    sigGroups.get(sig).tags.push(tag);
+                });
+
+                const groups = [...sigGroups.values()].map(g => {
+                    let totalCorrect = 0, totalQ = 0;
+                    g.attemptIdxs.forEach(idx => {
+                        const a = validAttempts[idx];
+                        totalCorrect += Number(a.correctCount) || 0;
+                        totalQ += Number(a.totalQuestions) || 0;
+                    });
+                    return {
+                        tags: g.tags.sort(),
+                        avg: totalQ > 0 ? (totalCorrect / totalQ) * 100 : 0,
+                        correct: totalCorrect,
+                        total: totalQ,
+                        attempts: g.attemptIdxs.size
+                    };
+                }).sort((a, b) => b.avg - a.avg);
+
                 if (!window._hubTagPage) window._hubTagPage = 1;
-                const tagsPerPage = 8;
-                const sortedTags = Object.entries(tagScores).sort((a,b) => (b[1].sum / b[1].count) - (a[1].sum / a[1].count));
-                const totalTagPages = Math.ceil(sortedTags.length / tagsPerPage);
-                
+                const groupsPerPage = 5;
+                const totalTagPages = Math.ceil(groups.length / groupsPerPage);
+                if (window._hubTagPage > totalTagPages && totalTagPages > 0) window._hubTagPage = 1;
+
                 let tagHtml = "";
-                if (sortedTags.length === 0) {
+                if (groups.length === 0) {
                     tagHtml = "(No tagged quizzes found)";
                 } else {
-                    const startIdx = (window._hubTagPage - 1) * tagsPerPage;
-                    const paginatedTags = sortedTags.slice(startIdx, startIdx + tagsPerPage);
-                    
-                    paginatedTags.forEach(([tag, data]) => {
-                        const avg = data.sum / data.count;
-                        const color = avg >= 80 ? '#10b981' : avg >= 50 ? '#f59e0b' : '#ef4444';
+                    tagHtml += `<div style="font-size:0.7em; color:#94a3b8; margin-bottom:10px; line-height:1.45; padding:6px 10px; background:#f1f5f9; border-radius:8px;"><i class="fa-solid fa-circle-info"></i> Tags are quiz-level. Tags that always co-occur on the same quizzes are grouped together since they share the same score.</div>`;
+                    const startIdx = (window._hubTagPage - 1) * groupsPerPage;
+                    const paginated = groups.slice(startIdx, startIdx + groupsPerPage);
+                    paginated.forEach((g, i) => {
+                        const color = g.avg >= 80 ? '#10b981' : g.avg >= 50 ? '#f59e0b' : '#ef4444';
+                        const primary = g.tags[0];
+                        const chips = g.tags.length > 1
+                            ? `<div style="display:flex; flex-wrap:wrap; gap:3px; margin-top:5px;">${g.tags.slice(1).map(t => `<span style="font-size:0.65em; background:#e2e8f0; color:#475569; padding:1px 7px; border-radius:6px; font-weight:600;">${t}</span>`).join('')}</div>`
+                            : '';
+                        const coLabel = g.tags.length > 1 ? `<span style="font-size:0.7em; color:#94a3b8; font-weight:600; margin-left:6px;">+${g.tags.length - 1} co-occurring</span>` : '';
+                        const isLast = i === paginated.length - 1;
                         tagHtml += `
-                            <div style="margin-bottom:8px;">
-                                <div style="display:flex; justify-content:space-between; margin-bottom:3px; font-weight:700;">
-                                    <span style="font-size:0.85em; color:#475569;">${tag}</span>
-                                    <span style="font-size:0.85em; color:${color}">${avg.toFixed(1)}%</span>
+                            <div style="margin-bottom:10px; padding-bottom:10px; ${!isLast ? 'border-bottom:1px dashed #e2e8f0;' : ''}">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="font-weight:700; font-size:0.85em; color:#475569;">${primary}${coLabel}</div>
+                                    <span style="font-size:0.85em; color:${color}; font-weight:800;">${g.avg.toFixed(1)}%</span>
                                 </div>
                                 <div style="width:100%; height:6px; background:#e2e8f0; border-radius:10px; overflow:hidden;">
-                                    <div style="width:${avg}%; height:100%; background:${color}; border-radius:10px; transition:width 0.5s ease-out;"></div>
+                                    <div style="width:${g.avg}%; height:100%; background:${color}; border-radius:10px; transition:width 0.5s ease-out;"></div>
                                 </div>
+                                <div style="font-size:0.7em; color:#94a3b8; margin-top:5px; font-weight:600;">${g.correct}/${g.total} correct &middot; ${g.attempts} ${g.attempts === 1 ? 'attempt' : 'attempts'}</div>
+                                ${chips}
                             </div>
                         `;
                     });
 
-                    // Tag Pagination Controls (Turbo Style)
                     if (totalTagPages > 1) {
                         tagHtml += `
-                            <div style="display:flex; justify-content:center; align-items:center; gap:12px; margin-top:15px; padding-top:10px; border-top:1px dashed #e2e8f0;">
+                            <div style="display:flex; justify-content:center; align-items:center; gap:12px; margin-top:10px; padding-top:10px; border-top:1px dashed #e2e8f0;">
                                 <button onclick="changeTagPage('${userId}', -1)" ${window._hubTagPage === 1 ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''} style="background:#f1f5f9; border:none; padding:4px 10px; border-radius:8px; font-weight:900; cursor:pointer;">⬅️</button>
                                 <span style="font-size:0.75em; font-weight:900; color:#94a3b8;">${window._hubTagPage} / ${totalTagPages}</span>
                                 <button onclick="changeTagPage('${userId}', 1)" ${window._hubTagPage >= totalTagPages ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''} style="background:#f1f5f9; border:none; padding:4px 10px; border-radius:8px; font-weight:900; cursor:pointer;">➡️</button>
@@ -23732,22 +23766,33 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
                 tagBox.innerHTML = tagHtml;
 
-                // 3. Simple Strength/Weakness
-                if (sortedTags.length > 0) {
-                    const best = sortedTags[0];
-                    const worst = sortedTags[sortedTags.length - 1];
+                // 3. Strength / Weakness — operate on groups; show tag-cluster + real ratio
+                if (groups.length === 0) {
+                    summaryBox.innerHTML = "Participate in more tagged quizzes to unlock skill profiling.";
+                } else if (groups.length === 1) {
+                    const only = groups[0];
+                    const label = only.tags.length > 1 ? `${only.tags[0]} <span style="font-size:0.85em; color:#64748b;">(+${only.tags.length - 1} more)</span>` : only.tags[0];
                     summaryBox.innerHTML = `
-                        <div style="margin-bottom:10px; padding:10px; background:rgba(16,185,129,0.05); border-radius:10px; border-left:4px solid #10b981;">
-                            <div style="font-weight:bold; color:#065f46; font-size:0.9em;">🌟 Strength</div>
-                            <div style="font-size:0.85em;">Excellent performance in <b>${best[0]}</b>. Keep it up!</div>
-                        </div>
-                        <div style="padding:10px; background:rgba(239,68,68,0.05); border-radius:10px; border-left:4px solid #ef4444;">
-                            <div style="font-weight:bold; color:#991b1b; font-size:0.9em;">⚠️ Area for Improvement</div>
-                            <div style="font-size:0.85em;">Consider reviewing <b>${worst[0]}</b> modules (Avg: ${(worst[1].sum / worst[1].count).toFixed(1)}%).</div>
+                        <div style="padding:10px; background:rgba(99,102,241,0.05); border-radius:10px; border-left:4px solid #6366f1;">
+                            <div style="font-weight:bold; color:#3730a3; font-size:0.9em;">📊 Single Tag Cluster</div>
+                            <div style="font-size:0.85em;">All quiz history is in <b>${label}</b> (${only.correct}/${only.total} = ${only.avg.toFixed(1)}%). Try other quiz topics to compare strengths.</div>
                         </div>
                     `;
                 } else {
-                    summaryBox.innerHTML = "Participate in more tagged quizzes to unlock skill profiling.";
+                    const best = groups[0];
+                    const worst = groups[groups.length - 1];
+                    const bestLabel = best.tags.length > 1 ? `${best.tags[0]} <span style="font-size:0.85em; color:#64748b;">(+${best.tags.length - 1} more)</span>` : best.tags[0];
+                    const worstLabel = worst.tags.length > 1 ? `${worst.tags[0]} <span style="font-size:0.85em; color:#64748b;">(+${worst.tags.length - 1} more)</span>` : worst.tags[0];
+                    summaryBox.innerHTML = `
+                        <div style="margin-bottom:10px; padding:10px; background:rgba(16,185,129,0.05); border-radius:10px; border-left:4px solid #10b981;">
+                            <div style="font-weight:bold; color:#065f46; font-size:0.9em;">🌟 Strength</div>
+                            <div style="font-size:0.85em;">Excellent performance in <b>${bestLabel}</b> &mdash; ${best.correct}/${best.total} = ${best.avg.toFixed(1)}%.</div>
+                        </div>
+                        <div style="padding:10px; background:rgba(239,68,68,0.05); border-radius:10px; border-left:4px solid #ef4444;">
+                            <div style="font-weight:bold; color:#991b1b; font-size:0.9em;">⚠️ Area for Improvement</div>
+                            <div style="font-size:0.85em;">Consider reviewing <b>${worstLabel}</b> &mdash; ${worst.correct}/${worst.total} = ${worst.avg.toFixed(1)}%.</div>
+                        </div>
+                    `;
                 }
 
             } catch (err) {
