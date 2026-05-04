@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.16</title>
+    <title>Nika V92.17</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -27689,12 +27689,28 @@ Recommended Review: X days`;
                         const deletedAt = e.deletedAt ? new Date(e.deletedAt).toLocaleString() : '—';
                         const tags = (e.tags || []).map(t => `<span style="background:#fee2e2;color:#991b1b;border-radius:5px;padding:1px 6px;font-size:0.72em;">${t}</span>`).join(' ');
                         const reason = (e.deleteReason || '(no reason)').replace(/\s+/g, ' ').trim().slice(0, 200);
+                        // V92.17: TTL countdown — entries with deleteAt show time remaining; legacy entries (no deleteAt) show "manual"
+                        let ttlBadge = '';
+                        if (e.deleteAt && e.deleteAt.toMillis) {
+                            const msLeft = e.deleteAt.toMillis() - Date.now();
+                            if (msLeft > 0) {
+                                const hLeft = Math.floor(msLeft / 3600000);
+                                const mLeft = Math.floor((msLeft % 3600000) / 60000);
+                                const txt = hLeft > 0 ? `${hLeft}h ${mLeft}m` : `${mLeft}m`;
+                                ttlBadge = `<span title="Auto-purges via Firestore TTL within 24h of expiry" style="font-size:0.7em;color:#7c2d12;background:#fed7aa;border:1px solid #fdba74;border-radius:5px;padding:1px 6px;font-weight:700;">⏳ ${txt}</span>`;
+                            } else {
+                                ttlBadge = `<span title="TTL elapsed — Firestore sweep pending (typically within 24h)" style="font-size:0.7em;color:#7f1d1d;background:#fde68a;border:1px solid #fcd34d;border-radius:5px;padding:1px 6px;font-weight:700;">⏳ pending purge</span>`;
+                            }
+                        } else {
+                            ttlBadge = `<span title="Legacy soft-delete (pre-V92.17) — no TTL field; restore + re-delete to apply auto-purge" style="font-size:0.7em;color:#475569;background:#e2e8f0;border:1px solid #cbd5e1;border-radius:5px;padding:1px 6px;font-weight:700;">manual</span>`;
+                        }
                         return `<div data-lp-id="${e.id}" style="padding:10px 12px;border-radius:12px;border:1px solid #fecaca;background:#fef2f2;margin-bottom:4px;opacity:0.95;">
                             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
                                 <div style="font-size:0.88em;font-weight:700;color:#7f1d1d;text-decoration:line-through;">${e.title||'Untitled'}</div>
-                                <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
+                                <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;flex-wrap:wrap;">
                                     <span style="font-size:0.7em;color:#7f1d1d;background:#fecaca;border-radius:5px;padding:1px 6px;font-weight:700;">DELETED</span>
-                                    <button onclick="lpAdminRestoreFromTrash('${e.id}')" title="Restore this entry (audit logged)" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:2px 8px;font-size:0.72em;font-weight:700;cursor:pointer;">↩️ Restore</button>
+                                    ${ttlBadge}
+                                    <button onclick="lpAdminRestoreFromTrash('${e.id}')" title="Restore this entry (cancels TTL, audit logged)" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:2px 8px;font-size:0.72em;font-weight:700;cursor:pointer;">↩️ Restore</button>
                                 </div>
                             </div>
                             <div style="font-size:0.72em;color:#991b1b;margin-top:4px;">Deleted by <strong>${e.deletedBy || 'admin'}</strong> · ${deletedAt}</div>
@@ -28036,11 +28052,19 @@ Recommended Review: X days`;
                 const prevHistory = Array.isArray(before.editHistory) ? before.editHistory : [];
                 const nextHistory = [...prevHistory, editEntry].slice(-10);
 
+                // V92.17: TTL — set deleteAt to 24h from now. Firestore TTL policy on
+                // learning_path_entries.deleteAt will hard-delete the doc within 24h
+                // of that timestamp. (TTL policy must be enabled in Firebase Console;
+                // see PR description for one-time setup steps.)
+                const deleteAtMs = Date.now() + 24 * 60 * 60 * 1000;
+                const deleteAtTs = firebase.firestore.Timestamp.fromMillis(deleteAtMs);
+
                 await db.collection('learning_path_entries').doc(entryId).update({
                     deleted: true,
                     deletedAt: editEntry.editedAt,
                     deletedBy: editEntry.editorEmail,
                     deleteReason: reason,
+                    deleteAt: deleteAtTs,  // V92.17: TTL trigger field
                     editHistory: nextHistory,
                     lastAdminEdit: {
                         editorEmail: editEntry.editorEmail,
@@ -28050,7 +28074,7 @@ Recommended Review: X days`;
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-                statusEl.textContent = 'Deleted ✓ Moved to trash.';
+                statusEl.textContent = 'Deleted ✓ Moved to trash (auto-purges in 24h).';
                 lpAdminNotifyEdit(entryId, 'delete');  // LINE push
                 setTimeout(() => {
                     forceHideModal('lpAdminDeleteConfirmModal');
@@ -28098,6 +28122,7 @@ Recommended Review: X days`;
                     deletedAt: firebase.firestore.FieldValue.delete(),
                     deletedBy: firebase.firestore.FieldValue.delete(),
                     deleteReason: firebase.firestore.FieldValue.delete(),
+                    deleteAt: firebase.firestore.FieldValue.delete(),  // V92.17: cancel TTL on restore
                     editHistory: nextHistory,
                     lastAdminEdit: {
                         editorEmail: editEntry.editorEmail,
