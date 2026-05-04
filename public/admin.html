@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.25</title>
+    <title>Nika V92.26</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -23047,14 +23047,35 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     dash.qc++;
                 });
 
+                // V92.26: merge the +0.10 base "Daily Reflective Log" entry from checkin_logs into
+                // the corresponding rich reflective_logs entry, mirroring the V92.25 quest pattern.
+                let reflectiveBaseAbsorbedCount = 0;
                 rLogsSnap.forEach(doc => {
                     const x = doc.data();
-                    const score = x.adminBonus || 0;
+                    const adminBonus = x.adminBonus || 0;
+                    const tDate = x.timestamp?.toDate();
+
+                    // Find and absorb the matching base reward (±60s window) added earlier by addP from checkin_logs
+                    let baseScore = 0;
+                    if (tDate) {
+                        const idx = allLogs.findIndex(log =>
+                            log.type === 'reflective_log' &&
+                            log.text === 'Daily Reflective Log' &&
+                            log.t && Math.abs(log.t.getTime() - tDate.getTime()) < 60000
+                        );
+                        if (idx !== -1) {
+                            baseScore = Number(allLogs[idx].score) || 0;
+                            allLogs.splice(idx, 1);
+                            reflectiveBaseAbsorbedCount++;
+                        }
+                    }
+                    const totalScore = adminBonus + baseScore;
                     allLogs.push({
-                        t: x.timestamp?.toDate(),
+                        t: tDate,
                         type: 'reflective_log',
                         text: `📔 Reflective Log: ${x.content?.substring(0, 50)}...`,
-                        score: score,
+                        score: totalScore,
+                        scoreBreakdown: { receive: baseScore, review: adminBonus },
                         isReflective: true,
                         docId: doc.id,
                         fullContent: x.content,
@@ -23063,11 +23084,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         moodSecondary: x.moodSecondary || null,
                         learningTools: Array.isArray(x.learningTools) ? x.learningTools : []
                     });
-                    dash.logs += score;
-                    dash.logsDR += score;
+                    // dash.logs total stays correct: the absorbed base score was already in dash.logs
+                    // (added by checkin_logs loop), we just add the adminBonus here.
+                    dash.logs += adminBonus;
+                    dash.logsDR += adminBonus;
                     dash.lc++;
                     dash.lcDR++;
                 });
+                // Roll back the entry-count over-count (each absorbed checkin_logs entry already
+                // contributed +1 to lc/lcDR; merged entry just added another +1 → subtract one back)
+                dash.lc -= reflectiveBaseAbsorbedCount;
+                dash.lcDR -= reflectiveBaseAbsorbedCount;
 
                 // V91.106: Learning Note entries — included in LOGS bucket
                 lpSnap.forEach(doc => {
