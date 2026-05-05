@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.37</title>
+    <title>Nika V92.39</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -24026,15 +24026,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const thPct = totalChars ? Math.round(thChars / totalChars * 100) : 0;
             const enPct = totalChars ? 100 - thPct : 0;
 
-            // Mood distribution
+            // Mood distribution — normalize legacy string keys to intern-UI emojis so same-glyph buckets merge
+            const legacyToEmoji = { happy: '😊', normal: '😐', sad: '😭', tired: '😓', unknown: '❓' };
             const moodCount = {};
-            logs.forEach(l => { const m = l.mood || 'unknown'; moodCount[m] = (moodCount[m] || 0) + 1; });
-            const moodEmoji = { happy: '😊', normal: '😐', sad: '😢', tired: '😴', unknown: '❓' };
+            logs.forEach(l => {
+                const raw = l.mood || 'unknown';
+                const k = legacyToEmoji[raw] || raw;
+                moodCount[k] = (moodCount[k] || 0) + 1;
+            });
             const moodSorted = Object.entries(moodCount).sort((a, b) => b[1] - a[1]);
-            const moodTop = moodSorted[0] ? `${moodEmoji[moodSorted[0][0]] || moodSorted[0][0] || '❓'} ${moodSorted[0][1]}` : '-';
-            const moodRest = moodSorted.slice(1)
-                .map(([m, n]) => `${moodEmoji[m] || m || '❓'} ${n}`)
-                .join('  ');
+            const moodTop = moodSorted[0] ? `${moodSorted[0][0]} ${moodSorted[0][1]}` : '-';
+            const moodRest = moodSorted.slice(1).map(([m, n]) => `${m} ${n}`).join('  ');
 
             // Top 5 learning tools
             const toolCount = {};
