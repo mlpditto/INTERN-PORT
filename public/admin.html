@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.33</title>
+    <title>Nika V92.34</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -2727,7 +2727,21 @@
                     </div>
                     <button class="btn-sm" onclick="renderHubBacklog(window._currentPopupUser)" style="border:1px solid #dbe3ef; background:#f8fafc; color:#475569; border-radius:999px; padding:5px 12px; font-size:0.72em; font-weight:800;">Refresh</button>
                 </div>
-                <div id="hub-backlog-summary" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;"></div>
+                <div id="hub-backlog-summary" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;"></div>
+                <!-- V92.34: Backlog toolbar — search + sort + compact -->
+                <div id="hub-backlog-toolbar" style="display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
+                    <input id="hub-backlog-search" type="text" placeholder="🔍 Search title…" oninput="onHubBacklogSearch(this)" style="flex:1; min-width:160px; padding:6px 12px; border:1px solid #e2e8f0; border-radius:10px; font-size:0.85em; outline:none; background:#fff;">
+                    <select id="hub-backlog-sort" onchange="onHubBacklogSort(this)" style="padding:6px 10px; border:1px solid #e2e8f0; border-radius:10px; font-size:0.8em; background:#fff; color:#475569; font-weight:700; cursor:pointer; outline:none;">
+                        <option value="newest">Newest</option>
+                        <option value="oldest">Oldest</option>
+                        <option value="score-desc">Score ↓</option>
+                        <option value="score-asc">Score ↑</option>
+                        <option value="duration-desc">Duration ↓</option>
+                        <option value="duration-asc">Duration ↑</option>
+                        <option value="title">Title A→Z</option>
+                    </select>
+                    <button id="hub-backlog-compact-btn" onclick="toggleHubBacklogCompact()" title="Toggle compact / card view" style="padding:6px 12px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; color:#475569; font-size:0.8em; font-weight:700; cursor:pointer;"><i class="fa-solid fa-list"></i> Compact</button>
+                </div>
                 <div id="hub-backlog-list" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; max-height:620px; overflow-y:auto; padding-right:4px;"></div>
             </div>
 
@@ -22812,35 +22826,95 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const summary = document.getElementById('hub-backlog-summary');
             if (!list || !summary) return;
 
+            // V92.34: filter / search / sort / compact state (single-popup-scoped)
+            if (!window._hubBacklogFilter) window._hubBacklogFilter = 'all';
+            if (window._hubBacklogSearch == null) window._hubBacklogSearch = '';
+            if (!window._hubBacklogSort) window._hubBacklogSort = 'newest';
+            if (window._hubBacklogCompact == null) window._hubBacklogCompact = false;
+
             const user = (usersData || []).find(u => u.id === userId) || {};
             const counts = { backlog: 0, scheduled: 0, review: 0, done: 0, expired: 0 };
-            const visible = (questsCache || [])
+
+            // Build the unfiltered "allVisible" set first so pill counts always reflect totals.
+            const allVisible = (questsCache || [])
                 .filter(q => isQuestAssignedToUser(q, user))
                 .map(q => {
                     const sub = (questsSubList || []).find(s => s.questId === q.id && s.userId === userId);
                     return { quest: q, sub, status: getQuestLifecycleStatus(q, sub) };
                 })
-                .filter(item => item.status !== 'draft')
-                .sort((a, b) => {
-                    const ad = toHubDate(a.quest.deadline)?.getTime() || 0;
-                    const bd = toHubDate(b.quest.deadline)?.getTime() || 0;
-                    return ad - bd;
-                });
+                .filter(item => item.status !== 'draft');
 
-            visible.forEach(item => { if (counts[item.status] !== undefined) counts[item.status]++; });
-            summary.innerHTML = Object.entries(counts).map(([key, val]) => {
-                const colors = {
-                    backlog: ['#fff7ed', '#c2410c'],
-                    scheduled: ['#eff6ff', '#1d4ed8'],
-                    review: ['#fef3c7', '#b45309'],
-                    done: ['#dcfce7', '#166534'],
-                    expired: ['#fee2e2', '#b91c1c']
-                }[key];
-                return `<span style="border-radius:999px; padding:5px 10px; background:${colors[0]}; color:${colors[1]}; font-size:0.74em; font-weight:900; text-transform:uppercase;">${key}: ${val}</span>`;
+            allVisible.forEach(item => { if (counts[item.status] !== undefined) counts[item.status]++; });
+
+            // Render status filter pills
+            const totalCount = allVisible.length;
+            const filterKey = window._hubBacklogFilter;
+            const pillEntries = [
+                ['all',       totalCount,        ['#f1f5f9', '#475569']],
+                ['backlog',   counts.backlog,    ['#fff7ed', '#c2410c']],
+                ['scheduled', counts.scheduled,  ['#eff6ff', '#1d4ed8']],
+                ['review',    counts.review,     ['#fef3c7', '#b45309']],
+                ['done',      counts.done,       ['#dcfce7', '#166534']],
+                ['expired',   counts.expired,    ['#fee2e2', '#b91c1c']]
+            ];
+            summary.innerHTML = pillEntries.map(([key, val, colors]) => {
+                const isActive = filterKey === key;
+                const border = isActive ? `2px solid ${colors[1]}` : '2px solid transparent';
+                const shadow = isActive ? `0 4px 10px ${colors[1]}33` : 'none';
+                return `<button onclick="setHubBacklogFilter('${key}')" style="border:${border}; border-radius:999px; padding:5px 11px; background:${colors[0]}; color:${colors[1]}; font-size:0.74em; font-weight:900; text-transform:uppercase; cursor:pointer; transition:all 0.15s; box-shadow:${shadow};">${key}: ${val}</button>`;
             }).join('');
 
+            // Sync toolbar state with window vars (preserves across re-render)
+            const searchEl = document.getElementById('hub-backlog-search');
+            if (searchEl && searchEl.value !== window._hubBacklogSearch) searchEl.value = window._hubBacklogSearch;
+            const sortEl = document.getElementById('hub-backlog-sort');
+            if (sortEl && sortEl.value !== window._hubBacklogSort) sortEl.value = window._hubBacklogSort;
+            const compactBtn = document.getElementById('hub-backlog-compact-btn');
+            if (compactBtn) {
+                if (window._hubBacklogCompact) {
+                    compactBtn.style.background = '#1e293b';
+                    compactBtn.style.color = '#fff';
+                    compactBtn.style.borderColor = '#1e293b';
+                    compactBtn.innerHTML = '<i class="fa-solid fa-list"></i> Compact ✓';
+                } else {
+                    compactBtn.style.background = '#fff';
+                    compactBtn.style.color = '#475569';
+                    compactBtn.style.borderColor = '#e2e8f0';
+                    compactBtn.innerHTML = '<i class="fa-solid fa-list"></i> Compact';
+                }
+            }
+
+            // Apply filter + search + sort
+            const search = (window._hubBacklogSearch || '').toLowerCase().trim();
+            const visible = allVisible
+                .filter(item => filterKey === 'all' || item.status === filterKey)
+                .filter(item => !search || String(item.quest.question || '').toLowerCase().includes(search))
+                .sort((a, b) => {
+                    const cAms = a.quest.createdAt && a.quest.createdAt.toMillis ? a.quest.createdAt.toMillis() : 0;
+                    const cBms = b.quest.createdAt && b.quest.createdAt.toMillis ? b.quest.createdAt.toMillis() : 0;
+                    switch (window._hubBacklogSort) {
+                        case 'newest': return cBms - cAms;
+                        case 'oldest': return cAms - cBms;
+                        case 'score-desc': return Number(b.quest.baseScore || 0) - Number(a.quest.baseScore || 0);
+                        case 'score-asc':  return Number(a.quest.baseScore || 0) - Number(b.quest.baseScore || 0);
+                        case 'duration-desc': return Number(b.quest.durationMinutes || 0) - Number(a.quest.durationMinutes || 0);
+                        case 'duration-asc':  return Number(a.quest.durationMinutes || 0) - Number(b.quest.durationMinutes || 0);
+                        case 'title': return String(a.quest.question || '').localeCompare(String(b.quest.question || ''));
+                        default: {
+                            const ad = toHubDate(a.quest.deadline)?.getTime() || 0;
+                            const bd = toHubDate(b.quest.deadline)?.getTime() || 0;
+                            return ad - bd;
+                        }
+                    }
+                });
+
+            // Toggle grid vs single-column for compact
+            list.style.gridTemplateColumns = window._hubBacklogCompact ? '1fr' : 'repeat(auto-fit, minmax(260px, 1fr))';
+            list.style.gap = window._hubBacklogCompact ? '6px' : '12px';
+
             if (!visible.length) {
-                list.innerHTML = `<div style="grid-column:1/-1; padding:18px; border:1px dashed #cbd5e1; border-radius:14px; color:#64748b; text-align:center; font-weight:800; background:#f8fafc;">No assigned Daily Quest found for this user.</div>`;
+                const reason = (search || filterKey !== 'all') ? 'No quests match the current filter / search.' : 'No assigned Daily Quest found for this user.';
+                list.innerHTML = `<div style="grid-column:1/-1; padding:18px; border:1px dashed #cbd5e1; border-radius:14px; color:#64748b; text-align:center; font-weight:800; background:#f8fafc;">${reason}</div>`;
                 return;
             }
 
@@ -22856,13 +22930,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const tagInfoByVal = {};
             (typeof DQ_TAGS !== 'undefined' ? DQ_TAGS : []).forEach(t => { tagInfoByVal[t.val] = t; });
 
+            const compact = !!window._hubBacklogCompact;
+
             list.innerHTML = visible.map(({ quest, sub, status }) => {
                 const [label, bg, fg] = statusStyles[status] || statusStyles.backlog;
                 const deadline = toHubDate(quest.deadline);
                 const start = toHubDate(quest.startTime || quest.scheduledStart);
                 const submitted = toHubDate(sub?.submittedAt);
                 const title = String(quest.question || 'Untitled Daily Quest');
-                // V92.19: clickable card opens detail modal; status-aware action chips replace lone "Open"
                 const subId = sub?.id || '';
                 const hasAnswer = !!(sub && (sub.answer || sub.submission || sub.content));
                 const grade = (status === 'review' && subId)
@@ -22874,6 +22949,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const tagInfo = tagInfoByVal[quest.tag || ''];
                 const tagChip = (tagInfo && tagInfo.val)
                     ? `<span title="Tag: ${tagInfo.label}" style="border-radius:6px; padding:2px 7px; background:${tagInfo.color}22; color:${tagInfo.color}; font-size:0.65em; font-weight:800; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;"><i class="fa-solid ${tagInfo.icon}" style="font-size:0.85em;"></i> ${tagInfo.label}</span>`
+                    : '';
+                // V92.34: edit-history pill (V92.22 audit log)
+                const editCount = (sub && Array.isArray(sub.editHistory)) ? sub.editHistory.length : 0;
+                const editPill = (editCount > 0 && subId)
+                    ? `<span onclick="event.stopPropagation(); toggleEditHistoryInline('${subId}')" title="Click to view edit history" style="border-radius:999px; padding:2px 8px; background:#fef3c7; color:#92400e; font-size:0.65em; font-weight:800; cursor:pointer; flex-shrink:0;">✏️ ${editCount}×</span>`
+                    : '';
+                const editHistoryInline = (editCount > 0 && subId)
+                    ? `<div id="edit-history-inline-${subId}" style="display:none; margin:8px 0; padding:8px 10px; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; font-size:0.7em; color:#78716c;"></div>`
                     : '';
                 // V92.32: time-to-submit relative to deadline
                 let submittedBlock = '';
@@ -22895,16 +22978,35 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     }
                     submittedBlock = `<div title="${absSubmitted}" style="margin-top:10px; padding-top:10px; border-top:1px dashed #e2e8f0; font-size:0.76em; color:#94a3b8; font-weight:700; cursor:help;">${relText}</div>`;
                 }
+
+                if (compact) {
+                    // V92.34 — Compact (single-line) variant
+                    const compactScore = `<span style="color:#10b981; font-weight:900; font-size:0.85em; flex-shrink:0;">+${Number(quest.baseScore || 0).toFixed(2)}</span>`;
+                    return `
+                        <div onclick="showHubBacklogDetails('${quest.id}')" style="display:flex; gap:8px; align-items:center; padding:8px 12px; border:1px solid #e2e8f0; border-radius:10px; background:white; cursor:pointer; transition:0.15s;" onmouseover="this.style.borderColor='#4361ee'" onmouseout="this.style.borderColor='#e2e8f0'">
+                            <span style="border-radius:999px; padding:3px 8px; background:${bg}; color:${fg}; font-size:0.65em; font-weight:900; text-transform:uppercase; flex-shrink:0;">${label}</span>
+                            ${tagChip}
+                            ${editPill}
+                            <span style="flex:1; min-width:0; font-size:0.85em; font-weight:700; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${title}</span>
+                            ${compactScore}
+                            <span style="font-size:0.7em; color:#94a3b8; font-weight:700; flex-shrink:0;">${quest.durationMinutes || 30}m</span>
+                            <span style="display:flex; gap:4px; flex-shrink:0;">${grade}${view}${edit}</span>
+                        </div>
+                        ${editHistoryInline}
+                    `;
+                }
                 return `
                     <div onclick="showHubBacklogDetails('${quest.id}')" style="border:1px solid #e2e8f0; border-radius:14px; background:white; padding:14px; box-shadow:0 8px 18px rgba(15,23,42,0.04); cursor:pointer; transition:0.2s;" onmouseover="this.style.borderColor='#4361ee'; this.style.boxShadow='0 8px 18px rgba(67,97,238,0.12)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 8px 18px rgba(15,23,42,0.04)'">
                         <div style="display:flex; justify-content:space-between; gap:6px; align-items:flex-start; margin-bottom:10px; flex-wrap:wrap;">
                             <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
                                 <span style="border-radius:999px; padding:4px 9px; background:${bg}; color:${fg}; font-size:0.7em; font-weight:900; text-transform:uppercase;">${label}</span>
                                 ${tagChip}
+                                ${editPill}
                             </div>
                             <div style="display:flex; gap:4px; flex-wrap:wrap;">${grade}${view}${edit}</div>
                         </div>
                         <div style="font-weight:900; color:#1e293b; line-height:1.35; margin-bottom:10px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${title}</div>
+                        ${editHistoryInline}
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.76em; color:#64748b; font-weight:700;">
                             <div>Score<br><b style="color:#10b981;">+${Number(quest.baseScore || 0).toFixed(2)}</b></div>
                             <div>Duration<br><b>${quest.durationMinutes || 30}m</b></div>
@@ -22916,6 +23018,53 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 `;
             }).join('');
         }
+
+        // V92.34 — Backlog toolbar handlers
+        window.setHubBacklogFilter = function(key) {
+            window._hubBacklogFilter = key;
+            if (window._currentPopupUser) renderHubBacklog(window._currentPopupUser);
+        };
+        window.onHubBacklogSearch = function(input) {
+            window._hubBacklogSearch = input.value || '';
+            // Debounce by render-coalescing — re-render is cheap because data is in cache.
+            if (window._hubBacklogSearchTimer) clearTimeout(window._hubBacklogSearchTimer);
+            window._hubBacklogSearchTimer = setTimeout(() => {
+                if (window._currentPopupUser) renderHubBacklog(window._currentPopupUser);
+            }, 150);
+        };
+        window.onHubBacklogSort = function(select) {
+            window._hubBacklogSort = select.value || 'newest';
+            if (window._currentPopupUser) renderHubBacklog(window._currentPopupUser);
+        };
+        window.toggleHubBacklogCompact = function() {
+            window._hubBacklogCompact = !window._hubBacklogCompact;
+            if (window._currentPopupUser) renderHubBacklog(window._currentPopupUser);
+        };
+        window.toggleEditHistoryInline = function(subId) {
+            const div = document.getElementById('edit-history-inline-' + subId);
+            if (!div) return;
+            if (div.style.display === 'none' || !div.style.display) {
+                const sub = (questsSubList || []).find(s => s.id === subId);
+                const history = (sub && Array.isArray(sub.editHistory)) ? sub.editHistory : [];
+                if (history.length === 0) {
+                    div.innerHTML = '<i style="color:#94a3b8;">No edits yet.</i>';
+                } else {
+                    div.innerHTML = history.map((e, i) => {
+                        const editor = escapeHtml(e.editorEmail || '?');
+                        const reason = escapeHtml(e.reason || '(no reason)');
+                        const tStr = e.editedAt ? window._fmtDate(e.editedAt) : '';
+                        const typeLabel = e.type === 'revert' ? '<span style="color:#7c3aed; font-weight:800;"> [REVERT]</span>' : '';
+                        return `<div style="padding:5px 0; ${i > 0 ? 'border-top:1px dashed #fde68a;' : ''}">
+                            <div style="font-weight:800; color:#92400e;">#${i + 1} · ${editor}${typeLabel}</div>
+                            <div style="margin-top:2px;">${reason} <span style="color:#a8a29e;">· ${tStr}</span></div>
+                        </div>`;
+                    }).join('');
+                }
+                div.style.display = 'block';
+            } else {
+                div.style.display = 'none';
+            }
+        };
 
         // V92.20: HTML-escape user-submitted text and convert bare http(s) URLs to clickable links.
         // Trailing sentence punctuation (.,!?;:)]) is kept outside the anchor.
@@ -23508,6 +23657,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const trainingHtml = td
                 ? `<span title="${dateRangeTip}" style="color:${td.color}; font-weight:700; cursor:help;"><i class="fa-regular fa-calendar" style="margin-right:4px;"></i>${td.label}</span>`
                 : `<span><i class="fa-regular fa-calendar" style="margin-right:4px;"></i>${dateRangeTip}</span>`;
+            // V92.34: clickable score → breakdown popover
             document.getElementById('lb-popup-header').innerHTML = `
                 <img src="${u.pictureUrl}" style="width:65px; height:65px; border-radius:50%; object-fit:cover; border:3px solid #4361ee; box-shadow:0 8px 20px rgba(67,97,238,0.2);">
                 <div style="flex:1">
@@ -23518,10 +23668,80 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     <div style="font-size:0.85em; color:#64748b; margin-top:4px;">
                         ${trainingHtml}
                         <span style="margin:0 10px; color:#cbd5e1;">|</span>
-                        <i class="fa-solid fa-star" style="color:#f59e0b; margin-right:4px;"></i> Now: <b style="color:#4361ee; font-size:1.1em;">${(u.score || 0).toFixed(2)}</b>${buildHubCertificateAction(u)}
+                        <span id="hub-score-trigger" onclick="event.stopPropagation(); toggleHubScoreBreakdown(event)" title="Click for score breakdown" style="cursor:pointer; padding:2px 6px; border-radius:8px; transition:background 0.15s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'">
+                            <i class="fa-solid fa-star" style="color:#f59e0b; margin-right:4px;"></i> Now: <b style="color:#4361ee; font-size:1.1em;">${(u.score || 0).toFixed(2)}</b>
+                        </span>${buildHubCertificateAction(u)}
                     </div>
                 </div>
+                <div id="hub-score-popover" style="display:none; position:absolute; z-index:100; top:90px; left:90px;"></div>
             `;
+            // Ensure parent has position:relative so absolute popover anchors correctly
+            const parent = document.getElementById('lb-popup-header');
+            if (parent) parent.style.position = 'relative';
+        }
+
+        // V92.34 — Score breakdown popover
+        window.toggleHubScoreBreakdown = function(event) {
+            const popover = document.getElementById('hub-score-popover');
+            if (!popover) return;
+            const isOpen = popover.style.display === 'block';
+            if (isOpen) { popover.style.display = 'none'; return; }
+            const userId = window._currentPopupUser;
+            const cache = (window._hubUserCache && userId) ? window._hubUserCache[userId] : null;
+            const dash = cache && cache.dash;
+            if (!dash) {
+                popover.innerHTML = `<div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:12px; box-shadow:0 8px 20px rgba(15,23,42,0.15); font-size:0.85em; color:#94a3b8;">Score breakdown not yet computed.</div>`;
+            } else {
+                const total = (dash.quizzes || 0) + (dash.works || 0) + (dash.logs || 0) + (dash.bonus || 0) + (dash.manual || 0);
+                const row = (icon, label, val, color, count) => {
+                    const cnt = (count != null) ? `<span style="color:#94a3b8; font-weight:600; font-size:0.85em;">(${count})</span>` : '';
+                    return `<div style="display:contents;">
+                        <span style="text-align:center;">${icon}</span>
+                        <span style="color:#475569;">${label} ${cnt}</span>
+                        <b style="color:${color}; text-align:right;">${(val || 0).toFixed(2)}</b>
+                    </div>`;
+                };
+                popover.innerHTML = `
+                    <div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; box-shadow:0 8px 24px rgba(15,23,42,0.18); min-width:240px; font-size:0.85em;">
+                        <div style="font-size:0.7em; color:#94a3b8; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">Score Breakdown</div>
+                        <div style="display:grid; grid-template-columns:auto 1fr auto; gap:6px 12px;">
+                            ${row('📚', 'Quizzes', dash.quizzes, '#4361ee', dash.qc)}
+                            ${row('📝', 'Works',   dash.works,   '#2ec4b6', dash.wc)}
+                            ${row('📒', 'Logs',    dash.logs,    '#f72585', dash.lc)}
+                            ${row('🎁', 'Bonus',   dash.bonus,   '#ff9f1c', dash.bc)}
+                            ${row('👤', 'Manual',  dash.manual,  '#6f42c1', dash.mc)}
+                        </div>
+                        <div style="margin-top:10px; padding-top:8px; border-top:1px dashed #e2e8f0; display:grid; grid-template-columns:auto 1fr auto; gap:6px 12px;">
+                            <span style="text-align:center;">⭐</span>
+                            <span style="color:#1e293b; font-weight:800;">Total</span>
+                            <b style="color:#1e293b; text-align:right;">${total.toFixed(2)}</b>
+                        </div>
+                    </div>
+                `;
+            }
+            // Position relative to trigger, anchored under the score span
+            const trigger = document.getElementById('hub-score-trigger');
+            const parent = document.getElementById('lb-popup-header');
+            if (trigger && parent) {
+                const tRect = trigger.getBoundingClientRect();
+                const pRect = parent.getBoundingClientRect();
+                popover.style.top = `${tRect.bottom - pRect.top + 6}px`;
+                popover.style.left = `${tRect.left - pRect.left}px`;
+            }
+            popover.style.display = 'block';
+            // Close on outside click
+            setTimeout(() => {
+                document.addEventListener('click', closeHubScoreBreakdownOnce, { once: true });
+            }, 0);
+        };
+        function closeHubScoreBreakdownOnce(e) {
+            const popover = document.getElementById('hub-score-popover');
+            if (popover && !popover.contains(e.target)) {
+                popover.style.display = 'none';
+            } else {
+                // clicked inside popover — re-arm the listener
+                document.addEventListener('click', closeHubScoreBreakdownOnce, { once: true });
+            }
         }
 
         function updateHubDashUI(dash) {
