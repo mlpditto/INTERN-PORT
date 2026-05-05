@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.29</title>
+    <title>Nika V92.30</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -23898,6 +23898,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // questions still collapse into one row instead of duplicating).
                 const tagSig = {};   // tag -> Set<"attemptIdx:qIdx">
                 const tagStats = {}; // tag -> { correct, total }
+                const tagEntries = {}; // tag -> [{attemptIdx, isCorrect}, ...] in chronological order (V92.30 trend)
 
                 attempts.forEach((att, attIdx) => {
                     const qData = quizzesData.find(x => x.id === att.quizId);
@@ -23932,9 +23933,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         tags.forEach(t => {
                             if (!tagSig[t]) tagSig[t] = new Set();
                             if (!tagStats[t]) tagStats[t] = { correct: 0, total: 0 };
+                            if (!tagEntries[t]) tagEntries[t] = [];
                             tagSig[t].add(sigEntry);
                             tagStats[t].correct += isCorrect ? 1 : 0;
                             tagStats[t].total += 1;
+                            tagEntries[t].push({ attemptIdx: attIdx, isCorrect });
                         });
                     });
                 });
@@ -23949,12 +23952,32 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const groups = [...sigGroups.values()].map(g => {
                     const attemptsTouched = new Set();
                     g.sigEntries.forEach(s => attemptsTouched.add(s.split(':')[0]));
+                    // V92.30: trend = recent (last 3 distinct attempts touching this group) vs earlier, ±5% threshold.
+                    // All tags in a group share the same entries by construction (same signature), so we sample tags[0].
+                    let trend = null;
+                    const entries = g.tags[0] ? (tagEntries[g.tags[0]] || []) : [];
+                    if (entries.length > 0) {
+                        const distinctAtt = [...new Set(entries.map(e => e.attemptIdx))].sort((a, b) => a - b);
+                        if (distinctAtt.length >= 4) {
+                            const recentSet = new Set(distinctAtt.slice(-3));
+                            const recent = entries.filter(e => recentSet.has(e.attemptIdx));
+                            const earlier = entries.filter(e => !recentSet.has(e.attemptIdx));
+                            if (recent.length > 0 && earlier.length > 0) {
+                                const recentPct = (recent.filter(e => e.isCorrect).length / recent.length) * 100;
+                                const earlierPct = (earlier.filter(e => e.isCorrect).length / earlier.length) * 100;
+                                const delta = recentPct - earlierPct;
+                                if (Math.abs(delta) < 5) trend = 'stable';
+                                else trend = delta > 0 ? 'up' : 'down';
+                            }
+                        }
+                    }
                     return {
                         tags: g.tags.sort(),
                         avg: g.stats.total > 0 ? (g.stats.correct / g.stats.total) * 100 : 0,
                         correct: g.stats.correct,
                         total: g.stats.total,
-                        attempts: attemptsTouched.size
+                        attempts: attemptsTouched.size,
+                        trend
                     };
                 }).sort((a, b) => b.avg - a.avg);
 
@@ -23962,6 +23985,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const groupsPerPage = 5;
                 const totalTagPages = Math.ceil(groups.length / groupsPerPage);
                 if (window._hubTagPage > totalTagPages && totalTagPages > 0) window._hubTagPage = 1;
+
+                // V92.30 — trend icon helper, shared by Performance by Tags bars and S&W rows
+                const trendBadge = (trend) => {
+                    if (!trend) return '';
+                    const cfg = trend === 'up'
+                        ? { icon: '⬆', color: '#10b981', title: 'Improving — recent score is higher than earlier (last 3 attempts vs prior)' }
+                        : trend === 'down'
+                        ? { icon: '⬇', color: '#ef4444', title: 'Declining — recent score is lower than earlier (last 3 attempts vs prior)' }
+                        : { icon: '➡', color: '#94a3b8', title: 'Stable — recent vs earlier within ±5%' };
+                    return ` <span title="${cfg.title}" style="color:${cfg.color}; font-weight:900;">${cfg.icon}</span>`;
+                };
 
                 let tagHtml = "";
                 if (groups.length === 0) {
@@ -23982,7 +24016,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             <div style="margin-bottom:10px; padding-bottom:10px; ${!isLast ? 'border-bottom:1px dashed #e2e8f0;' : ''}">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                     <div style="font-weight:700; font-size:0.85em; color:#475569;">${primary}${coLabel}</div>
-                                    <span style="font-size:0.85em; color:${color}; font-weight:800;">${g.avg.toFixed(1)}%</span>
+                                    <span style="font-size:0.85em; color:${color}; font-weight:800;">${g.avg.toFixed(1)}%${trendBadge(g.trend)}</span>
                                 </div>
                                 <div style="width:100%; height:6px; background:#e2e8f0; border-radius:10px; overflow:hidden;">
                                     <div style="width:${g.avg}%; height:100%; background:${color}; border-radius:10px; transition:width 0.5s ease-out;"></div>
@@ -24035,7 +24069,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         return `
                             <div onclick="jumpToTagPage('${userId}', ${targetPage})" title="Jump to this tag in Performance by Tags" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; border-radius:8px; margin-bottom:3px; cursor:pointer; transition:background 0.15s; gap:8px;" onmouseover="this.style.background='rgba(0,0,0,0.04)'" onmouseout="this.style.background='transparent'">
                                 <div style="font-size:0.82em; font-weight:700; color:#475569; line-height:1.4; min-width:0; flex:1;">${label}${lowNBadge}</div>
-                                <div style="font-size:0.82em; font-weight:800; color:${color}; white-space:nowrap;">${g.avg.toFixed(1)}% <span style="color:#94a3b8; font-weight:600; font-size:0.88em;">(${g.correct}/${g.total})</span></div>
+                                <div style="font-size:0.82em; font-weight:800; color:${color}; white-space:nowrap;">${g.avg.toFixed(1)}%${trendBadge(g.trend)} <span style="color:#94a3b8; font-weight:600; font-size:0.88em;">(${g.correct}/${g.total})</span></div>
                             </div>
                         `;
                     };
