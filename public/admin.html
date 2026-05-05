@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.30</title>
+    <title>Nika V92.31</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -9374,6 +9374,24 @@
 
             <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid #f1f5f9;">
                 <button onclick="document.getElementById('bulkTagModal').style.display='none'" style="padding:8px 18px; background:#f1f5f9; color:#475569; border:none; border-radius:10px; font-weight:700; font-size:0.85em; cursor:pointer;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- V92.31: Quiz Insight Tag Drill-Down (Tier 2) -->
+    <div id="tagDrillDownModal" class="modal" style="z-index:4280;">
+        <div class="modal-content" style="max-width:820px; width:95%; max-height:88vh; display:flex; flex-direction:column; text-align:left;">
+            <span class="close-modal" onclick="closeTagDrillDown()">&times;</span>
+            <div id="drilldown-header" style="display:flex; align-items:flex-start; gap:12px; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid #f1f5f9;">
+                <i class="fa-solid fa-microscope" style="color:#6366f1; font-size:1.4em; margin-top:2px;"></i>
+                <div style="flex:1; min-width:0;">
+                    <div id="drilldown-title" style="font-weight:900; color:#1e293b; font-size:1.05em; line-height:1.4; word-break:break-word;">-</div>
+                    <div id="drilldown-stats" style="font-size:0.78em; color:#64748b; font-weight:700; margin-top:4px;">-</div>
+                </div>
+            </div>
+            <div id="drilldown-body" style="flex:1; overflow-y:auto; padding-right:5px; min-height:200px;"></div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid #f1f5f9;">
+                <button onclick="closeTagDrillDown()" style="padding:8px 18px; background:#f1f5f9; color:#475569; border:none; border-radius:10px; font-weight:700; font-size:0.85em; cursor:pointer;">Close</button>
             </div>
         </div>
     </div>
@@ -24012,8 +24030,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             : '';
                         const coLabel = g.tags.length > 1 ? `<span style="font-size:0.7em; color:#94a3b8; font-weight:600; margin-left:6px;">+${g.tags.length - 1} co-occurring</span>` : '';
                         const isLast = i === paginated.length - 1;
+                        const globalIdx = startIdx + i;
                         tagHtml += `
-                            <div style="margin-bottom:10px; padding-bottom:10px; ${!isLast ? 'border-bottom:1px dashed #e2e8f0;' : ''}">
+                            <div onclick="openTagDrillDown(${globalIdx})" title="Click for question-level detail" style="margin-bottom:10px; padding:6px 8px 10px; border-radius:10px; cursor:pointer; transition:background 0.15s; ${!isLast ? 'border-bottom:1px dashed #e2e8f0;' : ''}" onmouseover="this.style.background='rgba(99,102,241,0.04)'" onmouseout="this.style.background='transparent'">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                     <div style="font-weight:700; font-size:0.85em; color:#475569;">${primary}${coLabel}</div>
                                     <span style="font-size:0.85em; color:${color}; font-weight:800;">${g.avg.toFixed(1)}%${trendBadge(g.trend)}</span>
@@ -24065,9 +24084,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         const lowNBadge = lowN
                             ? ` <span title="Score based on only ${g.total} question${g.total !== 1 ? 's' : ''} — interpret with caution" style="background:#fef3c7; color:#92400e; padding:1px 7px; border-radius:6px; font-size:0.62em; font-weight:800; margin-left:6px; vertical-align:middle;">⚠ low N</span>`
                             : '';
-                        const targetPage = Math.floor(globalIdx / groupsPerPage) + 1;
                         return `
-                            <div onclick="jumpToTagPage('${userId}', ${targetPage})" title="Jump to this tag in Performance by Tags" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; border-radius:8px; margin-bottom:3px; cursor:pointer; transition:background 0.15s; gap:8px;" onmouseover="this.style.background='rgba(0,0,0,0.04)'" onmouseout="this.style.background='transparent'">
+                            <div onclick="openTagDrillDown(${globalIdx})" title="Click for question-level detail" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; border-radius:8px; margin-bottom:3px; cursor:pointer; transition:background 0.15s; gap:8px;" onmouseover="this.style.background='rgba(0,0,0,0.04)'" onmouseout="this.style.background='transparent'">
                                 <div style="font-size:0.82em; font-weight:700; color:#475569; line-height:1.4; min-width:0; flex:1;">${label}${lowNBadge}</div>
                                 <div style="font-size:0.82em; font-weight:800; color:${color}; white-space:nowrap;">${g.avg.toFixed(1)}%${trendBadge(g.trend)} <span style="color:#94a3b8; font-weight:600; font-size:0.88em;">(${g.correct}/${g.total})</span></div>
                             </div>
@@ -24087,6 +24105,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     `;
                 }
 
+                // V92.31: stash context for drill-down handler (avoids re-fetching attempts)
+                window._quizInsightCtx = { userId, attempts, groups };
+
             } catch (err) {
                 console.error("Quiz Insight error:", err);
                 chartBox.innerHTML = "Error loading trend.";
@@ -24098,12 +24119,210 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             renderQuizInsight(userId);
         }
 
-        // V92.29 — click Strength/Weakness row to jump to that page in Performance by Tags
-        window.jumpToTagPage = function(userId, page) {
-            const target = Math.max(1, parseInt(page) || 1);
-            if (window._hubTagPage === target) return;
-            window._hubTagPage = target;
-            renderQuizInsight(userId);
+        // V92.31 — Tag Drill-Down (Tier 2 PR2): question-level review + suggested quizzes
+        window.openTagDrillDown = function(groupIdx) {
+            const ctx = window._quizInsightCtx;
+            const modal = document.getElementById('tagDrillDownModal');
+            if (!ctx || !modal) return;
+            const group = ctx.groups[groupIdx];
+            if (!group) return;
+
+            const wrong = computeWrongQuestionsForGroup(group, ctx);
+            const { practice, retake } = computeSuggestedQuizzes(group, ctx);
+            renderTagDrillDownContent(group, wrong, practice, retake);
+            modal.style.display = 'flex';
+        };
+
+        window.closeTagDrillDown = function() {
+            const modal = document.getElementById('tagDrillDownModal');
+            if (modal) modal.style.display = 'none';
+        };
+
+        function questionMatchesGroup(q, qData, groupTags) {
+            const perQRaw = (q && q.tags) ? String(q.tags).trim() : '';
+            const quizFallbackRaw = qData && qData.tags ? String(qData.tags).trim() : '';
+            const tagStr = perQRaw || quizFallbackRaw;
+            if (!tagStr) return false;
+            const qTags = tagStr.split(',').map(t => t.trim()).filter(Boolean);
+            return groupTags.every(gt => qTags.includes(gt));
+        }
+
+        function computeWrongQuestionsForGroup(group, ctx) {
+            const wrong = [];
+            ctx.attempts.forEach(att => {
+                const qData = quizzesData.find(x => x.id === att.quizId);
+                if (!qData || !Array.isArray(qData.questions)) return;
+                const manualCorrect = att.manualCorrect || {};
+                const gradedAnswers = att.gradedAnswers || {};
+                const answers = att.answers || [];
+                qData.questions.forEach((q, qi) => {
+                    if (!questionMatchesGroup(q, qData, group.tags)) return;
+                    let isCorrect = false;
+                    if (manualCorrect[qi] === true) {
+                        isCorrect = true;
+                    } else if ((q.type || 'choice') === 'choice') {
+                        const userAns = answers[qi];
+                        const target = q.correct;
+                        const sAns = Array.isArray(userAns) ? userAns : (userAns !== undefined && userAns !== null ? [userAns] : []);
+                        const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
+                        isCorrect = sAns.length > 0 && sAns.length === tAns.length && sAns.every(v => tAns.includes(v));
+                    } else {
+                        isCorrect = !!gradedAnswers[qi];
+                    }
+                    if (!isCorrect) {
+                        wrong.push({
+                            question: q,
+                            userAnswer: answers[qi],
+                            quizTitle: qData.title || qData.shortTitle || '(Untitled quiz)',
+                            quizId: att.quizId,
+                            timestamp: att.timestamp,
+                            qIdx: qi
+                        });
+                    }
+                });
+            });
+            wrong.sort((a, b) => (b.timestamp && b.timestamp.toMillis ? b.timestamp.toMillis() : 0) - (a.timestamp && a.timestamp.toMillis ? a.timestamp.toMillis() : 0));
+            return wrong;
+        }
+
+        function computeSuggestedQuizzes(group, ctx) {
+            const groupTagSet = new Set(group.tags);
+            const userAttemptedQuizIds = new Set(ctx.attempts.map(a => a.quizId));
+            const lowScoreQuizIds = new Set();
+            const lastScoreByQuiz = {};
+            ctx.attempts.forEach(att => {
+                if (att.totalQuestions > 0) {
+                    const pct = (att.correctCount / att.totalQuestions) * 100;
+                    lastScoreByQuiz[att.quizId] = Math.round(pct);
+                    if (pct < 70) lowScoreQuizIds.add(att.quizId);
+                }
+            });
+
+            const practice = [];
+            const retake = [];
+            (Array.isArray(quizzesData) ? quizzesData : []).forEach(qd => {
+                if (!qd || !qd.tags) return;
+                const tags = String(qd.tags).split(',').map(t => t.trim()).filter(Boolean);
+                const overlapCount = tags.filter(t => groupTagSet.has(t)).length;
+                if (overlapCount === 0) return;
+                const card = {
+                    id: qd.id,
+                    title: qd.title || qd.shortTitle || '(Untitled)',
+                    overlap: overlapCount,
+                    questionCount: Array.isArray(qd.questions) ? qd.questions.length : 0
+                };
+                if (userAttemptedQuizIds.has(qd.id)) {
+                    if (lowScoreQuizIds.has(qd.id)) {
+                        retake.push({ ...card, prevScore: lastScoreByQuiz[qd.id] });
+                    }
+                } else {
+                    practice.push(card);
+                }
+            });
+
+            practice.sort((a, b) => b.overlap - a.overlap);
+            retake.sort((a, b) => (a.prevScore || 0) - (b.prevScore || 0));
+            return { practice: practice.slice(0, 5), retake: retake.slice(0, 5) };
+        }
+
+        function renderAnswerLabel(q, ans) {
+            if ((q.type || 'choice') === 'choice') {
+                const indices = Array.isArray(ans) ? ans : (ans !== undefined && ans !== null ? [ans] : []);
+                if (indices.length === 0) return '<i style="color:#94a3b8;">(no answer)</i>';
+                return indices.map(i => {
+                    const idx = parseInt(i);
+                    if (Number.isFinite(idx) && q.options && q.options[idx] !== undefined) {
+                        return `${idx + 1}. ${escapeHtml(q.options[idx])}`;
+                    }
+                    return '?';
+                }).join(' / ');
+            }
+            return ans ? escapeHtml(String(ans)) : '<i style="color:#94a3b8;">(no answer)</i>';
+        }
+
+        function fmtDrillDownDate(ts) {
+            if (!ts) return '';
+            try {
+                const d = ts.toDate ? ts.toDate() : new Date(ts);
+                return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+            } catch (e) { return ''; }
+        }
+
+        function renderTagDrillDownContent(group, wrong, practice, retake) {
+            const titleEl = document.getElementById('drilldown-title');
+            const statsEl = document.getElementById('drilldown-stats');
+            const bodyEl = document.getElementById('drilldown-body');
+            if (!titleEl || !statsEl || !bodyEl) return;
+
+            const primary = group.tags[0];
+            const extras = group.tags.length > 1
+                ? ` <span style="font-size:0.78em; color:#64748b; font-weight:600;">+${group.tags.length - 1} co-occurring</span>`
+                : '';
+            titleEl.innerHTML = `${escapeHtml(primary)}${extras}`;
+            const lowN = group.total < 10 ? ' &middot; <span style="color:#92400e;">⚠ low N</span>' : '';
+            statsEl.innerHTML = `${group.correct}/${group.total} correct &middot; ${group.avg.toFixed(1)}% &middot; ${group.attempts} attempt${group.attempts !== 1 ? 's' : ''}${lowN}`;
+
+            let html = '';
+
+            // Wrong questions
+            html += `<div style="font-size:0.78em; font-weight:800; color:#991b1b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-xmark-circle"></i> Wrong questions <span style="background:#fee2e2; color:#991b1b; padding:1px 8px; border-radius:8px; font-size:0.85em;">${wrong.length}</span></div>`;
+            if (wrong.length === 0) {
+                html += `<div style="padding:14px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; color:#065f46; font-size:0.85em; font-weight:700;">No wrong answers in this cluster — strong performance!</div>`;
+            } else {
+                wrong.forEach(w => {
+                    const qText = w.question.q || '';
+                    const truncated = qText.length > 220 ? qText.slice(0, 220) + '…' : qText;
+                    html += `
+                        <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:12px; padding:12px; margin-bottom:8px;">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px;">
+                                <div style="font-size:0.72em; color:#94a3b8; font-weight:700; min-width:0; flex:1; word-break:break-word;">${escapeHtml(w.quizTitle)} &middot; ${fmtDrillDownDate(w.timestamp)}</div>
+                                <span style="font-size:0.6em; padding:2px 8px; border-radius:6px; background:#fee2e2; color:#991b1b; font-weight:800; white-space:nowrap;">Q${w.qIdx + 1} WRONG</span>
+                            </div>
+                            <div style="font-size:0.85em; color:#1e293b; font-weight:700; margin-bottom:10px; line-height:1.5; word-break:break-word;">${escapeHtml(truncated)}</div>
+                            <div style="display:flex; flex-direction:column; gap:4px; font-size:0.78em;">
+                                <div><span style="color:#94a3b8; font-weight:700;">Your answer:</span> <span style="color:#991b1b; font-weight:700;">${renderAnswerLabel(w.question, w.userAnswer)}</span></div>
+                                <div><span style="color:#94a3b8; font-weight:700;">Correct:</span> <span style="color:#065f46; font-weight:700;">${renderAnswerLabel(w.question, w.question.correct)}</span></div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            // Suggested quizzes — hide section entirely if both empty
+            if (practice.length > 0 || retake.length > 0) {
+                html += `<div style="margin-top:18px; padding-top:14px; border-top:1px solid #f1f5f9;"></div>`;
+                html += `<div style="font-size:0.78em; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;"><i class="fa-solid fa-compass"></i> Suggested quizzes</div>`;
+                if (practice.length > 0) {
+                    html += `<div style="font-size:0.72em; font-weight:800; color:#6366f1; margin-bottom:6px;">📚 PRACTICE <span style="color:#94a3b8; font-weight:600;">(not yet attempted)</span></div>`;
+                    practice.forEach(p => {
+                        html += `
+                            <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:6px;">
+                                <i class="fa-solid fa-graduation-cap" style="color:#6366f1; flex-shrink:0;"></i>
+                                <div style="flex:1; min-width:0;">
+                                    <div style="font-size:0.85em; font-weight:700; color:#1e293b; word-break:break-word;">${escapeHtml(p.title)}</div>
+                                    <div style="font-size:0.7em; color:#94a3b8; font-weight:600;">${p.overlap} matching tag${p.overlap !== 1 ? 's' : ''}${p.questionCount ? ` &middot; ${p.questionCount} question${p.questionCount !== 1 ? 's' : ''}` : ''}</div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+                if (retake.length > 0) {
+                    html += `<div style="font-size:0.72em; font-weight:800; color:#f59e0b; margin:10px 0 6px;">🔁 RETAKE <span style="color:#94a3b8; font-weight:600;">(previous score &lt; 70%)</span></div>`;
+                    retake.forEach(r => {
+                        html += `
+                            <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; margin-bottom:6px;">
+                                <i class="fa-solid fa-rotate-right" style="color:#f59e0b; flex-shrink:0;"></i>
+                                <div style="flex:1; min-width:0;">
+                                    <div style="font-size:0.85em; font-weight:700; color:#1e293b; word-break:break-word;">${escapeHtml(r.title)}</div>
+                                    <div style="font-size:0.7em; color:#94a3b8; font-weight:600;">${r.overlap} matching tag${r.overlap !== 1 ? 's' : ''}${typeof r.prevScore === 'number' ? ` &middot; previous score ${r.prevScore}%` : ''}</div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+            }
+
+            bodyEl.innerHTML = html;
         }
 
         function drawQuizTrendLine(attempts) {
