@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.32</title>
+    <title>Nika V92.33</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -8058,15 +8058,15 @@
                             style="width:100%; height:105px; padding:14px; border-radius:14px; border:1px solid #dbe3ef; font-family:inherit; resize:vertical; font-size:0.95em; line-height:1.55; background:#fff; box-sizing:border-box;"></textarea>
                     </div>
 
-                    <!-- Image URL + Reference Link -->
+                    <!-- Image URL + Reference Link (V92.33: live URL validation) -->
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:14px;">
                         <div>
                             <label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:4px;">🖼️ Image URL</label>
-                            <input type="text" id="q-img" placeholder="https://..." style="width:100%; margin:0; border-radius:12px; box-sizing:border-box;">
+                            <input type="text" id="q-img" oninput="validateQuestUrl(this)" placeholder="https://..." style="width:100%; margin:0; border-radius:12px; box-sizing:border-box;">
                         </div>
                         <div>
                             <label style="font-size:0.75em; font-weight:bold; color:#777; display:block; margin-bottom:4px;">🔗 Reference Link</label>
-                            <input type="text" id="q-link" placeholder="Reference link..." style="width:100%; margin:0; border-radius:12px; box-sizing:border-box;">
+                            <input type="text" id="q-link" oninput="validateQuestUrl(this)" placeholder="Reference link..." style="width:100%; margin:0; border-radius:12px; box-sizing:border-box;">
                         </div>
                     </div>
 
@@ -8093,7 +8093,7 @@
                     <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:8px; margin-bottom:16px;">
                         <div title="Optional. If set, the quest goes live at this time. Required when using the Schedule action; leave blank for Post Now or Save Draft." style="background:#eff6ff; border:1.5px solid #bfdbfe; border-radius:14px; padding:10px 12px; cursor:help;">
                             <label style="font-size:0.68em; font-weight:800; color:#3b82f6; display:block; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.05em;">⏰ Scheduled Start</label>
-                            <input type="datetime-local" id="q-start-time" style="width:100%; margin:0; border:none; background:transparent; font-size:0.85em; color:#1e3a8a; font-weight:700; padding:0; outline:none;">
+                            <input type="datetime-local" id="q-start-time" oninput="updateScheduleButtonState()" style="width:100%; margin:0; border:none; background:transparent; font-size:0.85em; color:#1e3a8a; font-weight:700; padding:0; outline:none;">
                         </div>
                         <div title="Hours until the quest expires. Counts from Scheduled Start (if set) or from Post Now. After expiry, users who haven't submitted move to Expired and forfeit the score." style="background:#fefce8; border:1.5px solid #fde68a; border-radius:14px; padding:10px 12px; text-align:center; cursor:help;">
                             <label style="font-size:0.68em; font-weight:800; color:#d97706; display:block; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.05em;">⏳ Expires (h)</label>
@@ -8112,7 +8112,7 @@
                     <!-- Action buttons -->
                     <div style="display:flex; gap:10px; justify-content:flex-end; align-items:center; border-top:1px solid #eef2f7; padding-top:14px;">
                         <button class="btn-sm" onclick="createQuest('draft')" style="background:#f8fafc; color:#475569; border:1px solid #dbe3ef; padding:10px 16px; border-radius:12px; font-weight:900;">Save Draft</button>
-                        <button class="btn-sm" onclick="createQuest('schedule')" style="background:#111827; color:white; border:none; padding:10px 16px; border-radius:12px; font-weight:900;">Schedule</button>
+                        <button id="quest-schedule-btn" class="btn-sm" onclick="createQuest('schedule')" style="background:#111827; color:white; border:none; padding:10px 16px; border-radius:12px; font-weight:900;">Schedule</button>
                         <button class="magic-btn" onclick="createQuest('post')" style="min-width:180px; background:#d35400; margin:0;">Post Now</button>
                     </div>
                 </div>
@@ -25424,12 +25424,57 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         }
 
+        // V92.33 — URL validation helper for Daily Quest form
+        window.validateQuestUrl = function(input) {
+            if (!input) return;
+            const v = (input.value || '').trim();
+            if (!v) {
+                input.style.border = '';
+                input.title = '';
+            } else if (!/^https?:\/\/\S+/i.test(v)) {
+                input.style.border = '2px solid #ef4444';
+                input.title = 'URL should start with http:// or https://';
+            } else {
+                input.style.border = '1.5px solid #10b981';
+                input.title = '';
+            }
+        };
+
+        // V92.33 — Schedule button gating: disabled until Scheduled Start is filled
+        window.updateScheduleButtonState = function() {
+            const startInput = document.getElementById('q-start-time');
+            const btn = document.getElementById('quest-schedule-btn');
+            if (!btn) return;
+            const hasStart = !!(startInput && (startInput.value || '').trim());
+            if (hasStart) {
+                btn.disabled = false;
+                btn.style.opacity = '';
+                btn.style.cursor = 'pointer';
+                btn.title = '';
+            } else {
+                btn.disabled = true;
+                btn.style.opacity = '0.4';
+                btn.style.cursor = 'not-allowed';
+                btn.title = 'Set ⏰ Scheduled Start to enable Schedule. Use Save Draft or Post Now if you don\'t want to schedule.';
+            }
+        };
+
         function switchModalTab(type) {
             const taskForm = document.getElementById('form-task-container');
             const questForm = document.getElementById('form-quest-container');
             const btnTask = document.getElementById('modal-tab-task');
             const btnQuest = document.getElementById('modal-tab-quest');
-            
+
+            // V92.33 — warn when leaving a dirty Daily Quest draft for the Kanban Task tab.
+            // Tab switch does not actually drop the value (form stays in DOM), but this surfaces
+            // unsaved work so admins don't accidentally walk away from a half-typed prompt.
+            if (type === 'task' && questForm && questForm.style.display === 'block') {
+                const draft = (document.getElementById('q-text')?.value || '').trim();
+                if (draft && !confirm('Daily Quest draft has unsaved content.\n\nSwitch to Kanban Task tab anyway? Your draft is preserved when you switch back.')) {
+                    return;
+                }
+            }
+
             if (type === 'task') {
                 taskForm.style.display = 'block';
                 questForm.style.display = 'none';
@@ -25451,6 +25496,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // Render card pickers
                 renderDQGroupCards();
                 renderDQTagCards();
+                // V92.33: refresh Schedule button gating when entering quest tab
+                if (typeof updateScheduleButtonState === 'function') updateScheduleButtonState();
             }
         }
         async function saveSideQuest() { const id = document.getElementById('edit-id').value; const t = document.getElementById('sq-title').value; if (!t) return alert("Title?"); const d = { title: t, description: document.getElementById('sq-desc').value, priority: document.getElementById('sq-priority').value, dueDate: document.getElementById('sq-due').value, isProject: document.getElementById('sq-isProject').checked, assigneeIds: [...document.querySelectorAll('.sq-user-check:checked')].map(c => c.value), assignees: [...document.querySelectorAll('.sq-user-check:checked')].map(c => ({ uid: c.value, name: c.dataset.name, pic: c.dataset.pic })) }; if (id) { await db.collection("side_quests").doc(id).update(d); showToast("Updated"); } else { d.status = "Backlog"; d.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").add(d); showToast("Created"); } document.getElementById('taskModal').style.display = 'none'; }
