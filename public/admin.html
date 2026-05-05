@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.34</title>
+    <title>Nika V92.35</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -10319,21 +10319,21 @@
             if (typeof str === 'object') return str;
             try {
                 let cleaned = str.trim();
-                // Remove markdown code blocks if present
+                // V92.35: strip code fences with any language tag (json / javascript / js / JSON / etc.)
                 if (cleaned.includes("```")) {
-                    cleaned = cleaned.replace(/```json/g, "").replace(/```/g, "").trim();
+                    cleaned = cleaned.replace(/```[a-zA-Z]*\s*/g, '').replace(/```/g, '').trim();
                 }
-                
+
                 // Try direct parse
                 try { return JSON.parse(cleaned); } catch(e) {}
-                
+
                 // Try extracting first matching { ... } or [ ... ]
                 const sObj = cleaned.indexOf('{');
                 const eObj = cleaned.lastIndexOf('}');
                 if (sObj !== -1 && eObj !== -1 && eObj >= sObj) {
                     try { return JSON.parse(cleaned.substring(sObj, eObj + 1)); } catch(e) {}
                 }
-                
+
                 const sArr = cleaned.indexOf('[');
                 const eArr = cleaned.lastIndexOf(']');
                 if (sArr !== -1 && eArr !== -1 && eArr >= sArr) {
@@ -11290,9 +11290,10 @@
 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-1.5-pro-latest';
                 const { text: resultJson } = await callUniversalAI(selectedModel, prompt, true);
-                
-                const cleanJson = resultJson.replace(/```json/g, "").replace(/```/g, "").trim();
-                const newQuestions = JSON.parse(cleanJson);
+
+                // V92.35: use shared safeJsonParse with bracket-extraction fallback
+                const newQuestions = safeJsonParse(resultJson);
+                if (!newQuestions) throw new Error('AI returned invalid JSON. First 200 chars: ' + String(resultJson || '').slice(0, 200));
 
                 if (newQuestions && Array.isArray(newQuestions)) {
                     const container = document.getElementById('quiz-questions-container');
@@ -11445,14 +11446,15 @@
 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-1.5-pro-latest';
                 const { text: resultRaw } = await callUniversalAI(selectedModel, prompt, true);
-                const cleanJson = resultRaw.replace(/```json/g, "").replace(/```/g, "").trim();
-                const suggestions = JSON.parse(cleanJson);
-                
+                // V92.35: use shared safeJsonParse with bracket-extraction fallback
+                const suggestions = safeJsonParse(resultRaw);
+                if (!suggestions) throw new Error('AI returned invalid JSON. First 200 chars: ' + String(resultRaw || '').slice(0, 200));
+
                 const configModal = document.getElementById('ai-suggest-config-modal');
                 if (configModal) configModal.remove();
-                
+
                 showAiSuggestionsPopup(suggestions);
-                
+
             } catch(e) {
                 console.error(e);
                 alert("Suggestion error: " + e.message);
@@ -11526,12 +11528,13 @@
                 showToast(" Regenerating with custom focus...");
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-1.5-pro-latest';
                 const { text: resultRaw } = await callUniversalAI(selectedModel, prompt, true);
-                const cleanJson = resultRaw.replace(/```json/g, "").replace(/```/g, "").trim();
-                const suggestions = JSON.parse(cleanJson);
-                
+                // V92.35: use shared safeJsonParse with bracket-extraction fallback
+                const suggestions = safeJsonParse(resultRaw);
+                if (!suggestions) throw new Error('AI returned invalid JSON. First 200 chars: ' + String(resultRaw || '').slice(0, 200));
+
                 const popup = document.getElementById('ai-suggestions-popup');
                 if (popup) popup.remove();
-                
+
                 showAiSuggestionsPopup(suggestions);
                 
             } catch(e) {
@@ -12584,16 +12587,9 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                 window.setQuizMagicState(item, 'enhancing');
                 
                 
-                // Robust parsing for JSON
-                let cleanJson = aiResponse.trim();
-                // Find potential JSON block
-                const startIdx = cleanJson.indexOf('{');
-                const endIdx = cleanJson.lastIndexOf('}');
-                if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-                    cleanJson = cleanJson.substring(startIdx, endIdx + 1);
-                }
-                
-                const data = JSON.parse(cleanJson);
+                // V92.35: use shared safeJsonParse with bracket-extraction fallback (handles fences + array/object spans)
+                const data = safeJsonParse(aiResponse);
+                if (!data) throw new Error('AI returned invalid JSON. First 200 chars: ' + String(aiResponse || '').slice(0, 200));
                 
                 let confirmMsg = `✨ AI (${actualModel}) has prepared the new content! ✨\n\n`;
                 confirmMsg += `--- 📌 Original Data ---\nQuestion: ${questionText}\n`;
@@ -17807,10 +17803,10 @@ async function saveQuiz() {
                 }`;
 
                 const { text: aiResponse } = await window.callUniversalAI("gemini-1.5-flash", prompt, true);
-                
-                let cleanJson = aiResponse.trim();
-                if (cleanJson.includes("```")) cleanJson = cleanJson.replace(/```json|```/g, "").trim();
-                const result = JSON.parse(cleanJson);
+
+                // V92.35: use shared safeJsonParse with bracket-extraction fallback
+                const result = safeJsonParse(aiResponse);
+                if (!result) throw new Error('AI returned invalid JSON. First 200 chars: ' + String(aiResponse || '').slice(0, 200));
 
                 btn.disabled = false;
                 btn.innerHTML = originalHtml;
@@ -31865,8 +31861,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-1.5-flash';
                 const { text: resultJson } = await callUniversalAI(selectedModel, prompt, true);
-                const cleanJson = resultJson.replace(/```json/g, "").replace(/```/g, "").trim();
-                const newSuggestion = JSON.parse(cleanJson);
+                // V92.35: use shared safeJsonParse with bracket-extraction fallback
+                const newSuggestion = safeJsonParse(resultJson);
+                if (!newSuggestion) throw new Error('AI returned invalid JSON. First 200 chars: ' + String(resultJson || '').slice(0, 200));
                 const diffState = window.getAiImprovementDiffState(originalQ, newSuggestion);
                 if (!diffState.hasMeaningfulDiff) {
                     throw new Error("AI returned an almost identical version. Please regenerate again.");
