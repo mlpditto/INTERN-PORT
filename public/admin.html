@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.42</title>
+    <title>Nika V92.43</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1489,6 +1489,35 @@
             font-weight:700;
             color:#312e81;
             background:#fafaff;
+        }
+        /* V92.43: AI Refine model chips (replaces the dropdown) */
+        .alabasta-casecard-tools-chip-rail {
+            display:flex;
+            gap:6px;
+            flex-wrap:wrap;
+        }
+        .alabasta-casecard-tools-chip {
+            flex:1 1 auto;
+            border:1px solid #ddd6fe;
+            background:#fafaff;
+            color:#5b21b6;
+            border-radius:999px;
+            padding:7px 12px;
+            font-size:0.78em;
+            font-weight:800;
+            cursor:pointer;
+            transition:all 0.15s ease;
+            white-space:nowrap;
+        }
+        .alabasta-casecard-tools-chip:hover {
+            border-color:#a78bfa;
+            background:#f5f3ff;
+        }
+        .alabasta-casecard-tools-chip.active {
+            background:linear-gradient(135deg,#7c3aed,#6d28d9);
+            border-color:transparent;
+            color:#fff;
+            box-shadow:0 6px 14px rgba(124,58,237,0.28);
         }
         .alabasta-casecard-tools-refine .alabasta-casecard-tools-item {
             margin:0 -12px;
@@ -10161,7 +10190,7 @@
                                 <option value="imagen">Vertex Imagen 3 (premium)</option>
                                 <option value="imagen-nano">Imagen 3 Fast (cheap & fast)</option>
                             </select>
-                            <a id="alabasta-case-card-image-download" href="#" download="alabasta-case-card.png" class="btn-sm alabasta-casecard-btn utility" style="text-decoration:none;">Download PNG · PNG 다운로드</a>
+                            <a id="alabasta-case-card-image-download" href="#" download="alabasta-case-card.png" class="btn-sm alabasta-casecard-btn utility" style="text-decoration:none;" title="Download PNG · PNG 다운로드"><i class="fa-solid fa-download"></i> PNG</a>
                         </div>
                     </div>
                 </div>
@@ -10190,13 +10219,17 @@
                                 </button>
                                 <hr class="alabasta-casecard-tools-divider">
                                 <div class="alabasta-casecard-tools-refine">
-                                    <label for="alabasta-case-card-refine-model" class="alabasta-casecard-tools-label">AI Refine model</label>
-                                    <!-- V91.85: removed Vertex AI option — value was the literal placeholder
+                                    <label class="alabasta-casecard-tools-label">AI Refine model</label>
+                                    <!-- V92.43: dropdown → chip pair (only 2 options, chips read at a glance).
+                                         Hidden <input> keeps the same id/name so existing JS that reads
+                                         `alabasta-case-card-refine-model` value continues to work.
+                                         V91.85: removed Vertex AI option — value was the literal placeholder
                                          "vertex-ai-model-name" (no real model wired), causing API errors. -->
-                                    <select id="alabasta-case-card-refine-model" class="alabasta-casecard-tools-select">
-                                        <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet</option>
-                                        <option value="gpt-4-turbo">OpenAI GPT-4 Turbo</option>
-                                    </select>
+                                    <input type="hidden" id="alabasta-case-card-refine-model" value="claude-3-5-sonnet-latest">
+                                    <div class="alabasta-casecard-tools-chip-rail" role="radiogroup" aria-label="AI Refine model">
+                                        <button type="button" class="alabasta-casecard-tools-chip active" data-value="claude-3-5-sonnet-latest" role="radio" aria-checked="true" onclick="selectAlabastaCaseCardRefineModel(this)">Claude 3.5 Sonnet</button>
+                                        <button type="button" class="alabasta-casecard-tools-chip" data-value="gpt-4-turbo" role="radio" aria-checked="false" onclick="selectAlabastaCaseCardRefineModel(this)">GPT-4 Turbo</button>
+                                    </div>
                                     <button type="button" id="alabasta-case-card-refine-btn" class="alabasta-casecard-tools-item refine" onclick="refineAlabastaCaseCardPromptWithSelectedModel(); closeAlabastaCaseCardToolsMenu();" title="Refine this GenMage prompt with AI · 이 프롬프트를 AI로 다듬기">
                                         <i class="fa-solid fa-wand-magic-sparkles"></i>
                                         <span><strong>AI Refine prompt</strong><small>Send the prompt through the selected text model</small></span>
@@ -20999,13 +21032,11 @@ async function saveQuiz() {
         }
 
         function buildAlabastaCaseCardPrompt(payload) {
-            // V92.42: text-render reduced to title+subtitle only.
-            // Earlier prompt asked the image model to render 5+ labelled text blocks
-            // (Title / Subtitle / Left column title / Right column title / Bottom section)
-            // plus the entire safe case summary. gpt-image-1 / Imagen garble long text
-            // → users got "Caso", "Cuss", "Mussie-tension", etc. on the poster.
-            // Now: only one short title (and optional subtitle) is allowed on the poster;
-            // all other content is passed as REFERENCE for visual storytelling only.
+            // V92.43: prompt strengthened after user testing showed Imagen 3 Fast
+            // still added garbled anatomical labels and paragraph blocks despite
+            // the V92.42 "no labels" rule. Tightened to: hard 12-word total cap,
+            // explicit anatomy-label ban, and primary rules moved to the top so
+            // weaker models (Fast tier) hit them first.
             const textContent = payload.textContent || {};
             const imageBrief = payload.imageBrief || {};
             const visualRequirements = Array.isArray(payload.visualRequirements) ? payload.visualRequirements : [];
@@ -21015,19 +21046,23 @@ async function saveQuiz() {
             return [
                 `Create a ${imageBrief.format || 'clean medical illustration card'} for a privacy-safe educational medical case.`,
                 '',
-                'On-poster text (the ONLY text allowed to appear in the image):',
-                `- Title: "${title}" — render exactly this short phrase, large and bold, near the top.`,
-                subtitle ? `- Subtitle: "${subtitle}" — small, directly under the title.` : '',
+                '### CRITICAL TEXT RULES (read first, override defaults) ###',
+                `- Total visible text on the entire poster MUST be ≤ 12 words combined.`,
+                `- The ONLY text allowed is: Title "${title}"${subtitle ? ` and Subtitle "${subtitle}"` : ''}. Nothing else.`,
+                '- DO NOT label body parts, organs, muscles, bones, or anatomical regions with text — use color zones, arrows, or shapes instead.',
+                '- DO NOT add bullet point lists, numbered lists, or any list markers next to content.',
+                '- DO NOT add column headers, section titles, footer captions, watermarks, page numbers, fake URLs, fake dates, signatures, or sample paragraphs.',
+                '- DO NOT include any sample / lorem-ipsum / placeholder text blocks under the illustration.',
+                '- If a word cannot be rendered with 100% spelling accuracy, omit it entirely rather than guessing.',
                 '',
                 'Reference content (use ONLY to inform the illustration — do NOT render verbatim on the poster):',
                 `- Topic / system: ${payload.primarySystemLabel}`,
                 `- Symptom tags: ${payload.symptomTags.length ? payload.symptomTags.join(', ') : 'not specified'}`,
                 `- Case context: ${payload.safeSummary}`,
                 '',
-                'Composition rules:',
-                '- DO NOT add column headers, section titles, body paragraphs, bullet points, captions, watermarks, fake URLs, fake dates, or any text other than the title/subtitle above.',
+                'Composition guidance:',
                 '- Communicate the case via icons, anatomical illustrations, color-coded zones, and visual metaphors — NOT written sentences.',
-                '- If a word cannot be rendered with 100% spelling accuracy, omit it entirely rather than guessing.',
+                '- Generous whitespace is preferred over text-filled regions.',
                 '',
                 'Visual style:',
                 '- Clean medical infographic illustration',
@@ -21039,9 +21074,11 @@ async function saveQuiz() {
                 '- No HN, Ref No., case number, customer name, patient name, user name, LINE name, phone, email, or any identifier visible anywhere on the poster',
                 '- Do not invent patient identity or extra clinical facts',
                 '',
-                'Avoid:',
-                '- Garbled or misspelled text, fake words, prescription labels, ID cards, hospital forms with personal data',
-                '- Crowded layout, tiny illegible text, paragraph blocks, fine-print captions',
+                'Avoid (negative prompt):',
+                '- Anatomical labels, organ name labels, body-region tags, muscle-name overlays',
+                '- Body-text paragraphs, lorem ipsum, sample copy, captions under the illustration',
+                '- Garbled text, misspelled medical terms, fake words, prescription labels, ID cards, hospital forms',
+                '- Crowded layout, tiny illegible text, fine-print',
                 '- Real patient photos, graphic surgical imagery',
                 ...negativePrompt.map(item => `- ${item}`)
             ].filter(Boolean).join('\n');
@@ -21059,6 +21096,19 @@ async function saveQuiz() {
         window.closeAlabastaCaseCardToolsMenu = function() {
             const menu = document.getElementById('alabasta-case-card-tools-menu');
             if (menu) menu.removeAttribute('open');
+        };
+
+        // V92.43: AI Refine model picker (chip rail replaces the old <select>)
+        window.selectAlabastaCaseCardRefineModel = function(btn) {
+            if (!btn) return;
+            const value = btn.dataset.value || 'claude-3-5-sonnet-latest';
+            document.querySelectorAll('.alabasta-casecard-tools-chip').forEach(chip => {
+                const isActive = chip === btn;
+                chip.classList.toggle('active', isActive);
+                chip.setAttribute('aria-checked', String(isActive));
+            });
+            const hiddenInput = document.getElementById('alabasta-case-card-refine-model');
+            if (hiddenInput) hiddenInput.value = value;
         };
 
         window.switchAndRegenerateAlabastaCaseCard = function(modelValue) {
