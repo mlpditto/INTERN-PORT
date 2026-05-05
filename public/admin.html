@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.39</title>
+    <title>Nika V92.40</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -9032,6 +9032,47 @@
                     <span id="reflective-detail-date"></span>
                     <span id="reflective-detail-score" style="font-weight:bold; color:var(--primary);"></span>
                 </div>
+            </div>
+        </div>
+
+        <!-- V92.10: Manual Adjust Edit + Audit Trail modal (mirrors lpAdminEditModal pattern) -->
+        <div id="manualAdjustEditModal" class="modal" style="z-index: 2503;">
+            <div class="modal-content" style="max-width: 640px; border-top: 5px solid #6366f1; border-radius: 14px;">
+                <span class="close-modal" onclick="document.getElementById('manualAdjustEditModal').style.display='none'">&times;</span>
+                <h3 style="color:#4338ca; margin:0 0 4px 0;"><i class="fa-solid fa-pen-to-square"></i> Edit Manual Adjustment</h3>
+                <div id="ma-edit-meta" style="font-size:0.78em; color:#64748b; margin-bottom:14px;"></div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                    <label style="font-size:0.78em; font-weight:700; color:#475569;">Amount (pts)
+                        <input id="ma-edit-amount" type="number" step="0.01" style="margin:4px 0 0; padding:8px 10px; border-radius:10px; width:100%; box-sizing:border-box;">
+                    </label>
+                    <div style="font-size:0.78em; font-weight:700; color:#475569;">Original
+                        <div id="ma-edit-amount-orig" style="margin:4px 0 0; padding:8px 10px; border-radius:10px; background:#f1f5f9; color:#475569; font-weight:800;">—</div>
+                    </div>
+                </div>
+
+                <label style="font-size:0.78em; font-weight:700; color:#475569; display:block;">Note
+                    <textarea id="ma-edit-note" style="margin:4px 0 10px; min-height:80px; padding:10px 12px; border-radius:10px; width:100%; box-sizing:border-box; font-size:0.9em; line-height:1.5;"></textarea>
+                </label>
+
+                <div style="background:#fffbeb; border:1px solid #fde68a; padding:10px 12px; border-radius:10px; margin-bottom:12px;">
+                    <label style="font-size:0.78em; font-weight:800; color:#92400e; display:block;">Reason for this edit (required)
+                        <input id="ma-edit-reason" type="text" placeholder="e.g. แก้ตัวเลขผิด, เพิ่ม context, ปรับตามเวลาจริง" maxlength="240" style="margin:6px 0 0; padding:8px 10px; border-radius:8px; width:100%; box-sizing:border-box; background:#fff; border:1px solid #fcd34d;">
+                    </label>
+                    <div id="ma-edit-reason-error" style="display:none; font-size:0.75em; color:#dc2626; margin-top:4px; font-weight:700;">Reason is required to create an audit log entry.</div>
+                </div>
+
+                <div id="ma-edit-status" style="font-size:0.78em; color:#64748b; margin-bottom:8px; min-height:1.2em;"></div>
+
+                <div style="display:flex; gap:10px; justify-content:flex-end;">
+                    <button onclick="document.getElementById('manualAdjustEditModal').style.display='none'" style="background:#e5e7eb; color:#374151; border:none; padding:10px 18px; border-radius:10px; font-weight:700; cursor:pointer;">Cancel</button>
+                    <button id="ma-edit-save-btn" onclick="manualAdjustSaveEdit()" style="background:#4338ca; color:#fff; border:none; padding:10px 22px; border-radius:10px; font-weight:800; cursor:pointer;">💾 Save with Audit</button>
+                </div>
+
+                <details style="margin-top:18px; background:#f5f3ff; border:1px solid #e9d5ff; border-radius:12px; padding:10px 14px;">
+                    <summary style="cursor:pointer; font-weight:800; color:#5b21b6; font-size:0.9em; user-select:none;">📜 Edit History (<span id="ma-edit-history-count">0</span>)</summary>
+                    <div id="ma-edit-history-list" style="margin-top:10px; display:flex; flex-direction:column; gap:8px; max-height:340px; overflow-y:auto;"></div>
+                </details>
             </div>
         </div>
 
@@ -22112,7 +22153,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             });
         }
         function toggleWorkArchive() { hideCompletedWorks = !hideCompletedWorks; document.getElementById('btn-toggle-work-archive').classList.toggle('active'); renderTable('works'); }
-        async function adjDec(id) { try { const valInput = document.getElementById(`adj-${id}`); let v = valInput.value; if (!v) return alert("Please specify score."); v = v.replace(',', '.'); const scoreVal = parseFloat(v); if (isNaN(scoreVal)) return alert("Invalid score value."); const n = prompt("Reason (Note):"); if (!n) return; await db.collection("users").doc(id).update({ score: firebase.firestore.FieldValue.increment(scoreVal) }); await db.collection("checkin_logs").add({ userId: id, type: 'manual_adjust', amount: scoreVal, note: n, timestamp: firebase.firestore.FieldValue.serverTimestamp() }); showToast("Saved!"); valInput.value = ""; valInput.blur(); } catch (e) { alert("Error saving score: " + e.message); } }
+        async function adjDec(id) { try { const valInput = document.getElementById(`adj-${id}`); let v = valInput.value; if (!v) return alert("Please specify score."); v = v.replace(',', '.'); const scoreVal = parseFloat(v); if (isNaN(scoreVal)) return alert("Invalid score value."); const n = prompt("Reason (Note):"); if (!n) return; const editor = (auth && auth.currentUser) || {}; await db.collection("users").doc(id).update({ score: firebase.firestore.FieldValue.increment(scoreVal) }); await db.collection("checkin_logs").add({ userId: id, type: 'manual_adjust', amount: scoreVal, note: n, timestamp: firebase.firestore.FieldValue.serverTimestamp(), createdByUid: editor.uid || 'unknown', createdByEmail: editor.email || ALLOWED_EMAIL }); showToast("Saved!"); valInput.value = ""; valInput.blur(); } catch (e) { alert("Error saving score: " + e.message); } }
 
         function renderCertTable() {
             // 🔥 [Version: V79.5] Certificates merged into Users tab — this is now a no-op
@@ -24104,8 +24145,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const seqNum = filteredLogs.length - globalIdx;
                 const d = window._fmtDate(e.t);
                 let delBtn = (e.source === 'checkin_logs' && e.docId) ? `<button class="btn-sm" style="background:none; color:#ef4444; border:none; padding:0; margin-left:8px; cursor:pointer;" onclick="deleteHubHistoryLog('${e.docId}', ${e.score})"><i class="fa-solid fa-trash-can"></i></button>` : "";
-                const isClickable = e.type === 'work' || e.isReflective || e.isLearningNote;
-                const onClickAttr = isClickable ? ` onclick="showHubItemDetails(${JSON.stringify(e).replace(/"/g, '&quot;')})" ` : '';
+                const isManualAdjust = e.type === 'manual' && !!e.docId;
+                const isClickable = e.type === 'work' || e.isReflective || e.isLearningNote || isManualAdjust;
+                const onClickAttr = isManualAdjust
+                    ? ` onclick="openManualAdjustEditModal('${e.docId}')" `
+                    : (isClickable ? ` onclick="showHubItemDetails(${JSON.stringify(e).replace(/"/g, '&quot;')})" ` : '');
 
                 // V91.102/V91.106: per-entry word count + content preview for reflective_log + learning_note
                 let wordsBadge = '';
@@ -24213,6 +24257,282 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 alert("Failed to delete history log: " + e.message);
             }
         }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // V92.10: Manual Adjust Edit + Audit Trail (mirrors lpAdmin* pattern)
+        // ═══════════════════════════════════════════════════════════════════
+        window._maEditCache = null;
+
+        window.openManualAdjustEditModal = async function(logId) {
+            const uid = window._currentPopupUser;
+            if (!uid || !logId) return;
+            try {
+                const snap = await db.collection('checkin_logs').doc(logId).get();
+                if (!snap.exists) { alert('Log not found.'); return; }
+                const data = snap.data() || {};
+                if (data.type !== 'manual_adjust' && data.type !== 'manual') {
+                    alert('Not a manual adjustment entry.');
+                    return;
+                }
+                window._maEditCache = { logId, userId: uid, data };
+
+                const createdAt = data.timestamp?.toDate ? data.timestamp.toDate() : null;
+                const createdBy = data.createdByEmail || data.editorEmail || '—';
+                const editCount = (data.editHistory || []).length;
+                document.getElementById('ma-edit-meta').innerHTML =
+                    `Log ID: <code>${logId}</code> · Created: <strong>${createdAt ? createdAt.toLocaleString() : '—'}</strong> · By: <strong>${createdBy}</strong> · Edits so far: <strong>${editCount}</strong>`;
+
+                const amt = Number(data.amount || 0);
+                document.getElementById('ma-edit-amount').value = amt.toFixed(2);
+                document.getElementById('ma-edit-amount-orig').textContent = `${amt >= 0 ? '+' : ''}${amt.toFixed(2)}`;
+                document.getElementById('ma-edit-note').value = data.note || '';
+                document.getElementById('ma-edit-reason').value = '';
+                document.getElementById('ma-edit-reason-error').style.display = 'none';
+                document.getElementById('ma-edit-status').textContent = '';
+                document.getElementById('ma-edit-save-btn').disabled = false;
+
+                manualAdjustRenderHistory(data.editHistory || []);
+                document.getElementById('manualAdjustEditModal').style.display = 'flex';
+            } catch (err) {
+                console.error('openManualAdjustEditModal', err);
+                alert('Failed to open editor: ' + (err.message || 'unknown'));
+            }
+        };
+
+        window.manualAdjustRenderHistory = function(history) {
+            const listEl = document.getElementById('ma-edit-history-list');
+            const countEl = document.getElementById('ma-edit-history-count');
+            if (countEl) countEl.textContent = history.length;
+            if (!listEl) return;
+            if (!history.length) {
+                listEl.innerHTML = '<div style="padding:14px; text-align:center; color:#94a3b8; font-size:0.85em;">No prior edits.</div>';
+                return;
+            }
+            const indexed = history.map((h, i) => ({ ...h, _idx: i })).reverse();
+            listEl.innerHTML = indexed.map(h => {
+                const when = h.editedAt ? new Date(h.editedAt).toLocaleString() : '—';
+                const isRevert = h.type === 'revert';
+                const typeBadge = isRevert
+                    ? '<span style="background:#fef3c7;color:#92400e;border-radius:5px;padding:1px 6px;font-size:0.7em;font-weight:800;">↩️ REVERT</span>'
+                    : '<span style="background:#dbeafe;color:#1e3a8a;border-radius:5px;padding:1px 6px;font-size:0.7em;font-weight:800;">✏️ EDIT</span>';
+                const safeReason = String(h.reason || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                return `<div style="background:#fff; border:1px solid #e9d5ff; border-radius:10px; padding:10px 12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:200px;">
+                            <div style="display:flex; gap:6px; align-items:center; margin-bottom:3px;">
+                                ${typeBadge}
+                                <span style="font-size:0.78em; font-weight:700; color:#0f172a;">#${h._idx + 1}</span>
+                            </div>
+                            <div style="font-size:0.78em; color:#475569;"><strong>${h.editorEmail || '—'}</strong> · ${when}</div>
+                            <div style="font-size:0.82em; color:#0f172a; margin-top:4px; font-style:italic;">"${safeReason}"</div>
+                        </div>
+                        <div style="display:flex; gap:6px; flex-shrink:0;">
+                            <button onclick="manualAdjustToggleDiff(${h._idx})" style="background:#ede9fe; color:#5b21b6; border:none; border-radius:6px; padding:4px 10px; font-size:0.72em; font-weight:700; cursor:pointer;">🔍 Diff</button>
+                            <button onclick="manualAdjustRevert(${h._idx})" title="Restore the state that existed BEFORE this edit" style="background:#fef3c7; color:#92400e; border:none; border-radius:6px; padding:4px 10px; font-size:0.72em; font-weight:700; cursor:pointer;">↩️ Revert</button>
+                        </div>
+                    </div>
+                    <div id="ma-history-diff-${h._idx}" style="display:none; margin-top:8px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px;"></div>
+                </div>`;
+            }).join('');
+        };
+
+        window.manualAdjustToggleDiff = function(idx) {
+            const cache = window._maEditCache;
+            const h = cache && (cache.data.editHistory || [])[idx];
+            const diffEl = document.getElementById('ma-history-diff-' + idx);
+            if (!diffEl || !h) return;
+            if (diffEl.style.display !== 'none') { diffEl.style.display = 'none'; return; }
+            diffEl.innerHTML = manualAdjustRenderDiff(h.fieldsBefore || {}, h.fieldsAfter || {});
+            diffEl.style.display = 'block';
+        };
+
+        window.manualAdjustRenderDiff = function(before, after) {
+            const FIELD_LABELS = { amount: 'Amount', note: 'Note' };
+            const fmt = (v) => {
+                if (v == null || v === '') return '<span style="color:#94a3b8;">(empty)</span>';
+                if (typeof v === 'number') return `<code style="font-weight:800;">${v >= 0 ? '+' : ''}${v.toFixed(2)}</code>`;
+                const s = String(v);
+                const truncated = s.length > 200 ? s.slice(0, 200) + '…' : s;
+                return `<span style="white-space:pre-wrap; word-break:break-word;">${truncated.replace(/</g, '&lt;')}</span>`;
+            };
+            return Object.keys(FIELD_LABELS).map(k => {
+                const same = before[k] === after[k];
+                const opacity = same ? '0.45' : '1';
+                const bg = same ? 'transparent' : '#fef9c3';
+                return `<div style="display:grid; grid-template-columns:80px 1fr 1fr; gap:8px; padding:6px; opacity:${opacity}; background:${bg}; border-radius:6px; margin-bottom:4px; font-size:0.78em;">
+                    <div style="font-weight:800; color:#475569; align-self:start;">${FIELD_LABELS[k]}${same?'':' *'}</div>
+                    <div style="color:#7c2d12;">${fmt(before[k])}</div>
+                    <div style="color:#14532d;">${fmt(after[k])}</div>
+                </div>`;
+            }).join('') + '<div style="font-size:0.7em; color:#94a3b8; text-align:right; margin-top:4px;">← before · after → · * = changed</div>';
+        };
+
+        // Atomic update: doc fields + user.score increment by (newAmount - oldAmount).
+        // Wrapped in a Firestore transaction so a partial failure can't drift the user's score.
+        window.manualAdjustSaveEdit = async function() {
+            const cache = window._maEditCache;
+            if (!cache) return;
+            const reason = document.getElementById('ma-edit-reason').value.trim();
+            const reasonErr = document.getElementById('ma-edit-reason-error');
+            if (!reason) {
+                reasonErr.style.display = 'block';
+                document.getElementById('ma-edit-reason').focus();
+                return;
+            }
+            reasonErr.style.display = 'none';
+
+            const newAmountRaw = document.getElementById('ma-edit-amount').value;
+            const newAmount = parseFloat(String(newAmountRaw).replace(',', '.'));
+            if (isNaN(newAmount)) { alert('Amount must be a number.'); return; }
+            const newNote = document.getElementById('ma-edit-note').value;
+
+            const oldAmount = Number(cache.data.amount || 0);
+            const oldNote = cache.data.note || '';
+            const fieldsBefore = { amount: oldAmount, note: oldNote };
+            const fieldsAfter = { amount: newAmount, note: newNote };
+            if (oldAmount === newAmount && oldNote === newNote) {
+                alert('No fields changed. Edit a field or cancel.');
+                return;
+            }
+
+            const statusEl = document.getElementById('ma-edit-status');
+            const saveBtn = document.getElementById('ma-edit-save-btn');
+            statusEl.textContent = 'Saving with audit log...';
+            saveBtn.disabled = true;
+
+            try {
+                const editor = (auth && auth.currentUser) || {};
+                const editEntry = {
+                    editorUid: editor.uid || 'unknown',
+                    editorEmail: editor.email || ALLOWED_EMAIL,
+                    editedAt: new Date().toISOString(),
+                    reason,
+                    fieldsBefore,
+                    fieldsAfter,
+                    type: 'edit'
+                };
+                const prevHistory = Array.isArray(cache.data.editHistory) ? cache.data.editHistory : [];
+                const nextHistory = [...prevHistory, editEntry].slice(-10);
+                const scoreDelta = newAmount - oldAmount;
+
+                const logRef = db.collection('checkin_logs').doc(cache.logId);
+                const userRef = db.collection('users').doc(cache.userId);
+
+                await db.runTransaction(async (tx) => {
+                    const fresh = await tx.get(logRef);
+                    if (!fresh.exists) throw new Error('Log doc disappeared.');
+                    const freshAmt = Number(fresh.data().amount || 0);
+                    if (freshAmt !== oldAmount) {
+                        throw new Error(`Amount changed under us (was ${oldAmount}, now ${freshAmt}). Reload and retry.`);
+                    }
+                    tx.update(logRef, {
+                        amount: newAmount,
+                        note: newNote,
+                        editHistory: nextHistory,
+                        lastAdminEdit: { editorEmail: editEntry.editorEmail, editedAt: editEntry.editedAt, reason }
+                    });
+                    if (scoreDelta !== 0) {
+                        tx.update(userRef, { score: firebase.firestore.FieldValue.increment(scoreDelta) });
+                    }
+                });
+
+                // Patch local state so a re-open without refetch is consistent
+                cache.data.amount = newAmount;
+                cache.data.note = newNote;
+                cache.data.editHistory = nextHistory;
+                const localUser = (usersData || []).find(u => u.id === cache.userId);
+                if (localUser && scoreDelta !== 0) localUser.score = Number(localUser.score || 0) + scoreDelta;
+
+                statusEl.textContent = 'Saved ✓ Audit logged.';
+                showToast('Manual adjustment updated', 'success');
+                setTimeout(async () => {
+                    document.getElementById('manualAdjustEditModal').style.display = 'none';
+                    await openUserHub(cache.userId, 'history');
+                }, 600);
+            } catch (err) {
+                console.error('manualAdjustSaveEdit', err);
+                statusEl.textContent = 'Error: ' + (err.message || 'unknown');
+                saveBtn.disabled = false;
+            }
+        };
+
+        window.manualAdjustRevert = async function(idx) {
+            const cache = window._maEditCache;
+            if (!cache) return;
+            const h = (cache.data.editHistory || [])[idx];
+            if (!h) { alert('History entry not found.'); return; }
+            const target = h.fieldsBefore || {};
+            const when = h.editedAt ? new Date(h.editedAt).toLocaleString() : '—';
+            const reason = prompt(`Revert to the state BEFORE edit #${idx + 1} (made by ${h.editorEmail} on ${when})?\n\nEnter a reason for the revert (required):`);
+            if (reason == null) return;
+            const trimmed = reason.trim();
+            if (!trimmed) { alert('Reason is required for revert.'); return; }
+
+            const oldAmount = Number(cache.data.amount || 0);
+            const oldNote = cache.data.note || '';
+            const newAmount = Number(target.amount != null ? target.amount : oldAmount);
+            const newNote = target.note != null ? target.note : oldNote;
+            if (oldAmount === newAmount && oldNote === newNote) {
+                alert('Already at this state — nothing to revert.');
+                return;
+            }
+
+            const statusEl = document.getElementById('ma-edit-status');
+            statusEl.textContent = 'Reverting...';
+            try {
+                const editor = (auth && auth.currentUser) || {};
+                const revertEntry = {
+                    editorUid: editor.uid || 'unknown',
+                    editorEmail: editor.email || ALLOWED_EMAIL,
+                    editedAt: new Date().toISOString(),
+                    reason: `[Revert to before edit #${idx + 1}] ${trimmed}`,
+                    fieldsBefore: { amount: oldAmount, note: oldNote },
+                    fieldsAfter: { amount: newAmount, note: newNote },
+                    type: 'revert',
+                    revertedFromIndex: idx
+                };
+                const prevHistory = Array.isArray(cache.data.editHistory) ? cache.data.editHistory : [];
+                const nextHistory = [...prevHistory, revertEntry].slice(-10);
+                const scoreDelta = newAmount - oldAmount;
+
+                const logRef = db.collection('checkin_logs').doc(cache.logId);
+                const userRef = db.collection('users').doc(cache.userId);
+
+                await db.runTransaction(async (tx) => {
+                    const fresh = await tx.get(logRef);
+                    if (!fresh.exists) throw new Error('Log doc disappeared.');
+                    const freshAmt = Number(fresh.data().amount || 0);
+                    if (freshAmt !== oldAmount) {
+                        throw new Error(`Amount changed under us (was ${oldAmount}, now ${freshAmt}). Reload and retry.`);
+                    }
+                    tx.update(logRef, {
+                        amount: newAmount,
+                        note: newNote,
+                        editHistory: nextHistory,
+                        lastAdminEdit: { editorEmail: revertEntry.editorEmail, editedAt: revertEntry.editedAt, reason: revertEntry.reason }
+                    });
+                    if (scoreDelta !== 0) {
+                        tx.update(userRef, { score: firebase.firestore.FieldValue.increment(scoreDelta) });
+                    }
+                });
+
+                cache.data.amount = newAmount;
+                cache.data.note = newNote;
+                cache.data.editHistory = nextHistory;
+                const localUser = (usersData || []).find(u => u.id === cache.userId);
+                if (localUser && scoreDelta !== 0) localUser.score = Number(localUser.score || 0) + scoreDelta;
+
+                statusEl.textContent = 'Reverted ✓';
+                showToast('Reverted', 'success');
+                setTimeout(async () => {
+                    document.getElementById('manualAdjustEditModal').style.display = 'none';
+                    await openUserHub(cache.userId, 'history');
+                }, 600);
+            } catch (err) {
+                console.error('manualAdjustRevert', err);
+                statusEl.textContent = 'Revert failed: ' + (err.message || 'unknown');
+            }
+        };
 
         window.changeHubHistoryPage = function(dir) {
             const t = Math.ceil(historyCache.length / 15);
