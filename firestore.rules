@@ -209,6 +209,22 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // 26. Exam Sessions (Multi-user collaborative exam, TBL/GRAT-style — V1 Phase 2)
+    // Trust model: <10 users per session, private session link as the access gate, all
+    // users are signed-in (LIFF + Firebase anonymous auth). Permissive update is
+    // acceptable here because:
+    //   - Admin is the only role that creates/deletes sessions.
+    //   - The session link is shared privately (LINE chat) within the trusted intern pool.
+    //   - Field-level diff guards (e.g. only host can change state) require
+    //     request.resource.data.diff(resource.data).changedKeys() checks that complicate
+    //     the rule — out of scope for the lobby ship; revisit when adding vote logic
+    //     in Phase 3 if peer tampering becomes a concern.
+    match /exam_sessions/{sessionId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isSignedIn();
+    }
+
     // 25. Unified Submissions (V91.62+ Phase 2 — Case/Work/Quiz/Quest/Reflective/Learning Note)
     // V94.09: Match reflective_logs (rule 13) pattern — single-query onSnapshot at
     // loadUnifiedSubmissions() (public/index.html:9912) uses where('userId','==',userId)

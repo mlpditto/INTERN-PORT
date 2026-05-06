@@ -3,15 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exam Session V1.0 — INTERN-PORT</title>
+    <title>Exam Session V2.0 — INTERN-PORT</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+    <!-- Firebase (V2.0 Phase 2: Firestore for session sync) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -21,26 +26,24 @@
             background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #312e81 100%);
             color: #f1f5f9;
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             padding: 20px;
         }
 
         .container {
             width: 100%;
-            max-width: 720px;
+            max-width: 880px;
+            margin: 0 auto;
             background: rgba(30, 41, 59, 0.85);
             backdrop-filter: blur(20px);
             border: 1px solid rgba(99, 102, 241, 0.2);
             border-radius: 24px;
-            padding: 48px 40px;
+            padding: 40px 36px;
             box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4);
         }
 
         .header {
             text-align: center;
-            margin-bottom: 32px;
+            margin-bottom: 28px;
         }
 
         .badge {
@@ -55,13 +58,13 @@
             font-weight: 700;
             letter-spacing: 0.04em;
             text-transform: uppercase;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
 
         h1 {
-            font-size: 2em;
+            font-size: 1.85em;
             font-weight: 800;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             background: linear-gradient(135deg, #818cf8, #c084fc);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -70,7 +73,7 @@
 
         .subtitle {
             color: #94a3b8;
-            font-size: 0.95em;
+            font-size: 0.9em;
             font-weight: 400;
         }
 
@@ -78,243 +81,463 @@
             background: rgba(15, 23, 42, 0.6);
             border: 1px solid rgba(148, 163, 184, 0.15);
             border-radius: 16px;
-            padding: 32px;
-            margin-bottom: 20px;
-            text-align: center;
+            padding: 28px;
+            margin-bottom: 16px;
         }
 
         .spinner {
-            width: 48px;
-            height: 48px;
+            width: 44px;
+            height: 44px;
             border: 4px solid rgba(99, 102, 241, 0.2);
             border-top-color: #818cf8;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
-            margin: 0 auto 20px;
+            margin: 0 auto 18px;
         }
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
         .status-text {
-            font-size: 1.05em;
+            font-size: 1.02em;
             color: #cbd5e1;
-            font-weight: 500;
-            margin-bottom: 8px;
+            font-weight: 600;
+            text-align: center;
         }
 
         .status-detail {
-            font-size: 0.85em;
+            font-size: 0.82em;
             color: #64748b;
+            text-align: center;
+            margin-top: 4px;
         }
 
-        .profile-card {
+        /* Profile chip */
+        .me-chip {
             display: flex;
             align-items: center;
-            gap: 20px;
-            background: rgba(99, 102, 241, 0.08);
+            gap: 12px;
+            background: rgba(99, 102, 241, 0.1);
             border: 1px solid rgba(99, 102, 241, 0.25);
-            border-radius: 16px;
-            padding: 20px;
-            margin-top: 16px;
+            border-radius: 999px;
+            padding: 6px 14px 6px 6px;
+            margin-top: 14px;
+            font-size: 0.85em;
         }
-
-        .profile-pic {
-            width: 72px;
-            height: 72px;
-            border-radius: 50%;
-            border: 3px solid rgba(129, 140, 248, 0.6);
-            object-fit: cover;
-            flex-shrink: 0;
-            background: #1e293b;
+        .me-chip img {
+            width: 32px; height: 32px; border-radius: 50%; object-fit: cover; background: #1e293b;
         }
+        .me-chip-name { font-weight: 700; color: #e0e7ff; }
+        .me-chip-tag { font-size: 0.72em; color: #94a3b8; margin-left: 4px; }
 
-        .profile-info {
-            flex: 1;
-            text-align: left;
-            min-width: 0;
+        /* Lobby UI */
+        .lobby-meta {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 22px;
+            padding-bottom: 18px;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.15);
         }
-
-        .profile-name {
+        .exam-title {
             font-size: 1.3em;
             font-weight: 800;
             color: #f1f5f9;
             margin-bottom: 4px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
         }
+        .exam-subline { font-size: 0.82em; color: #94a3b8; }
+        .exam-subline i { color: #fbbf24; }
 
-        .profile-meta {
-            font-size: 0.78em;
-            color: #94a3b8;
-            font-family: Consolas, monospace;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .session-info {
-            background: rgba(34, 197, 94, 0.08);
+        .timer-pill {
+            background: rgba(34, 197, 94, 0.12);
             border: 1px solid rgba(34, 197, 94, 0.3);
-            border-radius: 12px;
-            padding: 14px 18px;
-            margin-top: 16px;
-            font-size: 0.9em;
             color: #86efac;
-        }
-
-        .session-info i { margin-right: 8px; }
-        .session-info code {
-            background: rgba(0, 0, 0, 0.25);
-            padding: 2px 8px;
-            border-radius: 6px;
-            font-family: Consolas, monospace;
-            font-size: 0.9em;
-            color: #d8b4fe;
-        }
-
-        .placeholder-note {
-            background: rgba(251, 191, 36, 0.08);
-            border: 1px solid rgba(251, 191, 36, 0.3);
+            padding: 8px 16px;
             border-radius: 12px;
-            padding: 16px 20px;
-            margin-top: 16px;
-            font-size: 0.88em;
-            color: #fde68a;
-            line-height: 1.5;
-            text-align: left;
+            font-weight: 800;
+            font-size: 0.92em;
+            white-space: nowrap;
         }
 
-        .placeholder-note strong { color: #fcd34d; }
+        .section-label {
+            font-size: 0.72em;
+            font-weight: 700;
+            color: #818cf8;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 10px;
+        }
+        .section-label .count {
+            display: inline-block;
+            background: rgba(99, 102, 241, 0.18);
+            color: #c7d2fe;
+            padding: 1px 8px;
+            border-radius: 6px;
+            font-size: 0.92em;
+            margin-left: 4px;
+        }
 
-        .error-box {
-            background: rgba(239, 68, 68, 0.08);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            color: #fca5a5;
-            border-radius: 16px;
-            padding: 24px;
+        .participants-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .participant-card {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1.5px solid rgba(148, 163, 184, 0.15);
+            border-radius: 14px;
+            padding: 14px 12px;
             text-align: center;
+            position: relative;
+            transition: border-color 0.2s, transform 0.15s;
+        }
+
+        .participant-card.host {
+            border-color: rgba(251, 191, 36, 0.5);
+            background: rgba(251, 191, 36, 0.06);
+        }
+
+        .participant-card.is-me {
+            border-color: rgba(129, 140, 248, 0.65);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        }
+
+        .participant-pic {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            margin: 0 auto 8px;
+            object-fit: cover;
+            background: #1e293b;
+            border: 2px solid rgba(99, 102, 241, 0.3);
+        }
+
+        .participant-name {
+            font-size: 0.85em;
+            font-weight: 700;
+            color: #f1f5f9;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .host-crown {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: #78350f;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.78em;
+            box-shadow: 0 4px 8px rgba(251, 191, 36, 0.4);
+        }
+
+        .online-dot {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid rgba(15, 23, 42, 0.9);
+            box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.2);
+        }
+        .online-dot.online { background: #22c55e; box-shadow: 0 0 8px rgba(34, 197, 94, 0.6); }
+        .online-dot.idle { background: #f59e0b; }
+        .online-dot.offline { background: #64748b; }
+
+        /* Action area */
+        .action-area {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 12px;
         }
 
         .btn {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: linear-gradient(135deg, #6366f1, #a855f7);
-            color: white;
             border: none;
             padding: 12px 28px;
             border-radius: 12px;
             font-family: inherit;
-            font-size: 1em;
-            font-weight: 700;
+            font-size: 0.95em;
+            font-weight: 800;
             cursor: pointer;
             transition: transform 0.15s, box-shadow 0.15s;
             text-decoration: none;
-            margin-top: 16px;
         }
-
-        .btn:hover {
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1, #a855f7);
+            color: white;
+        }
+        .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
         }
+        .btn-primary:disabled {
+            background: #475569;
+            color: #94a3b8;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .btn-secondary {
+            background: rgba(148, 163, 184, 0.12);
+            color: #cbd5e1;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .info-banner {
+            background: rgba(251, 191, 36, 0.08);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            border-radius: 12px;
+            padding: 14px 18px;
+            font-size: 0.86em;
+            color: #fde68a;
+            line-height: 1.55;
+            text-align: left;
+            margin-top: 12px;
+        }
+        .info-banner strong { color: #fcd34d; }
+
+        .error-box {
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+            border-radius: 16px;
+            padding: 28px;
+            text-align: center;
+        }
+        .error-box .btn { margin-top: 16px; }
 
         .footer {
             text-align: center;
-            font-size: 0.75em;
+            font-size: 0.72em;
             color: #475569;
-            margin-top: 32px;
+            margin-top: 28px;
             line-height: 1.5;
         }
-
         .footer code {
             font-family: Consolas, monospace;
             color: #64748b;
         }
 
+        .placeholder-card {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .placeholder-card .ico {
+            font-size: 3em;
+            margin-bottom: 12px;
+            color: rgba(129, 140, 248, 0.5);
+        }
+        .placeholder-card .ttl {
+            font-size: 1.2em;
+            font-weight: 800;
+            color: #e0e7ff;
+            margin-bottom: 8px;
+        }
+        .placeholder-card .desc {
+            color: #94a3b8;
+            font-size: 0.9em;
+            line-height: 1.55;
+        }
+
         .hidden { display: none !important; }
+
+        @media (max-width: 600px) {
+            .container { padding: 28px 22px; }
+            .lobby-meta { grid-template-columns: 1fr; }
+            .timer-pill { justify-self: start; }
+            .participants-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
         <div class="header">
-            <span class="badge"><i class="fa-solid fa-flask"></i> Phase 1 · Auth Foundation</span>
-            <h1><i class="fa-solid fa-graduation-cap"></i> Exam Session</h1>
-            <p class="subtitle">Group exam · LINE Login · INTERN-PORT</p>
+            <span class="badge"><i class="fa-solid fa-graduation-cap"></i> Exam Session V2.0</span>
+            <h1 id="page-title">Exam Session</h1>
+            <p class="subtitle">Group exam · Real-time sync · INTERN-PORT</p>
         </div>
 
-        <!-- LOADING STATE -->
+        <!-- LOADING -->
         <div id="state-loading" class="state-box">
             <div class="spinner"></div>
             <div class="status-text" id="loading-status">Initializing...</div>
-            <div class="status-detail" id="loading-detail">Loading LIFF SDK</div>
+            <div class="status-detail" id="loading-detail">Loading SDKs</div>
         </div>
 
-        <!-- WELCOME STATE -->
-        <div id="state-welcome" class="state-box hidden">
-            <h2 style="font-size:1.4em; font-weight:800; color:#86efac; margin-bottom:6px;">
-                <i class="fa-solid fa-circle-check"></i> Login Successful
-            </h2>
-            <p style="color:#cbd5e1; font-size:0.92em;">LINE authentication confirmed. Profile loaded.</p>
+        <!-- LOBBY -->
+        <div id="state-lobby" class="state-box hidden">
+            <div class="lobby-meta">
+                <div>
+                    <div class="exam-title" id="lobby-exam-title">—</div>
+                    <div class="exam-subline">
+                        <i class="fa-solid fa-crown"></i>
+                        Host: <span id="lobby-host-name">—</span>
+                    </div>
+                </div>
+                <div class="timer-pill" id="lobby-timer-pill">— min total</div>
+            </div>
 
-            <div class="profile-card">
-                <img id="profile-pic" class="profile-pic" src="" alt="Profile picture">
-                <div class="profile-info">
-                    <div class="profile-name" id="profile-name">—</div>
-                    <div class="profile-meta" id="profile-uid">—</div>
+            <div class="section-label">
+                Participants in Lobby <span class="count" id="lobby-count">0</span>
+            </div>
+            <div class="participants-grid" id="participants-grid"></div>
+
+            <div id="me-chip-wrap"></div>
+
+            <div class="action-area" id="lobby-action-area">
+                <!-- Host: Start button. Non-host: Waiting message. -->
+            </div>
+        </div>
+
+        <!-- RUNNING (Phase 3 placeholder) -->
+        <div id="state-running" class="state-box hidden">
+            <div class="placeholder-card">
+                <div class="ico"><i class="fa-solid fa-rocket"></i></div>
+                <div class="ttl">Session is running</div>
+                <div class="desc">
+                    Phase 3 (voting + timer + per-question sync) lands in the next ship.<br>
+                    For now the lobby has transitioned to <code>running</code> state — verify state-switching works.
                 </div>
             </div>
+        </div>
 
-            <div id="session-info" class="session-info hidden">
-                <i class="fa-solid fa-link"></i>
-                Session ID: <code id="session-id">—</code>
-            </div>
-
-            <div class="placeholder-note">
-                <strong><i class="fa-solid fa-circle-info"></i> Phase 1 milestone:</strong>
-                Authentication foundation only. Session lobby, voting, and timer arrive in Phase 2–4.
-                <br>
-                If you see your name + picture above, the LIFF auth flow on this device works correctly.
+        <!-- PAUSED (Phase 3 placeholder) -->
+        <div id="state-paused" class="state-box hidden">
+            <div class="placeholder-card">
+                <div class="ico"><i class="fa-solid fa-pause"></i></div>
+                <div class="ttl">Session paused by host</div>
+                <div class="desc">Timer is frozen. The host will resume when ready.</div>
             </div>
         </div>
 
-        <!-- ERROR STATE -->
+        <!-- DONE (Phase 4 placeholder) -->
+        <div id="state-done" class="state-box hidden">
+            <div class="placeholder-card">
+                <div class="ico"><i class="fa-solid fa-flag-checkered"></i></div>
+                <div class="ttl">Session complete</div>
+                <div class="desc" id="done-detail">
+                    Phase 4 will save scores per participant and link with User Hub history.
+                </div>
+            </div>
+        </div>
+
+        <!-- LATE-JOIN BLOCK -->
+        <div id="state-blocked" class="state-box hidden">
+            <div class="placeholder-card">
+                <div class="ico" style="color:#f87171;"><i class="fa-solid fa-ban"></i></div>
+                <div class="ttl">Cannot join — session in progress</div>
+                <div class="desc">
+                    The host has already started this session and you are not on the participant list.
+                    To preserve fairness, late joins are blocked.<br><br>
+                    <span style="color:#fbbf24;">Contact the host or admin for a new session.</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- NOT FOUND -->
+        <div id="state-notfound" class="state-box hidden">
+            <div class="placeholder-card">
+                <div class="ico" style="color:#f87171;"><i class="fa-solid fa-circle-question"></i></div>
+                <div class="ttl">Session not found</div>
+                <div class="desc">
+                    The session ID <code id="notfound-sid" style="color:#fcd34d;">—</code> does not exist or has been removed.<br>
+                    Double-check the link from the host.
+                </div>
+            </div>
+        </div>
+
+        <!-- NO SESSION PARAM -->
+        <div id="state-nosession" class="state-box hidden">
+            <div class="placeholder-card">
+                <div class="ico"><i class="fa-solid fa-link-slash"></i></div>
+                <div class="ttl">No session ID in URL</div>
+                <div class="desc">
+                    Add <code style="color:#fcd34d;">?session=&lt;id&gt;</code> to the URL to join a specific session.<br>
+                    The session URL is shared by the admin in LINE chat.
+                </div>
+            </div>
+        </div>
+
+        <!-- ERROR -->
         <div id="state-error" class="state-box error-box hidden">
             <i class="fa-solid fa-triangle-exclamation" style="font-size:2em; margin-bottom:12px;"></i>
             <div class="status-text" id="error-status" style="color:#fca5a5;">Something went wrong</div>
             <div class="status-detail" id="error-detail" style="color:#f87171;">—</div>
-            <button class="btn" onclick="location.reload()">
+            <button class="btn btn-primary" onclick="location.reload()">
                 <i class="fa-solid fa-rotate-right"></i> Retry
             </button>
         </div>
 
         <div class="footer">
-            INTERN-PORT · Exam Session V1.0 · Phase 1<br>
+            INTERN-PORT · Exam Session V2.0 · Phase 2 (Lobby + Sync)<br>
             <code>2008959998-4ty7kBq2</code>
         </div>
     </div>
 
     <script>
-        // V1.0 Phase 1: Authentication foundation only.
-        // Future phases will add Firestore session sync, lobby, voting, results.
+        // V2.0 Phase 2: lobby + realtime participants + heartbeat + state switching.
+        // Phase 3 will add voting + timer + host controls; Phase 4 will save scores.
         const EXAM_SESSION_LIFF_ID = "2008959998-4ty7kBq2";
+        const HEARTBEAT_INTERVAL_MS = 10000;     // 10s
+        const ONLINE_THRESHOLD_MS = 30000;       // <30s = online
+        const IDLE_THRESHOLD_MS = 60000;         // <60s = idle, else offline
+
+        // Firebase config (mirrors index.html / admin.html)
+        const firebaseConfig = {
+            apiKey: "AIzaSyCnyZoNfk_YE7TfLeEXFo9GgA-QMj3tv6Q",
+            authDomain: "intern-port-edfa7.firebaseapp.com",
+            projectId: "intern-port-edfa7",
+            storageBucket: "intern-port-edfa7.firebasestorage.app",
+            messagingSenderId: "367076866368",
+            appId: "1:367076866368:web:9c6559652cb0a78ddce2a5"
+        };
+        if (firebase.apps.length === 0) firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
 
         const $ = (id) => document.getElementById(id);
-        const showState = (which) => {
-            ['loading', 'welcome', 'error'].forEach(s => {
-                $(`state-${s}`).classList.toggle('hidden', s !== which);
-            });
-        };
-        const setLoading = (status, detail) => {
+        const STATES = ['loading', 'lobby', 'running', 'paused', 'done', 'blocked', 'notfound', 'nosession', 'error'];
+        function showState(which) {
+            STATES.forEach(s => $(`state-${s}`).classList.toggle('hidden', s !== which));
+        }
+        function setLoading(status, detail) {
             $('loading-status').textContent = status;
             $('loading-detail').textContent = detail || '';
-        };
-        const showError = (status, detail) => {
+        }
+        function showError(status, detail) {
             $('error-status').textContent = status;
             $('error-detail').textContent = detail || '';
             showState('error');
-        };
+        }
+        function escapeHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        // Module state
+        let myProfile = null;        // { userId, displayName, pictureUrl }
+        let mySessionId = '';
+        let myFirebaseUid = '';
+        let _sessionUnsub = null;
+        let _heartbeatTimer = null;
+        let _onlineRefreshTimer = null;
+        let _latestSession = null;   // most recent snapshot
 
         function getSessionIdFromUrl() {
             try {
@@ -325,10 +548,11 @@
 
         async function init() {
             try {
-                if (!window.liff) {
-                    return showError('LIFF SDK not loaded', 'Check network connection and refresh.');
-                }
+                // 0. Pull session id from URL early — bail with friendly message if missing.
+                mySessionId = getSessionIdFromUrl();
 
+                // 1. LIFF init + login
+                if (!window.liff) return showError('LIFF SDK not loaded', 'Refresh the page after a network reconnect.');
                 setLoading('Initializing LIFF...', `LIFF ID: ${EXAM_SESSION_LIFF_ID}`);
                 const initPromise = liff.init({ liffId: EXAM_SESSION_LIFF_ID });
                 const timeoutPromise = new Promise((_, reject) =>
@@ -337,37 +561,240 @@
                 await Promise.race([initPromise, timeoutPromise]);
 
                 if (!liff.isLoggedIn()) {
-                    setLoading('Redirecting to LINE Login...', 'Please complete the login on the next screen.');
+                    setLoading('Redirecting to LINE Login...', 'Complete login on the next screen.');
                     liff.login({ redirectUri: window.location.href });
                     return;
                 }
 
-                setLoading('Loading profile...', 'Fetching display name and picture from LINE');
-                const profile = await liff.getProfile();
-                if (!profile || !profile.userId) {
+                setLoading('Loading profile...', 'Fetching display name and picture');
+                myProfile = await liff.getProfile();
+                if (!myProfile || !myProfile.userId) {
                     return showError('Profile fetch failed', 'LIFF returned an empty profile.');
                 }
+                renderMeChip();
 
-                $('profile-name').textContent = profile.displayName || '(no display name)';
-                $('profile-uid').textContent = profile.userId;
-                if (profile.pictureUrl) {
-                    $('profile-pic').src = profile.pictureUrl;
-                } else {
-                    $('profile-pic').style.display = 'none';
+                // 2. If no session id → bail to "no session" state but still show the profile.
+                if (!mySessionId) {
+                    showState('nosession');
+                    return;
                 }
 
-                const sessionId = getSessionIdFromUrl();
-                if (sessionId) {
-                    $('session-id').textContent = sessionId;
-                    $('session-info').classList.remove('hidden');
-                }
+                // 3. Firebase anonymous auth — needed for Firestore (rules: isSignedIn())
+                setLoading('Connecting to Firebase...', 'Anonymous auth for Firestore access');
+                const cred = await auth.signInAnonymously();
+                myFirebaseUid = cred.user && cred.user.uid;
 
-                showState('welcome');
+                // 4. Subscribe to session doc (realtime)
+                setLoading('Joining session...', `Session: ${mySessionId}`);
+                attachSessionListener();
             } catch (err) {
                 console.error('Exam Session init error:', err);
                 showError('Init failed', err && err.message ? err.message : String(err));
             }
         }
+
+        function renderMeChip() {
+            const wrap = $('me-chip-wrap');
+            if (!wrap || !myProfile) return;
+            const pic = myProfile.pictureUrl || '';
+            wrap.innerHTML = `
+                <div class="me-chip">
+                    ${pic ? `<img src="${pic}" alt="">` : '<div style="width:32px;height:32px;border-radius:50%;background:#1e293b;"></div>'}
+                    <div>
+                        <span class="me-chip-name">${escapeHtml(myProfile.displayName || 'You')}</span>
+                        <span class="me-chip-tag">(you)</span>
+                    </div>
+                </div>`;
+        }
+
+        function attachSessionListener() {
+            if (_sessionUnsub) { _sessionUnsub(); _sessionUnsub = null; }
+            _sessionUnsub = db.collection("exam_sessions").doc(mySessionId)
+                .onSnapshot(async (snap) => {
+                    if (!snap.exists) {
+                        $('notfound-sid').textContent = mySessionId;
+                        showState('notfound');
+                        stopHeartbeat();
+                        return;
+                    }
+                    const data = snap.data();
+                    _latestSession = data;
+                    await handleSessionUpdate(data);
+                }, err => {
+                    console.error('Session listener error:', err);
+                    showError('Sync failed', err && err.message ? err.message : String(err));
+                });
+        }
+
+        async function handleSessionUpdate(session) {
+            const myUid = myProfile.userId;
+            const participants = session.participants || {};
+            const alreadyJoined = !!participants[myUid];
+
+            // Apply join policy:
+            // - state === 'lobby' → can join (add self if not already)
+            // - state === 'running' or 'paused' → only existing participants can stay (reconnection)
+            // - state === 'done' → show closing screen for everyone (existing or not)
+            if (session.state === 'done') {
+                stopHeartbeat();
+                $('done-detail').textContent = session.endedByAdmin
+                    ? 'Session ended by admin.'
+                    : 'Phase 4 will save scores per participant and link with User Hub history.';
+                showState('done');
+                return;
+            }
+
+            if (session.state === 'lobby') {
+                if (!alreadyJoined) {
+                    await joinSession(session);
+                }
+                renderLobby(session);
+                startHeartbeat();
+                return;
+            }
+
+            // running / paused
+            if (!alreadyJoined) {
+                stopHeartbeat();
+                showState('blocked');
+                return;
+            }
+
+            // Existing participant → show running/paused placeholder, keep heartbeat alive
+            startHeartbeat();
+            if (session.state === 'paused') showState('paused');
+            else showState('running');
+        }
+
+        async function joinSession(session) {
+            const myUid = myProfile.userId;
+            const myEntry = {
+                uid: myUid,
+                displayName: myProfile.displayName || '',
+                pictureUrl: myProfile.pictureUrl || '',
+                joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            try {
+                await db.collection("exam_sessions").doc(mySessionId).update({
+                    [`participants.${myUid}`]: myEntry
+                });
+            } catch (e) {
+                console.error('joinSession write error:', e);
+                showError('Could not join lobby', e.message || String(e));
+            }
+        }
+
+        function renderLobby(session) {
+            const isHost = session.hostUid === myProfile.userId;
+            $('page-title').textContent = session.examTitle || 'Exam Session';
+            $('lobby-exam-title').textContent = session.examTitle || session.examId || '—';
+            $('lobby-host-name').textContent = session.hostName || session.hostUid || 'Host';
+
+            const totalSec = (session.timer && session.timer.totalSec) || 0;
+            const totalMin = Math.round(totalSec / 60);
+            $('lobby-timer-pill').textContent = totalMin > 0 ? `${totalMin} min total` : 'No timer';
+
+            const participants = Object.values(session.participants || {});
+            $('lobby-count').textContent = String(participants.length);
+
+            const grid = $('participants-grid');
+            const now = Date.now();
+            grid.innerHTML = participants.map(p => {
+                const lastMs = (p.lastSeen && p.lastSeen.toMillis) ? p.lastSeen.toMillis() : 0;
+                const diff = lastMs ? (now - lastMs) : Infinity;
+                let onlineClass = 'offline';
+                if (diff < ONLINE_THRESHOLD_MS) onlineClass = 'online';
+                else if (diff < IDLE_THRESHOLD_MS) onlineClass = 'idle';
+
+                const isMe = p.uid === myProfile.userId;
+                const isHostP = p.uid === session.hostUid;
+                const cardClass = `participant-card ${isHostP ? 'host' : ''} ${isMe ? 'is-me' : ''}`.trim();
+                const pic = p.pictureUrl || '';
+                return `
+                <div class="${cardClass}" title="${escapeHtml(p.displayName || p.uid)}">
+                    <span class="online-dot ${onlineClass}" title="${onlineClass}"></span>
+                    ${isHostP ? '<span class="host-crown" title="Host"><i class="fa-solid fa-crown"></i></span>' : ''}
+                    ${pic ? `<img class="participant-pic" src="${pic}" alt="">` : '<div class="participant-pic"></div>'}
+                    <div class="participant-name">${escapeHtml(p.displayName || 'User')}${isMe ? ' (you)' : ''}</div>
+                </div>`;
+            }).join('');
+
+            const action = $('lobby-action-area');
+            if (isHost) {
+                const hasOthers = participants.length >= 1; // host counts; allow even solo for testing
+                action.innerHTML = `
+                    <button class="btn btn-primary" id="btn-start-session" onclick="startSession()" ${hasOthers ? '' : 'disabled'}>
+                        <i class="fa-solid fa-play"></i> Start Session
+                    </button>
+                    <div class="info-banner" style="flex-basis:100%;">
+                        <strong>You are the host.</strong> Click <em>Start</em> when everyone is in the lobby.
+                        Phase 3 will add the voting UI; for now this just transitions state to <code>running</code>.
+                    </div>`;
+            } else {
+                action.innerHTML = `
+                    <div class="info-banner" style="flex-basis:100%;">
+                        <strong>Waiting for host (${escapeHtml(session.hostName || 'host')})</strong> to start the session.
+                        Stay on this page — your status updates automatically.
+                    </div>`;
+            }
+
+            showState('lobby');
+        }
+
+        async function startSession() {
+            if (!_latestSession) return;
+            if (_latestSession.hostUid !== myProfile.userId) return alert('Only the host can start.');
+            const btn = $('btn-start-session');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Starting...'; }
+            try {
+                await db.collection("exam_sessions").doc(mySessionId).update({
+                    state: 'running',
+                    'timer.startedAt': firebase.firestore.FieldValue.serverTimestamp(),
+                    currentIdx: 0
+                });
+                // listener will pick up the new state and switch the view
+            } catch (e) {
+                console.error('startSession error:', e);
+                alert('Failed to start: ' + e.message);
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-play"></i> Start Session'; }
+            }
+        }
+
+        function startHeartbeat() {
+            if (_heartbeatTimer) return;
+            const tick = async () => {
+                if (!myProfile || !mySessionId) return;
+                try {
+                    await db.collection("exam_sessions").doc(mySessionId).update({
+                        [`participants.${myProfile.userId}.lastSeen`]: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } catch (e) {
+                    // Silent — likely permission or transient network; will retry next tick.
+                    console.warn('Heartbeat write skipped:', e.message);
+                }
+            };
+            tick(); // immediate
+            _heartbeatTimer = setInterval(tick, HEARTBEAT_INTERVAL_MS);
+
+            // Also refresh online indicators every 5s without needing a Firestore write
+            if (!_onlineRefreshTimer) {
+                _onlineRefreshTimer = setInterval(() => {
+                    if (_latestSession && _latestSession.state === 'lobby') renderLobby(_latestSession);
+                }, 5000);
+            }
+        }
+
+        function stopHeartbeat() {
+            if (_heartbeatTimer) { clearInterval(_heartbeatTimer); _heartbeatTimer = null; }
+            if (_onlineRefreshTimer) { clearInterval(_onlineRefreshTimer); _onlineRefreshTimer = null; }
+        }
+
+        // Cleanup on tab close
+        window.addEventListener('beforeunload', () => {
+            stopHeartbeat();
+            if (_sessionUnsub) _sessionUnsub();
+        });
 
         init();
     </script>
