@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.47</title>
+    <title>Nika V92.48</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -10338,6 +10338,10 @@
                     <!-- V92.46: OpenRouter image model. The `or/` prefix in data-value tells
                          callUniversalAI() to route via the openrouter provider in callAIProxy. -->
                     <button type="button" class="alabasta-genmage-model-chip" data-value="or/openai/gpt-5.4-image-2" onclick="selectAlabastaCaseCardModel(this)" title="OpenRouter — OpenAI GPT-5.4 Image 2 · 최신 GPT 이미지 모델.">GPT-5.4 Image 2 · 최신</button>
+                    <!-- V92.48: Nano Banana 2 (Gemini 3.1 Flash Image Preview) via OpenRouter.
+                         Same `or/` routing as the GPT-5.4 chip; the backend image-detect regex
+                         /(^|\/|-)image(-|\d|$)/i already matches `-image-preview`. -->
+                    <button type="button" class="alabasta-genmage-model-chip" data-value="or/google/gemini-3.1-flash-image-preview" onclick="selectAlabastaCaseCardModel(this)" title="OpenRouter — Google Gemini 3.1 Flash Image Preview (Nano Banana 2) · 최신 Google 이미지 모델.">Nano Banana 2 · 최신</button>
                 </div>
                 <div style="display:none;">
                     <select id="alabasta-case-card-model" style="min-width:260px; max-width:100%; border:1.5px solid #ddd6fe; border-radius:12px; padding:10px 12px; background:#fff; color:#312e81; font-weight:800;">
@@ -10345,6 +10349,7 @@
                         <option value="imagen">Google Vertex Imagen 3</option>
                         <option value="imagen-nano">Google Imagen 3 Fast</option>
                         <option value="or/openai/gpt-5.4-image-2">OpenRouter — GPT-5.4 Image 2</option>
+                        <option value="or/google/gemini-3.1-flash-image-preview">OpenRouter — Nano Banana 2 (Gemini 3.1 Flash Image)</option>
                     </select>
                 </div>
             </div>
@@ -10386,6 +10391,7 @@
                                 <button type="button" class="alabasta-genmage-quick-chip" data-value="imagen" onclick="switchAndRegenerateAlabastaCaseCard('imagen')" title="Vertex Imagen 3 (premium)">Imagen 3</button>
                                 <button type="button" class="alabasta-genmage-quick-chip" data-value="imagen-nano" onclick="switchAndRegenerateAlabastaCaseCard('imagen-nano')" title="Imagen 3 Fast (cheap & fast)">Imagen Fast</button>
                                 <button type="button" class="alabasta-genmage-quick-chip" data-value="or/openai/gpt-5.4-image-2" onclick="switchAndRegenerateAlabastaCaseCard('or/openai/gpt-5.4-image-2')" title="OpenRouter — OpenAI GPT-5.4 Image 2">GPT-5.4 Image 2</button>
+                                <button type="button" class="alabasta-genmage-quick-chip" data-value="or/google/gemini-3.1-flash-image-preview" onclick="switchAndRegenerateAlabastaCaseCard('or/google/gemini-3.1-flash-image-preview')" title="OpenRouter — Google Gemini 3.1 Flash Image Preview (Nano Banana 2)">Nano Banana 2</button>
                             </div>
                             <a id="alabasta-case-card-image-download" href="#" download="alabasta-case-card.png" class="btn-sm alabasta-casecard-btn utility" style="text-decoration:none;" title="Download image as PNG · 이미지를 PNG로 저장"><i class="fa-solid fa-download"></i> PNG</a>
                         </div>
@@ -21369,6 +21375,9 @@ async function saveQuiz() {
             ].filter(Boolean).join('\n');
         }
 
+        // V92.48: localStorage key for persisted model preference (Generate Case Card).
+        window.ALABASTA_CASECARD_MODEL_PREF_KEY = 'alabasta-case-card-model-pref';
+
         window.selectAlabastaCaseCardModel = function(btn) {
             const hiddenInput = document.getElementById('alabasta-case-card-model');
             document.querySelectorAll('.alabasta-genmage-model-chip').forEach(chip => chip.classList.remove('active'));
@@ -21378,6 +21387,8 @@ async function saveQuiz() {
             if (hiddenInput) hiddenInput.value = value;
             // V92.46: keep the under-image quick-rail visually in sync with ③
             syncAlabastaCaseCardQuickRail(value);
+            // V92.48: persist last-chosen model so the next modal open lands on it
+            try { localStorage.setItem(window.ALABASTA_CASECARD_MODEL_PREF_KEY, value); } catch (e) {}
         };
 
         // V92.46: highlight the under-image quick-switch chip that matches the active model
@@ -21672,6 +21683,15 @@ async function saveQuiz() {
             const step4Arrow = document.getElementById('alabasta-case-card-step-arrow-4');
             if (step4Chip) step4Chip.setAttribute('hidden', '');
             if (step4Arrow) step4Arrow.setAttribute('hidden', '');
+            // V92.48: restore last-chosen model from localStorage. If the saved value no longer
+            // matches a chip (e.g. model deprecated), fall back to whichever chip is currently active.
+            try {
+                const savedModel = localStorage.getItem(window.ALABASTA_CASECARD_MODEL_PREF_KEY);
+                if (savedModel) {
+                    const savedChip = document.querySelector(`.alabasta-genmage-model-chip[data-value="${savedModel}"]`);
+                    if (savedChip) window.selectAlabastaCaseCardModel(savedChip);
+                }
+            } catch (e) {}
             await rebuildAlabastaCaseCardPromptFromInputs({ quiet: false });
         }
 
