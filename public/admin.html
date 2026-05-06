@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.50</title>
+    <title>Nika V92.51</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4779,6 +4779,7 @@
             <button class="tab-btn" onclick="switchTab('tab-ai-hub')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🤖 AI Digital Lab</button>
             <button class="tab-btn" onclick="switchTab('tab-laughtale')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🏝️ Laugh Tale</button>
             <button class="tab-btn" onclick="switchTab('tab-poneglyph')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🪨 Poneglyph</button>
+            <button class="tab-btn" onclick="switchTab('tab-exam-sessions')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🎓 Exam Sessions</button>
 
         </div>
 
@@ -8285,6 +8286,70 @@
                             <button onclick="lpToggleInternTrash()" id="lp-intern-trash-toggle" style="background:none; border:none; font-size:0.8em; font-weight:700; color:#b91c1c; cursor:pointer; padding:4px 0; margin-bottom:8px;">🗑️ Trash (0) ▼</button>
                             <div id="lp-intern-trash" style="display:none; flex-direction:column; gap:4px; max-height:40vh; overflow-y:auto;"></div>
                         </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- 🎓 Exam Sessions tab (V92.51 — Phase 2 of multi-user collaborative exam feature) -->
+        <div id="tab-exam-sessions" class="tab-content" style="background:var(--bg-body); padding:22px 14px; border-radius:26px;">
+            <div style="max-width:1200px; margin:0 auto;">
+
+                <div style="margin-bottom:24px; padding-bottom:16px; border-bottom:1px solid var(--border-color);">
+                    <h2 style="margin:0 0 6px 0; color:#0f172a; font-size:1.4em; font-weight:800;">🎓 Exam Sessions</h2>
+                    <p style="margin:0; color:#64748b; font-size:0.9em; line-height:1.5;">
+                        Multi-user collaborative exam (TBL/GRAT-style). Create a session, share the LIFF link in LINE, designated host clicks <strong>Start</strong> when everyone is in the lobby.
+                    </p>
+                </div>
+
+                <!-- Create Form -->
+                <div style="background:#fff; border:1px solid var(--border-color); border-radius:16px; padding:20px; margin-bottom:20px; box-shadow:0 4px 12px rgba(0,0,0,0.04);">
+                    <h3 style="margin:0 0 14px 0; color:#0f172a; font-size:1.05em; font-weight:800;">
+                        <i class="fa-solid fa-plus-circle" style="color:#6366f1;"></i> Create New Session
+                    </h3>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+                        <div>
+                            <label style="display:block; font-size:0.78em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Quiz <span style="color:#ef4444;">*</span></label>
+                            <select id="exam-create-quiz" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; background:#fff; color:#1e293b; font-weight:700;">
+                                <option value="">— Select quiz (multiple-choice only) —</option>
+                            </select>
+                            <div style="font-size:0.72em; color:#94a3b8; margin-top:4px;">Auto-filtered to <code>type === 'choice'</code> quizzes</div>
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:0.78em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Host (designated user) <span style="color:#ef4444;">*</span></label>
+                            <input id="exam-create-host-search" type="text" placeholder="Type to search users..." oninput="renderExamHostSearchResults()" autocomplete="off" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; box-sizing:border-box;">
+                            <input type="hidden" id="exam-create-host-uid">
+                            <div id="exam-create-host-results" style="display:none; position:relative; margin-top:4px; max-height:220px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:10px; background:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.08); z-index:10;"></div>
+                            <div id="exam-create-host-selected" style="display:none; margin-top:6px; padding:6px 10px; background:#eef2ff; border-radius:8px; font-size:0.82em; color:#4338ca; font-weight:700;"></div>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom:14px;">
+                        <label style="display:block; font-size:0.78em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Total time (minutes)</label>
+                        <input id="exam-create-total-min" type="number" value="30" min="5" max="180" step="5" style="width:120px; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em;">
+                        <span style="font-size:0.78em; color:#94a3b8; margin-left:8px;">Pausable by host during session.</span>
+                    </div>
+
+                    <button onclick="createExamSession()" style="background:linear-gradient(135deg, #6366f1, #a855f7); color:white; border:none; padding:11px 24px; border-radius:12px; font-weight:800; font-size:0.92em; cursor:pointer; box-shadow:0 4px 12px rgba(99,102,241,0.3); transition:transform 0.15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                        <i class="fa-solid fa-circle-plus"></i> Create Session
+                    </button>
+                </div>
+
+                <!-- Active Sessions List -->
+                <div style="background:#fff; border:1px solid var(--border-color); border-radius:16px; padding:20px; box-shadow:0 4px 12px rgba(0,0,0,0.04);">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+                        <h3 style="margin:0; color:#0f172a; font-size:1.05em; font-weight:800;">
+                            <i class="fa-solid fa-list-check" style="color:#10b981;"></i> Active Sessions
+                            <span id="exam-sessions-count" style="margin-left:6px; background:#f1f5f9; color:#64748b; font-size:0.7em; padding:2px 8px; border-radius:8px; font-weight:700;">0</span>
+                        </h3>
+                        <button onclick="refreshExamSessionsList()" style="background:#f8fafc; border:1px solid #e2e8f0; color:#475569; padding:6px 12px; border-radius:8px; font-size:0.78em; font-weight:700; cursor:pointer;">
+                            <i class="fa-solid fa-rotate"></i> Refresh
+                        </button>
+                    </div>
+                    <div id="exam-sessions-list" style="display:flex; flex-direction:column; gap:10px;">
+                        <div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.88em;">No active sessions. Create one above to get started.</div>
                     </div>
                 </div>
 
@@ -19552,6 +19617,9 @@ async function saveQuiz() {
                 initLearningPath();
             } else if (id === 'tab-podcast') {
                 loadPodcastEpisodes();
+            } else if (id === 'tab-exam-sessions') {
+                // V92.51: lazy-init exam sessions tab on first switch
+                initExamSessionsTab();
             }
         }
 
@@ -33623,6 +33691,260 @@ Reply ONLY with raw JSON, no markdown:
                 showToast("Submission Reviewed & Awarded!");
             } catch (e) {
                 alert(e.message);
+            }
+        }
+
+        // ===================================================================
+        // 🎓 EXAM SESSIONS — V92.51 (Phase 2 of multi-user collaborative exam)
+        // ===================================================================
+        // Admin creates a session, designates a host (a LINE user), shares the
+        // LIFF link in chat, and monitors lobby + state via a realtime listener.
+        // Vote logic, timer, and end-of-session score writes land in Phase 3-4.
+
+        const EXAM_SESSION_LIFF_ID = "2008959998-4ty7kBq2";
+        let _examSessionsUnsub = null;
+        let _examSessionsTabInitialized = false;
+
+        function initExamSessionsTab() {
+            populateExamQuizSelect();
+            // Reset host picker
+            const hostSearchEl = document.getElementById('exam-create-host-search');
+            const hostUidEl = document.getElementById('exam-create-host-uid');
+            const hostSelectedEl = document.getElementById('exam-create-host-selected');
+            const hostResultsEl = document.getElementById('exam-create-host-results');
+            if (hostSearchEl) hostSearchEl.value = '';
+            if (hostUidEl) hostUidEl.value = '';
+            if (hostSelectedEl) { hostSelectedEl.style.display = 'none'; hostSelectedEl.innerHTML = ''; }
+            if (hostResultsEl) hostResultsEl.style.display = 'none';
+
+            // Attach realtime listener once; subsequent tab switches reuse it
+            if (!_examSessionsUnsub) {
+                _examSessionsUnsub = db.collection("exam_sessions")
+                    .orderBy("createdAt", "desc")
+                    .onSnapshot(snap => {
+                        const sessions = snap.docs
+                            .map(d => ({ id: d.id, ...d.data() }))
+                            .filter(s => s.state !== 'done');
+                        renderExamSessionsList(sessions);
+                    }, err => {
+                        console.error("Exam sessions listener error:", err);
+                        const list = document.getElementById('exam-sessions-list');
+                        if (list) list.innerHTML = `<div style="padding:20px; color:#ef4444; text-align:center;">Error loading sessions: ${err.message}</div>`;
+                    });
+            }
+            _examSessionsTabInitialized = true;
+        }
+
+        function populateExamQuizSelect() {
+            const sel = document.getElementById('exam-create-quiz');
+            if (!sel) return;
+            // Filter to quizzes where every question is type 'choice' (or untyped, treated as choice)
+            const eligible = (quizzesData || []).filter(q =>
+                Array.isArray(q.questions)
+                && q.questions.length > 0
+                && q.questions.every(qq => !qq.type || qq.type === 'choice')
+            );
+            sel.innerHTML = '<option value="">— Select quiz (multiple-choice only) —</option>'
+                + eligible.map(q => {
+                    const label = (q.shortTitle || q.title || q.id) + ` (${q.questions.length} Q)`;
+                    return `<option value="${q.id}">${escapeHtml(label)}</option>`;
+                }).join('');
+        }
+
+        function renderExamHostSearchResults() {
+            const inputEl = document.getElementById('exam-create-host-search');
+            const resultsEl = document.getElementById('exam-create-host-results');
+            if (!inputEl || !resultsEl) return;
+            const q = String(inputEl.value || '').trim().toLowerCase();
+            if (q.length < 1) { resultsEl.style.display = 'none'; resultsEl.innerHTML = ''; return; }
+
+            const matches = (usersData || [])
+                .filter(u => {
+                    const name = String(u.displayName || u.name || '').toLowerCase();
+                    return name.includes(q);
+                })
+                .slice(0, 10);
+
+            if (matches.length === 0) {
+                resultsEl.innerHTML = '<div style="padding:10px; color:#94a3b8; font-size:0.85em;">No users match.</div>';
+                resultsEl.style.display = 'block';
+                return;
+            }
+
+            resultsEl.innerHTML = matches.map(u => {
+                const name = u.displayName || u.name || u.id;
+                const pic = u.pictureUrl || '';
+                return `<div onclick="selectExamHost('${u.id}')" style="display:flex; align-items:center; gap:10px; padding:8px 12px; cursor:pointer; border-bottom:1px solid #f1f5f9; transition:background 0.15s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">
+                    <img src="${pic}" alt="" style="width:32px; height:32px; border-radius:50%; background:#cbd5e1; object-fit:cover;">
+                    <div style="font-weight:700; color:#1e293b; font-size:0.88em;">${escapeHtml(name)}</div>
+                </div>`;
+            }).join('');
+            resultsEl.style.display = 'block';
+        }
+
+        function selectExamHost(uid) {
+            const user = (usersData || []).find(u => u.id === uid);
+            if (!user) return;
+            document.getElementById('exam-create-host-uid').value = uid;
+            document.getElementById('exam-create-host-search').value = user.displayName || uid;
+            const selectedEl = document.getElementById('exam-create-host-selected');
+            if (selectedEl) {
+                selectedEl.innerHTML = `<i class="fa-solid fa-check"></i> Host: <strong>${escapeHtml(user.displayName || uid)}</strong>`;
+                selectedEl.style.display = 'block';
+            }
+            const resultsEl = document.getElementById('exam-create-host-results');
+            if (resultsEl) { resultsEl.style.display = 'none'; resultsEl.innerHTML = ''; }
+        }
+
+        async function createExamSession() {
+            const quizId = document.getElementById('exam-create-quiz').value;
+            const hostUid = document.getElementById('exam-create-host-uid').value;
+            const totalMin = parseInt(document.getElementById('exam-create-total-min').value, 10);
+
+            if (!quizId) return alert('Please select a quiz.');
+            if (!hostUid) return alert('Please select a host.');
+            if (!Number.isFinite(totalMin) || totalMin < 5 || totalMin > 180) return alert('Total time must be between 5 and 180 minutes.');
+
+            const quiz = (quizzesData || []).find(q => q.id === quizId);
+            const host = (usersData || []).find(u => u.id === hostUid);
+            if (!quiz || !host) return alert('Quiz or host data missing — please refresh.');
+
+            try {
+                const sessionDoc = {
+                    examId: quizId,
+                    examTitle: quiz.shortTitle || quiz.title || quizId,
+                    hostUid: hostUid,
+                    hostName: host.displayName || hostUid,
+                    createdBy: (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    state: 'lobby',
+                    currentIdx: 0,
+                    participants: {},
+                    votes: {},
+                    finalAnswers: {},
+                    timer: {
+                        totalSec: totalMin * 60,
+                        startedAt: null,
+                        pausedAt: null,
+                        accumulatedActiveMs: 0
+                    },
+                    attemptIds: {}
+                };
+
+                const ref = await db.collection("exam_sessions").add(sessionDoc);
+                const liffUrl = `https://liff.line.me/${EXAM_SESSION_LIFF_ID}?session=${ref.id}`;
+                showToast('✅ Exam session created!');
+
+                // Reset form
+                document.getElementById('exam-create-quiz').value = '';
+                document.getElementById('exam-create-host-search').value = '';
+                document.getElementById('exam-create-host-uid').value = '';
+                const selectedEl = document.getElementById('exam-create-host-selected');
+                if (selectedEl) { selectedEl.style.display = 'none'; selectedEl.innerHTML = ''; }
+
+                // Show toast with copy hint — sessions list will auto-update via realtime listener
+                if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                    try {
+                        await navigator.clipboard.writeText(liffUrl);
+                        showToast('🔗 Session link copied to clipboard!');
+                    } catch (e) { /* clipboard blocked, ignore */ }
+                }
+                console.log('Exam session URL:', liffUrl);
+            } catch (e) {
+                console.error('createExamSession error:', e);
+                alert('Failed to create session: ' + e.message);
+            }
+        }
+
+        function refreshExamSessionsList() {
+            // Listener already keeps the list fresh, but provide a manual nudge for trust.
+            showToast('🔄 Refreshed');
+        }
+
+        function renderExamSessionsList(sessions) {
+            const list = document.getElementById('exam-sessions-list');
+            const countEl = document.getElementById('exam-sessions-count');
+            if (!list) return;
+
+            if (countEl) countEl.textContent = String(sessions.length);
+
+            if (sessions.length === 0) {
+                list.innerHTML = `<div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.88em;">No active sessions. Create one above to get started.</div>`;
+                return;
+            }
+
+            const stateColors = {
+                lobby: { bg: '#eef2ff', text: '#4338ca', border: '#c7d2fe', label: 'LOBBY' },
+                running: { bg: '#dcfce7', text: '#166534', border: '#86efac', label: 'RUNNING' },
+                paused: { bg: '#fef3c7', text: '#92400e', border: '#fde68a', label: 'PAUSED' },
+                done: { bg: '#f1f5f9', text: '#64748b', border: '#cbd5e1', label: 'DONE' }
+            };
+
+            const now = Date.now();
+            list.innerHTML = sessions.map(s => {
+                const colors = stateColors[s.state] || stateColors.lobby;
+                const liffUrl = `https://liff.line.me/${EXAM_SESSION_LIFF_ID}?session=${s.id}`;
+                const participantsObj = s.participants || {};
+                const participants = Object.values(participantsObj);
+                const totalCount = participants.length;
+                const onlineCount = participants.filter(p => {
+                    const last = p && p.lastSeen && p.lastSeen.toMillis ? p.lastSeen.toMillis() : 0;
+                    return last && (now - last < 30000);
+                }).length;
+                const created = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
+                const createdStr = created ? created.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+
+                return `
+                <div style="border:1px solid #e2e8f0; border-radius:14px; padding:14px 16px; background:#fff; display:grid; grid-template-columns:auto 1fr auto; gap:14px; align-items:center;">
+                    <span style="background:${colors.bg}; color:${colors.text}; border:1px solid ${colors.border}; padding:5px 10px; border-radius:8px; font-size:0.7em; font-weight:800; letter-spacing:0.05em;">${colors.label}</span>
+                    <div style="min-width:0;">
+                        <div style="font-weight:800; color:#0f172a; font-size:0.95em; margin-bottom:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                            ${escapeHtml(s.examTitle || s.examId)}
+                        </div>
+                        <div style="font-size:0.78em; color:#64748b;">
+                            <span title="${escapeHtml(s.hostName || s.hostUid)}"><i class="fa-solid fa-crown" style="color:#fbbf24;"></i> ${escapeHtml(s.hostName || 'Host')}</span>
+                            <span style="margin:0 8px; color:#cbd5e1;">·</span>
+                            <span><i class="fa-solid fa-users" style="color:#10b981;"></i> ${onlineCount}/${totalCount}</span>
+                            <span style="margin:0 8px; color:#cbd5e1;">·</span>
+                            <span style="color:#94a3b8; font-family:Consolas, monospace; font-size:0.92em;" title="Session ID">${s.id.slice(0, 8)}…</span>
+                            <span style="margin:0 8px; color:#cbd5e1;">·</span>
+                            <span style="color:#94a3b8;">${createdStr}</span>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button onclick="copyExamSessionLink('${s.id}')" title="Copy LIFF link" style="background:#f8fafc; border:1px solid #e2e8f0; color:#475569; padding:7px 12px; border-radius:8px; font-size:0.78em; font-weight:700; cursor:pointer;">
+                            <i class="fa-solid fa-link"></i> Copy
+                        </button>
+                        <button onclick="cancelExamSession('${s.id}')" title="End session" style="background:#fee2e2; border:1px solid #fecaca; color:#991b1b; padding:7px 12px; border-radius:8px; font-size:0.78em; font-weight:700; cursor:pointer;">
+                            <i class="fa-solid fa-stop"></i> End
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        async function copyExamSessionLink(sessionId) {
+            const url = `https://liff.line.me/${EXAM_SESSION_LIFF_ID}?session=${sessionId}`;
+            try {
+                await navigator.clipboard.writeText(url);
+                showToast('🔗 Link copied: ' + url);
+            } catch (e) {
+                prompt('Copy this link:', url);
+            }
+        }
+
+        async function cancelExamSession(sessionId) {
+            if (!confirm('End this session? Participants will see "Session ended" on their screens.')) return;
+            try {
+                await db.collection("exam_sessions").doc(sessionId).update({
+                    state: 'done',
+                    completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    endedByAdmin: true
+                });
+                showToast('✅ Session ended');
+            } catch (e) {
+                console.error('cancelExamSession error:', e);
+                alert('Failed to end session: ' + e.message);
             }
         }
     </script>
