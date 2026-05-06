@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.43</title>
+    <title>Nika V92.44</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1113,6 +1113,90 @@
             margin-bottom:18px;
             padding-bottom:16px;
             border-bottom:1px solid rgba(196,181,253,0.45);
+        }
+
+        /* V92.44: Sticky step navigation. Negative margin pulls the bar to the
+           shell's edges so its background covers the padding area when stuck. */
+        .alabasta-casecard-stepnav {
+            position:sticky;
+            top:-28px;
+            z-index:5;
+            margin:-4px -28px 18px;
+            padding:12px 28px;
+            background:rgba(252,251,255,0.94);
+            border-bottom:1px solid rgba(196,181,253,0.5);
+            -webkit-backdrop-filter:blur(10px);
+            backdrop-filter:blur(10px);
+            display:flex;
+            align-items:center;
+            gap:8px;
+            flex-wrap:wrap;
+        }
+        .alabasta-casecard-step-chip {
+            display:inline-flex;
+            align-items:center;
+            gap:6px;
+            padding:7px 13px;
+            border-radius:999px;
+            background:#f5f3ff;
+            color:#5b21b6;
+            text-decoration:none;
+            font-size:0.78em;
+            font-weight:800;
+            border:1px solid rgba(196,181,253,0.65);
+            transition:transform 0.18s ease, background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+            cursor:pointer;
+            white-space:nowrap;
+        }
+        .alabasta-casecard-step-chip:hover {
+            background:#ede9fe;
+            transform:translateY(-1px);
+        }
+        .alabasta-casecard-step-chip.active {
+            background:linear-gradient(135deg,#7c3aed,#6d28d9);
+            color:#fff;
+            border-color:transparent;
+            box-shadow:0 6px 14px rgba(124,58,237,0.28);
+        }
+        .alabasta-casecard-step-chip.completed {
+            background:#ecfdf5;
+            color:#047857;
+            border-color:rgba(110,231,183,0.65);
+        }
+        .alabasta-casecard-step-chip.completed::before {
+            content:'✓';
+            margin-right:2px;
+            font-weight:900;
+        }
+        .alabasta-casecard-step-chip.active.completed {
+            background:linear-gradient(135deg,#7c3aed,#6d28d9);
+            color:#fff;
+            border-color:transparent;
+        }
+        .alabasta-casecard-step-num {
+            font-size:1.05em;
+            line-height:1;
+        }
+        .alabasta-casecard-step-arrow {
+            color:#c4b5fd;
+            font-size:1em;
+            font-weight:900;
+            opacity:0.7;
+        }
+        .alabasta-casecard-step-chip[hidden],
+        .alabasta-casecard-step-arrow[hidden] {
+            display:none !important;
+        }
+        @media (max-width: 640px) {
+            .alabasta-casecard-stepnav {
+                top:-20px;
+                margin:-4px -16px 14px;
+                padding:10px 16px;
+                gap:6px;
+            }
+            .alabasta-casecard-step-chip { padding:6px 10px; font-size:0.74em; }
+            .alabasta-casecard-step-label { display:none; }
+            .alabasta-casecard-step-arrow { font-size:0.85em; }
         }
 
         .alabasta-casecard-title {
@@ -10095,20 +10179,44 @@
                 <span class="alabasta-casecard-badge" title="The summary text was screened for patient identifiers before this modal opened. · 모달이 열리기 전에 환자 식별 정보를 확인했습니다.">Privacy Checked · 개인정보 확인됨</span>
             </div>
 
+            <!-- V92.44: Sticky step indicator. Anchors scroll to each step + IntersectionObserver
+                 lights the chip for whichever step is currently in view inside the modal scroll. -->
+            <nav class="alabasta-casecard-stepnav" aria-label="Case card steps" id="alabasta-case-card-stepnav">
+                <a href="#alabasta-case-card-step-1" class="alabasta-casecard-step-chip active" data-step="1" onclick="scrollAlabastaCaseCardStep(event, 'alabasta-case-card-step-1')">
+                    <span class="alabasta-casecard-step-num">①</span>
+                    <span class="alabasta-casecard-step-label">Summary</span>
+                </a>
+                <span class="alabasta-casecard-step-arrow" aria-hidden="true">›</span>
+                <a href="#alabasta-case-card-step-2" class="alabasta-casecard-step-chip" data-step="2" onclick="scrollAlabastaCaseCardStep(event, 'alabasta-case-card-step-2')">
+                    <span class="alabasta-casecard-step-num">②</span>
+                    <span class="alabasta-casecard-step-label">Prompt</span>
+                </a>
+                <span class="alabasta-casecard-step-arrow" aria-hidden="true">›</span>
+                <a href="#alabasta-case-card-step-3" class="alabasta-casecard-step-chip" data-step="3" onclick="scrollAlabastaCaseCardStep(event, 'alabasta-case-card-step-3')">
+                    <span class="alabasta-casecard-step-num">③</span>
+                    <span class="alabasta-casecard-step-label">Model</span>
+                </a>
+                <span class="alabasta-casecard-step-arrow alabasta-casecard-step-arrow-image" aria-hidden="true" id="alabasta-case-card-step-arrow-4" hidden>›</span>
+                <a href="#alabasta-case-card-image-wrap" class="alabasta-casecard-step-chip" data-step="4" id="alabasta-case-card-step-chip-4" hidden onclick="scrollAlabastaCaseCardStep(event, 'alabasta-case-card-image-wrap')">
+                    <span class="alabasta-casecard-step-num">④</span>
+                    <span class="alabasta-casecard-step-label">Image</span>
+                </a>
+            </nav>
+
             <input type="hidden" id="alabasta-case-card-id">
 
-            <div class="alabasta-visual-card" style="margin-bottom:12px;">
+            <div class="alabasta-visual-card" id="alabasta-case-card-step-1" style="margin-bottom:12px; scroll-margin-top:80px;">
                 <label class="alabasta-visual-label" for="alabasta-case-card-safe-summary">① Anonymized Summary · 익명 요약</label>
-                <textarea id="alabasta-case-card-safe-summary" onblur="rebuildAlabastaCaseCardPromptFromInputs()" class="alabasta-casecard-textarea" style="min-height:150px;"></textarea>
+                <textarea id="alabasta-case-card-safe-summary" onblur="rebuildAlabastaCaseCardPromptFromInputs()" class="alabasta-casecard-textarea" style="min-height:120px; max-height:240px;"></textarea>
                 <div class="alabasta-casecard-note">This summary will be translated into concise English first, then rebuilt into the final GenMage prompt below. · 이 요약은 먼저 영어로 번역된 후 아래 최종 GenMage 프롬프트로 재구성됩니다.</div>
             </div>
 
             <!-- V91.89: GenMage Prompt pulled out of Advanced Draft Details so admins can preview/edit
                  the final prompt text BEFORE clicking GenMage (used to be hidden inside a collapsed
                  accordion — admins were burning AI tokens without seeing what they were sending). -->
-            <div class="alabasta-visual-card" style="margin-bottom:12px;">
+            <div class="alabasta-visual-card" id="alabasta-case-card-step-2" style="margin-bottom:12px; scroll-margin-top:80px;">
                 <label class="alabasta-visual-label" for="alabasta-case-card-prompt">② Final Prompt Preview · 최종 프롬프트 미리보기</label>
-                <textarea id="alabasta-case-card-prompt" class="alabasta-casecard-textarea" style="min-height:130px;"></textarea>
+                <textarea id="alabasta-case-card-prompt" class="alabasta-casecard-textarea" style="min-height:120px; max-height:220px;"></textarea>
                 <div class="alabasta-casecard-note">Edit before sending if needed. Optimized for clearer English copy and better infographic readability. · 필요하면 전송 전에 편집하세요. 명확한 영어와 인포그래픽 가독성에 최적화되어 있습니다.</div>
             </div>
 
@@ -10139,7 +10247,7 @@
                 </div>
             </details>
 
-            <div class="alabasta-visual-card" style="margin-bottom:12px; padding:12px 14px;">
+            <div class="alabasta-visual-card" id="alabasta-case-card-step-3" style="margin-bottom:12px; padding:12px 14px; scroll-margin-top:80px;">
                 <label class="alabasta-visual-label" for="alabasta-case-card-model">③ GenMage AI Model · GenMage AI 모델</label>
                 <div class="alabasta-genmage-model-rail" aria-label="GenMage AI model tabs">
                     <button type="button" class="alabasta-genmage-model-chip active" data-value="gpt-image-1" onclick="selectAlabastaCaseCardModel(this)" title="Balanced speed and quality. · 균형 잡힌 속도와 품질.">OpenAI Images · 균형 (balanced)</button>
@@ -10155,7 +10263,7 @@
                 </div>
             </div>
 
-            <div id="alabasta-case-card-image-wrap" class="alabasta-visual-card" style="margin-bottom:12px; display:none;">
+            <div id="alabasta-case-card-image-wrap" class="alabasta-visual-card" style="margin-bottom:12px; display:none; scroll-margin-top:80px;">
                 <label class="alabasta-visual-label">Generated Image · 생성된 이미지</label>
                 <div class="alabasta-genmage-gallery">
                     <div id="alabasta-case-card-image-stage" class="alabasta-genmage-stage">
@@ -21098,6 +21206,60 @@ async function saveQuiz() {
             if (menu) menu.removeAttribute('open');
         };
 
+        // V92.44: sticky step indicator helpers
+        window.scrollAlabastaCaseCardStep = function(event, targetId) {
+            if (event) event.preventDefault();
+            const target = document.getElementById(targetId);
+            if (!target) return;
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+
+        let __alabastaCaseCardStepObserver = null;
+        function setupAlabastaCaseCardStepObserver() {
+            if (__alabastaCaseCardStepObserver) return;
+            const root = document.querySelector('#alabastaCaseCardModal .alabasta-casecard-shell');
+            if (!root) return;
+            const targetIds = [
+                'alabasta-case-card-step-1',
+                'alabasta-case-card-step-2',
+                'alabasta-case-card-step-3',
+                'alabasta-case-card-image-wrap'
+            ];
+            __alabastaCaseCardStepObserver = new IntersectionObserver((entries) => {
+                // Pick the entry with the largest visible ratio that is currently intersecting.
+                let best = null;
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) return;
+                    if (!best || entry.intersectionRatio > best.intersectionRatio) best = entry;
+                });
+                if (!best) return;
+                const targetId = best.target.id;
+                document.querySelectorAll('.alabasta-casecard-step-chip').forEach(chip => {
+                    chip.classList.toggle('active', chip.getAttribute('href') === '#' + targetId);
+                });
+            }, {
+                root,
+                threshold: [0.2, 0.5, 0.85],
+                rootMargin: '-90px 0px -45% 0px'
+            });
+            targetIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) __alabastaCaseCardStepObserver.observe(el);
+            });
+        }
+
+        window.revealAlabastaCaseCardStep4 = function() {
+            const chip = document.getElementById('alabasta-case-card-step-chip-4');
+            const arrow = document.getElementById('alabasta-case-card-step-arrow-4');
+            if (chip) chip.removeAttribute('hidden');
+            if (arrow) arrow.removeAttribute('hidden');
+        };
+
+        window.collapseAlabastaCaseCardAdvanced = function() {
+            const details = document.querySelector('#alabastaCaseCardModal .alabasta-casecard-details');
+            if (details && details.hasAttribute('open')) details.removeAttribute('open');
+        };
+
         // V92.43: AI Refine model picker (chip rail replaces the old <select>)
         window.selectAlabastaCaseCardRefineModel = function(btn) {
             if (!btn) return;
@@ -21318,6 +21480,11 @@ async function saveQuiz() {
                 ids.imageStatus.className = 'alabasta-genmage-status-pill';
                 ids.imageStatus.innerHTML = '<i class="fa-regular fa-image"></i> Preview';
             }
+            // V92.44: hide step ④ until an image is generated for THIS case
+            const step4Chip = document.getElementById('alabasta-case-card-step-chip-4');
+            const step4Arrow = document.getElementById('alabasta-case-card-step-arrow-4');
+            if (step4Chip) step4Chip.setAttribute('hidden', '');
+            if (step4Arrow) step4Arrow.setAttribute('hidden', '');
             await rebuildAlabastaCaseCardPromptFromInputs({ quiet: false });
         }
 
@@ -21367,6 +21534,8 @@ async function saveQuiz() {
             if (idEl) idEl.value = caseDocId;
             await populateAlabastaCaseCardModal(caseItem);
             forceShowModal('alabastaCaseCardModal');
+            // V92.44: lazy-init the step IntersectionObserver after the modal is in the DOM
+            requestAnimationFrame(() => setupAlabastaCaseCardStepObserver());
         }
 
         async function refreshAlabastaCaseCardDraft() {
@@ -21514,6 +21683,11 @@ async function saveQuiz() {
                 // the READY pill in the toolbar already conveys this. Keep footer meta as
                 // the static privacy reminder so users always see why this modal exists.
                 if (metaEl) metaEl.textContent = 'No identifiers should appear in the safe summary or image prompt. · 안전 요약이나 이미지 프롬프트에 식별 정보가 나타나지 않아야 합니다.';
+                // V92.44: surface step ④ in the sticky nav, collapse Advanced Draft Details,
+                // and observe the new image-wrap so the chip can light up when scrolled into view.
+                if (typeof revealAlabastaCaseCardStep4 === 'function') revealAlabastaCaseCardStep4();
+                if (typeof collapseAlabastaCaseCardAdvanced === 'function') collapseAlabastaCaseCardAdvanced();
+                if (__alabastaCaseCardStepObserver && imageWrap) __alabastaCaseCardStepObserver.observe(imageWrap);
 
                 await db.collection('cases').doc(caseDocId).update({
                     caseVisualGeneratedAt: firebase.firestore.FieldValue.serverTimestamp(),
