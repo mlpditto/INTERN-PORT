@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.51</title>
+    <title>Nika V92.52</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4779,7 +4779,6 @@
             <button class="tab-btn" onclick="switchTab('tab-ai-hub')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🤖 AI Digital Lab</button>
             <button class="tab-btn" onclick="switchTab('tab-laughtale')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🏝️ Laugh Tale</button>
             <button class="tab-btn" onclick="switchTab('tab-poneglyph')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🪨 Poneglyph</button>
-            <button class="tab-btn" onclick="switchTab('tab-exam-sessions')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🎓 Exam Sessions</button>
 
         </div>
 
@@ -5168,6 +5167,68 @@
                 <!-- Inactive Quiz Pagination -->
                 <div id="inactive-quiz-pagination"
                     style="display:flex; justify-content:center; align-items:center; margin-top:15px; gap:10px;"></div>
+            </div>
+
+            <!-- 🎓 Exam Sessions Section (V92.52 — moved under Quiz Engine, inside tab-assignments) -->
+            <div style="background:#faf5ff; padding:20px; border-radius:12px; margin-bottom:30px; border:1px solid #d8b4fe;">
+                <div class="flex-between" style="border-bottom:1px solid #c4b5fd; padding-bottom:15px; margin-bottom:20px;">
+                    <h3 style="margin:0; color:#6b21a8; display:flex; align-items:center; gap:12px; font-weight:900; font-size:1.3em;">
+                        🎓 Exam Sessions
+                        <span style="font-size:0.6em; font-weight:700; background:#ede9fe; color:#7c3aed; padding:3px 10px; border-radius:8px; letter-spacing:0.04em;">MULTI-USER · TBL/GRAT</span>
+                    </h3>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <span id="exam-sessions-count" style="background:rgba(124,58,237,0.08); color:#6b21a8; font-weight:800; font-size:0.75em; padding:6px 12px; border-radius:10px; border:1px solid rgba(124,58,237,0.15);">Active: 0</span>
+                        <button onclick="refreshExamSessionsList()" title="Refresh sessions list" style="background:#fff; border:1px solid #d8b4fe; color:#6b21a8; padding:6px 12px; border-radius:8px; font-size:0.78em; font-weight:700; cursor:pointer;">
+                            <i class="fa-solid fa-rotate"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <p style="margin:0 0 18px 0; color:#64748b; font-size:0.85em; line-height:1.5;">
+                    Multi-user collaborative exam (TBL/GRAT-style). Pick a quiz, assign a host, share the LIFF link in LINE chat — host clicks <strong>Start</strong> when everyone is in the lobby. Voting majority wins; results saved per participant.
+                </p>
+
+                <!-- Create Form -->
+                <div style="background:white; border:1px solid #e9d5ff; border-radius:12px; padding:18px; margin-bottom:20px; box-shadow:0 2px 5px rgba(0,0,0,0.04);">
+                    <h4 style="margin:0 0 14px 0; color:#6b21a8; font-size:0.95em; font-weight:800;">
+                        <i class="fa-solid fa-plus-circle"></i> Create New Session
+                    </h4>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+                        <div>
+                            <label style="display:block; font-size:0.75em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Quiz <span style="color:#ef4444;">*</span></label>
+                            <select id="exam-create-quiz" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; background:#fff; color:#1e293b; font-weight:700;">
+                                <option value="">— Select quiz (multiple-choice only) —</option>
+                            </select>
+                            <div style="font-size:0.7em; color:#94a3b8; margin-top:4px;">Auto-filtered to <code>type === 'choice'</code> quizzes</div>
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:0.75em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Host (designated user) <span style="color:#ef4444;">*</span></label>
+                            <input id="exam-create-host-search" type="text" placeholder="Type to search users..." oninput="renderExamHostSearchResults()" autocomplete="off" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; box-sizing:border-box;">
+                            <input type="hidden" id="exam-create-host-uid">
+                            <div id="exam-create-host-results" style="display:none; position:relative; margin-top:4px; max-height:220px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:10px; background:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.08); z-index:10;"></div>
+                            <div id="exam-create-host-selected" style="display:none; margin-top:6px; padding:6px 10px; background:#ede9fe; border-radius:8px; font-size:0.8em; color:#5b21b6; font-weight:700;"></div>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom:14px;">
+                        <label style="display:block; font-size:0.75em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Total time (minutes)</label>
+                        <input id="exam-create-total-min" type="number" value="30" min="5" max="180" step="5" style="width:120px; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em;">
+                        <span style="font-size:0.75em; color:#94a3b8; margin-left:8px;">Pausable by host during session.</span>
+                    </div>
+
+                    <button onclick="createExamSession()" class="magic-btn" style="background:linear-gradient(135deg, #7c3aed, #a855f7); padding:10px 22px; border-radius:12px; font-weight:900; font-size:0.88em;">
+                        <i class="fa-solid fa-circle-plus"></i> Create Session
+                    </button>
+                </div>
+
+                <!-- Active Sessions List -->
+                <h4 style="color:#6b21a8; margin:0 0 10px 0; font-size:0.95em; font-weight:800;">
+                    <i class="fa-solid fa-list-check" style="color:#10b981;"></i> Active Sessions
+                </h4>
+                <div id="exam-sessions-list" style="display:flex; flex-direction:column; gap:10px; background:white; padding:15px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05); min-height:80px;">
+                    <div style="padding:24px; text-align:center; color:#94a3b8; font-size:0.86em;">No active sessions. Create one above to get started.</div>
+                </div>
             </div>
         </div>
 
@@ -8286,70 +8347,6 @@
                             <button onclick="lpToggleInternTrash()" id="lp-intern-trash-toggle" style="background:none; border:none; font-size:0.8em; font-weight:700; color:#b91c1c; cursor:pointer; padding:4px 0; margin-bottom:8px;">🗑️ Trash (0) ▼</button>
                             <div id="lp-intern-trash" style="display:none; flex-direction:column; gap:4px; max-height:40vh; overflow-y:auto;"></div>
                         </div>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-
-        <!-- 🎓 Exam Sessions tab (V92.51 — Phase 2 of multi-user collaborative exam feature) -->
-        <div id="tab-exam-sessions" class="tab-content" style="background:var(--bg-body); padding:22px 14px; border-radius:26px;">
-            <div style="max-width:1200px; margin:0 auto;">
-
-                <div style="margin-bottom:24px; padding-bottom:16px; border-bottom:1px solid var(--border-color);">
-                    <h2 style="margin:0 0 6px 0; color:#0f172a; font-size:1.4em; font-weight:800;">🎓 Exam Sessions</h2>
-                    <p style="margin:0; color:#64748b; font-size:0.9em; line-height:1.5;">
-                        Multi-user collaborative exam (TBL/GRAT-style). Create a session, share the LIFF link in LINE, designated host clicks <strong>Start</strong> when everyone is in the lobby.
-                    </p>
-                </div>
-
-                <!-- Create Form -->
-                <div style="background:#fff; border:1px solid var(--border-color); border-radius:16px; padding:20px; margin-bottom:20px; box-shadow:0 4px 12px rgba(0,0,0,0.04);">
-                    <h3 style="margin:0 0 14px 0; color:#0f172a; font-size:1.05em; font-weight:800;">
-                        <i class="fa-solid fa-plus-circle" style="color:#6366f1;"></i> Create New Session
-                    </h3>
-
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
-                        <div>
-                            <label style="display:block; font-size:0.78em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Quiz <span style="color:#ef4444;">*</span></label>
-                            <select id="exam-create-quiz" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; background:#fff; color:#1e293b; font-weight:700;">
-                                <option value="">— Select quiz (multiple-choice only) —</option>
-                            </select>
-                            <div style="font-size:0.72em; color:#94a3b8; margin-top:4px;">Auto-filtered to <code>type === 'choice'</code> quizzes</div>
-                        </div>
-                        <div>
-                            <label style="display:block; font-size:0.78em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Host (designated user) <span style="color:#ef4444;">*</span></label>
-                            <input id="exam-create-host-search" type="text" placeholder="Type to search users..." oninput="renderExamHostSearchResults()" autocomplete="off" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; box-sizing:border-box;">
-                            <input type="hidden" id="exam-create-host-uid">
-                            <div id="exam-create-host-results" style="display:none; position:relative; margin-top:4px; max-height:220px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:10px; background:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.08); z-index:10;"></div>
-                            <div id="exam-create-host-selected" style="display:none; margin-top:6px; padding:6px 10px; background:#eef2ff; border-radius:8px; font-size:0.82em; color:#4338ca; font-weight:700;"></div>
-                        </div>
-                    </div>
-
-                    <div style="margin-bottom:14px;">
-                        <label style="display:block; font-size:0.78em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Total time (minutes)</label>
-                        <input id="exam-create-total-min" type="number" value="30" min="5" max="180" step="5" style="width:120px; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em;">
-                        <span style="font-size:0.78em; color:#94a3b8; margin-left:8px;">Pausable by host during session.</span>
-                    </div>
-
-                    <button onclick="createExamSession()" style="background:linear-gradient(135deg, #6366f1, #a855f7); color:white; border:none; padding:11px 24px; border-radius:12px; font-weight:800; font-size:0.92em; cursor:pointer; box-shadow:0 4px 12px rgba(99,102,241,0.3); transition:transform 0.15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-                        <i class="fa-solid fa-circle-plus"></i> Create Session
-                    </button>
-                </div>
-
-                <!-- Active Sessions List -->
-                <div style="background:#fff; border:1px solid var(--border-color); border-radius:16px; padding:20px; box-shadow:0 4px 12px rgba(0,0,0,0.04);">
-                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
-                        <h3 style="margin:0; color:#0f172a; font-size:1.05em; font-weight:800;">
-                            <i class="fa-solid fa-list-check" style="color:#10b981;"></i> Active Sessions
-                            <span id="exam-sessions-count" style="margin-left:6px; background:#f1f5f9; color:#64748b; font-size:0.7em; padding:2px 8px; border-radius:8px; font-weight:700;">0</span>
-                        </h3>
-                        <button onclick="refreshExamSessionsList()" style="background:#f8fafc; border:1px solid #e2e8f0; color:#475569; padding:6px 12px; border-radius:8px; font-size:0.78em; font-weight:700; cursor:pointer;">
-                            <i class="fa-solid fa-rotate"></i> Refresh
-                        </button>
-                    </div>
-                    <div id="exam-sessions-list" style="display:flex; flex-direction:column; gap:10px;">
-                        <div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.88em;">No active sessions. Create one above to get started.</div>
                     </div>
                 </div>
 
@@ -19601,6 +19598,8 @@ async function saveQuiz() {
                 loadActiveQuests();
                 renderQuizzes();
                 renderPendingQuizzes(); // Ensure pending quizzes are loaded
+                // V92.52: Exam Sessions section moved under Quiz Engine — init listener here
+                initExamSessionsTab();
             } else if (id === 'tab-sidequest') {
                 renderKanban();
                 renderTable('works');
@@ -19617,9 +19616,6 @@ async function saveQuiz() {
                 initLearningPath();
             } else if (id === 'tab-podcast') {
                 loadPodcastEpisodes();
-            } else if (id === 'tab-exam-sessions') {
-                // V92.51: lazy-init exam sessions tab on first switch
-                initExamSessionsTab();
             }
         }
 
@@ -33866,7 +33862,7 @@ Reply ONLY with raw JSON, no markdown:
             const countEl = document.getElementById('exam-sessions-count');
             if (!list) return;
 
-            if (countEl) countEl.textContent = String(sessions.length);
+            if (countEl) countEl.textContent = `Active: ${sessions.length}`;
 
             if (sessions.length === 0) {
                 list.innerHTML = `<div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.88em;">No active sessions. Create one above to get started.</div>`;
