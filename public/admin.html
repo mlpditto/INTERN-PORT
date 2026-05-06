@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.44</title>
+    <title>Nika V92.46</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -606,6 +606,48 @@
         }
         .alabasta-genmage-quick-model:hover {
             border-color:#a78bfa;
+        }
+
+        /* V92.46: Quick switch chip rail under the image — replaces the old <select>.
+           Mirrors the ③ GenMage model rail so users can switch model + regenerate
+           in one tap without scrolling back up. */
+        .alabasta-genmage-quick-rail {
+            display:flex;
+            align-items:center;
+            gap:6px;
+            flex-wrap:wrap;
+        }
+        .alabasta-genmage-quick-label {
+            font-size:0.72em;
+            font-weight:800;
+            color:#7c3aed;
+            text-transform:uppercase;
+            letter-spacing:0.04em;
+            margin-right:2px;
+        }
+        .alabasta-genmage-quick-chip {
+            min-height:34px;
+            padding:6px 12px;
+            border-radius:999px;
+            border:1px solid #ddd6fe;
+            background:#fafaff;
+            color:#5b21b6;
+            font-size:0.76em;
+            font-weight:800;
+            cursor:pointer;
+            transition:all 0.15s ease;
+            white-space:nowrap;
+        }
+        .alabasta-genmage-quick-chip:hover {
+            border-color:#a78bfa;
+            background:#f5f3ff;
+            transform:translateY(-1px);
+        }
+        .alabasta-genmage-quick-chip.active {
+            background:linear-gradient(135deg,#7c3aed,#6d28d9);
+            border-color:transparent;
+            color:#fff;
+            box-shadow:0 6px 14px rgba(124,58,237,0.28);
         }
 
         @keyframes alabastaSkeletonSweep {
@@ -10253,12 +10295,16 @@
                     <button type="button" class="alabasta-genmage-model-chip active" data-value="gpt-image-1" onclick="selectAlabastaCaseCardModel(this)" title="Balanced speed and quality. · 균형 잡힌 속도와 품질.">OpenAI Images · 균형 (balanced)</button>
                     <button type="button" class="alabasta-genmage-model-chip" data-value="imagen" onclick="selectAlabastaCaseCardModel(this)" title="Highest quality, slower. · 최고 품질, 느림.">Vertex Imagen 3 · 고품질 (premium)</button>
                     <button type="button" class="alabasta-genmage-model-chip" data-value="imagen-nano" onclick="selectAlabastaCaseCardModel(this)" title="Fastest and cheapest, lower fidelity. · 가장 빠르고 저렴, 충실도 낮음.">Imagen 3 Fast · 빠름 (cheap & fast)</button>
+                    <!-- V92.46: OpenRouter image model. The `or/` prefix in data-value tells
+                         callUniversalAI() to route via the openrouter provider in callAIProxy. -->
+                    <button type="button" class="alabasta-genmage-model-chip" data-value="or/openai/gpt-5.4-image-2" onclick="selectAlabastaCaseCardModel(this)" title="OpenRouter — OpenAI GPT-5.4 Image 2 · 최신 GPT 이미지 모델.">GPT-5.4 Image 2 · 최신</button>
                 </div>
                 <div style="display:none;">
                     <select id="alabasta-case-card-model" style="min-width:260px; max-width:100%; border:1.5px solid #ddd6fe; border-radius:12px; padding:10px 12px; background:#fff; color:#312e81; font-weight:800;">
                         <option value="gpt-image-1">OpenAI Images (gpt-image-1)</option>
                         <option value="imagen">Google Vertex Imagen 3</option>
                         <option value="imagen-nano">Google Imagen 3 Fast</option>
+                        <option value="or/openai/gpt-5.4-image-2">OpenRouter — GPT-5.4 Image 2</option>
                     </select>
                 </div>
             </div>
@@ -10287,18 +10333,21 @@
                             <span id="alabasta-case-card-image-status" class="alabasta-genmage-status-pill"><i class="fa-regular fa-image"></i> Preview · 미리보기</span>
                             <span id="alabasta-case-card-image-meta" class="alabasta-genmage-image-meta"></span>
                         </div>
-                        <!-- V92.42: Quick regenerate row — no scroll-back to ③ chip needed -->
+                        <!-- V92.46: Quick regenerate row — chip rail mirrors ③ rail.
+                             Clicking a chip = switch model + regenerate in one tap. The active
+                             chip is kept in sync with ③ via syncAlabastaCaseCardQuickRail(). -->
                         <div class="alabasta-genmage-toolbar-actions">
                             <button type="button" id="alabasta-case-card-regenerate-btn" class="btn-sm alabasta-casecard-btn refine alabasta-genmage-regenerate-btn" onclick="generateAlabastaCaseCardImage()" title="Regenerate with the currently selected model · 현재 모델로 다시 생성">
                                 <i class="fa-solid fa-rotate"></i> Regenerate · 다시 생성
                             </button>
-                            <select id="alabasta-case-card-quick-model" class="alabasta-genmage-quick-model" onchange="switchAndRegenerateAlabastaCaseCard(this.value)" title="Switch model and regenerate · 모델 전환 후 다시 생성">
-                                <option value="">Try another model… · 다른 모델…</option>
-                                <option value="gpt-image-1">OpenAI Images (balanced)</option>
-                                <option value="imagen">Vertex Imagen 3 (premium)</option>
-                                <option value="imagen-nano">Imagen 3 Fast (cheap & fast)</option>
-                            </select>
-                            <a id="alabasta-case-card-image-download" href="#" download="alabasta-case-card.png" class="btn-sm alabasta-casecard-btn utility" style="text-decoration:none;" title="Download PNG · PNG 다운로드"><i class="fa-solid fa-download"></i> PNG</a>
+                            <div class="alabasta-genmage-quick-rail" id="alabasta-case-card-quick-rail" aria-label="Switch image model">
+                                <span class="alabasta-genmage-quick-label">Switch:</span>
+                                <button type="button" class="alabasta-genmage-quick-chip active" data-value="gpt-image-1" onclick="switchAndRegenerateAlabastaCaseCard('gpt-image-1')" title="OpenAI Images (balanced)">OpenAI</button>
+                                <button type="button" class="alabasta-genmage-quick-chip" data-value="imagen" onclick="switchAndRegenerateAlabastaCaseCard('imagen')" title="Vertex Imagen 3 (premium)">Imagen 3</button>
+                                <button type="button" class="alabasta-genmage-quick-chip" data-value="imagen-nano" onclick="switchAndRegenerateAlabastaCaseCard('imagen-nano')" title="Imagen 3 Fast (cheap & fast)">Imagen Fast</button>
+                                <button type="button" class="alabasta-genmage-quick-chip" data-value="or/openai/gpt-5.4-image-2" onclick="switchAndRegenerateAlabastaCaseCard('or/openai/gpt-5.4-image-2')" title="OpenRouter — OpenAI GPT-5.4 Image 2">GPT-5.4 Image 2</button>
+                            </div>
+                            <a id="alabasta-case-card-image-download" href="#" download="alabasta-case-card.png" class="btn-sm alabasta-casecard-btn utility" style="text-decoration:none;" title="Download image as PNG · 이미지를 PNG로 저장"><i class="fa-solid fa-download"></i> PNG</a>
                         </div>
                     </div>
                 </div>
@@ -21197,7 +21246,17 @@ async function saveQuiz() {
             document.querySelectorAll('.alabasta-genmage-model-chip').forEach(chip => chip.classList.remove('active'));
             if (!btn) return;
             btn.classList.add('active');
-            if (hiddenInput) hiddenInput.value = btn.dataset.value || 'gpt-image-1';
+            const value = btn.dataset.value || 'gpt-image-1';
+            if (hiddenInput) hiddenInput.value = value;
+            // V92.46: keep the under-image quick-rail visually in sync with ③
+            syncAlabastaCaseCardQuickRail(value);
+        };
+
+        // V92.46: highlight the under-image quick-switch chip that matches the active model
+        window.syncAlabastaCaseCardQuickRail = function(activeValue) {
+            document.querySelectorAll('.alabasta-genmage-quick-chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.value === activeValue);
+            });
         };
 
         // V92.42: helpers for the new Tools dropdown + quick-regenerate row
@@ -21277,13 +21336,13 @@ async function saveQuiz() {
             if (!modelValue) return;
             const chip = document.querySelector(`.alabasta-genmage-model-chip[data-value="${modelValue}"]`);
             if (chip && typeof selectAlabastaCaseCardModel === 'function') {
-                selectAlabastaCaseCardModel(chip);
+                selectAlabastaCaseCardModel(chip); // also syncs the quick rail
             } else {
+                // Fallback path if ③ rail doesn't have a matching chip
                 const hiddenInput = document.getElementById('alabasta-case-card-model');
                 if (hiddenInput) hiddenInput.value = modelValue;
+                if (typeof syncAlabastaCaseCardQuickRail === 'function') syncAlabastaCaseCardQuickRail(modelValue);
             }
-            const quickSelect = document.getElementById('alabasta-case-card-quick-model');
-            if (quickSelect) quickSelect.value = '';
             if (typeof generateAlabastaCaseCardImage === 'function') {
                 generateAlabastaCaseCardImage();
             }

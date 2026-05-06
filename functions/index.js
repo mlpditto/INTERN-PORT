@@ -417,10 +417,22 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             let orModel = model || "openai/gpt-4o-mini";
             if (orModel.includes('Llama-3.3') || orModel.includes('llama-3.3')) orModel = "meta-llama/llama-3.3-70b-instruct";
             else if (orModel.includes('Llama-3.1') || orModel.includes('llama-3.1')) orModel = "meta-llama/llama-3.1-70b-instruct";
+
+            // V92.46: detect image-generation models (e.g. openai/gpt-5.4-image-2,
+            // google/gemini-2.5-flash-image-preview). Image models accept the same
+            // chat.completions endpoint but require modalities:["image","text"] and
+            // return base64 data URLs in choices[0].message.images[].image_url.url
+            const requestedModalities = Array.isArray(req.body?.generationOptions?.modalities)
+                ? req.body.generationOptions.modalities
+                : null;
+            const isImageRequest = (requestedModalities && requestedModalities.includes("image"))
+                || /(^|\/|-)image(-|\d|$)/i.test(orModel);
+
             const body = {
                 model: orModel,
                 messages: [{ role: "user", content: tailoredPrompt }],
                 ...(isJson ? { response_format: { type: "json_object" } } : {}),
+                ...(isImageRequest ? { modalities: ["image", "text"] } : {}),
                 temperature: 0.7,
                 max_tokens: 4096
             };
@@ -433,6 +445,24 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                     "X-Title": "INTERN-PORT"
                 }
             });
+
+            if (isImageRequest) {
+                const message = response.data?.choices?.[0]?.message || {};
+                const firstImage = Array.isArray(message.images) ? message.images[0] : null;
+                const imageDataUrl = firstImage?.image_url?.url || "";
+                if (!imageDataUrl) {
+                    return res.status(502).json({
+                        error: `OpenRouter ${orModel} returned no image data.`,
+                        details: { hasImages: Array.isArray(message.images), choicesCount: response.data?.choices?.length || 0 }
+                    });
+                }
+                return res.json({
+                    imageDataUrl,
+                    text: message.content || "",
+                    tokens: response.data.usage?.total_tokens || 0,
+                    model: orModel
+                });
+            }
 
             return res.json({
                 text: response.data.choices[0].message.content,
