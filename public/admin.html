@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.46</title>
+    <title>Nika V92.47</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4370,7 +4370,47 @@
             height: 50px;
         }
 
-
+        /* V92.47: Edit/preview toggle per option (markdown rich-text rendering) */
+        .q-opt-preview {
+            flex: 1;
+            margin: 0;
+            padding: 8px;
+            min-height: 45px;
+            font-size: 1.05em;
+            font-weight: 700;
+            color: #f8fafc;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            line-height: 1.5;
+            border-radius: 10px;
+            cursor: text;
+            outline: none;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+        .q-opt-preview:focus {
+            box-shadow: 0 0 0 2px rgba(99,102,241,0.4);
+        }
+        .q-opt-preview:empty::before {
+            content: 'Click to edit option…';
+            color: #64748b;
+            font-style: italic;
+            font-weight: 500;
+        }
+        .q-opt-row.is-correct .q-opt-preview { color: #4ade80; }
+        .q-opt-preview > *:first-child { margin-top: 0; }
+        .q-opt-preview > *:last-child { margin-bottom: 0; }
+        .q-opt-preview p { margin: 0.3em 0; }
+        .q-opt-preview ul, .q-opt-preview ol { margin: 0.3em 0; padding-left: 1.4em; }
+        .q-opt-preview strong { font-weight: 900; color: #fbbf24; }
+        .q-opt-row.is-correct .q-opt-preview strong { color: #86efac; }
+        .q-opt-preview em { font-style: italic; color: #c7d2fe; }
+        .q-opt-preview code {
+            background: #1e293b;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-family: Consolas, monospace;
+        }
 
         .q-opt-row {
             display: flex;
@@ -12993,6 +13033,78 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
             window._qTextDebounce.set(textarea, t);
         };
 
+        // V92.47: Edit/preview toggle for option textareas — markdown rich text per option
+        window._qOptDebounce = window._qOptDebounce || new WeakMap();
+        window.renderQOptPreview = function(textarea) {
+            if (!textarea) return;
+            const wrap = textarea.closest('.q-opt-edit-wrap');
+            if (!wrap) return;
+            const preview = wrap.querySelector('.q-opt-preview');
+            if (!preview) return;
+            const prev = window._qOptDebounce.get(textarea);
+            if (prev) clearTimeout(prev);
+            const t = setTimeout(() => {
+                const md = textarea.value || '';
+                if (!md.trim()) {
+                    preview.innerHTML = '';
+                    return;
+                }
+                try {
+                    if (window.marked && window.DOMPurify) {
+                        const html = window.DOMPurify.sanitize(window.marked.parseInline(md, { breaks: true, gfm: true }));
+                        preview.innerHTML = html;
+                    } else {
+                        preview.textContent = md;
+                    }
+                } catch (e) {
+                    preview.textContent = md;
+                }
+            }, 150);
+            window._qOptDebounce.set(textarea, t);
+        };
+        window.showQOptPreview = function(textarea) {
+            if (!textarea) return;
+            const wrap = textarea.closest('.q-opt-edit-wrap');
+            if (!wrap) return;
+            const preview = wrap.querySelector('.q-opt-preview');
+            if (!preview) return;
+            const md = textarea.value || '';
+            if (!md.trim()) {
+                preview.style.display = 'none';
+                textarea.style.display = '';
+                return;
+            }
+            try {
+                if (window.marked && window.DOMPurify) {
+                    preview.innerHTML = window.DOMPurify.sanitize(window.marked.parseInline(md, { breaks: true, gfm: true }));
+                } else {
+                    preview.textContent = md;
+                }
+            } catch (e) {
+                preview.textContent = md;
+            }
+            textarea.style.display = 'none';
+            preview.style.display = '';
+        };
+        window.editQOptFromPreview = function(preview) {
+            if (!preview) return;
+            const wrap = preview.closest('.q-opt-edit-wrap');
+            if (!wrap) return;
+            const textarea = wrap.querySelector('textarea.q-opt');
+            if (!textarea) return;
+            preview.style.display = 'none';
+            textarea.style.display = '';
+            textarea.focus();
+            const len = textarea.value.length;
+            try { textarea.setSelectionRange(len, len); } catch (e) {}
+        };
+        window.initQOptPreviewsIn = function(scope) {
+            const root = scope || document;
+            root.querySelectorAll('textarea.q-opt').forEach(ta => {
+                if (ta.value && ta.value.trim()) window.showQOptPreview(ta);
+            });
+        };
+
         window.aiEnhanceQuestion = async function(btn) {
             const item = btn.closest('.quiz-q-item');
             const questionTextarea = item.querySelector('.q-text');
@@ -13032,7 +13144,7 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                    - *italic* for emphasis or anatomical/Latin terms
                    - bullet lists ("- ") for symptoms, criteria, lab parameters, or differentials
                    - "\\n\\n" for paragraph breaks (e.g., between vignette and question stem)
-                   Keep markdown light and purposeful — do not over-format. The "options" array MUST remain plain text (NO markdown), so users cannot infer the correct answer from formatting cues.
+                   Keep markdown light and purposeful — do not over-format. For the "options" array (V92.47): if you apply any markdown (e.g., **bold** for the key term, *italic* for Latin/anatomical terms), you MUST apply it CONSISTENTLY across ALL options or NONE — never format only some options, as inconsistent formatting could let users infer the correct answer from formatting cues.
 
                 Original Question: "${questionText}"
                 Original Options: ${JSON.stringify(options)}
@@ -13092,12 +13204,16 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                             <input type="checkbox" name="q-correct-${qId}" value="${i}" id="corr-${qId}-${i}" class="q-correct-check" ${isCorrect ? 'checked' : ''} onchange="toggleOptionCorrect(this)">
                             <span class="circle-content" style="font-size:0.9em; border-width:2px;">${i + 1}</span>
                         </label>
-                        <textarea class="q-opt" placeholder="Option ${i + 1}" style="flex:1; margin:0; font-size:0.95em; padding:8px 12px; border-radius:10px; border:none; background:transparent; min-height:40px; outline:none;">${optText}</textarea>
+                        <div class="q-opt-edit-wrap" style="flex:1; display:flex; min-width:0;">
+                            <textarea class="q-opt" placeholder="Option ${i + 1}" oninput="renderQOptPreview(this)" onblur="showQOptPreview(this)" style="flex:1; margin:0; font-size:0.95em; padding:8px 12px; border-radius:10px; border:none; background:transparent; min-height:40px; outline:none;">${optText}</textarea>
+                            <div class="q-opt-preview" tabindex="0" onclick="editQOptFromPreview(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editQOptFromPreview(this);}" style="display:none; flex:1;"></div>
+                        </div>
                         <button type="button" onclick="removeOption(this)" style="width:28px; height:28px; padding:0; background:none; color:#cbd5e1; border:none; cursor:pointer; font-size:0.8em; transition:color 0.2s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#cbd5e1'" title="Delete Option">✕</button>
                     `;
                     optContainer.appendChild(row);
                 });
-                
+
+                if (window.initQOptPreviewsIn) window.initQOptPreviewsIn(item);
                 updateOptionNumbers(item);
                 window.setQuizMagicState(item, 'applied');
                 showToast("✨ Question translated and enhanced!");
@@ -14086,7 +14202,10 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                                 <input type="checkbox" name="q-correct-${qId}" value="${i}" id="corr-${qId}-${i}" class="q-correct-check" ${isSelected ? 'checked' : ''} onchange="toggleOptionCorrect(this)">
                                 <span class="circle-content" style="font-size:0.95em; border-width:2.5px; font-weight:900;">${i+1}</span>
                             </label>
-                            <textarea class="q-opt" placeholder="Option ${i + 1}" style="flex:1; margin:0; font-size:1.05em; padding:8px; border-radius:10px; border:none; background:transparent; min-height:45px; outline:none; font-weight:700; color:${isSelected ? '#4ade80' : '#f8fafc'}; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${opt}</textarea>
+                            <div class="q-opt-edit-wrap" style="flex:1; display:flex; min-width:0;">
+                                <textarea class="q-opt" placeholder="Option ${i + 1}" oninput="renderQOptPreview(this)" onblur="showQOptPreview(this)" style="flex:1; margin:0; font-size:1.05em; padding:8px; border-radius:10px; border:none; background:transparent; min-height:45px; outline:none; font-weight:700; color:${isSelected ? '#4ade80' : '#f8fafc'}; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${opt}</textarea>
+                                <div class="q-opt-preview" tabindex="0" onclick="editQOptFromPreview(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editQOptFromPreview(this);}" style="display:none; flex:1;"></div>
+                            </div>
                             ${options.length > 2 ? `<button type="button" onclick="removeOption(this)" style="width:32px; height:32px; padding:0; background:none; color:#94a3b8; border:none; cursor:pointer; font-size:0.9em; transition:all 0.2s;" onmouseover="this.style.color='#ef4444'; this.style.transform='scale(1.2)'" onmouseout="this.style.color='#94a3b8'; this.style.transform='scale(1)'">✕</button>` : ''}
                         </div>
                         `;
@@ -14132,6 +14251,8 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                 const pageEl = div.querySelector('.q-page-content');
                 if (pageEl) window.renderQTextPreview(pageEl);
             }
+            // V92.47: collapse populated option textareas to rich-text preview
+            if (window.initQOptPreviewsIn) window.initQOptPreviewsIn(div);
 
             if (!data) {
                 const total = document.querySelectorAll('.quiz-q-item').length;
@@ -14851,13 +14972,17 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                                     <input type="checkbox" name="q-correct-${qId}" value="${idx}" class="q-correct-check" ${isCorrect ? 'checked' : ''} onchange="toggleOptionCorrect(this)">
                                     <span class="circle-content" style="font-size:0.95em; border-width:2.5px; font-weight:900;">${idx+1}</span>
                                 </label>
-                                <textarea class="q-opt" style="flex:1; margin:0; padding:8px; border:none; background:transparent; font-size:1.05em; font-weight:700; color:${isCorrect ? '#4ade80' : '#f8fafc'}; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${opt}</textarea>
+                                <div class="q-opt-edit-wrap" style="flex:1; display:flex; min-width:0;">
+                                    <textarea class="q-opt" oninput="renderQOptPreview(this)" onblur="showQOptPreview(this)" style="flex:1; margin:0; padding:8px; border:none; background:transparent; font-size:1.05em; font-weight:700; color:${isCorrect ? '#4ade80' : '#f8fafc'}; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${opt}</textarea>
+                                    <div class="q-opt-preview" tabindex="0" onclick="editQOptFromPreview(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editQOptFromPreview(this);}" style="display:none; flex:1;"></div>
+                                </div>
                                 <button type="button" onclick="removeOption(this)" style="background:none; border:none; color:#94a3b8;">✕</button>
                             </div>`;
                             optContainer.insertAdjacentHTML('beforeend', optHtml);
                         });
                         item.querySelector('.options-container').style.display = 'flex';
                         item.querySelector('.options-actions').style.display = 'block';
+                        if (window.initQOptPreviewsIn) window.initQOptPreviewsIn(item);
                     }
 
                     showToast("AI Vision Scan Complete!");
@@ -15011,7 +15136,10 @@ If no issues, return empty array for issues. Keep suggestions kind and construct
                         <input type="checkbox" name="q-correct-${qId}" value="${count}" id="corr-${qId}-${count}" class="q-correct-check" onchange="toggleOptionCorrect(this)">
                         <span class="circle-content" style="font-size:0.95em; border-width:2.5px; font-weight:900;">${count + 1}</span>
                     </label>
-                    <textarea class="q-opt" placeholder="Option ${count + 1}" style="flex:1; margin:0; font-size:1.05em; padding:8px; border-radius:10px; border:none; background:transparent; min-height:45px; outline:none; font-weight:700; color:#f8fafc; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${val}</textarea>
+                    <div class="q-opt-edit-wrap" style="flex:1; display:flex; min-width:0;">
+                        <textarea class="q-opt" placeholder="Option ${count + 1}" oninput="renderQOptPreview(this)" onblur="showQOptPreview(this)" style="flex:1; margin:0; font-size:1.05em; padding:8px; border-radius:10px; border:none; background:transparent; min-height:45px; outline:none; font-weight:700; color:#f8fafc; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${val}</textarea>
+                        <div class="q-opt-preview" tabindex="0" onclick="editQOptFromPreview(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editQOptFromPreview(this);}" style="display:none; flex:1;"></div>
+                    </div>
                     <button type="button" onclick="removeOption(this)" style="width:28px; height:28px; padding:0; background:none; color:#94a3b8; border:none; cursor:pointer; font-size:0.8em; transition:all 0.2s;" onmouseover="this.style.color='#ef4444'; this.style.transform='scale(1.1)'" onmouseout="this.style.color='#94a3b8'; this.style.transform='scale(1)'" title="Delete Option">✕</button>
                 `;
             container.appendChild(row);
