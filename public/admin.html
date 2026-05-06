@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.52</title>
+    <title>Nika V92.53</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -3661,6 +3661,53 @@
     display: block;
 }
 
+/* V92.53: Sub-tabs inside Assignments tab — switch between Quiz Engine and Exam Sessions */
+.subtab-nav {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 22px;
+    padding: 4px;
+    background: #f1f5f9;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    width: fit-content;
+}
+.subtab-btn {
+    padding: 8px 18px;
+    border-radius: 10px;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    font-weight: 800;
+    font-size: 0.88em;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+    font-family: inherit;
+}
+.subtab-btn:hover:not(.active) {
+    background: rgba(99, 102, 241, 0.06);
+    color: #475569;
+}
+.subtab-btn.active {
+    background: linear-gradient(135deg, #fff, #f8fafc);
+    color: #1e293b;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(99, 102, 241, 0.12);
+}
+.subtab-btn .subtab-pill {
+    background: rgba(124, 58, 237, 0.12);
+    color: #7c3aed;
+    font-size: 0.7em;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+.subtab-content { display: none; }
+.subtab-content.active { display: block; }
+
 .kanban-board {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -5091,6 +5138,18 @@
 
             <!-- Reflective Log moved to Today Dashboard -->
 
+            <!-- V92.53: Sub-tabs to switch between Quiz Engine and Exam Sessions -->
+            <div class="subtab-nav" role="tablist" aria-label="Assignments tools">
+                <button type="button" class="subtab-btn active" data-subtab="subtab-quiz-engine" onclick="switchAssignmentsSubtab('subtab-quiz-engine')" role="tab">
+                    🧠 Quiz Engine
+                </button>
+                <button type="button" class="subtab-btn" data-subtab="subtab-exam-sessions" onclick="switchAssignmentsSubtab('subtab-exam-sessions')" role="tab">
+                    🎓 Exam Sessions
+                    <span class="subtab-pill">TBL/GRAT</span>
+                </button>
+            </div>
+
+            <div id="subtab-quiz-engine" class="subtab-content active">
             <!-- 2. Quiz Section -->
             <div
                 style="background:#e3f2fd; padding:20px; border-radius:12px; margin-bottom:30px; border:1px solid #bbdefb;">
@@ -5168,8 +5227,10 @@
                 <div id="inactive-quiz-pagination"
                     style="display:flex; justify-content:center; align-items:center; margin-top:15px; gap:10px;"></div>
             </div>
+            </div><!-- /subtab-quiz-engine -->
 
-            <!-- 🎓 Exam Sessions Section (V92.52 — moved under Quiz Engine, inside tab-assignments) -->
+            <div id="subtab-exam-sessions" class="subtab-content">
+            <!-- 🎓 Exam Sessions Section (V92.53 — sibling sub-tab to Quiz Engine inside Assignments) -->
             <div style="background:#faf5ff; padding:20px; border-radius:12px; margin-bottom:30px; border:1px solid #d8b4fe;">
                 <div class="flex-between" style="border-bottom:1px solid #c4b5fd; padding-bottom:15px; margin-bottom:20px;">
                     <h3 style="margin:0; color:#6b21a8; display:flex; align-items:center; gap:12px; font-weight:900; font-size:1.3em;">
@@ -5230,6 +5291,7 @@
                     <div style="padding:24px; text-align:center; color:#94a3b8; font-size:0.86em;">No active sessions. Create one above to get started.</div>
                 </div>
             </div>
+            </div><!-- /subtab-exam-sessions -->
         </div>
 
         <div id="tab-users" class="tab-content">
@@ -33688,6 +33750,20 @@ Reply ONLY with raw JSON, no markdown:
             } catch (e) {
                 alert(e.message);
             }
+        }
+
+        // V92.53: Sub-tab switcher inside the Assignments tab.
+        // Toggles visibility between subtab-quiz-engine and subtab-exam-sessions.
+        // The realtime listener in initExamSessionsTab() is attached when tab-assignments
+        // first opens (regardless of which sub-tab is active), so switching sub-tabs is
+        // a pure visual swap — no extra Firestore reads.
+        function switchAssignmentsSubtab(id) {
+            document.querySelectorAll('#tab-assignments .subtab-content').forEach(el => {
+                el.classList.toggle('active', el.id === id);
+            });
+            document.querySelectorAll('#tab-assignments .subtab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.subtab === id);
+            });
         }
 
         // ===================================================================
