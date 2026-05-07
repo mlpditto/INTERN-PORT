@@ -139,15 +139,13 @@
     }
 
     // --- Toggle state (3-state: '1'=ON, '0'=OFF, missing=default) ---
-    // Page-aware defaults (Phase β.1):
-    //   - index.html (LIFF user-facing): default OFF — high-visibility
-    //     standalone Thai now has EN equivalents, EN-only is the new default.
-    //   - admin.html (still Phase α): default ON until Phase δ adds EN
-    //     translations for admin's standalone Thai. Existing admin users
-    //     see no change on first load.
-    var IS_ADMIN_PAGE = /admin\.html$/i.test(location.pathname);
-    var DEFAULT_ON_KR = IS_ADMIN_PAGE;
-    var DEFAULT_ON_TH = IS_ADMIN_PAGE;
+    // Page defaults (Phase δ.3, V94.30):
+    //   - Both index.html and admin.html now default OFF — admin's standalone
+    //     Thai got EN equivalents in δ.1+δ.2. EN-only is the unified default.
+    //   - 3-state localStorage means users who explicitly toggled stay put;
+    //     only first-time visitors / never-toggled users see this flip.
+    var DEFAULT_ON_KR = false;
+    var DEFAULT_ON_TH = false;
 
     function isLangOn(lang) {
         var key = lang === 'kr' ? 'uiLangKR' : 'uiLangTH';
