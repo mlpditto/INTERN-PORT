@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.35)</title>
+    <title>Internship Portfolio (V94.36)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3479,6 +3479,7 @@
 
     <div id="quizFeedbackModal" class="modal">
         <div class="modal-content" style="max-width:450px; text-align: left;">
+            <span class="close-modal" onclick="closeFeedbackModal()" title="Close">&times;</span>
             <h3 style="color:var(--primary); margin-top:0;"><i class="fa-solid fa-comment-heart"></i> Feedback ส่งความเห็นหลังทำ</h3>
             <div id="feedback-score-display"
                 style="text-align:center; padding:15px; background:#f0f7ff; border-radius:12px; margin-bottom:15px;">
@@ -3496,23 +3497,28 @@
                 <span id="fb-rating-num" style="font-size:1.5em;">0</span> / 10
             </div>
 
-            <label style="font-weight:bold; display:block; margin-bottom:5px;">🎯 Next quiz topic? ชุดข้อสอบต่อไปที่อยากทำ?</label>
+            <label style="font-weight:bold; display:block; margin-bottom:5px;">🎯 Next quiz topic? <span style="font-weight:normal; color:#94a3b8; font-size:0.85em;">optional ไม่บังคับ</span></label>
             <input type="text" id="fb-next-topic" placeholder="e.g. dispensing workflow, case management..." data-th-placeholder="เช่น ขั้นตอนการจ่ายยา, การดูแลเคส..."
                 style="width:100%;">
 
-            <label style="font-weight:bold; display:block; margin-bottom:5px;">💬 Suggestions for this quiz set คำแนะนำต่อชุดข้อสอบนี้:</label>
-            <textarea id="fb-comment" rows="4" placeholder="Note what worked, what needs improvement, and suggestions for this quiz..." data-th-placeholder="ระบุจุดที่ดี จุดที่ควรปรับ และข้อแนะนำสำหรับชุดข้อสอบนี้..."
+            <label style="font-weight:bold; display:block; margin-bottom:5px; margin-top:10px;">💬 Suggestions <span style="font-weight:normal; color:#94a3b8; font-size:0.85em;">optional ไม่บังคับ</span></label>
+            <textarea id="fb-comment" rows="3" placeholder="Share what worked or what could improve..." data-th-placeholder="แชร์จุดที่ดีหรืออยากให้ปรับ..."
                 style="width:100%; resize:none;" oninput="updateFeedbackCommentCounter()"></textarea>
             <div
-                style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; margin-bottom:2px;">
-                <span id="fb-comment-hint" style="font-size:0.78em; color:#64748b;">Please write more than 100 characters โปรดเขียนข้อเสนอแนะมากกว่า 100 ตัวอักษร</span>
-                <span id="fb-comment-count" style="font-size:0.8em; font-weight:700; color:#ef4444;">0/100</span>
+                style="display:flex; justify-content:flex-end; align-items:center; margin-top:4px; margin-bottom:2px;">
+                <span id="fb-comment-count" style="font-size:0.75em; color:#94a3b8;">0 chars</span>
             </div>
 
-            <button class="btn-primary" onclick="submitFeedback()"
-                style="width:100%; margin-top:10px; font-weight:bold; height:50px; border-radius:15px; background:linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%);">
-                Submit Feedback ส่งความเห็น
-            </button>
+            <div style="display:flex; gap:8px; margin-top:14px;">
+                <button onclick="closeFeedbackModal()"
+                    style="flex:1; padding:12px; border-radius:14px; border:1px solid #cbd5e1; background:#f1f5f9; color:#475569; font-weight:700; cursor:pointer;">
+                    Maybe later ไว้ทีหลัง
+                </button>
+                <button class="btn-primary" onclick="submitFeedback()"
+                    style="flex:2; font-weight:bold; height:48px; border-radius:14px; background:linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%);">
+                    Submit ส่งความเห็น
+                </button>
+            </div>
         </div>
     </div>
 
@@ -6952,37 +6958,30 @@
             document.getElementById('quizResultModal').style.display = 'flex';
         }
 
-        // 🔥 V84.1: Submit Quiz Feedback
+        // V94.36 Phase A: Quiz Feedback friction reduction.
+        //   - Optional comment (no 100-char gate); counter is informational only.
+        //   - Optional nextTopic (no required-field gate).
+        //   - Modal has × close + "Maybe later" via closeFeedbackModal().
         function updateFeedbackCommentCounter() {
             const el = document.getElementById('fb-comment');
             const countEl = document.getElementById('fb-comment-count');
             if (!el || !countEl) return;
-
             const length = (el.value || '').trim().length;
-            countEl.innerText = `${length}/100`;
-            countEl.style.color = length >= 100 ? '#16a34a' : '#ef4444';
+            countEl.innerText = `${length} chars`;
+        }
+
+        function closeFeedbackModal() {
+            document.getElementById('quizFeedbackModal').style.display = 'none';
+            currentQuizIdForFeedback = null;
+            quizTotalStartTime = null;
         }
 
         async function submitFeedback() {
-            const rating = document.getElementById('fb-rating').value;
-            const nextTopic = document.getElementById('fb-next-topic').value;
-            const comment = document.getElementById('fb-comment').value;
-            const trimmedComment = (comment || '').trim();
-
             if (!currentQuizIdForFeedback) return;
 
-            if (!nextTopic.trim()) {
-                alert("กรุณาระบุชุดข้อสอบต่อไปที่อยากทำ?");
-                document.getElementById('fb-next-topic').focus();
-                return;
-            }
-
-            if (trimmedComment.length < 100) {
-                alert(`กรุณาเขียนคำแนะนำต่อชุดข้อสอบนี้มากกว่า 100 ตัวอักษร (ปัจจุบัน ${trimmedComment.length}/100)`);
-                updateFeedbackCommentCounter();
-                document.getElementById('fb-comment').focus();
-                return;
-            }
+            const rating = document.getElementById('fb-rating').value;
+            const nextTopic = document.getElementById('fb-next-topic').value.trim();
+            const trimmedComment = (document.getElementById('fb-comment').value || '').trim();
 
             try {
                 const timeUsed = quizTotalStartTime ? Math.floor((new Date() - quizTotalStartTime) / 1000) : 0;
@@ -6998,10 +6997,8 @@
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-                document.getElementById('quizFeedbackModal').style.display = 'none';
-                alert("🙏 ขอบคุณสำหรับความเห็นครับ! ข้อมูลของคุณถูกบันทึกเรียบร้อยแล้ว");
-                currentQuizIdForFeedback = null;
-                quizTotalStartTime = null;
+                closeFeedbackModal();
+                alert("🙏 Thanks for your feedback! ขอบคุณสำหรับความเห็น");
             } catch (e) {
                 alert("Feedback Error: " + e.message);
             }
