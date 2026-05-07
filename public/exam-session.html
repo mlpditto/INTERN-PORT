@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exam Session V3.0 — INTERN-PORT</title>
+    <title>Exam Session V3.1 — INTERN-PORT</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -554,6 +554,98 @@
         }
         .btn-danger:hover { background: rgba(239, 68, 68, 0.22); }
 
+        /* Countdown bar (Phase 3.2.a — top of running/paused, host pause/resume pinned inside) */
+        .countdown-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 18px;
+            background: rgba(34, 197, 94, 0.08);
+            border: 1px solid rgba(34, 197, 94, 0.28);
+            border-radius: 14px;
+            margin-bottom: 18px;
+            transition: background 0.25s, border-color 0.25s;
+        }
+        .countdown-bar.warning {
+            background: rgba(251, 191, 36, 0.1);
+            border-color: rgba(251, 191, 36, 0.4);
+        }
+        .countdown-bar.critical {
+            background: rgba(239, 68, 68, 0.12);
+            border-color: rgba(239, 68, 68, 0.5);
+            animation: countdownPulse 1.1s ease-in-out infinite;
+        }
+        .countdown-bar.paused {
+            background: rgba(148, 163, 184, 0.12);
+            border-color: rgba(148, 163, 184, 0.32);
+            animation: none;
+        }
+        @keyframes countdownPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+            50% { box-shadow: 0 0 14px 2px rgba(239,68,68,0.32); }
+        }
+        .countdown-display {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-family: ui-monospace, "JetBrains Mono", "Menlo", monospace;
+            font-size: 1.6em;
+            font-weight: 800;
+            color: #86efac;
+            letter-spacing: 0.04em;
+        }
+        .countdown-bar.warning .countdown-display { color: #fcd34d; }
+        .countdown-bar.critical .countdown-display { color: #fca5a5; }
+        .countdown-bar.paused .countdown-display { color: #cbd5e1; }
+        .countdown-display i { font-size: 0.85em; opacity: 0.85; }
+        .countdown-label {
+            font-size: 0.65em;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            opacity: 0.7;
+            margin-left: 4px;
+        }
+        .countdown-host-controls { display: flex; gap: 8px; flex-shrink: 0; }
+        .btn-pause, .btn-resume {
+            background: rgba(251, 191, 36, 0.18);
+            border: 1px solid rgba(251, 191, 36, 0.45);
+            color: #fbbf24;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-weight: 800;
+            font-size: 0.82em;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.1s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: inherit;
+        }
+        .btn-pause:hover { background: rgba(251, 191, 36, 0.28); }
+        .btn-pause:active { transform: scale(0.97); }
+        .btn-resume {
+            background: rgba(34, 197, 94, 0.2);
+            border-color: rgba(34, 197, 94, 0.5);
+            color: #86efac;
+        }
+        .btn-resume:hover { background: rgba(34, 197, 94, 0.3); }
+        .btn-resume:active { transform: scale(0.97); }
+        .btn-pause:disabled, .btn-resume:disabled { opacity: 0.55; cursor: not-allowed; }
+
+        .paused-banner {
+            text-align: center;
+            font-size: 0.88em;
+            color: #cbd5e1;
+            margin-bottom: 14px;
+            padding: 10px 14px;
+            background: rgba(148, 163, 184, 0.08);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 10px;
+        }
+        .paused-banner i { color: #fbbf24; margin-right: 6px; }
+
         .hidden { display: none !important; }
 
         @media (max-width: 600px) {
@@ -561,6 +653,9 @@
             .lobby-meta { grid-template-columns: 1fr; }
             .timer-pill { justify-self: start; }
             .participants-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+            .countdown-bar { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 14px; }
+            .countdown-display { justify-content: center; font-size: 1.4em; }
+            .countdown-host-controls { justify-content: center; }
         }
     </style>
 </head>
@@ -568,7 +663,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <span class="badge"><i class="fa-solid fa-graduation-cap"></i> Exam Session V3.0</span>
+            <span class="badge"><i class="fa-solid fa-graduation-cap"></i> Exam Session V3.1</span>
             <h1 id="page-title">Exam Session</h1>
             <p class="subtitle">Group exam · Real-time sync · INTERN-PORT</p>
         </div>
@@ -605,8 +700,18 @@
             </div>
         </div>
 
-        <!-- RUNNING (V3.0 Phase 3.1 — voting + host advance) -->
+        <!-- RUNNING (V3.1 Phase 3.2.a — countdown timer + Pause + auto-end) -->
         <div id="state-running" class="state-box hidden">
+            <!-- Countdown bar (top focal element for proctored exams) -->
+            <div class="countdown-bar" id="countdown-bar-running">
+                <div class="countdown-display">
+                    <i class="fa-solid fa-clock"></i>
+                    <span id="countdown-text">--:--</span>
+                    <span class="countdown-label">remaining</span>
+                </div>
+                <div class="countdown-host-controls" id="countdown-host-controls"></div>
+            </div>
+
             <div class="running-meta">
                 <div class="running-host-tag">
                     <i class="fa-solid fa-crown"></i>
@@ -636,16 +741,23 @@
             <div class="host-controls" id="host-controls"></div>
         </div>
 
-        <!-- PAUSED (Phase 3 placeholder) -->
+        <!-- PAUSED (V3.1 Phase 3.2.a — frozen countdown + host Resume) -->
         <div id="state-paused" class="state-box hidden">
-            <div class="placeholder-card">
-                <div class="ico"><i class="fa-solid fa-pause"></i></div>
-                <div class="ttl">Session paused by host</div>
-                <div class="desc">Timer is frozen. The host will resume when ready.</div>
+            <div class="countdown-bar paused" id="countdown-bar-paused">
+                <div class="countdown-display">
+                    <i class="fa-solid fa-pause"></i>
+                    <span id="paused-countdown-text">--:--</span>
+                    <span class="countdown-label">frozen</span>
+                </div>
+                <div class="countdown-host-controls" id="paused-host-controls"></div>
+            </div>
+            <div class="paused-banner">
+                <i class="fa-solid fa-circle-info"></i>
+                Session paused by host. The timer is frozen — discussion continues, votes are preserved.
             </div>
         </div>
 
-        <!-- DONE (Phase 4 placeholder — Phase 3.1 transitions here after final Next) -->
+        <!-- DONE (Phase 4 placeholder — reached via final Next, host End Now, or 00:00 auto-end) -->
         <div id="state-done" class="state-box hidden">
             <div class="placeholder-card">
                 <div class="ico" style="color:#86efac;"><i class="fa-solid fa-flag-checkered"></i></div>
@@ -708,15 +820,16 @@
         </div>
 
         <div class="footer">
-            INTERN-PORT · Exam Session V3.0 · Phase 3.1 (Voting + Host Advance)<br>
+            INTERN-PORT · Exam Session V3.1 · Phase 3.2.a (Timer + Pause/Resume + Auto-end)<br>
             <code>2008959998-4ty7kBq2</code>
         </div>
     </div>
 
     <script>
-        // V3.0 Phase 3.1: voting + realtime tally + host advance (compute majority on Next).
-        // Phase 3.2 will add the proper countdown timer + Pause/Resume + tie-break with
-        // 60s AFK fallback; Phase 4 will persist scores per participant.
+        // V3.1 Phase 3.2.a: server-validated countdown timer + Pause/Resume + auto-end.
+        // Trust `timer.startedAt` (server timestamp) and tick locally with Date.now() — drift
+        // is sub-second over a 30-min exam. Phase 3.2.b will replace the lowest-index tie-
+        // break placeholder with proper host-pick + 60s AFK fallback. Phase 4 persists scores.
         const EXAM_SESSION_LIFF_ID = "2008959998-4ty7kBq2";
         const HEARTBEAT_INTERVAL_MS = 10000;     // 10s
         const ONLINE_THRESHOLD_MS = 30000;       // <30s = online
@@ -765,6 +878,8 @@
         let _latestSession = null;   // most recent snapshot
         let _quizCache = null;       // quiz doc fetched once when state → running (V3.0)
         let _quizFetchPromise = null;
+        let _countdownTick = null;   // 1s interval for countdown UI (Phase 3.2.a)
+        let _autoEndingNow = false;  // host-side race guard for auto-end at 00:00
 
         function getSessionIdFromUrl() {
             try {
@@ -884,11 +999,10 @@
                 return;
             }
 
-            // Existing participant → render the live question view (V3.0 Phase 3.1).
-            // Phase 3.2 will add the proper paused screen with countdown freeze.
+            // Existing participant → render the live question view.
             startHeartbeat();
             if (session.state === 'paused') {
-                showState('paused');
+                await renderPaused(session);
                 return;
             }
             await renderRunning(session);
@@ -1004,7 +1118,7 @@
         }
 
         // V3.0: pick winner from a tally. On tie, returns the lowest choice index — this is
-        // a placeholder that Phase 3.2 will replace with proper host-pick + AFK fallback to
+        // a placeholder that Phase 3.2.b will replace with proper host-pick + AFK fallback to
         // first-vote-wins. Returns null if no votes were cast at all (host advancing on an
         // empty question).
         function computeMajorityWinner(tally) {
@@ -1095,9 +1209,16 @@
                 </button>`;
             }).join('');
 
+            const isHost = session.hostUid === myProfile.userId;
+
+            // Countdown bar — Pause button (host only)
+            const countdownHostBox = $('countdown-host-controls');
+            countdownHostBox.innerHTML = isHost
+                ? `<button class="btn-pause" onclick="pauseSession()"><i class="fa-solid fa-pause"></i> Pause</button>`
+                : '';
+
             // Host controls
             const hostBox = $('host-controls');
-            const isHost = session.hostUid === myProfile.userId;
             if (isHost) {
                 const isLast = idx >= questions.length - 1;
                 const nextLabel = isLast
@@ -1113,7 +1234,7 @@
                     </button>
                     <div class="info-banner">
                         <strong>Host controls.</strong> Tally: ${totalVotes} vote${totalVotes === 1 ? '' : 's'} of ${participants.length} participant${participants.length === 1 ? '' : 's'}.
-                        ${noVotesYet ? 'Wait for at least one vote before advancing.' : (isLast ? 'This is the last question — clicking Finish ends the session.' : 'On tie, the lowest choice index wins for now (Phase 3.2 will add proper host-pick + 60s AFK fallback).')}
+                        ${noVotesYet ? 'Wait for at least one vote before advancing.' : (isLast ? 'This is the last question — clicking Finish ends the session.' : 'On tie, the lowest choice index wins for now (Phase 3.2.b will add proper host-pick + 60s AFK fallback).')}
                     </div>`;
             } else {
                 hostBox.innerHTML = `
@@ -1124,6 +1245,19 @@
             }
 
             showState('running');
+            ensureCountdownTick();
+        }
+
+        // Phase 3.2.a — Paused view: same countdown bar but frozen, plus Resume button (host).
+        async function renderPaused(session) {
+            $('page-title').textContent = session.examTitle || 'Exam Session';
+            const isHost = session.hostUid === myProfile.userId;
+            const pausedHostBox = $('paused-host-controls');
+            pausedHostBox.innerHTML = isHost
+                ? `<button class="btn-resume" onclick="resumeSession()"><i class="fa-solid fa-play"></i> Resume</button>`
+                : '';
+            showState('paused');
+            ensureCountdownTick();
         }
 
         async function voteOnQuestion(choiceIdx) {
@@ -1198,6 +1332,7 @@
         }
 
         async function renderDone(session) {
+            stopCountdownTick();
             // Phase 4 will compute + persist scores. For Phase 3.1 we just summarise how
             // many questions were locked in by the group.
             const finalAnswers = session.finalAnswers || {};
@@ -1210,6 +1345,8 @@
                 detailEl.textContent = 'Session ended by admin.';
             } else if (session.endedByHost) {
                 detailEl.textContent = 'Session ended early by the host.';
+            } else if (session.autoEnded) {
+                detailEl.textContent = 'Time is up — session auto-ended at 00:00.';
             } else {
                 detailEl.textContent = 'All questions answered. Phase 4 will save scores per participant.';
             }
@@ -1254,6 +1391,135 @@
             }
         }
 
+        // ─── Phase 3.2.a — Server-validated countdown helpers ───────────────────
+        // Trust `timer.startedAt` (Firestore serverTimestamp) as the authoritative start.
+        // Each tick we compute `remaining = totalMs - accumulatedActiveMs - (now - startedAt)`.
+        // On Pause we snapshot elapsed → accumulatedActiveMs and clear the running clock.
+        // On Resume we write a fresh startedAt; accumulatedActiveMs preserves prior segments.
+        function getRemainingMs(session) {
+            const t = session && session.timer;
+            if (!t) return 0;
+            const totalMs = (t.totalSec || 0) * 1000;
+            const accum = t.accumulatedActiveMs || 0;
+            if (session.state === 'paused') {
+                return Math.max(0, totalMs - accum);
+            }
+            if (session.state === 'running' && t.startedAt && t.startedAt.toMillis) {
+                const elapsed = Date.now() - t.startedAt.toMillis();
+                return Math.max(0, totalMs - accum - elapsed);
+            }
+            return Math.max(0, totalMs - accum);
+        }
+
+        function formatCountdown(ms) {
+            const totalSec = Math.max(0, Math.floor(ms / 1000));
+            const m = Math.floor(totalSec / 60);
+            const s = totalSec % 60;
+            return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+
+        function applyCountdownStyle(barEl, remainingMs, isPaused) {
+            if (!barEl) return;
+            barEl.classList.remove('warning', 'critical');
+            if (isPaused) return; // paused bar keeps its grey style
+            if (remainingMs <= 60000) barEl.classList.add('critical');
+            else if (remainingMs <= 5 * 60000) barEl.classList.add('warning');
+        }
+
+        function _countdownTickFn() {
+            const s = _latestSession;
+            if (!s || (s.state !== 'running' && s.state !== 'paused')) return;
+            const remaining = getRemainingMs(s);
+            const txt = formatCountdown(remaining);
+            const runText = $('countdown-text');
+            const pausedText = $('paused-countdown-text');
+            if (runText) runText.textContent = txt;
+            if (pausedText) pausedText.textContent = txt;
+            applyCountdownStyle($('countdown-bar-running'), remaining, false);
+            // Auto-end (host-only, running-only, fires once)
+            if (s.state === 'running' && remaining <= 0 && !_autoEndingNow
+                && myProfile && s.hostUid === myProfile.userId) {
+                _autoEndingNow = true;
+                autoEndSession().finally(() => { _autoEndingNow = false; });
+            }
+        }
+        function ensureCountdownTick() {
+            // Always repaint immediately — covers paused→running transitions where the
+            // interval was already running (otherwise the user sees --:-- for up to 1s).
+            _countdownTickFn();
+            if (!_countdownTick) {
+                _countdownTick = setInterval(_countdownTickFn, 1000);
+            }
+        }
+
+        function stopCountdownTick() {
+            if (_countdownTick) { clearInterval(_countdownTick); _countdownTick = null; }
+        }
+
+        async function pauseSession() {
+            if (!_latestSession || _latestSession.state !== 'running') return;
+            if (!myProfile || _latestSession.hostUid !== myProfile.userId) return;
+            const t = _latestSession.timer || {};
+            const startMs = (t.startedAt && t.startedAt.toMillis) ? t.startedAt.toMillis() : Date.now();
+            const elapsed = Math.max(0, Date.now() - startMs);
+            const newAccum = (t.accumulatedActiveMs || 0) + elapsed;
+            try {
+                await db.collection("exam_sessions").doc(mySessionId).update({
+                    state: 'paused',
+                    'timer.accumulatedActiveMs': newAccum,
+                    'timer.pausedAt': firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } catch (e) {
+                console.error('pauseSession error:', e);
+                alert('Could not pause: ' + (e.message || e));
+            }
+        }
+
+        async function resumeSession() {
+            if (!_latestSession || _latestSession.state !== 'paused') return;
+            if (!myProfile || _latestSession.hostUid !== myProfile.userId) return;
+            try {
+                await db.collection("exam_sessions").doc(mySessionId).update({
+                    state: 'running',
+                    'timer.startedAt': firebase.firestore.FieldValue.serverTimestamp(),
+                    'timer.pausedAt': null
+                });
+            } catch (e) {
+                console.error('resumeSession error:', e);
+                alert('Could not resume: ' + (e.message || e));
+            }
+        }
+
+        // Auto-end at 00:00 — host's tab triggers this. Locks finalAnswers for the current
+        // and any unreached questions using the current vote tally (Phase 3.2.b will replace
+        // the lowest-index tie-break inside computeMajorityWinner). Unreached questions get
+        // null winner / empty tally, which Phase 4 reads as "skipped".
+        async function autoEndSession() {
+            const s = _latestSession;
+            const quiz = _quizCache;
+            if (!s || !quiz) return;
+            const questions = Array.isArray(quiz.questions) ? quiz.questions : [];
+            const votes = s.votes || {};
+            const finalAnswers = Object.assign({}, s.finalAnswers || {});
+            const fromIdx = s.currentIdx || 0;
+            for (let i = fromIdx; i < questions.length; i++) {
+                if (finalAnswers[i]) continue;
+                const { tally, totalVotes } = tallyVotes(votes[i] || {});
+                const winner = computeMajorityWinner(tally); // null when no votes
+                finalAnswers[i] = { winner, tally, totalVotes };
+            }
+            try {
+                await db.collection("exam_sessions").doc(mySessionId).update({
+                    state: 'done',
+                    completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    autoEnded: true,
+                    finalAnswers
+                });
+            } catch (e) {
+                console.error('autoEndSession error:', e);
+            }
+        }
+
         function startHeartbeat() {
             if (_heartbeatTimer) return;
             const tick = async () => {
@@ -1286,6 +1552,7 @@
         // Cleanup on tab close
         window.addEventListener('beforeunload', () => {
             stopHeartbeat();
+            stopCountdownTick();
             if (_sessionUnsub) _sessionUnsub();
         });
 
