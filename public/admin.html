@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.60</title>
+    <title>Nika V92.61</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -11095,14 +11095,15 @@
                     const d = await resp.json();
                     if (!d.choices?.[0]) throw new Error(d.error?.message || `Together API error (status ${resp.status})`);
                     return { text: d.choices[0].message.content, tokens: d.usage?.total_tokens || 0, model: modelName };
-                } else if (modelName.includes('typhoon') && window.TYPHOON_API_KEY) {
+                } else if (modelName.includes('typhoon') && window.TYPHOON_API_KEY && !window.TYPHOON_API_KEY.includes('__')) {
                     const resp = await fetch('https://api.opentyphoon.ai/v1/chat/completions', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.TYPHOON_API_KEY}` },
                         body: JSON.stringify({ model: modelName, messages: [{role: 'user', content: prompt}], temperature: 0.4 })
                     });
                     const d = await resp.json();
-                    if (!d.choices?.[0]) throw new Error(d.error?.message || `Typhoon API error (status ${resp.status})`);
+                    // OpenTyphoon 401/403 returns FastAPI-shape `{detail: "..."}`, not OpenAI's `{error: {message: "..."}}` — fall through both shapes.
+                    if (!d.choices?.[0]) throw new Error(d.detail || d.error?.message || `Typhoon API error (status ${resp.status})`);
                     return { text: d.choices[0].message.content, tokens: d.usage?.total_tokens || 0, model: modelName };
                 } else if ((modelName.includes('glm-5.1') || modelName.includes('ollama')) && (window.OLLAMA_API_KEY || window.OLLAMA_ENDPOINT)) {
                     const resp = await fetch(`${window.OLLAMA_ENDPOINT}/chat/completions`, {
