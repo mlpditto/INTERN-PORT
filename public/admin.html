@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.59</title>
+    <title>Nika V92.60</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4726,7 +4726,7 @@
     <!-- V91.84: cache-busting on case-taxonomy.js so browser refetches when shim changes (script URL is otherwise constant) -->
     <script src="case-taxonomy.js?v=V91.84"></script>
     <!-- V91.98 fix: walker skips user-content subtrees (q-text-preview / md-render / lang-no-toggle) -->
-    <script src="lang-toggle.js?v=V94.29"></script>
+    <script src="lang-toggle.js?v=V94.30"></script>
 </head>
 
 <body>
@@ -20009,7 +20009,7 @@ async function saveQuiz() {
                                     gdriveBackupError: String(backupErr?.message || backupErr || '').slice(0, 200),
                                     gdriveBackupFolderId: backupFolderId || ''
                                 });
-                                showToast('⚠️ Saved to Firebase แต่สำรอง Google Drive ไม่สำเร็จ', 'warning');
+                                showToast('⚠️ Saved to Firebase, but Google Drive backup failed สำรอง Google Drive ไม่สำเร็จ', 'warning');
                             }
                         }
 
@@ -22642,7 +22642,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
                     const bonus = parseFloat(String(input).trim());
                     if (!Number.isFinite(bonus) || bonus < 0) {
-                        alert('กรุณากรอกคะแนนเป็นตัวเลข 0 ขึ้นไป');
+                        alert('Please enter a score (0 or higher).');
                         return;
                     }
 
@@ -28189,13 +28189,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         async function delQ(id) { if (confirm("Del?")) await db.collection("quests").doc(id).delete(); }
 
         async function closeQuest(id) {
-            if (!confirm("ปิด Quest นี้และย้ายไป Done?\n\nผู้ที่ยังไม่ได้ submit จะไม่สามารถส่งงานได้อีก")) return;
+            if (!confirm("Close this Quest and move it to Done?\n\nUsers who haven't submitted will no longer be able to submit.")) return;
             try {
                 await db.collection("quests").doc(id).update({
                     status: 'closed',
                     closedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                showToast("✅ Quest ปิดแล้ว → Done");
+                showToast("✅ Quest closed → Done ปิดแล้ว");
             } catch (e) { alert("Error: " + e.message); }
         }
         function drawCertificate(ctx, name, dates, awards, level, score) {
@@ -32184,7 +32184,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         // Mirrors deleteReflectiveLog: also reverts the +0.1 autoScore granted at submit time
         // and any adminBonus already awarded. Hard-deletes the submission doc.
         async function deleteLearningNote(id) {
-            if (!confirm('Delete this Learning Note submission? คะแนนที่เคยให้ (autoScore + adminBonus) จะถูกลบอัตโนมัติ')) return;
+            if (!confirm('Delete this Learning Note submission? Any awarded scores (autoScore + adminBonus) will be removed automatically.')) return;
             try {
                 const ref = db.collection("submissions").doc(id);
                 const snap = await ref.get();
@@ -32223,7 +32223,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         }
 
         async function deleteReflectiveLog(id) {
-            if (!confirm('Delete this reflective log? คะแนนที่เคยให้จาก log นี้จะถูกลบอัตโนมัติ')) return;
+            if (!confirm('Delete this reflective log? Any scores awarded from this log will be removed automatically.')) return;
 
             try {
                 const logRef = db.collection("reflective_logs").doc(id);
@@ -32485,12 +32485,12 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             
             // Validate score
             if (newScore < 0 || newScore > 2.0) {
-                showToast("⚠️ คะแนนต้องอยู่ระหว่าง 0 ถึง 2.0", "error");
+                showToast("⚠️ Score must be between 0 and 2.0 คะแนนต้องอยู่ระหว่าง", "error");
                 return;
             }
             
             if (!reason) {
-                showToast("⚠️ กรุณาระบุเหตุผลการปรับคะแนน", "error");
+                showToast("⚠️ Please specify a reason for the adjustment กรุณาระบุเหตุผลการปรับคะแนน", "error");
                 return;
             }
             
@@ -32526,11 +32526,11 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 // Clear form
                 document.getElementById('score-adjustment-reason').value = '';
                 
-                showToast(`✅ ปรับคะแนนเป็น +${newScore} เรียบร้อย`, "success");
+                showToast(`✅ Score adjusted to +${newScore} ปรับคะแนนเรียบร้อย`, "success");
                 
             } catch (error) {
                 console.error("Error adjusting score:", error);
-                showToast("❌ ไม่สามารถปรับคะแนนได้ กรุณาลองใหม่", "error");
+                showToast("❌ Could not adjust score — please try again ไม่สามารถปรับคะแนนได้ กรุณาลองใหม่", "error");
             }
         }
 
@@ -32584,7 +32584,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 const reason = document.getElementById('period-adjustment-reason').value.trim();
                 
                 if (!userId) {
-                    showToast("❌ ไม่พบข้อมูล User", "error");
+                    showToast("❌ User data not found ไม่พบข้อมูล", "error");
                     return;
                 }
                 
@@ -32595,12 +32595,12 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     const endDate = document.getElementById('period-end-date').value;
                     
                     if (!startDate || !endDate) {
-                        showToast("❌ กรุณาระบุวันเริ่มต้นและวันสิ้นสุด", "error");
+                        showToast("❌ Please specify start and end dates กรุณาระบุวันเริ่มต้นและวันสิ้นสุด", "error");
                         return;
                     }
                     
                     if (new Date(startDate) > new Date(endDate)) {
-                        showToast("❌ วันเริ่มต้นต้องไม่เกินวันสิ้นสุด", "error");
+                        showToast("❌ Start date must not be after end date วันเริ่มต้นต้องไม่เกินวันสิ้นสุด", "error");
                         return;
                     }
                     
@@ -32638,11 +32638,11 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 closePeriodAdjustmentModal();
                 renderTable('users');
                 
-                showToast(`✅ ${enabled ? 'ตั้งค่า Period' : 'ลบ Period'} เรียบร้อย`, "success");
+                showToast(`✅ ${enabled ? 'Period set ตั้งค่า' : 'Period removed ลบ'} เรียบร้อย`, "success");
                 
             } catch (error) {
                 console.error("Error adjusting period:", error);
-                showToast("❌ ไม่สามารถปรับ Period ได้ กรุณาลองใหม่", "error");
+                showToast("❌ Could not adjust Period — please try again ไม่สามารถปรับ Period ได้ กรุณาลองใหม่", "error");
             }
         }
 
