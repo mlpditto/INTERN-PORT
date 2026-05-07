@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exam Session V3.1 — INTERN-PORT</title>
+    <title>Exam Session V3.2 — INTERN-PORT</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -646,6 +646,93 @@
         }
         .paused-banner i { color: #fbbf24; margin-right: 6px; }
 
+        /* Tie-break banner (Phase 3.2.b — appears between voted-status and choices when host clicks Next on a tied tally) */
+        .tiebreak-banner {
+            background: linear-gradient(135deg, rgba(251, 146, 60, 0.12), rgba(251, 191, 36, 0.1));
+            border: 1.5px solid rgba(251, 146, 60, 0.45);
+            border-radius: 14px;
+            padding: 14px 16px;
+            margin-bottom: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .tiebreak-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .tiebreak-title {
+            font-weight: 800;
+            color: #fdba74;
+            font-size: 0.95em;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .tiebreak-title i { color: #fb923c; }
+        .tiebreak-countdown {
+            font-family: ui-monospace, "JetBrains Mono", "Menlo", monospace;
+            font-weight: 800;
+            font-size: 1em;
+            color: #fdba74;
+            background: rgba(15, 23, 42, 0.5);
+            padding: 4px 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(251, 146, 60, 0.3);
+        }
+        .tiebreak-countdown.urgent { color: #fca5a5; border-color: rgba(239, 68, 68, 0.45); }
+        .tiebreak-info {
+            font-size: 0.85em;
+            color: #fde68a;
+            line-height: 1.5;
+        }
+        .tiebreak-picks {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .tiebreak-pick-btn {
+            background: rgba(251, 146, 60, 0.18);
+            border: 1.5px solid rgba(251, 146, 60, 0.5);
+            color: #fed7aa;
+            padding: 9px 14px;
+            border-radius: 10px;
+            font-weight: 800;
+            font-size: 0.86em;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.1s;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+        }
+        .tiebreak-pick-btn:hover { background: rgba(251, 146, 60, 0.3); }
+        .tiebreak-pick-btn:active { transform: scale(0.97); }
+        .tiebreak-pick-btn .pick-letter {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(251, 146, 60, 0.4);
+            color: #fff7ed;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85em;
+        }
+
+        /* When tie-break is active, lock the choice cards visually (vote writes are blocked in JS too) */
+        .choices-grid.tiebreak-locked .choice-card {
+            cursor: not-allowed;
+            opacity: 0.78;
+        }
+        .choices-grid.tiebreak-locked .choice-card:hover {
+            border-color: rgba(148, 163, 184, 0.18);
+            background: transparent;
+        }
+
         .hidden { display: none !important; }
 
         @media (max-width: 600px) {
@@ -663,7 +750,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <span class="badge"><i class="fa-solid fa-graduation-cap"></i> Exam Session V3.1</span>
+            <span class="badge"><i class="fa-solid fa-graduation-cap"></i> Exam Session V3.2</span>
             <h1 id="page-title">Exam Session</h1>
             <p class="subtitle">Group exam · Real-time sync · INTERN-PORT</p>
         </div>
@@ -735,6 +822,9 @@
                 <i class="fa-solid fa-circle-info"></i>
                 <span id="voted-status-text">Click a choice to cast your vote.</span>
             </div>
+
+            <!-- Tie-break banner (Phase 3.2.b — populated by JS when session.tieBreak is set; hidden otherwise) -->
+            <div class="tiebreak-banner hidden" id="tiebreak-banner"></div>
 
             <div class="choices-grid" id="choices-grid"></div>
 
@@ -820,16 +910,17 @@
         </div>
 
         <div class="footer">
-            INTERN-PORT · Exam Session V3.1 · Phase 3.2.a (Timer + Pause/Resume + Auto-end)<br>
+            INTERN-PORT · Exam Session V3.2 · Phase 3.2.b (Tie-break + 60s AFK fallback)<br>
             <code>2008959998-4ty7kBq2</code>
         </div>
     </div>
 
     <script>
-        // V3.1 Phase 3.2.a: server-validated countdown timer + Pause/Resume + auto-end.
-        // Trust `timer.startedAt` (server timestamp) and tick locally with Date.now() — drift
-        // is sub-second over a 30-min exam. Phase 3.2.b will replace the lowest-index tie-
-        // break placeholder with proper host-pick + 60s AFK fallback. Phase 4 persists scores.
+        // V3.2 Phase 3.2.b: vote-integrity. Replaces the lowest-index tie placeholder with
+        // host-pick + 60s AFK fallback to first-vote-wins. Vote schema upgraded to per-vote
+        // {c, t} objects (backward-compat reads number too). Tie-break state lives on the
+        // session doc so all clients sync; only host's tab fires the fallback at 60s. Phase
+        // 3.3 = reconnection polish, Phase 4 = score persistence.
         const EXAM_SESSION_LIFF_ID = "2008959998-4ty7kBq2";
         const HEARTBEAT_INTERVAL_MS = 10000;     // 10s
         const ONLINE_THRESHOLD_MS = 30000;       // <30s = online
@@ -880,6 +971,8 @@
         let _quizFetchPromise = null;
         let _countdownTick = null;   // 1s interval for countdown UI (Phase 3.2.a)
         let _autoEndingNow = false;  // host-side race guard for auto-end at 00:00
+        let _afkFiringNow = false;   // host-side race guard for tie-break AFK fallback at 60s (Phase 3.2.b)
+        const TIEBREAK_AFK_MS = 60000; // 60s window for host to pick before first-vote-wins fires
 
         function getSessionIdFromUrl() {
             try {
@@ -1104,28 +1197,56 @@
             }
         }
 
-        // V3.0: count votes per choice index. Returns { tally: {0:n, 1:n, ...}, totalVotes }.
+        // V3.2 Phase 3.2.b: vote schema is per-vote {c, t} object; legacy number-only votes
+        // (pre-V3.2) read as {c: n, t: 0} so they sort earliest under first-vote-wins.
+        function getVoteChoice(v) {
+            if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+            if (v && typeof v.c === 'number') return v.c;
+            return null;
+        }
+        function getVoteTime(v) {
+            if (v && typeof v.t === 'number') return v.t;
+            return 0;
+        }
+
+        // V3.0 (updated V3.2): count votes per choice index. Returns { tally: {0:n, ...}, totalVotes }.
         function tallyVotes(votesForQ) {
             const tally = {};
             let totalVotes = 0;
-            Object.values(votesForQ || {}).forEach(choice => {
-                const c = Number(choice);
-                if (!Number.isFinite(c)) return;
+            Object.values(votesForQ || {}).forEach(v => {
+                const c = getVoteChoice(v);
+                if (c == null) return;
                 tally[c] = (tally[c] || 0) + 1;
                 totalVotes++;
             });
             return { tally, totalVotes };
         }
 
-        // V3.0: pick winner from a tally. On tie, returns the lowest choice index — this is
-        // a placeholder that Phase 3.2.b will replace with proper host-pick + AFK fallback to
-        // first-vote-wins. Returns null if no votes were cast at all (host advancing on an
-        // empty question).
+        // V3.2 Phase 3.2.b: returns { winner, tied, tiedChoices }. Caller decides what to do
+        // when tied — host gets a picker UI, AFK fallback after 60s picks first-vote-wins.
+        // Returns winner=null+tied=false when no votes at all.
         function computeMajorityWinner(tally) {
             const entries = Object.entries(tally).map(([k, v]) => [Number(k), v]);
-            if (entries.length === 0) return null;
-            entries.sort((a, b) => (b[1] - a[1]) || (a[0] - b[0])); // by count desc, then idx asc
-            return entries[0][0];
+            if (entries.length === 0) return { winner: null, tied: false, tiedChoices: [] };
+            const maxCount = Math.max.apply(null, entries.map(e => e[1]));
+            const top = entries.filter(e => e[1] === maxCount).map(e => e[0]).sort((a, b) => a - b);
+            if (top.length === 1) return { winner: top[0], tied: false, tiedChoices: [] };
+            return { winner: null, tied: true, tiedChoices: top };
+        }
+
+        // First-vote-wins: among tied choices, pick the one whose earliest vote came first.
+        // Used by AFK fallback (host didn't pick in 60s) and by auto-end at 00:00 on tied questions.
+        function pickFirstVoteWins(votesForQ, tiedChoices) {
+            const tied = new Set(tiedChoices);
+            let bestChoice = tiedChoices[0];
+            let bestTime = Infinity;
+            Object.values(votesForQ || {}).forEach(v => {
+                const c = getVoteChoice(v);
+                if (c == null || !tied.has(c)) return;
+                const t = getVoteTime(v);
+                if (t < bestTime) { bestTime = t; bestChoice = c; }
+            });
+            return bestChoice;
         }
 
         async function renderRunning(session) {
@@ -1165,14 +1286,23 @@
             const myUid = myProfile.userId;
             const votesForQ = (session.votes && session.votes[idx]) || {};
             const myVote = votesForQ[myUid];
-            const hasVoted = myVote !== undefined && myVote !== null;
+            const myVoteChoice = getVoteChoice(myVote);
+            const hasVoted = myVoteChoice != null;
             const { tally, totalVotes } = tallyVotes(votesForQ);
             const leadingCount = Object.values(tally).reduce((m, v) => Math.max(m, v), 0);
+
+            // Phase 3.2.b: tie-break is active when session.tieBreak.qIdx matches the current question.
+            const tb = session.tieBreak;
+            const tieActive = !!(tb && tb.qIdx === idx && Array.isArray(tb.tiedChoices) && tb.tiedChoices.length);
+            const tiedSet = tieActive ? new Set(tb.tiedChoices) : null;
 
             // Voted-status banner
             const statusEl = $('voted-status');
             const statusText = $('voted-status-text');
-            if (hasVoted) {
+            if (tieActive) {
+                statusEl.classList.remove('complete');
+                statusText.innerHTML = `<i class="fa-solid fa-scale-balanced"></i> Tie at the top — votes are locked while the host picks the winner.`;
+            } else if (hasVoted) {
                 statusEl.classList.add('complete');
                 statusText.innerHTML = `<i class="fa-solid fa-check"></i> Your vote is locked in. You can change it any time before the host advances.`;
             } else {
@@ -1180,18 +1310,49 @@
                 statusText.innerHTML = `<i class="fa-solid fa-circle-info"></i> Click a choice to cast your vote — group discusses, anyone can change their pick before the host advances.`;
             }
 
-            // Choices
+            const isHost = session.hostUid === myProfile.userId;
             const opts = Array.isArray(q.options) ? q.options : [];
+
+            // Tie-break banner (Phase 3.2.b)
+            const tbBanner = $('tiebreak-banner');
+            if (tieActive) {
+                const pickButtons = isHost
+                    ? `<div class="tiebreak-picks">${tb.tiedChoices.map(ci => `
+                        <button class="tiebreak-pick-btn" onclick="hostPickTieBreak(${ci})">
+                            <span class="pick-letter">${String.fromCharCode(65 + ci)}</span>
+                            Pick ${escapeHtml(opts[ci] || `Choice ${String.fromCharCode(65 + ci)}`)} wins
+                        </button>`).join('')}</div>`
+                    : '';
+                const labels = tb.tiedChoices.map(ci => String.fromCharCode(65 + ci)).join(' / ');
+                const infoText = isHost
+                    ? `Pick a winner below. If no pick within 60s, first-vote-wins fires automatically (whichever tied option received its earliest vote first).`
+                    : `Waiting for host (${escapeHtml(session.hostName || 'host')}) to pick the winner. If no pick within 60s, the option with the earliest vote wins automatically.`;
+                tbBanner.classList.remove('hidden');
+                tbBanner.innerHTML = `
+                    <div class="tiebreak-header">
+                        <span class="tiebreak-title"><i class="fa-solid fa-scale-balanced"></i> Tie at <strong>${labels}</strong></span>
+                        <span class="tiebreak-countdown" id="tiebreak-countdown-text">--</span>
+                    </div>
+                    <div class="tiebreak-info">${infoText}</div>
+                    ${pickButtons}`;
+            } else {
+                tbBanner.classList.add('hidden');
+                tbBanner.innerHTML = '';
+            }
+
+            // Choices
             const grid = $('choices-grid');
+            grid.classList.toggle('tiebreak-locked', tieActive);
             grid.innerHTML = opts.map((opt, i) => {
-                const isVoted = myVote === i;
+                const isVoted = myVoteChoice === i;
                 const count = tally[i] || 0;
                 const isLeading = count > 0 && count === leadingCount;
+                const isTied = tiedSet && tiedSet.has(i);
                 const tallyClass = `choice-tally ${count > 0 ? 'has-votes' : ''} ${isLeading ? 'is-leading' : ''}`.trim();
 
                 // Voter chips per choice — small avatars of who voted this option
                 const voters = Object.entries(votesForQ)
-                    .filter(([, c]) => Number(c) === i)
+                    .filter(([, v]) => getVoteChoice(v) === i)
                     .map(([uid]) => session.participants[uid])
                     .filter(Boolean);
                 const votersHtml = voters.map(p => {
@@ -1200,24 +1361,23 @@
                     return `<span class="voter-chip" title="${name}">${pic ? `<img src="${pic}" alt="">` : ''}${name}</span>`;
                 }).join('');
 
+                const onClick = tieActive ? '' : `onclick="voteOnQuestion(${i})"`;
                 return `
-                <button type="button" class="choice-card ${isVoted ? 'voted' : ''}" onclick="voteOnQuestion(${i})">
-                    <span class="choice-letter">${String.fromCharCode(65 + i)}</span>
+                <button type="button" class="choice-card ${isVoted ? 'voted' : ''}" ${onClick} ${tieActive ? 'aria-disabled="true"' : ''}>
+                    <span class="choice-letter">${String.fromCharCode(65 + i)}${isTied ? ' ⚖' : ''}</span>
                     <span class="choice-text">${escapeHtml(opt)}</span>
                     <span class="${tallyClass}"><i class="fa-solid fa-user-check"></i> ${count}</span>
                     ${votersHtml ? `<div class="voters-row">${votersHtml}</div>` : ''}
                 </button>`;
             }).join('');
 
-            const isHost = session.hostUid === myProfile.userId;
-
-            // Countdown bar — Pause button (host only)
+            // Countdown bar — Pause button (host only, hidden during tie-break to focus host on the pick)
             const countdownHostBox = $('countdown-host-controls');
-            countdownHostBox.innerHTML = isHost
+            countdownHostBox.innerHTML = (isHost && !tieActive)
                 ? `<button class="btn-pause" onclick="pauseSession()"><i class="fa-solid fa-pause"></i> Pause</button>`
                 : '';
 
-            // Host controls
+            // Host controls — Next is disabled during tie-break (resolution comes from tieBreak picker)
             const hostBox = $('host-controls');
             if (isHost) {
                 const isLast = idx >= questions.length - 1;
@@ -1225,16 +1385,22 @@
                     ? '<i class="fa-solid fa-flag-checkered"></i> Finish Session'
                     : '<i class="fa-solid fa-forward"></i> Next Question';
                 const noVotesYet = totalVotes === 0;
+                const advanceDisabled = noVotesYet || tieActive;
+                const tail = tieActive
+                    ? 'Tie-break in progress — pick a winner above (or wait for the 60s AFK fallback).'
+                    : (noVotesYet
+                        ? 'Wait for at least one vote before advancing.'
+                        : (isLast ? 'This is the last question — clicking Finish ends the session.' : 'Advancing locks the current tally as the group answer.'));
                 hostBox.innerHTML = `
                     <button class="btn btn-danger" onclick="endSession()">
                         <i class="fa-solid fa-stop"></i> End Now
                     </button>
-                    <button class="btn btn-primary" id="btn-advance-q" onclick="advanceQuestion()" ${noVotesYet ? 'disabled' : ''}>
+                    <button class="btn btn-primary" id="btn-advance-q" onclick="advanceQuestion()" ${advanceDisabled ? 'disabled' : ''}>
                         ${nextLabel}
                     </button>
                     <div class="info-banner">
                         <strong>Host controls.</strong> Tally: ${totalVotes} vote${totalVotes === 1 ? '' : 's'} of ${participants.length} participant${participants.length === 1 ? '' : 's'}.
-                        ${noVotesYet ? 'Wait for at least one vote before advancing.' : (isLast ? 'This is the last question — clicking Finish ends the session.' : 'On tie, the lowest choice index wins for now (Phase 3.2.b will add proper host-pick + 60s AFK fallback).')}
+                        ${tail}
                     </div>`;
             } else {
                 hostBox.innerHTML = `
@@ -1262,11 +1428,14 @@
 
         async function voteOnQuestion(choiceIdx) {
             if (!_latestSession || _latestSession.state !== 'running') return;
+            // Phase 3.2.b: votes are locked while host is breaking a tie on this question.
+            const tb = _latestSession.tieBreak;
+            if (tb && tb.qIdx === (_latestSession.currentIdx || 0)) return;
             const myUid = myProfile.userId;
             const idx = _latestSession.currentIdx || 0;
             try {
                 await db.collection("exam_sessions").doc(mySessionId).update({
-                    [`votes.${idx}.${myUid}`]: choiceIdx
+                    [`votes.${idx}.${myUid}`]: { c: choiceIdx, t: Date.now() }
                 });
                 // Listener will re-render; no need to re-render manually here.
             } catch (e) {
@@ -1289,14 +1458,32 @@
             const { tally, totalVotes } = tallyVotes(votesForQ);
             if (totalVotes === 0) return alert('No votes cast yet.');
 
-            const winner = computeMajorityWinner(tally);
-            const isLast = idx >= questions.length - 1;
+            const result = computeMajorityWinner(tally);
 
+            // Phase 3.2.b: if tied, write tieBreak state and bail. The listener will re-render
+            // with the picker UI; host picks (or 60s AFK fires the fallback) → finalAnswers.
+            if (result.tied) {
+                try {
+                    await db.collection("exam_sessions").doc(mySessionId).update({
+                        tieBreak: {
+                            qIdx: idx,
+                            tiedChoices: result.tiedChoices,
+                            startedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }
+                    });
+                } catch (e) {
+                    console.error('initiate tieBreak error:', e);
+                    alert('Could not start tie-break: ' + (e.message || e));
+                }
+                return;
+            }
+
+            const isLast = idx >= questions.length - 1;
             const btn = $('btn-advance-q');
             if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
 
             const update = {
-                [`finalAnswers.${idx}`]: { winner, tally, totalVotes }
+                [`finalAnswers.${idx}`]: { winner: result.winner, tally, totalVotes, brokenBy: 'majority' }
             };
             if (isLast) {
                 update.state = 'done';
@@ -1312,6 +1499,56 @@
                 console.error('advanceQuestion error:', e);
                 alert('Could not advance: ' + e.message);
                 if (btn) { btn.disabled = false; }
+            }
+        }
+
+        // Phase 3.2.b: host clicks one of the tied-choice buttons → write finalAnswers, clear
+        // tieBreak, advance (or finish if last question).
+        async function hostPickTieBreak(choiceIdx) {
+            const s = _latestSession;
+            if (!s || !s.tieBreak) return;
+            if (s.hostUid !== myProfile.userId) return;
+            const idx = s.tieBreak.qIdx;
+            const votesForQ = (s.votes && s.votes[idx]) || {};
+            const { tally, totalVotes } = tallyVotes(votesForQ);
+            await _resolveTieBreak(idx, choiceIdx, tally, totalVotes, 'host');
+        }
+
+        // Phase 3.2.b: 60s AFK fallback fires from the host's tab tick. Picks first-vote-wins
+        // among the tied choices (deterministic, fair: whoever cast the earliest vote on a
+        // tied option wins it for the group).
+        async function autoFallbackTieBreak() {
+            const s = _latestSession;
+            if (!s || !s.tieBreak) return;
+            if (s.hostUid !== myProfile.userId) return;
+            const idx = s.tieBreak.qIdx;
+            const tied = Array.isArray(s.tieBreak.tiedChoices) ? s.tieBreak.tiedChoices : [];
+            if (!tied.length) return;
+            const votesForQ = (s.votes && s.votes[idx]) || {};
+            const { tally, totalVotes } = tallyVotes(votesForQ);
+            const winner = pickFirstVoteWins(votesForQ, tied);
+            await _resolveTieBreak(idx, winner, tally, totalVotes, 'afk-fallback');
+        }
+
+        async function _resolveTieBreak(idx, winner, tally, totalVotes, brokenBy) {
+            const quiz = _quizCache;
+            const questions = Array.isArray(quiz && quiz.questions) ? quiz.questions : [];
+            const isLast = idx >= questions.length - 1;
+            const update = {
+                [`finalAnswers.${idx}`]: { winner, tally, totalVotes, brokenBy },
+                tieBreak: firebase.firestore.FieldValue.delete()
+            };
+            if (isLast) {
+                update.state = 'done';
+                update.completedAt = firebase.firestore.FieldValue.serverTimestamp();
+            } else {
+                update.currentIdx = idx + 1;
+            }
+            try {
+                await db.collection("exam_sessions").doc(mySessionId).update(update);
+            } catch (e) {
+                console.error('_resolveTieBreak error:', e);
+                alert('Could not save winner: ' + (e.message || e));
             }
         }
 
@@ -1442,6 +1679,22 @@
                 _autoEndingNow = true;
                 autoEndSession().finally(() => { _autoEndingNow = false; });
             }
+            // Phase 3.2.b: tie-break 60s AFK countdown (host-only fallback fires once)
+            const tb = s.tieBreak;
+            if (tb && tb.startedAt && tb.startedAt.toMillis && tb.qIdx === (s.currentIdx || 0)) {
+                const tbElapsed = Date.now() - tb.startedAt.toMillis();
+                const tbRemaining = Math.max(0, TIEBREAK_AFK_MS - tbElapsed);
+                const tbEl = $('tiebreak-countdown-text');
+                if (tbEl) {
+                    tbEl.textContent = `${Math.ceil(tbRemaining / 1000)}s`;
+                    tbEl.classList.toggle('urgent', tbRemaining <= 10000);
+                }
+                if (tbRemaining <= 0 && !_afkFiringNow && s.state === 'running'
+                    && myProfile && s.hostUid === myProfile.userId) {
+                    _afkFiringNow = true;
+                    autoFallbackTieBreak().finally(() => { _afkFiringNow = false; });
+                }
+            }
         }
         function ensureCountdownTick() {
             // Always repaint immediately — covers paused→running transitions where the
@@ -1491,9 +1744,9 @@
         }
 
         // Auto-end at 00:00 — host's tab triggers this. Locks finalAnswers for the current
-        // and any unreached questions using the current vote tally (Phase 3.2.b will replace
-        // the lowest-index tie-break inside computeMajorityWinner). Unreached questions get
-        // null winner / empty tally, which Phase 4 reads as "skipped".
+        // and any unreached questions using the current vote tally. Tied questions get
+        // resolved via first-vote-wins (Phase 3.2.b) instead of stalling on a tie picker —
+        // there's no time left for human intervention. Unreached questions get null winner.
         async function autoEndSession() {
             const s = _latestSession;
             const quiz = _quizCache;
@@ -1504,15 +1757,25 @@
             const fromIdx = s.currentIdx || 0;
             for (let i = fromIdx; i < questions.length; i++) {
                 if (finalAnswers[i]) continue;
-                const { tally, totalVotes } = tallyVotes(votes[i] || {});
-                const winner = computeMajorityWinner(tally); // null when no votes
-                finalAnswers[i] = { winner, tally, totalVotes };
+                const votesForQ = votes[i] || {};
+                const { tally, totalVotes } = tallyVotes(votesForQ);
+                const result = computeMajorityWinner(tally);
+                let winner, brokenBy;
+                if (result.tied) {
+                    winner = pickFirstVoteWins(votesForQ, result.tiedChoices);
+                    brokenBy = 'auto-end-fvw';
+                } else {
+                    winner = result.winner; // null when no votes
+                    brokenBy = totalVotes === 0 ? 'skipped' : 'majority';
+                }
+                finalAnswers[i] = { winner, tally, totalVotes, brokenBy };
             }
             try {
                 await db.collection("exam_sessions").doc(mySessionId).update({
                     state: 'done',
                     completedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     autoEnded: true,
+                    tieBreak: firebase.firestore.FieldValue.delete(),
                     finalAnswers
                 });
             } catch (e) {
