@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.36)</title>
+    <title>Internship Portfolio (V94.37)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3498,6 +3498,7 @@
             </div>
 
             <label style="font-weight:bold; display:block; margin-bottom:5px;">🎯 Next quiz topic? <span style="font-weight:normal; color:#94a3b8; font-size:0.85em;">optional ไม่บังคับ</span></label>
+            <div id="fb-topic-chip-rail" style="display:none; flex-wrap:wrap; gap:6px; margin-bottom:6px;"></div>
             <input type="text" id="fb-next-topic" placeholder="e.g. dispensing workflow, case management..." data-th-placeholder="เช่น ขั้นตอนการจ่ายยา, การดูแลเคส..."
                 style="width:100%;">
 
@@ -6858,6 +6859,7 @@
                     document.getElementById('fb-next-topic').value = "";
                     document.getElementById('fb-comment').value = "";
                     updateFeedbackCommentCounter();
+                    renderFeedbackTopicChips();
 
                     setTimeout(() => {
                         document.getElementById('quizFeedbackModal').style.display = 'flex';
@@ -6962,6 +6964,51 @@
         //   - Optional comment (no 100-char gate); counter is informational only.
         //   - Optional nextTopic (no required-field gate).
         //   - Modal has × close + "Maybe later" via closeFeedbackModal().
+        // V94.37 Phase B: Dynamic topic chip rail above fb-next-topic.
+        //   - Aggregate quiz `tags` CSV across quizzesCache, render top 6.
+        //   - Chip click replaces fb-next-topic with the tag (single-select).
+        //   - Hidden when catalog has 0 tags.
+        function renderFeedbackTopicChips() {
+            const rail = document.getElementById('fb-topic-chip-rail');
+            if (!rail) return;
+            const counts = {};
+            (quizzesCache || []).forEach(q => {
+                if (!q || !q.tags) return;
+                String(q.tags).split(',').map(t => t.trim()).filter(Boolean).forEach(t => {
+                    counts[t] = (counts[t] || 0) + 1;
+                });
+            });
+            const top = Object.entries(counts)
+                .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+                .slice(0, 6)
+                .map(([tag]) => tag);
+            if (top.length === 0) {
+                rail.style.display = 'none';
+                rail.innerHTML = '';
+                return;
+            }
+            const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            rail.style.display = 'flex';
+            rail.innerHTML = top.map(tag => {
+                const safe = esc(tag);
+                return `<button type="button" class="fb-topic-chip" data-tag="${safe}" onclick="pickFeedbackTopicChip(this)" style="font-size:0.78em; padding:5px 11px; border-radius:999px; border:1px solid #e0e7ff; background:#eef2ff; color:#4338ca; cursor:pointer; font-weight:600;">${safe}</button>`;
+            }).join('');
+        }
+
+        function pickFeedbackTopicChip(btn) {
+            const tag = btn.getAttribute('data-tag') || '';
+            const input = document.getElementById('fb-next-topic');
+            if (input) input.value = tag;
+            document.querySelectorAll('#fb-topic-chip-rail .fb-topic-chip').forEach(b => {
+                b.style.background = '#eef2ff';
+                b.style.color = '#4338ca';
+                b.style.borderColor = '#e0e7ff';
+            });
+            btn.style.background = '#4361ee';
+            btn.style.color = '#ffffff';
+            btn.style.borderColor = '#4361ee';
+        }
+
         function updateFeedbackCommentCounter() {
             const el = document.getElementById('fb-comment');
             const countEl = document.getElementById('fb-comment-count');
