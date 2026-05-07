@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.53</title>
+    <title>Nika V92.54</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -336,6 +336,18 @@
         }
 
         .alabasta-genmage-model-rail::-webkit-scrollbar { display:none; }
+
+        /* V92.54: Miss Goldenweek design-engine chip rail (sidebar variant — wraps onto multiple rows in 350px column) */
+        .design-engine-chip-rail {
+            display:flex;
+            flex-wrap:wrap;
+            gap:6px;
+            padding:8px;
+            border-radius:18px;
+            border:1px solid rgba(196,181,253,0.65);
+            background:linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(245,243,255,0.88) 100%);
+            box-shadow:inset 0 1px 0 rgba(255,255,255,0.92), 0 6px 18px rgba(124,58,237,0.08);
+        }
 
         .alabasta-genmage-model-chip {
             border:none;
@@ -5468,13 +5480,16 @@
                         <div style="margin-bottom:25px; padding-bottom:20px; border-bottom:1px solid #f1f3f5;">
                             <label style="display:block; font-weight:bold; color:#34495e; font-size:0.85em; margin-bottom:12px; text-transform:uppercase; letter-spacing:1px;">🤖 AI Architecture</label>
                             
-                            <!-- Design Engine -->
+                            <!-- Design Engine — V92.54: select → chip rail with OpenRouter image models -->
                             <div id="hub-ctrl-design-engine">
-                                <select id="design-engine" style="width:100%; padding:12px; border:1.5px solid #eee; border-radius:14px; font-size:0.95em; color:var(--primary); font-weight:bold; cursor:pointer; outline:none; background:#f9fbff;" onchange="if(document.getElementById('design-engine-inline')) document.getElementById('design-engine-inline').value = this.value;">
-                                    <option value="imagen">Google Vertex AI (Imagen 3)</option>
-                                    <option value="imagen-nano">Google Imagen 3 Fast</option>
-                                    <option value="dalle">OpenAI DALL-E 3</option>
-                                </select>
+                                <div class="design-engine-chip-rail" role="radiogroup" aria-label="AI Architecture (Image Engine)">
+                                    <button type="button" class="alabasta-genmage-model-chip active" data-value="imagen" onclick="selectDesignEngine(this)" title="Highest quality, slower · 최고 품질, 느림.">🚀 Vertex Imagen 3 · premium</button>
+                                    <button type="button" class="alabasta-genmage-model-chip" data-value="imagen-nano" onclick="selectDesignEngine(this)" title="Fastest and cheapest, lower fidelity · 가장 빠르고 저렴, 충실도 낮음.">⚡ Imagen 3 Fast</button>
+                                    <button type="button" class="alabasta-genmage-model-chip" data-value="dalle" onclick="selectDesignEngine(this)" title="OpenAI DALL-E 3.">🎨 OpenAI DALL-E 3</button>
+                                    <button type="button" class="alabasta-genmage-model-chip" data-value="or/openai/gpt-5.4-image-2" onclick="selectDesignEngine(this)" title="OpenRouter — OpenAI GPT-5.4 Image 2 · 최신 GPT 이미지 모델.">🆕 GPT-5.4 Image 2 · 최신</button>
+                                    <button type="button" class="alabasta-genmage-model-chip" data-value="or/google/gemini-3.1-flash-image-preview" onclick="selectDesignEngine(this)" title="OpenRouter — Google Gemini 3.1 Flash Image (Nano Banana 2) · 최신 Google 이미지 모델.">🍌 Nano Banana 2 · 최신</button>
+                                </div>
+                                <input type="hidden" id="design-engine" value="imagen">
                             </div>
 
                             <!-- Research Model -->
@@ -5585,13 +5600,16 @@
                                         style="height:150px; border-radius:24px; border:2px solid #f1f3f5; background:#f9fbff; padding:25px; font-size:1.1em; width:100%; box-sizing:border-box; outline:none; transition:0.3s; resize:none;"></textarea>
                                     
                                     <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:15px; background:#f8fafc; padding:15px 20px; border-radius:20px; border:1px solid #edf2f7;">
-                                        <div style="display:flex; align-items:center; gap:12px;">
-                                            <i class="fa-solid fa-microchip" style="color:#94a3b8;"></i>
-                                            <select id="design-engine-inline" style="padding:10px 15px; border-radius:14px; border:1.5px solid #e2e8f0; background:white; font-size:0.9em; font-weight:700; color:#1e293b; outline:none; cursor:pointer;" onchange="document.getElementById('design-engine').value = this.value">
-                                                <option value="imagen">🚀 Google Vertex (Imagen 3)</option>
-                                                <option value="imagen-nano">⚡ Vertex (Imagen Fast)</option>
-                                                <option value="dalle">🎨 OpenAI (DALL-E 3)</option>
-                                            </select>
+                                        <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
+                                            <i class="fa-solid fa-microchip" style="color:#94a3b8; flex-shrink:0;"></i>
+                                            <!-- V92.54: select → quick chip rail; the canonical state lives in the hidden #design-engine input above -->
+                                            <div class="alabasta-genmage-quick-rail" role="radiogroup" aria-label="Engine quick switch">
+                                                <button type="button" class="alabasta-genmage-quick-chip active" data-value="imagen" onclick="selectDesignEngineByValue('imagen')" title="Vertex Imagen 3">🚀 Imagen 3</button>
+                                                <button type="button" class="alabasta-genmage-quick-chip" data-value="imagen-nano" onclick="selectDesignEngineByValue('imagen-nano')" title="Imagen 3 Fast">⚡ Fast</button>
+                                                <button type="button" class="alabasta-genmage-quick-chip" data-value="dalle" onclick="selectDesignEngineByValue('dalle')" title="OpenAI DALL-E 3">🎨 DALL-E 3</button>
+                                                <button type="button" class="alabasta-genmage-quick-chip" data-value="or/openai/gpt-5.4-image-2" onclick="selectDesignEngineByValue('or/openai/gpt-5.4-image-2')" title="GPT-5.4 Image 2 · 최신">🆕 GPT-5.4 Image 2</button>
+                                                <button type="button" class="alabasta-genmage-quick-chip" data-value="or/google/gemini-3.1-flash-image-preview" onclick="selectDesignEngineByValue('or/google/gemini-3.1-flash-image-preview')" title="Nano Banana 2 · 최신">🍌 Nano Banana 2</button>
+                                            </div>
                                         </div>
                                         <button class="magic-btn" id="btn-generate-design" style="border-radius:50px; padding:12px 35px; font-size:1em; background:linear-gradient(45deg, #4361ee, #4895ef); box-shadow:0 10px 20px rgba(67,97,238,0.25); border:none; color:white; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:10px; height:48px;" onclick="generateAIDesign()">
                                             <i class="fa-solid fa-wand-magic-sparkles"></i> Create Masterpiece
@@ -12243,6 +12261,44 @@
                 promptInput.placeholder = "Describe the image you want to create...";
             }
         };
+
+        // V92.54: chip-rail helpers for the design engine selector (sidebar + inline quick rail).
+        // Canonical state lives in hidden input #design-engine; both rails sync to it via data-value.
+        window.DESIGN_ENGINE_PREF_KEY = 'design_engine_model_pref';
+
+        window.selectDesignEngine = function(btn) {
+            if (!btn) return;
+            const value = btn.dataset.value || 'imagen';
+            // Sync BOTH rails (sidebar + inline quick) — match by data-value
+            document.querySelectorAll('.alabasta-genmage-model-chip[data-value], .alabasta-genmage-quick-chip[data-value]').forEach(chip => {
+                if (chip.closest('#hub-ctrl-design-engine') || chip.closest('.alabasta-genmage-quick-rail[aria-label="Engine quick switch"]')) {
+                    chip.classList.toggle('active', chip.dataset.value === value);
+                }
+            });
+            const hidden = document.getElementById('design-engine');
+            if (hidden) hidden.value = value;
+            try { localStorage.setItem(window.DESIGN_ENGINE_PREF_KEY, value); } catch (e) {}
+        };
+
+        // Inline quick-rail handler — looks up the matching sidebar chip and routes through selectDesignEngine
+        window.selectDesignEngineByValue = function(value) {
+            const chip = document.querySelector('#hub-ctrl-design-engine .alabasta-genmage-model-chip[data-value="' + value + '"]');
+            if (chip) window.selectDesignEngine(chip);
+        };
+
+        // Restore last-chosen engine on page load (idempotent — runs once DOM is ready)
+        (function restoreDesignEnginePref() {
+            const apply = function() {
+                try {
+                    const saved = localStorage.getItem(window.DESIGN_ENGINE_PREF_KEY);
+                    if (!saved) return;
+                    const chip = document.querySelector('#hub-ctrl-design-engine .alabasta-genmage-model-chip[data-value="' + saved + '"]');
+                    if (chip) window.selectDesignEngine(chip);
+                } catch (e) {}
+            };
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);
+            else apply();
+        })();
 
         window.generateAIDesign = async function() {
             const promptInput = document.getElementById('design-prompt');
