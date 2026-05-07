@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exam Session V3.3 — INTERN-PORT</title>
+    <title>Exam Session V3.4 — INTERN-PORT</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -829,7 +829,7 @@
 
     <div class="container">
         <div class="header">
-            <span class="badge"><i class="fa-solid fa-graduation-cap"></i> Exam Session V3.3</span>
+            <span class="badge"><i class="fa-solid fa-graduation-cap"></i> Exam Session V3.4</span>
             <h1 id="page-title">Exam Session</h1>
             <p class="subtitle">Group exam · Real-time sync · INTERN-PORT</p>
         </div>
@@ -989,17 +989,18 @@
         </div>
 
         <div class="footer">
-            INTERN-PORT · Exam Session V3.3 · Phase 3.3 (Reconnection polish + Cheat-detector)<br>
+            INTERN-PORT · Exam Session V3.4 · Phase 4.a (Score persistence per participant)<br>
             <code>2008959998-4ty7kBq2</code>
         </div>
     </div>
 
     <script>
-        // V3.3 Phase 3.3: reconnection polish. (1) Connection pill via Firestore metadata
-        // (cached vs server). (2) Cheat-detector wire-in (initCheatDetector on running,
-        // stop on paused/done/blocked) — tracks tab-switch/blur/copy-paste/fullscreen exit
-        // for proctored fairness. (3) Welcome-back toast on first listener fire after
-        // page reload if user has a vote on the current question. Phase 4 = score persistence.
+        // V3.4 Phase 4.a: score persistence. When state→done, each participant's tab writes
+        // its own quiz_attempts + checkin_logs doc and stamps session.attemptIds[uid] back.
+        // Per locked decision #2 ("group score"), all participants share the same score
+        // (groupScore = sum of q.score for Qs where groupWinner === q.correct). Individual
+        // vote breakdown lives in votedQuestions[] for V92.50 review overlay (Phase 4.c).
+        // Phase 4.b will rebuild renderDone() into a proper score card with reveal toggle.
         const EXAM_SESSION_LIFF_ID = "2008959998-4ty7kBq2";
         const HEARTBEAT_INTERVAL_MS = 10000;     // 10s
         const ONLINE_THRESHOLD_MS = 30000;       // <30s = online
@@ -1055,6 +1056,8 @@
         let _firstSessionFire = true; // Phase 3.3: triggers welcome-back toast on first listener fire post-page-load
         let _lastFromCache = null;   // Phase 3.3: tracks Firestore sync state to avoid re-paint when unchanged
         let _cheatActive = false;    // Phase 3.3: idempotent guard for cheat-detector init/stop calls
+        let _attemptWriteFiringNow = false; // Phase 4.a: race guard so the same tab doesn't fire two parallel writeMyAttempt calls
+        let _attemptWriteStatus = null;     // Phase 4.a: 'pending' | 'saved' | 'error' — surfaces in renderDone for user feedback
 
         function getSessionIdFromUrl() {
             try {
@@ -1718,8 +1721,149 @@
             }
         }
 
+        // ─── Phase 4.a — Score persistence ───────────────────────────────────────
+        // Per locked decision #2 ("group score"), every participant gets the same score:
+        // groupScore = sum of q.score for Qs where the resolved groupWinner === q.correct.
+        // Each participant's tab writes its own quiz_attempts + checkin_logs doc and stamps
+        // session.attemptIds[uid] back so duplicate writes (from listener re-fires or page
+        // reload after done) get skipped.
+
+        function _isAnswerCorrect(myChoice, correct) {
+            // Mirrors solo quiz scoring (index.html submitQuiz): q.correct can be a number or
+            // an array of numbers; for single-choice exam we treat array as "any-of".
+            if (myChoice == null) return false;
+            if (Array.isArray(correct)) return correct.includes(myChoice);
+            if (typeof correct === 'number') return myChoice === correct;
+            return false;
+        }
+
+        function computeMyAttempt(session, quiz, myUid) {
+            const questions = Array.isArray(quiz.questions) ? quiz.questions : [];
+            const finalAnswers = session.finalAnswers || {};
+            const votes = session.votes || {};
+            const totalQuestions = questions.length;
+
+            let totalScore = 0;
+            let groupScore = 0;
+            let groupCorrectCount = 0;
+            const votedQuestions = [];
+            const answers = [];
+
+            questions.forEach((q, idx) => {
+                const qScore = (typeof q.score === 'number' && q.score > 0) ? q.score : 1;
+                totalScore += qScore;
+
+                const finalA = finalAnswers[idx] || null;
+                const groupWinner = finalA ? finalA.winner : null;
+                const brokenBy = finalA ? (finalA.brokenBy || null) : 'skipped';
+                const officialAnswer = (q.correct !== undefined) ? q.correct : null;
+                const groupCorrect = (groupWinner != null) && _isAnswerCorrect(groupWinner, officialAnswer);
+
+                if (groupCorrect) {
+                    groupScore += qScore;
+                    groupCorrectCount += 1;
+                }
+
+                const myVote = votes[idx] && votes[idx][myUid];
+                const myChoice = getVoteChoice(myVote);
+                const myVotedAt = (myVote && typeof myVote === 'object') ? getVoteTime(myVote) : 0;
+                const myMatchedGroup = (myChoice != null && groupWinner != null && myChoice === groupWinner);
+
+                answers.push(myChoice == null ? null : myChoice);
+                votedQuestions.push({
+                    qIdx: idx,
+                    myChoice,
+                    myVotedAt,
+                    myMatchedGroup,
+                    groupWinner,
+                    brokenBy,
+                    officialAnswer,
+                    groupCorrect
+                });
+            });
+
+            return {
+                correctCount: groupCorrectCount,
+                totalQuestions,
+                groupScore,
+                totalScore,
+                answers,
+                votedQuestions
+            };
+        }
+
+        async function writeMyAttempt(session) {
+            if (!session || session.state !== 'done') return;
+            if (!myProfile || !myProfile.userId) return;
+            if (_attemptWriteFiringNow) return;
+            const myUid = myProfile.userId;
+            const existingAttemptId = session.attemptIds && session.attemptIds[myUid];
+            if (existingAttemptId) {
+                // Already saved on a previous done re-fire (or another tab) — sync local status.
+                _attemptWriteStatus = 'saved';
+                return;
+            }
+            const quiz = _quizCache;
+            if (!quiz) {
+                // renderDone fetches the quiz when needed; bail and let the next listener fire retry.
+                return;
+            }
+
+            _attemptWriteFiringNow = true;
+            _attemptWriteStatus = 'pending';
+            try {
+                const attempt = computeMyAttempt(session, quiz, myUid);
+                const attemptId = `exam-${mySessionId}-${myUid}`;
+                const ts = firebase.firestore.FieldValue.serverTimestamp();
+                const examId = session.examId || quiz.id || '';
+
+                const attemptDoc = {
+                    userId: myUid,
+                    quizId: examId,
+                    correctCount: attempt.correctCount,
+                    totalQuestions: attempt.totalQuestions,
+                    answers: attempt.answers,
+                    status: 'completed',
+                    timestamp: ts,
+                    isExamSession: true,
+                    examSessionId: mySessionId,
+                    groupScore: attempt.groupScore,
+                    totalScore: attempt.totalScore,
+                    votedQuestions: attempt.votedQuestions
+                };
+
+                const tasks = [
+                    db.collection("quiz_attempts").doc(attemptId).set(attemptDoc, { merge: true }),
+                    db.collection("checkin_logs").add({
+                        userId: myUid,
+                        quizId: examId,
+                        examSessionId: mySessionId,
+                        type: 'exam_session_completed',
+                        score: attempt.groupScore,
+                        totalScore: attempt.totalScore,
+                        correctCount: attempt.correctCount,
+                        totalQuestions: attempt.totalQuestions,
+                        timestamp: ts
+                    }),
+                    db.collection("exam_sessions").doc(mySessionId).update({
+                        [`attemptIds.${myUid}`]: attemptId
+                    })
+                ];
+                await Promise.all(tasks);
+                _attemptWriteStatus = 'saved';
+            } catch (e) {
+                console.error('writeMyAttempt error:', e);
+                _attemptWriteStatus = 'error';
+            } finally {
+                _attemptWriteFiringNow = false;
+            }
+        }
+
         async function renderDone(session) {
             stopCountdownTick();
+            // Phase 4.a: kick off the per-participant write. Idempotent — guarded by
+            // session.attemptIds[myUid] + local _attemptWriteFiringNow flag.
+            writeMyAttempt(session);
             // Phase 4 will compute + persist scores. For Phase 3.1 we just summarise how
             // many questions were locked in by the group.
             const finalAnswers = session.finalAnswers || {};
@@ -1742,9 +1886,21 @@
             try {
                 if (session.examId) {
                     const quiz = await loadQuizForSession(session.examId);
+                    // Phase 4.a: writeMyAttempt was kicked off above; retry here in case the
+                    // earlier call bailed because _quizCache wasn't loaded yet on first done arrival.
+                    if (!(session.attemptIds && session.attemptIds[myProfile.userId])) writeMyAttempt(session);
                     const total = Array.isArray(quiz.questions) ? quiz.questions.length : 0;
                     if (total > 0) {
-                        summaryText.textContent = `${answered} of ${total} question${total === 1 ? '' : 's'} answered by the group. Detailed breakdown will arrive in Phase 4 alongside per-participant scoring.`;
+                        // Phase 4.a: surface group score now that the attempt is computed locally.
+                        const myUid = myProfile.userId;
+                        const me = computeMyAttempt(session, quiz, myUid);
+                        const pct = me.totalScore > 0 ? Math.round((me.groupScore / me.totalScore) * 100) : 0;
+                        const saveLabel = _attemptWriteStatus === 'saved'
+                            ? '<span style="color:#86efac;"><i class="fa-solid fa-circle-check"></i> Score saved to your User Hub history.</span>'
+                            : (_attemptWriteStatus === 'error'
+                                ? '<span style="color:#fca5a5;"><i class="fa-solid fa-circle-exclamation"></i> Could not save score — refresh to retry.</span>'
+                                : '<span style="color:#cbd5e1;"><i class="fa-solid fa-cloud-arrow-up fa-fade"></i> Saving score…</span>');
+                        summaryText.innerHTML = `Group answered <strong>${me.correctCount}</strong> of <strong>${me.totalQuestions}</strong> correctly · group score <strong>${me.groupScore}</strong> / ${me.totalScore} (${pct}%).<br>${saveLabel}<br><span style="color:#94a3b8; font-size:0.88em;">Per-participant breakdown + reveal toggle land in Phase 4.b.</span>`;
                         summaryEl.style.display = 'block';
                     }
                 }
