@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.37)</title>
+    <title>Internship Portfolio (V94.38)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3489,6 +3489,7 @@
                     เวลาที่ใช้: 00:00 นาที</div>
             </div>
 
+            <div id="fb-form-content">
             <label style="font-weight:bold; display:block; margin-bottom:5px;">⭐ Rate this quiz set ให้คะแนนชุดข้อสอบนี้ (0-10):</label>
             <input type="range" id="fb-rating" min="0" max="10" step="1" value="0"
                 oninput="document.getElementById('fb-rating-num').innerText = this.value"
@@ -3519,6 +3520,17 @@
                     style="flex:2; font-weight:bold; height:48px; border-radius:14px; background:linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%);">
                     Submit ส่งความเห็น
                 </button>
+            </div>
+            </div>
+
+            <!-- V94.38 Phase C: incentive reward card after submit -->
+            <div id="fb-reward-card" style="display:none; padding:24px 18px; text-align:center; background:linear-gradient(135deg, #f0f9ff 0%, #ede9fe 100%); border:1px solid #c7d2fe; border-radius:16px; margin-top:8px;">
+                <div style="font-size:2.6em; line-height:1; margin-bottom:6px;">✨</div>
+                <div style="font-size:1.05em; font-weight:800; color:#4338ca; margin-bottom:4px;">Thanks for your feedback!</div>
+                <div style="font-size:0.95em; color:#4338ca; margin-bottom:14px;">ขอบคุณสำหรับความเห็น</div>
+                <div style="font-size:0.95em; color:#7c2d12; font-weight:700;">🔥 You've shared feedback <span id="fb-reward-streak" style="font-size:1.25em; font-weight:900;">1</span> time<span id="fb-reward-streak-plural"></span></div>
+                <div style="font-size:0.9em; color:#92400e; margin-top:2px;">ส่งความเห็นมาแล้ว <span id="fb-reward-streak-th" style="font-weight:900;">1</span> ครั้ง</div>
+                <div style="font-size:0.85em; color:#64748b; margin-top:10px;">keep shaping the curriculum 🌱 กำลังช่วยปรับหลักสูตร</div>
             </div>
         </div>
     </div>
@@ -7019,8 +7031,36 @@
 
         function closeFeedbackModal() {
             document.getElementById('quizFeedbackModal').style.display = 'none';
+            const form = document.getElementById('fb-form-content');
+            const card = document.getElementById('fb-reward-card');
+            if (form) form.style.display = '';
+            if (card) card.style.display = 'none';
             currentQuizIdForFeedback = null;
             quizTotalStartTime = null;
+        }
+
+        // V94.38 Phase C: incentive reward card + streak count after submit.
+        //   - Hides form content, reveals #fb-reward-card with EN+TH thanks + N-times streak.
+        //   - Streak query is best-effort; failure still shows the card with N=1 fallback.
+        //   - Auto-closes after 2.5s; user can also × close manually.
+        function showFeedbackReward(streak) {
+            const form = document.getElementById('fb-form-content');
+            const card = document.getElementById('fb-reward-card');
+            if (!form || !card) {
+                closeFeedbackModal();
+                alert("🙏 Thanks for your feedback! ขอบคุณสำหรับความเห็น");
+                return;
+            }
+            const n = Math.max(1, parseInt(streak, 10) || 1);
+            const elEn = document.getElementById('fb-reward-streak');
+            const elTh = document.getElementById('fb-reward-streak-th');
+            const elPlural = document.getElementById('fb-reward-streak-plural');
+            if (elEn) elEn.innerText = n;
+            if (elTh) elTh.innerText = n;
+            if (elPlural) elPlural.innerText = n === 1 ? '' : 's';
+            form.style.display = 'none';
+            card.style.display = 'block';
+            setTimeout(() => closeFeedbackModal(), 2500);
         }
 
         async function submitFeedback() {
@@ -7029,11 +7069,12 @@
             const rating = document.getElementById('fb-rating').value;
             const nextTopic = document.getElementById('fb-next-topic').value.trim();
             const trimmedComment = (document.getElementById('fb-comment').value || '').trim();
+            const submittedQuizId = currentQuizIdForFeedback;
 
             try {
                 const timeUsed = quizTotalStartTime ? Math.floor((new Date() - quizTotalStartTime) / 1000) : 0;
                 await db.collection("quiz_feedback").add({
-                    quizId: currentQuizIdForFeedback,
+                    quizId: submittedQuizId,
                     userId: userId,
                     displayName: userProfile.displayName,
                     rating: parseInt(rating),
@@ -7044,8 +7085,14 @@
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-                closeFeedbackModal();
-                alert("🙏 Thanks for your feedback! ขอบคุณสำหรับความเห็น");
+                let streak = 1;
+                try {
+                    const snap = await db.collection("quiz_feedback").where("userId", "==", userId).get();
+                    streak = snap.size || 1;
+                } catch (_) {
+                    // streak query is best-effort — show reward with fallback count.
+                }
+                showFeedbackReward(streak);
             } catch (e) {
                 alert("Feedback Error: " + e.message);
             }
