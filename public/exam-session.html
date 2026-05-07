@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exam Session V3.2 — INTERN-PORT</title>
+    <title>Exam Session V3.3 — INTERN-PORT</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -17,6 +17,9 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <!-- Cheat-detector (V3.3 Phase 3.3: tab-switch/blur/copy-paste/fullscreen tracking for proctored fairness) -->
+    <script src="cheat-detector.js"></script>
 
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -733,6 +736,76 @@
             background: transparent;
         }
 
+        /* Connection pill (Phase 3.3 — fixed top-right; reflects Firestore metadata.fromCache) */
+        .connection-pill {
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            background: rgba(34, 197, 94, 0.15);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            color: #86efac;
+            padding: 5px 11px 5px 9px;
+            border-radius: 999px;
+            font-size: 0.72em;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            z-index: 1000;
+            transition: background 0.3s, border-color 0.3s, color 0.3s;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+        .connection-pill.cached {
+            background: rgba(251, 191, 36, 0.18);
+            border-color: rgba(251, 191, 36, 0.45);
+            color: #fcd34d;
+        }
+        .connection-pill .conn-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #86efac;
+            animation: connDotPulse 2s ease-in-out infinite;
+        }
+        .connection-pill.cached .conn-dot {
+            background: #fcd34d;
+            animation: connDotPulse 0.9s ease-in-out infinite;
+        }
+        @keyframes connDotPulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.85); }
+        }
+
+        /* Welcome-back toast (Phase 3.3 — fires once on first listener fire post-page-load if user has vote on current Q) */
+        .welcome-toast {
+            position: fixed;
+            top: 56px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-12px);
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.96), rgba(168, 85, 247, 0.92));
+            color: #fff;
+            padding: 11px 20px;
+            border-radius: 14px;
+            font-size: 0.86em;
+            font-weight: 600;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            z-index: 999;
+            pointer-events: none;
+            max-width: 90%;
+            text-align: center;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .welcome-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        .welcome-toast i { font-size: 1em; }
+
         .hidden { display: none !important; }
 
         @media (max-width: 600px) {
@@ -748,9 +821,15 @@
 </head>
 
 <body>
+    <!-- Connection pill (Phase 3.3 — Firestore sync state indicator; updated by listener metadata) -->
+    <div class="connection-pill" id="connection-pill" style="display:none;">
+        <span class="conn-dot"></span>
+        <span id="connection-pill-text">Synced</span>
+    </div>
+
     <div class="container">
         <div class="header">
-            <span class="badge"><i class="fa-solid fa-graduation-cap"></i> Exam Session V3.2</span>
+            <span class="badge"><i class="fa-solid fa-graduation-cap"></i> Exam Session V3.3</span>
             <h1 id="page-title">Exam Session</h1>
             <p class="subtitle">Group exam · Real-time sync · INTERN-PORT</p>
         </div>
@@ -910,17 +989,17 @@
         </div>
 
         <div class="footer">
-            INTERN-PORT · Exam Session V3.2 · Phase 3.2.b (Tie-break + 60s AFK fallback)<br>
+            INTERN-PORT · Exam Session V3.3 · Phase 3.3 (Reconnection polish + Cheat-detector)<br>
             <code>2008959998-4ty7kBq2</code>
         </div>
     </div>
 
     <script>
-        // V3.2 Phase 3.2.b: vote-integrity. Replaces the lowest-index tie placeholder with
-        // host-pick + 60s AFK fallback to first-vote-wins. Vote schema upgraded to per-vote
-        // {c, t} objects (backward-compat reads number too). Tie-break state lives on the
-        // session doc so all clients sync; only host's tab fires the fallback at 60s. Phase
-        // 3.3 = reconnection polish, Phase 4 = score persistence.
+        // V3.3 Phase 3.3: reconnection polish. (1) Connection pill via Firestore metadata
+        // (cached vs server). (2) Cheat-detector wire-in (initCheatDetector on running,
+        // stop on paused/done/blocked) — tracks tab-switch/blur/copy-paste/fullscreen exit
+        // for proctored fairness. (3) Welcome-back toast on first listener fire after
+        // page reload if user has a vote on the current question. Phase 4 = score persistence.
         const EXAM_SESSION_LIFF_ID = "2008959998-4ty7kBq2";
         const HEARTBEAT_INTERVAL_MS = 10000;     // 10s
         const ONLINE_THRESHOLD_MS = 30000;       // <30s = online
@@ -973,6 +1052,9 @@
         let _autoEndingNow = false;  // host-side race guard for auto-end at 00:00
         let _afkFiringNow = false;   // host-side race guard for tie-break AFK fallback at 60s (Phase 3.2.b)
         const TIEBREAK_AFK_MS = 60000; // 60s window for host to pick before first-vote-wins fires
+        let _firstSessionFire = true; // Phase 3.3: triggers welcome-back toast on first listener fire post-page-load
+        let _lastFromCache = null;   // Phase 3.3: tracks Firestore sync state to avoid re-paint when unchanged
+        let _cheatActive = false;    // Phase 3.3: idempotent guard for cheat-detector init/stop calls
 
         function getSessionIdFromUrl() {
             try {
@@ -1044,12 +1126,17 @@
 
         function attachSessionListener() {
             if (_sessionUnsub) { _sessionUnsub(); _sessionUnsub = null; }
+            // Phase 3.3: includeMetadataChanges → we get an extra fire when Firestore transitions
+            // between cached and server-confirmed snapshots. Cheap to ignore data-identical
+            // re-paints; the value is the connection-pill UX.
             _sessionUnsub = db.collection("exam_sessions").doc(mySessionId)
-                .onSnapshot(async (snap) => {
+                .onSnapshot({ includeMetadataChanges: true }, async (snap) => {
+                    updateConnectionPill(!!(snap.metadata && snap.metadata.fromCache));
                     if (!snap.exists) {
                         $('notfound-sid').textContent = mySessionId;
                         showState('notfound');
                         stopHeartbeat();
+                        syncCheatDetector(null);
                         return;
                     }
                     const data = snap.data();
@@ -1061,10 +1148,73 @@
                 });
         }
 
+        // Phase 3.3 — connection pill: green when synced from server, amber when serving from cache.
+        function updateConnectionPill(fromCache) {
+            if (_lastFromCache === fromCache) return;
+            _lastFromCache = fromCache;
+            const pill = $('connection-pill');
+            if (!pill) return;
+            pill.style.display = 'inline-flex';
+            pill.classList.toggle('cached', fromCache);
+            $('connection-pill-text').textContent = fromCache ? 'Reconnecting…' : 'Synced';
+        }
+
+        // Phase 3.3 — welcome-back toast: fires once on first listener fire if user has prior state
+        // on the current question (vote already cast). Helps users understand their work persisted
+        // through a refresh/network blip.
+        function showWelcomeBackToast(html) {
+            let el = $('welcome-toast');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'welcome-toast';
+                el.className = 'welcome-toast';
+                document.body.appendChild(el);
+            }
+            el.innerHTML = html;
+            requestAnimationFrame(() => el.classList.add('show'));
+            clearTimeout(el._dismissTimer);
+            el._dismissTimer = setTimeout(() => el.classList.remove('show'), 4500);
+        }
+
+        // Phase 3.3 — cheat-detector lifecycle: active during running (incl. tie-break sub-state),
+        // stopped on paused / done / blocked. cheat-detector itself is idempotent, but we guard
+        // here too to avoid resetting its event counters on every snapshot re-fire.
+        function syncCheatDetector(session) {
+            if (typeof window.initCheatDetector !== 'function') return;
+            const shouldRun = !!(session && session.state === 'running');
+            if (shouldRun && !_cheatActive) {
+                window.currentQuiz = { id: session.examId || mySessionId };
+                window.initCheatDetector();
+                _cheatActive = true;
+            } else if (!shouldRun && _cheatActive) {
+                window.stopCheatDetector && window.stopCheatDetector();
+                _cheatActive = false;
+            }
+        }
+
         async function handleSessionUpdate(session) {
             const myUid = myProfile.userId;
             const participants = session.participants || {};
             const alreadyJoined = !!participants[myUid];
+
+            // Phase 3.3: cheat-detector follows session state (running on, anything else off)
+            syncCheatDetector(session);
+
+            // Phase 3.3: welcome-back toast — fires once if user reconnected mid-session with state
+            if (_firstSessionFire) {
+                _firstSessionFire = false;
+                if (alreadyJoined && (session.state === 'running' || session.state === 'paused')) {
+                    const idx = session.currentIdx || 0;
+                    const myVote = session.votes && session.votes[idx] && session.votes[idx][myUid];
+                    const choice = getVoteChoice(myVote);
+                    if (choice != null) {
+                        const letter = String.fromCharCode(65 + choice);
+                        showWelcomeBackToast(`<i class="fa-solid fa-rotate-right"></i> Welcome back — your vote on Q${idx + 1} (<strong>${letter}</strong>) is preserved.`);
+                    } else {
+                        showWelcomeBackToast(`<i class="fa-solid fa-rotate-right"></i> Welcome back — Q${idx + 1} is in progress.`);
+                    }
+                }
+            }
 
             // Apply join policy:
             // - state === 'lobby' → can join (add self if not already)
@@ -1816,6 +1966,11 @@
         window.addEventListener('beforeunload', () => {
             stopHeartbeat();
             stopCountdownTick();
+            // Phase 3.3: flush cheat-detector events synchronously before tab dies
+            if (_cheatActive && typeof window.stopCheatDetector === 'function') {
+                window.stopCheatDetector();
+                _cheatActive = false;
+            }
             if (_sessionUnsub) _sessionUnsub();
         });
 
