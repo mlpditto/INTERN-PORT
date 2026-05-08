@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.63</title>
+    <title>Nika V92.64</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -8176,6 +8176,49 @@
              Section content unchanged — same DOM IDs so existing renderAlabastaCases /
              casesData listeners / action handlers all keep working. -->
         <div id="tab-alabasta" class="tab-content">
+            <!-- V92.64 Phase 2a: Inbox section — surfaces pending cases (LIFF submissions awaiting admin review) above the existing Cases repository. Same casesData global, just filtered to status==='pending' && !isArchived. -->
+            <div id="alabasta-inbox-section" class="review-card" style="margin-top:18px; border-color:#7dd3fc; background:linear-gradient(180deg, #f0f9ff 0%, #fff 100%); border-radius:14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; border-bottom:1px solid #bae6fd; padding-bottom:10px; margin-bottom:12px;">
+                    <h4 style="margin:0; color:#075985; display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:1.1em;">📥</span> Inbox · เคสจาก LIFF
+                    </h4>
+                    <span style="font-size:0.78em; color:#075985; font-weight:700; background:#fff; border:1px solid #7dd3fc; border-radius:999px; padding:4px 14px;">
+                        Pending · 대기 <b id="alabasta-inbox-count">0</b>
+                    </span>
+                </div>
+                <div id="alabasta-inbox-container" style="display:flex; flex-direction:column; gap:14px;">
+                    <!-- cards rendered by renderAlabastaInbox() -->
+                </div>
+                <div id="alabasta-inbox-empty" style="display:none; text-align:center; padding:32px 16px; color:#64748b;">
+                    <div style="font-size:2.4em; margin-bottom:8px; opacity:0.55;">📭</div>
+                    <div style="font-weight:700; color:#475569;">ไม่มีเคสที่รอ · No pending submissions</div>
+                    <div style="font-size:0.86em; margin-top:6px; color:#94a3b8;">เคสที่ user ส่งมาทาง LIFF จะปรากฏตรงนี้ก่อนถูก mark reviewed</div>
+                </div>
+            </div>
+
+            <!-- V92.64 Phase 2a: Reject modal — preset reasons + custom textarea. Writes status='rejected' + rejectedReason + rejectedAt + isArchived. -->
+            <div id="alabastaRejectModal" class="modal" style="display:none; z-index:9100;">
+                <div class="modal-content" style="max-width:560px; padding:24px; border-radius:16px;">
+                    <span class="close-modal" onclick="closeAlabastaRejectModal()" style="position:absolute; top:14px; right:16px; cursor:pointer; font-size:1.4em; color:#64748b;">&times;</span>
+                    <h3 style="margin:0 0 6px 0; color:#991b1b;"><i class="fa-solid fa-circle-xmark"></i> Reject Case</h3>
+                    <div style="color:#64748b; font-size:0.86em; margin-bottom:14px;">เลือกเหตุผล (preset) หรือพิมพ์เอง — user จะเห็นเหตุผลนี้ผ่าน history</div>
+                    <input type="hidden" id="alabasta-reject-case-id">
+                    <div id="alabasta-reject-presets" style="display:flex; flex-direction:column; gap:10px; margin-bottom:14px;">
+                        <button type="button" class="alabasta-reject-preset" data-reason="ข้อมูลไม่ครบ · Incomplete info" onclick="rejectWithPreset(this)" style="text-align:left; padding:12px 16px; border-radius:10px; border:1.5px solid #e2e8f0; background:#fff; cursor:pointer; font-size:0.95em; font-weight:600; color:#334155; transition:0.15s;">📋 ข้อมูลไม่ครบ · Incomplete info</button>
+                        <button type="button" class="alabasta-reject-preset" data-reason="เคสซ้ำ · Duplicate" onclick="rejectWithPreset(this)" style="text-align:left; padding:12px 16px; border-radius:10px; border:1.5px solid #e2e8f0; background:#fff; cursor:pointer; font-size:0.95em; font-weight:600; color:#334155; transition:0.15s;">🔁 เคสซ้ำ · Duplicate</button>
+                        <button type="button" class="alabasta-reject-preset" data-reason="ไม่เกี่ยวข้อง · Not relevant" onclick="rejectWithPreset(this)" style="text-align:left; padding:12px 16px; border-radius:10px; border:1.5px solid #e2e8f0; background:#fff; cursor:pointer; font-size:0.95em; font-weight:600; color:#334155; transition:0.15s;">❌ ไม่เกี่ยวข้อง · Not relevant</button>
+                        <button type="button" id="alabasta-reject-custom-toggle" onclick="toggleAlabastaRejectCustom()" style="text-align:left; padding:12px 16px; border-radius:10px; border:1.5px solid #e2e8f0; background:#fff; cursor:pointer; font-size:0.95em; font-weight:600; color:#334155;">📝 อื่นๆ · Other (specify)</button>
+                    </div>
+                    <div id="alabasta-reject-custom-wrap" style="display:none;">
+                        <textarea id="alabasta-reject-custom" rows="3" placeholder="ระบุเหตุผล... · Type a custom reason..." style="width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid #e2e8f0; font-family:inherit; font-size:0.95em; resize:vertical;"></textarea>
+                        <div style="display:flex; gap:8px; margin-top:10px; justify-content:flex-end;">
+                            <button type="button" onclick="closeAlabastaRejectModal()" style="padding:8px 18px; border-radius:8px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-weight:700; color:#64748b;">Cancel</button>
+                            <button type="button" onclick="confirmAlabastaRejectCustom()" style="padding:8px 18px; border-radius:8px; border:none; background:#dc2626; color:#fff; cursor:pointer; font-weight:700;">Reject with reason</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="alabasta-case-section" class="review-card" style="margin-top:18px; border-color:#fcd34d; background:linear-gradient(180deg, #fffbeb 0%, #fff 100%); border-radius:14px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; border-bottom:1px solid #fde68a; padding-bottom:10px; margin-bottom:12px;">
                     <h4 style="margin:0; color:#92400e;"><i class="fa-solid fa-dungeon"></i> Alabasta</h4>
@@ -21149,6 +21192,8 @@ async function saveQuiz() {
         }
 
         function renderAlabastaCases() {
+            // V92.64 Phase 2a: Inbox shares the same casesData global; refresh both on every snapshot.
+            renderAlabastaInbox();
             const tbody = document.querySelector('#alabastaCaseTable tbody');
             if (!tbody) return;
 
@@ -22854,6 +22899,139 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 alert('Failed to update case status: ' + e.message);
             }
         }
+
+        // V92.64 Phase 2a — Inbox: surface pending cases (LIFF submissions awaiting review)
+        // as cards above the existing cases table. Reads from same casesData global; reuses
+        // updateCaseStatus for Mark Reviewed and editCaseNote for Open Case. Reject path is
+        // new — writes status='rejected' + rejectedReason + rejectedAt + isArchived.
+
+        function renderAlabastaInbox() {
+            const container = document.getElementById('alabasta-inbox-container');
+            const emptyEl = document.getElementById('alabasta-inbox-empty');
+            const countEl = document.getElementById('alabasta-inbox-count');
+            if (!container || !emptyEl || !countEl) return;
+
+            const pending = (casesData || []).filter(c =>
+                !c.isArchived &&
+                (c.status || 'pending') === 'pending'
+            ).sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
+
+            countEl.textContent = pending.length;
+
+            if (pending.length === 0) {
+                container.innerHTML = '';
+                container.style.display = 'none';
+                emptyEl.style.display = 'block';
+                return;
+            }
+            container.style.display = 'flex';
+            emptyEl.style.display = 'none';
+
+            const safe = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const fmtAgo = (ts) => {
+                if (!ts || !ts.toMillis) return '';
+                const ms = Date.now() - ts.toMillis();
+                const min = Math.floor(ms / 60000);
+                if (min < 1) return 'just now';
+                if (min < 60) return `${min} min ago`;
+                const hr = Math.floor(min / 60);
+                if (hr < 24) return `${hr} hr ago`;
+                const day = Math.floor(hr / 24);
+                return `${day} day${day === 1 ? '' : 's'} ago`;
+            };
+            const truncate = (s, n) => {
+                s = String(s || '');
+                return s.length > n ? s.slice(0, n - 1) + '…' : s;
+            };
+
+            container.innerHTML = pending.map(c => {
+                const tagsHtml = Array.isArray(c.symptomTags) && c.symptomTags.length
+                    ? c.symptomTags.slice(0, 6).map(t => `<span style="display:inline-block; padding:2px 8px; background:#e0f2fe; color:#075985; border-radius:6px; font-size:0.78em; font-weight:600; margin-right:4px;">${safe(t)}</span>`).join('')
+                    : '';
+                const noteText = truncate(c.note || '', 220);
+                const avatar = c.pictureUrl
+                    ? `<img src="${safe(c.pictureUrl)}" alt="" style="width:36px; height:36px; border-radius:50%; object-fit:cover; border:1.5px solid #bae6fd;">`
+                    : `<div style="width:36px; height:36px; border-radius:50%; background:#bae6fd; color:#075985; display:flex; align-items:center; justify-content:center; font-weight:800;">?</div>`;
+                return `
+                    <div class="alabasta-inbox-card" style="background:#fff; border:1.5px solid #bae6fd; border-radius:14px; padding:14px 16px; box-shadow:0 2px 6px rgba(7,89,133,0.06);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
+                            <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+                                ${avatar}
+                                <div style="min-width:0;">
+                                    <div style="font-weight:800; color:#0f172a; font-size:0.95em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${safe(c.displayName || 'Anonymous')}</div>
+                                    <div style="font-size:0.75em; color:#64748b;">${fmtAgo(c.timestamp)}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; font-size:0.82em; color:#475569; align-items:center;">
+                            <span style="font-weight:700;">HN:</span> <code style="background:#f1f5f9; padding:1px 6px; border-radius:4px;">${safe(c.caseId || '—')}</code>
+                            ${c.customer ? `<span>·</span><span><b>Patient:</b> ${safe(c.customer)}</span>` : ''}
+                            ${c.diseaseSystemLabel ? `<span>·</span><span style="color:#7c2d12;">🏥 ${safe(c.diseaseSystemLabel)}</span>` : ''}
+                        </div>
+                        ${c.disease ? `<div style="font-weight:700; color:#7c2d12; margin-bottom:6px;">${safe(c.disease)}</div>` : ''}
+                        ${tagsHtml ? `<div style="margin-bottom:8px;">${tagsHtml}</div>` : ''}
+                        ${noteText ? `<div style="background:#f8fafc; border-left:3px solid #7dd3fc; padding:8px 12px; border-radius:6px; font-size:0.88em; color:#334155; line-height:1.55; margin-bottom:12px; white-space:pre-wrap;">${safe(noteText)}</div>` : ''}
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button type="button" onclick="updateCaseStatus('${c.id}', 'reviewed')" style="flex:1; min-width:130px; padding:8px 14px; background:#16a34a; color:#fff; border:none; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.86em;">✅ Mark Reviewed</button>
+                            <button type="button" onclick="openAlabastaRejectModal('${c.id}')" style="flex:1; min-width:120px; padding:8px 14px; background:#fff; color:#dc2626; border:1.5px solid #fecaca; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.86em;">❌ Reject</button>
+                            <button type="button" onclick="editCaseNote('${c.id}')" style="flex:1; min-width:120px; padding:8px 14px; background:#fff; color:#334155; border:1.5px solid #e2e8f0; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.86em;">👁 Open Case</button>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        function openAlabastaRejectModal(caseDocId) {
+            document.getElementById('alabasta-reject-case-id').value = caseDocId;
+            document.getElementById('alabasta-reject-custom').value = '';
+            document.getElementById('alabasta-reject-custom-wrap').style.display = 'none';
+            document.getElementById('alabasta-reject-custom-toggle').style.display = 'block';
+            document.getElementById('alabastaRejectModal').style.display = 'flex';
+        }
+
+        function closeAlabastaRejectModal() {
+            document.getElementById('alabastaRejectModal').style.display = 'none';
+        }
+
+        function toggleAlabastaRejectCustom() {
+            document.getElementById('alabasta-reject-custom-toggle').style.display = 'none';
+            const wrap = document.getElementById('alabasta-reject-custom-wrap');
+            wrap.style.display = 'block';
+            setTimeout(() => { const t = document.getElementById('alabasta-reject-custom'); if (t) t.focus(); }, 50);
+        }
+
+        async function rejectWithPreset(btn) {
+            const reason = (btn && btn.dataset && btn.dataset.reason) || '';
+            if (!reason) return;
+            await _persistAlabastaReject(reason);
+        }
+
+        async function confirmAlabastaRejectCustom() {
+            const reason = (document.getElementById('alabasta-reject-custom').value || '').trim();
+            if (!reason) { alert('กรุณาระบุเหตุผล · Please enter a reason'); return; }
+            await _persistAlabastaReject(reason);
+        }
+
+        async function _persistAlabastaReject(reason) {
+            const caseDocId = document.getElementById('alabasta-reject-case-id').value;
+            if (!caseDocId) return;
+            try {
+                await db.collection('cases').doc(caseDocId).update({
+                    status: 'rejected',
+                    rejectedReason: reason,
+                    rejectedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    rejectedBy: ALLOWED_EMAIL || 'admin',
+                    isArchived: true,
+                    archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    adminUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                closeAlabastaRejectModal();
+                if (typeof showToast === 'function') showToast(`Rejected · 거절됨: ${reason}`, 'success');
+            } catch (e) {
+                console.error('Failed to reject case:', e);
+                alert('Failed to reject case: ' + e.message);
+            }
+        }
+
         function renderTable(type) {
             const tbody = document.querySelector(`#${type}Table tbody`);
             let data = (type === 'works') ? [...worksData] : [...usersData];
