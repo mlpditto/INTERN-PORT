@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.68</title>
+    <title>Nika V92.69</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -17082,9 +17082,14 @@ async function saveQuiz() {
                 const recalculatedForApproval = typeof calculateAttemptScoring === 'function'
                     ? calculateAttemptScoring(att, quiz)
                     : null;
-                const actualApprovePoints = Number.isFinite(recalculatedForApproval && recalculatedForApproval.score)
-                    ? recalculatedForApproval.score
-                    : fallbackActualPoints;
+                // V92.69: exam-session attempts (V3.10+) carry the locked group score directly
+                // (`att.groupScore` summed during writeMyAttempt); approve flow should NOT
+                // recompute from correctCount because variable-point quizzes would drift.
+                const actualApprovePoints = att.isExamSession && Number.isFinite(Number(att.groupScore))
+                    ? Number(att.groupScore)
+                    : (Number.isFinite(recalculatedForApproval && recalculatedForApproval.score)
+                        ? recalculatedForApproval.score
+                        : fallbackActualPoints);
                 const actualApproveLabel = `${actualApprovePoints.toFixed(2)} pts`;
 
                 // V92.50: when reopening an already-approved attempt (e.g. from User Hub History),
@@ -18840,13 +18845,18 @@ async function saveQuiz() {
                 const att = docSnap.data();
                 const quiz = quizzesData.find(x => x.id === att.quizId);
                 if (!quiz) return alert("Quiz data not found");
-                
+
                 let gradedAnswers = att.gradedAnswers || {};
                 quiz.questions.forEach((q, i) => {
                     gradedAnswers[i] = true;
                 });
-                
-                const pointsToAdd = parseFloat(quiz.totalPoints || 1.0);
+
+                // V92.69: for exam-session attempts (Phase 4.a writes att.totalScore = sum of
+                // q.score across the locked questions), Manten = full possible group total.
+                // Solo quizzes still use quiz.totalPoints.
+                const pointsToAdd = (att.isExamSession && Number.isFinite(Number(att.totalScore)))
+                    ? Number(att.totalScore)
+                    : parseFloat(quiz.totalPoints || 1.0);
                 const b = db.batch();
                 
                 b.update(docRef, {
@@ -18903,9 +18913,22 @@ async function saveQuiz() {
                 const fallbackCorrect = Number(att.correctCount || 0);
                 const fallbackRatio = totalQ > 0 ? fallbackCorrect / totalQ : 0;
                 const fallbackPoints = parseFloat((fallbackRatio * parseFloat(quiz.totalPoints || 1.0)).toFixed(2));
+                // V92.69: exam-session attempts carry the locked group score; trust att.groupScore
+                // and the matching ratio (groupScore / totalScore) over recalculated values which
+                // assume solo per-question grading.
+                const isExam = !!att.isExamSession;
+                const examGroupScore = Number(att.groupScore);
+                const examTotalScore = Number(att.totalScore);
+                const examRatio = (isExam && Number.isFinite(examGroupScore) && Number.isFinite(examTotalScore) && examTotalScore > 0)
+                    ? (examGroupScore / examTotalScore)
+                    : null;
                 const curCorrect = Number.isFinite(recalculated && recalculated.correctCount) ? recalculated.correctCount : fallbackCorrect;
-                const pointsToAdd = Number.isFinite(recalculated && recalculated.score) ? recalculated.score : fallbackPoints;
-                const scoreRatio = totalQ > 0 ? (curCorrect / totalQ) : 0;
+                const pointsToAdd = (isExam && Number.isFinite(examGroupScore))
+                    ? examGroupScore
+                    : (Number.isFinite(recalculated && recalculated.score) ? recalculated.score : fallbackPoints);
+                const scoreRatio = examRatio != null
+                    ? examRatio
+                    : (totalQ > 0 ? (curCorrect / totalQ) : 0);
 
                 const confirmed = confirm(`Approve this attempt with ACTUAL score?\n\nAward: ${pointsToAdd.toFixed(2)} pts\nCorrect: ${curCorrect}/${totalQ}`);
                 if (!confirmed) return;
@@ -34279,18 +34302,35 @@ Reply ONLY with raw JSON, no markdown:
             _examSessionsTabInitialized = true;
         }
 
+        // V92.69: silent auto-retry for transient permission-denied (admin auth token refresh
+        // race; happens roughly every ~1h when Firebase Auth refreshes the ID token, leaving a
+        // sub-second window where Firestore SDK sees no auth context). Up to 3 retries × 2s
+        // before showing the visible error UI.
+        let _examSessionsRetryAttempt = 0;
+        const EXAM_SESSIONS_MAX_RETRIES = 3;
+        const EXAM_SESSIONS_RETRY_DELAY_MS = 2000;
+
         function attachExamSessionsListener() {
             // Tear down any prior listener before re-attaching (idempotent — supports retry on permission errors).
             if (_examSessionsUnsub) { try { _examSessionsUnsub(); } catch (_) {} _examSessionsUnsub = null; }
             _examSessionsUnsub = db.collection("exam_sessions")
                 .orderBy("createdAt", "desc")
                 .onSnapshot(snap => {
+                    _examSessionsRetryAttempt = 0; // recovered — reset the retry counter
                     _examSessionsLatest = snap.docs
                         .map(d => ({ id: d.id, ...d.data() }))
                         .filter(s => s.state !== 'done');
                     renderExamSessionsList();
                 }, err => {
                     console.error("Exam sessions listener error:", err);
+                    const isPermissionDenied = err && (err.code === 'permission-denied' || /permissions/i.test(err.message || ''));
+                    if (isPermissionDenied && _examSessionsRetryAttempt < EXAM_SESSIONS_MAX_RETRIES) {
+                        _examSessionsRetryAttempt += 1;
+                        const list = document.getElementById('exam-sessions-list');
+                        if (list) list.innerHTML = `<div style="padding:18px; text-align:center; color:#6b21a8; font-size:0.84em;"><i class="fa-solid fa-spinner fa-spin"></i> Reconnecting (attempt ${_examSessionsRetryAttempt}/${EXAM_SESSIONS_MAX_RETRIES})…</div>`;
+                        setTimeout(() => attachExamSessionsListener(), EXAM_SESSIONS_RETRY_DELAY_MS);
+                        return;
+                    }
                     showExamSessionsError(err && err.message ? err.message : String(err));
                 });
         }
