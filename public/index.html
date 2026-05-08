@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.38)</title>
+    <title>Internship Portfolio (V94.39)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -10257,26 +10257,37 @@ async function archiveDoneCard(cardId) {
                 }
             });
 
-            // 2. Quizzes (Pending/Approved)
+            // 2. Quizzes (Pending/Approved + Exam Session)
+            // V94.39 Phase 4.c: include exam-session attempts (status='completed', isExamSession=true)
+            // so group-exam results show in user history alongside solo quiz attempts.
             Object.keys(quizAttemptsCache).forEach(qid => {
                 const att = quizAttemptsCache[qid];
-                if (att.status === 'pending' || att.status === 'approved') {
+                if (att.status === 'pending' || att.status === 'approved' || att.isExamSession) {
                     const quiz = quizzesCache.find(q => q.id === qid);
                     const qTitle = quiz ? quiz.title : (att.quizTitle || "แบบทดสอบ (Quiz)");
+
                     // Single source of truth: show persisted score from quiz_attempts.
-                    // This avoids drift against users.score shown in profile.
-                    let score = Number(att.score);
-                    // V90.74: Fallback to calculation if score is missing but correctCount exists
-                    if (!Number.isFinite(score) || score === 0) {
-                        if (att.correctCount !== undefined && att.totalQuestions) {
-                            score = (att.correctCount / att.totalQuestions) * (quiz ? (quiz.totalPoints || 1.0) : 1.0);
-                        } else {
-                            score = 0;
+                    // For exam-session, prefer att.groupScore (locked at session level) over
+                    // recalculating — variable-point questions can drift if recomputed.
+                    let score;
+                    if (att.isExamSession && Number.isFinite(Number(att.groupScore))) {
+                        score = Number(att.groupScore);
+                    } else {
+                        score = Number(att.score);
+                        // V90.74: Fallback to calculation if score is missing but correctCount exists
+                        if (!Number.isFinite(score) || score === 0) {
+                            if (att.correctCount !== undefined && att.totalQuestions) {
+                                score = (att.correctCount / att.totalQuestions) * (quiz ? (quiz.totalPoints || 1.0) : 1.0);
+                            } else {
+                                score = 0;
+                            }
                         }
                     }
 
                     let qTypePrefix = "";
-                    if (quiz) {
+                    if (att.isExamSession) {
+                        qTypePrefix = "🎓 ";  // overrides other prefixes — exam-session takes precedence
+                    } else if (quiz) {
                         if (quiz.quizType === 'read_only') qTypePrefix = "📚 ";
                         else if (quiz.questions && quiz.questions.some(x => x.type === 'ordering')) qTypePrefix = "🔢 ";
                         else if (quiz.questions && quiz.questions.some(x => x.type === 'flashcard')) qTypePrefix = "⚡ ";

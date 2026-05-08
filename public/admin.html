@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.61</title>
+    <title>Nika V92.62</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16717,8 +16717,99 @@ async function saveQuiz() {
 
                 let cardsHtml = cheatSummaryHtml + telemetrySummaryHtml;
 
-                // Read-only Review Display
-                if (quiz.quizType === 'read_only') {
+                // V92.62 Phase 4.c: exam-session attempts (written by exam-session.html Phase 4.a
+                // with isExamSession:true + votedQuestions[]) get a different review path —
+                // group-decided answers, no per-question manual scoring, no cheat/telemetry
+                // (those tracked tab-side, not at attempt level).
+                if (att.isExamSession) {
+                    const _esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                    const _letterFor = (idx) => idx == null ? '—' : String.fromCharCode(65 + idx);
+                    const _truncate = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+                    const brokenByLabel = {
+                        'host': '⚖ Tie broken by host',
+                        'afk-fallback': '⏱ Tie broken by FVW (60s AFK)',
+                        'auto-end-fvw': '⏱ Auto-ended at 00:00 (FVW)'
+                    };
+
+                    const examSummaryHtml = `
+                        <div style="border:1px solid #c7d2fe; border-radius:16px; background:#eef2ff; padding:20px; margin-bottom:20px; box-shadow:0 12px 24px rgba(15,23,42,0.05);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                                <div>
+                                    <div style="font-size:1.05em; font-weight:800; color:#3730a3;">🎓 Group Exam Session</div>
+                                    <div style="margin-top:6px; color:#475569; font-size:0.88em;">
+                                        Group score <b>${att.groupScore || 0}</b> / ${att.totalScore || 0}
+                                        · <b>${att.correctCount || 0}</b> of ${att.totalQuestions || 0} questions correct
+                                    </div>
+                                </div>
+                                <code style="background:#fff; padding:4px 10px; border-radius:8px; font-size:0.78em; color:#475569; border:1px solid #e2e8f0;">Session: ${_esc(att.examSessionId || '—')}</code>
+                            </div>
+                            <div style="margin-top:12px; padding-top:12px; border-top:1px solid #c7d2fe; color:#475569; font-size:0.82em;">
+                                Each row reflects the group's locked decision (majority vote, host pick, or first-vote-wins). Per-question manual scoring is disabled — group answers are session-level, not individually graded.
+                            </div>
+                        </div>`;
+
+                    const votedQs = Array.isArray(att.votedQuestions) ? att.votedQuestions : [];
+                    if (votedQs.length === 0) {
+                        cardsHtml = examSummaryHtml + `<div style="padding:24px; text-align:center; color:#64748b; background:#fff; border-radius:12px; border:1px solid #e2e8f0;">No question breakdown recorded for this session.</div>`;
+                    } else {
+                        const examCards = votedQs.map(vq => {
+                            const q = (quiz.questions || [])[vq.qIdx] || {};
+                            const stemFull = q.q || `Question ${vq.qIdx + 1}`;
+                            const stemShort = _truncate(stemFull, 80);
+                            const isSkipped = (vq.brokenBy === 'skipped');
+                            const officialIdx = Array.isArray(vq.officialAnswer) ? vq.officialAnswer[0] : vq.officialAnswer;
+                            const officialText = (officialIdx != null && q.options && q.options[officialIdx] != null) ? q.options[officialIdx] : '';
+                            const groupText = (vq.groupWinner != null && q.options && q.options[vq.groupWinner] != null) ? q.options[vq.groupWinner] : '';
+                            const yourText = (vq.myChoice != null && q.options && q.options[vq.myChoice] != null) ? q.options[vq.myChoice] : '';
+
+                            const cardBg = isSkipped ? '#f3f4f6' : (vq.groupCorrect ? '#d4edda' : '#f8d7da');
+                            const cardBorder = isSkipped ? '#9ca3af' : (vq.groupCorrect ? '#28a745' : '#dc3545');
+                            const cardIcon = isSkipped ? '⊘' : (vq.groupCorrect ? '&#10004;' : '&#10006;');
+
+                            const brokenByBadge = brokenByLabel[vq.brokenBy]
+                                ? `<span style="font-size:0.72em; background:#fef3c7; color:#92400e; padding:3px 10px; border-radius:10px; font-weight:700; white-space:nowrap;">${brokenByLabel[vq.brokenBy]}</span>`
+                                : '';
+
+                            const yourBg = (vq.myChoice == null) ? '#f3f4f6' : (vq.myMatchedGroup ? '#d1fae5' : '#fee2e2');
+                            const yourColor = (vq.myChoice == null) ? '#6b7280' : (vq.myMatchedGroup ? '#065f46' : '#991b1b');
+                            const yourMark = (vq.myChoice == null) ? '' : (vq.myMatchedGroup ? ' ✓' : ' ✗');
+                            const yourLabel = (vq.myChoice == null)
+                                ? '<i>No vote</i>'
+                                : `<b>${_letterFor(vq.myChoice)}</b>${yourText ? ` <span style="color:#475569; font-weight:400;">(${_esc(yourText)})</span>` : ''}${yourMark}`;
+
+                            const groupLabel = isSkipped
+                                ? '<i>No answer (skipped)</i>'
+                                : `<b>${_letterFor(vq.groupWinner)}</b>${groupText ? ` <span style="color:#475569; font-weight:400;">(${_esc(groupText)})</span>` : ''}`;
+
+                            return `
+                                <div style="border:2px solid ${cardBorder}; padding:15px; margin-bottom:15px; border-radius:12px; background:${cardBg}; border-left:8px solid ${cardBorder}; box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+                                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+                                        <b style="font-size:1.05em; flex:1; min-width:200px; word-wrap:break-word;" title="${_esc(stemFull)}">
+                                            ${cardIcon} Q${vq.qIdx + 1}: ${_esc(stemShort)}
+                                        </b>
+                                        <div style="display:flex; gap:6px; flex-wrap:wrap; flex-shrink:0;">${brokenByBadge}</div>
+                                    </div>
+                                    <div style="display:flex; flex-direction:column; gap:8px;">
+                                        <div style="padding:10px; border-radius:8px; background:${yourBg}; color:${yourColor}; font-size:0.95em;">
+                                            <span style="font-weight:bold; display:inline-block; width:90px;">You voted:</span>
+                                            ${yourLabel}
+                                        </div>
+                                        <div style="padding:10px; border-radius:8px; background:${isSkipped ? '#f3f4f6' : '#e0e7ff'}; color:${isSkipped ? '#6b7280' : '#3730a3'}; font-size:0.95em;">
+                                            <span style="font-weight:bold; display:inline-block; width:90px;">Group voted:</span>
+                                            ${groupLabel}
+                                        </div>
+                                        ${officialIdx != null ? `
+                                            <div style="padding:10px; border-radius:8px; background:#d1e7dd; color:#0f5132; font-size:0.95em; border:1px solid #badbcc;">
+                                                <span style="font-weight:bold; display:inline-block; width:90px;">Correct:</span>
+                                                <b>${_letterFor(officialIdx)}</b>${officialText ? ` <span style="font-weight:400;">(${_esc(officialText)})</span>` : ''}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>`;
+                        }).join('');
+                        cardsHtml = examSummaryHtml + examCards;
+                    }
+                } else if (quiz.quizType === 'read_only') {
                     const rawFeedback = (att.answers || [])[att.answers.length - 1] || 'No feedback provided.';
                     const feedbackText = Array.isArray(rawFeedback) ? rawFeedback.join("\n---\n") : rawFeedback;
                     cardsHtml = cheatSummaryHtml + telemetrySummaryHtml + `
@@ -16868,6 +16959,10 @@ async function saveQuiz() {
                 const approvedBadgeHtml = isAlreadyApproved
                     ? `<span style="display:inline-flex;align-items:center;gap:6px;background:#dcfce7;color:#166534;border:1px solid #86efac;padding:6px 12px;border-radius:999px;font-size:0.78em;font-weight:800;"><i class="fa-solid fa-circle-check"></i> Already Approved</span>`
                     : '';
+                // V92.62 Phase 4.c: badge for exam-session attempts.
+                const examBadgeHtml = att.isExamSession
+                    ? `<span style="display:inline-flex;align-items:center;gap:6px;background:#e0e7ff;color:#3730a3;border:1px solid #a5b4fc;padding:6px 12px;border-radius:999px;font-size:0.78em;font-weight:800;">🎓 Group Exam Session</span>`
+                    : '';
 
                 // Create overlay directly on document.body
                 const overlay = document.createElement('div');
@@ -16876,7 +16971,7 @@ async function saveQuiz() {
                 overlay.innerHTML = `
                     <div style="background:white;width:95vw;height:95vh;border-radius:15px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
                         <div style="padding:15px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;background:#f8f9fa;">
-                            <h3 style="margin:0;color:#4361ee;font-size:1.1em;"><i class="fa-solid fa-magnifying-glass"></i> Review Quiz Attempt ${approvedBadgeHtml}</h3>
+                            <h3 style="margin:0;color:#4361ee;font-size:1.1em;display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><span><i class="fa-solid fa-magnifying-glass"></i> Review Quiz Attempt</span> ${approvedBadgeHtml} ${examBadgeHtml}</h3>
                             <div style="display:flex; gap:8px;">
                                 <button onclick="openTimingRiskConfigModal()" style="background:#0ea5e9;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:1.1em;" title="Timing Config">⚙</button>
                                 <button ${isAlreadyApproved ? 'disabled' : `onclick="approveQuizAttempt('${attemptId}')"`} style="${approveBtnStyle || 'background:#2ecc71;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;'}" title="${isAlreadyApproved ? 'Already approved — cannot re-approve' : 'Approve at 100%'}">🍎 Manten Manten no Mi (100%)</button>
