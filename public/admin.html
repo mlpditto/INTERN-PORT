@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.66</title>
+    <title>Nika V92.67</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -10097,7 +10097,13 @@
                     <h3 style="margin:0; color:#92400e; font-size:1.45em; font-weight:900; display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-pen-to-square"></i> Edit Case Note · 케이스 메모 편집</h3>
                     <div style="margin-top:6px; font-size:0.88em; color:#78716c;">Adjust the submitted note while keeping the case context visible for admin review.<br>검토를 위해 케이스 정보를 유지하면서 제출된 메모를 수정합니다.</div>
                 </div>
-                <span style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; border-radius:999px; padding:6px 12px; font-size:0.76em; font-weight:800;">Alabasta</span>
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <!-- V92.67 Phase 3-E: copy a deep-link to this case so admins can share the URL. -->
+                    <button type="button" id="edit-case-share-btn" onclick="copyEditCaseShareLink()" title="Copy share link · 공유 링크 복사" style="background:#fff; color:#1f2937; border:1px solid #cbd5e1; border-radius:999px; padding:6px 12px; font-size:0.78em; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-link"></i> Copy Link
+                    </button>
+                    <span style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; border-radius:999px; padding:6px 12px; font-size:0.76em; font-weight:800;">Alabasta</span>
+                </div>
             </div>
 
             <input type="hidden" id="edit-case-note-id">
@@ -21504,6 +21510,15 @@ async function saveQuiz() {
 
         function closeEditCaseNoteModal() {
             forceHideModal('editCaseNoteModal');
+            // V92.67 Phase 3-E: drop the ?case= param from the URL when the modal closes so the
+            // address bar matches what's on screen. replaceState avoids polluting browser history.
+            try {
+                const url = new URL(window.location.href);
+                if (url.searchParams.has('case')) {
+                    url.searchParams.delete('case');
+                    history.replaceState({}, '', url.toString());
+                }
+            } catch (_) { /* SSR / file:// — ignore */ }
             const noteEl = document.getElementById('edit-case-note-text');
             const idEl = document.getElementById('edit-case-note-id');
             const saveBtn = document.getElementById('edit-case-note-save-btn');
@@ -21573,6 +21588,62 @@ async function saveQuiz() {
             renderEditCaseTaxonomyCard();
 
             forceShowModal('editCaseNoteModal');
+            // V92.67 Phase 3-E: stamp ?case={id} into the URL so refresh / back-forward / share keep the modal context.
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set('case', caseDocId);
+                history.replaceState({ case: caseDocId }, '', url.toString());
+            } catch (_) { /* SSR / file:// — ignore */ }
+        }
+
+        // V92.67 Phase 3-E — share-link + deep-link helpers.
+        async function copyEditCaseShareLink() {
+            const id = document.getElementById('edit-case-note-id')?.value || '';
+            if (!id) { alert('No case loaded'); return; }
+            const url = `${window.location.origin}${window.location.pathname}?case=${encodeURIComponent(id)}`;
+            try {
+                await navigator.clipboard.writeText(url);
+                if (typeof showToast === 'function') showToast('Share link copied · 링크 복사됨', 'success');
+                else alert(url);
+            } catch (e) {
+                // Fallback: show a prompt for manual copy.
+                try { prompt('Copy this link:', url); } catch (_) { alert(url); }
+            }
+        }
+
+        function _processAlabastaDeepLink() {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const id = params.get('case');
+                if (!id) return;
+                if (typeof switchTab === 'function') {
+                    try { switchTab('tab-alabasta'); } catch (_) {}
+                }
+                // casesData is hydrated async by the Firestore snapshot listener.
+                // Poll up to ~10s for the case to appear, then open editCaseNote (which
+                // also re-stamps the URL via the V92.67 history hook in editCaseNote).
+                let attempts = 0;
+                const tryOpen = () => {
+                    const data = window.casesData || [];
+                    const found = data.find(c => c.id === id);
+                    if (found && typeof editCaseNote === 'function') {
+                        editCaseNote(id);
+                    } else if (attempts++ < 20) {
+                        setTimeout(tryOpen, 500);
+                    } else {
+                        console.warn('[deeplink] case not found after wait:', id);
+                        if (typeof showToast === 'function') showToast(`Case not found: ${id}`, 'error');
+                    }
+                };
+                tryOpen();
+            } catch (e) {
+                console.warn('[deeplink] parse failed:', e && e.message);
+            }
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', _processAlabastaDeepLink);
+        } else {
+            _processAlabastaDeepLink();
         }
 
         let alabastaBridgeSavedPoneglyphId = '';
