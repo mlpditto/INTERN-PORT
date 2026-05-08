@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exam Session V3.7 — INTERN-PORT</title>
+    <title>Exam Session V3.8 — INTERN-PORT</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -867,6 +867,45 @@
         }
 
         /* Connection pill (Phase 3.3 — fixed top-right; reflects Firestore metadata.fromCache) */
+        /* V3.8: top-right control row — wraps the pill so we can sit a Logout button next to it.
+           Logout is shown only on `state-blocked` (late-join lockout) per UX decision; the rest of
+           the time the pill stands alone. */
+        .exam-top-controls {
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            z-index: 1000;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .exam-top-controls .connection-pill {
+            position: static;
+            top: auto;
+            right: auto;
+        }
+        .exam-logout-btn {
+            background: rgba(239, 68, 68, 0.18);
+            border: 1px solid rgba(239, 68, 68, 0.45);
+            color: #fca5a5;
+            padding: 5px 11px 5px 9px;
+            border-radius: 999px;
+            font-size: 0.72em;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+        .exam-logout-btn:hover {
+            background: rgba(239, 68, 68, 0.28);
+            border-color: rgba(239, 68, 68, 0.65);
+            color: #fecaca;
+        }
         .connection-pill {
             position: fixed;
             top: 12px;
@@ -951,15 +990,21 @@
 </head>
 
 <body>
-    <!-- Connection pill (Phase 3.3 — Firestore sync state indicator; updated by listener metadata) -->
-    <div class="connection-pill" id="connection-pill" style="display:none;">
-        <span class="conn-dot"></span>
-        <span id="connection-pill-text">Synced</span>
+    <!-- Top-right controls: V3.8 wraps Phase 3.3 connection pill + the V3.8 Logout button so they can sit side-by-side. -->
+    <div class="exam-top-controls">
+        <button class="exam-logout-btn" id="exam-logout-btn" type="button" onclick="logoutExamSession()" style="display:none;" title="Sign out · 로그아웃">
+            <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </button>
+        <!-- Connection pill (Phase 3.3 — Firestore sync state indicator; updated by listener metadata) -->
+        <div class="connection-pill" id="connection-pill" style="display:none;">
+            <span class="conn-dot"></span>
+            <span id="connection-pill-text">Synced</span>
+        </div>
     </div>
 
     <div class="container">
         <div class="header">
-            <span class="badge"><i class="fa-solid fa-graduation-cap"></i> Exam Session V3.7</span>
+            <span class="badge"><i class="fa-solid fa-graduation-cap"></i> Exam Session V3.8</span>
             <h1 id="page-title">Exam Session</h1>
             <p class="subtitle">Group exam · Real-time sync · INTERN-PORT</p>
         </div>
@@ -1129,7 +1174,7 @@
         </div>
 
         <div class="footer">
-            INTERN-PORT · Exam Session V3.7 · cheat-detector init guard (Start no longer hangs)<br>
+            INTERN-PORT · Exam Session V3.8 · Logout button on late-join lockout screen<br>
             <code>2008959998-4ty7kBq2</code>
         </div>
     </div>
@@ -1165,6 +1210,22 @@
         const STATES = ['loading', 'lobby', 'running', 'paused', 'done', 'blocked', 'notfound', 'nosession', 'error'];
         function showState(which) {
             STATES.forEach(s => $(`state-${s}`).classList.toggle('hidden', s !== which));
+            // V3.8: Logout only appears on the late-join lockout screen — gives the user a way out
+            // when their UID isn't on the participant list (different browser, re-auth, etc.) without
+            // exposing a destructive button mid-exam.
+            const logoutBtn = $('exam-logout-btn');
+            if (logoutBtn) logoutBtn.style.display = (which === 'blocked') ? 'inline-flex' : 'none';
+        }
+
+        // V3.8 Logout: clear LIFF auth + Firebase anonymous auth, then reload to re-trigger init.
+        // Reachable only from the `state-blocked` view; safe to expand later if other recovery
+        // states (notfound, error) want it too.
+        async function logoutExamSession() {
+            if (_sessionUnsub) { try { _sessionUnsub(); } catch (_) {} _sessionUnsub = null; }
+            try { stopHeartbeat(); } catch (_) {}
+            try { await auth.signOut(); } catch (e) { console.warn('auth.signOut failed:', e && e.message); }
+            try { liff.logout(); } catch (e) { console.warn('liff.logout failed:', e && e.message); }
+            window.location.reload();
         }
         function setLoading(status, detail) {
             $('loading-status').textContent = status;
