@@ -2,6 +2,19 @@
     const FLUSH_DELAY_MS = 3000;
     const FORCE_FULLSCREEN = false;
 
+    // 2026-05-08 hotfix: pre-init the global so first access in initCheatDetector
+    // (line ~279, `window.cheatMonitor.active`) doesn't TypeError. Prior code only
+    // ever READ properties — the object itself was never created here, and no
+    // caller (index.html solo quiz, exam-session.html) initialised it either.
+    // The throw was silent in solo quiz (modal opens first, fires-and-forgets the
+    // call) but FATAL in exam-session.html: syncCheatDetector is invoked from the
+    // Firestore listener (handleSessionUpdate), so the throw kills the listener
+    // and host-side `Start Session` hangs forever on "Starting..." because the
+    // state-→running transition never reaches renderRunning.
+    if (!window.cheatMonitor) {
+        window.cheatMonitor = { active: false, events: [] };
+    }
+
     function ensureStyle() {
         if (document.getElementById('cheat-detector-style')) return;
         const style = document.createElement('style');
