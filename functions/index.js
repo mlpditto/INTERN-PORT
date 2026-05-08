@@ -864,3 +864,164 @@ exports.notifyOnAdminEdit = onCall(
     }
 });
 
+// ============================================================
+// notifyAdminOnNewCase (V94.40 / Alabasta Phase 2b)
+// ------------------------------------------------------------
+// Pushes a LINE Flex Message to the admin LINE userId whenever a
+// user submits a new case via LIFF. Caller-side invocation (called
+// from index.html submitCase() AFTER cases.add() succeeds) — the
+// project's Firestore region (asia-southeast3) doesn't support
+// Eventarc triggers, so callable wraps the push. See memory
+// `feedback_firestore_trigger_region_limitation.md`.
+//
+// Caller: public/index.html  submitCase()
+//
+// Input:  { caseDocId: string }
+// Auth:   signed-in (the user submitting the case is non-admin)
+// Body:   reads cases/{caseDocId} for displayName/caseId/disease/
+//         customer/diseaseSystemLabel/note → builds Flex Message →
+//         pushes to ADMIN_LINE_USER_ID via LINE Push API.
+// Output: { ok, pushed?, code?, status?, ... }  (best-effort,
+//         no retry; LIFF logs warning on non-ok and silently
+//         continues — case submission must not fail because of
+//         a LINE notify issue.)
+//
+// Required secrets (set via `firebase functions:secrets:set`):
+//   - LINE_CHANNEL_ACCESS_TOKEN  (already set; same one used by
+//     notifyOnReviewMessage and notifyOnAdminEdit)
+//   - ADMIN_LINE_USER_ID  (NEW — single LINE userId starting with
+//     'U'; the recipient of every new-case Flex Message)
+// ============================================================
+exports.notifyAdminOnNewCase = onCall(
+    { secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID'] },
+    async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'Login required');
+    }
+
+    const data = request.data || {};
+    const caseDocId = data.caseDocId || '';
+    if (!caseDocId) {
+        throw new HttpsError('invalid-argument', 'caseDocId required');
+    }
+
+    let caseData;
+    try {
+        const caseDoc = await admin.firestore()
+            .collection('cases').doc(caseDocId).get();
+        if (!caseDoc.exists) {
+            console.warn(`[notifyAdminOnNewCase] case ${caseDocId} not found`);
+            return { skipped: true, reason: 'case-not-found' };
+        }
+        caseData = caseDoc.data() || {};
+    } catch (err) {
+        console.error(`[notifyAdminOnNewCase] failed to read case ${caseDocId}:`, err.message);
+        throw new HttpsError('internal', 'failed to read case');
+    }
+
+    const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    const adminLineId = process.env.ADMIN_LINE_USER_ID;
+
+    if (!accessToken) {
+        console.warn(`[notifyAdminOnNewCase] LINE_CHANNEL_ACCESS_TOKEN secret missing — skipping push for case=${caseDocId}`);
+        return { skipped: true, reason: 'token-missing' };
+    }
+    if (!adminLineId || typeof adminLineId !== 'string' || !adminLineId.startsWith('U')) {
+        console.warn(`[notifyAdminOnNewCase] ADMIN_LINE_USER_ID missing or invalid — skipping push for case=${caseDocId}`);
+        return { skipped: true, reason: 'admin-id-missing' };
+    }
+
+    // Sanitize + truncate fields for the Flex Message.
+    const displayName = String(caseData.displayName || 'Unknown').slice(0, 60);
+    const caseRef = String(caseData.caseId || '').slice(0, 30);
+    const customer = String(caseData.customer || '').slice(0, 60);
+    const disease = String(caseData.disease || '').slice(0, 80);
+    const systemLabel = String(caseData.diseaseSystemLabel || '').slice(0, 60);
+    const noteRaw = String(caseData.note || '').replace(/\s+/g, ' ').trim();
+    const noteText = noteRaw.length > 200 ? noteRaw.slice(0, 197) + '…' : (noteRaw || '(no note)');
+
+    const altText = `🩺 New case: ${disease || caseRef || 'Untitled'} from ${displayName}`.slice(0, 400);
+    const adminUri = 'https://mlpditto.github.io/INTERN-PORT/admin.html';
+
+    const subtitleParts = [];
+    if (caseRef) subtitleParts.push(`HN ${caseRef}`);
+    if (customer) subtitleParts.push(customer);
+    const subtitle = subtitleParts.length ? subtitleParts.join(' · ') : 'New submission';
+
+    const detailRows = [];
+    if (disease) detailRows.push({ type: 'text', text: `🏥 ${disease}`, size: 'sm', color: '#7c2d12', weight: 'bold', wrap: true });
+    if (systemLabel) detailRows.push({ type: 'text', text: systemLabel, size: 'xs', color: '#94a3b8', wrap: true });
+    if (detailRows.length) detailRows.push({ type: 'separator', margin: 'sm' });
+    detailRows.push({ type: 'text', text: noteText, wrap: true, size: 'sm', color: '#1f2937', margin: detailRows.length ? 'sm' : 'none' });
+
+    const flex = {
+        type: 'flex',
+        altText: altText,
+        contents: {
+            type: 'bubble',
+            size: 'kilo',
+            header: {
+                type: 'box',
+                layout: 'vertical',
+                backgroundColor: '#0ea5e9',
+                paddingAll: '12px',
+                contents: [
+                    { type: 'text', text: '🩺 New Case Submitted', weight: 'bold', size: 'sm', color: '#ffffff' },
+                    { type: 'text', text: `${displayName} · ${subtitle}`, size: 'xs', color: '#e0f2fe', margin: 'xs', wrap: true }
+                ]
+            },
+            body: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '16px',
+                spacing: 'sm',
+                contents: detailRows
+            },
+            footer: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '12px',
+                contents: [
+                    {
+                        type: 'button',
+                        style: 'primary',
+                        color: '#0ea5e9',
+                        height: 'sm',
+                        action: { type: 'uri', label: 'Review in Admin →', uri: adminUri }
+                    }
+                ]
+            }
+        }
+    };
+
+    try {
+        await axios.post('https://api.line.me/v2/bot/message/push', {
+            to: adminLineId,
+            messages: [flex]
+        }, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 8000
+        });
+
+        console.log(`[notifyAdminOnNewCase] PUSHED  case=${caseDocId}  user=${displayName}  hn=${caseRef || '(none)'}`);
+        return { ok: true, pushed: true, caseDocId };
+    } catch (err) {
+        const status = err && err.response ? err.response.status : null;
+        const lineMessage = (err && err.response && err.response.data && err.response.data.message) || (err && err.message) || 'unknown';
+        let code;
+        if (status === 400) code = 'invalid';
+        else if (status === 401) code = 'token';
+        else if (status === 403) code = 'no-friend';
+        else if (status === 404) code = 'invalid-user';
+        else if (status === 429) code = 'rate-limit';
+        else if (status >= 500 && status < 600) code = 'transient';
+        else code = 'network';
+
+        console.error(`[notifyAdminOnNewCase] PUSH_FAILED  code=${code}  status=${status || 'no-response'}  case=${caseDocId}  message=${JSON.stringify(lineMessage)}`);
+        return { ok: false, code, status: status || null, caseDocId };
+    }
+});
+
