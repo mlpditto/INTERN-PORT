@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.39)</title>
+    <title>Internship Portfolio (V94.40)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -12335,6 +12335,18 @@ async function archiveDoneCard(cardId) {
                     // Don't fail the submission if unified write fails
                 }
 
+                // V94.40 Phase 2b: Push LINE Flex Message to admin (best-effort, non-blocking).
+                // Case submission must NOT fail because of a notify error — log + continue.
+                try {
+                    if (typeof firebase !== 'undefined' && firebase.functions) {
+                        const notifyFn = firebase.functions().httpsCallable('notifyAdminOnNewCase');
+                        const res = await notifyFn({ caseDocId: legacyRef.id });
+                        console.log('[notifyAdminOnNewCase]', res && res.data);
+                    }
+                } catch (notifyErr) {
+                    console.warn('[notifyAdminOnNewCase] non-critical:', (notifyErr && notifyErr.message) || notifyErr);
+                }
+
                 await awardCaseSubmitBonus();
 
                 // Notify LINE
@@ -12382,7 +12394,16 @@ async function archiveDoneCard(cardId) {
                             timestamp: firebase.firestore.FieldValue.serverTimestamp()
                         };
                         
-                        await db.collection("cases").add(caseData);
+                        const fallbackRef = await db.collection("cases").add(caseData);
+                        // V94.40 Phase 2b: same admin LINE notify as the main path; safe to swallow errors here too.
+                        try {
+                            if (typeof firebase !== 'undefined' && firebase.functions) {
+                                const notifyFn = firebase.functions().httpsCallable('notifyAdminOnNewCase');
+                                await notifyFn({ caseDocId: fallbackRef.id });
+                            }
+                        } catch (notifyErr) {
+                            console.warn('[notifyAdminOnNewCase fallback] non-critical:', (notifyErr && notifyErr.message) || notifyErr);
+                        }
                         await awardCaseSubmitBonus();
                         // V94.19: same inline success card as the main path
                         clearCaseDraft();
