@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.67</title>
+    <title>Nika V92.68</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -3712,6 +3712,29 @@
     display: block;
 }
 
+/* V92.68: Exam Sessions filter chips */
+        .exam-filter-chip {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            color: #475569;
+            padding: 5px 12px;
+            border-radius: 999px;
+            font-size: 0.74em;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .exam-filter-chip:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+        .exam-filter-chip.is-active {
+            background: #ede9fe;
+            border-color: #c4b5fd;
+            color: #6b21a8;
+        }
+
 /* V92.53: Sub-tabs inside Assignments tab — switch between Quiz Engine and Exam Sessions */
 .subtab-nav {
     display: flex;
@@ -5101,8 +5124,7 @@
                     🧠 Quiz Engine
                 </button>
                 <button type="button" class="subtab-btn" data-subtab="subtab-exam-sessions" onclick="switchAssignmentsSubtab('subtab-exam-sessions')" role="tab">
-                    🎓 Exam Sessions
-                    <span class="subtab-pill">TBL/GRAT</span>
+                    🎓 Exam
                 </button>
             </div>
 
@@ -5192,18 +5214,18 @@
                 <div class="flex-between" style="border-bottom:1px solid #c4b5fd; padding-bottom:15px; margin-bottom:20px;">
                     <h3 style="margin:0; color:#6b21a8; display:flex; align-items:center; gap:12px; font-weight:900; font-size:1.3em;">
                         🎓 Exam Sessions
-                        <span style="font-size:0.6em; font-weight:700; background:#ede9fe; color:#7c3aed; padding:3px 10px; border-radius:8px; letter-spacing:0.04em;">MULTI-USER · TBL/GRAT</span>
                     </h3>
                     <div style="display:flex; gap:10px; align-items:center;">
-                        <span id="exam-sessions-count" style="background:rgba(124,58,237,0.08); color:#6b21a8; font-weight:800; font-size:0.75em; padding:6px 12px; border-radius:10px; border:1px solid rgba(124,58,237,0.15);">Active: 0</span>
-                        <button onclick="refreshExamSessionsList()" title="Refresh sessions list" style="background:#fff; border:1px solid #d8b4fe; color:#6b21a8; padding:6px 12px; border-radius:8px; font-size:0.78em; font-weight:700; cursor:pointer;">
-                            <i class="fa-solid fa-rotate"></i> Refresh
+                        <!-- V92.68: breakdown badge — Lobby / Running counts (Done/paused not shown; listener already filters out done) -->
+                        <span id="exam-sessions-count" style="background:rgba(124,58,237,0.08); color:#6b21a8; font-weight:800; font-size:0.75em; padding:6px 12px; border-radius:10px; border:1px solid rgba(124,58,237,0.15); font-variant-numeric:tabular-nums;">Lobby: 0 · Running: 0</span>
+                        <button id="exam-sessions-refresh" onclick="retryExamSessionsListener()" title="Re-attach realtime listener (rarely needed — list auto-updates)" style="background:#fff; border:1px solid #d8b4fe; color:#6b21a8; width:32px; height:32px; border-radius:8px; font-size:0.95em; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;" aria-label="Re-attach listener">
+                            <i class="fa-solid fa-rotate"></i>
                         </button>
                     </div>
                 </div>
 
                 <p style="margin:0 0 18px 0; color:#64748b; font-size:0.85em; line-height:1.5;">
-                    Multi-user collaborative exam (TBL/GRAT-style). Pick a quiz, assign a host, share the LIFF link in LINE chat — host clicks <strong>Start</strong> when everyone is in the lobby. Voting majority wins; results saved per participant.
+                    Multi-user collaborative exam. Pick a quiz, assign a host, share the LIFF link in LINE chat — host clicks <strong>Start</strong> when everyone is in the lobby. Voting majority wins; results saved per participant.
                 </p>
 
                 <!-- Create Form -->
@@ -5218,10 +5240,9 @@
                             <select id="exam-create-quiz" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; background:#fff; color:#1e293b; font-weight:700;">
                                 <option value="">— Select quiz (multiple-choice only) —</option>
                             </select>
-                            <div style="font-size:0.7em; color:#94a3b8; margin-top:4px;">Auto-filtered to <code>type === 'choice'</code> quizzes</div>
                         </div>
                         <div>
-                            <label style="display:block; font-size:0.75em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Host (designated user) <span style="color:#ef4444;">*</span></label>
+                            <label style="display:block; font-size:0.75em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Host <span style="color:#ef4444;">*</span></label>
                             <input id="exam-create-host-search" type="text" placeholder="Type to search users..." oninput="renderExamHostSearchResults()" autocomplete="off" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; box-sizing:border-box;">
                             <input type="hidden" id="exam-create-host-uid">
                             <div id="exam-create-host-results" style="display:none; position:relative; margin-top:4px; max-height:220px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:10px; background:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.08); z-index:10;"></div>
@@ -5230,9 +5251,8 @@
                     </div>
 
                     <div style="margin-bottom:14px;">
-                        <label style="display:block; font-size:0.75em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Total time (minutes)</label>
+                        <label style="display:block; font-size:0.75em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Total time (min) — host can pause anytime</label>
                         <input id="exam-create-total-min" type="number" value="30" min="5" max="180" step="5" style="width:120px; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em;">
-                        <span style="font-size:0.75em; color:#94a3b8; margin-left:8px;">Pausable by host during session.</span>
                     </div>
 
                     <button onclick="createExamSession()" class="magic-btn" style="background:linear-gradient(135deg, #7c3aed, #a855f7); padding:10px 22px; border-radius:12px; font-weight:900; font-size:0.88em;">
@@ -5240,12 +5260,23 @@
                     </button>
                 </div>
 
-                <!-- Active Sessions List -->
-                <h4 style="color:#6b21a8; margin:0 0 10px 0; font-size:0.95em; font-weight:800;">
-                    <i class="fa-solid fa-list-check" style="color:#10b981;"></i> Active Sessions
-                </h4>
+                <!-- Active Sessions List + V92.68 filter chips -->
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:0 0 10px 0;">
+                    <h4 style="color:#6b21a8; margin:0; font-size:0.95em; font-weight:800;">
+                        <i class="fa-solid fa-list-check" style="color:#10b981;"></i> Active Sessions
+                    </h4>
+                    <div id="exam-sessions-filter-chips" role="tablist" aria-label="Filter sessions by state" style="display:flex; gap:6px;">
+                        <button type="button" class="exam-filter-chip is-active" data-filter="all" onclick="setExamSessionFilter('all')">All</button>
+                        <button type="button" class="exam-filter-chip" data-filter="lobby" onclick="setExamSessionFilter('lobby')">Lobby</button>
+                        <button type="button" class="exam-filter-chip" data-filter="running" onclick="setExamSessionFilter('running')">Running</button>
+                        <button type="button" class="exam-filter-chip" data-filter="paused" onclick="setExamSessionFilter('paused')">Paused</button>
+                    </div>
+                </div>
                 <div id="exam-sessions-list" style="display:flex; flex-direction:column; gap:10px; background:white; padding:15px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05); min-height:80px;">
-                    <div style="padding:24px; text-align:center; color:#94a3b8; font-size:0.86em;">No active sessions. Create one above to get started.</div>
+                    <div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.86em;">
+                        <div style="font-size:2em; margin-bottom:8px; opacity:0.5;">🎓</div>
+                        No active sessions yet — create one above to get started.
+                    </div>
                 </div>
             </div>
             </div><!-- /subtab-exam-sessions -->
@@ -34227,6 +34258,10 @@ Reply ONLY with raw JSON, no markdown:
         const EXAM_SESSION_LIFF_ID = "2008959998-4ty7kBq2";
         let _examSessionsUnsub = null;
         let _examSessionsTabInitialized = false;
+        // V92.68: cache the latest snapshot so the filter chips can re-render without a roundtrip,
+        // and track the active filter (default = 'all').
+        let _examSessionsLatest = [];
+        let _examSessionsFilter = 'all';
 
         function initExamSessionsTab() {
             populateExamQuizSelect();
@@ -34240,22 +34275,59 @@ Reply ONLY with raw JSON, no markdown:
             if (hostSelectedEl) { hostSelectedEl.style.display = 'none'; hostSelectedEl.innerHTML = ''; }
             if (hostResultsEl) hostResultsEl.style.display = 'none';
 
-            // Attach realtime listener once; subsequent tab switches reuse it
-            if (!_examSessionsUnsub) {
-                _examSessionsUnsub = db.collection("exam_sessions")
-                    .orderBy("createdAt", "desc")
-                    .onSnapshot(snap => {
-                        const sessions = snap.docs
-                            .map(d => ({ id: d.id, ...d.data() }))
-                            .filter(s => s.state !== 'done');
-                        renderExamSessionsList(sessions);
-                    }, err => {
-                        console.error("Exam sessions listener error:", err);
-                        const list = document.getElementById('exam-sessions-list');
-                        if (list) list.innerHTML = `<div style="padding:20px; color:#ef4444; text-align:center;">Error loading sessions: ${err.message}</div>`;
-                    });
-            }
+            attachExamSessionsListener();
             _examSessionsTabInitialized = true;
+        }
+
+        function attachExamSessionsListener() {
+            // Tear down any prior listener before re-attaching (idempotent — supports retry on permission errors).
+            if (_examSessionsUnsub) { try { _examSessionsUnsub(); } catch (_) {} _examSessionsUnsub = null; }
+            _examSessionsUnsub = db.collection("exam_sessions")
+                .orderBy("createdAt", "desc")
+                .onSnapshot(snap => {
+                    _examSessionsLatest = snap.docs
+                        .map(d => ({ id: d.id, ...d.data() }))
+                        .filter(s => s.state !== 'done');
+                    renderExamSessionsList();
+                }, err => {
+                    console.error("Exam sessions listener error:", err);
+                    showExamSessionsError(err && err.message ? err.message : String(err));
+                });
+        }
+
+        // V92.68: friendlier error card with Retry + Refresh page actions instead of bare red text.
+        function showExamSessionsError(message) {
+            const list = document.getElementById('exam-sessions-list');
+            if (!list) return;
+            const safeMsg = String(message || 'Unknown error').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+            list.innerHTML = `
+                <div style="padding:22px; text-align:center; background:#fef2f2; border:1px solid #fecaca; border-radius:10px;">
+                    <div style="color:#991b1b; font-weight:800; font-size:0.95em; margin-bottom:6px;">⚠️ Couldn't load sessions</div>
+                    <div style="color:#7f1d1d; font-size:0.82em; margin-bottom:14px;">${safeMsg}</div>
+                    <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+                        <button onclick="retryExamSessionsListener()" style="background:#dc2626; color:#fff; border:none; padding:7px 14px; border-radius:8px; font-size:0.82em; font-weight:700; cursor:pointer;">
+                            <i class="fa-solid fa-rotate"></i> Retry
+                        </button>
+                        <button onclick="location.reload()" style="background:#fff; color:#7f1d1d; border:1px solid #fecaca; padding:7px 14px; border-radius:8px; font-size:0.82em; font-weight:700; cursor:pointer;">
+                            <i class="fa-solid fa-arrows-rotate"></i> Refresh page
+                        </button>
+                    </div>
+                </div>`;
+        }
+
+        // V92.68: replaces the old refreshExamSessionsList toast — actually re-attaches the listener
+        // so a transient permission-denied or network error can recover without a full page reload.
+        function retryExamSessionsListener() {
+            attachExamSessionsListener();
+            if (typeof showToast === 'function') showToast('🔄 Reconnecting...');
+        }
+
+        function setExamSessionFilter(state) {
+            _examSessionsFilter = state || 'all';
+            document.querySelectorAll('.exam-filter-chip').forEach(btn => {
+                btn.classList.toggle('is-active', btn.dataset.filter === _examSessionsFilter);
+            });
+            renderExamSessionsList();
         }
 
         function populateExamQuizSelect() {
@@ -34379,20 +34451,32 @@ Reply ONLY with raw JSON, no markdown:
             }
         }
 
-        function refreshExamSessionsList() {
-            // Listener already keeps the list fresh, but provide a manual nudge for trust.
-            showToast('🔄 Refreshed');
-        }
-
-        function renderExamSessionsList(sessions) {
+        // V92.68: renderExamSessionsList now reads from _examSessionsLatest cache + applies the
+        // current filter chip selection. Counts in the header always reflect the FULL list.
+        function renderExamSessionsList() {
             const list = document.getElementById('exam-sessions-list');
             const countEl = document.getElementById('exam-sessions-count');
             if (!list) return;
 
-            if (countEl) countEl.textContent = `Active: ${sessions.length}`;
+            const all = _examSessionsLatest || [];
+            const lobbyCount = all.filter(s => s.state === 'lobby').length;
+            const runningCount = all.filter(s => s.state === 'running').length;
+            const pausedCount = all.filter(s => s.state === 'paused').length;
+            if (countEl) {
+                countEl.textContent = pausedCount > 0
+                    ? `Lobby: ${lobbyCount} · Running: ${runningCount} · Paused: ${pausedCount}`
+                    : `Lobby: ${lobbyCount} · Running: ${runningCount}`;
+            }
+
+            const sessions = _examSessionsFilter === 'all'
+                ? all
+                : all.filter(s => s.state === _examSessionsFilter);
 
             if (sessions.length === 0) {
-                list.innerHTML = `<div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.88em;">No active sessions. Create one above to get started.</div>`;
+                const filterLabel = _examSessionsFilter === 'all' ? '' : ` in <b>${_examSessionsFilter}</b> state`;
+                list.innerHTML = all.length === 0
+                    ? `<div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.86em;"><div style="font-size:2em; margin-bottom:8px; opacity:0.5;">🎓</div>No active sessions yet — create one above to get started.</div>`
+                    : `<div style="padding:24px; text-align:center; color:#94a3b8; font-size:0.86em;">No sessions${filterLabel}. Try a different filter or <a href="#" onclick="setExamSessionFilter('all'); return false;" style="color:#7c3aed; font-weight:700;">show all</a>.</div>`;
                 return;
             }
 
