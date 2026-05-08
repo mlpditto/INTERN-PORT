@@ -108,7 +108,7 @@ function getSafeProviderError(err) {
  * 🤖 AI Proxy Function (V89.19)
  * Handles: Gemini, OpenAI, and Vertex AI (Imagen 3)
  */
-exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY"], timeoutSeconds: 300, memory: "512MiB" }, async (req, res) => {
+exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY"], timeoutSeconds: 300, memory: "512MiB" }, async (req, res) => {
     try {
         // 1. Basic Auth Check (Custom Header)
         const authHeader = req.headers["x-mlp-secret"];
@@ -400,6 +400,52 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 text: response.data.content[0].text, 
                 tokens: (response.data.usage.input_tokens + response.data.usage.output_tokens) || 0,
                 model: actualModel
+            });
+        }
+
+        // --- 🟡 Google AI Studio (Gemini Generative Language API — image gen via Nano Banana) ---
+        // V92.70: New default for Case Card + Goldenweek after OpenRouter started returning 500.
+        // Uses GEMINI_API_KEY from https://aistudio.google.com/api-keys (project-bound to intern-port-edfa7).
+        if (provider === "gemini-aistudio") {
+            const apiKey = process.env.GEMINI_API_KEY;
+            if (!apiKey) return res.status(500).json({ error: "GEMINI_API_KEY is not configured on server." });
+
+            const asModel = model || "gemini-2.5-flash-image-preview";
+            const isImageRequest = /image/i.test(asModel);
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${asModel}:generateContent?key=${apiKey}`;
+
+            const body = {
+                contents: [{ parts: [{ text: prompt }] }],
+                ...(isImageRequest ? { generationConfig: { responseModalities: ["IMAGE", "TEXT"] } } : {})
+            };
+
+            const response = await axios.post(endpoint, body, {
+                headers: { "Content-Type": "application/json" }
+            });
+
+            if (isImageRequest) {
+                const parts = response.data?.candidates?.[0]?.content?.parts || [];
+                const inline = parts.find(p => p?.inlineData?.data);
+                if (!inline) {
+                    return res.status(502).json({
+                        error: `AI Studio ${asModel} returned no image data.`,
+                        details: { partsCount: parts.length, candidatesCount: response.data?.candidates?.length || 0 }
+                    });
+                }
+                const mime = inline.inlineData.mimeType || "image/png";
+                return res.json({
+                    imageDataUrl: `data:${mime};base64,${inline.inlineData.data}`,
+                    text: parts.find(p => p?.text)?.text || "",
+                    tokens: response.data?.usageMetadata?.totalTokenCount || 0,
+                    model: asModel
+                });
+            }
+
+            const textOut = response.data?.candidates?.[0]?.content?.parts?.find(p => p?.text)?.text || "";
+            return res.json({
+                text: textOut,
+                tokens: response.data?.usageMetadata?.totalTokenCount || 0,
+                model: asModel
             });
         }
 
