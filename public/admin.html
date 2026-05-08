@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.65</title>
+    <title>Nika V92.66</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1107,6 +1107,57 @@
         .alabasta-action-btn.is-reopen { background: #334155; }
         .alabasta-action-btn.is-delete {
             background: #ef4444;
+        }
+        /* V92.66 Phase 3-D: ⋯ More dropdown for case-row secondary actions (Laboon / Case Card / Poneglyph). */
+        .alabasta-action-btn.is-more { background: #64748b; }
+        .alabasta-more-menu {
+            position: relative;
+            display: inline-block;
+        }
+        .alabasta-more-menu > summary {
+            list-style: none;
+            cursor: pointer;
+            user-select: none;
+        }
+        .alabasta-more-menu > summary::-webkit-details-marker { display: none; }
+        .alabasta-more-menu[open] > summary.alabasta-action-btn {
+            box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.32);
+        }
+        .alabasta-more-menu-body {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            min-width: 220px;
+            max-width: 280px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 16px 32px rgba(15, 23, 42, 0.14);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            z-index: 50;
+        }
+        .alabasta-more-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-align: left;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            padding: 9px 12px;
+            cursor: pointer;
+            color: #1f2937;
+            font-size: 0.86em;
+            font-weight: 700;
+            white-space: nowrap;
+            font-family: inherit;
+            transition: background 0.15s ease;
+        }
+        .alabasta-more-menu-item:hover {
+            background: #f1f5f9;
         }
 
         .alabasta-visual-grid {
@@ -21280,12 +21331,19 @@ async function saveQuiz() {
                     ? `<button class="btn-sm alabasta-action-btn is-reopen" title="Reopen case · 케이스 재개" onclick="updateCaseStatus('${c.id}', 'pending')"><span class="alabasta-emoji">↩️</span></button>`
                     : `<button class="btn-sm alabasta-action-btn is-review" title="Mark reviewed · 검토 완료로 표시" onclick="updateCaseStatus('${c.id}', 'reviewed')"><span class="alabasta-emoji">✅</span></button>`;
                 const editBtn = `<button class="btn-sm alabasta-action-btn is-edit" title="Edit case note · 케이스 메모 편집" onclick="editCaseNote('${c.id}')"><span class="alabasta-emoji">✏️</span></button>`;
-                const laboonBtn = `<button class="btn-sm alabasta-action-btn is-laboon" title="Ask Laboon · Laboon에게 묻기" onclick="openAlabastaLaboon('${c.id}')"><span class="alabasta-emoji">🐳</span></button>`;
-                const caseCardBtn = `<button class="btn-sm alabasta-action-btn is-case-card" title="Generate patient-safe case card · 환자 안전 카드 생성" onclick="openAlabastaCaseCard('${c.id}')"><span class="alabasta-emoji">🖼️</span></button>`;
-                const hasPoneglyphLink = !!c.poneglyphNoteId;
-                const poneglyphBtn = `<button class="btn-sm alabasta-action-btn is-poneglyph" title="${hasPoneglyphLink ? 'Open linked Poneglyph draft · 연결된 Poneglyph 초안 열기' : 'Promote to Poneglyph · Poneglyph로 승격'}" onclick="openAlabastaPoneglyph('${c.id}')"><span class="alabasta-emoji">🪨</span></button>`;
                 const deleteBtn = `<button class="btn-sm alabasta-action-btn is-delete" title="Delete case · 케이스 삭제" onclick="deleteCaseSubmission('${c.id}')"><span class="alabasta-emoji">🗑️</span></button>`;
-                const actionBtn = `<div class="alabasta-action-row">${editBtn}${laboonBtn}${caseCardBtn}${poneglyphBtn}${statusBtn}${deleteBtn}</div>`;
+                const hasPoneglyphLink = !!c.poneglyphNoteId;
+                // V92.66 Phase 3-D: secondary actions (Laboon / Case Card / Poneglyph) collapsed
+                // behind ⋯ More to keep the row to 4 visible buttons (Edit · Review/Reopen · Delete · More).
+                const moreBtn = `<details class="alabasta-more-menu">
+                    <summary class="btn-sm alabasta-action-btn is-more" title="More actions · 더 보기"><span class="alabasta-emoji">⋯</span></summary>
+                    <div class="alabasta-more-menu-body" role="menu">
+                        <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaLaboon('${c.id}');"><span class="alabasta-emoji">🐳</span> Ask Laboon · Laboon에게 묻기</button>
+                        <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaCaseCard('${c.id}');"><span class="alabasta-emoji">🖼️</span> Generate Case Card · 카드 생성</button>
+                        <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaPoneglyph('${c.id}');"><span class="alabasta-emoji">🪨</span> ${hasPoneglyphLink ? 'Open Poneglyph draft · 초안 열기' : 'Promote to Poneglyph · 승격'}</button>
+                    </div>
+                </details>`;
+                const actionBtn = `<div class="alabasta-action-row">${editBtn}${statusBtn}${deleteBtn}${moreBtn}</div>`;
 
                 const isSelected = window.alabastaSelectedIds.has(c.id);
                 return `
@@ -23032,6 +23090,30 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 alert('Failed to reject case: ' + e.message);
             }
         }
+
+        // V92.66 Phase 3-D — coordinate the per-row ⋯ More menus so only one is open at a time
+        // and any outside click closes them all. Wired once at first load via the IIFE guard.
+        function closeAlabastaMoreMenus() {
+            document.querySelectorAll('details.alabasta-more-menu[open]').forEach(d => d.removeAttribute('open'));
+        }
+        (function setupAlabastaMoreMenuListeners() {
+            if (window._alabastaMoreMenuWired) return;
+            window._alabastaMoreMenuWired = true;
+            document.addEventListener('click', (e) => {
+                document.querySelectorAll('details.alabasta-more-menu[open]').forEach(d => {
+                    if (!d.contains(e.target)) d.removeAttribute('open');
+                });
+            });
+            // toggle doesn't bubble, so listen in capture phase
+            document.addEventListener('toggle', (e) => {
+                const t = e.target;
+                if (t && t.classList && t.classList.contains('alabasta-more-menu') && t.open) {
+                    document.querySelectorAll('details.alabasta-more-menu[open]').forEach(d => {
+                        if (d !== t) d.removeAttribute('open');
+                    });
+                }
+            }, true);
+        })();
 
         function renderTable(type) {
             const tbody = document.querySelector(`#${type}Table tbody`);
