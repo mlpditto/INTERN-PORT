@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.72</title>
+    <title>Nika V92.73</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -8524,6 +8524,8 @@
                                 <button onclick="saveLpEntry()" style="background:#16a34a; color:#fff; border:none; border-radius:10px; padding:8px 12px; font-size:0.84em; font-weight:700; cursor:pointer;">💾 Save</button>
                                 <button onclick="deleteLpEntry()" style="background:#dc2626; color:#fff; border:none; border-radius:10px; padding:8px 12px; font-size:0.84em; font-weight:700; cursor:pointer;">🗑️ Delete</button>
                                 <button onclick="aiEnhanceLpEntry()" style="background:#5b21b6; color:#fff; border:none; border-radius:10px; padding:8px 12px; font-size:0.84em; font-weight:700; cursor:pointer;">🤖 AI Enhance</button>
+                                <button onclick="copyLpEntryContent()" title="Copy entry content (textarea) to clipboard" style="background:#0ea5e9; color:#fff; border:none; border-radius:10px; padding:8px 12px; font-size:0.84em; font-weight:700; cursor:pointer;">📋 Copy</button>
+                                <button onclick="copyLpEntryFull()" title="Copy full entry: title, date, tags, content, AI output" style="background:#0284c7; color:#fff; border:none; border-radius:10px; padding:8px 12px; font-size:0.84em; font-weight:700; cursor:pointer;">📑 Copy All</button>
                                 <span id="lp-save-status" style="margin-left:auto; font-size:0.82em; color:#64748b;">Ready</span>
                             </div>
                             <input id="lp-entry-title" type="text" placeholder="Entry title..." style="margin:0 0 8px 0; font-size:1.05em; font-weight:800; border-radius:10px; padding:10px 12px; width:100%; box-sizing:border-box;">
@@ -30653,6 +30655,51 @@ Recommended Review: X days`;
             const content = document.getElementById('lp-entry-content');
             content.value = (content.value ? content.value + '\n\n---\n' : '') + ai;
             lpAutoResize(content);
+        };
+
+        // V92.73: Copy entry content (textarea only) to clipboard.
+        window.copyLpEntryContent = async function() {
+            const content = document.getElementById('lp-entry-content').value;
+            if (!content.trim()) { showToast('⚠️ Nothing to copy.'); return; }
+            try {
+                await navigator.clipboard.writeText(content);
+                showToast('📋 Content copied!');
+            } catch (e) {
+                console.error('copyLpEntryContent', e);
+                alert('Copy failed: ' + e.message);
+            }
+        };
+
+        // V92.73: Copy full entry (title + date + tags + content + AI output) to clipboard.
+        window.copyLpEntryFull = async function() {
+            const title = document.getElementById('lp-entry-title').value || '(untitled)';
+            const date = document.getElementById('lp-entry-date').value || '';
+            const nextReview = document.getElementById('lp-entry-next-review').value || '';
+            const tags = document.getElementById('lp-entry-tags').value || '';
+            const content = document.getElementById('lp-entry-content').value || '';
+            const ai = document.getElementById('lp-ai-output').value || '';
+
+            const lines = [title];
+            const meta = [];
+            if (date) meta.push(`Date: ${date}`);
+            if (nextReview) meta.push(`Next Review: ${nextReview}`);
+            if (meta.length) lines.push(meta.join(' | '));
+            if (tags) lines.push(`Tags: ${tags}`);
+            lines.push('');
+            lines.push(content);
+            if (ai.trim()) {
+                lines.push('');
+                lines.push('--- AI Output ---');
+                lines.push(ai);
+            }
+            const fullText = lines.join('\n');
+            try {
+                await navigator.clipboard.writeText(fullText);
+                showToast('📑 Full entry copied!');
+            } catch (e) {
+                console.error('copyLpEntryFull', e);
+                alert('Copy failed: ' + e.message);
+            }
         };
 
         window.lpTogglePathDetail = function() {
