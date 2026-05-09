@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.40)</title>
+    <title>Internship Portfolio (V94.41)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2844,6 +2844,8 @@
                                     <div style="font-size:0.9em; font-weight:800; color:#475569; margin-bottom:12px;">
                                         🎓 My Notes <span id="ln-history-count" style="color:#94a3b8; font-weight:700;">(0)</span>
                                     </div>
+                                    <!-- V94.41: Axis filter rail (LP_TAXONOMY-derived) -->
+                                    <div id="ln-history-filter" style="display:none; gap:6px; margin-bottom:12px; flex-wrap:wrap; padding:8px; background:#f8fafc; border:1px solid #f1f5f9; border-radius:12px;"></div>
                                     <div id="ln-history-list" style="display:flex; flex-direction:column; gap:10px;"></div>
                                     <div id="ln-history-pagination" style="margin-top:12px; display:flex; justify-content:center; gap:6px;"></div>
                                 </div>
@@ -9118,21 +9120,90 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             }
         };
 
+        // V94.41: Lazy-derive axis tag sets from LP_TAXONOMY (lowercase for case-insensitive match)
+        function lnGetAxisTagSets() {
+            if (window._lnAxisTagSets) return window._lnAxisTagSets;
+            const tx = window.LP_TAXONOMY || {};
+            const sets = {};
+            ['medical', 'skill', 'tool'].forEach(axis => {
+                const systems = (tx[axis] && tx[axis].systems) || [];
+                sets[axis] = new Set(systems.flatMap(s => (s.tags || []).map(t => String(t).toLowerCase())));
+            });
+            window._lnAxisTagSets = sets;
+            return sets;
+        }
+        function lnTagAxis(tag) {
+            const sets = lnGetAxisTagSets();
+            const lo = String(tag || '').toLowerCase();
+            if (sets.medical && sets.medical.has(lo)) return 'medical';
+            if (sets.skill   && sets.skill.has(lo))   return 'skill';
+            if (sets.tool    && sets.tool.has(lo))    return 'tool';
+            return 'custom';
+        }
+        // V94.41: per-axis pill colors (Straw Hat palette, mirrors LP_TAXONOMY.colors)
+        const LN_AXIS_STYLE = {
+            medical: { bg: '#fff1f2', fg: '#be123c', label: '🩺 Medical' },
+            skill:   { bg: '#f0fdf4', fg: '#15803d', label: '🎯 Skill' },
+            tool:    { bg: '#f0f9ff', fg: '#0c4a6e', label: '🛠️ Tool' },
+            custom:  { bg: '#fef3c7', fg: '#92400e', label: '🏷️ Custom' }
+        };
+
         // V94.32: LN history render (C-i — recent notes below LN form)
+        // V94.41: Axis filter rail + per-axis tag colors
         window.renderLnHistory = function() {
             const wrap = document.getElementById('ln-history');
             const list = document.getElementById('ln-history-list');
             const pgWrap = document.getElementById('ln-history-pagination');
             const countEl = document.getElementById('ln-history-count');
+            const filterWrap = document.getElementById('ln-history-filter');
             if (!wrap || !list) return;
-            const cache = (window.myLpEntriesCache || []).slice().sort((a, b) => {
+            const fullCache = (window.myLpEntriesCache || []).slice().sort((a, b) => {
                 const ta = a.createdAt?.toMillis ? a.createdAt.toMillis() : (new Date(a.createdAt || 0)).getTime();
                 const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : (new Date(b.createdAt || 0)).getTime();
                 return tb - ta;
             });
-            if (cache.length === 0) { wrap.style.display = 'none'; return; }
+            if (fullCache.length === 0) { wrap.style.display = 'none'; return; }
             wrap.style.display = 'block';
-            if (countEl) countEl.textContent = `(${cache.length})`;
+
+            // V94.41: count entries per axis (entry counted once per axis it touches via any tag)
+            const axisCounts = { medical: 0, skill: 0, tool: 0, custom: 0 };
+            fullCache.forEach(e => {
+                const axes = new Set();
+                (Array.isArray(e.tags) ? e.tags : []).forEach(t => axes.add(lnTagAxis(t)));
+                axes.forEach(a => { axisCounts[a]++; });
+            });
+
+            // V94.41: filter cache by selected axis (default 'all')
+            const axis = window._lnHistoryAxis || 'all';
+            const cache = axis === 'all'
+                ? fullCache
+                : fullCache.filter(e => (Array.isArray(e.tags) ? e.tags : []).some(t => lnTagAxis(t) === axis));
+
+            if (countEl) countEl.textContent = axis === 'all' ? `(${fullCache.length})` : `(${cache.length}/${fullCache.length})`;
+
+            // V94.41: render filter chip rail (hide chips with count 0 except All)
+            if (filterWrap) {
+                const chips = [{ k: 'all', label: 'All', count: fullCache.length }];
+                ['medical', 'skill', 'tool', 'custom'].forEach(a => {
+                    if (axisCounts[a] > 0) chips.push({ k: a, label: LN_AXIS_STYLE[a].label, count: axisCounts[a] });
+                });
+                filterWrap.style.display = chips.length > 1 ? 'flex' : 'none';
+                filterWrap.innerHTML = chips.map(c => {
+                    const isActive = c.k === axis;
+                    const style = LN_AXIS_STYLE[c.k];
+                    const activeCss = isActive
+                        ? (style ? `background:${style.bg}; color:${style.fg}; border-color:${style.fg};` : `background:#1e293b; color:white; border-color:#1e293b;`)
+                        : `background:white; color:#64748b; border-color:transparent;`;
+                    return `<button type="button" onclick="lnSetHistoryAxis('${c.k}')" style="display:inline-flex; align-items:center; gap:4px; border:1.5px solid; border-radius:999px; padding:5px 11px; font-size:0.78em; font-weight:700; cursor:pointer; ${activeCss}">${c.label} <span style="font-size:0.85em; font-weight:600; opacity:0.75;">${c.count}</span></button>`;
+                }).join('');
+            }
+
+            // Empty after filter
+            if (cache.length === 0) {
+                list.innerHTML = `<div style="padding:24px 12px; text-align:center; color:#94a3b8; font-size:0.85em; background:#f8fafc; border:1px dashed #e2e8f0; border-radius:10px;">ไม่มี Notes ในหมวดนี้ — ลองเปลี่ยน filter</div>`;
+                if (pgWrap) pgWrap.innerHTML = '';
+                return;
+            }
 
             const totalPages = Math.max(1, Math.ceil(cache.length / LN_HISTORY_PER_PAGE));
             if (window._lnHistoryPage > totalPages) window._lnHistoryPage = 1;
@@ -9142,9 +9213,11 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             const escapeHtml = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             list.innerHTML = slice.map(e => {
                 const tags = Array.isArray(e.tags) ? e.tags : [];
-                const tagsHtml = tags.slice(0, 5).map(t =>
-                    `<span style="background:#eef2ff; color:#4361ee; padding:2px 8px; border-radius:999px; font-size:0.7em; font-weight:800;">${escapeHtml(t)}</span>`
-                ).join(' ');
+                const tagsHtml = tags.slice(0, 5).map(t => {
+                    const a = lnTagAxis(t);
+                    const s = LN_AXIS_STYLE[a];
+                    return `<span style="background:${s.bg}; color:${s.fg}; padding:2px 8px; border-radius:999px; font-size:0.7em; font-weight:800;">${escapeHtml(t)}</span>`;
+                }).join(' ');
                 const dateMs = e.createdAt?.toMillis ? e.createdAt.toMillis() : (new Date(e.createdAt || 0)).getTime();
                 const dateStr = dateMs ? new Date(dateMs).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
                 const content = escapeHtml(e.contentMarkdown || '');
@@ -9185,6 +9258,13 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     if (window._lnHistoryPage < totalPages) addBtn('›', window._lnHistoryPage + 1);
                 }
             }
+        };
+
+        // V94.41: filter rail click handler — switch axis + reset pagination
+        window.lnSetHistoryAxis = function(axis) {
+            window._lnHistoryAxis = axis;
+            window._lnHistoryPage = 1;
+            renderLnHistory();
         };
 
         // ═══════════════════════════════════════════════════════════════════
