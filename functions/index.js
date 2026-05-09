@@ -106,7 +106,7 @@ function getSafeProviderError(err) {
 
 /**
  * 🤖 AI Proxy Function (V89.19)
- * Handles: Gemini, OpenAI, and Vertex AI (Imagen 3)
+ * Handles: Gemini, OpenAI, Anthropic, OpenRouter, AI Studio, ThaiLLM, Typhoon, Cloud TTS
  */
 exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY"], timeoutSeconds: 300, memory: "512MiB" }, async (req, res) => {
     try {
@@ -121,38 +121,6 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             return res.status(400).json({ error: "Missing provider or prompt" });
         }
 
-        // --- 🔵 Google Vertex AI (Imagen 3 / Nano) ---
-        if (provider === "imagen") {
-            const auth = new GoogleAuth({
-                scopes: "https://www.googleapis.com/auth/cloud-platform",
-            });
-            const client = await auth.getClient();
-            const token = await client.getAccessToken();
-
-            const actualModelName = (model === "imagen-nano")
-                ? "imagen-3.0-fast-generate-001"
-                : "imagen-3.0-generate-002";
-            const endpoint = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/publishers/google/models/${actualModelName}:predict`;
-
-            const response = await axios.post(endpoint, {
-                instances: [{ prompt: prompt }],
-                parameters: { sampleCount: 1 }
-            }, {
-                headers: { 
-                    "Authorization": `Bearer ${token.token}`,
-                    "Content-Type": "application/json"
-                }
-            });
-
-            if (response.data.predictions && response.data.predictions[0]) {
-                const b64 = response.data.predictions[0].bytesBase64Encoded;
-                return res.json({ text: `data:image/png;base64,${b64}`, model: actualModelName });
-            } else {
-                return res.status(500).json({ error: "No image predicted by Vertex AI" });
-            }
-        }
-
-        // --- 🟠 OpenAI (GPT / DALL-E) ---
         // --- Google Cloud Text-to-Speech (Gemini TTS) ---
         if (provider === "cloud_tts") {
             const auth = new GoogleAuth({
@@ -188,34 +156,15 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 return res.status(500).json({ error: "OPENAI_API_KEY is not configured on server." });
             }
 
-            const imageModelRequested = model === "dalle" || model === "gpt-image-1";
-            const endpoint = imageModelRequested ? "https://api.openai.com/v1/images/generations" : "https://api.openai.com/v1/chat/completions";
-            
             const actualModel = model.includes('gpt-5') ? model : (model.includes('gpt-4') ? 'gpt-5.4-mini' : model);
-            
+
             // Ensure 'json' is in prompt for OpenAI if isJson is true (V89.15)
             let tailoredPrompt = prompt;
             if (isJson && !prompt.toLowerCase().includes("json") && !actualModel.includes('o1')) {
                 tailoredPrompt += "\n\n(Respond in strictly valid JSON format)";
             }
 
-            const body = imageModelRequested ? (
-                model === "gpt-image-1"
-                    ? {
-                        model: "gpt-image-1",
-                        prompt: prompt,
-                        size: generationOptions.size || "1024x1024",
-                        quality: generationOptions.quality || "medium",
-                        background: generationOptions.background || "opaque",
-                        output_format: generationOptions.output_format || "png"
-                    }
-                    : {
-                        model: "dall-e-3",
-                        prompt: prompt,
-                        n: 1,
-                        size: generationOptions.size || "1024x1024"
-                    }
-            ) : {
+            const body = {
                 model: actualModel,
                 messages: [{ role: "user", content: tailoredPrompt }],
                 response_format: (isJson && !actualModel.includes('o1')) ? { type: "json_object" } : undefined,
@@ -223,30 +172,11 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 [actualModel.includes('o1') ? 'max_completion_tokens' : 'max_tokens']: isJson ? 4096 : 4096
             };
 
-            const response = await axios.post(endpoint, body, {
+            const response = await axios.post("https://api.openai.com/v1/chat/completions", body, {
                 headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" }
             });
 
-            if (model === "gpt-image-1") {
-                const b64 = response?.data?.data?.[0]?.b64_json;
-                if (!b64) {
-                    return res.status(500).json({ error: "No image payload returned from gpt-image-1" });
-                }
-                const mime = `image/${response?.data?.output_format || generationOptions.output_format || "png"}`;
-                const imageDataUrl = `data:${mime};base64,${b64}`;
-                return res.json({
-                    text: imageDataUrl,
-                    imageDataUrl,
-                    model: "gpt-image-1",
-                    tokens: response?.data?.usage?.total_tokens || 0,
-                    usage: response?.data?.usage || null
-                });
-            }
-            if (model === 'dalle') {
-                return res.json({ text: response.data.data[0].url, model: "dall-e-3" });
-            } else {
-                return res.json({ text: response.data.choices[0].message.content, tokens: response.data.usage.total_tokens });
-            }
+            return res.json({ text: response.data.choices[0].message.content, tokens: response.data.usage.total_tokens });
         }
 
         // --- 🟣 Google Vertex AI (Gemini Multimodal / Vision) ---
