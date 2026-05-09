@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.76</title>
+    <title>Nika V92.77</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -5204,6 +5204,8 @@
                         </div>
                         <div>
                             <label style="display:block; font-size:0.75em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Host <span style="color:#ef4444;">*</span></label>
+                            <!-- V92.77: Recent hosts quick-pick — shares localStorage with V92.75 Quick Launch modal -->
+                            <div id="exam-create-recent-hosts" style="display:none; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
                             <input id="exam-create-host-search" type="text" placeholder="Type to search users..." oninput="renderExamHostSearchResults()" autocomplete="off" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; box-sizing:border-box;">
                             <input type="hidden" id="exam-create-host-uid">
                             <div id="exam-create-host-results" style="display:none; position:relative; margin-top:4px; max-height:220px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:10px; background:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.08); z-index:10;"></div>
@@ -5239,6 +5241,18 @@
                         No active sessions yet — create one above to get started.
                     </div>
                 </div>
+
+                <!-- V92.77: Session History — collapsible, last 30 done sessions, with top-host / top-quiz stats -->
+                <details id="exam-history-wrap" style="display:none; margin-top:18px; background:white; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05); overflow:hidden;">
+                    <summary style="padding:14px 16px; cursor:pointer; font-weight:800; color:#6b21a8; font-size:0.92em; user-select:none; list-style:none; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                        <span><i class="fa-solid fa-clock-rotate-left" style="margin-right:8px; color:#94a3b8;"></i>Session History <span id="exam-history-count" style="margin-left:8px; padding:2px 9px; background:#f1f5f9; border-radius:999px; font-size:0.78em; color:#64748b; font-weight:700;">0</span></span>
+                        <span style="font-size:0.78em; color:#94a3b8; font-weight:600;">Last 30 done sessions</span>
+                    </summary>
+                    <div style="padding:0 16px 16px 16px;">
+                        <div id="exam-history-stats" style="display:none; gap:12px; flex-wrap:wrap; padding:10px 14px; background:#faf5ff; border:1px solid #e9d5ff; border-radius:10px; margin-bottom:12px; font-size:0.82em; color:#6b21a8;"></div>
+                        <div id="exam-history-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+                    </div>
+                </details>
             </div>
             </div><!-- /subtab-exam-sessions -->
         </div>
@@ -20636,16 +20650,17 @@ async function saveQuiz() {
                 }
             });
 
-            db.collection("users").orderBy("score", "desc").onSnapshot(s => { 
-                usersData = s.docs.map(d => ({ id: d.id, ...d.data() })); 
+            db.collection("users").orderBy("score", "desc").onSnapshot(s => {
+                usersData = s.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderUserGroupTabs();
                 renderBoardGroupTabs();
-                renderTable('users'); 
-                renderLeaderboard(); 
-                updateAssigneeList(); 
-                renderCertTable(); 
-                drawKanban(); 
+                renderTable('users');
+                renderLeaderboard();
+                updateAssigneeList();
+                renderCertTable();
+                drawKanban();
                 renderAlabastaCases();
+                if (typeof renderAllExamRecentHosts === 'function') renderAllExamRecentHosts();
             }, e => console.error("🔥 [Firestore Error] users:", e));
 
             db.collection("side_quests").orderBy("createdAt", "desc").onSnapshot(renderKanban, e => console.error("🔥 [Firestore Error] side_quests:", e));
@@ -34332,6 +34347,8 @@ Reply ONLY with raw JSON, no markdown:
 
         const EXAM_SESSION_LIFF_ID = "2008959998-4ty7kBq2";
         let _examSessionsUnsub = null;
+        let _examSessionsHistory = [];  // V92.77: done sessions (capped at 30 newest)
+        const EXAM_SESSIONS_HISTORY_MAX = 30;
         let _examSessionsTabInitialized = false;
         // V92.68: cache the latest snapshot so the filter chips can re-render without a roundtrip,
         // and track the active filter (default = 'all').
@@ -34367,12 +34384,14 @@ Reply ONLY with raw JSON, no markdown:
             if (_examSessionsUnsub) { try { _examSessionsUnsub(); } catch (_) {} _examSessionsUnsub = null; }
             _examSessionsUnsub = db.collection("exam_sessions")
                 .orderBy("createdAt", "desc")
+                .limit(100)  // V92.77: cap query — covers active (typically <5) + recent done window
                 .onSnapshot(snap => {
                     _examSessionsRetryAttempt = 0; // recovered — reset the retry counter
-                    _examSessionsLatest = snap.docs
-                        .map(d => ({ id: d.id, ...d.data() }))
-                        .filter(s => s.state !== 'done');
+                    const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    _examSessionsLatest = all.filter(s => s.state !== 'done');
+                    _examSessionsHistory = all.filter(s => s.state === 'done').slice(0, EXAM_SESSIONS_HISTORY_MAX);
                     renderExamSessionsList();
+                    renderExamSessionsHistory();
                 }, err => {
                     console.error("Exam sessions listener error:", err);
                     const isPermissionDenied = err && (err.code === 'permission-denied' || /permissions/i.test(err.message || ''));
@@ -34540,6 +34559,9 @@ Reply ONLY with raw JSON, no markdown:
                 const result = await _createExamSessionDoc(quizId, hostUid, totalMin);
                 if (!result) return;
 
+                pushQuickLaunchRecentHost(hostUid);
+                renderAllExamRecentHosts();
+
                 // Reset form
                 document.getElementById('exam-create-quiz').value = '';
                 document.getElementById('exam-create-host-search').value = '';
@@ -34586,11 +34608,13 @@ Reply ONLY with raw JSON, no markdown:
             if (evt) { evt.stopPropagation(); evt.preventDefault(); }
             const filtered = getQuickLaunchRecentHostUids().filter(x => x !== uid);
             try { localStorage.setItem(QUICK_LAUNCH_RECENT_HOSTS_KEY, JSON.stringify(filtered)); } catch (e) {}
-            renderQuickLaunchRecentHosts();
+            renderAllExamRecentHosts();
         };
 
-        function renderQuickLaunchRecentHosts() {
-            const wrap = document.getElementById('quicklaunch-exam-recent-hosts');
+        // V92.77: parameterized so the same recent-host list renders into both the Quick Launch
+        // modal (V92.75) and the inline Create New Session form on the Exam Sessions tab.
+        function renderExamRecentHosts(wrapId, selectFnName) {
+            const wrap = document.getElementById(wrapId);
             if (!wrap) return;
             const uids = getQuickLaunchRecentHostUids();
             const users = uids
@@ -34605,13 +34629,24 @@ Reply ONLY with raw JSON, no markdown:
                 const name = u.displayName || u.name || u.id;
                 const pic = u.pictureUrl || '';
                 const shortName = String(name).length > 14 ? String(name).slice(0, 13) + '…' : name;
-                return `<button type="button" onclick="selectQuickLaunchHost('${u.id}')" title="${escapeHtml(name)}" style="position:relative; display:inline-flex; align-items:center; gap:6px; padding:4px 10px 4px 4px; background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:999px; cursor:pointer; transition:all 0.15s; font-size:0.82em; color:#1e293b; font-weight:700;" onmouseover="this.style.borderColor='#a855f7'; this.style.background='#faf5ff';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.background='#f8fafc';">
+                return `<button type="button" onclick="${selectFnName}('${u.id}')" title="${escapeHtml(name)}" style="position:relative; display:inline-flex; align-items:center; gap:6px; padding:4px 10px 4px 4px; background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:999px; cursor:pointer; transition:all 0.15s; font-size:0.82em; color:#1e293b; font-weight:700;" onmouseover="this.style.borderColor='#a855f7'; this.style.background='#faf5ff';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.background='#f8fafc';">
                     <img src="${pic}" alt="" style="width:24px; height:24px; border-radius:50%; background:#cbd5e1; object-fit:cover; flex-shrink:0;">
                     <span>${escapeHtml(shortName)}</span>
                     <span onclick="removeQuickLaunchRecentHost('${u.id}', event)" title="Remove from recent" style="display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; color:#94a3b8; font-size:0.85em; line-height:1;" onmouseover="this.style.color='#ef4444'; this.style.background='#fef2f2';" onmouseout="this.style.color='#94a3b8'; this.style.background='transparent';">&times;</span>
                 </button>`;
             }).join('');
             wrap.style.display = 'flex';
+        }
+
+        // Re-render both wraps; safe to call when only one is in DOM (each is null-guarded).
+        function renderAllExamRecentHosts() {
+            renderExamRecentHosts('quicklaunch-exam-recent-hosts', 'selectQuickLaunchHost');
+            renderExamRecentHosts('exam-create-recent-hosts', 'selectExamHost');
+        }
+
+        // Backwards-compatible alias for the V92.75 callsite at modal open.
+        function renderQuickLaunchRecentHosts() {
+            renderExamRecentHosts('quicklaunch-exam-recent-hosts', 'selectQuickLaunchHost');
         }
 
         function openQuickLaunchExamModal(quizId) {
@@ -34788,6 +34823,91 @@ Reply ONLY with raw JSON, no markdown:
                             <i class="fa-solid fa-stop"></i> End
                         </button>
                     </div>
+                </div>`;
+            }).join('');
+        }
+
+        // V92.77: Session History — last 30 done sessions + top-3 host / top-3 quiz stats.
+        function renderExamSessionsHistory() {
+            const wrap = document.getElementById('exam-history-wrap');
+            const countEl = document.getElementById('exam-history-count');
+            const statsEl = document.getElementById('exam-history-stats');
+            const listEl = document.getElementById('exam-history-list');
+            if (!wrap || !listEl) return;
+
+            const history = _examSessionsHistory || [];
+            if (countEl) countEl.textContent = String(history.length);
+
+            if (history.length === 0) {
+                wrap.style.display = 'none';
+                if (statsEl) { statsEl.style.display = 'none'; statsEl.innerHTML = ''; }
+                listEl.innerHTML = '';
+                return;
+            }
+            wrap.style.display = 'block';
+
+            // Stats: top-3 hosts + top-3 quizzes by occurrence count
+            const tally = (key) => {
+                const counts = new Map();
+                history.forEach(s => {
+                    const k = s[key];
+                    if (!k) return;
+                    counts.set(k, (counts.get(k) || 0) + 1);
+                });
+                return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+            };
+            const topHosts = tally('hostUid');
+            const topQuizzes = tally('examId');
+            const labelHost = uid => {
+                const u = (usersData || []).find(x => x.id === uid);
+                const fromHist = history.find(s => s.hostUid === uid);
+                return (u && (u.displayName || u.name)) || (fromHist && fromHist.hostName) || uid.slice(0, 8);
+            };
+            const labelQuiz = qid => {
+                const q = (quizzesData || []).find(x => x.id === qid);
+                const fromHist = history.find(s => s.examId === qid);
+                return (q && (q.shortTitle || q.title)) || (fromHist && fromHist.examTitle) || qid.slice(0, 8);
+            };
+            const renderTop = (rows, labelFn) => rows.map(([id, n]) =>
+                `<span style="display:inline-flex; align-items:center; gap:4px; padding:3px 9px; background:#fff; border:1px solid #e9d5ff; border-radius:999px;"><strong>${escapeHtml(labelFn(id))}</strong> <span style="color:#94a3b8; font-weight:700;">·${n}</span></span>`
+            ).join(' ');
+            if (statsEl) {
+                statsEl.style.display = 'flex';
+                statsEl.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="font-weight:800;"><i class="fa-solid fa-crown" style="color:#fbbf24; margin-right:4px;"></i>Top hosts:</span>${renderTop(topHosts, labelHost)}</div>
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="font-weight:800;"><i class="fa-solid fa-graduation-cap" style="color:#a855f7; margin-right:4px;"></i>Top quizzes:</span>${renderTop(topQuizzes, labelQuiz)}</div>
+                `;
+            }
+
+            // List of done sessions (compact rows, similar to active list but read-only)
+            listEl.innerHTML = history.map(s => {
+                const created = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
+                const createdStr = created ? created.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+                const participantsObj = s.participants || {};
+                const participantCount = Object.keys(participantsObj).length;
+                const activeMs = (s.timer && s.timer.accumulatedActiveMs) || 0;
+                const activeMin = activeMs > 0 ? Math.round(activeMs / 60000) : null;
+                const durationStr = activeMin != null ? `${activeMin} min` : '—';
+                return `
+                <div style="border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; background:#f8fafc; display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:center;">
+                    <span style="background:#f1f5f9; color:#64748b; border:1px solid #cbd5e1; padding:3px 8px; border-radius:6px; font-size:0.66em; font-weight:800; letter-spacing:0.05em;">DONE</span>
+                    <div style="min-width:0;">
+                        <div style="font-weight:700; color:#334155; font-size:0.88em; margin-bottom:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                            ${escapeHtml(s.examTitle || s.examId)}
+                        </div>
+                        <div style="font-size:0.74em; color:#94a3b8;">
+                            <span title="${escapeHtml(s.hostName || s.hostUid)}"><i class="fa-solid fa-crown" style="color:#fbbf24;"></i> ${escapeHtml(s.hostName || 'Host')}</span>
+                            <span style="margin:0 6px; color:#cbd5e1;">·</span>
+                            <span><i class="fa-solid fa-users" style="color:#10b981;"></i> ${participantCount}</span>
+                            <span style="margin:0 6px; color:#cbd5e1;">·</span>
+                            <span title="Active runtime"><i class="fa-regular fa-clock"></i> ${durationStr}</span>
+                            <span style="margin:0 6px; color:#cbd5e1;">·</span>
+                            <span>${createdStr}</span>
+                        </div>
+                    </div>
+                    <button onclick="copyExamSessionLink('${s.id}')" title="Copy LIFF link" style="background:transparent; border:1px solid #e2e8f0; color:#64748b; padding:5px 10px; border-radius:7px; font-size:0.72em; font-weight:700; cursor:pointer;">
+                        <i class="fa-solid fa-link"></i>
+                    </button>
                 </div>`;
             }).join('');
         }
