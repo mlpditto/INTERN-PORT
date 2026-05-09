@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.71</title>
+    <title>Nika V92.72</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -5280,6 +5280,46 @@
                 </div>
             </div>
             </div><!-- /subtab-exam-sessions -->
+        </div>
+
+        <!-- V92.72: Quick Launch Exam modal — opened from 🎓 button on each Quiz Engine row -->
+        <div id="quickLaunchExamModal" class="modal" style="display:none; z-index:9200;">
+            <div class="modal-content" style="max-width:520px; padding:22px; border-radius:16px;">
+                <span class="close-modal" onclick="closeQuickLaunchExamModal()" style="position:absolute; top:14px; right:16px; cursor:pointer; font-size:1.4em; color:#64748b;">&times;</span>
+                <h3 style="margin:0 0 4px 0; color:#6b21a8; display:flex; align-items:center; gap:10px; font-weight:900;">
+                    🎓 Launch as Exam Session
+                </h3>
+                <div style="color:#64748b; font-size:0.85em; margin-bottom:16px; line-height:1.5;">
+                    Quiz pre-selected from Quiz Engine. Pick a host and total time, then create the session — link is copied to clipboard.
+                </div>
+
+                <input type="hidden" id="quicklaunch-exam-quiz-id">
+
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.72em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Quiz</label>
+                    <div id="quicklaunch-exam-quiz-label" style="padding:10px 12px; background:#faf5ff; border:1.5px solid #e9d5ff; border-radius:10px; font-weight:800; color:#6b21a8; font-size:0.92em;"></div>
+                </div>
+
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.72em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Host <span style="color:#ef4444;">*</span></label>
+                    <input id="quicklaunch-exam-host-search" type="text" placeholder="Type to search users..." oninput="renderQuickLaunchHostResults()" autocomplete="off" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; box-sizing:border-box;">
+                    <input type="hidden" id="quicklaunch-exam-host-uid">
+                    <div id="quicklaunch-exam-host-results" style="display:none; position:relative; margin-top:4px; max-height:220px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:10px; background:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.08); z-index:10;"></div>
+                    <div id="quicklaunch-exam-host-selected" style="display:none; margin-top:6px; padding:6px 10px; background:#ede9fe; border-radius:8px; font-size:0.8em; color:#5b21b6; font-weight:700;"></div>
+                </div>
+
+                <div style="margin-bottom:18px;">
+                    <label style="display:block; font-size:0.72em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Total time (min) — host can pause anytime</label>
+                    <input id="quicklaunch-exam-total-min" type="number" value="30" min="5" max="180" step="5" style="width:120px; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em;">
+                </div>
+
+                <div style="display:flex; gap:8px; justify-content:flex-end;">
+                    <button type="button" onclick="closeQuickLaunchExamModal()" style="padding:9px 18px; border-radius:10px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-weight:700; color:#64748b;">Cancel</button>
+                    <button type="button" onclick="submitQuickLaunchExamSession()" class="magic-btn" style="background:linear-gradient(135deg, #7c3aed, #a855f7); padding:9px 22px; border-radius:10px; font-weight:900; font-size:0.88em;">
+                        <i class="fa-solid fa-circle-plus"></i> Create Session
+                    </button>
+                </div>
+            </div>
         </div>
 
         <div id="tab-users" class="tab-content">
@@ -19392,11 +19432,16 @@ async function saveQuiz() {
                                     onclick="event.stopPropagation(); showQuizFeedbackPanel('${q.id}')" title="View User Feedback">
                                     ⭐
                                 </button>
-                                <button class="btn-sm" style="background:${q.isTemplate ? '#fbbf24' : '#f1f5f9'}; color:${q.isTemplate ? 'white' : '#64748b'}; border:1px solid #e2e8f0; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s;" 
+                                <button class="btn-sm" style="background:${q.isTemplate ? '#fbbf24' : '#f1f5f9'}; color:${q.isTemplate ? 'white' : '#64748b'}; border:1px solid #e2e8f0; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s;"
                                     onclick="toggleTemplateStatus('${q.id}', ${q.isTemplate || false})" title="Toggle Master Template">
                                     📌
                                 </button>
-                                <button class="btn-sm" style="background:#fee2e2; color:#ef4444; border:none; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1.1em; transition:0.2s; margin-left:auto;" 
+                                ${isActiveSection && isExamEligibleQuiz(q) ? `
+                                <button class="btn-sm" style="background:#faf5ff; color:#6b21a8; border:1px solid #e9d5ff; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s;"
+                                    onclick="event.stopPropagation(); openQuickLaunchExamModal('${q.id}')" title="Launch as Exam Session">
+                                    🎓
+                                </button>` : ''}
+                                <button class="btn-sm" style="background:#fee2e2; color:#ef4444; border:none; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1.1em; transition:0.2s; margin-left:auto;"
                                     onclick="deleteQuiz('${q.id}')" title="Delete Quiz Permamently">
                                     🗑️
                                 </button>
@@ -34443,44 +34488,62 @@ Reply ONLY with raw JSON, no markdown:
             if (resultsEl) { resultsEl.style.display = 'none'; resultsEl.innerHTML = ''; }
         }
 
+        // V92.72: shared helper used by both the Exam Sessions form and the
+        // Quiz Engine "🎓 Launch as Exam" quick-launch modal.
+        async function _createExamSessionDoc(quizId, hostUid, totalMin) {
+            if (!quizId) { alert('Please select a quiz.'); return null; }
+            if (!hostUid) { alert('Please select a host.'); return null; }
+            if (!Number.isFinite(totalMin) || totalMin < 5 || totalMin > 180) {
+                alert('Total time must be between 5 and 180 minutes.');
+                return null;
+            }
+            const quiz = (quizzesData || []).find(q => q.id === quizId);
+            const host = (usersData || []).find(u => u.id === hostUid);
+            if (!quiz || !host) { alert('Quiz or host data missing — please refresh.'); return null; }
+
+            const sessionDoc = {
+                examId: quizId,
+                examTitle: quiz.shortTitle || quiz.title || quizId,
+                hostUid: hostUid,
+                hostName: host.displayName || hostUid,
+                createdBy: (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                state: 'lobby',
+                currentIdx: 0,
+                participants: {},
+                votes: {},
+                finalAnswers: {},
+                timer: {
+                    totalSec: totalMin * 60,
+                    startedAt: null,
+                    pausedAt: null,
+                    accumulatedActiveMs: 0
+                },
+                attemptIds: {}
+            };
+
+            const ref = await db.collection("exam_sessions").add(sessionDoc);
+            const liffUrl = `https://liff.line.me/${EXAM_SESSION_LIFF_ID}?session=${ref.id}`;
+            showToast('✅ Exam session created!');
+
+            if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                try {
+                    await navigator.clipboard.writeText(liffUrl);
+                    showToast('🔗 Session link copied to clipboard!');
+                } catch (e) { /* clipboard blocked, ignore */ }
+            }
+            console.log('Exam session URL:', liffUrl);
+            return { id: ref.id, liffUrl };
+        }
+
         async function createExamSession() {
             const quizId = document.getElementById('exam-create-quiz').value;
             const hostUid = document.getElementById('exam-create-host-uid').value;
             const totalMin = parseInt(document.getElementById('exam-create-total-min').value, 10);
 
-            if (!quizId) return alert('Please select a quiz.');
-            if (!hostUid) return alert('Please select a host.');
-            if (!Number.isFinite(totalMin) || totalMin < 5 || totalMin > 180) return alert('Total time must be between 5 and 180 minutes.');
-
-            const quiz = (quizzesData || []).find(q => q.id === quizId);
-            const host = (usersData || []).find(u => u.id === hostUid);
-            if (!quiz || !host) return alert('Quiz or host data missing — please refresh.');
-
             try {
-                const sessionDoc = {
-                    examId: quizId,
-                    examTitle: quiz.shortTitle || quiz.title || quizId,
-                    hostUid: hostUid,
-                    hostName: host.displayName || hostUid,
-                    createdBy: (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    state: 'lobby',
-                    currentIdx: 0,
-                    participants: {},
-                    votes: {},
-                    finalAnswers: {},
-                    timer: {
-                        totalSec: totalMin * 60,
-                        startedAt: null,
-                        pausedAt: null,
-                        accumulatedActiveMs: 0
-                    },
-                    attemptIds: {}
-                };
-
-                const ref = await db.collection("exam_sessions").add(sessionDoc);
-                const liffUrl = `https://liff.line.me/${EXAM_SESSION_LIFF_ID}?session=${ref.id}`;
-                showToast('✅ Exam session created!');
+                const result = await _createExamSessionDoc(quizId, hostUid, totalMin);
+                if (!result) return;
 
                 // Reset form
                 document.getElementById('exam-create-quiz').value = '';
@@ -34488,17 +34551,111 @@ Reply ONLY with raw JSON, no markdown:
                 document.getElementById('exam-create-host-uid').value = '';
                 const selectedEl = document.getElementById('exam-create-host-selected');
                 if (selectedEl) { selectedEl.style.display = 'none'; selectedEl.innerHTML = ''; }
-
-                // Show toast with copy hint — sessions list will auto-update via realtime listener
-                if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                    try {
-                        await navigator.clipboard.writeText(liffUrl);
-                        showToast('🔗 Session link copied to clipboard!');
-                    } catch (e) { /* clipboard blocked, ignore */ }
-                }
-                console.log('Exam session URL:', liffUrl);
             } catch (e) {
                 console.error('createExamSession error:', e);
+                alert('Failed to create session: ' + e.message);
+            }
+        }
+
+        // V92.72: Quick-launch flow — open modal pre-filled with quizId from a Quiz Engine row.
+        function isExamEligibleQuiz(q) {
+            return Array.isArray(q && q.questions)
+                && q.questions.length > 0
+                && q.questions.every(qq => !qq.type || qq.type === 'choice');
+        }
+
+        function openQuickLaunchExamModal(quizId) {
+            const quiz = (quizzesData || []).find(q => q.id === quizId);
+            if (!quiz) { alert('Quiz not found.'); return; }
+            if (!isExamEligibleQuiz(quiz)) {
+                alert('Exam Sessions support multiple-choice quizzes only.');
+                return;
+            }
+            const modal = document.getElementById('quickLaunchExamModal');
+            if (!modal) return;
+
+            document.getElementById('quicklaunch-exam-quiz-id').value = quizId;
+            const labelEl = document.getElementById('quicklaunch-exam-quiz-label');
+            const title = quiz.shortTitle || quiz.title || quizId;
+            labelEl.textContent = `${title} (${quiz.questions.length} Q)`;
+
+            // Reset host + time fields each open
+            document.getElementById('quicklaunch-exam-host-search').value = '';
+            document.getElementById('quicklaunch-exam-host-uid').value = '';
+            const selectedEl = document.getElementById('quicklaunch-exam-host-selected');
+            if (selectedEl) { selectedEl.style.display = 'none'; selectedEl.innerHTML = ''; }
+            const resultsEl = document.getElementById('quicklaunch-exam-host-results');
+            if (resultsEl) { resultsEl.style.display = 'none'; resultsEl.innerHTML = ''; }
+            document.getElementById('quicklaunch-exam-total-min').value = 30;
+
+            modal.style.display = 'flex';
+            setTimeout(() => {
+                const hostInput = document.getElementById('quicklaunch-exam-host-search');
+                if (hostInput) hostInput.focus();
+            }, 50);
+        }
+
+        function closeQuickLaunchExamModal() {
+            const modal = document.getElementById('quickLaunchExamModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function renderQuickLaunchHostResults() {
+            const inputEl = document.getElementById('quicklaunch-exam-host-search');
+            const resultsEl = document.getElementById('quicklaunch-exam-host-results');
+            if (!inputEl || !resultsEl) return;
+            const q = String(inputEl.value || '').trim().toLowerCase();
+            if (q.length < 1) { resultsEl.style.display = 'none'; resultsEl.innerHTML = ''; return; }
+
+            const matches = (usersData || [])
+                .filter(u => {
+                    const name = String(u.displayName || u.name || '').toLowerCase();
+                    return name.includes(q);
+                })
+                .slice(0, 10);
+
+            if (matches.length === 0) {
+                resultsEl.innerHTML = '<div style="padding:10px; color:#94a3b8; font-size:0.85em;">No users match.</div>';
+                resultsEl.style.display = 'block';
+                return;
+            }
+
+            resultsEl.innerHTML = matches.map(u => {
+                const name = u.displayName || u.name || u.id;
+                const pic = u.pictureUrl || '';
+                return `<div onclick="selectQuickLaunchHost('${u.id}')" style="display:flex; align-items:center; gap:10px; padding:8px 12px; cursor:pointer; border-bottom:1px solid #f1f5f9; transition:background 0.15s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">
+                    <img src="${pic}" alt="" style="width:32px; height:32px; border-radius:50%; background:#cbd5e1; object-fit:cover;">
+                    <div style="font-weight:700; color:#1e293b; font-size:0.88em;">${escapeHtml(name)}</div>
+                </div>`;
+            }).join('');
+            resultsEl.style.display = 'block';
+        }
+
+        function selectQuickLaunchHost(uid) {
+            const user = (usersData || []).find(u => u.id === uid);
+            if (!user) return;
+            document.getElementById('quicklaunch-exam-host-uid').value = uid;
+            document.getElementById('quicklaunch-exam-host-search').value = user.displayName || uid;
+            const selectedEl = document.getElementById('quicklaunch-exam-host-selected');
+            if (selectedEl) {
+                selectedEl.innerHTML = `<i class="fa-solid fa-check"></i> Host: <strong>${escapeHtml(user.displayName || uid)}</strong>`;
+                selectedEl.style.display = 'block';
+            }
+            const resultsEl = document.getElementById('quicklaunch-exam-host-results');
+            if (resultsEl) { resultsEl.style.display = 'none'; resultsEl.innerHTML = ''; }
+        }
+
+        async function submitQuickLaunchExamSession() {
+            const quizId = document.getElementById('quicklaunch-exam-quiz-id').value;
+            const hostUid = document.getElementById('quicklaunch-exam-host-uid').value;
+            const totalMin = parseInt(document.getElementById('quicklaunch-exam-total-min').value, 10);
+
+            try {
+                const result = await _createExamSessionDoc(quizId, hostUid, totalMin);
+                if (!result) return;
+                closeQuickLaunchExamModal();
+            } catch (e) {
+                console.error('submitQuickLaunchExamSession error:', e);
                 alert('Failed to create session: ' + e.message);
             }
         }
