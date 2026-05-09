@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.74</title>
+    <title>Nika V92.75</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -5263,6 +5263,8 @@
 
                 <div style="margin-bottom:14px;">
                     <label style="display:block; font-size:0.72em; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Host <span style="color:#ef4444;">*</span></label>
+                    <!-- V92.75: Recent hosts quick-pick row (auto-tracked, hidden when empty) -->
+                    <div id="quicklaunch-exam-recent-hosts" style="display:none; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
                     <input id="quicklaunch-exam-host-search" type="text" placeholder="Type to search users..." oninput="renderQuickLaunchHostResults()" autocomplete="off" style="width:100%; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:0.92em; box-sizing:border-box;">
                     <input type="hidden" id="quicklaunch-exam-host-uid">
                     <div id="quicklaunch-exam-host-results" style="display:none; position:relative; margin-top:4px; max-height:220px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:10px; background:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.08); z-index:10;"></div>
@@ -34548,6 +34550,61 @@ Reply ONLY with raw JSON, no markdown:
                 && q.questions.every(qq => !qq.type || qq.type === 'choice');
         }
 
+        // V92.75: Recent host quick-pick — localStorage-backed list of last N hostUids selected
+        // in this modal. Self-bootstrapping (empty until used). Survives stale UIDs by validating
+        // against usersData at render time.
+        const QUICK_LAUNCH_RECENT_HOSTS_KEY = 'quicklaunch-exam-recent-hosts';
+        const QUICK_LAUNCH_RECENT_HOSTS_MAX = 6;
+
+        function getQuickLaunchRecentHostUids() {
+            try {
+                const raw = localStorage.getItem(QUICK_LAUNCH_RECENT_HOSTS_KEY);
+                if (!raw) return [];
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed.filter(x => typeof x === 'string') : [];
+            } catch (e) { return []; }
+        }
+
+        function pushQuickLaunchRecentHost(uid) {
+            if (!uid) return;
+            const current = getQuickLaunchRecentHostUids().filter(x => x !== uid);
+            current.unshift(uid);
+            const trimmed = current.slice(0, QUICK_LAUNCH_RECENT_HOSTS_MAX);
+            try { localStorage.setItem(QUICK_LAUNCH_RECENT_HOSTS_KEY, JSON.stringify(trimmed)); } catch (e) {}
+        }
+
+        window.removeQuickLaunchRecentHost = function(uid, evt) {
+            if (evt) { evt.stopPropagation(); evt.preventDefault(); }
+            const filtered = getQuickLaunchRecentHostUids().filter(x => x !== uid);
+            try { localStorage.setItem(QUICK_LAUNCH_RECENT_HOSTS_KEY, JSON.stringify(filtered)); } catch (e) {}
+            renderQuickLaunchRecentHosts();
+        };
+
+        function renderQuickLaunchRecentHosts() {
+            const wrap = document.getElementById('quicklaunch-exam-recent-hosts');
+            if (!wrap) return;
+            const uids = getQuickLaunchRecentHostUids();
+            const users = uids
+                .map(uid => (usersData || []).find(u => u.id === uid))
+                .filter(Boolean);
+            if (users.length === 0) {
+                wrap.style.display = 'none';
+                wrap.innerHTML = '';
+                return;
+            }
+            wrap.innerHTML = users.map(u => {
+                const name = u.displayName || u.name || u.id;
+                const pic = u.pictureUrl || '';
+                const shortName = String(name).length > 14 ? String(name).slice(0, 13) + '…' : name;
+                return `<button type="button" onclick="selectQuickLaunchHost('${u.id}')" title="${escapeHtml(name)}" style="position:relative; display:inline-flex; align-items:center; gap:6px; padding:4px 10px 4px 4px; background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:999px; cursor:pointer; transition:all 0.15s; font-size:0.82em; color:#1e293b; font-weight:700;" onmouseover="this.style.borderColor='#a855f7'; this.style.background='#faf5ff';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.background='#f8fafc';">
+                    <img src="${pic}" alt="" style="width:24px; height:24px; border-radius:50%; background:#cbd5e1; object-fit:cover; flex-shrink:0;">
+                    <span>${escapeHtml(shortName)}</span>
+                    <span onclick="removeQuickLaunchRecentHost('${u.id}', event)" title="Remove from recent" style="display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; color:#94a3b8; font-size:0.85em; line-height:1;" onmouseover="this.style.color='#ef4444'; this.style.background='#fef2f2';" onmouseout="this.style.color='#94a3b8'; this.style.background='transparent';">&times;</span>
+                </button>`;
+            }).join('');
+            wrap.style.display = 'flex';
+        }
+
         function openQuickLaunchExamModal(quizId) {
             const quiz = (quizzesData || []).find(q => q.id === quizId);
             if (!quiz) { alert('Quiz not found.'); return; }
@@ -34571,6 +34628,8 @@ Reply ONLY with raw JSON, no markdown:
             const resultsEl = document.getElementById('quicklaunch-exam-host-results');
             if (resultsEl) { resultsEl.style.display = 'none'; resultsEl.innerHTML = ''; }
             document.getElementById('quicklaunch-exam-total-min').value = 30;
+
+            renderQuickLaunchRecentHosts();
 
             modal.style.display = 'flex';
             setTimeout(() => {
@@ -34637,6 +34696,7 @@ Reply ONLY with raw JSON, no markdown:
             try {
                 const result = await _createExamSessionDoc(quizId, hostUid, totalMin);
                 if (!result) return;
+                pushQuickLaunchRecentHost(hostUid);
                 closeQuickLaunchExamModal();
             } catch (e) {
                 console.error('submitQuickLaunchExamSession error:', e);
