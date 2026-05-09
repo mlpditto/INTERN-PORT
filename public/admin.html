@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.75</title>
+    <title>Nika V92.76</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -27015,8 +27015,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 pendingQuizzesCache.forEach(att => {
                     const q = quizzesData.find(x => x.id === att.quizId) || {};
                     const qTitle = q.shortTitle || q.title || "Unknown Quiz";
-                    const uImg = att.pictureUrl || '';
-                    const uName = att.displayName || 'Unknown';
+                    // V92.76: mirror renderPendingQuizzes (line ~16342) — fall back to usersData when
+                    // attempt doc is missing displayName/pictureUrl (older docs or "requesting" state)
+                    let uImg = att.pictureUrl || '';
+                    let uName = att.displayName || 'Unknown';
+                    if (att.userId) {
+                        const u = usersData.find(x => x.id === att.userId);
+                        if (u) {
+                            if (!uImg) uImg = u.pictureUrl || '';
+                            if (!uName || uName === 'Unknown') uName = u.displayName || 'Unknown';
+                        }
+                    }
                     const isRequest = att.status === 'requesting';
 
                     if (filter && !qTitle.toLowerCase().includes(filter) && !uName.toLowerCase().includes(filter)) return;
