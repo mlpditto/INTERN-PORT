@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.77</title>
+    <title>Nika V92.78</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16766,6 +16766,40 @@ async function saveQuiz() {
             if (el) el.remove();
         }
 
+        // V92.78: copy a single exam-session question to clipboard.
+        // includeAnswer = true → adds "Correct: <letter>" at the bottom (เฉลย)
+        //                = false → options only, no answer marker (ไม่เฉลย, for re-asking)
+        window.copyExamQuestion = async function(quizId, qIdx, includeAnswer) {
+            const quiz = (quizzesData || []).find(q => q.id === quizId);
+            if (!quiz) return alert('Quiz not found');
+            const q = (quiz.questions || [])[qIdx];
+            if (!q) return alert('Question not found');
+
+            const stem = String(q.q || '').trim();
+            const options = Array.isArray(q.options) ? q.options : [];
+            const correctIdx = Array.isArray(q.correct) ? q.correct[0] : q.correct;
+
+            const lines = [`Q${qIdx + 1}: ${stem}`, ''];
+            options.forEach((opt, i) => {
+                const letter = String.fromCharCode(65 + i);
+                lines.push(`${letter}. ${opt}`);
+            });
+            if (includeAnswer && correctIdx != null && options[correctIdx] != null) {
+                lines.push('');
+                lines.push(`Correct: ${String.fromCharCode(65 + correctIdx)}. ${options[correctIdx]}`);
+            }
+
+            const text = lines.join('\n');
+            try {
+                await navigator.clipboard.writeText(text);
+                if (typeof showToast === 'function') {
+                    showToast(`📋 Q${qIdx + 1} copied (${includeAnswer ? 'with answer' : 'no answer'})`, 'success');
+                }
+            } catch (e) {
+                prompt('Copy this text manually (Ctrl+C):', text);
+            }
+        };
+
         async function reviewQuiz(attemptId) {
             try {
                 // Remove any existing overlay first
@@ -16917,7 +16951,6 @@ async function saveQuiz() {
                         const examCards = votedQs.map(vq => {
                             const q = (quiz.questions || [])[vq.qIdx] || {};
                             const stemFull = q.q || `Question ${vq.qIdx + 1}`;
-                            const stemShort = _truncate(stemFull, 80);
                             const isSkipped = (vq.brokenBy === 'skipped');
                             const officialIdx = Array.isArray(vq.officialAnswer) ? vq.officialAnswer[0] : vq.officialAnswer;
                             const officialText = (officialIdx != null && q.options && q.options[officialIdx] != null) ? q.options[officialIdx] : '';
@@ -16931,6 +16964,27 @@ async function saveQuiz() {
                             const brokenByBadge = brokenByLabel[vq.brokenBy]
                                 ? `<span style="font-size:0.72em; background:#fef3c7; color:#92400e; padding:3px 10px; border-radius:10px; font-weight:700; white-space:nowrap;">${brokenByLabel[vq.brokenBy]}</span>`
                                 : '';
+
+                            // V92.78: copy buttons (with / without answer) per question
+                            const copyBtns = `
+                                <button type="button" onclick="copyExamQuestion('${_esc(quiz.id)}', ${vq.qIdx}, true)" title="Copy question + options + answer key" style="font-size:0.72em; background:#fff; color:#166534; border:1px solid #86efac; padding:3px 9px; border-radius:8px; font-weight:700; cursor:pointer; white-space:nowrap;">
+                                    <i class="fa-regular fa-clipboard"></i> + เฉลย
+                                </button>
+                                <button type="button" onclick="copyExamQuestion('${_esc(quiz.id)}', ${vq.qIdx}, false)" title="Copy question + options only (no answer)" style="font-size:0.72em; background:#fff; color:#475569; border:1px solid #cbd5e1; padding:3px 9px; border-radius:8px; font-weight:700; cursor:pointer; white-space:nowrap;">
+                                    <i class="fa-regular fa-clipboard"></i> ไม่เฉลย
+                                </button>`;
+
+                            // V92.78: full A/B/C/D options list (correct one marked when answer exists)
+                            const allOptionsHtml = (Array.isArray(q.options) && q.options.length > 0) ? `
+                                <div style="background:rgba(255,255,255,0.7); border:1px solid rgba(15,23,42,0.08); border-radius:8px; padding:10px 12px; margin-bottom:10px;">
+                                    <div style="font-size:0.74em; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px;">Options</div>
+                                    ${q.options.map((opt, i) => {
+                                        const isOfficial = (officialIdx != null && i === officialIdx);
+                                        return `<div style="font-size:0.92em; color:#1f2937; padding:4px 0; ${isOfficial ? 'font-weight:700;' : ''}">
+                                            <b style="display:inline-block; width:22px;">${_letterFor(i)}.</b>${_esc(opt)}${isOfficial ? ' <span style="color:#16a34a;">✓</span>' : ''}
+                                        </div>`;
+                                    }).join('')}
+                                </div>` : '';
 
                             const yourBg = (vq.myChoice == null) ? '#f3f4f6' : (vq.myMatchedGroup ? '#d1fae5' : '#fee2e2');
                             const yourColor = (vq.myChoice == null) ? '#6b7280' : (vq.myMatchedGroup ? '#065f46' : '#991b1b');
@@ -16946,11 +17000,12 @@ async function saveQuiz() {
                             return `
                                 <div style="border:2px solid ${cardBorder}; padding:15px; margin-bottom:15px; border-radius:12px; background:${cardBg}; border-left:8px solid ${cardBorder}; box-shadow:0 4px 6px rgba(0,0,0,0.05);">
                                     <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
-                                        <b style="font-size:1.05em; flex:1; min-width:200px; word-wrap:break-word;" title="${_esc(stemFull)}">
-                                            ${cardIcon} Q${vq.qIdx + 1}: ${_esc(stemShort)}
+                                        <b style="font-size:1.05em; flex:1; min-width:200px; word-wrap:break-word; word-break:break-word; line-height:1.5;">
+                                            ${cardIcon} Q${vq.qIdx + 1}: ${_esc(stemFull)}
                                         </b>
-                                        <div style="display:flex; gap:6px; flex-wrap:wrap; flex-shrink:0;">${brokenByBadge}</div>
+                                        <div style="display:flex; gap:6px; flex-wrap:wrap; flex-shrink:0; align-items:center;">${brokenByBadge}${copyBtns}</div>
                                     </div>
+                                    ${allOptionsHtml}
                                     <div style="display:flex; flex-direction:column; gap:8px;">
                                         <div style="padding:10px; border-radius:8px; background:${yourBg}; color:${yourColor}; font-size:0.95em;">
                                             <span style="font-weight:bold; display:inline-block; width:90px;">You voted:</span>
