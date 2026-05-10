@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.85</title>
+    <title>Nika V92.86</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -34010,14 +34010,15 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 .replace(/'/g, '&#39;');
         }
 
-        // V92.84: strip every Unicode control/format codepoint (\p{C}) \u2014 covers
-        // ZWSP/ZWNJ/ZWJ/BOM (V92.36 originals) plus LRM/RLM, soft hyphen, variation
-        // selectors, and other invisible format chars that the previous 5-char
-        // allowlist missed and were rendering as blank chips. trim() then handles
-        // \p{Z} whitespace including NBSP and CJK ideographic space.
+        // V92.86: V92.84 stripped \p{C} (control/format) but combining marks (\p{M})
+        // and other Unicode oddities can survive normalize+trim with length > 0 yet
+        // render as zero-width chips. After stripping, require at least one clearly
+        // visible codepoint \u2014 Letter/Number/Symbol/Punctuation. If none, return '' so
+        // existing length/truthy checks at all 3 call sites drop the entry uniformly.
         function qfpNormalizeTopic(topic) {
             if (topic == null) return '';
-            return String(topic).replace(/\p{C}/gu, '').trim();
+            const cleaned = String(topic).replace(/\p{C}/gu, '').trim();
+            return /[\p{L}\p{N}\p{S}\p{P}]/u.test(cleaned) ? cleaned : '';
         }
 
         async function qfpCallAI(model, prompt) {
@@ -34284,14 +34285,54 @@ Reply ONLY with raw JSON, no markdown:
             }
         }
 
+        // V92.86: closes parked item 22 — Panel-modal Delete now mirrors V92.83's
+        // deleteEmptyCommentFeedback flow: batch delete + revert pointsEarned +
+        // checkin_logs audit row, AND invalidates window._quizFeedbackCache so the
+        // LAUGH TALE grid stops showing the deleted card after admin closes the panel.
         async function deleteQuizFeedbackItem(feedbackId) {
             if (!feedbackId) return;
-            if (!confirm('Delete this feedback entry? This cannot be undone.')) return;
+
+            const fb = (_qfpFeedbacks || []).find(x => x.id === feedbackId);
+            if (!fb) { alert('Feedback entry not found.'); return; }
+
+            const user = (usersData || []).find(u => u.id === fb.userId) || {};
+            const userName = user.displayName || fb.displayName || 'Unknown user';
+            const quiz = (quizzesData || []).find(q => q.id === fb.quizId);
+            const quizTitle = quiz?.title || quiz?.name || fb.quizId || 'Quiz';
+            const pointsToRevert = (typeof fb.pointsEarned === 'number' && fb.pointsEarned > 0) ? fb.pointsEarned : 0;
+            const userExists = fb.userId && fb.userId !== 'anon' && (usersData || []).some(u => u.id === fb.userId);
+            const willRevert = pointsToRevert > 0 && userExists;
+
+            const confirmMsg = willRevert
+                ? `Delete this feedback?\n\nUser: ${userName}\nQuiz: ${quizTitle}\nScore to revert: −${pointsToRevert.toFixed(1)} PTS\n\nThis cannot be undone.`
+                : `Delete this feedback?\n\nUser: ${userName}\nQuiz: ${quizTitle}\n(No score to revert)\n\nThis cannot be undone.`;
+            if (!confirm(confirmMsg)) return;
 
             try {
-                await db.collection('quiz_feedback').doc(feedbackId).delete();
+                const b = db.batch();
+                b.delete(db.collection('quiz_feedback').doc(feedbackId));
+
+                if (willRevert) {
+                    b.update(db.collection('users').doc(fb.userId), {
+                        score: firebase.firestore.FieldValue.increment(-pointsToRevert)
+                    });
+                    b.set(db.collection('checkin_logs').doc(), {
+                        userId: fb.userId,
+                        type: 'manual_adjust',
+                        amount: -pointsToRevert,
+                        note: `Revert: Quiz Feedback deleted via Panel — '${quizTitle}'`,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+
+                await b.commit();
+
                 _qfpFeedbacks = _qfpFeedbacks.filter(x => x.id !== feedbackId);
-                showToast('Feedback deleted');
+                if (Array.isArray(window._quizFeedbackCache)) {
+                    window._quizFeedbackCache = window._quizFeedbackCache.filter(x => x.id !== feedbackId);
+                }
+
+                showToast(willRevert ? `Deleted & reverted −${pointsToRevert.toFixed(1)} PTS` : 'Feedback deleted');
                 if (_qfpCurrentId) {
                     await showQuizFeedbackPanel(_qfpCurrentId);
                 }
