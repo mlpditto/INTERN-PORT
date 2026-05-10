@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.87</title>
+    <title>Nika V92.88</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -34115,10 +34115,18 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 const stars = typeof f.rating === 'number' ? ('★'.repeat(Math.round(f.rating / 10 * 5)) + '☆'.repeat(5 - Math.round(f.rating / 10 * 5))) : '';
                 const mins = Math.floor((f.timeUsedSeconds || 0) / 60);
                 const secs = (f.timeUsedSeconds || 0) % 60;
+                // V92.88: derive comment metrics from \p{C}-stripped text so invisible-only
+                // submissions (ZWSP padding, lone combining marks, etc.) don't pass the
+                // "Meets minimum" gate or render as zero-height boxes. Same family of bug
+                // V92.84/V92.86 fixed for next-topic chips; here we apply it to the comment
+                // body. cleanComment also drives the rendered text so admins see exactly
+                // what counts.
                 const rawComment = (f.comment || '').trim();
-                const safeComment = qfpEscapeHtml(rawComment);
-                const commentLength = rawComment.length;
-                const meetsMin = commentLength >= 100;
+                const cleanComment = rawComment.replace(/\p{C}/gu, '');
+                const hasVisibleContent = /[\p{L}\p{N}\p{S}\p{P}]/u.test(cleanComment);
+                const safeComment = qfpEscapeHtml(cleanComment);
+                const commentLength = cleanComment.length;
+                const meetsMin = hasVisibleContent && commentLength >= 100;
                 const aiScoreText = typeof f.aiFeedbackScore === 'number' ? `${f.aiFeedbackScore.toFixed(1)}/10` : 'Not scored';
                 const aiIssue = qfpEscapeHtml(f.aiFeedbackIssue || '');
                 const aiSuggestion = qfpEscapeHtml(f.aiFeedbackSuggestion || '');
@@ -34142,11 +34150,11 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                         <span onclick="document.getElementById('qfp-res-${f.id}').style.filter='none'; this.style.display='none';" style="font-size:0.7em; color:#94a3b8; cursor:pointer; white-space:nowrap;">🔒 reveal</span>
                     </div>`;
                 }
-                // V92.87: tint Individual Feedback card red when no comment — same
-                // palette as V92.83 LAUGH TALE empty-comment cards so admins recognize
-                // the cleanup target consistently across both surfaces.
-                const cardBg = rawComment ? 'white' : '#fef2f2';
-                const cardBorder = rawComment ? '1px solid #e2e8f0' : '1px solid #fca5a5';
+                // V92.87 + V92.88: tint card red when there is no VISIBLE comment content
+                // (truly empty OR all-invisible-junk both qualify) so admins recognize the
+                // cleanup target consistently with LAUGH TALE empty-comment cards.
+                const cardBg = hasVisibleContent ? 'white' : '#fef2f2';
+                const cardBorder = hasVisibleContent ? '1px solid #e2e8f0' : '1px solid #fca5a5';
                 return `
                     <div style="background:${cardBg};border:${cardBorder};border-radius:12px;padding:14px 16px;">
                         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
@@ -34159,13 +34167,13 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                         </div>
                         ${quizResultHtml}
                         ${(() => { const nt = qfpNormalizeTopic(f.nextTopic); return nt ? `<div style="margin-bottom:6px;"><span style="font-size:0.75em;font-weight:700;color:#7c3aed;">🎯 Next Topic:</span> <span style="font-size:0.82em;color:#6d28d9;">${qfpEscapeHtml(nt)}</span></div>` : ''; })()}
-                        ${rawComment ? `<div style="font-size:0.85em;color:#475569;background:#f8fafc;padding:8px 12px;border-radius:8px;border-left:3px solid #cbd5e1; white-space:pre-wrap;">${safeComment}</div>` : ''}
+                        ${hasVisibleContent ? `<div style="font-size:0.85em;color:#475569;background:#f8fafc;padding:8px 12px;border-radius:8px;border-left:3px solid #cbd5e1; white-space:pre-wrap;">${safeComment}</div>` : ''}
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap;">
                             <span style="font-size:0.76em; font-weight:700; color:${meetsMin ? '#166534' : '#b45309'}; background:${meetsMin ? '#dcfce7' : '#ffedd5'}; border:1px solid ${meetsMin ? '#86efac' : '#fdba74'}; border-radius:999px; padding:3px 10px;">
                                 Feedback Length: ${commentLength} chars · ${meetsMin ? 'Meets minimum' : 'Below 100'}
                             </span>
                             <div style="display:flex; gap:6px; align-items:center;">
-                                <button id="qfp-ai-btn-${f.id}" class="btn-sm" onclick="runAIFeedbackScoring('${f.id}')" ${!rawComment ? 'disabled title="No feedback text to score"' : ''} style="background:${rawComment ? '#1d4ed8' : '#94a3b8'}; color:white; border:none; border-radius:8px; padding:5px 10px; ${!rawComment ? 'cursor:not-allowed; opacity:0.6;' : ''}">
+                                <button id="qfp-ai-btn-${f.id}" class="btn-sm" onclick="runAIFeedbackScoring('${f.id}')" ${!hasVisibleContent ? 'disabled title="No visible feedback text to score"' : ''} style="background:${hasVisibleContent ? '#1d4ed8' : '#94a3b8'}; color:white; border:none; border-radius:8px; padding:5px 10px; ${!hasVisibleContent ? 'cursor:not-allowed; opacity:0.6;' : ''}">
                                     🗡️ Score
                                 </button>
                                 <button class="btn-sm" onclick="deleteQuizFeedbackItem('${f.id}')" style="background:#dc2626; color:white; border:none; border-radius:8px; padding:5px 10px;">
