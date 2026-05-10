@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.81</title>
+    <title>Nika V92.82</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12882,10 +12882,15 @@ Respond ONLY with valid JSON (no markdown, no extra text):
   "grade": "ดี" or "พอใช้" or "ควรปรับ",
   "issues": ["concise issue in Thai (max 3 items)"],
   "suggestions": ["practical suggestion in Thai (max 3 items)"],
-  "improved": "improved rewrite in the same language as original"
+  "improved": "improved rewrite in the same language as original",
+  "changes": [
+    {"from": "exact substring from the original", "to": "exact replacement substring in the improved version", "reason": "the writing principle behind this edit (clarity, specificity, grammar, tone, conciseness, etc.) — 1 short sentence in Thai"}
+  ]
 }
 
-If you have nothing concrete to flag, return empty arrays for issues/suggestions — NEVER include empty strings, single punctuation marks, or placeholder text. Each item must be a real, actionable sentence. Keep suggestions kind and constructive.`;
+If you have nothing concrete to flag, return empty arrays for issues/suggestions — NEVER include empty strings, single punctuation marks, or placeholder text. Each item must be a real, actionable sentence. Keep suggestions kind and constructive.
+
+For "changes": list every meaningful edit between original and improved. Each entry MUST have non-empty "from" and "to" substrings copied verbatim from the texts (include 1–3 words of surrounding context if the change is a single word, so the learner can locate it). Reasons must explain the writing principle, not just describe what changed (e.g. "ทำให้ชัดเจนขึ้นว่าอาหารถูกจัดเตรียมมา" — not "เพิ่มคำว่า provided"). If improved equals original verbatim, return an empty changes array.`;
 
                 // Run admin feedback (JSON: feedback + bonus suggestion) + grammar check in parallel
                 const [feedbackResult, grammarResult] = await Promise.allSettled([
@@ -12917,7 +12922,7 @@ If you have nothing concrete to flag, return empty arrays for issues/suggestions
                 }
 
                 if (grammarResult.status === 'fulfilled') {
-                    renderGrammarAnalysis(grammarResult.value.text);
+                    renderGrammarAnalysis(grammarResult.value.text, grammarSource);
                 }
 
             } catch (error) {
@@ -12934,7 +12939,43 @@ If you have nothing concrete to flag, return empty arrays for issues/suggestions
             }
         };
 
-        function renderGrammarAnalysis(rawText) {
+        // V92.82: word-level LCS diff for Writing Analysis Improved Sample.
+        // Returns array of {type: 'eq'|'add'|'del', text}. For Thai-only text without
+        // spaces, the entire run becomes a single token — diff degrades to whole-chunk
+        // replace, still functional just less granular.
+        function diffWords(a, b) {
+            const tokenize = s => String(s || '').split(/(\s+)/).filter(t => t.length);
+            const aw = tokenize(a), bw = tokenize(b);
+            const m = aw.length, n = bw.length;
+            if (m === 0 && n === 0) return [];
+            if (m === 0) return bw.map(t => ({ type: 'add', text: t }));
+            if (n === 0) return aw.map(t => ({ type: 'del', text: t }));
+            const dp = Array.from({ length: m + 1 }, () => new Uint16Array(n + 1));
+            for (let i = 1; i <= m; i++) {
+                for (let j = 1; j <= n; j++) {
+                    dp[i][j] = aw[i - 1] === bw[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
+                }
+            }
+            const ops = [];
+            let i = m, j = n;
+            while (i > 0 || j > 0) {
+                if (i > 0 && j > 0 && aw[i - 1] === bw[j - 1]) { ops.push({ type: 'eq', text: aw[i - 1] }); i--; j--; }
+                else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) { ops.push({ type: 'add', text: bw[j - 1] }); j--; }
+                else { ops.push({ type: 'del', text: aw[i - 1] }); i--; }
+            }
+            return ops.reverse();
+        }
+
+        function renderWordDiff(original, improved) {
+            return diffWords(original, improved).map(op => {
+                const txt = escapeHtml(op.text);
+                if (op.type === 'eq') return txt;
+                if (op.type === 'add') return `<span style="background:#dcfce7; color:#166534; padding:0 3px; border-radius:3px; font-weight:600;">${txt}</span>`;
+                return `<span style="background:#fee2e2; color:#991b1b; padding:0 3px; border-radius:3px; text-decoration:line-through; opacity:0.65;">${txt}</span>`;
+            }).join('');
+        }
+
+        function renderGrammarAnalysis(rawText, originalText) {
             const card = document.getElementById('reflective-grammar-card');
             const content = document.getElementById('reflective-grammar-content');
             const badge = document.getElementById('reflective-grammar-score');
@@ -12980,9 +13021,23 @@ If you have nothing concrete to flag, return empty arrays for issues/suggestions
             }
 
             if (data.improved) {
-                html += `<div>
+                const improvedHtml = (originalText && String(originalText).trim().length > 0)
+                    ? renderWordDiff(originalText, data.improved)
+                    : escapeHtml(data.improved);
+                html += `<div style="margin-bottom:8px;">
                     <div style="font-size:0.7em; font-weight:900; color:#15803d; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">✏ Improved sample ตัวอย่างประโยคที่ดีขึ้น</div>
-                    <div style="font-size:0.82em; color:#14532d; background:#f0fdf4; border:1px solid #bbf7d0; padding:9px 11px; border-radius:10px; line-height:1.6;">${escapeHtml(data.improved)}</div>
+                    <div style="font-size:0.82em; color:#14532d; background:#f0fdf4; border:1px solid #bbf7d0; padding:9px 11px; border-radius:10px; line-height:1.6;">${improvedHtml}</div>
+                </div>`;
+            }
+
+            const cleanChanges = (data.changes || []).filter(c => c && c.from && c.to && c.reason && String(c.reason).trim().length > 0);
+            if (cleanChanges.length > 0) {
+                html += `<div>
+                    <div style="font-size:0.7em; font-weight:900; color:#0e7490; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">📚 Why these changes ทำไมถึงปรับ</div>
+                    ${cleanChanges.map(c => `<div style="font-size:0.8em; background:#f0f9ff; border-left:3px solid #0ea5e9; padding:6px 9px; border-radius:0 8px 8px 0; margin-bottom:5px; line-height:1.5;">
+                        <div style="font-size:0.92em; margin-bottom:3px;"><span style="background:#fee2e2; color:#991b1b; padding:1px 5px; border-radius:3px; text-decoration:line-through; opacity:0.75;">${escapeHtml(c.from)}</span> <span style="color:#64748b; font-weight:700; padding:0 4px;">→</span> <span style="background:#dcfce7; color:#166534; padding:1px 5px; border-radius:3px; font-weight:600;">${escapeHtml(c.to)}</span></div>
+                        <div style="color:#0c4a6e;">${escapeHtml(c.reason)}</div>
+                    </div>`).join('')}
                 </div>`;
             }
 
