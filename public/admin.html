@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.83</title>
+    <title>Nika V92.84</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -34008,14 +34008,14 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 .replace(/'/g, '&#39;');
         }
 
-        // V92.36: strip zero-width whitespace that .trim() ignores (ZWSP, ZWNJ, ZWJ, BOM, NBSP)
-        // so user-submitted "empty" next-topic values don't render as blank pills.
-        // RegExp constructor with string escapes used per V91.95 lesson - never embed literal
-        // zero-width chars in regex source; they are invisible and editors can drop them silently.
-        const QFP_ZW_REGEX = new RegExp('[\u200B\u200C\u200D\uFEFF\u00A0]', 'g');
+        // V92.84: strip every Unicode control/format codepoint (\p{C}) \u2014 covers
+        // ZWSP/ZWNJ/ZWJ/BOM (V92.36 originals) plus LRM/RLM, soft hyphen, variation
+        // selectors, and other invisible format chars that the previous 5-char
+        // allowlist missed and were rendering as blank chips. trim() then handles
+        // \p{Z} whitespace including NBSP and CJK ideographic space.
         function qfpNormalizeTopic(topic) {
             if (topic == null) return '';
-            return String(topic).replace(QFP_ZW_REGEX, '').trim();
+            return String(topic).replace(/\p{C}/gu, '').trim();
         }
 
         async function qfpCallAI(model, prompt) {
@@ -34070,8 +34070,11 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             // Compute summary
             const ratings = _qfpFeedbacks.map(f => f.rating).filter(r => typeof r === 'number');
             const avgRating = ratings.length ? (ratings.reduce((a, b) => a + b, 0) / ratings.length) : null;
-            // V92.36: normalize first (strips zero-width chars) then keep only non-empty
-            const topics = _qfpFeedbacks.map(f => qfpNormalizeTopic(f.nextTopic)).filter(t => t.length > 0);
+            // V92.84: count blank-but-submitted topics separately so they show as a
+            // muted "+N blank" chip instead of being silently dropped.
+            const allTopics = _qfpFeedbacks.map(f => qfpNormalizeTopic(f.nextTopic));
+            const topics = allTopics.filter(t => t.length > 0);
+            const blankTopicCount = allTopics.length - topics.length;
             const avgTime = _qfpFeedbacks.reduce((a, f) => a + (f.timeUsedSeconds || 0), 0) / _qfpFeedbacks.length;
 
             const starFill = avgRating !== null ? Math.round(avgRating / 10 * 5) : null;
@@ -34092,9 +34095,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     <div style="font-size:2em;font-weight:900;color:#1d4ed8;">${Math.round(avgTime / 60)}<span style="font-size:0.5em;color:#3b82f6;"> min</span></div>
                     <div style="font-size:0.75em;color:#60a5fa;">${Math.round(avgTime)}s avg</div>
                 </div>
-                ${topics.length ? `<div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:12px;padding:12px 18px;flex:2;min-width:200px;">
+                ${(topics.length || blankTopicCount > 0) ? `<div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:12px;padding:12px 18px;flex:2;min-width:200px;">
                     <div style="font-size:0.75em;font-weight:700;color:#6b21a8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">🎯 Next Topics Requested</div>
-                    <div style="display:flex;flex-wrap:wrap;gap:5px;">${topics.slice(0, 8).map(t => `<span style="background:white;border:1px solid #d8b4fe;border-radius:8px;padding:3px 9px;font-size:0.8em;color:#7c3aed;font-weight:600;">${qfpEscapeHtml(t)}</span>`).join('')}</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:5px;">${topics.slice(0, 8).map(t => `<span style="background:white;border:1px solid #d8b4fe;border-radius:8px;padding:3px 9px;font-size:0.8em;color:#7c3aed;font-weight:600;">${qfpEscapeHtml(t)}</span>`).join('')}${blankTopicCount > 0 ? `<span style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:3px 9px;font-size:0.8em;color:#64748b;font-weight:600;" title="${blankTopicCount} user${blankTopicCount === 1 ? '' : 's'} submitted feedback without specifying a next topic">+${blankTopicCount} blank</span>` : ''}</div>
                 </div>` : ''}
             `;
 
