@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.82</title>
+    <title>Nika V92.83</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -29641,13 +29641,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const quiz = (quizzesData || []).find(q => q.id === fb.quizId);
                 const quizTitle = (quiz?.title || quiz?.name || 'Quiz').slice(0, 40);
                 const quizTitleFull = quiz?.title || quiz?.name || '';
+                // V92.83: flag empty-comment cards — red bg + 🗑 button to delete + revert pointsEarned
+                const hasNoComment = !fb.comment || !String(fb.comment).trim();
+                const cardBg = hasNoComment ? '#fef2f2' : 'var(--bg-card)';
+                const cardBorder = hasNoComment ? '1px solid #fca5a5' : '1px solid var(--border-color)';
+                const btnBg = hasNoComment ? '#fff' : 'var(--bg-card)';
                 return `
-                    <div id="qfcard-${fb.id}" class="laugh-card" onclick="showQuizFeedbackPanel('${fb.quizId}')" style="background:var(--bg-card); border-radius:30px; box-shadow:0 20px 50px rgba(0,0,0,0.07); padding:30px; position:relative; overflow:hidden; border:1px solid var(--border-color); transition:0.3s; height:100%; display:flex; flex-direction:column; cursor:pointer;">
+                    <div id="qfcard-${fb.id}" class="laugh-card" onclick="showQuizFeedbackPanel('${fb.quizId}')" style="background:${cardBg}; border-radius:30px; box-shadow:0 20px 50px rgba(0,0,0,0.07); padding:30px; position:relative; overflow:hidden; border:${cardBorder}; transition:0.3s; height:100%; display:flex; flex-direction:column; cursor:pointer;">
                         <div style="position:absolute; top:0; left:0; width:100%; height:10px; background:${groupColor};"></div>
                         <div style="position:absolute; top:20px; right:20px; display:flex; gap:8px; z-index:2;">
-                            <button onclick="event.stopPropagation(); copyLaughCard('qfcard-${fb.id}')" style="background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-main); border-radius:50%; width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.05); font-size:0.9em;" title="Copy Text">📋</button>
-                            <button onclick="event.stopPropagation(); blindLaughCard('qfcard-${fb.id}')" style="background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-main); border-radius:50%; width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.05); font-size:0.9em;" title="Blind Identity">🙈</button>
-                            <button onclick="event.stopPropagation(); window._laughTaleUserFilter='${fb.userId}'; renderQuizFeedbackCards()" style="background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-main); border-radius:50%; width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.05); font-size:0.9em;" title="Filter this user">👤</button>
+                            <button onclick="event.stopPropagation(); copyLaughCard('qfcard-${fb.id}')" style="background:${btnBg}; border:1px solid var(--border-color); color:var(--text-main); border-radius:50%; width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.05); font-size:0.9em;" title="Copy Text">📋</button>
+                            <button onclick="event.stopPropagation(); blindLaughCard('qfcard-${fb.id}')" style="background:${btnBg}; border:1px solid var(--border-color); color:var(--text-main); border-radius:50%; width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.05); font-size:0.9em;" title="Blind Identity">🙈</button>
+                            <button onclick="event.stopPropagation(); window._laughTaleUserFilter='${fb.userId}'; renderQuizFeedbackCards()" style="background:${btnBg}; border:1px solid var(--border-color); color:var(--text-main); border-radius:50%; width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.05); font-size:0.9em;" title="Filter this user">👤</button>
+                            ${hasNoComment ? `<button onclick="event.stopPropagation(); deleteEmptyCommentFeedback('${fb.id}')" style="background:#fee2e2; border:1px solid #fca5a5; color:#dc2626; border-radius:50%; width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; box-shadow:0 4px 6px rgba(220,38,38,0.15); font-size:0.95em;" title="Delete (no comment) + revert score">🗑️</button>` : ''}
                         </div>
                         <div style="margin-top:10px; margin-bottom:18px; background:#eef2ff; border-radius:12px; padding:8px 14px; display:flex; align-items:center; gap:8px;" title="${quizTitleFull}">
                             <span style="background:#4361ee; color:white; font-size:0.65em; font-weight:900; padding:2px 8px; border-radius:6px; letter-spacing:1px; flex-shrink:0;">QUIZ</span>
@@ -29678,6 +29684,55 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     </div>
                 `;
             }).join('');
+        }
+
+        // V92.83: delete a quiz_feedback doc that has no learner comment, and
+        // revert pointsEarned from the user's score. Mirrors deletePollParticipant
+        // pattern (batch delete + increment(-x) + checkin_logs audit row).
+        async function deleteEmptyCommentFeedback(feedbackId) {
+            if (!feedbackId) return;
+            const all = window._quizFeedbackCache || [];
+            const fb = all.find(x => x.id === feedbackId);
+            if (!fb) { alert('Feedback entry not found in cache.'); return; }
+
+            const user = (usersData || []).find(u => u.id === fb.userId) || {};
+            const userName = user.displayName || fb.displayName || 'Unknown user';
+            const quiz = (quizzesData || []).find(q => q.id === fb.quizId);
+            const quizTitle = quiz?.title || quiz?.name || fb.quizId || 'Quiz';
+            const pointsToRevert = (typeof fb.pointsEarned === 'number' && fb.pointsEarned > 0) ? fb.pointsEarned : 0;
+
+            const userExists = fb.userId && fb.userId !== 'anon' && (usersData || []).some(u => u.id === fb.userId);
+            const willRevert = pointsToRevert > 0 && userExists;
+
+            const confirmMsg = willRevert
+                ? `Delete this empty-comment feedback?\n\nUser: ${userName}\nQuiz: ${quizTitle}\nScore to revert: −${pointsToRevert.toFixed(1)} PTS\n\nThis cannot be undone.`
+                : `Delete this empty-comment feedback?\n\nUser: ${userName}\nQuiz: ${quizTitle}\n(No score to revert${pointsToRevert === 0 ? '' : ' — user not found in cache'})\n\nThis cannot be undone.`;
+            if (!confirm(confirmMsg)) return;
+
+            try {
+                const b = db.batch();
+                b.delete(db.collection('quiz_feedback').doc(feedbackId));
+
+                if (willRevert) {
+                    b.update(db.collection('users').doc(fb.userId), {
+                        score: firebase.firestore.FieldValue.increment(-pointsToRevert)
+                    });
+                    b.set(db.collection('checkin_logs').doc(), {
+                        userId: fb.userId,
+                        type: 'manual_adjust',
+                        amount: -pointsToRevert,
+                        note: `Revert: Quiz Feedback deleted (no comment) — '${quizTitle}'`,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+
+                await b.commit();
+                window._quizFeedbackCache = all.filter(x => x.id !== feedbackId);
+                showToast(willRevert ? `Deleted & reverted −${pointsToRevert.toFixed(1)} PTS` : 'Feedback deleted');
+                renderQuizFeedbackCards();
+            } catch (e) {
+                alert('Failed to delete: ' + e.message);
+            }
         }
 
         function renderLaughTale() {
