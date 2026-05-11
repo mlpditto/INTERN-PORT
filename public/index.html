@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.46)</title>
+    <title>Internship Portfolio (V94.47)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3505,11 +3505,22 @@
 
             <div id="fb-form-content">
             <label style="font-weight:bold; display:block; margin-bottom:5px;">⭐ Rate this quiz set ให้คะแนนชุดข้อสอบนี้ (0-10):</label>
-            <input type="range" id="fb-rating" min="0" max="10" step="1" value="5"
-                oninput="document.getElementById('fb-rating-num').innerText = this.value"
-                style="width:100%; margin:10px 0; accent-color:var(--primary);">
+            <!-- V94.47: 10 clickable stars (replace V93.01 slider). Default 0; user must click to rate. -->
+            <div id="fb-rating-stars" role="radiogroup" aria-label="Rating 0 to 10" style="display:flex; gap:4px; justify-content:center; margin:10px 0; flex-wrap:wrap;">
+                <i class="fa-regular fa-star fb-star" data-val="1" onclick="setFbRating(1)" title="1" style="font-size:1.6em; cursor:pointer; color:#fbbf24;"></i>
+                <i class="fa-regular fa-star fb-star" data-val="2" onclick="setFbRating(2)" title="2" style="font-size:1.6em; cursor:pointer; color:#fbbf24;"></i>
+                <i class="fa-regular fa-star fb-star" data-val="3" onclick="setFbRating(3)" title="3" style="font-size:1.6em; cursor:pointer; color:#fbbf24;"></i>
+                <i class="fa-regular fa-star fb-star" data-val="4" onclick="setFbRating(4)" title="4" style="font-size:1.6em; cursor:pointer; color:#fbbf24;"></i>
+                <i class="fa-regular fa-star fb-star" data-val="5" onclick="setFbRating(5)" title="5" style="font-size:1.6em; cursor:pointer; color:#fbbf24;"></i>
+                <i class="fa-regular fa-star fb-star" data-val="6" onclick="setFbRating(6)" title="6" style="font-size:1.6em; cursor:pointer; color:#fbbf24;"></i>
+                <i class="fa-regular fa-star fb-star" data-val="7" onclick="setFbRating(7)" title="7" style="font-size:1.6em; cursor:pointer; color:#fbbf24;"></i>
+                <i class="fa-regular fa-star fb-star" data-val="8" onclick="setFbRating(8)" title="8" style="font-size:1.6em; cursor:pointer; color:#fbbf24;"></i>
+                <i class="fa-regular fa-star fb-star" data-val="9" onclick="setFbRating(9)" title="9" style="font-size:1.6em; cursor:pointer; color:#fbbf24;"></i>
+                <i class="fa-regular fa-star fb-star" data-val="10" onclick="setFbRating(10)" title="10" style="font-size:1.6em; cursor:pointer; color:#fbbf24;"></i>
+            </div>
+            <input type="hidden" id="fb-rating" value="0">
             <div style="text-align:center; font-weight:bold; color:var(--primary); margin-bottom:15px;">
-                <span id="fb-rating-num" style="font-size:1.5em;">5</span> / 10
+                <span id="fb-rating-num" style="font-size:1.5em;">0</span> / 10
             </div>
 
             <label style="font-weight:bold; display:block; margin-bottom:5px;">🎯 Next quiz topic? <span style="font-weight:normal; color:#94a3b8; font-size:0.85em;">optional ไม่บังคับ</span></label>
@@ -6428,7 +6439,7 @@
                                         ${isChecked ? 'checked' : ''}
                                         onchange="handleChoiceChange(${currentStep}, ${displayIdx}, ${isMulti})"
                                         style="width:auto; margin:0; padding:0; flex:0 0 auto;">
-                                    ${opt}
+                                    <span style="flex:1 1 auto; min-width:0; text-align:left;">${opt}</span>
                                 </label>
                             `;
                     }).join('')}
@@ -7054,9 +7065,9 @@
 
                     document.getElementById('feedback-score-val').innerText = pointsAwarded.toFixed(2);
                     document.getElementById('feedback-time-val').innerText = `🕒 เวลาที่ใช้: ${mins}:${secs.toString().padStart(2, '0')} นาที`;
-                    // V93.01: default to 5 (neutral midpoint) instead of 10 (max) — was nudging score upward
-                    document.getElementById('fb-rating').value = 5;
-                    document.getElementById('fb-rating-num').innerText = "5";
+                    // V94.47: 10-star rating UI, default 0 (no rating) — user must click to rate.
+                    // (Replaced V93.01 slider default of 5 which still nudged feedback bias.)
+                    setFbRating(0);
                     document.getElementById('fb-next-topic').value = "";
                     document.getElementById('fb-comment').value = "";
                     updateFeedbackCommentCounter();
@@ -7208,6 +7219,27 @@
             btn.style.background = '#4361ee';
             btn.style.color = '#ffffff';
             btn.style.borderColor = '#4361ee';
+        }
+
+        // V94.47: 10-star rating UI (replaces V93.01 0-10 slider). Default 0.
+        // Click on star N fills stars 1..N solid; hidden #fb-rating input.value
+        // stores the numeric rating so submitFeedback() reads it unchanged.
+        function setFbRating(val) {
+            const v = Math.max(0, Math.min(10, parseInt(val) || 0));
+            const input = document.getElementById('fb-rating');
+            if (input) input.value = v;
+            const numEl = document.getElementById('fb-rating-num');
+            if (numEl) numEl.innerText = v;
+            document.querySelectorAll('#fb-rating-stars .fb-star').forEach(star => {
+                const starVal = parseInt(star.getAttribute('data-val')) || 0;
+                if (starVal <= v && v > 0) {
+                    star.classList.remove('fa-regular');
+                    star.classList.add('fa-solid');
+                } else {
+                    star.classList.remove('fa-solid');
+                    star.classList.add('fa-regular');
+                }
+            });
         }
 
         function updateFeedbackCommentCounter() {
