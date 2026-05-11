@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.41)</title>
+    <title>Internship Portfolio (V94.42)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -6151,6 +6151,150 @@
             loadDiscussionComments(discussionId);
         }
 
+        // ====================================================================
+        // V93.00 — Quiz Translation (Tier B Hybrid): on-device Translator API
+        // when available, Typhoon via callAIProxy fallback, localStorage cache.
+        // Translates question text + choice options. User clicks once, lang
+        // persists across questions + sessions (localStorage). Cache key:
+        // qt_{quizId}_{qIdx}_{lang}. Triggers background translate on render
+        // so navigating to a new question auto-translates with cache hit fast.
+        // ====================================================================
+        const QT_LANGS = [
+            { code: 'orig', label: 'Original' },
+            { code: 'th', label: 'ไทย' },
+            { code: 'en', label: 'EN' },
+            { code: 'ko', label: '한국어' },
+            { code: 'ja', label: '日本語' },
+            { code: 'zh', label: '中文' }
+        ];
+        const QT_LANG_NAMES = { th: 'Thai', en: 'English', ko: 'Korean', ja: 'Japanese', zh: 'Simplified Chinese' };
+        const qtBackgroundQueue = new Set();
+
+        function qtGetSelectedLang() { return localStorage.getItem('quizUiLang') || 'orig'; }
+        function qtSetSelectedLang(lang) { localStorage.setItem('quizUiLang', lang); }
+        function qtCacheKey(quizId, qIdx, lang) { return `qt_${quizId}_${qIdx}_${lang}`; }
+        function qtGetCached(quizId, qIdx, lang) {
+            try { const raw = localStorage.getItem(qtCacheKey(quizId, qIdx, lang)); return raw ? JSON.parse(raw) : null; }
+            catch (_) { return null; }
+        }
+        function qtSetCached(quizId, qIdx, lang, data) {
+            try { localStorage.setItem(qtCacheKey(quizId, qIdx, lang), JSON.stringify(data)); }
+            catch (e) {
+                // QuotaExceeded — drop oldest qt_* entries and retry once
+                const keys = Object.keys(localStorage).filter(k => k.startsWith('qt_'));
+                keys.slice(0, Math.min(50, keys.length)).forEach(k => localStorage.removeItem(k));
+                try { localStorage.setItem(qtCacheKey(quizId, qIdx, lang), JSON.stringify(data)); } catch (_) {}
+            }
+        }
+
+        async function qtTranslateText(text, targetLang) {
+            if (!text || !text.trim()) return { text: text || '', source: 'empty' };
+            if (targetLang === 'orig') return { text, source: 'orig' };
+
+            // Tier A: on-device Translator API (Chrome 138+, Android Chromium LINE)
+            if (typeof Translator !== 'undefined' && 'create' in Translator) {
+                try {
+                    const t = await Translator.create({ sourceLanguage: 'en', targetLanguage: targetLang });
+                    return { text: await t.translate(text), source: 'device' };
+                } catch (e) { /* fall through */ }
+            }
+
+            // Tier B: Typhoon via callAIProxy (server, cached server-side per-request)
+            const target = QT_LANG_NAMES[targetLang] || targetLang;
+            const prompt = `Translate the following text to ${target}. Output ONLY the translation, no explanations, no quotes, no markdown fences.\n\n${text}`;
+            const PROXY_URL = 'https://us-central1-intern-port-edfa7.cloudfunctions.net/callAIProxy';
+            const resp = await fetch(PROXY_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-mlp-secret': 'mlp-secret-8888' },
+                body: JSON.stringify({ provider: 'typhoon', model: 'typhoon-v2.5-30b-a3b-instruct', prompt, isJson: false })
+            });
+            if (!resp.ok) throw new Error(`Typhoon HTTP ${resp.status}`);
+            const data = await resp.json();
+            if (data.error) throw new Error(data.error);
+            return { text: (data.text || '').trim().replace(/^["']|["']$/g, ''), source: 'typhoon' };
+        }
+
+        async function qtTranslateQuestion(qIdx, targetLang) {
+            if (!currentQuiz || !currentQuiz.questions[qIdx] || targetLang === 'orig') return null;
+            const cached = qtGetCached(currentQuiz.id, qIdx, targetLang);
+            if (cached) return { ...cached, source: 'cached' };
+            const q = currentQuiz.questions[qIdx];
+            const qResult = await qtTranslateText(q.q || '', targetLang);
+            const opts = q.options || [];
+            const optResults = await Promise.all(opts.map(o => qtTranslateText(o || '', targetLang).catch(() => ({ text: o, source: 'failed' }))));
+            const translated = { q: qResult.text, options: optResults.map(r => r.text), source: qResult.source };
+            qtSetCached(currentQuiz.id, qIdx, targetLang, translated);
+            return translated;
+        }
+
+        function qtGetEffectiveQuestion(qIdx) {
+            const baseQ = currentQuiz.questions[qIdx];
+            const lang = qtGetSelectedLang();
+            if (lang === 'orig') return baseQ;
+            // Seed in-memory cache from localStorage on first access
+            if (!currentQuiz._translations) currentQuiz._translations = {};
+            if (!currentQuiz._translations[lang]) currentQuiz._translations[lang] = {};
+            let trans = currentQuiz._translations[lang][qIdx];
+            if (!trans) {
+                const cached = qtGetCached(currentQuiz.id, qIdx, lang);
+                if (cached) { trans = cached; currentQuiz._translations[lang][qIdx] = trans; }
+            }
+            if (trans) return { ...baseQ, q: trans.q, options: trans.options || baseQ.options, _translationSource: trans.source };
+            // Not cached — kick off background translate, return original for now
+            qtBackgroundTranslate(qIdx, lang);
+            return { ...baseQ, _translationPending: true };
+        }
+
+        async function qtBackgroundTranslate(qIdx, lang) {
+            const key = `${currentQuiz.id}_${qIdx}_${lang}`;
+            if (qtBackgroundQueue.has(key)) return;
+            qtBackgroundQueue.add(key);
+            try {
+                const result = await qtTranslateQuestion(qIdx, lang);
+                if (result) {
+                    if (!currentQuiz._translations) currentQuiz._translations = {};
+                    if (!currentQuiz._translations[lang]) currentQuiz._translations[lang] = {};
+                    currentQuiz._translations[lang][qIdx] = result;
+                    if (currentStep === qIdx && qtGetSelectedLang() === lang) {
+                        renderQuizStep(true);
+                    }
+                }
+            } catch (e) {
+                console.warn('[qt] translate failed:', e.message);
+                const statusEl = document.getElementById('qt-status');
+                if (statusEl && currentStep === qIdx) {
+                    statusEl.innerText = `❌ ${e.message}`;
+                    setTimeout(() => { if (statusEl.innerText.startsWith('❌')) statusEl.innerText = ''; }, 4000);
+                }
+            } finally {
+                qtBackgroundQueue.delete(key);
+            }
+        }
+
+        function qtRenderBar(effectiveQuestion) {
+            const currentLang = qtGetSelectedLang();
+            const sourceMap = { device: '⚡ on-device', typhoon: '🌀 Typhoon', cached: '🗃️ cached', orig: '' };
+            const status = effectiveQuestion && effectiveQuestion._translationPending
+                ? '⏳ Translating…'
+                : (effectiveQuestion && effectiveQuestion._translationSource ? sourceMap[effectiveQuestion._translationSource] || '' : '');
+            return `
+                <div class="qt-bar lang-no-toggle" style="margin:6px 0 12px; display:flex; align-items:center; gap:5px; flex-wrap:wrap; padding:6px 10px; background:#f8fafc; border-radius:10px; border:1px solid #e2e8f0;">
+                    <span style="font-size:0.7em; color:#64748b; font-weight:800;">🌐</span>
+                    ${QT_LANGS.map(l => `
+                        <button onclick="event.stopPropagation(); qtApplyTranslation('${l.code}')"
+                            style="font-size:0.7em; padding:3px 9px; border-radius:8px; cursor:pointer; border:1px solid ${currentLang === l.code ? '#4361ee' : '#cbd5e1'}; background:${currentLang === l.code ? '#4361ee' : 'white'}; color:${currentLang === l.code ? 'white' : '#475569'}; font-weight:700; transition:0.15s; white-space:nowrap;">
+                            ${l.label}
+                        </button>
+                    `).join('')}
+                    <span id="qt-status" style="font-size:0.7em; color:#94a3b8; margin-left:auto;">${status}</span>
+                </div>`;
+        }
+
+        function qtApplyTranslation(lang) {
+            qtSetSelectedLang(lang);
+            renderQuizStep(true);
+        }
+
         function renderQuizStep(useExistingTime = false) {
             try {
                 const quizRunContainer = document.getElementById('quiz-run-container');
@@ -6170,7 +6314,8 @@
                     console.error('renderQuizStep: invalid quiz state', { currentStep, quiz: currentQuiz });
                     return;
                 }
-                const question = currentQuiz.questions[currentStep];
+                // V93.00: use translated question if user has selected a target language
+                const question = qtGetEffectiveQuestion(currentStep);
 
                 // 🔥 Case Study Logic (V77.23)
                 const passageArea = document.getElementById('quiz-case-passage-area');
@@ -6308,7 +6453,8 @@
                 quizRunContainer.innerHTML = `
                 <div style="margin-bottom:15px;">
                     <span class="badge" style="background:#4361ee; margin-bottom:10px;">Q ${currentStep + 1}/${currentQuiz.questions.length} (${qType.toUpperCase()})</span>
-                    <div class="md-render" style="font-weight:bold; font-size:1.1em; color:#333;">${window.renderMd(question.q)}</div>
+                    ${qtRenderBar(question)}
+                    <div class="md-render lang-no-toggle" style="font-weight:bold; font-size:1.1em; color:#333;">${window.renderMd(question.q)}</div>
                 </div>
                 ${inputHtml}
             `;
