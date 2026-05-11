@@ -93,12 +93,17 @@
         // otherwise wrap Thai chars and absorb adjacent punctuation —
         // surfaced as Quiz Editor preview missing closing parens / Thai
         // when admin toggled TH off.
+        // V92.97 (admin): extend to q-opt-preview — Quiz Editor MCQ option
+        // preview divs were hiding Thai option text under EN-default body
+        // class. Same root cause as V92.92/V92.96 (lang-th wrapping +
+        // display:none cascade).
         var ancestor = parent;
         while (ancestor && ancestor.nodeType === 1) {
             if (ancestor.classList && (
                 ancestor.classList.contains('lang-no-toggle') ||
                 ancestor.classList.contains('md-render') ||
-                ancestor.classList.contains('q-text-preview')
+                ancestor.classList.contains('q-text-preview') ||
+                ancestor.classList.contains('q-opt-preview')
             )) return;
             ancestor = ancestor.parentNode;
         }
