@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.01</title>
+    <title>Nika V93.02</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -5103,6 +5103,7 @@
                             <span style="color:#ef4444; font-weight:900; font-size:0.75em; display:flex; align-items:center; gap:4px;">⏸️ Pause: <span id="stat-inactive-count">0</span></span>
                             <span style="color:#d97706; font-weight:900; font-size:0.75em; display:flex; align-items:center; gap:4px;">📂 Temps: <span id="stat-template-count">0</span></span>
                         </div>
+                        <button id="btn-translate-all-missing" class="magic-btn" onclick="event.stopPropagation(); qtAdminBackfillAll()" style="background:linear-gradient(135deg, #d97706, #b45309); padding:10px 18px; border-radius:14px; font-weight:900; font-size:0.85em;" title="Pre-translate every quiz that doesn't yet have a translations field (Phase 3 backfill)">🌐 Translate Missing</button>
                         <button class="magic-btn" onclick="event.stopPropagation(); openQuizModal()" style="background:linear-gradient(135deg, #1565c0, #0d47a1); padding:10px 25px; border-radius:14px; font-weight:900;">🧪 Create Quiz</button>
                     </div>
 
@@ -16218,14 +16219,16 @@ ${JSON.stringify(sourceObj)}`;
             return { questions: parsed.questions };
         }
 
-        async function qtAdminBatchTranslate(quizId, questions) {
-            if (!quizId || !Array.isArray(questions) || questions.length === 0) return;
+        // V93.02 admin: added `silent` param + return summary, so Phase 3 backfill can
+        // call this in a loop and drive its own progress UI without per-quiz toast spam.
+        async function qtAdminBatchTranslate(quizId, questions, silent) {
+            if (!quizId || !Array.isArray(questions) || questions.length === 0) return { success: 0, total: 0, errors: [] };
 
             const firstQ = (questions[0] && questions[0].q) || '';
             const sourceLang = qtAdminDetectSourceLang(firstQ);
             const targets = QT_ADMIN_TARGET_LANGS.filter(l => l !== sourceLang);
 
-            showToast(`🌀 Translating to ${targets.join('/')}...`);
+            if (!silent) showToast(`🌀 Translating to ${targets.join('/')}...`);
 
             const translations = {};
             let successCount = 0;
@@ -16253,18 +16256,75 @@ ${JSON.stringify(sourceObj)}`;
                     await db.collection("quizzes").doc(quizId).update(updatePayload);
                 } catch (e) {
                     console.error('[qt-admin] Firestore write failed:', e);
-                    showToast(`⚠️ Translation Firestore save failed: ${e.message}`);
-                    return;
+                    if (!silent) showToast(`⚠️ Translation Firestore save failed: ${e.message}`);
+                    return { success: 0, total: targets.length, errors: [...errors, `firestore: ${e.message}`] };
                 }
             }
 
-            if (successCount === targets.length) {
-                showToast(`✅ Translations saved (${targets.join('/')})`);
-            } else if (successCount > 0) {
-                showToast(`⚠️ Partial translations: ${successCount}/${targets.length} OK, ${errors.length} failed`);
-            } else {
-                showToast(`❌ All translations failed: ${errors[0] || 'unknown'}`);
+            if (!silent) {
+                if (successCount === targets.length) {
+                    showToast(`✅ Translations saved (${targets.join('/')})`);
+                } else if (successCount > 0) {
+                    showToast(`⚠️ Partial translations: ${successCount}/${targets.length} OK, ${errors.length} failed`);
+                } else {
+                    showToast(`❌ All translations failed: ${errors[0] || 'unknown'}`);
+                }
             }
+            return { success: successCount, total: targets.length, errors };
+        }
+
+        // V93.02 admin: Phase 3 — backfill button loops every quiz that still has no
+        // `translations` field (admin V93.01 only translates on save going forward).
+        // Skips read-only quizzes (V93.03 parked) and quizzes without questions.
+        // Sequential per-quiz to avoid Typhoon rate-limit storms. Button text drives
+        // progress so the showToast spam in qtAdminBatchTranslate is silenced here.
+        async function qtAdminBackfillAll() {
+            const missing = (quizzesData || []).filter(q =>
+                q.quizType !== 'read_only' &&
+                Array.isArray(q.questions) && q.questions.length > 0 &&
+                (!q.translations || Object.keys(q.translations).length === 0)
+            );
+            if (missing.length === 0) {
+                showToast('✨ All non-read-only quizzes already have translations');
+                return;
+            }
+
+            const estCalls = missing.length * 4;
+            const estMin = Math.max(1, Math.ceil(estCalls * 8 / 60));
+            const ok = confirm(`Backfill translations for ${missing.length} quiz(zes)?\n\nThis will make ~${estCalls} Typhoon API calls and may take ~${estMin} min.\nRead-only and empty quizzes are skipped.\n\nContinue?`);
+            if (!ok) return;
+
+            const btn = document.getElementById('btn-translate-all-missing');
+            const oldContent = btn ? btn.innerHTML : '';
+            if (btn) btn.disabled = true;
+
+            let done = 0;
+            let partial = 0;
+            let failed = 0;
+
+            for (let i = 0; i < missing.length; i++) {
+                const quiz = missing[i];
+                const label = (quiz.shortTitle || quiz.title || quiz.id || '').slice(0, 30);
+                if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${i + 1}/${missing.length}: ${label}`;
+                try {
+                    const result = await qtAdminBatchTranslate(quiz.id, quiz.questions || [], true);
+                    if (result.success === result.total && result.total > 0) done++;
+                    else if (result.success > 0) partial++;
+                    else failed++;
+                } catch (e) {
+                    console.warn(`[qt-admin backfill] ${quiz.id} failed:`, e);
+                    failed++;
+                }
+            }
+
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = oldContent;
+            }
+
+            const summary = `Backfill: ${done} OK, ${partial} partial, ${failed} failed (of ${missing.length})`;
+            console.log(`[qt-admin backfill] ${summary}`);
+            showToast((failed === 0 && partial === 0 ? '✅ ' : '⚠️ ') + summary);
         }
 
         async function saveQuiz() {
