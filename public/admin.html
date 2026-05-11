@@ -9761,6 +9761,23 @@
             </div>
         </div>
 
+        <!-- V92.95: Score Audit Modal — per-user breakdown across quiz_attempts + quiz_feedback + checkin_logs -->
+        <div id="userScoreAuditModal" class="modal" style="z-index: 2510;">
+            <div class="modal-content" style="max-width:600px; border-top:5px solid #10b981; border-radius:18px;">
+                <span class="close-modal" onclick="document.getElementById('userScoreAuditModal').style.display='none'">&times;</span>
+                <h3 style="margin:0 0 4px 0; display:flex; align-items:center; gap:10px; color:#065f46;">
+                    <i class="fa-solid fa-chart-pie"></i> Score Audit
+                </h3>
+                <div id="usa-username" style="font-size:0.85em; color:#64748b; margin-bottom:18px;"></div>
+                <div id="usa-body">
+                    <p style="text-align:center; color:#94a3b8; padding:40px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading audit data...</p>
+                </div>
+                <div style="text-align:right; margin-top:16px;">
+                    <button class="btn-sm" onclick="document.getElementById('userScoreAuditModal').style.display='none'" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; border-radius:10px; padding:8px 20px; font-weight:700;">Close</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Quiz Discussion Modal ([Version: V86.29]) -->
         <div id="quizDiscussionModal" class="modal" style="z-index: 2500;">
             <div class="modal-content" style="max-width: 800px; border-top: 5px solid #8e44ad;">
@@ -34173,6 +34190,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                                 <span style="color:#f59e0b;margin-left:8px;font-size:0.9em;">${stars}</span>
                                 <span style="margin-left:6px;font-size:0.8em;font-weight:700;color:#64748b;">${typeof f.rating === 'number' ? f.rating + '/10' : ''}</span>
                                 ${typeof f.pointsEarned === 'number' && f.pointsEarned > 0 ? `<span style="margin-left:8px;font-size:0.72em;font-weight:800;color:#065f46;background:#d1fae5;border:1px solid #6ee7b7;border-radius:999px;padding:2px 8px;" title="Feedback reward earned — this is what Delete would revert from the user's total score">🎁 +${f.pointsEarned.toFixed(1)} PTS</span>` : ''}
+                                ${f.userId && f.userId !== 'anon' ? `<button onclick="showUserScoreAudit('${f.userId}', ${JSON.stringify(f.displayName || '')})" title="Open score audit for this user — breakdown of total score by source" style="margin-left:6px;background:#ecfdf5;border:1px solid #6ee7b7;color:#065f46;border-radius:8px;padding:2px 8px;font-size:0.72em;font-weight:700;cursor:pointer;">📊 Audit</button>` : ''}
                             </div>
                             <div style="font-size:0.75em;color:#94a3b8;">${dateStr} · ⏱ ${mins}:${String(secs).padStart(2,'0')}</div>
                         </div>
@@ -34453,6 +34471,94 @@ Reply ONLY with raw JSON, no markdown:
                 if (_qfpCurrentId) await showQuizFeedbackPanel(_qfpCurrentId);
             } catch (e) {
                 alert('Failed to clear topic: ' + e.message);
+            }
+        }
+
+        // V92.95: Score Audit Modal — breaks down a user's total users.score by
+        // source (quiz_attempts, quiz_feedback, checkin_logs manual_adjust) so
+        // admin can verify before deleting/reverting feedback. Three parallel
+        // Firestore queries; gracefully handles missing fields and discrepancies
+        // (sum ≠ total may indicate untracked sources like Daily Quest, Case
+        // Study, Reflective Log — flagged with warning style if mismatch).
+        async function showUserScoreAudit(userId, displayName) {
+            if (!userId) return;
+            const modal = document.getElementById('userScoreAuditModal');
+            const body = document.getElementById('usa-body');
+            const titleEl = document.getElementById('usa-username');
+            titleEl.innerText = displayName || userId;
+            body.innerHTML = `<p style="text-align:center; color:#94a3b8; padding:40px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading audit data...</p>`;
+            modal.style.display = 'flex';
+
+            try {
+                const user = (usersData || []).find(u => u.id === userId);
+                const totalScore = typeof user?.score === 'number' ? user.score : 0;
+
+                const [attemptsSnap, feedbackSnap, adjustSnap] = await Promise.all([
+                    db.collection('quiz_attempts').where('userId', '==', userId).get(),
+                    db.collection('quiz_feedback').where('userId', '==', userId).get(),
+                    db.collection('checkin_logs').where('userId', '==', userId).where('type', '==', 'manual_adjust').get()
+                ]);
+
+                const attempts = attemptsSnap.docs.map(d => d.data());
+                const feedback = feedbackSnap.docs.map(d => d.data());
+                const adjusts = adjustSnap.docs.map(d => d.data());
+
+                const sumPts = (arr, key) => arr.reduce((a, x) => a + (typeof x[key] === 'number' ? x[key] : 0), 0);
+                const attemptsSum = sumPts(attempts, 'pointsEarned');
+                const feedbackSum = sumPts(feedback, 'pointsEarned');
+                const adjustsSum = sumPts(adjusts, 'amount');
+                const breakdownSum = attemptsSum + feedbackSum + adjustsSum;
+                const diff = totalScore - breakdownSum;
+                const matchesTotal = Math.abs(diff) < 0.01;
+
+                body.innerHTML = `
+                    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px;margin-bottom:16px;">
+                        <div style="font-size:0.75em;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">TOTAL SCORE (users.score)</div>
+                        <div style="font-size:2.2em;font-weight:900;color:#15803d;">${totalScore.toFixed(1)} <span style="font-size:0.45em;font-weight:700;">PTS</span></div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+                                <div>
+                                    <div style="font-weight:800;font-size:0.9em;color:#1d4ed8;">📝 Quiz Answers</div>
+                                    <div style="font-size:0.78em;color:#64748b;">${attempts.length} attempt${attempts.length === 1 ? '' : 's'} in <code>quiz_attempts</code></div>
+                                </div>
+                                <div style="font-size:1.3em;font-weight:900;color:#1d4ed8;white-space:nowrap;">+${attemptsSum.toFixed(1)} PTS</div>
+                            </div>
+                        </div>
+                        <div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:10px;padding:12px 16px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+                                <div>
+                                    <div style="font-weight:800;font-size:0.9em;color:#7c3aed;">🎁 Feedback Rewards</div>
+                                    <div style="font-size:0.78em;color:#64748b;">${feedback.length} feedback in <code>quiz_feedback</code></div>
+                                </div>
+                                <div style="font-size:1.3em;font-weight:900;color:#7c3aed;white-space:nowrap;">+${feedbackSum.toFixed(1)} PTS</div>
+                            </div>
+                        </div>
+                        <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px 16px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+                                <div>
+                                    <div style="font-weight:800;font-size:0.9em;color:#c2410c;">⚙️ Admin Manual Adjust</div>
+                                    <div style="font-size:0.78em;color:#64748b;">${adjusts.length} ${adjusts.length === 1 ? 'entry' : 'entries'} in <code>checkin_logs</code> (type=manual_adjust)</div>
+                                </div>
+                                <div style="font-size:1.3em;font-weight:900;color:${adjustsSum < 0 ? '#dc2626' : '#c2410c'};white-space:nowrap;">${adjustsSum >= 0 ? '+' : ''}${adjustsSum.toFixed(1)} PTS</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="background:${matchesTotal ? '#f0fdf4' : '#fef2f2'};border:2px solid ${matchesTotal ? '#86efac' : '#fca5a5'};border-radius:12px;padding:14px 18px;margin-top:16px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+                            <div style="font-weight:800;font-size:0.95em;color:${matchesTotal ? '#15803d' : '#dc2626'};">
+                                ${matchesTotal ? '✅ Sum matches total' : '⚠️ Sum differs from total'}
+                            </div>
+                            <div style="font-size:1.1em;font-weight:900;color:${matchesTotal ? '#15803d' : '#dc2626'};white-space:nowrap;">
+                                Sum: ${breakdownSum.toFixed(1)} PTS
+                            </div>
+                        </div>
+                        ${!matchesTotal ? `<div style="font-size:0.78em;color:#7f1d1d;margin-top:6px;">Difference: ${diff >= 0 ? '+' : ''}${diff.toFixed(2)} PTS — may indicate untracked sources (Daily Quest, Reflective Log, Case Study, etc.) not aggregated here, or stale users.score cache.</div>` : ''}
+                    </div>
+                `;
+            } catch (e) {
+                body.innerHTML = `<p style="color:#dc2626;padding:20px;">Failed to load audit: ${qfpEscapeHtml(e.message)}</p>`;
             }
         }
 
