@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.88</title>
+    <title>Nika V92.89</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -9751,7 +9751,7 @@
                 <div style="font-weight:800; font-size:0.88em; color:#475569; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
                     <i class="fa-solid fa-comments"></i> Individual Feedback
                 </div>
-                <div id="qfp-comments" style="max-height:350px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-right:4px;">
+                <div id="qfp-comments" style="display:flex; flex-direction:column; gap:10px;">
                     <p style="text-align:center; color:#94a3b8; padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</p>
                 </div>
 
@@ -34019,9 +34019,13 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         // render as zero-width chips. After stripping, require at least one clearly
         // visible codepoint \u2014 Letter/Number/Symbol/Punctuation. If none, return '' so
         // existing length/truthy checks at all 3 call sites drop the entry uniformly.
+        // V92.89: also strip \p{Default_Ignorable_Code_Point} \u2014 Unicode's own list of
+        // "should render invisibly" chars including Hangul fillers (U+115F, U+1160,
+        // U+3164, U+FFA0) and Khmer inherent vowels (U+17B4, U+17B5) which are
+        // categorized as Letter but produce no glyph. Caught by PRETEST-2 case.
         function qfpNormalizeTopic(topic) {
             if (topic == null) return '';
-            const cleaned = String(topic).replace(/\p{C}/gu, '').trim();
+            const cleaned = String(topic).replace(/[\p{C}\p{Default_Ignorable_Code_Point}]/gu, '').trim();
             return /[\p{L}\p{N}\p{S}\p{P}]/u.test(cleaned) ? cleaned : '';
         }
 
