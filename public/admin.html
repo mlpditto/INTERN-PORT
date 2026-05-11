@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.87</title>
+    <title>Nika V92.88</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -29644,7 +29644,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const quizTitle = (quiz?.title || quiz?.name || 'Quiz').slice(0, 40);
                 const quizTitleFull = quiz?.title || quiz?.name || '';
                 // V92.83: flag empty-comment cards — red bg + 🗑 button to delete + revert pointsEarned
-                const hasNoComment = !fb.comment || !String(fb.comment).trim();
+                // V92.88: extend V92.86 \p{C} + visible-char guard to comment field so
+                // invisible-Unicode-only payloads (length > 0 but unreadable) still trigger
+                // the "empty comment" path consistently across LAUGH grid + Panel modal.
+                const visibleComment = qfpNormalizeTopic(fb.comment);
+                const hasNoComment = !visibleComment;
                 const cardBg = hasNoComment ? '#fef2f2' : 'var(--bg-card)';
                 const cardBorder = hasNoComment ? '1px solid #fca5a5' : '1px solid var(--border-color)';
                 const btnBg = hasNoComment ? '#fff' : 'var(--bg-card)';
@@ -29677,7 +29681,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         </div>
                         <div class="lt-user-content" style="font-size:1.1em; color:var(--text-main); line-height:1.8; font-style:italic; margin-bottom:25px; background:var(--bg-body); padding:25px; border-radius:24px; border-left:8px solid #4361ee; position:relative; flex:1;">
                             <span style="position:absolute; top:5px; left:15px; font-size:5em; opacity:0.04; font-family:serif; font-weight:900;">"</span>
-                            ${fb.comment || '<span style="opacity:0.4;">No comment</span>'}
+                            ${visibleComment ? qfpEscapeHtml(visibleComment) : '<span style="opacity:0.4;">No comment</span>'}
                         </div>
                         <div style="border-top:2px solid var(--border-color); padding-top:20px; margin-top:auto;">
                             ${(() => { const nt = qfpNormalizeTopic(fb.nextTopic); return nt ? `<div style="font-size:0.85em; color:#64748b; margin-bottom:10px;"><span style="font-weight:900; color:#4361ee;">NEXT:</span> ${qfpEscapeHtml(nt)}</div>` : ''; })()}
@@ -34115,7 +34119,10 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 const stars = typeof f.rating === 'number' ? ('★'.repeat(Math.round(f.rating / 10 * 5)) + '☆'.repeat(5 - Math.round(f.rating / 10 * 5))) : '';
                 const mins = Math.floor((f.timeUsedSeconds || 0) / 60);
                 const secs = (f.timeUsedSeconds || 0) % 60;
-                const rawComment = (f.comment || '').trim();
+                // V92.88: route comment through qfpNormalizeTopic so invisible-only
+                // payloads (e.g. 119 chars of ZW chars + variation selectors) report
+                // as 0 visible chars + "Below 100" + red card + disabled Score button.
+                const rawComment = qfpNormalizeTopic(f.comment);
                 const safeComment = qfpEscapeHtml(rawComment);
                 const commentLength = rawComment.length;
                 const meetsMin = commentLength >= 100;
