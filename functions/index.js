@@ -230,7 +230,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             return res.json({ text: text, tokens: tokens, model: actualModelName });
         }
 
-        // --- 🔵 Typhoon Vision Support (V87.24.1) ---
+        // --- 🔵 Typhoon Vision + Text Support (V87.24.1 / V93.04 split) ---
         if (provider === "typhoon") {
             const apiKey = process.env.TYPHOON_API_KEY;
             if (!apiKey) return res.status(500).json({ error: "TYPHOON_API_KEY is not configured on server. Set with `firebase functions:secrets:set TYPHOON_API_KEY` then redeploy callAIProxy." });
@@ -240,17 +240,30 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 tailoredPromptT += "\n\n(Respond in strictly valid JSON format)";
             }
 
+            // V93.04: split model + content shape on visionData presence.
+            // The previous unconditional vision shape — model `typhoon-v2.5-vision-instruct`
+            // + `content: [{type:"text",text}]` array — was rejected by api.opentyphoon.ai
+            // with HTTP 400 when no image was attached (V93.x quiz translation + admin
+            // pre-translate Phase 1 both hit this). Text path now uses the 30B text model
+            // with a plain string content field; vision path keeps the array shape.
+            const isVision = !!visionData;
+            const useModel = isVision
+                ? (model && model.includes('vision') ? model : "typhoon-v2.5-vision-instruct")
+                : (model || "typhoon-v2.5-30b-a3b-instruct");
+
             const body = {
-                model: model.includes('vision') ? model : "typhoon-v2.5-vision-instruct",
+                model: useModel,
                 messages: [{
                     role: "user",
-                    content: [
-                        { type: "text", text: tailoredPromptT },
-                        ...(visionData ? [{ 
-                            type: "image_url", 
-                            image_url: { url: `data:${visionData.image_mimetype};base64,${visionData.image_base64}` } 
-                        }] : [])
-                    ]
+                    content: isVision
+                        ? [
+                            { type: "text", text: tailoredPromptT },
+                            {
+                                type: "image_url",
+                                image_url: { url: `data:${visionData.image_mimetype};base64,${visionData.image_base64}` }
+                            }
+                          ]
+                        : tailoredPromptT
                 }],
                 response_format: isJson ? { type: "json_object" } : undefined,
                 temperature: 0.2
