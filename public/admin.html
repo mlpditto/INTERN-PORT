@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.93</title>
+    <title>Nika V92.96</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -34083,9 +34083,14 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             const avgRating = ratings.length ? (ratings.reduce((a, b) => a + b, 0) / ratings.length) : null;
             // V92.84: count blank-but-submitted topics separately so they show as a
             // muted "+N blank" chip instead of being silently dropped.
-            const allTopics = _qfpFeedbacks.map(f => qfpNormalizeTopic(f.nextTopic));
-            const topics = allTopics.filter(t => t.length > 0);
-            const blankTopicCount = allTopics.length - topics.length;
+            // V92.96: build topicEntries[] preserving feedbackId per chip so each
+            // rendered chip is bound to ONE feedback entry — admin clicks a specific
+            // chip → clears only that entry's nextTopic, not all sharing the topic.
+            const allEntries = _qfpFeedbacks.map(f => ({ id: f.id, topic: qfpNormalizeTopic(f.nextTopic) }));
+            const topicEntries = allEntries.filter(e => e.topic.length > 0);
+            const topics = topicEntries.map(e => e.topic);
+            const blankTopicCount = allEntries.length - topicEntries.length;
+            window._qfpVisibleTopicEntries = topicEntries;
             const avgTime = _qfpFeedbacks.reduce((a, f) => a + (f.timeUsedSeconds || 0), 0) / _qfpFeedbacks.length;
 
             const starFill = avgRating !== null ? Math.round(avgRating / 10 * 5) : null;
@@ -34108,7 +34113,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 </div>
                 ${(topics.length || blankTopicCount > 0) ? `<div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:12px;padding:12px 18px;flex:2;min-width:200px;">
                     <div style="font-size:0.75em;font-weight:700;color:#6b21a8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">🎯 Next Topics Requested</div>
-                    <div style="display:flex;flex-wrap:wrap;gap:5px;">${topics.slice(0, 8).map(t => `<span style="background:white;border:1px solid #d8b4fe;border-radius:8px;padding:3px 9px;font-size:0.8em;color:#7c3aed;font-weight:600;">${qfpEscapeHtml(t)}</span>`).join('')}${blankTopicCount > 0 ? `<span onclick="qfpClearBlankTopics()" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:3px 9px;font-size:0.8em;color:#64748b;font-weight:600;cursor:pointer;transition:0.2s;" onmouseover="this.style.background='#fee2e2';this.style.borderColor='#fca5a5';this.style.color='#dc2626';" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1';this.style.color='#64748b';" title="Click to clear ${blankTopicCount} blank nextTopic field${blankTopicCount === 1 ? '' : 's'} (V92.90 — keeps rating + comment, removes empty nextTopic only)">🗑 +${blankTopicCount} blank</span>` : ''}</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:5px;">${topicEntries.slice(0, 8).map((e, i) => `<span class="lang-no-toggle" onclick="qfpClearTopicChip(${i})" style="background:white;border:1px solid #d8b4fe;border-radius:8px;padding:3px 9px;font-size:0.8em;color:#7c3aed;font-weight:600;cursor:pointer;transition:0.2s;min-width:18px;display:inline-block;text-align:center;" onmouseover="this.style.background='#fee2e2';this.style.borderColor='#fca5a5';this.style.color='#dc2626';" onmouseout="this.style.background='white';this.style.borderColor='#d8b4fe';this.style.color='#7c3aed';" title="Click to clear this entry's nextTopic (V92.96 — keeps rating + comment, removes only this nextTopic field)">${qfpEscapeHtml(e.topic)}</span>`).join('')}${blankTopicCount > 0 ? `<span onclick="qfpClearBlankTopics()" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:3px 9px;font-size:0.8em;color:#64748b;font-weight:600;cursor:pointer;transition:0.2s;" onmouseover="this.style.background='#fee2e2';this.style.borderColor='#fca5a5';this.style.color='#dc2626';" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1';this.style.color='#64748b';" title="Click to clear ${blankTopicCount} blank nextTopic field${blankTopicCount === 1 ? '' : 's'} (V92.90 — keeps rating + comment, removes empty nextTopic only)">🗑 +${blankTopicCount} blank</span>` : ''}</div>
                 </div>` : ''}
             `;
 
@@ -34404,6 +34409,42 @@ Reply ONLY with raw JSON, no markdown:
                 }
             } catch (e) {
                 alert('Failed to clear blank topics: ' + e.message);
+            }
+        }
+
+        // V92.96: clear nextTopic for ONE specific feedback entry — wired to the
+        // per-chip onclick in NEXT TOPICS REQUESTED. Index maps into the same
+        // topicEntries[] array that drove the chip render, stored on window.
+        // Non-destructive: only nextTopic field is cleared, rating + comment stay.
+        async function qfpClearTopicChip(idx) {
+            const entries = window._qfpVisibleTopicEntries || [];
+            const entry = entries[idx];
+            if (!entry) return;
+            const fb = (_qfpFeedbacks || []).find(f => f.id === entry.id);
+            if (!fb) { alert('Feedback entry not found in current panel data.'); return; }
+
+            const user = (usersData || []).find(u => u.id === fb.userId);
+            const userName = user?.displayName || fb.displayName || 'Anonymous';
+            const quiz = (quizzesData || []).find(q => q.id === _qfpCurrentId);
+            const quizTitle = quiz?.title || quiz?.name || _qfpCurrentId || 'Quiz';
+
+            const confirmMsg = `Clear the "Next Topic" field on this feedback entry?\n\nUser: ${userName}\nQuiz: ${quizTitle}\nCurrent topic: "${entry.topic}"\n\nThe rating and comment stay — only this nextTopic field is removed.\nThis cannot be undone.`;
+            if (!confirm(confirmMsg)) return;
+
+            try {
+                await db.collection('quiz_feedback').doc(fb.id).update({
+                    nextTopic: firebase.firestore.FieldValue.delete()
+                });
+                delete fb.nextTopic;
+                if (Array.isArray(window._quizFeedbackCache)) {
+                    const cached = window._quizFeedbackCache.find(c => c.id === fb.id);
+                    if (cached) delete cached.nextTopic;
+                }
+                if (typeof showToast === 'function') showToast(`Cleared topic for ${userName}`);
+                if (typeof renderQuizFeedbackCards === 'function') renderQuizFeedbackCards();
+                if (_qfpCurrentId) await showQuizFeedbackPanel(_qfpCurrentId);
+            } catch (e) {
+                alert('Failed to clear topic: ' + e.message);
             }
         }
 
