@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.44)</title>
+    <title>Internship Portfolio (V94.45)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -6172,7 +6172,10 @@
 
         function qtGetSelectedLang() { return localStorage.getItem('quizUiLang') || 'orig'; }
         function qtSetSelectedLang(lang) { localStorage.setItem('quizUiLang', lang); }
-        function qtCacheKey(quizId, qIdx, lang) { return `qt_${quizId}_${qIdx}_${lang}`; }
+        // V93.02: bump cache prefix qt_ → qt2_ to invalidate V93.00/V93.01 entries
+        // that were poisoned by the en-only sourceLanguage bug (Thai text cached
+        // as "translated" because en→en is identity).
+        function qtCacheKey(quizId, qIdx, lang) { return `qt2_${quizId}_${qIdx}_${lang}`; }
         function qtGetCached(quizId, qIdx, lang) {
             try { const raw = localStorage.getItem(qtCacheKey(quizId, qIdx, lang)); return raw ? JSON.parse(raw) : null; }
             catch (_) { return null; }
@@ -6180,21 +6183,37 @@
         function qtSetCached(quizId, qIdx, lang, data) {
             try { localStorage.setItem(qtCacheKey(quizId, qIdx, lang), JSON.stringify(data)); }
             catch (e) {
-                // QuotaExceeded — drop oldest qt_* entries and retry once
-                const keys = Object.keys(localStorage).filter(k => k.startsWith('qt_'));
+                // QuotaExceeded — drop oldest qt*_ entries (legacy + current) and retry once
+                const keys = Object.keys(localStorage).filter(k => k.startsWith('qt_') || k.startsWith('qt2_'));
                 keys.slice(0, Math.min(50, keys.length)).forEach(k => localStorage.removeItem(k));
                 try { localStorage.setItem(qtCacheKey(quizId, qIdx, lang), JSON.stringify(data)); } catch (_) {}
             }
+        }
+
+        // V93.02: detect source language by Unicode range — V93.00 hardcoded
+        // sourceLanguage='en' but quiz content is overwhelmingly Thai, so the
+        // on-device Translator did en→en identity transforms and never invoked
+        // Tier B Typhoon (which handles any source).
+        function qtDetectSourceLang(text) {
+            if (/[฀-๿]/.test(text)) return 'th';
+            if (/[가-힯]/.test(text)) return 'ko';
+            if (/[぀-ヿ]/.test(text)) return 'ja';
+            if (/[一-鿿]/.test(text)) return 'zh';
+            return 'en';
         }
 
         async function qtTranslateText(text, targetLang) {
             if (!text || !text.trim()) return { text: text || '', source: 'empty' };
             if (targetLang === 'orig') return { text, source: 'orig' };
 
-            // Tier A: on-device Translator API (Chrome 138+, Android Chromium LINE)
+            const sourceLang = qtDetectSourceLang(text);
+            if (sourceLang === targetLang) return { text, source: 'noop' };
+
+            // Tier A: on-device Translator API (Chrome 138+, Android Chromium LINE).
+            // Skips automatically if the source/target pair isn't supported on-device.
             if (typeof Translator !== 'undefined' && 'create' in Translator) {
                 try {
-                    const t = await Translator.create({ sourceLanguage: 'en', targetLanguage: targetLang });
+                    const t = await Translator.create({ sourceLanguage: sourceLang, targetLanguage: targetLang });
                     return { text: await t.translate(text), source: 'device' };
                 } catch (e) { /* fall through */ }
             }
@@ -6392,7 +6411,7 @@
                                     <input type="${isMulti ? 'checkbox' : 'radio'}" name="q-opt" value="${displayIdx}"
                                         ${isChecked ? 'checked' : ''}
                                         onchange="handleChoiceChange(${currentStep}, ${displayIdx}, ${isMulti})"
-                                        style="width:auto; margin:0;">
+                                        style="width:auto; margin:0; padding:0; flex:0 0 auto;">
                                     ${opt}
                                 </label>
                             `;
@@ -7157,7 +7176,7 @@
             rail.style.display = 'flex';
             rail.innerHTML = top.map(tag => {
                 const safe = esc(tag);
-                return `<button type="button" class="fb-topic-chip" data-tag="${safe}" onclick="pickFeedbackTopicChip(this)" style="font-size:0.78em; padding:5px 11px; border-radius:999px; border:1px solid #e0e7ff; background:#eef2ff; color:#4338ca; cursor:pointer; font-weight:600;">${safe}</button>`;
+                return `<button type="button" class="fb-topic-chip" data-tag="${safe}" onclick="pickFeedbackTopicChip(this)" style="width:auto; min-height:auto; flex:0 0 auto; font-size:0.78em; padding:5px 11px; border-radius:999px; border:1px solid #e0e7ff; background:#eef2ff; color:#4338ca; cursor:pointer; font-weight:600;">${safe}</button>`;
             }).join('');
         }
 
