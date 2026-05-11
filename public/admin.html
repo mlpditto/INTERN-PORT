@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V92.89</title>
+    <title>Nika V92.90</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -34108,7 +34108,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 </div>
                 ${(topics.length || blankTopicCount > 0) ? `<div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:12px;padding:12px 18px;flex:2;min-width:200px;">
                     <div style="font-size:0.75em;font-weight:700;color:#6b21a8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">🎯 Next Topics Requested</div>
-                    <div style="display:flex;flex-wrap:wrap;gap:5px;">${topics.slice(0, 8).map(t => `<span style="background:white;border:1px solid #d8b4fe;border-radius:8px;padding:3px 9px;font-size:0.8em;color:#7c3aed;font-weight:600;">${qfpEscapeHtml(t)}</span>`).join('')}${blankTopicCount > 0 ? `<span style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:3px 9px;font-size:0.8em;color:#64748b;font-weight:600;" title="${blankTopicCount} user${blankTopicCount === 1 ? '' : 's'} submitted feedback without specifying a next topic">+${blankTopicCount} blank</span>` : ''}</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:5px;">${topics.slice(0, 8).map(t => `<span style="background:white;border:1px solid #d8b4fe;border-radius:8px;padding:3px 9px;font-size:0.8em;color:#7c3aed;font-weight:600;">${qfpEscapeHtml(t)}</span>`).join('')}${blankTopicCount > 0 ? `<span onclick="qfpClearBlankTopics()" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:3px 9px;font-size:0.8em;color:#64748b;font-weight:600;cursor:pointer;transition:0.2s;" onmouseover="this.style.background='#fee2e2';this.style.borderColor='#fca5a5';this.style.color='#dc2626';" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1';this.style.color='#64748b';" title="Click to clear ${blankTopicCount} blank nextTopic field${blankTopicCount === 1 ? '' : 's'} (V92.90 — keeps rating + comment, removes empty nextTopic only)">🗑 +${blankTopicCount} blank</span>` : ''}</div>
                 </div>` : ''}
             `;
 
@@ -34354,6 +34354,55 @@ Reply ONLY with raw JSON, no markdown:
                 }
             } catch (e) {
                 alert('Failed to delete: ' + e.message);
+            }
+        }
+
+        // V92.90: clear nextTopic field on all feedback entries where qfpNormalizeTopic
+        // returns '' (truly blank — empty string, whitespace only, invisible Unicode).
+        // Wired to the "+N blank" pill in NEXT TOPICS REQUESTED so admins can declutter
+        // the chip row without deleting the underlying feedback (rating + comment stay).
+        // No score revert needed — only the supplementary nextTopic field is removed.
+        async function qfpClearBlankTopics() {
+            if (!_qfpFeedbacks || !_qfpFeedbacks.length) return;
+
+            const blanks = _qfpFeedbacks.filter(f => !qfpNormalizeTopic(f.nextTopic));
+            if (!blanks.length) {
+                if (typeof showToast === 'function') showToast('No blank topics to clear');
+                return;
+            }
+
+            const userNames = blanks.map(f => {
+                const u = (usersData || []).find(x => x.id === f.userId);
+                return u?.displayName || f.displayName || 'Anonymous';
+            });
+            const quiz = (quizzesData || []).find(q => q.id === _qfpCurrentId);
+            const quizTitle = quiz?.title || quiz?.name || _qfpCurrentId || 'Quiz';
+
+            const confirmMsg = `Clear the "Next Topic" field on ${blanks.length} blank feedback entr${blanks.length === 1 ? 'y' : 'ies'}?\n\nQuiz: ${quizTitle}\nUsers: ${userNames.join(', ')}\n\nThe rating and comment stay — only the empty nextTopic field is removed.\nThis cannot be undone.`;
+            if (!confirm(confirmMsg)) return;
+
+            try {
+                const b = db.batch();
+                blanks.forEach(f => {
+                    b.update(db.collection('quiz_feedback').doc(f.id), {
+                        nextTopic: firebase.firestore.FieldValue.delete()
+                    });
+                });
+                await b.commit();
+
+                // Local in-memory invalidation so panel + LAUGH grid don't keep showing the blank chip
+                const blankIds = new Set(blanks.map(f => f.id));
+                _qfpFeedbacks.forEach(f => { if (blankIds.has(f.id)) delete f.nextTopic; });
+                if (Array.isArray(window._quizFeedbackCache)) {
+                    window._quizFeedbackCache.forEach(c => { if (blankIds.has(c.id)) delete c.nextTopic; });
+                }
+
+                if (typeof showToast === 'function') showToast(`Cleared ${blanks.length} blank topic${blanks.length === 1 ? '' : 's'}`);
+                if (_qfpCurrentId) {
+                    await showQuizFeedbackPanel(_qfpCurrentId);
+                }
+            } catch (e) {
+                alert('Failed to clear blank topics: ' + e.message);
             }
         }
 
