@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.48)</title>
+    <title>Internship Portfolio (V94.49)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -6294,6 +6294,20 @@
             const baseQ = currentQuiz.questions[qIdx];
             const lang = qtGetSelectedLang();
             if (lang === 'orig') return baseQ;
+
+            // V94.49: Phase 2 — pre-translated data from admin V93.01 save (PR #219).
+            // Schema: quizzes/{id}.translations.{lang} = { questions: [{q, options}, ...] }.
+            // Present → instant return, no Typhoon RTT, no localStorage seed needed.
+            // Missing per-question (e.g. admin added a question after translating) → falls
+            // through to the runtime Typhoon path below for that index only.
+            const pre = currentQuiz.translations
+                && currentQuiz.translations[lang]
+                && currentQuiz.translations[lang].questions
+                && currentQuiz.translations[lang].questions[qIdx];
+            if (pre && pre.q) {
+                return { ...baseQ, q: pre.q, options: pre.options || baseQ.options, _translationSource: 'prebuilt' };
+            }
+
             // Seed in-memory cache from localStorage on first access
             if (!currentQuiz._translations) currentQuiz._translations = {};
             if (!currentQuiz._translations[lang]) currentQuiz._translations[lang] = {};
@@ -6336,7 +6350,7 @@
 
         function qtRenderBar(effectiveQuestion) {
             const currentLang = qtGetSelectedLang();
-            const sourceMap = { device: '⚡ on-device', typhoon: '🌀 Typhoon', cached: '🗃️ cached', orig: '' };
+            const sourceMap = { device: '⚡ on-device', typhoon: '🌀 Typhoon', cached: '🗃️ cached', prebuilt: '📦 prebuilt', orig: '' };
             const status = effectiveQuestion && effectiveQuestion._translationPending
                 ? '⏳ Translating…'
                 : (effectiveQuestion && effectiveQuestion._translationSource ? sourceMap[effectiveQuestion._translationSource] || '' : '');
