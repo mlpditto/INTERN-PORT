@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.45)</title>
+    <title>Internship Portfolio (V94.46)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -506,6 +506,18 @@
 
         .assignment-card:active {
             transform: scale(0.98);
+        }
+
+        /* V94.46: status-based tint for quiz cards (intern Quiz Assessment list).
+           Note: 'rejected' state intentionally omitted — admin reject DELETES the
+           quiz_attempts doc, so no card ever renders for it (public/admin.html:19255). */
+        .assignment-card.status-approved {
+            background: #f0fdf4;
+            border-color: #bbf7d0;
+        }
+        .assignment-card.status-pending {
+            background: #fefce8;
+            border-color: #fde68a;
         }
 
         .assign-header {
@@ -5458,15 +5470,19 @@
                     const isAllowed = attempt && attempt.status === 'allowed';
                     const isCollapsed = isExpired && !isStarted && !isRequesting && !isAllowed;
 
+                    // V94.46: tint card by completed-state status (Approved=green, Pending=yellow).
+                    if (attempt && attempt.status === 'approved') card.classList.add('status-approved');
+                    else if (attempt && attempt.status === 'pending') card.classList.add('status-pending');
+
                     card.innerHTML = `
                         <div class="assign-header" ${isCollapsed ? 'onclick="toggleAssignmentCard(this)" style="cursor:pointer; opacity:0.75;"' : ''}>
                             ${icon}
                             <div class="assign-info">
                                 <h4 style="${isCollapsed ? 'font-size:0.95em; color:#666;' : ''} white-space:normal; line-height:1.2;">
-                                    ${q.title} 
-                                    ${quizMetaTitleSuffix || ''}
+                                    ${q.title}
                                     ${isCollapsed ? '<small style="color:#ef233c; font-weight:normal; margin-left:5px;">Expired หมดเวลา</small>' : ''}
                                 </h4>
+                                ${quizMetaTitleSuffix ? `<div style="margin-top:4px;">${quizMetaTitleSuffix}</div>` : ''}
                                 <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
                                     ${statusBadge}
                                     ${typeTags.join('')}
