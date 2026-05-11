@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.47)</title>
+    <title>Internship Portfolio (V94.48)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -518,6 +518,13 @@
         .assignment-card.status-pending {
             background: #fefce8;
             border-color: #fde68a;
+        }
+        /* V94.48: orange tint when Retake button is shown (overrides green-approved
+           when applicable). Tracks the existing retryBtn condition at L5420 —
+           (isExpired && !isApproved) || (isApproved && score <= 0). */
+        .assignment-card.status-retake {
+            background: #fff7ed;
+            border-color: #fed7aa;
         }
 
         .assign-header {
@@ -5376,6 +5383,10 @@
                     const isOneTime = q.oneTimeMode === true;
                     const isHomework = q.isHomework === true;
                     let quizMetaTitleSuffix = "";
+                    // V94.48: hoisted flag — true whenever the Retake button is rendered.
+                    // Drives the orange card tint (.status-retake) that overrides the
+                    // V94.46 approved/pending tints. Tracks the existing retryBtn logic.
+                    let showRetake = false;
 
                     if (attempt) {
                         const isPending = attempt.status === 'pending';
@@ -5419,6 +5430,7 @@
                             // 🔥 V78.92: Show Retake button if score is 0.00 or expired
                             if ((isExpired && !isApproved) || (isApproved && score <= 0)) {
                                 retryBtn = `<button class="btn-sm btn-warning" onclick="requestLateQuiz('${q.id}', ${score <= 0})" style="margin-top:5px; width:100%;">🔄 Request Retake ขอสอบใหม่</button>`;
+                                showRetake = true;
                             }
 
                             bodyHtml = `
@@ -5481,8 +5493,13 @@
                     const isAllowed = attempt && attempt.status === 'allowed';
                     const isCollapsed = isExpired && !isStarted && !isRequesting && !isAllowed;
 
-                    // V94.46: tint card by completed-state status (Approved=green, Pending=yellow).
-                    if (attempt && attempt.status === 'approved') card.classList.add('status-approved');
+                    // V94.46/V94.48: card tint by state.
+                    // V94.48: status-retake (orange) takes precedence — covers the surprise
+                    // case where attempt.status is non-'approved' (e.g. 'graded'/'completed')
+                    // but the existing badge logic still renders "Approved" text, leading the
+                    // retake button to appear under (isExpired && !isApproved).
+                    if (showRetake) card.classList.add('status-retake');
+                    else if (attempt && attempt.status === 'approved') card.classList.add('status-approved');
                     else if (attempt && attempt.status === 'pending') card.classList.add('status-pending');
 
                     card.innerHTML = `
