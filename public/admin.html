@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.04</title>
+    <title>Nika V93.05</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -993,6 +993,70 @@
             background: linear-gradient(135deg, #f59e0b, #d97706);
             color: #fff;
             border-color: transparent;
+        }
+
+        /* V93.05 Phase 2: ⚙️ gear button next to Alabasta header (opens Case Taxonomy editor). */
+        .case-taxonomy-gear {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            border-radius: 50%;
+            border: 1.5px solid #fcd34d;
+            background: #fff;
+            cursor: pointer;
+            font-size: 0.95em;
+            line-height: 1;
+            transition: all 0.15s ease;
+        }
+        .case-taxonomy-gear:hover {
+            background: #fef3c7;
+            border-color: #f59e0b;
+            transform: rotate(45deg);
+        }
+
+        /* Taxonomy editor modal — list view rows + form view fields. */
+        .ct-editor-toolbar {
+            display: flex; justify-content: space-between; align-items: center;
+            gap: 10px; flex-wrap: wrap;
+            padding: 10px 12px; margin-bottom: 12px;
+            background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
+            font-size: 0.85em; color: #78350f;
+        }
+        .ct-editor-row {
+            display: grid; grid-template-columns: 36px 1fr auto; gap: 10px;
+            align-items: center; padding: 10px 12px; margin-bottom: 8px;
+            background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+            transition: border-color 0.15s ease;
+        }
+        .ct-editor-row:hover { border-color: #fcd34d; background: #fffbeb; }
+        .ct-editor-row-emoji { font-size: 1.6em; line-height: 1; text-align: center; }
+        .ct-editor-row-key { font-weight: 800; color: #92400e; font-size: 0.82em; letter-spacing: 0.04em; text-transform: uppercase; }
+        .ct-editor-row-labels { font-size: 0.92em; color: #334155; margin-top: 2px; }
+        .ct-editor-row-meta { font-size: 0.74em; color: #94a3b8; margin-top: 2px; }
+        .ct-editor-row-edit-btn {
+            padding: 6px 14px; border-radius: 8px; border: 1px solid #cbd5e1;
+            background: #fff; color: #334155; cursor: pointer; font-weight: 700; font-size: 0.82em;
+        }
+        .ct-editor-row-edit-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
+        .ct-form-grid {
+            display: grid; grid-template-columns: 120px 1fr; gap: 10px 14px; align-items: center;
+            margin-bottom: 14px;
+        }
+        .ct-form-grid > label { font-weight: 700; font-size: 0.86em; color: #475569; text-align: right; }
+        .ct-form-grid > input,
+        .ct-form-grid > textarea {
+            padding: 8px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px;
+            font-size: 0.92em; width: 100%; box-sizing: border-box;
+            font-family: inherit;
+        }
+        .ct-form-grid > input:focus,
+        .ct-form-grid > textarea:focus { border-color: #f59e0b; outline: none; }
+        .ct-form-error {
+            color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca;
+            border-radius: 8px; padding: 8px 12px; font-size: 0.85em; margin-bottom: 12px;
         }
 
         /* V91.90: Alabasta system filter pills (matches LIFF My Cases pattern, warm-orange theme) */
@@ -8322,7 +8386,17 @@
 
             <div id="alabasta-case-section" class="review-card" style="margin-top:18px; border-color:#fcd34d; background:linear-gradient(180deg, #fffbeb 0%, #fff 100%); border-radius:14px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; border-bottom:1px solid #fde68a; padding-bottom:10px; margin-bottom:12px;">
-                    <h4 style="margin:0; color:#92400e;"><i class="fa-solid fa-dungeon"></i> Alabasta</h4>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <h4 style="margin:0; color:#92400e;"><i class="fa-solid fa-dungeon"></i> Alabasta</h4>
+                        <!-- V93.05 Phase 2: Case Taxonomy admin editor entry point. Clicking opens
+                             the modal whose state is seeded from window.CASE_SYSTEMS (Firestore via
+                             V94.53 overlay, or static fallback). First Save also serves as the seed
+                             write that Phase 1's deferred migration would have done. -->
+                        <button type="button" onclick="openCaseTaxonomyEditor()"
+                                title="Edit Case Taxonomy · 진단 분류 편집"
+                                aria-label="Edit Case Taxonomy"
+                                class="case-taxonomy-gear">⚙️</button>
+                    </div>
                     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                         <input type="text" id="alabasta-case-search" placeholder="🔎 Search case, user, disease · 케이스 · 사용자 · 질병 검색..." onkeyup="renderAlabastaCases()" style="margin:0; width:280px; max-width:100%; padding:5px 12px; font-size:0.8em; border-radius:20px; border:1px solid #fcd34d;">
                         <!-- V91.93: Show Archived collapsed to icon toggle (tooltip retains bilingual label) -->
@@ -10320,6 +10394,72 @@
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px; flex-wrap:wrap;">
                 <button type="button" class="btn-sm" onclick="closeQuestReviewBonusModal(false)" style="min-width:96px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Cancel</button>
                 <button type="button" class="btn-sm" onclick="closeQuestReviewBonusModal(true)" style="min-width:110px; background:linear-gradient(135deg,#6366f1,#4f46e5); color:#fff; border:none; border-radius:12px; padding:10px 18px; font-weight:900;">Confirm & Award</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- V93.05 Phase 2: Case Taxonomy editor modal. Two views in one shell:
+         #ct-editor-list (table of current systems + Add button) and
+         #ct-editor-form (per-system form). openCaseTaxonomyEditor() seeds the
+         local working copy from window.CASE_SYSTEMS; Save writes to Firestore
+         taxonomy/case (rules added in V94.53 Phase 1 already allow admin write). -->
+    <div id="caseTaxonomyEditorModal" class="modal" style="z-index:4400;">
+        <div class="modal-content" style="max-width:760px;">
+            <span class="close-modal" onclick="closeCaseTaxonomyEditor()">&times;</span>
+            <h3 style="margin:0 0 4px 0; color:#92400e; display:flex; align-items:center; gap:8px;">
+                <span>⚙️</span> Edit Case Taxonomy · 진단 분류 편집
+            </h3>
+            <div style="font-size:0.83em; color:#78716c; margin-bottom:14px;">
+                Disease systems used by LIFF case-submit dropdown + Alabasta filter pills.
+            </div>
+
+            <!-- List view -->
+            <div id="ct-editor-list">
+                <div class="ct-editor-toolbar">
+                    <div>
+                        <span id="ct-editor-source-label" style="font-weight:800;">Source: …</span>
+                        <span id="ct-editor-count" style="margin-left:8px; color:#a16207;">0 systems</span>
+                    </div>
+                    <button type="button" onclick="ctEditorAddNew()"
+                            style="padding:7px 14px; border-radius:8px; border:none; background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; font-weight:800; cursor:pointer; font-size:0.85em;">
+                        + Add new system
+                    </button>
+                </div>
+                <div id="ct-editor-rows"></div>
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px;">
+                    <button type="button" onclick="closeCaseTaxonomyEditor()"
+                            style="padding:8px 18px; border-radius:8px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-weight:700; color:#64748b;">Close</button>
+                </div>
+            </div>
+
+            <!-- Form view (hidden by default) -->
+            <div id="ct-editor-form" style="display:none;">
+                <div id="ct-form-error" class="ct-form-error" style="display:none;"></div>
+                <div class="ct-form-grid">
+                    <label for="ct-form-key">Key</label>
+                    <input type="text" id="ct-form-key" placeholder="e.g. respiratory (lowercase, a-z 0-9 _)" maxlength="32">
+
+                    <label for="ct-form-emoji">Emoji</label>
+                    <input type="text" id="ct-form-emoji" placeholder="🫁" maxlength="8">
+
+                    <label for="ct-form-label-en">Label EN</label>
+                    <input type="text" id="ct-form-label-en" placeholder="Respiratory" maxlength="60">
+
+                    <label for="ct-form-label-ko">Label KO</label>
+                    <input type="text" id="ct-form-label-ko" placeholder="호흡기" maxlength="60">
+
+                    <label for="ct-form-label-th">Label TH</label>
+                    <input type="text" id="ct-form-label-th" placeholder="ระบบหายใจ" maxlength="60">
+
+                    <label for="ct-form-symptoms" style="align-self:flex-start; padding-top:8px;">Symptoms</label>
+                    <textarea id="ct-form-symptoms" rows="6" placeholder="One symptom per line&#10;Cough&#10;Dyspnea&#10;Sore Throat"></textarea>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:10px;">
+                    <button type="button" onclick="ctEditorBackToList()"
+                            style="padding:8px 18px; border-radius:8px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-weight:700; color:#64748b;">← Back to list</button>
+                    <button type="button" onclick="ctEditorSaveCurrent()"
+                            style="padding:8px 22px; border-radius:8px; border:none; background:linear-gradient(135deg,#10b981,#059669); color:#fff; cursor:pointer; font-weight:800;">💾 Save All</button>
+                </div>
             </div>
         </div>
     </div>
@@ -23251,6 +23391,166 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!inputEl) return;
             inputEl.value = Number(value).toFixed(1);
             syncCaseReviewScoreChips();
+        }
+
+        // V93.05 Phase 2 — Case Taxonomy editor.
+        // State machine: list view ↔ form view. Local working copy
+        // (`ctEditorState.systems`) is seeded from window.CASE_SYSTEMS on open and
+        // bulk-written to Firestore taxonomy/case on Save. Delete and reorder are
+        // intentionally deferred to Phase 3. On Save the local copy ALSO replaces
+        // window.CASE_SYSTEMS + the compat-shim globals so admin's own filter
+        // pills / case-review render immediately without reload (LIFF intern picks
+        // it up on next case-taxonomy.js Firestore overlay refetch).
+        let ctEditorState = { systems: [], editingIndex: -1, dirty: false };
+
+        function ctRebuildLocalShims(systems) {
+            // Mirrors case-taxonomy.js buildCaseTaxonomyGlobals — kept inline so
+            // Phase 2 doesn't have to bump intern via case-taxonomy.js. Keep in
+            // sync if Phase 3 adds new compat shapes.
+            window.CASE_SYSTEMS = systems;
+            window.CASE_SYSTEM_BY_KEY = Object.fromEntries(systems.map(s => [s.key, s]));
+            window.caseTaxonomyCatalog = systems.map(s => ({
+                key: s.key, label: s.label.en, thaiLabel: s.label.th, symptoms: s.symptoms
+            }));
+            window.CASE_SYSTEM_EMOJI = Object.fromEntries(systems.map(s => [s.key, s.emoji]));
+            window.alabastaTaxonomyCatalog = systems.map(s => ({
+                key: s.key, label: s.label.en, thaiLabel: s.label.th, koLabel: s.label.ko, tags: s.symptoms
+            }));
+            window.PRIMARY_SYSTEMS = systems.map(s => ({
+                value: s.key, label: `${s.emoji} ${s.label.en} ${s.label.ko}`, code: s.label.en
+            }));
+        }
+
+        function openCaseTaxonomyEditor() {
+            const seed = Array.isArray(window.CASE_SYSTEMS) ? window.CASE_SYSTEMS : [];
+            ctEditorState = {
+                systems: JSON.parse(JSON.stringify(seed)), // deep clone
+                editingIndex: -1,
+                dirty: false
+            };
+            ctEditorShowList();
+            forceShowModal('caseTaxonomyEditorModal', 'block');
+        }
+
+        function closeCaseTaxonomyEditor() {
+            if (ctEditorState.dirty && !confirm('Discard unsaved changes? · 변경 사항을 취소하시겠습니까?')) return;
+            forceHideModal('caseTaxonomyEditorModal');
+        }
+
+        function ctEditorShowList() {
+            document.getElementById('ct-editor-form').style.display = 'none';
+            document.getElementById('ct-editor-list').style.display = 'block';
+            const srcEl = document.getElementById('ct-editor-source-label');
+            const cntEl = document.getElementById('ct-editor-count');
+            if (srcEl) srcEl.innerText = 'Source: ' + (window.CASE_TAXONOMY_SOURCE === 'firestore' ? '📦 Firestore' : '📁 Static (will seed on first Save)');
+            if (cntEl) cntEl.innerText = `${ctEditorState.systems.length} systems`;
+            const rows = document.getElementById('ct-editor-rows');
+            rows.innerHTML = ctEditorState.systems.map((s, i) => `
+                <div class="ct-editor-row">
+                    <div class="ct-editor-row-emoji">${s.emoji || '·'}</div>
+                    <div>
+                        <div class="ct-editor-row-key">${s.key}</div>
+                        <div class="ct-editor-row-labels">${(s.label && s.label.en) || ''} / ${(s.label && s.label.ko) || ''} / ${(s.label && s.label.th) || ''}</div>
+                        <div class="ct-editor-row-meta">${(s.symptoms || []).length} symptom${(s.symptoms || []).length === 1 ? '' : 's'}</div>
+                    </div>
+                    <button type="button" class="ct-editor-row-edit-btn" onclick="ctEditorEditIndex(${i})">Edit</button>
+                </div>
+            `).join('');
+        }
+
+        function ctEditorAddNew() {
+            ctEditorState.editingIndex = -1; // -1 marker = new
+            ctEditorShowForm({ key: '', emoji: '', label: { en: '', ko: '', th: '' }, symptoms: [] });
+        }
+
+        function ctEditorEditIndex(idx) {
+            const s = ctEditorState.systems[idx];
+            if (!s) return;
+            ctEditorState.editingIndex = idx;
+            ctEditorShowForm(s);
+        }
+
+        function ctEditorShowForm(s) {
+            document.getElementById('ct-editor-list').style.display = 'none';
+            document.getElementById('ct-editor-form').style.display = 'block';
+            document.getElementById('ct-form-error').style.display = 'none';
+            document.getElementById('ct-form-key').value = s.key || '';
+            document.getElementById('ct-form-emoji').value = s.emoji || '';
+            document.getElementById('ct-form-label-en').value = (s.label && s.label.en) || '';
+            document.getElementById('ct-form-label-ko').value = (s.label && s.label.ko) || '';
+            document.getElementById('ct-form-label-th').value = (s.label && s.label.th) || '';
+            document.getElementById('ct-form-symptoms').value = (s.symptoms || []).join('\n');
+        }
+
+        function ctEditorBackToList() {
+            ctEditorShowList();
+        }
+
+        function ctEditorValidateAndCollect() {
+            const errEl = document.getElementById('ct-form-error');
+            errEl.style.display = 'none';
+            const key = String(document.getElementById('ct-form-key').value || '').trim().toLowerCase();
+            const emoji = String(document.getElementById('ct-form-emoji').value || '').trim();
+            const en = String(document.getElementById('ct-form-label-en').value || '').trim();
+            const ko = String(document.getElementById('ct-form-label-ko').value || '').trim();
+            const th = String(document.getElementById('ct-form-label-th').value || '').trim();
+            const symptomsRaw = String(document.getElementById('ct-form-symptoms').value || '');
+            const symptoms = symptomsRaw.split('\n').map(s => s.trim()).filter(Boolean);
+
+            if (!/^[a-z0-9_]+$/.test(key)) {
+                errEl.innerText = 'Key must be lowercase a-z, 0-9, or _ (no spaces).';
+                errEl.style.display = 'block'; return null;
+            }
+            if (!emoji) { errEl.innerText = 'Emoji is required.'; errEl.style.display = 'block'; return null; }
+            if (!en || !ko || !th) {
+                errEl.innerText = 'All three labels (EN / KO / TH) are required.';
+                errEl.style.display = 'block'; return null;
+            }
+            // Duplicate key check (only against OTHER rows, not the one being edited)
+            const dupIdx = ctEditorState.systems.findIndex((s, i) => s.key === key && i !== ctEditorState.editingIndex);
+            if (dupIdx !== -1) {
+                errEl.innerText = `Key "${key}" already exists at row ${dupIdx + 1}. Keys must be unique.`;
+                errEl.style.display = 'block'; return null;
+            }
+            return { key, emoji, label: { en, ko, th }, symptoms };
+        }
+
+        async function ctEditorSaveCurrent() {
+            const collected = ctEditorValidateAndCollect();
+            if (!collected) return;
+
+            // Apply to local working copy
+            if (ctEditorState.editingIndex === -1) {
+                ctEditorState.systems.push(collected);
+            } else {
+                ctEditorState.systems[ctEditorState.editingIndex] = collected;
+            }
+            ctEditorState.dirty = true;
+
+            // Persist whole array — bulk replace is simpler than per-row patches
+            // and matches the migration script's schema (one doc, systems[] field).
+            try {
+                await db.collection('taxonomy').doc('case').set({
+                    systems: ctEditorState.systems,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedBy: (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin-ui',
+                    schemaVersion: 1
+                });
+                window.CASE_TAXONOMY_SOURCE = 'firestore';
+                ctRebuildLocalShims(ctEditorState.systems);
+                document.dispatchEvent(new CustomEvent('case-taxonomy-loaded', {
+                    detail: { source: 'admin-save', count: ctEditorState.systems.length }
+                }));
+                ctEditorState.dirty = false;
+                ctEditorState.editingIndex = -1;
+                ctEditorShowList();
+                if (typeof showToast === 'function') showToast(`✅ Saved ${ctEditorState.systems.length} systems to Firestore`);
+            } catch (err) {
+                const errEl = document.getElementById('ct-form-error');
+                errEl.innerText = 'Save failed: ' + (err && err.message ? err.message : 'unknown error');
+                errEl.style.display = 'block';
+                console.error('[case-taxonomy] save failed:', err);
+            }
         }
 
         function closeCaseReviewScoreModal(shouldSubmit) {
