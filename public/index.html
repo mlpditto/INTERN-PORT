@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.53)</title>
+    <title>Internship Portfolio (V94.54)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5440,9 +5440,17 @@
                             // Pending/Done
                             const score = attempt.totalQuestions ? (attempt.correctCount / attempt.totalQuestions) * (q.totalPoints || 1.0) : 0;
                             const isApproved = attempt.status === 'approved';
-                            const color = isPending ? '#ff9f1c' : '#2ec4b6';
-                            const text = isPending ? 'Pending รอตรวจ' : 'Approved อนุมัติแล้ว';
-                            statusBadge = `<span class="assign-tag" style="background:${isPending ? '#fff3cd' : '#d4edda'}; color:${isPending ? '#856404' : '#155724'}">${text}</span>`;
+                            // V94.54: badge text + score color now keyed off `isApproved` (strict),
+                            // not `!isPending`. Previously `text = isPending ? 'Pending' : 'Approved'`
+                            // claimed "Approved" for ANY non-pending status — legacy attempts whose
+                            // status is missing or `'graded'`/`'completed'` rendered as green
+                            // "Approved" without ever being admin-reviewed (K2 case, see V94.48
+                            // status-retake tint + V94.52 retake-button fix that sidestepped this).
+                            // `isPending` is preserved below for the View Answers gate (line 5465)
+                            // so legacy attempts with valid scores keep their answer-review button.
+                            const color = isApproved ? '#2ec4b6' : '#ff9f1c';
+                            const text = isApproved ? 'Approved อนุมัติแล้ว' : 'Pending รอตรวจ';
+                            statusBadge = `<span class="assign-tag" style="background:${isApproved ? '#d4edda' : '#fff3cd'}; color:${isApproved ? '#155724' : '#856404'}">${text}</span>`;
 
                             let retryBtn = "";
                             const isExpired = (dead && new Date() > dead);
