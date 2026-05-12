@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.02</title>
+    <title>Nika V93.03</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -9460,7 +9460,7 @@
                         <label class="reflective-review-label">✍️ Writing Analysis</label>
                         <span id="reflective-grammar-score" style="font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; border:1px solid transparent;"></span>
                     </div>
-                    <div id="reflective-grammar-content"></div>
+                    <div id="reflective-grammar-content" class="lang-no-toggle"></div>
                 </div>
 
                 <div class="reflective-review-row-2">
@@ -13024,8 +13024,13 @@ For "changes": list every meaningful edit between original and improved. Each en
 
             let html = '';
 
-            const cleanIssues = (data.issues || []).filter(x => x && String(x).trim().length > 0);
-            const cleanSuggestions = (data.suggestions || []).filter(x => x && String(x).trim().length > 0);
+            // V93.03: route filters through qfpNormalizeTopic so AI payloads of pure
+            // invisible Unicode (zero-width spaces, Hangul fillers U+115F/U+3164,
+            // variation selectors, all \p{C}\p{Default_Ignorable_Code_Point}) drop
+            // out instead of rendering as empty colored bars. Same defensive pattern
+            // as V92.86/88/89 in the Quiz Feedback Panel.
+            const cleanIssues = (data.issues || []).filter(x => qfpNormalizeTopic(x));
+            const cleanSuggestions = (data.suggestions || []).filter(x => qfpNormalizeTopic(x));
 
             if (cleanIssues.length > 0) {
                 html += `<div style="margin-bottom:8px;">
@@ -13051,7 +13056,7 @@ For "changes": list every meaningful edit between original and improved. Each en
                 </div>`;
             }
 
-            const cleanChanges = (data.changes || []).filter(c => c && c.from && c.to && c.reason && String(c.reason).trim().length > 0);
+            const cleanChanges = (data.changes || []).filter(c => c && qfpNormalizeTopic(c.from) && qfpNormalizeTopic(c.to) && qfpNormalizeTopic(c.reason));
             if (cleanChanges.length > 0) {
                 html += `<div>
                     <div style="font-size:0.7em; font-weight:900; color:#0e7490; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">📚 Why these changes ทำไมถึงปรับ</div>
