@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.09</title>
+    <title>Nika V93.10</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1120,6 +1120,15 @@
             background: #fff; color: #334155; cursor: pointer; font-weight: 700; font-size: 0.82em;
         }
         .lpt-editor-row-edit-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
+        .lpt-editor-row-del-btn {
+            padding: 6px 10px; border-radius: 8px; border: 1px solid #fecaca;
+            background: #fff; cursor: pointer; font-size: 0.95em; line-height: 1;
+            transition: all 0.15s ease;
+        }
+        .lpt-editor-row-del-btn:hover:not(:disabled) {
+            background: #fef2f2; border-color: #f87171;
+        }
+        .lpt-editor-row-del-btn:disabled { opacity: 0.5; cursor: wait; }
         .lpt-add-btn {
             padding: 7px 14px; border-radius: 8px; border: none;
             background: linear-gradient(135deg, #a855f7, #7e22ce);
@@ -23864,6 +23873,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     </div>
                     <div class="lpt-editor-row-actions">
                         <button type="button" class="lpt-editor-row-edit-btn" onclick="lptEditorEditIndex(${i})">Edit</button>
+                        <button type="button" class="lpt-editor-row-del-btn" onclick="lptEditorDeleteIndex(${i})" title="Delete system · 삭제">🗑️</button>
                     </div>
                 </div>
             `).join('');
@@ -23879,6 +23889,101 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!s) return;
             lptEditorState.editingIndex = idx;
             lptEditorShowForm(s);
+        }
+
+        // V93.10 Phase 3: delete a SYSTEM (all its tags) with in-use guard against
+        // learning_path_entries. Different from case Phase 3:
+        //   - LP entries store `tags[]` array (vs case's single `diseaseSystemKey` field)
+        //     → must use `array-contains-any` instead of `==`
+        //   - Firestore `array-contains-any` is limited to 10 values per query
+        //     → batch when a system has >10 tags (tool.tool has 11). De-dup doc IDs
+        //     across batches so a single entry counted once.
+        //   - Persistence is **immediate** on confirm (unlike Phase 2 Add/Edit which
+        //     goes through the form's Save button). Justified by the destructive
+        //     nature of the action — confirming is enough, no second Save click.
+        // Note: deleting a system DOES NOT mutate the LP entries themselves; their
+        // `tags[]` arrays keep the original strings. Only the taxonomy resolution
+        // (chip render, fuzzy-match suggestions) loses that system's tags.
+        async function lptEditorDeleteIndex(idx) {
+            const axis = lptEditorState.axis;
+            const s = lptEditorState.systems[axis][idx];
+            if (!s) return;
+            const key = s.key;
+            const label = (s.label && s.label.en) || key;
+            const tags = Array.isArray(s.tags) ? s.tags.slice() : [];
+
+            const delBtn = document.querySelectorAll('.lpt-editor-row-del-btn')[idx];
+            const originalIcon = delBtn ? delBtn.innerHTML : '';
+            if (delBtn) { delBtn.disabled = true; delBtn.innerHTML = '⏳'; }
+
+            let usageCount = 0;
+            let usageOverflow = false;
+            try {
+                if (tags.length > 0) {
+                    // Batch tags into chunks of 10 for array-contains-any limit
+                    const chunks = [];
+                    for (let i = 0; i < tags.length; i += 10) chunks.push(tags.slice(i, i + 10));
+
+                    const docIds = new Set();
+                    for (const chunk of chunks) {
+                        const snap = await db.collection('learning_path_entries')
+                            .where('tags', 'array-contains-any', chunk)
+                            .limit(50).get();
+                        snap.forEach(d => docIds.add(d.id));
+                        if (docIds.size >= 50) { usageOverflow = true; break; }
+                    }
+                    usageCount = docIds.size;
+                }
+            } catch (err) {
+                console.warn('[lp-taxonomy] in-use check failed:', err && err.message);
+                if (delBtn) { delBtn.disabled = false; delBtn.innerHTML = originalIcon; }
+                const proceed = confirm(
+                    `⚠️ Could not check whether LP entries reference any tag from "${label}". ` +
+                    `Delete anyway? · 사용 중 확인 실패. 그래도 삭제하시겠습니까?`
+                );
+                if (!proceed) return;
+                // Fall through with usageCount=0 to take the simple-confirm path below.
+                if (delBtn) { delBtn.disabled = true; delBtn.innerHTML = '⏳'; }
+            }
+            if (delBtn) { delBtn.disabled = false; delBtn.innerHTML = originalIcon; }
+
+            let msg;
+            if (usageCount === 0) {
+                msg = `Delete "${label}" (${key}) from ${axis}? · 삭제하시겠습니까?\n\nNo LP entries reference its tags.`;
+            } else {
+                const countStr = usageOverflow ? '50+' : String(usageCount);
+                msg = `⚠️ ${countStr} LP entr${usageCount === 1 ? 'y' : 'ies'} reference one or more tags from "${label}" · ${countStr} LP 항목이 사용 중\n\n` +
+                      `Entry data is NOT modified — \`tags[]\` arrays keep their strings. Only the taxonomy resolution (chip render, fuzzy-match) loses these tags after delete.\n\n` +
+                      `Delete "${label}" from ${axis}?`;
+            }
+            if (!confirm(msg)) return;
+
+            // Optimistic local removal — restore on Firestore failure below.
+            const removed = lptEditorState.systems[axis].splice(idx, 1)[0];
+
+            try {
+                await db.collection('taxonomy').doc('lp_' + axis).set({
+                    systems: lptEditorState.systems[axis],
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedBy: (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin-ui',
+                    schemaVersion: 1
+                });
+                if (window.LP_TAXONOMY && window.LP_TAXONOMY[axis]) {
+                    window.LP_TAXONOMY[axis].systems = JSON.parse(JSON.stringify(lptEditorState.systems[axis]));
+                }
+                if (typeof window.rebuildLpAllTags === 'function') window.rebuildLpAllTags();
+                document.dispatchEvent(new CustomEvent('lp-taxonomy-loaded', {
+                    detail: { source: 'admin-delete', axis: axis, count: lptEditorState.systems[axis].length }
+                }));
+                lptEditorShowList();
+                if (typeof showToast === 'function') showToast(`🗑️ Deleted "${label}" from ${axis}`);
+            } catch (err) {
+                // Restore local copy on Firestore failure so UI stays consistent.
+                lptEditorState.systems[axis].splice(idx, 0, removed);
+                lptEditorShowList();
+                if (typeof showToast === 'function') showToast(`❌ Delete failed: ${err.message || err}`);
+                console.error('[lp-taxonomy] delete failed:', err);
+            }
         }
 
         function lptEditorShowForm(s) {
