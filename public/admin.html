@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.05</title>
+    <title>Nika V93.06</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1041,6 +1041,15 @@
             background: #fff; color: #334155; cursor: pointer; font-weight: 700; font-size: 0.82em;
         }
         .ct-editor-row-edit-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
+        .ct-editor-row-del-btn {
+            padding: 6px 10px; border-radius: 8px; border: 1px solid #fecaca;
+            background: #fff; cursor: pointer; font-size: 0.95em; line-height: 1;
+            transition: all 0.15s ease;
+        }
+        .ct-editor-row-del-btn:hover:not(:disabled) {
+            background: #fef2f2; border-color: #f87171;
+        }
+        .ct-editor-row-del-btn:disabled { opacity: 0.5; cursor: wait; }
         .ct-form-grid {
             display: grid; grid-template-columns: 120px 1fr; gap: 10px 14px; align-items: center;
             margin-bottom: 14px;
@@ -10455,9 +10464,9 @@
                     <textarea id="ct-form-symptoms" rows="6" placeholder="One symptom per line&#10;Cough&#10;Dyspnea&#10;Sore Throat"></textarea>
                 </div>
                 <div style="display:flex; justify-content:space-between; gap:10px;">
-                    <button type="button" onclick="ctEditorBackToList()"
+                    <button type="button" id="ct-form-back-btn" onclick="ctEditorBackToList()"
                             style="padding:8px 18px; border-radius:8px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-weight:700; color:#64748b;">← Back to list</button>
-                    <button type="button" onclick="ctEditorSaveCurrent()"
+                    <button type="button" id="ct-form-save-btn" onclick="ctEditorSaveCurrent()"
                             style="padding:8px 22px; border-radius:8px; border:none; background:linear-gradient(135deg,#10b981,#059669); color:#fff; cursor:pointer; font-weight:800;">💾 Save All</button>
                 </div>
             </div>
@@ -23453,9 +23462,65 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         <div class="ct-editor-row-labels">${(s.label && s.label.en) || ''} / ${(s.label && s.label.ko) || ''} / ${(s.label && s.label.th) || ''}</div>
                         <div class="ct-editor-row-meta">${(s.symptoms || []).length} symptom${(s.symptoms || []).length === 1 ? '' : 's'}</div>
                     </div>
-                    <button type="button" class="ct-editor-row-edit-btn" onclick="ctEditorEditIndex(${i})">Edit</button>
+                    <div style="display:flex; gap:6px;">
+                        <button type="button" class="ct-editor-row-edit-btn" onclick="ctEditorEditIndex(${i})">Edit</button>
+                        <button type="button" class="ct-editor-row-del-btn" onclick="ctEditorDeleteIndex(${i})" title="Delete system · 삭제">🗑️</button>
+                    </div>
                 </div>
             `).join('');
+        }
+
+        // V93.06 Phase 3: delete-with-confirm + in-use guard. Queries `cases`
+        // for any docs referencing the key being deleted; if found, surfaces
+        // the count in the confirm prompt so admin knows existing cases will
+        // fall back to the raw key for labels (no cascading delete — the data
+        // on the case docs stays put). User must explicitly confirm.
+        async function ctEditorDeleteIndex(idx) {
+            const s = ctEditorState.systems[idx];
+            if (!s) return;
+            const key = s.key;
+            const label = (s.label && s.label.en) || key;
+            const delBtn = document.querySelectorAll('.ct-editor-row-del-btn')[idx];
+            const originalIcon = delBtn ? delBtn.innerHTML : '';
+            if (delBtn) { delBtn.disabled = true; delBtn.innerHTML = '⏳'; }
+            let usageCount = 0;
+            let usageOverflow = false;
+            try {
+                const snap = await db.collection('cases').where('diseaseSystemKey', '==', key).limit(50).get();
+                usageCount = snap.size;
+                usageOverflow = snap.size === 50; // could be more — show as "50+"
+            } catch (err) {
+                console.warn('[case-taxonomy] in-use check failed:', err && err.message);
+                // Fail open: warn admin that check didn't complete, let them decide
+                const proceedWithoutCheck = confirm(
+                    `⚠️ Could not check whether existing cases reference "${key}". ` +
+                    `Delete anyway? (existing cases keep the key but will show fallback labels) · ` +
+                    `사용 중 확인 실패. 그래도 삭제하시겠습니까?`
+                );
+                if (delBtn) { delBtn.disabled = false; delBtn.innerHTML = originalIcon; }
+                if (!proceedWithoutCheck) return;
+                ctEditorState.systems.splice(idx, 1);
+                ctEditorState.dirty = true;
+                ctEditorShowList();
+                return;
+            }
+            if (delBtn) { delBtn.disabled = false; delBtn.innerHTML = originalIcon; }
+
+            let msg;
+            if (usageCount === 0) {
+                msg = `Delete "${label}" (${key})? · 삭제하시겠습니까?\n\nNo existing cases use this system.`;
+            } else {
+                const countStr = usageOverflow ? '50+' : String(usageCount);
+                msg = `⚠️ ${countStr} case(s) reference "${key}" · ${countStr} 케이스가 사용 중\n\n` +
+                      `Existing cases keep their data but will show fallback labels (the raw key) after delete. ` +
+                      `Cases data is NOT modified — only the taxonomy entry is removed.\n\n` +
+                      `Delete "${label}" anyway?`;
+            }
+            if (!confirm(msg)) return;
+
+            ctEditorState.systems.splice(idx, 1);
+            ctEditorState.dirty = true;
+            ctEditorShowList();
         }
 
         function ctEditorAddNew() {
@@ -23527,6 +23592,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
             ctEditorState.dirty = true;
 
+            // V93.06: loading state on Save button — disable both Save and Back
+            // so the form isn't dismissed mid-write.
+            const saveBtn = document.getElementById('ct-form-save-btn');
+            const backBtn = document.getElementById('ct-form-back-btn');
+            const originalSaveText = saveBtn ? saveBtn.innerHTML : '';
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '⏳ Saving…'; saveBtn.style.opacity = '0.7'; saveBtn.style.cursor = 'wait'; }
+            if (backBtn) { backBtn.disabled = true; backBtn.style.opacity = '0.5'; }
+
             // Persist whole array — bulk replace is simpler than per-row patches
             // and matches the migration script's schema (one doc, systems[] field).
             try {
@@ -23550,6 +23623,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 errEl.innerText = 'Save failed: ' + (err && err.message ? err.message : 'unknown error');
                 errEl.style.display = 'block';
                 console.error('[case-taxonomy] save failed:', err);
+            } finally {
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = originalSaveText; saveBtn.style.opacity = ''; saveBtn.style.cursor = ''; }
+                if (backBtn) { backBtn.disabled = false; backBtn.style.opacity = ''; }
             }
         }
 
