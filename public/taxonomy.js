@@ -1,11 +1,22 @@
 // V94.15: Tri-lingual LP tag taxonomy + Straw Hat easter-egg colors (Phase A polish)
 // Data source for #rl-lp-pane and #rl-lp-toggle-body Suggested chips.
 // Schema unchanged — LP entries still write tags[] as flat string array.
+//
+// V94.55 Phase 1: async Firestore overlay across 3 docs:
+//   taxonomy/lp_medical, taxonomy/lp_skill, taxonomy/lp_tool
+//   Each doc shape: { systems: [{key, label{en,ko,th}, tags[]}, ...] }
+// Axis metadata (icon/easterEgg/colors/label) stays bundled in this file —
+// only systems[] is overlay-eligible. If a doc is missing or fetch fails,
+// that axis falls back to its static `systems`. LP_ALL_TAGS is rebuilt after
+// overlay so fuzzy match stays consistent. Fires `lp-taxonomy-loaded` event.
+// Rules: V94.53's `match /taxonomy/{type}` already covers lp_* types.
 
 (function () {
     'use strict';
 
-    window.LP_TAXONOMY = {
+    // Static fallback baseline — also the seed source for the V94.55 migration
+    // script. Each axis here keeps its `systems[]` until Firestore overlays it.
+    const LP_TAXONOMY = {
         medical: {
             icon: '🩺',
             label: { en: 'Medical', ko: '의료', th: 'การแพทย์' },
@@ -66,14 +77,56 @@
         }
     };
 
-    // Flat unique lowercase tag list for fuzzy matching
-    window.LP_ALL_TAGS = (function () {
+    // V94.55: expose `LP_TAXONOMY` as the canonical sync global, plus
+    // `rebuildLpAllTags` so admin write paths (Phase 2) can refresh derived
+    // state in-place after a Save without reloading the page.
+    window.LP_TAXONOMY = LP_TAXONOMY;
+    function rebuildLpAllTags() {
         const set = new Set();
         Object.values(window.LP_TAXONOMY).forEach(axis => {
-            axis.systems.forEach(sys => sys.tags.forEach(t => set.add(t.toLowerCase())));
+            (axis.systems || []).forEach(sys => (sys.tags || []).forEach(t => set.add(String(t).toLowerCase())));
         });
-        return [...set];
-    })();
+        window.LP_ALL_TAGS = [...set];
+    }
+    rebuildLpAllTags();
+    window.rebuildLpAllTags = rebuildLpAllTags;
+    window.LP_TAXONOMY_SOURCE = 'static';
+
+    // V94.55 Phase 1: async overlay — fetch 3 axis docs in parallel; for each
+    // doc that returns a valid `systems[]`, replace LP_TAXONOMY[axis].systems
+    // and keep the bundled axis metadata (icon/easterEgg/colors/label) intact.
+    // Failures are non-fatal and per-axis: only the failed axis falls back to
+    // static. Fires `lp-taxonomy-loaded` with per-axis source map.
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+        try {
+            const db = firebase.firestore();
+            const axisKeys = ['medical', 'skill', 'tool'];
+            Promise.all(axisKeys.map(function (axis) {
+                return db.collection('taxonomy').doc('lp_' + axis).get()
+                    .then(function (snap) {
+                        if (snap.exists) {
+                            const data = snap.data();
+                            if (Array.isArray(data.systems) && data.systems.length > 0) {
+                                window.LP_TAXONOMY[axis].systems = data.systems;
+                                return { axis: axis, source: 'firestore', count: data.systems.length };
+                            }
+                        }
+                        return { axis: axis, source: 'static-fallback-missing-doc', count: window.LP_TAXONOMY[axis].systems.length };
+                    })
+                    .catch(function (err) {
+                        console.warn('[lp-taxonomy] axis ' + axis + ' overlay failed:', err && err.message);
+                        return { axis: axis, source: 'static-fallback-error', error: err && err.message };
+                    });
+            })).then(function (results) {
+                rebuildLpAllTags();
+                const allFirestore = results.every(function (r) { return r.source === 'firestore'; });
+                window.LP_TAXONOMY_SOURCE = allFirestore ? 'firestore' : 'mixed';
+                document.dispatchEvent(new CustomEvent('lp-taxonomy-loaded', { detail: { results: results } }));
+            });
+        } catch (e) {
+            console.warn('[lp-taxonomy] Firestore not ready, using static fallback:', e && e.message);
+        }
+    }
 
     // Soft fuzzy match: returns suggested tag if input is close to a known tag.
     // Returns null on empty, exact match, or no good suggestion (>= threshold).
