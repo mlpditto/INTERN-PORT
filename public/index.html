@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.49)</title>
+    <title>Internship Portfolio (V94.50)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2594,13 +2594,13 @@
                         </div>
                     </div>
                     <div id="kanban-content" style="display: none; border-top: 1px solid #f0f0f0; background: #fff;">
-                        <!-- Mission Tabs Bar (V94.31: Quiz first, DR/LN split into independent tabs) -->
+                        <!-- Mission Tabs Bar (V94.50: Quiz is the default tab) -->
                         <div class="mission-tabs-bar">
-                            <button class="mission-tab-btn" id="mtab-quiz" onclick="switchMissionTab('quiz')">
+                            <button class="mission-tab-btn active" id="mtab-quiz" onclick="switchMissionTab('quiz')">
                                 <i class="fa-solid fa-list-check"></i>
                                 <span>Quiz 퀴즈</span>
                             </button>
-                            <button class="mission-tab-btn active" id="mtab-reflection" onclick="switchMissionTab('reflection')">
+                            <button class="mission-tab-btn" id="mtab-reflection" onclick="switchMissionTab('reflection')">
                                 <i class="fa-solid fa-book-bookmark"></i>
                                 <span>Daily Reflection 일일 성찰</span>
                             </button>
@@ -2612,7 +2612,7 @@
 
                         <div style="padding: 15px;">
                             <!-- Tab: Daily Reflection (V94.31: renamed from pane-mission-log; LP moved to pane-mission-lp) -->
-                            <div id="pane-mission-reflection" class="mission-tab-pane active">
+                            <div id="pane-mission-reflection" class="mission-tab-pane">
                                 <!-- V94.31: My Writing Profile card -->
                                 <div id="my-writing-profile" style="display:none; background:#fcfdff; padding:14px; border-radius:15px; border:1px solid #eef2f7; margin-bottom:14px;">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
@@ -2817,8 +2817,8 @@
                                 </div>
                             </div>
                             
-                            <!-- 🔥 V92.00: Tab 2 - Quiz List (moved from Quiz card) -->
-                            <div id="pane-mission-quiz" class="mission-tab-pane">
+                            <!-- 🔥 V92.00: Tab 2 - Quiz List (moved from Quiz card) — V94.50: default active -->
+                            <div id="pane-mission-quiz" class="mission-tab-pane active">
                                 <div id="assignments-container"></div>
                                 <div id="assign-pagination" style="margin-top:15px; display:flex; justify-content:center; gap:10px;"></div>
                             </div>
@@ -6777,14 +6777,18 @@
                 }
 
                 // Render Correct Answer (if wrong)
+                // V94.50: bilingual labels + lang-no-toggle wrappers — quiz options
+                // are user-authored medical content (often Thai-only) and must
+                // stay visible in EN-only mode. Without these, lang-toggle.js
+                // wraps Thai runs in .lang-th and hides everything but a trailing ":".
                 let correctAnsText = "";
                 if (!isCorrect) {
                     if (isChoice || isFlash) {
                         const targetArr = Array.isArray(question.correct) ? question.correct : [question.correct];
-                        correctAnsText = `<div style="margin-top:5px; color:#155724; font-size:0.9em;"><b>เฉลย:</b> ${targetArr.map(idx => question.options[idx]).join(', ')}</div>`;
+                        correctAnsText = `<div style="margin-top:5px; color:#155724; font-size:0.9em;"><b>Correct<span class="lang-th"> เฉลย</span>:</b> <span class="lang-no-toggle">${targetArr.map(idx => question.options[idx]).join(', ')}</span></div>`;
                     } else if (isOrdering) {
                         const target = question.correct || question.options.map((_, i) => i);
-                        correctAnsText = `<div style="margin-top:5px; color:#155724; font-size:0.9em;"><b>ลำดับที่ถูก:</b><br>${target.map((idx, i) => `${i + 1}. ${question.options[idx]}`).join('<br>')}</div>`;
+                        correctAnsText = `<div style="margin-top:5px; color:#155724; font-size:0.9em;"><b>Correct order<span class="lang-th"> ลำดับที่ถูก</span>:</b><br><span class="lang-no-toggle">${target.map((idx, i) => `${i + 1}. ${question.options[idx]}`).join('<br>')}</span></div>`;
                     } else {
                         correctAnsText = `<div style="margin-top:5px; color:#666; font-size:0.9em;">(Subjective: ขึ้นอยู่กับดุลยพินิจผู้ตรวจ)</div>`;
                     }
@@ -6798,7 +6802,7 @@
                         </div>
                         <div class="md-render" style="font-size:1em; margin-bottom:5px;">${window.renderMd(question.q)}</div>
                         <div style="background:rgba(255,255,255,0.5); padding:8px; border-radius:6px; font-size:0.95em;">
-                            <b>ตอบ:</b> ${userAnsText}
+                            <b>Answer<span class="lang-th"> ตอบ</span>:</b> <span class="lang-no-toggle">${userAnsText}</span>
                         </div>
                         ${correctAnsText}
                     </div>
@@ -7130,11 +7134,12 @@
         // 🔥 V78: Show practice result — only shows which questions user got RIGHT (no answer key for wrong ones)
         function showPracticeResult(quiz, correctCount, answers) {
             const resultContainer = document.getElementById('quiz-result-container');
+            // V94.50: bilingual subtitle so EN-only mode still reads.
             let html = `
                 <div style="text-align:center; margin-bottom:20px; padding:20px; background:linear-gradient(135deg, #fff3cd, #ffeaa7); border-radius:12px;">
-                    <div style="font-size:1.2em; font-weight:bold; color:#856404;">🔄 ผลฝึกซ้อม (Practice Result)</div>
+                    <div style="font-size:1.2em; font-weight:bold; color:#856404;">🔄 Practice Result ผลฝึกซ้อม</div>
                     <div style="font-size:2.5em; font-weight:bold; color:#f57f17; margin:10px 0;">${correctCount} / ${quiz.questions.length}</div>
-                    <div style="font-size:0.9em; color:#856404;">คะแนนนี้ไม่นับจริง — ฝึกซ้อมเท่านั้น</div>
+                    <div style="font-size:0.9em; color:#856404;">Practice only — not counted คะแนนนี้ไม่นับจริง</div>
                 </div>
             `;
 
@@ -7163,6 +7168,8 @@
                             userAnsText = question.options[userAns] || '-';
                         }
                     }
+                    // V94.50: bilingual label + lang-no-toggle on the answer
+                    // (medical options may be Thai-only — see viewQuizAnswers).
                     html += `
                         <div style="background:#d4edda; border:1px solid #c3e6cb; padding:15px; border-radius:10px; margin-bottom:10px;">
                             <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
@@ -7171,12 +7178,13 @@
                             </div>
                             <div class="md-render" style="font-size:1em; margin-bottom:5px;">${window.renderMd(question.q)}</div>
                             <div style="background:rgba(255,255,255,0.5); padding:8px; border-radius:6px; font-size:0.95em;">
-                                <b>ตอบ:</b> ${userAnsText} ✅
+                                <b>Answer<span class="lang-th"> ตอบ</span>:</b> <span class="lang-no-toggle">${userAnsText}</span> ✅
                             </div>
                         </div>
                     `;
                 } else {
                     // For wrong answers: show question and that it was wrong, but NOT the correct answer
+                    // V94.50: add EN so the body stays readable in EN-only mode.
                     html += `
                         <div style="background:#f8d7da; border:1px solid #f5c6cb; padding:15px; border-radius:10px; margin-bottom:10px;">
                             <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
@@ -7185,7 +7193,7 @@
                             </div>
                             <div class="md-render" style="font-size:1em; margin-bottom:5px;">${window.renderMd(question.q)}</div>
                             <div style="background:rgba(255,255,255,0.5); padding:8px; border-radius:6px; font-size:0.95em; color:#721c24;">
-                                ❌ ตอบผิด — เฉลยจะแสดงหลังสอบจริงเท่านั้น
+                                ❌ Incorrect — answer revealed after real exam ตอบผิด — เฉลยจะแสดงหลังสอบจริงเท่านั้น
                             </div>
                         </div>
                     `;
@@ -9945,16 +9953,19 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             });
 
             // 🔥 Quiz Global Expiry (V77.24)
+            // V94.50: include EN text so the live countdown stays visible when
+            // Thai display is OFF (lang-toggle hides .lang-th spans by default).
+            // Previously rendered only Thai → only the trailing "." was visible.
             document.querySelectorAll('.quiz-global-expiry').forEach(el => {
                 const d = parseInt(el.dataset.dead);
                 const diff = d - now;
                 if (diff <= 0) {
-                    el.innerText = "หมดเวลา (Expired)";
+                    el.innerText = "Expired หมดเวลา";
                     el.style.color = "#ccc";
                 } else {
                     const h = Math.floor(diff / 3600000);
                     const m = Math.floor((diff % 3600000) / 60000);
-                    el.innerHTML = `<i class="fa-solid fa-hourglass-half"></i> เหลือเวลา: ${h}ชม. ${m}น.`;
+                    el.innerHTML = `<i class="fa-solid fa-hourglass-half"></i> ${h}h ${m}m left เหลือเวลา ${h}ชม. ${m}น.`;
                 }
             });
 
