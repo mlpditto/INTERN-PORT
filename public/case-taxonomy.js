@@ -53,51 +53,85 @@
           symptoms: ['Follow-up', 'Medication Q', 'Unclear Symptom'] }
     ];
 
-    const CASE_SYSTEM_BY_KEY = Object.fromEntries(CASE_SYSTEMS.map(s => [s.key, s]));
+    // V94.53 Phase 1: shim builder hoisted into a function so the same code
+    // path runs for both the synchronous static fallback (immediate) and the
+    // async Firestore overlay (when `taxonomy/case` doc is available). The
+    // build rebuilds every global the legacy inline JS in index.html /
+    // admin.html depends on — so dynamic re-renders that re-read these
+    // globals automatically pick up Firestore-edited data.
+    function buildCaseTaxonomyGlobals(systems) {
+        window.CASE_SYSTEMS = systems;
+        window.CASE_SYSTEM_BY_KEY = Object.fromEntries(systems.map(s => [s.key, s]));
 
-    // Primary canonical exports
-    window.CASE_SYSTEMS = CASE_SYSTEMS;
-    window.CASE_SYSTEM_BY_KEY = CASE_SYSTEM_BY_KEY;
+        // index.html:  caseTaxonomyCatalog
+        window.caseTaxonomyCatalog = systems.map(s => ({
+            key: s.key,
+            label: s.label.en,
+            thaiLabel: s.label.th,
+            symptoms: s.symptoms
+        }));
 
-    // ── Compat shims (kept identical to legacy shapes) ────────────────────
-    // These let existing inline JS in index.html / admin.html keep using the
-    // old names. Drop the in-file `const` declarations and these shims fill
-    // the gap. New code should prefer CASE_SYSTEMS / CASE_SYSTEM_BY_KEY.
+        // index.html:  CASE_SYSTEM_EMOJI
+        window.CASE_SYSTEM_EMOJI = Object.fromEntries(systems.map(s => [s.key, s.emoji]));
 
-    // index.html:  caseTaxonomyCatalog (was 10 entries; now 12 incl. renal/heme)
-    // V91.83: also expose `thaiLabel` so submitCase's
-    // `${entry.label} / ${entry.thaiLabel}` produces a real string instead of
-    // the pre-existing "X / undefined" that the prior inline catalog also had.
-    window.caseTaxonomyCatalog = CASE_SYSTEMS.map(s => ({
-        key: s.key,
-        label: s.label.en,
-        thaiLabel: s.label.th,
-        symptoms: s.symptoms
-    }));
+        // admin.html:  alabastaTaxonomyCatalog (V91.84: EN/KR/TH labels + symptoms→tags)
+        window.alabastaTaxonomyCatalog = systems.map(s => ({
+            key: s.key,
+            label: s.label.en,
+            thaiLabel: s.label.th,
+            koLabel: s.label.ko,
+            tags: s.symptoms
+        }));
 
-    // index.html:  CASE_SYSTEM_EMOJI (was object {key: emoji})
-    window.CASE_SYSTEM_EMOJI = Object.fromEntries(CASE_SYSTEMS.map(s => [s.key, s.emoji]));
+        // admin.html:  PRIMARY_SYSTEMS (V91.83 bilingual EN+KR button label)
+        window.PRIMARY_SYSTEMS = systems.map(s => ({
+            value: s.key,
+            label: `${s.emoji} ${s.label.en} ${s.label.ko}`,
+            code: s.label.en
+        }));
+    }
 
-    // admin.html:  alabastaTaxonomyCatalog (had thaiLabel + tags fields).
-    // V91.84: also expose koLabel so admin.html label generators can render
-    // EN+KR ("Neurological 신경계") instead of the prior Thai-prefix
-    // ("ระบบประสาท (Neurological)") format the user flagged.
-    window.alabastaTaxonomyCatalog = CASE_SYSTEMS.map(s => ({
-        key: s.key,
-        label: s.label.en,
-        thaiLabel: s.label.th,
-        koLabel: s.label.ko,
-        tags: s.symptoms
-    }));
+    // Synchronous boot — static fallback. Callers that read globals before
+    // the Firestore overlay completes see the bundled 12 systems and never
+    // get a null/undefined. Identical shape to legacy V91.84 behavior.
+    buildCaseTaxonomyGlobals(CASE_SYSTEMS);
+    window.CASE_TAXONOMY_SOURCE = 'static';
 
-    // admin.html:  PRIMARY_SYSTEMS (button group; previously had 8 items with
-    // a different `endo` key vs the rest of the codebase's `endocrine`.
-    // Unified to `endocrine` so all code paths agree.)
-    // V91.83: button label is now bilingual EN+KR (was Thai-only) to match
-    // the LIFF Disease System buttons and the rest of the EN+KR Edit modal.
-    window.PRIMARY_SYSTEMS = CASE_SYSTEMS.map(s => ({
-        value: s.key,
-        label: `${s.emoji} ${s.label.en} ${s.label.ko}`,
-        code: s.label.en
-    }));
+    // V94.53 Phase 1: async Firestore overlay. `taxonomy/case` (single doc)
+    // schema: { systems: [{key, emoji, label{en,ko,th}, symptoms[]}, ...] }.
+    // Rules: read=public, write=admin only (Phase 2 wires write). Failure
+    // modes (doc missing / network error / SDK unavailable) all keep the
+    // static fallback in place — production behavior unchanged until the
+    // migration writes the doc.
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+        try {
+            firebase.firestore().collection('taxonomy').doc('case').get()
+                .then(function (doc) {
+                    if (doc.exists) {
+                        const data = doc.data();
+                        if (Array.isArray(data.systems) && data.systems.length > 0) {
+                            buildCaseTaxonomyGlobals(data.systems);
+                            window.CASE_TAXONOMY_SOURCE = 'firestore';
+                            document.dispatchEvent(new CustomEvent('case-taxonomy-loaded', {
+                                detail: { source: 'firestore', count: data.systems.length }
+                            }));
+                            return;
+                        }
+                    }
+                    // Doc missing or malformed — static fallback stays in place.
+                    document.dispatchEvent(new CustomEvent('case-taxonomy-loaded', {
+                        detail: { source: 'static-fallback-missing-doc', count: CASE_SYSTEMS.length }
+                    }));
+                })
+                .catch(function (err) {
+                    console.warn('[case-taxonomy] Firestore overlay failed, using static fallback:', err && err.message);
+                    document.dispatchEvent(new CustomEvent('case-taxonomy-loaded', {
+                        detail: { source: 'static-fallback-error', error: err && err.message }
+                    }));
+                });
+        } catch (e) {
+            // firebase.firestore() threw — defensive: keep static fallback.
+            console.warn('[case-taxonomy] Firestore not ready, using static fallback:', e && e.message);
+        }
+    }
 })();
