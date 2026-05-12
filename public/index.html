@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.51)</title>
+    <title>Internship Portfolio (V94.52)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5446,9 +5446,17 @@
 
                             let retryBtn = "";
                             const isExpired = (dead && new Date() > dead);
-                            // 🔥 V78.92: Show Retake button if score is 0.00 or expired
-                            if ((isExpired && !isApproved) || (isApproved && score <= 0)) {
-                                retryBtn = `<button class="btn-sm btn-warning" onclick="requestLateQuiz('${q.id}', ${score <= 0})" style="margin-top:5px; width:100%;">🔄 Request Retake ขอสอบใหม่</button>`;
+                            // V94.52: retake only when the user actually failed (score ≤ 0).
+                            // Was: (isExpired && !isApproved) || (isApproved && score ≤ 0).
+                            // The `(isExpired && !isApproved)` clause incorrectly fired on
+                            // legacy attempts whose `status` field is missing or non-'approved'
+                            // (e.g. 'graded'/'completed' — see V94.48 comment below). Those
+                            // attempts have valid scores; clicking would have written
+                            // `status: 'requesting'` over the original and lost the score
+                            // permanently after admin-approved retake + restart (set without
+                            // merge at the started path).
+                            if (score <= 0) {
+                                retryBtn = `<button class="btn-sm btn-warning" onclick="requestLateQuiz('${q.id}', true)" style="margin-top:5px; width:100%;">🔄 Request Retake ขอสอบใหม่</button>`;
                                 showRetake = true;
                             }
 
