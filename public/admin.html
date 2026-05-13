@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.21</title>
+    <title>Nika V93.22</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -10607,6 +10607,7 @@
                 <button type="button" class="lpt-axis-tab" data-axis="medical" onclick="lptEditorSwitchAxis('medical')">🩺 Medical</button>
                 <button type="button" class="lpt-axis-tab" data-axis="skill" onclick="lptEditorSwitchAxis('skill')">🎯 Skill</button>
                 <button type="button" class="lpt-axis-tab" data-axis="tool" onclick="lptEditorSwitchAxis('tool')">🛠️ Tool</button>
+                <button type="button" class="lpt-axis-tab" data-axis="discover" onclick="lptEditorSwitchToDiscover()">🌱 Discover</button>
             </div>
 
             <!-- List view -->
@@ -10646,6 +10647,21 @@
                 <div style="display:flex; justify-content:space-between; gap:10px;">
                     <button type="button" id="lpt-form-back-btn" onclick="lptEditorBackToList()" class="lpt-form-back-btn">← Back to list</button>
                     <button type="button" id="lpt-form-save-btn" onclick="lptEditorSaveCurrent()" class="lpt-form-save-btn">💾 Save This Axis</button>
+                </div>
+            </div>
+
+            <!-- Discover view (V93.22) — community-popular custom tags promotion -->
+            <div id="lpt-editor-discover" style="display:none;">
+                <div class="lpt-editor-toolbar">
+                    <div style="font-size:0.83em; color:#78716c; max-width:60%; line-height:1.4;">
+                        Find custom tags users have added to LP entries that aren't yet in your taxonomy. Promote popular ones to a system to surface them as Suggested chips.
+                    </div>
+                    <button type="button" onclick="lptEditorScanCustomTags()" class="lpt-add-btn">🔍 Scan</button>
+                </div>
+                <div id="lpt-discover-status" style="margin:6px 0 12px; font-size:0.85em;"></div>
+                <div id="lpt-discover-rows"></div>
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px;">
+                    <button type="button" onclick="closeLpTaxonomyEditor()" class="lpt-form-back-btn">Close</button>
                 </div>
             </div>
         </div>
@@ -23858,7 +23874,148 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.querySelectorAll('.lpt-axis-tab').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.axis === axis);
             });
+            // V93.22: hide Discover view when returning to an axis tab
+            const discoverEl = document.getElementById('lpt-editor-discover');
+            if (discoverEl) discoverEl.style.display = 'none';
             lptEditorShowList();
+        }
+
+        // V93.22 / pending item #13: Tag promotion model (Option A — admin-curated
+        // discovery). Reads every LP entry's tags[], counts custom tags that aren't
+        // already in LP_TAXONOMY, lists them sorted by usage + distinct users. Admin
+        // picks a destination axis/system and clicks Promote — tag appends to the
+        // system's tags[] and persists immediately to Firestore (Phase 3 delete
+        // pattern: destructive enough that confirming + clicking Promote is sufficient).
+        function lptEditorSwitchToDiscover() {
+            lptEditorState.axis = 'discover';
+            lptEditorState.editingIndex = -1;
+            document.querySelectorAll('.lpt-axis-tab').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.axis === 'discover');
+            });
+            document.getElementById('lpt-editor-list').style.display = 'none';
+            document.getElementById('lpt-editor-form').style.display = 'none';
+            document.getElementById('lpt-editor-discover').style.display = 'block';
+            document.getElementById('lpt-discover-status').innerHTML = '<span style="color:#78716c;">Click 🔍 Scan to find custom tags from LP entries.</span>';
+            document.getElementById('lpt-discover-rows').innerHTML = '';
+        }
+
+        function lptEditorBuildKnownTagsSet() {
+            const set = new Set();
+            ['medical', 'skill', 'tool'].forEach(axis => {
+                const systems = lptEditorState.systems[axis] || [];
+                systems.forEach(s => {
+                    (s.tags || []).forEach(t => set.add(String(t).toLowerCase().trim()));
+                });
+            });
+            return set;
+        }
+
+        async function lptEditorScanCustomTags() {
+            const statusEl = document.getElementById('lpt-discover-status');
+            const rowsEl = document.getElementById('lpt-discover-rows');
+            statusEl.innerHTML = '<span style="color:#64748b;">🔄 Scanning LP entries…</span>';
+            rowsEl.innerHTML = '';
+            try {
+                // Cap at 3000 for performance — most-used tags surface even with sampling.
+                // Bump the limit if discovery starts missing popular tags in a large dataset.
+                const snap = await db.collection('learning_path_entries').limit(3000).get();
+                const known = lptEditorBuildKnownTagsSet();
+                const tagMap = new Map(); // tagLower -> { display, count, users:Set }
+                snap.forEach(doc => {
+                    const data = doc.data() || {};
+                    const tags = Array.isArray(data.tags) ? data.tags : [];
+                    const userId = data.userId || '';
+                    tags.forEach(t => {
+                        const raw = String(t || '').trim();
+                        if (!raw) return;
+                        const lower = raw.toLowerCase();
+                        if (known.has(lower)) return;
+                        if (!tagMap.has(lower)) tagMap.set(lower, { display: raw, count: 0, users: new Set() });
+                        const entry = tagMap.get(lower);
+                        entry.count++;
+                        if (userId) entry.users.add(userId);
+                    });
+                });
+                const results = Array.from(tagMap.values()).sort((a, b) => b.count - a.count || b.users.size - a.users.size);
+                window._lptDiscoverResults = results;
+                if (results.length === 0) {
+                    statusEl.innerHTML = `<span style="color:#16a34a;">✨ All custom tags from ${snap.size} LP entries are already in your taxonomy.</span>`;
+                    return;
+                }
+                statusEl.innerHTML = `<span style="color:#1f2937;">Found <strong>${results.length}</strong> custom tag${results.length === 1 ? '' : 's'} from ${snap.size} LP entries.</span>`;
+                const targetOptionsHtml = (() => {
+                    let html = '<option value="">Choose axis → system…</option>';
+                    [
+                        { axis: 'medical', emoji: '🩺' },
+                        { axis: 'skill',   emoji: '🎯' },
+                        { axis: 'tool',    emoji: '🛠️' }
+                    ].forEach(({ axis, emoji }) => {
+                        (lptEditorState.systems[axis] || []).forEach(s => {
+                            const sysLabel = (s.label && s.label.en) || s.key;
+                            html += `<option value="${axis}::${s.key}">${emoji} ${axis} → ${sysLabel}</option>`;
+                        });
+                    });
+                    return html;
+                })();
+                rowsEl.innerHTML = results.map((r, i) => `
+                    <div class="lpt-editor-row" id="lpt-discover-row-${i}">
+                        <div>
+                            <div class="lpt-editor-row-key">${escapeHtml(r.display)}</div>
+                            <div class="lpt-editor-row-meta">${r.count} use${r.count === 1 ? '' : 's'} · ${r.users.size} user${r.users.size === 1 ? '' : 's'}</div>
+                        </div>
+                        <div class="lpt-editor-row-actions">
+                            <select id="lpt-discover-target-${i}" style="padding:4px 6px; border-radius:6px; border:1px solid #d6d3d1; font-size:0.82em; max-width:260px;">${targetOptionsHtml}</select>
+                            <button type="button" class="lpt-editor-row-edit-btn" onclick="lptEditorPromoteTag(${i})">+ Promote</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('[lpt-discover] scan failed:', err);
+                statusEl.innerHTML = `<span style="color:#dc2626;">⚠️ Scan failed: ${err.message || 'unknown'}</span>`;
+            }
+        }
+
+        async function lptEditorPromoteTag(idx) {
+            const results = window._lptDiscoverResults || [];
+            const entry = results[idx];
+            if (!entry) return;
+            const tag = entry.display;
+            const target = document.getElementById(`lpt-discover-target-${idx}`).value;
+            if (!target) { alert('Choose a destination axis → system first.'); return; }
+            const [axis, sysKey] = target.split('::');
+            const sysIdx = (lptEditorState.systems[axis] || []).findIndex(s => s.key === sysKey);
+            if (sysIdx < 0) { alert('Destination system not found.'); return; }
+            const sys = lptEditorState.systems[axis][sysIdx];
+            if (!Array.isArray(sys.tags)) sys.tags = [];
+            if (sys.tags.map(t => String(t).toLowerCase().trim()).includes(tag.toLowerCase())) {
+                alert(`"${tag}" already in ${axis} → ${sys.key}.`);
+                return;
+            }
+            sys.tags.push(tag);
+            const rowEl = document.getElementById(`lpt-discover-row-${idx}`);
+            const btn = rowEl ? rowEl.querySelector('button.lpt-editor-row-edit-btn') : null;
+            if (btn) { btn.disabled = true; btn.innerText = '⏳ Saving…'; }
+            try {
+                await db.collection('taxonomy').doc(`lp_${axis}`).update({
+                    systems: lptEditorState.systems[axis],
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                if (window.LP_TAXONOMY && window.LP_TAXONOMY[axis]) {
+                    window.LP_TAXONOMY[axis].systems = JSON.parse(JSON.stringify(lptEditorState.systems[axis]));
+                }
+                if (typeof window.rebuildLpAllTags === 'function') window.rebuildLpAllTags();
+                window.dispatchEvent(new CustomEvent('lp-taxonomy-loaded', {
+                    detail: { source: 'admin-promote', axis: axis, count: lptEditorState.systems[axis].length }
+                }));
+                if (rowEl) rowEl.remove();
+                const statusEl = document.getElementById('lpt-discover-status');
+                if (statusEl) statusEl.innerHTML = `<span style="color:#16a34a;">✓ Promoted "${escapeHtml(tag)}" → ${axis} → ${sysKey}</span>`;
+            } catch (err) {
+                console.error('[lpt-promote] failed:', err);
+                sys.tags.pop(); // rollback
+                if (btn) { btn.disabled = false; btn.innerText = '+ Promote'; }
+                alert('Promotion failed: ' + (err.message || 'unknown error'));
+            }
         }
 
         function lptEditorShowList() {
