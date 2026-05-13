@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.55)</title>
+    <title>Internship Portfolio (V94.56)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5965,7 +5965,12 @@
                 return;
             }
 
-            const page = currentQuiz.questions[currentStep];
+            // V94.56: route through V93 translation pipeline. `qtGetEffectiveQuestion`
+            // returns translated {q, options} for the active lang or the original
+            // baseQ for 'orig'. `page.content` (long-form revealed body) is NOT
+            // translated here — that's the parked Case Study / read-only-content
+            // M-effort follow-up (`qt2_ro_content_*` cache key, separate path).
+            const page = qtGetEffectiveQuestion(currentStep);
             const isPoll = (page.type === 'choice' || page.type === 'ordering' || page.type === 'flashcard');
             const currentAns = userAnswers[currentStep];
             const isAnswered = currentAns !== undefined && currentAns !== null;
@@ -6075,7 +6080,10 @@
                 `;
             }
 
+            // V94.56: wrap in lang-no-toggle so V94.23 walker doesn't blank the
+            // translated text (Thai-blank lesson from V93.01).
             quizRunContainer.innerHTML = `
+                <div class="lang-no-toggle">
                 <div style="background:#fff; border-radius:12px; padding:20px; box-shadow:0 4px 15px rgba(0,0,0,0.05); border:1px solid #eee; margin-bottom:20px; position:relative;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #f0f0f0; padding-bottom:10px;">
                         <span style="background:#e3f2fd; color:#0d47a1; padding:4px 10px; border-radius:15px; font-size:0.75em; font-weight:bold;">
@@ -6085,6 +6093,8 @@
                             <i class="fa-regular fa-comment-dots"></i> Discussion
                         </button>
                     </div>
+
+                    ${qtRenderBar(page)}
 
                     <h3 class="md-render" style="margin-top:0; color:var(--primary); font-size:1.15em; line-height:1.4;">
                         ${window.renderMd(page.q)}
@@ -6097,6 +6107,7 @@
                         ${isPoll ? '<div style="font-weight:bold; color:var(--primary); margin-bottom:10px; border-top:1px solid #eee; padding-top:15px; font-size:0.9em;">✨ The Revelation — answer & extra content เฉลย/เนื้อหาเพิ่มเติม:</div>' : ''}
                         ${window.renderMd((page.content || "Content for this page... เนื้อหาสำหรับหน้านี้...").trim())}
                     </div>
+                </div>
                 </div>
             `;
 
