@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.10</title>
+    <title>Nika V93.11</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -17918,13 +17918,16 @@ ${JSON.stringify(sourceObj)}`;
         }
 
         const GDRIVE_CLIENT_ID  = getStoredConfig('GDRIVE_CLIENT_ID');
+        // V93.11: render review via html2canvas + jsPDF.addImage so Thai/Japanese
+        // glyphs display correctly. The prior jsPDF.text() + helvetica path could
+        // not encode characters outside Latin-1 and produced garbled output.
         async function exportIncorrectToPDF() {
             const attemptId = document.getElementById('review-attempt-id')?.value;
             if (!attemptId) return alert("Attempt ID missing");
 
             try {
                 if (typeof showToast === 'function') showToast("Generating PDF...");
-                
+
                 const attemptDoc = await db.collection("quiz_attempts").doc(attemptId).get();
                 if (!attemptDoc.exists) return alert("Data not found");
                 const att = attemptDoc.data();
@@ -17933,64 +17936,9 @@ ${JSON.stringify(sourceObj)}`;
 
                 const jsPdfCtor = window.jspdf && window.jspdf.jsPDF;
                 if (!jsPdfCtor) return alert('PDF engine is not ready.');
+                if (typeof html2canvas !== 'function') return alert('html2canvas is not ready.');
 
-                const doc = new jsPdfCtor('p', 'mm', 'a4');
-                let y = 20;
-                const margin = 15;
-                const pageW = doc.internal.pageSize.getWidth();
-                const pageH = doc.internal.pageSize.getHeight();
-                const maxW = pageW - (margin * 2);
-
-                const ensureSpace = (h) => {
-                    if (y + h > pageH - margin) {
-                        doc.addPage();
-                        y = 20;
-                        return true;
-                    }
-                    return false;
-                };
-
-                // V91.95: Expanded from V91.94 — V91.94 only covered U+2013/U+2014 dashes,
-                // missing non-breaking hyphen U+2011 (likely culprit for Q7 "life-threatening").
-                // V91.95 covers ALL Unicode dash variants (U+2010-U+2015), all unicode whitespace,
-                // and bidi/format invisibles.
-                const RE_SMART_SINGLE_QUOTE = /[‘-‛]/g;
-                const RE_SMART_DOUBLE_QUOTE = /[“-‟]/g;
-                const RE_DASH = /[‐-―]/g;
-                const RE_ELLIPSIS = /…/g;
-                const RE_UNICODE_SPACE = /[   -   　]/g;
-                const RE_INVISIBLE = /[\u200B-\u200F\u2028-\u202E\u2060-\u206F\uFEFF]/g;
-                // V92.49: math/arrow/symbol transliteration \u2014 AI-generated medical text
-                // (e.g. "\u226555\u00B0C", "\u2191BP", "\u00B15%") otherwise breaks jsPDF helvetica into
-                // per-character spacing fallback. Map covers symbols outside Latin-1
-                // that show up frequently in clinical content.
-                const PDF_SYMBOL_MAP = {
-                    '\u2265': '>=', '\u2264': '<=', '\u2260': '!=',
-                    '\u00B1': '+/-', '\u00D7': 'x', '\u00F7': '/',
-                    '\u2248': '~', '\u223C': '~', '\u221E': 'inf',
-                    '\u2192': '->', '\u2190': '<-', '\u2191': '^',
-                    '\u2193': 'v', '\u2194': '<->',
-                    '\u21D2': '=>', '\u21D0': '<=', '\u21D4': '<=>',
-                    '\u2122': '(TM)', '\u00AE': '(R)', '\u00A9': '(c)'
-                };
-                const RE_PDF_SYMBOLS = new RegExp('[' + Object.keys(PDF_SYMBOL_MAP).join('') + ']', 'g');
-                const normalizeForPdf = (s) => String(s || '')
-                    .replace(RE_SMART_SINGLE_QUOTE, "'")
-                    .replace(RE_SMART_DOUBLE_QUOTE, '"')
-                    .replace(RE_DASH, '-')
-                    .replace(RE_ELLIPSIS, '...')
-                    .replace(RE_UNICODE_SPACE, ' ')
-                    .replace(RE_INVISIBLE, '')
-                    .replace(RE_PDF_SYMBOLS, c => PDF_SYMBOL_MAP[c] || c);
-
-                doc.setFont('helvetica', 'bold');
-                doc.setFontSize(18);
-                doc.setTextColor(220, 53, 69);
-                doc.text("Incorrect Questions Review", margin, y);
-                y += 12;
-
-                // V92.49: robust Firebase Timestamp + ISO/number/Date handling, returns 'N/A' on Invalid Date.
-                const fmtTimestampForPdf = (ts) => {
+                const fmtTs = (ts) => {
                     if (!ts) return 'N/A';
                     let d = null;
                     if (typeof ts.toDate === 'function') d = ts.toDate();
@@ -18001,25 +17949,12 @@ ${JSON.stringify(sourceObj)}`;
                     return d.toLocaleString();
                 };
 
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'normal');
-                doc.setTextColor(80);
-                // V92.49: pass metadata strings through normalizeForPdf so hidden bidi/format chars
-                // in displayName don't trigger jsPDF's character-by-character fallback rendering.
-                doc.text(normalizeForPdf(`Quiz: ${quiz.title || 'Untitled'}`), margin, y); y += 6;
-                doc.text(normalizeForPdf(`Student: ${att.displayName || 'Anonymous'}`), margin, y); y += 6;
-                doc.text(normalizeForPdf(`Date: ${fmtTimestampForPdf(att.timestamp)}`), margin, y); y += 10;
-
-                doc.setDrawColor(220);
-                doc.line(margin, y, pageW - margin, y);
-                y += 12;
-
-                let incorrectCount = 0;
+                const incorrectBlocks = [];
                 (quiz.questions || []).forEach((q, i) => {
                     const studentAns = (att.answers || att.practiceAnswers || [])[i];
                     const isChoice = (q.type || 'choice') === 'choice';
                     const isManuallyCorrect = !!(att.manualCorrect && att.manualCorrect[i] === true);
-                    
+
                     let isCorrect = false;
                     if (isChoice) {
                         const target = q.correct;
@@ -18033,80 +17968,74 @@ ${JSON.stringify(sourceObj)}`;
                         isCorrect = !!((att.gradedAnswers && att.gradedAnswers[i]) || isManuallyCorrect);
                     }
                     isCorrect = isCorrect || isManuallyCorrect;
+                    if (isCorrect) return;
 
-                    if (!isCorrect) {
-                        incorrectCount++;
-                        ensureSpace(30);
-
-                        doc.setFont('helvetica', 'bold');
-                        doc.setTextColor(30);
-                        const qLines = doc.splitTextToSize(normalizeForPdf(`Q${i + 1}: ${q.q}`), maxW);
-                        qLines.forEach(line => {
-                            ensureSpace(6);
-                            doc.text(line, margin, y);
-                            y += 6;
-                        });
-
-                        y += 2;
-                        doc.setFont('helvetica', 'normal');
-                        doc.setTextColor(220, 53, 69); // Red
-                        
-                        let studentText = "Student Answer: ";
-                        if (isChoice) {
-                            const idx = parseInt(studentAns);
-                            studentText += isNaN(idx) ? "None" : (q.options[idx] || "None");
-                            if (!isNaN(idx)) studentText += ` (Choice ${idx + 1})`;
-                        } else {
-                            const ans = Array.isArray(studentAns) ? studentAns.join(", ") : studentAns;
-                            studentText += ans || "None";
-                        }
-                        
-                        const sLines = doc.splitTextToSize(normalizeForPdf(studentText), maxW);
-                        sLines.forEach(line => {
-                            ensureSpace(5);
-                            doc.text(line, margin, y);
-                            y += 5;
-                        });
-
-                        doc.setTextColor(40, 167, 69); // Green
-                        let correctText = "Correct Answer: ";
-                        if (isChoice) {
-                            const idx = parseInt(q.correct);
-                            correctText += isNaN(idx) ? "N/A" : (q.options[idx] || "N/A");
-                            if (!isNaN(idx)) correctText += ` (Choice ${idx + 1})`;
-                        } else {
-                            correctText += "(Refer to answer key)";
-                        }
-                        
-                        const cLines = doc.splitTextToSize(normalizeForPdf(correctText), maxW);
-                        cLines.forEach(line => {
-                            ensureSpace(5);
-                            doc.text(line, margin, y);
-                            y += 5;
-                        });
-
-                        if (q.explanation) {
-                            y += 2;
-                            doc.setTextColor(100);
-                            doc.setFont('helvetica', 'italic');
-                            const eLines = doc.splitTextToSize(normalizeForPdf(`Explanation: ${q.explanation}`), maxW);
-                            eLines.forEach(line => {
-                                ensureSpace(5);
-                                doc.text(line, margin, y);
-                                y += 5;
-                            });
-                        }
-
-                        doc.setTextColor(0);
-                        y += 10;
-                        doc.setDrawColor(240);
-                        doc.line(margin, y - 5, pageW - margin, y - 5);
+                    let studentText, correctText;
+                    if (isChoice) {
+                        const sIdx = parseInt(studentAns);
+                        studentText = isNaN(sIdx) ? "None" : ((q.options && q.options[sIdx]) || "None");
+                        if (!isNaN(sIdx)) studentText += ` (Choice ${sIdx + 1})`;
+                        const cIdx = parseInt(q.correct);
+                        correctText = isNaN(cIdx) ? "N/A" : ((q.options && q.options[cIdx]) || "N/A");
+                        if (!isNaN(cIdx)) correctText += ` (Choice ${cIdx + 1})`;
+                    } else {
+                        studentText = Array.isArray(studentAns) ? studentAns.join(", ") : (studentAns || "None");
+                        correctText = "(Refer to answer key)";
                     }
+                    incorrectBlocks.push({ idx: i + 1, q: q.q || '', studentText, correctText, explanation: q.explanation || '' });
                 });
 
-                if (incorrectCount === 0) {
+                if (incorrectBlocks.length === 0) {
                     alert("No incorrect questions found in this attempt!");
                     return;
+                }
+
+                const fontStack = `-apple-system, BlinkMacSystemFont, "Segoe UI", "Sarabun", "Noto Sans Thai", "Tahoma", "Hiragino Sans", "Yu Gothic", sans-serif`;
+                const container = document.createElement('div');
+                container.style.cssText = `position:fixed; left:-10000px; top:0; width:794px; background:#ffffff; padding:40px 48px; box-sizing:border-box; font-family:${fontStack}; color:#1a1a1a; line-height:1.5;`;
+                container.innerHTML = `
+                    <h1 style="color:#dc3545; font-size:22px; font-weight:700; margin:0 0 16px;">Incorrect Questions Review</h1>
+                    <div style="font-size:12px; color:#555; line-height:1.7; margin-bottom:14px;">
+                        <div>Quiz: ${escapeHtml(quiz.title || 'Untitled')}</div>
+                        <div>Student: ${escapeHtml(att.displayName || 'Anonymous')}</div>
+                        <div>Date: ${escapeHtml(fmtTs(att.timestamp))}</div>
+                    </div>
+                    <hr style="border:none; border-top:1px solid #dcdcdc; margin:0 0 16px;">
+                    ${incorrectBlocks.map(b => `
+                        <div style="margin-bottom:18px; page-break-inside:avoid;">
+                            <div style="font-weight:700; color:#222; font-size:13px; margin-bottom:6px;">Q${b.idx}: ${escapeHtml(b.q)}</div>
+                            <div style="color:#dc3545; font-size:12px; margin-bottom:4px;"><strong>Student Answer:</strong> ${escapeHtml(b.studentText)}</div>
+                            <div style="color:#28a745; font-size:12px;"><strong>Correct Answer:</strong> ${escapeHtml(b.correctText)}</div>
+                            ${b.explanation ? `<div style="color:#666; font-size:11px; font-style:italic; margin-top:6px;"><strong>Explanation:</strong> ${escapeHtml(b.explanation)}</div>` : ''}
+                            <hr style="border:none; border-top:1px solid #efefef; margin:14px 0 0;">
+                        </div>
+                    `).join('')}
+                `;
+                document.body.appendChild(container);
+
+                let canvas;
+                try {
+                    canvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+                } finally {
+                    container.remove();
+                }
+
+                const doc = new jsPdfCtor('p', 'mm', 'a4');
+                const pdfW = doc.internal.pageSize.getWidth();
+                const pdfH = doc.internal.pageSize.getHeight();
+                const imgW = pdfW;
+                const imgH = (canvas.height * imgW) / canvas.width;
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+                let heightLeft = imgH;
+                let position = 0;
+                doc.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
+                heightLeft -= pdfH;
+                while (heightLeft > 0) {
+                    position -= pdfH;
+                    doc.addPage();
+                    doc.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
+                    heightLeft -= pdfH;
                 }
 
                 const filename = `Review_Incorrect_${(att.displayName || 'Attempt').replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
