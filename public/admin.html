@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.24</title>
+    <title>Nika V93.25</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1303,6 +1303,65 @@
         }
         .alabasta-more-menu-item:hover {
             background: #f1f5f9;
+        }
+
+        /* V93.25 PR #13 Phase 2A: ⋯ More dropdown for quiz-row secondary actions
+           (Duplicate / Homework / Analytics / Discussion / Feedback / Template / Delete).
+           Mirror of .alabasta-more-menu — same <details>+click-outside coordination pattern. */
+        .quiz-more-menu {
+            position: relative;
+            display: inline-block;
+            margin-left: auto;
+        }
+        .quiz-more-menu > summary {
+            list-style: none;
+            cursor: pointer;
+            user-select: none;
+        }
+        .quiz-more-menu > summary::-webkit-details-marker { display: none; }
+        .quiz-more-menu[open] > summary {
+            box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.32);
+        }
+        .quiz-more-menu-body {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            min-width: 200px;
+            max-width: 260px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 16px 32px rgba(15, 23, 42, 0.14);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            z-index: 50;
+        }
+        .quiz-more-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-align: left;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            padding: 9px 12px;
+            cursor: pointer;
+            color: #1f2937;
+            font-size: 0.86em;
+            font-weight: 700;
+            white-space: nowrap;
+            font-family: inherit;
+            transition: background 0.15s ease;
+        }
+        .quiz-more-menu-item:hover { background: #f1f5f9; }
+        .quiz-more-menu-item.is-danger { color: #b91c1c; }
+        .quiz-more-menu-item.is-danger:hover { background: #fee2e2; }
+        .quiz-more-menu-divider {
+            height: 1px;
+            background: #e2e8f0;
+            margin: 4px 0;
         }
 
         .alabasta-visual-grid {
@@ -20040,42 +20099,26 @@ ${JSON.stringify(sourceObj)}`;
                                 </button>
                                 ${timerMenu}
                             </div>
-                            <!-- Row 2: Secondary Tools -->
+                            <!-- Row 2: Secondary Tools (V93.25 PR #13 Phase 2A: 7 buttons collapsed into ⋯ More) -->
                             <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:8px;">
-                                <button class="btn-sm" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s;" 
-                                    onclick="duplicateQuiz('${q.id}')" title="Duplicate/Copy Quiz">
-                                    ♻️
-                                </button>
-                                <button class="btn-sm" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s;" 
-                                    onclick="openHomeworkAssignModal('${q.id}')" title="Assign as Homework">
-                                    📚
-                                </button>
-                                ${(q.isPoll || hasWriting) ? `
-                                <button class="btn-sm" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s;" 
-                                    onclick="showPollResults('${q.id}')" title="View Results/Analytics">
-                                    📊
-                                </button>` : ''}
-                                <button class="btn-sm" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s;" 
-                                    onclick="showQuizDiscussions('${q.id}')" title="View Discussion Board">
-                                    💬
-                                </button>
-                                <button class="btn-sm" style="background:#fff7ed; color:#b45309; border:1px solid #fed7aa; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s;" 
-                                    onclick="event.stopPropagation(); showQuizFeedbackPanel('${q.id}')" title="View User Feedback">
-                                    ⭐
-                                </button>
-                                <button class="btn-sm" style="background:${q.isTemplate ? '#fbbf24' : '#f1f5f9'}; color:${q.isTemplate ? 'white' : '#64748b'}; border:1px solid #e2e8f0; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s;"
-                                    onclick="toggleTemplateStatus('${q.id}', ${q.isTemplate || false})" title="Toggle Master Template">
-                                    📌
-                                </button>
                                 ${isActiveSection && isExamEligibleQuiz(q) ? `
                                 <button class="btn-sm" style="background:#faf5ff; color:#6b21a8; border:1px solid #e9d5ff; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1em; transition:0.2s;"
                                     onclick="event.stopPropagation(); openQuickLaunchExamModal('${q.id}')" title="Launch as Exam Session">
                                     🎓
                                 </button>` : ''}
-                                <button class="btn-sm" style="background:#fee2e2; color:#ef4444; border:none; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1.1em; transition:0.2s; margin-left:auto;"
-                                    onclick="deleteQuiz('${q.id}')" title="Delete Quiz Permanently">
-                                    🗑️
-                                </button>
+                                <details class="quiz-more-menu">
+                                    <summary class="btn-sm" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1em; transition:0.2s;" title="More actions">⋯</summary>
+                                    <div class="quiz-more-menu-body" role="menu">
+                                        <button type="button" class="quiz-more-menu-item" onclick="closeQuizMoreMenus(); duplicateQuiz('${q.id}')">♻️ Duplicate</button>
+                                        <button type="button" class="quiz-more-menu-item" onclick="closeQuizMoreMenus(); openHomeworkAssignModal('${q.id}')">📚 Assign as Homework</button>
+                                        ${(q.isPoll || hasWriting) ? `<button type="button" class="quiz-more-menu-item" onclick="closeQuizMoreMenus(); showPollResults('${q.id}')">📊 View Results / Analytics</button>` : ''}
+                                        <button type="button" class="quiz-more-menu-item" onclick="closeQuizMoreMenus(); showQuizDiscussions('${q.id}')">💬 Discussion Board</button>
+                                        <button type="button" class="quiz-more-menu-item" onclick="closeQuizMoreMenus(); showQuizFeedbackPanel('${q.id}')">⭐ User Feedback</button>
+                                        <button type="button" class="quiz-more-menu-item" onclick="closeQuizMoreMenus(); toggleTemplateStatus('${q.id}', ${q.isTemplate || false})">📌 ${q.isTemplate ? 'Remove from Templates' : 'Mark as Template'}</button>
+                                        <div class="quiz-more-menu-divider"></div>
+                                        <button type="button" class="quiz-more-menu-item is-danger" onclick="closeQuizMoreMenus(); deleteQuiz('${q.id}')">🗑️ Delete Quiz</button>
+                                    </div>
+                                </details>
                             </div>
                         </td>
                     </tr>
@@ -24556,6 +24599,30 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const t = e.target;
                 if (t && t.classList && t.classList.contains('alabasta-more-menu') && t.open) {
                     document.querySelectorAll('details.alabasta-more-menu[open]').forEach(d => {
+                        if (d !== t) d.removeAttribute('open');
+                    });
+                }
+            }, true);
+        })();
+
+        // V93.25 PR #13 Phase 2A — coordinate the per-row ⋯ More menus on Quiz Engine
+        // rows so only one is open at a time and any outside click closes them all.
+        // Same pattern as Alabasta's V92.66 Phase 3-D above.
+        function closeQuizMoreMenus() {
+            document.querySelectorAll('details.quiz-more-menu[open]').forEach(d => d.removeAttribute('open'));
+        }
+        (function setupQuizMoreMenuListeners() {
+            if (window._quizMoreMenuWired) return;
+            window._quizMoreMenuWired = true;
+            document.addEventListener('click', (e) => {
+                document.querySelectorAll('details.quiz-more-menu[open]').forEach(d => {
+                    if (!d.contains(e.target)) d.removeAttribute('open');
+                });
+            });
+            document.addEventListener('toggle', (e) => {
+                const t = e.target;
+                if (t && t.classList && t.classList.contains('quiz-more-menu') && t.open) {
+                    document.querySelectorAll('details.quiz-more-menu[open]').forEach(d => {
                         if (d !== t) d.removeAttribute('open');
                     });
                 }
