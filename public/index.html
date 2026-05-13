@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.57)</title>
+    <title>Internship Portfolio (V94.58)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -6413,6 +6413,68 @@
             }
         }
 
+        // V94.58: per-quiz Case Study passage translation. Separate from per-question
+        // pipeline because `currentQuiz.caseContent` is one string for the whole quiz,
+        // not indexed by question. Cache key `qt2_case_{quizId}_{lang}`.
+        async function qtTranslateCaseContent(targetLang) {
+            if (!currentQuiz || !currentQuiz.caseContent || targetLang === 'orig') return null;
+            const cacheKey = `qt2_case_${currentQuiz.id}_${targetLang}`;
+            try {
+                const raw = localStorage.getItem(cacheKey);
+                if (raw) { const parsed = JSON.parse(raw); return { ...parsed, source: 'cached' }; }
+            } catch (_) {}
+            const result = await qtTranslateText(currentQuiz.caseContent, targetLang);
+            const data = { text: result.text, source: result.source };
+            try { localStorage.setItem(cacheKey, JSON.stringify(data)); }
+            catch (e) {
+                const keys = Object.keys(localStorage).filter(k => k.startsWith('qt_') || k.startsWith('qt2_'));
+                keys.slice(0, Math.min(50, keys.length)).forEach(k => localStorage.removeItem(k));
+                try { localStorage.setItem(cacheKey, JSON.stringify(data)); } catch (_) {}
+            }
+            return data;
+        }
+
+        function qtGetEffectiveCaseContent() {
+            if (!currentQuiz || !currentQuiz.caseContent) return '';
+            const lang = qtGetSelectedLang();
+            if (lang === 'orig') return currentQuiz.caseContent;
+            // Prebuilt from admin V93.16: quizzes/{id}.translations.{lang}.caseContent
+            const pre = currentQuiz.translations
+                && currentQuiz.translations[lang]
+                && currentQuiz.translations[lang].caseContent;
+            if (pre) return pre;
+            // Seed in-memory from localStorage
+            if (!currentQuiz._caseTranslations) currentQuiz._caseTranslations = {};
+            let trans = currentQuiz._caseTranslations[lang];
+            if (!trans) {
+                try {
+                    const raw = localStorage.getItem(`qt2_case_${currentQuiz.id}_${lang}`);
+                    if (raw) { trans = JSON.parse(raw); currentQuiz._caseTranslations[lang] = trans; }
+                } catch (_) {}
+            }
+            if (trans && trans.text) return trans.text;
+            qtBackgroundTranslateCaseContent(lang);
+            return currentQuiz.caseContent;
+        }
+
+        async function qtBackgroundTranslateCaseContent(lang) {
+            const key = `case_${currentQuiz.id}_${lang}`;
+            if (qtBackgroundQueue.has(key)) return;
+            qtBackgroundQueue.add(key);
+            try {
+                const result = await qtTranslateCaseContent(lang);
+                if (result) {
+                    if (!currentQuiz._caseTranslations) currentQuiz._caseTranslations = {};
+                    currentQuiz._caseTranslations[lang] = result;
+                    if (qtGetSelectedLang() === lang) renderQuizStep(true);
+                }
+            } catch (e) {
+                console.warn('[qt-case] translate failed:', e.message);
+            } finally {
+                qtBackgroundQueue.delete(key);
+            }
+        }
+
         function qtRenderBar(effectiveQuestion) {
             const currentLang = qtGetSelectedLang();
             const sourceMap = { device: '⚡ on-device', typhoon: '🌀 Typhoon', cached: '🗃️ cached', prebuilt: '📦 prebuilt', orig: '' };
@@ -6465,7 +6527,8 @@
                 const passageBody = document.getElementById('quiz-case-content-body');
                 if (currentQuiz.quizType === 'case_study' && currentQuiz.caseContent) {
                     passageArea.style.display = 'block';
-                    passageBody.innerHTML = window.renderMd(currentQuiz.caseContent);
+                    // V94.58: render via effective accessor — translates per active lang chip
+                    passageBody.innerHTML = window.renderMd(qtGetEffectiveCaseContent());
                     passageBody.classList.add('md-render');
                     // Auto-show on first step
                     if (currentStep === 0 && !useExistingTime) {
