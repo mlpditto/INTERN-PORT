@@ -19,6 +19,7 @@ try {
 // are GCF gen 1". Migrating to v2 syntax aligns local spec with cloud (gcfv2).
 // See memory `feedback_firebase_functions_v1_v2_gen_mismatch.md`.
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 
 // ============================================================
 // Phase 3.3 (intern V94.59 + this functions deploy): per-recipient
@@ -71,6 +72,15 @@ const LINE_I18N = {
         btnHistory:    { en: 'View History →',        th: 'ดูประวัติ →',           kr: '기록 보기 →' },
         btnNote:       { en: 'View Note →',           th: 'ดูโน้ต →',               kr: '노트 보기 →' },
         btnEdit:       { en: 'View Edit →',           th: 'ดูการแก้ไข →',           kr: '수정 보기 →' }
+    },
+    // V93.20 / Phase B Trash series: weekly digest to admin about entries
+    // approaching TTL purge. Per-doc strings used by notifyPurgeDigest below.
+    purgeDigest: {
+        title:  { en: '🗑️ Weekly Purge Digest',   th: '🗑️ สรุปการลบรายสัปดาห์',         kr: '🗑️ 주간 삭제 요약' },
+        cta:    { en: 'Open Trash in admin to restore any you want to keep.',
+                  th: 'เปิด Trash ในแอดมินเพื่อกู้คืนรายการที่ต้องการ',
+                  kr: '관리자 Trash에서 보관할 항목을 복원하세요.' },
+        button: { en: 'Open Admin →',             th: 'เปิดแอดมิน →',                kr: '관리자 열기 →' }
     }
 };
 
@@ -91,6 +101,18 @@ function lineFmtChanged(lang, n, asAltSuffix) {
     if (lang === 'kr') return asAltSuffix ? ` — ${n}개 필드 변경` : `${n}개 필드 변경:`;
     const plural = n === 1 ? '' : 's';
     return asAltSuffix ? ` — ${n} field${plural} changed` : `${n} field${plural} changed:`;
+}
+
+// V93.20 — same plural-aware inline pattern for the purge digest.
+function lineFmtPurgeIntro(lang, n) {
+    if (lang === 'th') return `${n} โน้ตกำลังจะถูกลบถาวรใน 7 วันข้างหน้า:`;
+    if (lang === 'kr') return `향후 7일 이내 영구 삭제 예정 노트 ${n}개:`;
+    return `${n} note${n === 1 ? '' : 's'} scheduled for permanent deletion in the next 7 days:`;
+}
+function lineFmtMoreCount(lang, n) {
+    if (lang === 'th') return `…และอีก ${n} รายการ`;
+    if (lang === 'kr') return `…외 ${n}개 더`;
+    return `…and ${n} more`;
 }
 
 // === Quest Submission API: รองรับ field poneglyphRef/linkedPoneglyphs ===
@@ -1092,6 +1114,152 @@ exports.notifyAdminOnNewCase = onCall(
 
         console.error(`[notifyAdminOnNewCase] PUSH_FAILED  code=${code}  status=${status || 'no-response'}  case=${caseDocId}  message=${JSON.stringify(lineMessage)}`);
         return { ok: false, code, status: status || null, caseDocId };
+    }
+});
+
+// ============================================================
+// notifyPurgeDigest (V93.20 / Phase B of V92.16 Trash series)
+// ------------------------------------------------------------
+// Weekly Cloud Scheduler job that scans `learning_path_entries`
+// for entries whose `deleteAt` falls within the next 7 days, then
+// pushes a single Flex Message digest to ADMIN_LINE_USER_ID. The
+// admin already has the Trash UI with countdown badges; this is
+// supplementary — gives an out-of-band heads-up so soft-deleted
+// notes that are still useful can be restored before TTL purges
+// them permanently.
+//
+// Schedule: every Monday 09:00 Asia/Bangkok.
+// Window:   `deleteAt > now AND deleteAt < now + 7 days`.
+// Skip:     no entries in window → no LINE push (no spam).
+// Region:   us-central1 to match the rest of the codebase. The
+//           Firestore read crosses regions (db is asia-southeast3)
+//           — adds latency but no functional issue for a weekly job.
+//
+// Note: actual Firestore TTL purges only happen if the Console
+// policy is enabled (item #20 in pending_optional). Until then,
+// this digest is informational — the docs are flagged for delete
+// but never actually purged. After Console TTL setup, the digest
+// becomes a real "last chance to restore" alert.
+//
+// Required secrets (already provisioned for the v94.40 admin
+// new-case notification — re-used here):
+//   - LINE_CHANNEL_ACCESS_TOKEN
+//   - ADMIN_LINE_USER_ID  (single LINE userId starting with 'U')
+// ============================================================
+exports.notifyPurgeDigest = onSchedule({
+    schedule: 'every monday 09:00',
+    timeZone: 'Asia/Bangkok',
+    region: 'us-central1',
+    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID']
+}, async (event) => {
+    const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    const adminLineId = process.env.ADMIN_LINE_USER_ID;
+    if (!accessToken) {
+        console.warn('[notifyPurgeDigest] LINE_CHANNEL_ACCESS_TOKEN missing — skipping');
+        return;
+    }
+    if (!adminLineId || typeof adminLineId !== 'string' || !adminLineId.startsWith('U')) {
+        console.warn(`[notifyPurgeDigest] ADMIN_LINE_USER_ID missing or invalid — skipping`);
+        return;
+    }
+
+    const now = admin.firestore.Timestamp.now();
+    const sevenDaysLater = admin.firestore.Timestamp.fromMillis(now.toMillis() + 7 * 24 * 60 * 60 * 1000);
+
+    let snap;
+    try {
+        snap = await admin.firestore()
+            .collection('learning_path_entries')
+            .where('deleteAt', '>', now)
+            .where('deleteAt', '<', sevenDaysLater)
+            .orderBy('deleteAt', 'asc')
+            .get();
+    } catch (err) {
+        console.error('[notifyPurgeDigest] Firestore query failed:', err.message);
+        return;
+    }
+
+    if (snap.empty) {
+        console.log('[notifyPurgeDigest] no entries in 7-day window — skipping push');
+        return;
+    }
+
+    const lang = await resolvePreferredLanguage(adminLineId);
+    const total = snap.size;
+    const SHOW_MAX = 5;
+    const shown = snap.docs.slice(0, SHOW_MAX);
+    const overflow = Math.max(0, total - SHOW_MAX);
+
+    const titleLines = shown.map(doc => {
+        const data = doc.data() || {};
+        const t = String(data.title || 'Untitled').replace(/\s+/g, ' ').trim().slice(0, 60);
+        return `• ${t || 'Untitled'}`;
+    });
+
+    const headerText = lineT('purgeDigest', 'title', lang);
+    const introText = lineFmtPurgeIntro(lang, total);
+    const ctaText = lineT('purgeDigest', 'cta', lang);
+    const buttonText = lineT('purgeDigest', 'button', lang);
+    const overflowText = overflow > 0 ? lineFmtMoreCount(lang, overflow) : '';
+    const altText = `${headerText} (${total})`.slice(0, 400);
+    const adminUri = 'https://mlpditto.github.io/INTERN-PORT/admin.html';
+
+    const bodyContents = [
+        { type: 'text', text: introText, size: 'sm', color: '#1f2937', wrap: true, weight: 'bold' },
+        { type: 'separator', margin: 'sm' },
+        ...titleLines.map(line => ({ type: 'text', text: line, size: 'xs', color: '#475569', wrap: true, margin: 'xs' }))
+    ];
+    if (overflowText) {
+        bodyContents.push({ type: 'text', text: overflowText, size: 'xs', color: '#94a3b8', style: 'italic', margin: 'sm' });
+    }
+    bodyContents.push({ type: 'separator', margin: 'sm' });
+    bodyContents.push({ type: 'text', text: ctaText, size: 'xs', color: '#dc2626', wrap: true, weight: 'bold', margin: 'sm' });
+
+    const flex = {
+        type: 'flex',
+        altText: altText,
+        contents: {
+            type: 'bubble',
+            size: 'kilo',
+            header: {
+                type: 'box',
+                layout: 'vertical',
+                backgroundColor: '#dc2626',
+                paddingAll: '12px',
+                contents: [{ type: 'text', text: headerText, weight: 'bold', size: 'sm', color: '#ffffff' }]
+            },
+            body: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '16px',
+                spacing: 'none',
+                contents: bodyContents
+            },
+            footer: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '12px',
+                contents: [{
+                    type: 'button', style: 'primary', color: '#dc2626', height: 'sm',
+                    action: { type: 'uri', label: buttonText, uri: adminUri }
+                }]
+            }
+        }
+    };
+
+    try {
+        await axios.post('https://api.line.me/v2/bot/message/push', {
+            to: adminLineId,
+            messages: [flex]
+        }, {
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            timeout: 8000
+        });
+        console.log(`[notifyPurgeDigest] PUSHED  count=${total}  shown=${shown.length}  overflow=${overflow}  lang=${lang}`);
+    } catch (err) {
+        const status = err && err.response ? err.response.status : null;
+        const lineMessage = (err && err.response && err.response.data && err.response.data.message) || (err && err.message) || 'unknown';
+        console.error(`[notifyPurgeDigest] PUSH_FAILED  status=${status || 'no-response'}  count=${total}  message=${JSON.stringify(lineMessage)}`);
     }
 });
 
