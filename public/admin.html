@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.23</title>
+    <title>Nika V93.24</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -5041,7 +5041,7 @@
 
         <div class="tab-nav" style="display:flex; gap:8px; margin-bottom:20px; border-bottom:2px solid rgba(0,0,0,0.05); padding-bottom:10px; overflow-x:auto;">
             <button class="tab-btn active" onclick="switchTab('tab-sidequest')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; background:rgba(67,97,238,0.05); color:var(--primary);">📊 Dashboard</button>
-            <button class="tab-btn" onclick="switchTab('tab-assignments')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">📦 Assignments</button>
+            <button class="tab-btn" onclick="switchTab('tab-assignments')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">📦 Assignments<span id="pending-review-badge" title="Quiz attempts awaiting review" style="display:none; background:#ef4444; color:white; font-size:0.7em; font-weight:900; padding:1px 7px; border-radius:10px;">0</span></button>
             <button class="tab-btn" onclick="switchTab('tab-users')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">👥 User Hub</button>
             <button class="tab-btn" onclick="switchTab('tab-ai-hub')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🤖 AI Digital Lab</button>
             <button class="tab-btn" onclick="switchTab('tab-laughtale')" style="padding:10px 20px; border-radius:14px; font-weight:800; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.3s; color:#64748b;">🏝️ Laugh Tale</button>
@@ -5284,9 +5284,9 @@
                     </h3>
                     <div style="display:flex; gap:10px; align-items:center;">
                         <div style="display:flex; gap:8px; background:rgba(21,101,192,0.05); padding:6px 14px; border-radius:14px; border:1px solid rgba(21,101,192,0.1); backdrop-filter:blur(10px);">
-                            <span style="color:#00897b; font-weight:900; font-size:0.75em; display:flex; align-items:center; gap:4px;">✅ Active: <span id="stat-active-count">0</span></span>
-                            <span style="color:#ef4444; font-weight:900; font-size:0.75em; display:flex; align-items:center; gap:4px;">⏸️ Pause: <span id="stat-inactive-count">0</span></span>
-                            <span style="color:#d97706; font-weight:900; font-size:0.75em; display:flex; align-items:center; gap:4px;">📂 Templates: <span id="stat-template-count">0</span></span>
+                            <span onclick="document.getElementById('section-active-quizzes').scrollIntoView({behavior:'smooth', block:'start'})" title="Jump to Active Quizzes" style="color:#00897b; font-weight:900; font-size:0.75em; display:flex; align-items:center; gap:4px; cursor:pointer;">✅ Active: <span id="stat-active-count">0</span></span>
+                            <span onclick="document.getElementById('section-inactive-quizzes').scrollIntoView({behavior:'smooth', block:'start'})" title="Jump to Inactive / Templates" style="color:#ef4444; font-weight:900; font-size:0.75em; display:flex; align-items:center; gap:4px; cursor:pointer;">⏸️ Pause: <span id="stat-inactive-count">0</span></span>
+                            <span onclick="document.getElementById('section-inactive-quizzes').scrollIntoView({behavior:'smooth', block:'start'})" title="Jump to Inactive / Templates" style="color:#d97706; font-weight:900; font-size:0.75em; display:flex; align-items:center; gap:4px; cursor:pointer;">📂 Templates: <span id="stat-template-count">0</span></span>
                         </div>
                         <button id="btn-translate-all-missing" class="magic-btn" onclick="event.stopPropagation(); qtAdminBackfillAll()" style="background:linear-gradient(135deg, #d97706, #b45309); padding:10px 18px; border-radius:14px; font-weight:900; font-size:0.85em;" title="Pre-translate every quiz that doesn't yet have a translations field (Phase 3 backfill)">🌐 Translate Missing</button>
                         <button class="magic-btn" onclick="event.stopPropagation(); openQuizModal()" style="background:linear-gradient(135deg, #1565c0, #0d47a1); padding:10px 25px; border-radius:14px; font-weight:900;">🧪 Create Quiz</button>
@@ -5295,7 +5295,7 @@
                 </div>
 
                 <!-- Active Quizzes -->
-                <h4 style="color:#0d47a1; margin-bottom:10px;">🟢 Active Quizzes</h4>
+                <h4 id="section-active-quizzes" style="color:#0d47a1; margin-bottom:10px;">🟢 Active Quizzes</h4>
                 <div
                     style="overflow-x:auto; margin-bottom:30px; background:white; padding:15px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
                     <table id="quizzesTableActive" style="width:100%;">
@@ -5314,7 +5314,7 @@
 
                 <!-- Inactive / Templates -->
 
-                <div style="background:#f1f5f9; padding:18px 22px; border-radius:20px; margin-bottom:15px; border:1px solid #e2e8f0; box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">
+                <div id="section-inactive-quizzes" style="background:#f1f5f9; padding:18px 22px; border-radius:20px; margin-bottom:15px; border:1px solid #e2e8f0; box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
                         <h4 style="color:#475569; margin:0; font-weight:800; font-size:1.1em; display:flex; align-items:center; gap:10px;">
                             <i class="fa-solid fa-box-archive" style="color:#94a3b8; font-size:1.2em;"></i> Inactive / Templates
@@ -21342,7 +21342,19 @@ ${JSON.stringify(sourceObj)}`;
             }, e => console.error("🔥 [Firestore Error] quizzes:", e));
             // 🔥 Refined [Version: V77.6] Listen only for actionable items (Pending Review or New Request)
             db.collection("quiz_attempts").where("status", "in", ["pending", "requesting"]).onSnapshot(s => {
-                renderPendingQuizzes(s.docs.map(d => ({ id: d.id, ...d.data() })));
+                const pendingDocs = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderPendingQuizzes(pendingDocs);
+                // V93.24 (PR #13 Phase 3A): red badge count on the 📦 Assignments
+                // top-nav tab button. Spec said `status === 'submitted' && !adminAcknowledged`
+                // but quiz_attempts uses status state machine (pending/requesting → approved)
+                // instead of an adminAcknowledged flag; this listener already streams
+                // the exact same set.
+                const badge = document.getElementById('pending-review-badge');
+                if (badge) {
+                    const n = pendingDocs.length;
+                    badge.textContent = n;
+                    badge.style.display = n > 0 ? 'inline-block' : 'none';
+                }
             });
             // 🔥 [Version: V77.16] Load ALL quiz attempts for counting and full history (Authorized for Admin)
             db.collection("quiz_attempts").orderBy("timestamp", "desc").onSnapshot(s => {
