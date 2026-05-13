@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.12</title>
+    <title>Nika V93.13</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13712,6 +13712,37 @@ For "changes": list every meaningful edit between original and improved. Each en
             }
         };
 
+        // V93.13: shared markdown renderers for read-only display surfaces
+        // (Quiz Attempt review modal, etc.). Mirrors index.html's window.renderMd.
+        // `renderMd` = block-level (wraps in <p>), `renderMdInline` = inline-only
+        // (no <p> wrapping — safe inside <b>/<span>/<h3>).
+        window.renderMd = window.renderMd || function(text) {
+            if (text === null || text === undefined) return '';
+            const str = String(text);
+            if (!str.trim()) return '';
+            try {
+                if (window.marked && window.DOMPurify) {
+                    return window.DOMPurify.sanitize(window.marked.parse(str, { breaks: true, gfm: true }));
+                }
+            } catch (e) { /* fall through */ }
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML.replace(/\n/g, '<br>');
+        };
+        window.renderMdInline = window.renderMdInline || function(text) {
+            if (text === null || text === undefined) return '';
+            const str = String(text);
+            if (!str.trim()) return '';
+            try {
+                if (window.marked && window.DOMPurify) {
+                    return window.DOMPurify.sanitize(window.marked.parseInline(str, { breaks: true, gfm: true }));
+                }
+            } catch (e) { /* fall through */ }
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        };
+
         // Markdown preview for q-text (Phase 1, V91.35)
         window._qTextDebounce = window._qTextDebounce || new WeakMap();
         window.renderQTextPreview = function(textarea) {
@@ -17643,8 +17674,8 @@ ${JSON.stringify(sourceObj)}`;
                         if (isChoice) {
                             const sIdx = parseInt(studentAns);
                             const cIdx = parseInt(q.correct);
-                            studentAnsText = `<b>${q.options[sIdx] || '-'}</b> (Choice ${isNaN(sIdx) ? '-' : sIdx + 1})`;
-                            correctAnsText = `<span style="color:green;">${q.options[cIdx]}</span> (Choice ${isNaN(cIdx) ? '-' : cIdx + 1})`;
+                            studentAnsText = `<b>${window.renderMdInline(q.options[sIdx] || '-')}</b> (Choice ${isNaN(sIdx) ? '-' : sIdx + 1})`;
+                            correctAnsText = `<span style="color:green;">${window.renderMdInline(q.options[cIdx])}</span> (Choice ${isNaN(cIdx) ? '-' : cIdx + 1})`;
                         } else {
                             let ansArray = [];
                             if (Array.isArray(studentAns)) ansArray = studentAns;
@@ -17681,7 +17712,7 @@ ${JSON.stringify(sourceObj)}`;
                         cardsHtml += `
                             <div class="lang-no-toggle" style="border:2px solid ${cardBorder}; padding:15px; margin-bottom:15px; border-radius:12px; background:${cardBg}; border-left:8px solid ${cardBorder}; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
                                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; flex-wrap: wrap; gap:8px;">
-                                    <b style="font-size:1.1em; flex:1; min-width:200px; word-wrap: break-word; overflow-wrap: break-word; white-space: normal;">${cardIcon} Q${i + 1}: ${q.q} ${durationHtml}${activeDurationHtml}${answerChangesHtml}${firstLatencyHtml}</b>
+                                    <b style="font-size:1.1em; flex:1; min-width:200px; word-wrap: break-word; overflow-wrap: break-word; white-space: normal;">${cardIcon} Q${i + 1}: ${window.renderMdInline(q.q)} ${durationHtml}${activeDurationHtml}${answerChangesHtml}${firstLatencyHtml}</b>
                                     <span class="badge" style="background:#6c757d; font-size:0.7em; padding:2px 8px; margin-left:8px; flex-shrink:0;">${isChoice ? 'Choice' : 'Short Answer'}</span>
                                 </div>
                                 <div style="display:flex; flex-direction:column; gap:8px;">
@@ -17712,13 +17743,13 @@ ${JSON.stringify(sourceObj)}`;
                                     </button>
                                 </div>
                                 <div id="review-full-${attemptId}-${i}" style="display:none; margin-top:10px; padding:12px; border-radius:8px; background:rgba(255,255,255,0.7); border:1px solid rgba(0,0,0,0.1); font-size:0.95em;">
-                                    ${q.content ? `<div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed #ccc;"><b style="color:#4361ee;"><i class="fa-solid fa-file-lines"></i> Additional Content / Details:</b><div style="margin-top:8px; background:#fff; padding:12px; border:1px solid #e2e8f0; border-radius:8px; overflow-x:auto;">${q.content}</div></div>` : ''}
+                                    ${q.content ? `<div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed #ccc;"><b style="color:#4361ee;"><i class="fa-solid fa-file-lines"></i> Additional Content / Details:</b><div class="md-render" style="margin-top:8px; background:#fff; padding:12px; border:1px solid #e2e8f0; border-radius:8px; overflow-x:auto;">${window.renderMd(q.content)}</div></div>` : ''}
                                     ${isChoice ? `<b style="color:#4361ee;"><i class="fa-regular fa-circle-check"></i> All Options:</b><div style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">
                                         ${(q.options || []).map((opt, oIdx) => {
                                             const isCrr = Array.isArray(q.correct) ? q.correct.includes(oIdx) : q.correct == oIdx;
                                             return `<div style="padding:10px 14px; background:${isCrr ? '#d1e7dd' : '#ffffff'}; border:2px solid ${isCrr ? '#badbcc' : '#e2e8f0'}; border-radius:12px; color:${isCrr ? '#0f5132' : '#0f172a'}; font-weight:${isCrr ? '800' : '700'}; display:flex; gap:12px; align-items:flex-start; box-shadow: ${isCrr ? '0 4px 12px rgba(25,135,84,0.1)' : '0 2px 4px rgba(0,0,0,0.02)'};">
                                                 <span style="font-weight:900; color:${isCrr ? '#0f5132' : '#64748b'}; background: ${isCrr ? 'rgba(255,255,255,0.4)' : '#f8fafc'}; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85em; border: 1.5px solid ${isCrr ? '#0f5132' : '#cbd5e1'};">${oIdx + 1}</span> 
-                                                <span style="flex:1; line-height: 1.5;">${opt}</span>
+                                                <span style="flex:1; line-height: 1.5;">${window.renderMdInline(opt)}</span>
                                                 ${isCrr ? '<i class="fa-solid fa-circle-check" style="color:#198754; font-size: 1.1em; margin-top:2px;"></i>' : ''}
                                             </div>`;
                                         }).join('')}
