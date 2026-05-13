@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.58)</title>
+    <title>Internship Portfolio (V94.59)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4380,6 +4380,13 @@
 
                 await upsertUserAuthLink(runtimeAuthUser, userId, userProfile, rawLiffUserId);
 
+                // V94.59 / Phase 3.3: sync KR/TH UI toggle state to Firestore so
+                // notifyOnReviewMessage + notifyOnAdminEdit can pick TH/KR/EN LINE
+                // message strings per user. Best-effort — write failure doesn't
+                // block app load. Re-runs on every toggle (see hookLangToggleSync).
+                syncPreferredLanguage();
+                hookLangToggleSync();
+
                 updateStatus("Checking Admin Access...");
 
                 // 🔥 Admin Auto-Redirect logic
@@ -4425,6 +4432,40 @@
             }
         }
         // Removed direct main() call to prevent double execution or execution before SDK load
+
+        // V94.59 / Phase 3.3: write user's preferred LINE notification language
+        // (derived from KR/TH UI toggle state in localStorage) to Firestore.
+        // Read by Cloud Functions notifyOnReviewMessage + notifyOnAdminEdit.
+        // 3-state localStorage from lang-toggle.js: '1'=on, '0'=off, missing=default.
+        // Mapping (priority: TH > KR > EN since both toggles can be on at once):
+        //   uiLangTH === '1'                    → 'th'
+        //   uiLangKR === '1' (and TH not '1')   → 'kr'
+        //   else                                → 'en'
+        function computePreferredLanguage() {
+            try {
+                if (localStorage.getItem('uiLangTH') === '1') return 'th';
+                if (localStorage.getItem('uiLangKR') === '1') return 'kr';
+            } catch (_) {}
+            return 'en';
+        }
+        function syncPreferredLanguage() {
+            if (!userId || !db) return;
+            const lang = computePreferredLanguage();
+            db.collection('users').doc(userId).set({ preferredLanguage: lang }, { merge: true })
+                .catch(e => console.warn('[i18n] preferredLanguage write failed:', e.message));
+        }
+        // Wrap window.toggleLang (set by lang-toggle.js) so each toggle also syncs.
+        // Idempotent — guards against double-wrap if main() somehow re-runs.
+        function hookLangToggleSync() {
+            if (window._langToggleSyncHooked) return;
+            const original = window.toggleLang;
+            if (typeof original !== 'function') return;
+            window.toggleLang = function(lang) {
+                original(lang);
+                syncPreferredLanguage();
+            };
+            window._langToggleSyncHooked = true;
+        }
 
 
         // --- User & Dates ---
