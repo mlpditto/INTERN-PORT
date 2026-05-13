@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.16</title>
+    <title>Nika V93.17</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -9002,7 +9002,8 @@
                 <input type="hidden" id="chat-card-id">
                 <div id="chat-box" class="chat-box" style="height:400px; overflow-y:auto; background:#f8fafc; border-radius:20px; padding:20px; margin-bottom:20px; border:1px solid #edf2f7; display:flex; flex-direction:column; gap:12px;"></div>
                 <div style="display:flex; gap:10px; align-items:center;">
-                    <input type="text" id="chat-input" placeholder="Type @name to tag..." 
+                    <input type="text" id="chat-input" placeholder="Type @name to tag..."
+                        onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); sendChat();}"
                         style="flex:1; margin:0; padding:12px 20px; border-radius:15px; border:1.5px solid #edf2f7; font-size:0.95em; outline:none; background:#fff; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02);">
                     <button onclick="sendChat()" style="background:var(--primary); color:white; border:none; width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:1.2em; transition:0.3s; box-shadow:0 4px 15px rgba(67,97,238,0.3);" onmouseover="this.style.transform='scale(1.1) rotate(-15deg)'" onmouseout="this.style.transform='scale(1) rotate(0)'">
                         🚀
@@ -28714,9 +28715,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const box = document.getElementById('chat-box'); 
             box.innerHTML = "<div style='text-align:center; padding:20px; color:#94a3b8; font-weight:bold;'>🛰️ Establishing Uplink...</div>"; 
             if (chatUnsub) chatUnsub(); 
-            chatUnsub = db.collection("side_quests").doc(id).collection("comments").orderBy("timestamp", "asc").onSnapshot(snap => { 
-                box.innerHTML = ""; 
-                snap.forEach(d => { 
+            chatUnsub = db.collection("side_quests").doc(id).collection("comments").orderBy("timestamp", "asc").onSnapshot(snap => {
+                // V93.17: empty-state placeholder so a fresh thread doesn't look broken.
+                // Previously the box just went blank after "Establishing Uplink…", which
+                // is what users were misreading as "ข้อความไม่ขึ้น" after they sent the
+                // very first message in a thread.
+                if (snap.size === 0) {
+                    box.innerHTML = '<div style="text-align:center; padding:40px 20px; color:#94a3b8; font-weight:600; font-size:0.9em;">💬 No messages yet — start the conversation<br><span style="font-size:0.8em; opacity:0.7; font-weight:500;">ยังไม่มีข้อความ — พิมพ์เพื่อเริ่มสนทนา</span></div>';
+                    return;
+                }
+                box.innerHTML = "";
+                snap.forEach(d => {
                     const m = d.data(); 
                     const isAdmin = (m.sender === 'Admin');
                     const cls = isAdmin ? 'msg-admin' : 'msg-user'; 
@@ -28748,10 +28757,40 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         </div>
                     `; 
                 }); 
-                box.scrollTop = box.scrollHeight; 
-            }); 
+                box.scrollTop = box.scrollHeight;
+            }, err => {
+                // V93.17: surface listener errors instead of silently leaving the box blank.
+                console.error('[openChat] listener failed:', err);
+                box.innerHTML = `<div style="text-align:center; padding:20px; color:#dc2626; font-weight:600;">⚠️ Chat listener error<br><span style="font-size:0.8em; opacity:0.8;">${(err && err.message) || 'unknown'}</span></div>`;
+            });
         }
-        async function sendChat() { const t = document.getElementById('chat-input').value.trim(); const id = document.getElementById('chat-card-id').value; if (!t) return; await db.collection("side_quests").doc(id).collection("comments").add({ msg: t, sender: 'Admin', timestamp: firebase.firestore.FieldValue.serverTimestamp() }); document.getElementById('chat-input').value = ""; }
+        // V93.17: try/catch so a failed write (permissions, quota, offline, missing
+        // chat-card-id, etc.) doesn't silently clear the input. Previously: input
+        // value was set to "" only after a successful await, so a thrown error left
+        // the message in the input — but server-side write failures with no console
+        // open looked exactly like "message disappeared after send". Now we alert.
+        async function sendChat() {
+            const input = document.getElementById('chat-input');
+            const t = input.value.trim();
+            const id = document.getElementById('chat-card-id').value;
+            if (!t) return;
+            if (!id) {
+                console.error('[sendChat] chat-card-id is empty — chat not properly opened');
+                alert('Chat not properly opened. Close and re-open the chat.');
+                return;
+            }
+            try {
+                await db.collection("side_quests").doc(id).collection("comments").add({
+                    msg: t,
+                    sender: 'Admin',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                input.value = "";
+            } catch (e) {
+                console.error('[sendChat] write failed:', e);
+                alert(`Send failed: ${e.message || 'unknown error'}\n\nMessage preserved in the input field — try again.`);
+            }
+        }
         async function openArchiveModal() {
             const l = document.getElementById("archive-list");
             l.innerHTML = "Loading...";
