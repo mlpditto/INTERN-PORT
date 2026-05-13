@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.11</title>
+    <title>Nika V93.12</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -24793,10 +24793,21 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const qData = quizzesData.find(x => x.id === att.quizId) || {};
                     let points = 0;
 
+                    // V93.12: parity with Shōjiki button. Previously used the raw formula
+                    // (correctCount / totalQuestions) * totalPoints, which ignored
+                    // `manualScores` partial credit + the exam-session locked `groupScore`.
+                    // Now mirrors approveQuizAttemptActual + calculateAttemptScoring so the
+                    // recalculated total matches the score the admin sees on the button.
                     if (qData.isPoll) {
                         points = (parseFloat(qData.totalPoints) || 1.0);
+                    } else if (att.isExamSession && Number.isFinite(Number(att.groupScore))) {
+                        points = Number(att.groupScore);
+                    } else if (typeof calculateAttemptScoring === 'function' && Array.isArray(qData.questions) && qData.questions.length > 0) {
+                        const recalculated = calculateAttemptScoring(att, qData);
+                        points = Number.isFinite(recalculated && recalculated.score) ? recalculated.score : 0;
                     } else {
-                        const totalQ = att.totalQuestions || 1; // Prevent div by zero
+                        // Fallback when the quiz definition is unavailable (e.g. deleted).
+                        const totalQ = att.totalQuestions || 1;
                         const correct = att.correctCount || 0;
                         const maxPoints = parseFloat(qData.totalPoints) || 1.0;
                         points = (correct / totalQ) * maxPoints;
