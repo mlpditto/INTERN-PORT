@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.56)</title>
+    <title>Internship Portfolio (V94.57)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -6331,12 +6331,24 @@
         async function qtTranslateQuestion(qIdx, targetLang) {
             if (!currentQuiz || !currentQuiz.questions[qIdx] || targetLang === 'orig') return null;
             const cached = qtGetCached(currentQuiz.id, qIdx, targetLang);
+            // V94.57: cache without `content` is from pre-V94.57 (q+options only) — keep it,
+            // but missing content will fall through to `baseQ.content` in qtGetEffectiveQuestion.
             if (cached) return { ...cached, source: 'cached' };
             const q = currentQuiz.questions[qIdx];
-            const qResult = await qtTranslateText(q.q || '', targetLang);
             const opts = q.options || [];
-            const optResults = await Promise.all(opts.map(o => qtTranslateText(o || '', targetLang).catch(() => ({ text: o, source: 'failed' }))));
-            const translated = { q: qResult.text, options: optResults.map(r => r.text), source: qResult.source };
+            // V94.57: translate q.content too (read-only Learn mode long-form body).
+            // Parallel with q + options — no extra wall-clock cost.
+            const [qResult, optResults, contentResult] = await Promise.all([
+                qtTranslateText(q.q || '', targetLang),
+                Promise.all(opts.map(o => qtTranslateText(o || '', targetLang).catch(() => ({ text: o, source: 'failed' })))),
+                qtTranslateText(q.content || '', targetLang).catch(() => ({ text: q.content || '', source: 'failed' }))
+            ]);
+            const translated = {
+                q: qResult.text,
+                options: optResults.map(r => r.text),
+                content: contentResult.text,
+                source: qResult.source
+            };
             qtSetCached(currentQuiz.id, qIdx, targetLang, translated);
             return translated;
         }
@@ -6356,7 +6368,9 @@
                 && currentQuiz.translations[lang].questions
                 && currentQuiz.translations[lang].questions[qIdx];
             if (pre && pre.q) {
-                return { ...baseQ, q: pre.q, options: pre.options || baseQ.options, _translationSource: 'prebuilt' };
+                // V94.57: pre.content may be undefined for translations docs written
+                // before V93.15 admin — fall back to original baseQ.content.
+                return { ...baseQ, q: pre.q, options: pre.options || baseQ.options, content: pre.content || baseQ.content, _translationSource: 'prebuilt' };
             }
 
             // Seed in-memory cache from localStorage on first access
@@ -6367,7 +6381,7 @@
                 const cached = qtGetCached(currentQuiz.id, qIdx, lang);
                 if (cached) { trans = cached; currentQuiz._translations[lang][qIdx] = trans; }
             }
-            if (trans) return { ...baseQ, q: trans.q, options: trans.options || baseQ.options, _translationSource: trans.source };
+            if (trans) return { ...baseQ, q: trans.q, options: trans.options || baseQ.options, content: trans.content || baseQ.content, _translationSource: trans.source };
             // Not cached — kick off background translate, return original for now
             qtBackgroundTranslate(qIdx, lang);
             return { ...baseQ, _translationPending: true };

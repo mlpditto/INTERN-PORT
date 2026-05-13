@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.14</title>
+    <title>Nika V93.15</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16557,9 +16557,12 @@ async function ensureAuthForQuizWrite(timeoutMs = 3000) {
         async function qtAdminTranslateOneLang(questions, sourceLang, targetLang) {
             const langName = QT_ADMIN_LANG_NAMES[targetLang] || targetLang;
             const srcName = QT_ADMIN_LANG_NAMES[sourceLang] || sourceLang;
-            const sourceObj = { questions: questions.map(q => ({ q: q.q || '', options: q.options || [] })) };
+            // V93.15: include `content` (read-only Learn mode long-form body) so intern
+            // V94.57 can read prebuilt content translation instead of falling through
+            // to runtime Typhoon every page-open on iPhone.
+            const sourceObj = { questions: questions.map(q => ({ q: q.q || '', options: q.options || [], content: q.content || '' })) };
 
-            const prompt = `Translate the following quiz from ${srcName} to ${langName}. Output ONLY strict valid JSON matching the input schema exactly — same number of questions, same number of options per question, same array order. Translate every "q" field and every string inside every "options" array. Do not translate proper nouns of drugs, conditions, or people. No markdown fences, no commentary, no explanations.
+            const prompt = `Translate the following quiz from ${srcName} to ${langName}. Output ONLY strict valid JSON matching the input schema exactly — same number of questions, same number of options per question, same array order. Translate every "q" field, every string inside every "options" array, and every "content" field. Preserve markdown formatting inside translated text. Do not translate proper nouns of drugs, conditions, or people. No markdown fences around the JSON, no commentary, no explanations.
 
 Source quiz:
 ${JSON.stringify(sourceObj)}`;
