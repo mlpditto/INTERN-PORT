@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.59)</title>
+    <title>Internship Portfolio (V94.60)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -6232,6 +6232,54 @@
             selectReadOnlyPoll(ans);
         }
 
+        // V94.60 (pending item #28): Reflective Log page UI chrome i18n.
+        // String table for renderFinalReflectionUI in 6 modes — 'orig' preserves the
+        // existing bilingual EN+TH UX bit-for-bit (no regression), th/en/ko/ja/zh are
+        // single-lang variants. Resolved via qtGetSelectedLang() so picking a V93 quiz
+        // translation chip (🇰🇷/🇯🇵/🇨🇳/🇹🇭/🇬🇧) also drives the Reflection screen.
+        const REFLECT_I18N = {
+            title: {
+                orig: 'Reflection (สรุปบทเรียน)',
+                th: 'สรุปบทเรียน',
+                en: 'Reflection',
+                ko: '성찰',
+                ja: '振り返り',
+                zh: '反思',
+            },
+            intro: {
+                orig: 'ยอดเยี่ยม! คุณอ่านครบทุกหน้าแล้ว ช่วยพิมพ์สรุปสิ่งที่ได้เรียนรู้/ข้อคิดเห็นในรูปแบบ **Tweetstorm** ด้านล่างเพื่อจบการเรียนรู้ครับ (จำกัด ${n} อักษรต่อข้อความ)',
+                th: 'ยอดเยี่ยม! คุณอ่านครบทุกหน้าแล้ว ช่วยพิมพ์สรุปสิ่งที่ได้เรียนรู้/ข้อคิดเห็นในรูปแบบ **Tweetstorm** ด้านล่างเพื่อจบการเรียนรู้ (จำกัด ${n} อักษรต่อข้อความ)',
+                en: "Excellent! You've read all the pages. Write a brief summary of what you've learned in the **Tweetstorm** format below to complete the learning. (Limit: ${n} characters per message)",
+                ko: '잘하셨습니다! 모든 페이지를 읽으셨습니다. 학습을 마치려면 아래 **Tweetstorm** 형식으로 배운 점과 성찰 내용을 작성해 주세요. (메시지당 ${n}자 제한)',
+                ja: 'お疲れさまでした！すべてのページを読み終えました。学習を完了するには、下記の **Tweetstorm** 形式で学んだことや感想を入力してください。(1メッセージあたり${n}文字まで)',
+                zh: '太好了！您已读完所有页面。请在下方以 **Tweetstorm** 形式总结所学内容或感想，以完成本次学习。(每条消息限 ${n} 字)',
+            },
+            addTweet: {
+                orig: 'เพิ่มข้อความสั้น (Add Tweet)',
+                th: 'เพิ่มข้อความสั้น',
+                en: 'Add Tweet',
+                ko: '트윗 추가',
+                ja: 'ツイートを追加',
+                zh: '添加推文',
+            },
+            submit: {
+                orig: 'ส่งข้อคิดเห็นและรับคะแนน (Submit)',
+                th: 'ส่งข้อคิดเห็นและรับคะแนน',
+                en: 'Submit reflection',
+                ko: '소감 제출',
+                ja: '感想を送信',
+                zh: '提交感想',
+            },
+        };
+
+        function reflectT(key, vars) {
+            const lang = (typeof qtGetSelectedLang === 'function') ? qtGetSelectedLang() : 'orig';
+            const entry = REFLECT_I18N[key] || {};
+            const raw = entry[lang] || entry.orig || entry.en || '';
+            if (!vars) return raw;
+            return raw.replace(/\$\{(\w+)\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : ''));
+        }
+
         function renderFinalReflectionUI() {
             const quizRunContainer = document.getElementById('quiz-run-container');
             const charLimit = currentQuiz.feedbackLimit || 280;
@@ -6244,10 +6292,10 @@
             quizRunContainer.innerHTML = `
                 <div style="background:#fff; border-radius:12px; padding:20px; box-shadow:0 4px 15px rgba(0,0,0,0.05); border:1px solid #eee; margin-bottom:20px;">
                     <h3 style="margin-top:0; color:#d81b60; display:flex; align-items:center; gap:10px; border-bottom:1px solid #fee2e2; padding-bottom:12px;">
-                        <i class="fa-solid fa-feather-pointed"></i> ✍️ Reflection (สรุปบทเรียน)
+                        <i class="fa-solid fa-feather-pointed"></i> ✍️ ${reflectT('title')}
                     </h3>
                     <p style="color:#666; font-size:0.9em; margin-bottom:20px;">
-                        ยอดเยี่ยม! คุณอ่านครบทุกหน้าแล้ว ช่วยพิมพ์สรุปสิ่งที่ได้เรียนรู้/ข้อคิดเห็นในรูปแบบ **Tweetstorm** ด้านล่างเพื่อจบการเรียนรู้ครับ (จำกัด ${charLimit} อักษรต่อข้อความ)
+                        ${reflectT('intro', { n: charLimit })}
                     </p>
 
                     <div id="read-only-tweetstorm-container" style="display:flex; flex-direction:column; gap:15px;">
@@ -6255,7 +6303,7 @@
                     </div>
 
                     <button class="btn-sm btn-dark" onclick="addTweet()" style="margin-top:20px; width:auto; padding:10px 20px; border-radius:25px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
-                        <i class="fa-solid fa-plus"></i> เพิ่มข้อความสั้น (Add Tweet)
+                        <i class="fa-solid fa-plus"></i> ${reflectT('addTweet')}
                     </button>
                 </div>
             `;
@@ -6266,7 +6314,7 @@
             const btnSubmit = document.getElementById('btn-quiz-submit');
             if (btnSubmit) {
                 btnSubmit.style.display = 'inline-block';
-                btnSubmit.innerText = "ส่งข้อคิดเห็นและรับคะแนน (Submit)";
+                btnSubmit.innerText = reflectT('submit');
                 btnSubmit.style.width = "100%";
                 btnSubmit.style.marginTop = "10px";
             }
