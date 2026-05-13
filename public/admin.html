@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.13</title>
+    <title>Nika V93.14</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16637,23 +16637,24 @@ ${JSON.stringify(sourceObj)}`;
 
         // V93.02 admin: Phase 3 — backfill button loops every quiz that still has no
         // `translations` field (admin V93.01 only translates on save going forward).
-        // Skips read-only quizzes (V93.03 parked) and quizzes without questions.
+        // V93.14: read-only quizzes now included (V94.56 intern read-only translation
+        // pairs with this — without prebuilt the iPhone path hits runtime Typhoon
+        // every page-open). Empty quizzes still skipped.
         // Sequential per-quiz to avoid Typhoon rate-limit storms. Button text drives
         // progress so the showToast spam in qtAdminBatchTranslate is silenced here.
         async function qtAdminBackfillAll() {
             const missing = (quizzesData || []).filter(q =>
-                q.quizType !== 'read_only' &&
                 Array.isArray(q.questions) && q.questions.length > 0 &&
                 (!q.translations || Object.keys(q.translations).length === 0)
             );
             if (missing.length === 0) {
-                showToast('✨ All non-read-only quizzes already have translations');
+                showToast('✨ All quizzes already have translations');
                 return;
             }
 
             const estCalls = missing.length * 4;
             const estMin = Math.max(1, Math.ceil(estCalls * 8 / 60));
-            const ok = confirm(`Backfill translations for ${missing.length} quiz(zes)?\n\nThis will make ~${estCalls} Typhoon API calls and may take ~${estMin} min.\nRead-only and empty quizzes are skipped.\n\nContinue?`);
+            const ok = confirm(`Backfill translations for ${missing.length} quiz(zes)?\n\nThis will make ~${estCalls} Typhoon API calls and may take ~${estMin} min.\nEmpty quizzes are skipped.\n\nContinue?`);
             if (!ok) return;
 
             const btn = document.getElementById('btn-translate-all-missing');
