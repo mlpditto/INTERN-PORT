@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.25</title>
+    <title>Nika V93.26</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -20010,12 +20010,15 @@ ${JSON.stringify(sourceObj)}`;
 
 
                 const timerOptions = [1, 2, 4, 8, 12, 24, 48, 72, 120, 168];
-                const timerMenu = isActiveSection ? `
-                    <select class="btn-sm" onchange="setQuizDuration('${q.id}', this.value)" style="width: auto; background: #e0f2f1; color: #00695c; border: 1px solid #b2dfdb; cursor: pointer; border-radius: 4px; padding: 2px 4px;">
-                        <option value="">⏲️ Timer</option>
+                // V93.26 PR #13 Phase 2B: Timer SELECT now shows on inactive section too.
+                // Choosing a duration there sets deadline + flips isActive=true in one click
+                // (setQuizDuration already writes `isActive: true`). Label hints at the dual action.
+                const timerMenu = `
+                    <select class="btn-sm" onchange="setQuizDuration('${q.id}', this.value)" style="width: auto; background: ${isActiveSection ? '#e0f2f1' : '#ecfdf5'}; color: ${isActiveSection ? '#00695c' : '#047857'}; border: 1px solid ${isActiveSection ? '#b2dfdb' : '#a7f3d0'}; cursor: pointer; border-radius: 4px; padding: 2px 4px;">
+                        <option value="">${isActiveSection ? '⏲️ Timer' : '🚀 Go Live + Timer'}</option>
                         ${timerOptions.map(h => `<option value="${h}">${h}h</option>`).join('')}
                     </select>
-                ` : '';
+                `;
 
                 const pointsVal = parseFloat(q.totalPoints) || 1.0;
                 const pointsColor = pointsVal > 5 ? '#d81b60' : (pointsVal > 1 ? '#8338ec' : '#444');
@@ -20217,7 +20220,14 @@ ${JSON.stringify(sourceObj)}`;
 
         async function setQuizDuration(id, hours) {
             if (!hours) return;
-            if (!confirm(`Set countdown timer for ${hours} hours?`)) return;
+            // V93.26 PR #13 Phase 2B: state-aware confirm + toast wording so an admin
+            // setting a timer on an inactive quiz understands they're also activating it.
+            const q = quizzesData.find(x => x.id === id);
+            const wasInactive = q && q.isActive === false;
+            const confirmMsg = wasInactive
+                ? `Go live + set ${hours}h timer for this quiz?`
+                : `Set countdown timer for ${hours} hours?`;
+            if (!confirm(confirmMsg)) return;
             const now = new Date();
             const deadline = new Date(now.getTime() + (parseFloat(hours) * 3600000));
             try {
@@ -20226,7 +20236,7 @@ ${JSON.stringify(sourceObj)}`;
                     isActive: true, // Ensure it's active
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                showToast(`Timer set for ${hours} hours!`);
+                showToast(wasInactive ? `Quiz is now live with ${hours}h timer!` : `Timer set for ${hours} hours!`);
             } catch (e) { alert(e.message); }
         }
 
