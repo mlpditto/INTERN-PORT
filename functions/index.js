@@ -20,6 +20,79 @@ try {
 // See memory `feedback_firebase_functions_v1_v2_gen_mismatch.md`.
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 
+// ============================================================
+// Phase 3.3 (intern V94.59 + this functions deploy): per-recipient
+// LINE message language. Intern app writes users/{lineUserId}.preferredLanguage
+// on load + on KR/TH toggle. Read here to switch Flex Message strings
+// between EN / TH / KR. Defaults 'en' when field missing or invalid.
+// Used by notifyOnReviewMessage + notifyOnAdminEdit (both user-facing).
+// notifyAdminOnNewCase stays EN-only (admin-bound — message goes to
+// the admin LINE account, not a user).
+// ============================================================
+const LINE_LANGS = ['en', 'th', 'kr'];
+
+async function resolvePreferredLanguage(lineUserId) {
+    if (!lineUserId) return 'en';
+    try {
+        const doc = await admin.firestore().collection('users').doc(lineUserId).get();
+        if (!doc.exists) return 'en';
+        const lang = (doc.data() || {}).preferredLanguage;
+        return LINE_LANGS.includes(lang) ? lang : 'en';
+    } catch (err) {
+        console.warn(`[i18n] resolvePreferredLanguage failed for ${lineUserId}:`, err.message);
+        return 'en';
+    }
+}
+
+const LINE_I18N = {
+    reviewReply: {
+        title:     { en: '💬 Admin Review Reply', th: '💬 แอดมินตอบรีวิว',  kr: '💬 관리자 리뷰 답변' },
+        altPrefix: { en: 'Admin replied: ',       th: 'แอดมินตอบ: ',         kr: '관리자 답변: ' },
+        button:    { en: 'Open in LIFF →',        th: 'เปิดใน LIFF →',       kr: 'LIFF에서 열기 →' },
+        featured:  { en: 'Featured',              th: 'แนะนำ',               kr: '추천' },
+        escalated: { en: 'Escalated',             th: 'ส่งต่อ',              kr: '에스컬레이션' },
+        revision:  { en: 'Revision',              th: 'แก้ไข',               kr: '수정 요청' },
+        pts:       { en: 'pts',                   th: 'คะแนน',               kr: '점' },
+        noContent: { en: '(no content)',          th: '(ไม่มีเนื้อหา)',     kr: '(내용 없음)' }
+    },
+    adminEdit: {
+        headerDelete:  { en: '🗑️ Admin Deleted Your Note',  th: '🗑️ แอดมินลบโน้ตของคุณ',   kr: '🗑️ 관리자가 노트를 삭제했습니다' },
+        headerRestore: { en: '↩️ Admin Restored Your Note', th: '↩️ แอดมินกู้คืนโน้ต',      kr: '↩️ 관리자가 노트를 복원했습니다' },
+        headerRevert:  { en: '↩️ Admin Reverted Your Note', th: '↩️ แอดมินย้อนกลับโน้ต',    kr: '↩️ 관리자가 노트를 되돌렸습니다' },
+        headerEdit:    { en: '✏️ Admin Edited Your Note',   th: '✏️ แอดมินแก้ไขโน้ต',        kr: '✏️ 관리자가 노트를 수정했습니다' },
+        deleteBody:    { en: 'Hidden from your view. The admin can restore it from Trash.', th: 'ซ่อนจากมุมมองของคุณ แอดมินสามารถกู้คืนได้จากถังขยะ', kr: '내 보기에서 숨김. 관리자가 휴지통에서 복원할 수 있음.' },
+        restoreBody:   { en: 'Now visible in your view again.',                              th: 'กลับมาแสดงในมุมมองของคุณแล้ว',                        kr: '이제 다시 보입니다.' },
+        noReason:      { en: '(no reason)',           th: '(ไม่มีเหตุผล)',          kr: '(사유 없음)' },
+        fieldTitle:    { en: 'title',                 th: 'หัวข้อ',                kr: '제목' },
+        fieldDate:     { en: 'date',                  th: 'วันที่',                 kr: '날짜' },
+        fieldNextRev:  { en: 'next review',           th: 'รอบทบทวนถัดไป',          kr: '다음 복습일' },
+        fieldTags:     { en: 'tags',                  th: 'แท็ก',                   kr: '태그' },
+        fieldContent:  { en: 'content',               th: 'เนื้อหา',                kr: '내용' },
+        btnHistory:    { en: 'View History →',        th: 'ดูประวัติ →',           kr: '기록 보기 →' },
+        btnNote:       { en: 'View Note →',           th: 'ดูโน้ต →',               kr: '노트 보기 →' },
+        btnEdit:       { en: 'View Edit →',           th: 'ดูการแก้ไข →',           kr: '수정 보기 →' }
+    }
+};
+
+function lineT(catKey, key, lang) {
+    const cat = LINE_I18N[catKey];
+    if (!cat) return '';
+    const entry = cat[key];
+    if (!entry) return '';
+    return entry[lang] || entry.en || '';
+}
+
+// Phase 3.3: plural-aware "N field(s) changed" formatter — EN uses
+// English pluralization; TH/KR have no plural marker so they format
+// without an "s" toggle. Kept inline so the LINE_I18N constant stays
+// pure string data.
+function lineFmtChanged(lang, n, asAltSuffix) {
+    if (lang === 'th') return asAltSuffix ? ` — แก้ไข ${n} ฟิลด์` : `แก้ไข ${n} ฟิลด์:`;
+    if (lang === 'kr') return asAltSuffix ? ` — ${n}개 필드 변경` : `${n}개 필드 변경:`;
+    const plural = n === 1 ? '' : 's';
+    return asAltSuffix ? ` — ${n} field${plural} changed` : `${n} field${plural} changed:`;
+}
+
 // === Quest Submission API: รองรับ field poneglyphRef/linkedPoneglyphs ===
 exports.questSubmission = onRequest(async (req, res) => {
     if (req.method === "POST") {
@@ -575,6 +648,9 @@ exports.notifyOnReviewMessage = onCall(
         return { skipped: true, reason: 'token-missing' };
     }
 
+    // Phase 3.3: pick TH/KR/EN strings per recipient's preferredLanguage.
+    const lang = await resolvePreferredLanguage(lineUserId);
+
     // γ.4b.4 — build Flex Message and push to LINE. Best-effort: log + return structured error code, no retry.
     const adminName = (typeof msg.authorName === 'string' && msg.authorName.trim()) ? msg.authorName.trim() : 'Admin';
     const bonus = Number(submission.adminBonus) || 0;
@@ -582,16 +658,16 @@ exports.notifyOnReviewMessage = onCall(
     const reviewState = submission.reviewState || '';
 
     const subtitleParts = [];
-    if (reviewState === 'featured') subtitleParts.push('⭐ Featured');
-    else if (reviewState === 'escalated') subtitleParts.push('🚀 Escalated');
-    else if (reviewState === 'revision_requested') subtitleParts.push('🔄 Revision');
-    if (bonus > 0) subtitleParts.push(`+${bonus} pts`);
+    if (reviewState === 'featured') subtitleParts.push(`⭐ ${lineT('reviewReply', 'featured', lang)}`);
+    else if (reviewState === 'escalated') subtitleParts.push(`🚀 ${lineT('reviewReply', 'escalated', lang)}`);
+    else if (reviewState === 'revision_requested') subtitleParts.push(`🔄 ${lineT('reviewReply', 'revision', lang)}`);
+    if (bonus > 0) subtitleParts.push(`+${bonus} ${lineT('reviewReply', 'pts', lang)}`);
     if (stars > 0) subtitleParts.push('⭐'.repeat(stars));
     const subtitle = subtitleParts.length ? `${adminName} · ${subtitleParts.join(' · ')}` : adminName;
 
     const rawBody = String(msg.body || '').replace(/\s+/g, ' ').trim();
-    const bodyText = rawBody.length > 280 ? rawBody.slice(0, 277) + '…' : (rawBody || '(no content)');
-    const altText = `Admin replied: ${rawBody.slice(0, 100)}`.slice(0, 400);
+    const bodyText = rawBody.length > 280 ? rawBody.slice(0, 277) + '…' : (rawBody || lineT('reviewReply', 'noContent', lang));
+    const altText = `${lineT('reviewReply', 'altPrefix', lang)}${rawBody.slice(0, 100)}`.slice(0, 400);
     const liffUri = 'https://liff.line.me/2008959998-yjcNpaGt?tab=history';
 
     const flex = {
@@ -606,7 +682,7 @@ exports.notifyOnReviewMessage = onCall(
                 backgroundColor: '#7c3aed',
                 paddingAll: '12px',
                 contents: [
-                    { type: 'text', text: '💬 Admin Review Reply', weight: 'bold', size: 'sm', color: '#ffffff' },
+                    { type: 'text', text: lineT('reviewReply', 'title', lang), weight: 'bold', size: 'sm', color: '#ffffff' },
                     { type: 'text', text: subtitle, size: 'xs', color: '#e9d5ff', margin: 'xs', wrap: true }
                 ]
             },
@@ -628,7 +704,7 @@ exports.notifyOnReviewMessage = onCall(
                         style: 'primary',
                         color: '#7c3aed',
                         height: 'sm',
-                        action: { type: 'uri', label: 'Open in LIFF →', uri: liffUri }
+                        action: { type: 'uri', label: lineT('reviewReply', 'button', lang), uri: liffUri }
                     }
                 ]
             }
@@ -685,9 +761,10 @@ exports.notifyOnReviewMessage = onCall(
 // Output: { ok, pushed?, code?, status?, ... }  (best-effort,
 //         no retry; admin UI shows toast on non-ok)
 //
-// Language: EN-only for now. Phase 3.3 plan parked: add
-// preferredLanguage to user doc + sync from localStorage so this
-// function can pick TH/EN/KR per intern.
+// Language: V94.59 — Phase 3.3 shipped. Reads
+// users/{lineUserId}.preferredLanguage (intern writes on load + on
+// KR/TH toggle) and picks TH/KR/EN strings via LINE_I18N + lineT().
+// Falls back to 'en' when field missing or invalid.
 // ============================================================
 exports.notifyOnAdminEdit = onCall(
     { secrets: ['LINE_CHANNEL_ACCESS_TOKEN'] },
@@ -735,34 +812,37 @@ exports.notifyOnAdminEdit = onCall(
         return { skipped: true, reason: 'token-missing' };
     }
 
+    // Phase 3.3: pick TH/KR/EN strings per recipient's preferredLanguage.
+    const lang = await resolvePreferredLanguage(lineUserId);
+
     // Compute changed-field summary
-    const FIELD_LABELS = { title: 'title', date: 'date', nextReviewDate: 'next review', tags: 'tags', contentMarkdown: 'content' };
+    const FIELD_KEYS = { title: 'fieldTitle', date: 'fieldDate', nextReviewDate: 'fieldNextRev', tags: 'fieldTags', contentMarkdown: 'fieldContent' };
     const before = lastEdit.fieldsBefore || {};
     const after = lastEdit.fieldsAfter || {};
-    const changedFields = Object.keys(FIELD_LABELS).filter(k => {
+    const changedFields = Object.keys(FIELD_KEYS).filter(k => {
         const a = before[k];
         const b = after[k];
         if (Array.isArray(a) && Array.isArray(b)) return JSON.stringify(a) !== JSON.stringify(b);
         return a !== b;
     });
     const changedCount = changedFields.length;
-    const changedLabel = changedFields.map(k => FIELD_LABELS[k]).join(', ') || '(none)';
+    const changedLabel = changedFields.map(k => lineT('adminEdit', FIELD_KEYS[k], lang)).join(', ') || '(none)';
     const isRevert = lastEdit.type === 'revert';
     const isDelete = lastEdit.type === 'delete';
     const isRestore = lastEdit.type === 'restore';
 
     const title = (entry.title || '').slice(0, 80) || 'Untitled';
     const reasonRaw = (lastAdminEdit.reason || lastEdit.reason || '').replace(/\s+/g, ' ').trim();
-    const reason = reasonRaw.length > 200 ? reasonRaw.slice(0, 197) + '…' : (reasonRaw || '(no reason)');
+    const reason = reasonRaw.length > 200 ? reasonRaw.slice(0, 197) + '…' : (reasonRaw || lineT('adminEdit', 'noReason', lang));
     const editorEmail = (lastAdminEdit.editorEmail || lastEdit.editorEmail || 'admin').replace(/\s+/g, ' ').trim();
 
     // V92.16: extend headers for soft-delete + restore types
     let headerText, headerColor, subFooterColor;
-    if (isDelete)        { headerText = '🗑️ Admin Deleted Your Note';   headerColor = '#dc2626'; subFooterColor = '#fecaca'; }
-    else if (isRestore)  { headerText = '↩️ Admin Restored Your Note';   headerColor = '#16a34a'; subFooterColor = '#bbf7d0'; }
-    else if (isRevert)   { headerText = '↩️ Admin Reverted Your Note';   headerColor = '#d97706'; subFooterColor = '#fde68a'; }
-    else                 { headerText = '✏️ Admin Edited Your Note';     headerColor = '#7c3aed'; subFooterColor = '#e9d5ff'; }
-    const altText = `${headerText}: "${title.slice(0, 60)}"` + (isDelete || isRestore ? '' : ` — ${changedCount} field${changedCount === 1 ? '' : 's'} changed`);
+    if (isDelete)        { headerText = lineT('adminEdit', 'headerDelete',  lang); headerColor = '#dc2626'; subFooterColor = '#fecaca'; }
+    else if (isRestore)  { headerText = lineT('adminEdit', 'headerRestore', lang); headerColor = '#16a34a'; subFooterColor = '#bbf7d0'; }
+    else if (isRevert)   { headerText = lineT('adminEdit', 'headerRevert',  lang); headerColor = '#d97706'; subFooterColor = '#fde68a'; }
+    else                 { headerText = lineT('adminEdit', 'headerEdit',    lang); headerColor = '#7c3aed'; subFooterColor = '#e9d5ff'; }
+    const altText = `${headerText}: "${title.slice(0, 60)}"` + (isDelete || isRestore ? '' : lineFmtChanged(lang, changedCount, true));
     const liffUri = `https://liff.line.me/2008959998-yjcNpaGt?entryId=${encodeURIComponent(entryId)}&showHistory=1`;
 
     const flex = {
@@ -791,7 +871,7 @@ exports.notifyOnAdminEdit = onCall(
                     ? [
                         { type: 'text', text: title, weight: 'bold', size: 'sm', color: '#1f2937', wrap: true, decoration: isDelete ? 'line-through' : 'none' },
                         { type: 'text', text: `"${reason}"`, size: 'xs', color: '#475569', style: 'italic', wrap: true },
-                        { type: 'text', text: isDelete ? 'Hidden from your view. The admin can restore it from Trash.' : 'Now visible in your view again.', size: 'xs', color: headerColor, weight: 'bold', wrap: true, margin: 'sm' }
+                        { type: 'text', text: isDelete ? lineT('adminEdit', 'deleteBody', lang) : lineT('adminEdit', 'restoreBody', lang), size: 'xs', color: headerColor, weight: 'bold', wrap: true, margin: 'sm' }
                     ]
                     : [
                         { type: 'text', text: title, weight: 'bold', size: 'sm', color: '#1f2937', wrap: true },
@@ -804,7 +884,7 @@ exports.notifyOnAdminEdit = onCall(
                             paddingAll: '8px',
                             margin: 'sm',
                             contents: [
-                                { type: 'text', text: `${changedCount} field${changedCount === 1 ? '' : 's'} changed:`, size: 'xs', color: '#64748b', weight: 'bold', flex: 0 },
+                                { type: 'text', text: lineFmtChanged(lang, changedCount, false), size: 'xs', color: '#64748b', weight: 'bold', flex: 0 },
                                 { type: 'text', text: changedLabel, size: 'xs', color: '#0f172a', margin: 'sm', wrap: true }
                             ]
                         }
@@ -820,7 +900,7 @@ exports.notifyOnAdminEdit = onCall(
                         style: 'primary',
                         color: headerColor,
                         height: 'sm',
-                        action: { type: 'uri', label: isDelete ? 'View History →' : (isRestore ? 'View Note →' : 'View Edit →'), uri: liffUri }
+                        action: { type: 'uri', label: isDelete ? lineT('adminEdit', 'btnHistory', lang) : (isRestore ? lineT('adminEdit', 'btnNote', lang) : lineT('adminEdit', 'btnEdit', lang)), uri: liffUri }
                     }
                 ]
             }
