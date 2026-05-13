@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.26</title>
+    <title>Nika V93.27</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1362,6 +1362,32 @@
             height: 1px;
             background: #e2e8f0;
             margin: 4px 0;
+        }
+
+        /* V93.27 PR #13 Phase 4B: filter pills for Quiz Engine global toolbar
+           (All / GRADED / TEMPLATE / ONE-TIME). Indigo active state matches the
+           hover accent used by .quiz-tag-chips. */
+        .quiz-filter-pill {
+            padding: 5px 12px;
+            border-radius: 14px;
+            border: 1.5px solid #cbd5e1;
+            background: white;
+            color: #64748b;
+            font-size: 0.72em;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+            letter-spacing: 0.5px;
+        }
+        .quiz-filter-pill:hover {
+            border-color: #6366f1;
+            color: #6366f1;
+        }
+        .quiz-filter-pill.is-active {
+            background: #6366f1;
+            color: white;
+            border-color: #6366f1;
         }
 
         .alabasta-visual-grid {
@@ -5353,6 +5379,39 @@
 
                 </div>
 
+                <!-- V93.27 PR #13 Phase 4A+4B+4C: global toolbar above both Active+Inactive lists.
+                     Search box was moved here from the inactive wrapper so it filters BOTH lists.
+                     Filter pills + sort dropdown are new. -->
+                <div style="background:#fff; padding:14px 18px; border-radius:14px; margin-bottom:18px; border:1px solid #e2e8f0; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                    <div style="display:grid; grid-template-columns: 1fr auto; gap:12px; align-items:center; margin-bottom:10px;">
+                        <div style="position:relative;">
+                            <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:0.9em;"></i>
+                            <input type="text" id="quiz-search-global" placeholder="Search title, short title, or tag (Active + Inactive)..." oninput="renderQuizzes()" style="width:100%; padding:9px 15px 9px 42px; border-radius:12px; border:1.5px solid #cbd5e1; font-size:0.88em; outline:none; transition:0.3s; background:white; color:#1e293b;" onfocus="this.style.borderColor='#6366f1'; this.style.boxShadow='0 0 0 4px rgba(99,102,241,0.08)';" onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='none';">
+                        </div>
+                        <select id="quiz-sort-select" onchange="setQuizSort(this.value)" style="padding:9px 12px; border-radius:12px; border:1.5px solid #cbd5e1; font-size:0.85em; outline:none; background:white; cursor:pointer; font-weight:700; color:#475569;">
+                            <option value="newest">📅 Newest first</option>
+                            <option value="az">🔤 A → Z</option>
+                            <option value="submissions">📊 Most submissions</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; border-top:1px solid #f1f5f9; padding-top:10px;">
+                        <span style="font-size:0.65em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap;">
+                            <i class="fa-solid fa-filter" style="font-size:0.8em;"></i> Filter:
+                        </span>
+                        <div id="quiz-filter-pills" style="display:flex; gap:6px;">
+                            <button type="button" class="quiz-filter-pill is-active" data-filter="all" onclick="setQuizFilter('all')">All</button>
+                            <button type="button" class="quiz-filter-pill" data-filter="graded" onclick="setQuizFilter('graded')">GRADED</button>
+                            <button type="button" class="quiz-filter-pill" data-filter="template" onclick="setQuizFilter('template')">TEMPLATE</button>
+                            <button type="button" class="quiz-filter-pill" data-filter="onetime" onclick="setQuizFilter('onetime')">ONE-TIME</button>
+                        </div>
+                        <span style="height:18px; border-left:1px solid #e2e8f0; margin:0 4px;"></span>
+                        <span style="font-size:0.65em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap;">Tags:</span>
+                        <div id="quiz-tag-chips" style="display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; flex:1; min-width:120px;">
+                            <!-- Tag chips injected by renderQuizzes -->
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Active Quizzes -->
                 <h4 id="section-active-quizzes" style="color:#0d47a1; margin-bottom:10px;">🟢 Active Quizzes</h4>
                 <div
@@ -5371,27 +5430,12 @@
                     </table>
                 </div>
 
-                <!-- Inactive / Templates -->
+                <!-- Inactive / Templates (V93.27: search + chips moved to global toolbar above) -->
 
                 <div id="section-inactive-quizzes" style="background:#f1f5f9; padding:18px 22px; border-radius:20px; margin-bottom:15px; border:1px solid #e2e8f0; box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">
-                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
-                        <h4 style="color:#475569; margin:0; font-weight:800; font-size:1.1em; display:flex; align-items:center; gap:10px;">
-                            <i class="fa-solid fa-box-archive" style="color:#94a3b8; font-size:1.2em;"></i> Inactive / Templates
-                        </h4>
-                        <div style="position:relative; width:100%; max-width:450px;">
-                            <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:0.9em;"></i>
-                            <input type="text" id="inactive-quiz-search" placeholder="Search by topic, drug, or disease tags..." oninput="renderQuizzes()" style="width:100%; padding:10px 15px 10px 42px; border-radius:14px; border:1.5px solid #cbd5e1; font-size:0.9em; outline:none; transition:0.3s; background:white; color:#1e293b;" onfocus="this.style.borderColor='#6366f1'; this.style.boxShadow='0 0 0 4px rgba(99,102,241,0.08)';" onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='none';">
-                        </div>
-                    </div>
-                    
-                    <div style="display:flex; align-items:center; gap:10px; border-top:1px solid rgba(203,213,225,0.5); pt:10px; margin-top:5px; padding-top:10px;">
-                        <span style="font-size:0.65em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; display:flex; align-items:center; gap:5px;">
-                            <i class="fa-solid fa-filter" style="font-size:0.8em;"></i> Quick Filters:
-                        </span>
-                        <div id="quiz-tag-chips" style="display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; flex:1;">
-                            <!-- Tag chips will be injected here -->
-                        </div>
-                    </div>
+                    <h4 style="color:#475569; margin:0; font-weight:800; font-size:1.1em; display:flex; align-items:center; gap:10px;">
+                        <i class="fa-solid fa-box-archive" style="color:#94a3b8; font-size:1.2em;"></i> Inactive / Templates
+                    </h4>
                 </div>
                 <div
                     style="overflow-x:auto; background:white; padding:15px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
@@ -19900,10 +19944,19 @@ ${JSON.stringify(sourceObj)}`;
 
             // 🔥 [Version: V75.1] Separating logic with grouping for Inactive/Templates
             // 🔥 [Version: V89.28] Smart Filtering & Grouping
+            // V93.27 PR #13 Phase 4A+4B+4C: search applies to BOTH lists, filter pill applies
+            // to both, sort applies to both. Search input id was renamed to quiz-search-global.
             const activeList = [];
             const inactiveGroups = {};
-            const searchVal = (document.getElementById('inactive-quiz-search') ? document.getElementById('inactive-quiz-search').value : "").toLowerCase();
+            const searchVal = (document.getElementById('quiz-search-global') ? document.getElementById('quiz-search-global').value : "").toLowerCase();
             const allTags = new Set();
+
+            const matchesSearch = (q) => {
+                if (!searchVal) return true;
+                return (q.title || "").toLowerCase().includes(searchVal)
+                    || (q.shortTitle || "").toLowerCase().includes(searchVal)
+                    || (q.tags || "").toLowerCase().includes(searchVal);
+            };
 
             quizzesData.forEach(q => {
                 const getSafeDate = (ts) => {
@@ -19916,22 +19969,20 @@ ${JSON.stringify(sourceObj)}`;
                 const dead = getSafeDate(q.deadline);
                 const isActuallyActive = q.isActive && (!dead || now <= dead);
 
-                // Collect tags for chips
+                // Collect tags for chips (from ALL quizzes regardless of filter, so admins can
+                // still discover tags in filtered states).
                 if (q.tags) q.tags.split(',').forEach(t => {
                     const cleanT = t.trim();
                     if (cleanT) allTags.add(cleanT);
                 });
 
+                // V93.27: apply filter pill + global search to both lists.
+                if (!quizMatchesFilter(q)) return;
+                if (!matchesSearch(q)) return;
+
                 if (isActuallyActive) {
                     activeList.push(q);
                 } else {
-                    // Apply Search Filter (Title, ShortTitle, Tags)
-                    const titleMatch = (q.title || "").toLowerCase().includes(searchVal);
-                    const shortMatch = (q.shortTitle || "").toLowerCase().includes(searchVal);
-                    const tagMatch = (q.tags || "").toLowerCase().includes(searchVal);
-                    
-                    if (searchVal && !titleMatch && !shortMatch && !tagMatch) return;
-
                     // Version Grouping (by shortTitle or title)
                     const key = q.shortTitle || q.title || q.id;
                     const getSafeMillis = (ts) => {
@@ -19948,15 +19999,15 @@ ${JSON.stringify(sourceObj)}`;
                 }
             });
 
-            // Update Tag Chips UI ([Version: V89.50])
+            // Update Tag Chips UI ([Version: V89.50]; V93.27: chips set quiz-search-global)
             const chipContainer = document.getElementById('quiz-tag-chips');
             if (chipContainer && !searchVal) {
                 const topTags = Array.from(allTags).slice(0, 15);
                 chipContainer.innerHTML = topTags.map(tag => `
-                    <span class="badge" onclick="document.getElementById('inactive-quiz-search').value='${tag}'; renderQuizzes();" style="background:white; color:#64748b; font-size:0.7em; cursor:pointer; padding:5px 12px; border:1px solid #cbd5e1; white-space:nowrap; border-radius:10px; font-weight:700; transition:0.2s; box-shadow:0 1px 2px rgba(0,0,0,0.05);" onmouseover="this.style.background='#f1f5f9'; this.style.borderColor='#6366f1'; this.style.color='#6366f1'" onmouseout="this.style.background='white'; this.style.borderColor='#cbd5e1'; this.style.color='#64748b'">#${tag}</span>
+                    <span class="badge" onclick="document.getElementById('quiz-search-global').value='${tag}'; renderQuizzes();" style="background:white; color:#64748b; font-size:0.7em; cursor:pointer; padding:5px 12px; border:1px solid #cbd5e1; white-space:nowrap; border-radius:10px; font-weight:700; transition:0.2s; box-shadow:0 1px 2px rgba(0,0,0,0.05);" onmouseover="this.style.background='#f1f5f9'; this.style.borderColor='#6366f1'; this.style.color='#6366f1'" onmouseout="this.style.background='white'; this.style.borderColor='#cbd5e1'; this.style.color='#64748b'">#${tag}</span>
                 `).join('');
             } else if (chipContainer && searchVal) {
-                chipContainer.innerHTML = `<span class="badge" onclick="document.getElementById('inactive-quiz-search').value=''; renderQuizzes();" style="background:#fee2e2; color:#ef4444; font-size:0.75em; cursor:pointer; padding:6px 14px; border:1px solid #fecaca; border-radius:10px; font-weight:800; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-circle-xmark"></i> Clear Search Filter</span>`;
+                chipContainer.innerHTML = `<span class="badge" onclick="document.getElementById('quiz-search-global').value=''; renderQuizzes();" style="background:#fee2e2; color:#ef4444; font-size:0.75em; cursor:pointer; padding:6px 14px; border:1px solid #fecaca; border-radius:10px; font-weight:800; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-circle-xmark"></i> Clear Search Filter</span>`;
             }
 
             // Helper to render row
@@ -20128,14 +20179,27 @@ ${JSON.stringify(sourceObj)}`;
                 `;
             };
 
-            // Render Active
-            activeList.forEach((q, index) => { 
-                tbodyActive.innerHTML += generateRow(q, true); 
+            // Render Active (V93.27: apply selected sort)
+            sortQuizzes(activeList).forEach((q, index) => {
+                tbodyActive.innerHTML += generateRow(q, true);
             });
 
             // Render Inactive (Grouped & Sorted with Pagination)
-            const sortedInactive = Object.values(inactiveGroups).sort((a, b) => b.time - a.time);
-            
+            // V93.27: sort by selected mode. inactiveGroups items are {data, time} so we
+            // adapt the comparator. Prefix grouping headers are skipped on non-newest modes
+            // because those orderings break the topic clusters.
+            const inactiveItems = Object.values(inactiveGroups);
+            let sortedInactive;
+            if (window.currentQuizSort === 'az') {
+                sortedInactive = inactiveItems.sort((a, b) => (a.data.title || '').localeCompare(b.data.title || ''));
+            } else if (window.currentQuizSort === 'submissions') {
+                const c = window.quizCounts || {};
+                sortedInactive = inactiveItems.sort((a, b) => (c[b.data.id] || 0) - (c[a.data.id] || 0));
+            } else {
+                sortedInactive = inactiveItems.sort((a, b) => b.time - a.time);
+            }
+            const showPrefixHeaders = (window.currentQuizSort === 'newest' || !window.currentQuizSort);
+
             const activeCount = activeList.length;
             const inactiveCount = sortedInactive.length;
             const templateCount = quizzesData.filter(q => q.isTemplate).length;
@@ -20155,13 +20219,13 @@ ${JSON.stringify(sourceObj)}`;
             const pageData = sortedInactive.slice(startIdx, startIdx + INACTIVE_QUIZ_PER_PAGE);
 
             let lastPrefix = "";
-            pageData.forEach(group => { 
+            pageData.forEach(group => {
                 const q = group.data;
                 const prefixMatch = (q.title || "").match(/^\[(.*?)\]/);
                 const currentPrefix = prefixMatch ? prefixMatch[1] : null;
 
-                // Add Category Header
-                if (currentPrefix && currentPrefix !== lastPrefix) {
+                // Add Category Header (V93.27: only in newest sort — other sorts break the clusters)
+                if (showPrefixHeaders && currentPrefix && currentPrefix !== lastPrefix) {
                     tbodyInactive.innerHTML += `
                         <tr style="background:#f8fafc; pointer-events:none;">
                             <td colspan="5" style="padding:10px 15px; border-left:4px solid #6366f1;">
@@ -20172,7 +20236,7 @@ ${JSON.stringify(sourceObj)}`;
                         </tr>
                     `;
                     lastPrefix = currentPrefix;
-                } else if (!currentPrefix && lastPrefix) {
+                } else if (showPrefixHeaders && !currentPrefix && lastPrefix) {
                     // First non-prefix item after prefixed items
                     tbodyInactive.innerHTML += `
                         <tr style="background:#f8fafc; pointer-events:none;">
@@ -20205,6 +20269,57 @@ ${JSON.stringify(sourceObj)}`;
         function changeInactiveQuizPage(dir) {
             inactiveQuizPage += dir;
             renderQuizzes();
+        }
+
+        // V93.27 PR #13 Phase 4B+4C: filter pill + sort dropdown handlers for the
+        // Quiz Engine global toolbar. State lives on window so a single source of truth
+        // is read by renderQuizzes regardless of where the call originated (listener,
+        // pagination, search input, chip click, etc.).
+        window.currentQuizFilter = window.currentQuizFilter || 'all';
+        window.currentQuizSort = window.currentQuizSort || 'newest';
+
+        function setQuizFilter(filterName) {
+            window.currentQuizFilter = filterName;
+            inactiveQuizPage = 1;
+            document.querySelectorAll('.quiz-filter-pill').forEach(b => {
+                b.classList.toggle('is-active', b.dataset.filter === filterName);
+            });
+            renderQuizzes();
+        }
+
+        function setQuizSort(sortValue) {
+            window.currentQuizSort = sortValue;
+            inactiveQuizPage = 1;
+            renderQuizzes();
+        }
+
+        function quizMatchesFilter(q) {
+            const f = window.currentQuizFilter || 'all';
+            if (f === 'all') return true;
+            if (f === 'graded') return q.quizType !== 'read_only';
+            if (f === 'template') return !!q.isTemplate;
+            if (f === 'onetime') return !!q.oneTimeMode;
+            return true;
+        }
+
+        function sortQuizzes(arr) {
+            const mode = window.currentQuizSort || 'newest';
+            if (mode === 'az') {
+                return [...arr].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+            }
+            if (mode === 'submissions') {
+                const c = window.quizCounts || {};
+                return [...arr].sort((a, b) => (c[b.id] || 0) - (c[a.id] || 0));
+            }
+            // newest (default): max(updatedAt, createdAt) desc
+            const t = (ts) => {
+                if (!ts) return 0;
+                if (typeof ts.toMillis === 'function') return ts.toMillis();
+                if (ts instanceof Date) return ts.getTime();
+                if (ts.seconds) return ts.seconds * 1000;
+                return 0;
+            };
+            return [...arr].sort((a, b) => Math.max(t(b.updatedAt), t(b.createdAt)) - Math.max(t(a.updatedAt), t(a.createdAt)));
         }
 
         async function repostQuiz(id) {
