@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.28</title>
+    <title>Nika V93.29</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6081,6 +6081,9 @@
                                                 <button type="button" id="chip-engine-cloud" class="tts-chip" onclick="selectTtsBackend('cloud_tts')" style="flex:1; justify-content:center; gap:8px;">
                                                     <i class="fa-solid fa-cloud"></i> Cloud TTS API
                                                 </button>
+                                                <button type="button" id="chip-engine-omnivoice" class="tts-chip" onclick="selectTtsBackend('omnivoice')" style="flex:1; justify-content:center; gap:8px;" title="Phase 1A registration only — Phase 1B will wire the Replicate backend">
+                                                    <i class="fa-solid fa-microphone-lines"></i> OmniVoice
+                                                </button>
                                             </div>
                                             <input type="hidden" id="tts-backend-select" value="gemini_api">
                                             <div id="tts-model-select-wrap" style="margin-top:12px;">
@@ -6898,6 +6901,32 @@
                     },
                     models: [
                         { value: 'qwen3-tts', label: 'Qwen3-TTS', description: 'Current local OpenAI-compatible speech model.', costBadge: 'Free-first local', costTone: 'emerald', costHint: 'Use this first when cost matters more than managed-cloud polish.' }
+                    ]
+                },
+                omnivoice: {
+                    label: 'OmniVoice',
+                    engine: 'omnivoice',
+                    help: 'k2-fsa zero-shot TTS via Replicate. Voice cloning + 600+ langs including native Thai. Phase 1A registration only — Phase 1B will wire the Replicate proxy + REPLICATE_API_TOKEN secret.',
+                    cost: {
+                        tier: 'preview',
+                        badge: 'Phase 1A · not wired',
+                        badgeTone: 'rose',
+                        warning: 'Backend is registered but not yet connected. Picking this and clicking Generate will surface a friendly error pointing at Phase 1B. Cost target ~$0.02/call via Replicate once wired.',
+                        detail: 'Will unlock zero-shot voice cloning (ref audio → host doctor voice) + native Thai narration that the Qwen catalog currently lacks.'
+                    },
+                    capabilities: {
+                        encodings: ['mp3', 'wav'],
+                        sampleRates: [24000],
+                        maxTextBytes: 6000,
+                        maxCombinedBytes: 6000,
+                        supportsDialogue: false,
+                        supportsLanguageAuto: true,
+                        supportsVoiceDesign: true,
+                        supportsVoiceCloning: true,
+                        notes: 'Single-speaker zero-shot TTS. 600+ langs incl. native Thai. Voice cloning from 3-10s reference audio. Voice design via attributes (gender / age / pitch / dialect / whisper). RTF 0.025 ≈ 40x realtime.'
+                    },
+                    models: [
+                        { value: 'k2-fsa/omnivoice', label: 'OmniVoice (Replicate, default)', description: 'Drop-in 4th backend. Phase 1B will wire the proxy.', costBadge: 'Not wired', costTone: 'rose', costHint: 'Phase 1A registration only — Phase 1B will add the Replicate backend.' }
                     ]
                 }
             };
@@ -8252,6 +8281,12 @@
                         audioDataBase64 = audioPart.inlineData.data;
                         returnedAudioMime = audioPart.inlineData?.mimeType || '';
 
+                    } else if (selectedEngine === 'omnivoice') {
+                        // V93.29 Phase 1A: OmniVoice backend is registered in LABOON_TTS_BACKEND_MODELS
+                        // and selectable from the chip group, but the actual call path (Replicate proxy
+                        // or self-host) is not wired yet. Phase 1B will add the Cloud Function + secret.
+                        // For now, surface a clear error instead of silently falling through to qwen.
+                        throw new Error('OmniVoice backend is registered (Phase 1A) but not wired yet. Pick Qwen / Gemini / Cloud TTS for now — Phase 1B will add the Replicate proxy.');
                     } else {
                         // Qwen3-TTS logic
                         const qwenUrl = localStorage.getItem('ai_qwen_url') || 'http://localhost:8880/v1';
