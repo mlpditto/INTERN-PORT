@@ -4,11 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.34</title>
+    <title>Nika V93.35</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+
+    <!-- [V93.35] Quill 2.x rich-text editor + DOMPurify for Reflective Review Comment POC -->
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
 
     <script>
         // Force unregister service workers to fix persistent caching issues ([Version: V91.61])
@@ -10011,7 +10016,9 @@
                         <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">Llama 70B</option>
                     </select>
 
-                    <textarea id="reflective-review-comment" class="reflective-review-textarea" placeholder="Write a draft first then click AI Suggest, or leave blank for AI to write" data-th-placeholder="พิมพ์ draft ไทยไว้ก่อน แล้วกด AI Suggest หรือปล่อยว่างให้ AI เขียนอัตโนมัติ" style="min-height:85px; font-size:0.9em;" oninput="updateReflectiveRewriteChipsState()"></textarea>
+                    <!-- [V93.35] Quill editor (visible) — replaces plain textarea. Hidden textarea below kept as backward-compat plaintext mirror (synced by Quill text-change) so legacy .value reads keep working. -->
+                    <div id="reflective-review-comment-editor" class="reflective-review-quill" style="background:#fcfdff; border:1.5px solid #e1e7f0; border-radius:15px; font-size:0.9em;"></div>
+                    <textarea id="reflective-review-comment" class="reflective-review-textarea" placeholder="Write a draft first then click AI Suggest, or leave blank for AI to write" data-th-placeholder="พิมพ์ draft ไทยไว้ก่อน แล้วกด AI Suggest หรือปล่อยว่างให้ AI เขียนอัตโนมัติ" style="display:none;" oninput="updateReflectiveRewriteChipsState()"></textarea>
                     <div class="reflective-rewrite-chips lang-no-toggle" id="reflective-rewrite-chips">
                         <button type="button" class="reflective-rewrite-chip" data-intent="shorter" data-en="Shorter" data-th="สั้นลง" data-icon="fa-compress" onclick="rewriteReflectiveReview(this)" disabled><i class="fa-solid fa-compress"></i><span>Shorter</span></button>
                         <button type="button" class="reflective-rewrite-chip" data-intent="longer" data-en="Longer" data-th="ยาวขึ้น" data-icon="fa-expand" onclick="rewriteReflectiveReview(this)" disabled><i class="fa-solid fa-expand"></i><span>Longer</span></button>
@@ -13308,6 +13315,85 @@
             });
         };
 
+        // [V93.35] Quill rich-text editor for Reflective Review comment.
+        // Lazy-init on first openReflectiveReviewModal call. Quill is the visible editor;
+        // the hidden #reflective-review-comment textarea is synced via text-change so all
+        // existing .value reads (AI rewrite/suggest handlers, save handler) keep working.
+        window.initReflectiveQuill = function() {
+            if (window.quillReflective) return window.quillReflective;
+            if (typeof Quill === 'undefined') {
+                console.warn('[V93.35] Quill not loaded — Reflective Review will fall back to plain textarea');
+                const textarea = document.getElementById('reflective-review-comment');
+                if (textarea) textarea.style.display = '';
+                return null;
+            }
+            const editorEl = document.getElementById('reflective-review-comment-editor');
+            if (!editorEl) return null;
+            window.quillReflective = new Quill(editorEl, {
+                theme: 'snow',
+                placeholder: 'Write a draft first then click AI Suggest, or leave blank for AI to write',
+                modules: {
+                    toolbar: [
+                        ['bold', 'italic', 'underline'],
+                        [{ 'header': [false, 2, 3] }],
+                        [{ 'list': 'bullet' }, { 'list': 'ordered' }],
+                        ['link', 'clean']
+                    ]
+                }
+            });
+            // Sync hidden textarea on every change so legacy .value reads keep working.
+            window.quillReflective.on('text-change', function() {
+                const textarea = document.getElementById('reflective-review-comment');
+                if (textarea) {
+                    textarea.value = window.quillReflective.getText().trim();
+                    if (typeof updateReflectiveRewriteChipsState === 'function') updateReflectiveRewriteChipsState();
+                }
+            });
+            return window.quillReflective;
+        };
+
+        // [V93.35] Helpers to load/save Quill content with sanitization + backward compat.
+        window.loadReflectiveQuillContent = function(adminCommentHtml, adminCommentPlain) {
+            const q = window.initReflectiveQuill();
+            const textarea = document.getElementById('reflective-review-comment');
+            const plain = adminCommentPlain || '';
+            if (textarea) textarea.value = plain;
+            if (!q) return;
+            if (adminCommentHtml && typeof DOMPurify !== 'undefined') {
+                q.root.innerHTML = DOMPurify.sanitize(adminCommentHtml);
+            } else {
+                q.setText(plain);
+            }
+        };
+
+        window.getReflectiveQuillContent = function() {
+            const q = window.quillReflective;
+            const textarea = document.getElementById('reflective-review-comment');
+            if (q && typeof DOMPurify !== 'undefined') {
+                const html = DOMPurify.sanitize(q.root.innerHTML);
+                const plain = q.getText().trim();
+                // Empty editor returns '<p><br></p>' — collapse to '' so isEmpty checks work.
+                const isEmpty = !plain || (html === '<p><br></p>');
+                return { html: isEmpty ? '' : html, plain: isEmpty ? '' : plain };
+            }
+            const plain = textarea ? textarea.value.trim() : '';
+            return { html: '', plain: plain };
+        };
+
+        window.setReflectiveQuillText = function(text) {
+            const q = window.quillReflective;
+            const cleaned = String(text || '').trim();
+            if (q) {
+                q.setText(cleaned);
+            } else {
+                const textarea = document.getElementById('reflective-review-comment');
+                if (textarea) {
+                    textarea.value = cleaned;
+                    if (typeof updateReflectiveRewriteChipsState === 'function') updateReflectiveRewriteChipsState();
+                }
+            }
+        };
+
         // --- [V91.44] Reflection history strip ---
         window.renderReflectiveHistoryStrip = function(uid, currentLogId) {
             const strip = document.getElementById('reflective-history-strip');
@@ -13459,7 +13545,13 @@ Rules:
 
                 const result = await window.callUniversalAI(modelName, prompt);
                 if (result && result.text) {
-                    textarea.value = result.text.trim().replace(/^["']+|["']+$/g, '');
+                    const cleaned = result.text.trim().replace(/^["']+|["']+$/g, '');
+                    // [V93.35] Route through Quill setter (syncs hidden textarea + chip state)
+                    if (typeof setReflectiveQuillText === 'function') {
+                        setReflectiveQuillText(cleaned);
+                    } else {
+                        textarea.value = cleaned;
+                    }
                     setReflectiveReviewStatus('✨ Rewritten — ' + intent, 'success');
                 }
             } catch (err) {
@@ -13562,12 +13654,17 @@ For "changes": list every meaningful edit between original and improved. Each en
                     } catch (e) { parsed = null; }
 
                     if (parsed && parsed.feedback) {
-                        textarea.value = String(parsed.feedback).trim();
+                        // [V93.35] Route through Quill setter (syncs hidden textarea + chip state)
+                        const fb = String(parsed.feedback).trim();
+                        if (typeof setReflectiveQuillText === 'function') setReflectiveQuillText(fb);
+                        else textarea.value = fb;
                         if (typeof parsed.suggestedBonus === 'number' && parsed.suggestedBonus > 0) {
                             showReflectiveBonusSuggestion(parsed.suggestedBonus, parsed.reason || '');
                         }
                     } else {
-                        textarea.value = raw.trim();
+                        const fb = raw.trim();
+                        if (typeof setReflectiveQuillText === 'function') setReflectiveQuillText(fb);
+                        else textarea.value = fb;
                     }
                     setReflectiveReviewStatus(existingDraft ? `AI refined your draft in ${targetLang}.` : `AI suggestion ready in ${targetLang}.`, 'success');
                     showToast(existingDraft ? "✨ AI refined your Thai draft → " + targetLang : "✨ AI suggested feedback!");
@@ -29533,9 +29630,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.getElementById('reflective-detail-content').innerText = item.fullContent || "No content found.";
             
             const feedbackSection = document.getElementById('reflective-detail-feedback');
-            if (item.adminComment) {
+            if (item.adminComment || item.adminCommentHtml) {
                 feedbackSection.style.display = 'block';
-                document.getElementById('reflective-detail-feedback-text').innerText = item.adminComment;
+                // [V93.35] Prefer sanitized HTML from Quill if present; fall back to plaintext.
+                const fbEl = document.getElementById('reflective-detail-feedback-text');
+                if (item.adminCommentHtml && typeof DOMPurify !== 'undefined') {
+                    fbEl.innerHTML = DOMPurify.sanitize(item.adminCommentHtml);
+                } else {
+                    fbEl.innerText = item.adminComment || '';
+                }
             } else {
                 feedbackSection.style.display = 'none';
             }
@@ -34701,7 +34804,12 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             `;
 
             document.getElementById('reflective-review-bonus').value = log.adminBonus !== undefined ? log.adminBonus : "0.5";
-            document.getElementById('reflective-review-comment').value = log.adminComment || "";
+            // [V93.35] Load via Quill helper — handles HTML/plaintext fallback + sanitization
+            if (typeof loadReflectiveQuillContent === 'function') {
+                loadReflectiveQuillContent(log.adminCommentHtml, log.adminComment);
+            } else {
+                document.getElementById('reflective-review-comment').value = log.adminComment || "";
+            }
             document.getElementById('reflective-review-raw-content').value = log.content || '';
             const grammarCard = document.getElementById('reflective-grammar-card');
             if (grammarCard) { grammarCard.style.display = 'none'; document.getElementById('reflective-grammar-content').innerHTML = ''; document.getElementById('reflective-grammar-score').textContent = ''; }
@@ -34732,7 +34840,12 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             const uid = document.getElementById('reflective-review-uid').value;
             const name = document.getElementById('reflective-review-uname').value;
             let bonus = parseFloat(document.getElementById('reflective-review-bonus').value) || 0;
-            const comment = document.getElementById('reflective-review-comment').value.trim();
+            // [V93.35] Dual capture: plaintext from Quill (legacy field) + sanitized HTML (new field).
+            const rte = (typeof getReflectiveQuillContent === 'function')
+                ? getReflectiveQuillContent()
+                : { html: '', plain: (document.getElementById('reflective-review-comment').value || '').trim() };
+            const comment = rte.plain;
+            const commentHtml = rte.html;
 
             // 🔥 Ensure bonus is reasonable (0.1 to 2.0) and default to 0.5 if invalid
             if (bonus <= 0 || bonus > 2.0) {
@@ -34746,8 +34859,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             try {
                 const logRef = db.collection("reflective_logs").doc(id);
 
-                const upData = { 
+                const upData = {
                     adminComment: comment,
+                    adminCommentHtml: commentHtml || '',
                     adminBonus: bonus,
                     reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     pointsClaimed: false // 🔥 User must claim the points
