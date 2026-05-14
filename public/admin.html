@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.31</title>
+    <title>Nika V93.32</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6081,7 +6081,7 @@
                                                 <button type="button" id="chip-engine-cloud" class="tts-chip" onclick="selectTtsBackend('cloud_tts')" style="flex:1; justify-content:center; gap:8px;">
                                                     <i class="fa-solid fa-cloud"></i> Cloud TTS API
                                                 </button>
-                                                <button type="button" id="chip-engine-omnivoice" class="tts-chip" onclick="selectTtsBackend('omnivoice')" style="flex:1; justify-content:center; gap:8px;" title="Phase 1A registration only — Phase 1B will wire the Replicate backend">
+                                                <button type="button" id="chip-engine-omnivoice" class="tts-chip" onclick="selectTtsBackend('omnivoice')" style="flex:1; justify-content:center; gap:8px;" title="Free zero-shot TTS via HuggingFace Space — pick voice design attributes below">
                                                     <i class="fa-solid fa-microphone-lines"></i> OmniVoice
                                                 </button>
                                             </div>
@@ -6182,6 +6182,32 @@
                                                             <input type="text" id="tts-qwen-vd-target-model" placeholder="optional runtime model id" style="width:100%; font-size:0.82em; padding:9px 10px; border-radius:10px; border:1.5px solid #dbe4ff; background:white; color:#1e293b;">
                                                         </div>
                                                     </div>
+                                                </div>
+                                                <div id="tts-omnivoice-panel" style="display:none; margin-top:10px; padding:12px; border-radius:12px; border:1px solid #a7f3d0; background:#ecfdf5;">
+                                                    <div style="font-weight:800; color:#047857; font-size:0.85em; margin-bottom:6px;">
+                                                        <i class="fa-solid fa-sliders"></i> OmniVoice Voice Design
+                                                    </div>
+                                                    <div style="font-size:0.72em; color:#065f46; margin-bottom:10px; line-height:1.45;">
+                                                        Pick attribute chips below — the HF Space picks a matching voice. <b>Random</b> lets it pick. <b>English Accent</b> / <b>Chinese Dialect</b> only apply when the production language matches; otherwise the value is ignored.
+                                                    </div>
+                                                    <input type="hidden" id="tts-omnivoice-gender" value="Random">
+                                                    <input type="hidden" id="tts-omnivoice-age" value="Adult">
+                                                    <input type="hidden" id="tts-omnivoice-pitch" value="Medium">
+                                                    <input type="hidden" id="tts-omnivoice-style" value="Calm">
+                                                    <input type="hidden" id="tts-omnivoice-accent-en" value="American">
+                                                    <input type="hidden" id="tts-omnivoice-dialect-cn" value="Mandarin">
+                                                    <div style="font-size:0.65em; font-weight:800; color:#047857; text-transform:uppercase; margin:6px 0 4px;">Gender</div>
+                                                    <div class="tts-chip-group" id="omni-chips-gender" style="margin-bottom:6px;"></div>
+                                                    <div style="font-size:0.65em; font-weight:800; color:#047857; text-transform:uppercase; margin:6px 0 4px;">Age</div>
+                                                    <div class="tts-chip-group" id="omni-chips-age" style="margin-bottom:6px;"></div>
+                                                    <div style="font-size:0.65em; font-weight:800; color:#047857; text-transform:uppercase; margin:6px 0 4px;">Pitch</div>
+                                                    <div class="tts-chip-group" id="omni-chips-pitch" style="margin-bottom:6px;"></div>
+                                                    <div style="font-size:0.65em; font-weight:800; color:#047857; text-transform:uppercase; margin:6px 0 4px;">Style</div>
+                                                    <div class="tts-chip-group" id="omni-chips-style" style="margin-bottom:6px;"></div>
+                                                    <div style="font-size:0.65em; font-weight:800; color:#047857; text-transform:uppercase; margin:6px 0 4px;">English Accent</div>
+                                                    <div class="tts-chip-group" id="omni-chips-accent-en" style="margin-bottom:6px;"></div>
+                                                    <div style="font-size:0.65em; font-weight:800; color:#047857; text-transform:uppercase; margin:6px 0 4px;">Chinese Dialect</div>
+                                                    <div class="tts-chip-group" id="omni-chips-dialect-cn"></div>
                                                 </div>
                                             </div>
 
@@ -6906,13 +6932,13 @@
                 omnivoice: {
                     label: 'OmniVoice',
                     engine: 'omnivoice',
-                    help: 'k2-fsa zero-shot TTS via Replicate. Voice cloning + 600+ langs including native Thai. Phase 1A registration only — Phase 1B will wire the Replicate proxy + REPLICATE_API_TOKEN secret.',
+                    help: 'k2-fsa zero-shot TTS via the public HuggingFace Space (free ZeroGPU). Voice design across 600+ languages including native Thai — no API key, no Cloud Function.',
                     cost: {
-                        tier: 'preview',
-                        badge: 'Phase 1A · not wired',
-                        badgeTone: 'rose',
-                        warning: 'Backend is registered but not yet connected. Picking this and clicking Generate will surface a friendly error pointing at Phase 1B. Cost target ~$0.02/call via Replicate once wired.',
-                        detail: 'Will unlock zero-shot voice cloning (ref audio → host doctor voice) + native Thai narration that the Qwen catalog currently lacks.'
+                        tier: 'free',
+                        badge: 'Free · HF Space',
+                        badgeTone: 'emerald',
+                        warning: 'Runs on the public HuggingFace Space (ZeroGPU community quota). Expect ~10–30s queue waits when the Space is busy, and brief outages if the Space is paused. No SLA — fall back to Qwen / Gemini / Cloud TTS for time-critical jobs.',
+                        detail: 'Voice design via Gender / Age / Pitch / Style / English Accent / Chinese Dialect chip rails. Cloning (ref audio) lives behind a later phase.'
                     },
                     capabilities: {
                         encodings: ['mp3', 'wav'],
@@ -6920,13 +6946,13 @@
                         maxTextBytes: 6000,
                         maxCombinedBytes: 6000,
                         supportsDialogue: false,
-                        supportsLanguageAuto: true,
+                        supportsLanguageAuto: false,
                         supportsVoiceDesign: true,
-                        supportsVoiceCloning: true,
-                        notes: 'Single-speaker zero-shot TTS. 600+ langs incl. native Thai. Voice cloning from 3-10s reference audio. Voice design via attributes (gender / age / pitch / dialect / whisper). RTF 0.025 ≈ 40x realtime.'
+                        supportsVoiceCloning: false,
+                        notes: 'Single-speaker zero-shot TTS via HF Space /_design_fn endpoint. 600+ langs incl. native Thai. Voice cloning (/_clone_fn) is planned for a later phase. RTF 0.025 ≈ 40x realtime on warm GPU.'
                     },
                     models: [
-                        { value: 'k2-fsa/omnivoice', label: 'OmniVoice (Replicate, default)', description: 'Drop-in 4th backend. Phase 1B will wire the proxy.', costBadge: 'Not wired', costTone: 'rose', costHint: 'Phase 1A registration only — Phase 1B will add the Replicate backend.' }
+                        { value: 'k2-fsa/OmniVoice', label: 'OmniVoice (HF Space, free)', description: 'Public HuggingFace Space — no API key needed. Queue + ZeroGPU quota applies.', costBadge: 'Free', costTone: 'emerald', costHint: 'Runs on shared HuggingFace ZeroGPU. Slow under load; great when cost matters more than SLA.' }
                     ]
                 }
             };
@@ -7701,12 +7727,67 @@
                 return { ok: true, estimate };
             };
 
+            const OMNIVOICE_VOICE_DESIGN_OPTIONS = {
+                gender: ['Random', 'Male', 'Female'],
+                age: ['Random', 'Young', 'Adult', 'Middle-Aged', 'Senior', 'Elderly'],
+                pitch: ['Random', 'Very Low', 'Low', 'Medium', 'High', 'Very High'],
+                style: ['Random', 'Calm'],
+                accentEn: ['Random', 'American', 'British', 'Australian', 'Indian', 'Canadian', 'Irish', 'Scottish', 'Welsh', 'South African', 'New Zealand'],
+                dialectCn: ['Random', 'Mandarin', 'Cantonese', 'Shanghainese', 'Sichuanese', 'Wu', 'Min', 'Hakka', 'Xiang', 'Gan', 'Hui', 'Yue', 'Jin']
+            };
+
+            const OMNIVOICE_CHIP_GROUPS = [
+                { key: 'gender',    container: 'omni-chips-gender',     input: 'tts-omnivoice-gender' },
+                { key: 'age',       container: 'omni-chips-age',        input: 'tts-omnivoice-age' },
+                { key: 'pitch',     container: 'omni-chips-pitch',      input: 'tts-omnivoice-pitch' },
+                { key: 'style',     container: 'omni-chips-style',      input: 'tts-omnivoice-style' },
+                { key: 'accentEn',  container: 'omni-chips-accent-en',  input: 'tts-omnivoice-accent-en' },
+                { key: 'dialectCn', container: 'omni-chips-dialect-cn', input: 'tts-omnivoice-dialect-cn' }
+            ];
+
+            window.renderOmnivoiceVoiceDesignChips = function() {
+                OMNIVOICE_CHIP_GROUPS.forEach(group => {
+                    const container = document.getElementById(group.container);
+                    const input = document.getElementById(group.input);
+                    if (!container || !input) return;
+                    if (container.dataset.omniRendered === '1') return;
+                    container.innerHTML = '';
+                    const options = OMNIVOICE_VOICE_DESIGN_OPTIONS[group.key] || [];
+                    options.forEach(label => {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'tts-chip' + (label === input.value ? ' active' : '');
+                        btn.textContent = label;
+                        btn.onclick = () => {
+                            input.value = label;
+                            container.querySelectorAll('.tts-chip').forEach(c => c.classList.remove('active'));
+                            btn.classList.add('active');
+                        };
+                        container.appendChild(btn);
+                    });
+                    container.dataset.omniRendered = '1';
+                });
+            };
+
+            window.getOmnivoiceVoiceDesign = function() {
+                const read = (id, fallback) => (document.getElementById(id)?.value || fallback);
+                return {
+                    gender:    read('tts-omnivoice-gender', 'Random'),
+                    age:       read('tts-omnivoice-age', 'Adult'),
+                    pitch:     read('tts-omnivoice-pitch', 'Medium'),
+                    style:     read('tts-omnivoice-style', 'Calm'),
+                    accentEn:  read('tts-omnivoice-accent-en', 'American'),
+                    dialectCn: read('tts-omnivoice-dialect-cn', 'Mandarin')
+                };
+            };
+
             window.selectTtsBackend = function(backend, options = {}) {
                 const resolvedBackend = LABOON_TTS_BACKEND_MODELS[backend] ? backend : getDefaultLaboonTtsBackend();
                 const hiddenBackend = document.getElementById('tts-backend-select');
                 const geminiChip = document.getElementById('chip-engine-gemini');
                 const cloudChip = document.getElementById('chip-engine-cloud');
                 const qwenChip = document.getElementById('chip-engine-qwen');
+                const omnivoiceChip = document.getElementById('chip-engine-omnivoice');
 
                 if (hiddenBackend) hiddenBackend.value = resolvedBackend;
                 window._ttsBackend = resolvedBackend;
@@ -7716,6 +7797,13 @@
                 if (geminiChip) geminiChip.classList.toggle('active', resolvedBackend === 'gemini_api');
                 if (cloudChip) cloudChip.classList.toggle('active', resolvedBackend === 'cloud_tts');
                 if (qwenChip) qwenChip.classList.toggle('active', resolvedBackend === 'qwen');
+                if (omnivoiceChip) omnivoiceChip.classList.toggle('active', resolvedBackend === 'omnivoice');
+
+                const omniPanel = document.getElementById('tts-omnivoice-panel');
+                if (omniPanel) {
+                    omniPanel.style.display = resolvedBackend === 'omnivoice' ? 'block' : 'none';
+                    if (resolvedBackend === 'omnivoice') window.renderOmnivoiceVoiceDesignChips();
+                }
 
                 if (resolvedBackend === 'qwen' && window._ttsMode === 'dialogue' && typeof showToast === 'function' && !options.silent) {
                     showToast('Dialogue mode works best with Gemini TTS right now.', 'warning');
@@ -8282,11 +8370,61 @@
                         returnedAudioMime = audioPart.inlineData?.mimeType || '';
 
                     } else if (selectedEngine === 'omnivoice') {
-                        // V93.29 Phase 1A: OmniVoice backend is registered in LABOON_TTS_BACKEND_MODELS
-                        // and selectable from the chip group, but the actual call path (Replicate proxy
-                        // or self-host) is not wired yet. Phase 1B will add the Cloud Function + secret.
-                        // For now, surface a clear error instead of silently falling through to qwen.
-                        throw new Error('OmniVoice backend is registered (Phase 1A) but not wired yet. Pick Qwen / Gemini / Cloud TTS for now — Phase 1B will add the Replicate proxy.');
+                        // V93.32 Phase 1B: free path via @gradio/client → public HF Space k2-fsa/OmniVoice
+                        // → /_design_fn endpoint. No Cloud Function, no API key, no secret. Queue + ZeroGPU
+                        // community quota applies. If the Space is paused or schema drifts, surface a clear
+                        // error pointing at the Space status page.
+                        const omniLangMap = {
+                            'th-TH': 'Thai', 'en-US': 'English', 'ja-JP': 'Japanese',
+                            'zh-CN': 'Chinese', 'ko-KR': 'Korean', 'auto': 'English'
+                        };
+                        const omniLang = omniLangMap[selectedLanguageCode] || 'English';
+                        const omniVoiceDesign = window.getOmnivoiceVoiceDesign
+                            ? window.getOmnivoiceVoiceDesign()
+                            : { gender: 'Random', age: 'Adult', pitch: 'Medium', style: 'Calm', accentEn: 'American', dialectCn: 'Mandarin' };
+
+                        if (!window._gradioClientModulePromise) {
+                            window._gradioClientModulePromise = import('https://esm.sh/@gradio/client');
+                        }
+                        const gradioModule = await window._gradioClientModulePromise;
+                        const GradioClient = gradioModule.Client || gradioModule.default?.Client;
+                        if (!GradioClient) throw new Error('Failed to load @gradio/client from esm.sh — check network / CDN reachability.');
+
+                        const hfClient = await GradioClient.connect('k2-fsa/OmniVoice');
+                        const omniResult = await hfClient.predict('/_design_fn', [
+                            transcript,                  // Text (str)
+                            omniLang,                    // Language (Literal, e.g. "Thai")
+                            32,                          // Inference Steps (4-64)
+                            2.0,                         // Guidance Scale CFG (0.0-4.0)
+                            true,                        // Denoise
+                            1.0,                         // Speed (0.5-1.5)
+                            0,                           // Duration (sec; 0 = auto)
+                            true,                        // Preprocess Prompt
+                            true,                        // Postprocess Output
+                            omniVoiceDesign.gender,      // Gender
+                            omniVoiceDesign.age,         // Age
+                            omniVoiceDesign.pitch,       // Pitch
+                            omniVoiceDesign.style,       // Style
+                            omniVoiceDesign.accentEn,    // English Accent
+                            omniVoiceDesign.dialectCn    // Chinese Dialect
+                        ]);
+
+                        const audioFile = omniResult?.data?.[0];
+                        const audioUrl = audioFile?.url || audioFile?.path;
+                        if (!audioUrl) {
+                            throw new Error('OmniVoice HF Space returned no audio. The Space may be paused or the /_design_fn schema may have drifted — check https://huggingface.co/spaces/k2-fsa/OmniVoice');
+                        }
+
+                        const audioFetch = await fetch(audioUrl);
+                        if (!audioFetch.ok) throw new Error(`Failed to fetch OmniVoice audio file: ${audioFetch.status} ${audioFetch.statusText}`);
+                        const audioBlob = await audioFetch.blob();
+                        returnedAudioMime = audioBlob.type || 'audio/wav';
+                        audioDataBase64 = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(String(reader.result).split(',')[1]);
+                            reader.readAsDataURL(audioBlob);
+                        });
+                        resolvedBackendModel = 'k2-fsa/OmniVoice@HF';
                     } else {
                         // Qwen3-TTS logic
                         const qwenUrl = localStorage.getItem('ai_qwen_url') || 'http://localhost:8880/v1';
