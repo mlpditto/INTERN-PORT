@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.32</title>
+    <title>Nika V93.33</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12474,16 +12474,29 @@
                 }
                 
                 const prompt = `You are a high-level Assessment Specialist. Analyze these quiz questions for redundancy, logical variety, and cognitive depth (Bloom's Taxonomy).
-                
+
+                ⚠️ STEP 0 — PER-QUESTION LANGUAGE DETECTION (DO THIS BEFORE ANYTHING ELSE):
+                For EACH source question Q[n] in the list below, identify its predominant language by looking at the question stem (NOT the options):
+                  • Primarily Thai characters → mark as "th"
+                  • Primarily English characters → mark as "en"
+                  • Mixed Thai+English → use the language of the question stem sentence, NOT the technical/medical loanwords
+                Hold this per-question language mapping in mind while you generate each "improvedQuestion".
+
+                ⚠️ STRICT LANGUAGE RULE for "improvedQuestion" (HARD FORMAT REQUIREMENT):
+                - "improvedQuestion.q" AND every entry in "improvedQuestion.options" MUST be written in the EXACT SAME language you detected for the source Q[qNumber] in STEP 0.
+                - NEVER translate. If Q3 is Thai → improvedQuestion for index 3 MUST be Thai. If Q5 is English → improvedQuestion for index 5 MUST be English.
+                - Medical/technical loanwords (e.g. "MRI", "ECG", "stroke") may appear inline as they do in the source — do NOT use them as an excuse to switch the whole sentence's language.
+                - The "analysisText", "issue", and "suggestion" fields are admin-facing meta-feedback — write THOSE in Thai regardless of source language.
+
                 YOUR GOALS:
                 1. Identify simple "Recall" questions and suggest shifting them to "Application" or "Analysis" (Higher-Order Thinking).
                 2. Evaluate Distractor Quality: Mark questions where distractors are too easy or obviously wrong.
                 3. Suggest scenarios/clinical contexts to make the assessment more realistic and challenging.
-                
+
                 Questions list:
                 ${qList}
-                
-                OUTPUT FORMAT (MANDATORY JSON):
+
+                OUTPUT FORMAT (MANDATORY JSON — placeholders are language-neutral on purpose; fill them in the language demanded by STEP 0):
                 {
                   "suggestedTitles": { "full": "...", "short": "..." },
                   "analysisText": "Professional summary in Thai, evaluating the overall Challenge Level (Low/Med/High) and suggesting a better balance of question types.",
@@ -12494,23 +12507,20 @@
                       "issue": "Detailed issue description in Thai (e.g., 'เป็นเพียงความจำระดับพื้นฐาน และตัวเลือกไม่สมเหตุสมผล')",
                       "suggestion": "Detailed Thai suggestion on how to make it more challenging (e.g. 'เปลี่ยนเป็นโจทย์สถานการณ์จำลอง เพื่อให้ผู้เรียนวิเคราะห์')",
                       "improvedQuestion": {
-                        "q": "Enhanced question text using Application/Analysis approach",
+                        "q": "<<<rewritten question stem — MUST be in the same language as source Q[qNumber] per STEP 0>>>",
                         "type": "choice",
-                        "options": ["Plausible Distractor A", "Correct Answer B", "Plausible Distractor C", "Plausible Distractor D"],
+                        "options": ["<<<distractor, same language as q>>>", "<<<correct answer, same language as q>>>", "<<<distractor, same language as q>>>", "<<<distractor, same language as q>>>"],
                         "correct": [1],
                         "timer": 60
                       }
                     }
                   ]
                 }
-                
-                CRITICAL INSTRUCTION: The "improvedQuestion" MUST incorporate 'Professional-Grade' distractors and higher-order challenge (Analysis/Application). Omit perfect questions. 
-                
-                ⚠️ LANGUAGE INHERITANCE RULE (STRICT): 
-                1. The "improvedQuestion" (both "q" and "options") MUST maintain the EXACT SAME LANGUAGE as the original input question. 
-                2. DO NOT translate questions. If the input is English, the output MUST be English. If the input is Thai, the output MUST be Thai.
-                3. Use THAI only for "analysisText", "issue", and "suggestion" fields to provide feedback to the admin. 
-                4. Failure to maintain language consistency in the "improvedQuestion" object is a format violation.`;
+
+                CRITICAL INSTRUCTIONS:
+                1. The "improvedQuestion" MUST incorporate 'Professional-Grade' distractors and higher-order challenge (Analysis/Application).
+                2. Omit perfect questions — don't return an item for them.
+                3. SELF-CHECK before returning: re-read each improvedQuestion.q and confirm its language matches the source Q[qNumber] from STEP 0. If you find a mismatch, REGENERATE that item in the correct language. A language mismatch is a hard format error.`;
                 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-2.5-pro';
                 
