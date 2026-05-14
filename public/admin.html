@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.33</title>
+    <title>Nika V93.34</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -9794,8 +9794,8 @@
                         <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:6px 12px; background:rgba(124,58,237,0.1); border-radius:12px; border:1px solid rgba(124,58,237,0.25); box-shadow:0 4px 15px rgba(0,0,0,0.1);">
                             <span style="font-size:0.65em; font-weight:900; color:#a78bfa; letter-spacing:0.8px; white-space:nowrap; text-transform:uppercase; margin-right:4px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Intelligence</span>
                             <div class="glass-toggle-container" id="ai-analyze-model-toggle" style="margin:0; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.05); padding:3px; height:32px; border-radius:10px; gap:2px;">
-                                <div class="glass-toggle-item active" data-value="gemini-2.5-flash" onclick="window.selectAiToolbarToggle(this,'ai-analyzer-model-val')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#fbbf24;">Flash</div>
-                                <div class="glass-toggle-item" data-value="gemini-2.5-pro" onclick="window.selectAiToolbarToggle(this,'ai-analyzer-model-val')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#94a3b8;">Pro</div>
+                                <div class="glass-toggle-item" data-value="gemini-2.5-flash" onclick="window.selectAiToolbarToggle(this,'ai-analyzer-model-val')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#fbbf24;">Flash</div>
+                                <div class="glass-toggle-item active" data-value="gemini-2.5-pro" onclick="window.selectAiToolbarToggle(this,'ai-analyzer-model-val')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#94a3b8;">Pro</div>
                                 <div class="glass-toggle-item" data-value="gpt-4o" onclick="window.selectAiToolbarToggle(this,'ai-analyzer-model-val')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#94a3b8;">GPT</div>
                                 <div class="glass-toggle-item" data-value="claude-4-sonnet-latest" onclick="window.selectAiToolbarToggle(this,'ai-analyzer-model-val')" style="font-size:0.65em; font-weight:800; padding:2px 10px; border-radius:8px; color:#94a3b8;">Claude</div>
                                 <div class="glass-toggle-item" data-value="typhoon-v2.5-30b-a3b-instruct" onclick="window.selectAiToolbarToggle(this,'ai-analyzer-model-val')" title="Typhoon" style="font-size:0.7em; padding:2px 8px; border-radius:8px; color:#94a3b8;">🌀</div>
@@ -14664,6 +14664,26 @@ For "changes": list every meaningful edit between original and improved. Each en
                 });
             }
 
+            // V93.34: helper to keep a chip-rail's .active class in sync with its hidden input.
+            // The static HTML defaults can drift from the hidden input value (e.g. V93.31 Gemini
+            // refresh moved hidden defaults but kept stale Flash chip .active marker), and
+            // localStorage-loaded values bypass any chip-visual update. Run after attaching
+            // click handlers so the rail looks correct on first paint of the modal.
+            const syncChipRailToHidden = (containerEl, hiddenId) => {
+                if (!containerEl) return;
+                const stored = localStorage.getItem({
+                    'ai-analyzer-model-val': 'ai_default_analyzer_model',
+                    'toolbar-ai-translate-model': 'ai_default_translate_model'
+                }[hiddenId]);
+                const hidden = document.getElementById(hiddenId);
+                if (!hidden) return;
+                const resolved = stored || hidden.value;
+                hidden.value = resolved;
+                containerEl.querySelectorAll('.glass-toggle-item').forEach(item => {
+                    item.classList.toggle('active', item.dataset.value === resolved);
+                });
+            };
+
             // 🔥 Init AI Model Toggles
             const aiAnalyzeToggle = document.getElementById('ai-analyze-model-toggle');
             if (aiAnalyzeToggle) {
@@ -14675,6 +14695,7 @@ For "changes": list every meaningful edit between original and improved. Each en
                         this.classList.add('active');
                     };
                 });
+                syncChipRailToHidden(aiAnalyzeToggle, 'ai-analyzer-model-val');
             }
 
             const aiTranslateToggle = document.getElementById('ai-translate-model-toggle');
@@ -14687,6 +14708,7 @@ For "changes": list every meaningful edit between original and improved. Each en
                         this.classList.add('active');
                     };
                 });
+                syncChipRailToHidden(aiTranslateToggle, 'toolbar-ai-translate-model');
             }
 
             // 🔥 Init AI Language Toggle (TH/EN/CN/JP)
