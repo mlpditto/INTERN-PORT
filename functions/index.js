@@ -280,7 +280,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             const client = await auth.getClient();
             const token = await client.getAccessToken();
 
-            let actualModelName = model || "gemini-1.5-flash-002";
+            let actualModelName = model || "gemini-2.5-flash";
             
             // Standardize model name for Vertex AI targeting (V89.90 - April 2026)
             if (model?.startsWith('gemini-') || !model) {
