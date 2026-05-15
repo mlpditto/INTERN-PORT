@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.61)</title>
+    <title>Internship Portfolio (V94.62)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5920,6 +5920,13 @@
             });
 
             document.getElementById('quiz-run-title').innerText = currentQuiz.title + (isPracticeMode ? ' (Practice ฝึกซ้อม)' : '');
+            // [V94.62] Defensive reset of nav button disabled state. Belt-and-suspenders with
+            // the submitQuiz success-path fix — covers any other path that might leave
+            // buttons disabled between quizzes (e.g. safety timeout misfires, future code).
+            ['btn-quiz-next', 'btn-quiz-prev', 'btn-quiz-submit'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.disabled = false;
+            });
             document.getElementById('quizModal').style.display = 'flex';
             renderQuizStep(isResuming);
             initCheatDetector();
@@ -7260,6 +7267,14 @@
 
                 // --- 4. UI Success & Modal Close ---
                 clearTimeout(safetyTimeout);
+                // [V94.62] Re-enable nav buttons before closing modal — without this, the next
+                // quiz the intern opens reuses the SAME #btn-quiz-next/prev/submit elements with
+                // disabled=true still set from this submit, blocking Next clicks until the
+                // timer expires and programmatically advances. Mirrors safety-timeout + error
+                // paths which already reset.
+                if (btn) btn.disabled = false;
+                if (btnPrev) btnPrev.disabled = false;
+                if (btnNext) btnNext.disabled = false;
                 document.getElementById('quizModal').style.display = 'none';
                 isSubmittingQuiz = false;
                 morningBonusPromise.then(result => {
