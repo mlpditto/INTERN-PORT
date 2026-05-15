@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.39</title>
+    <title>Nika V93.40</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -29687,15 +29687,23 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const flexDir = isAdmin ? "row-reverse" : "row";
                     const marginSide = isAdmin ? "margin-left:50px;" : "margin-right:50px;";
 
+                    // V93.40: per-bubble ✕ delete button — admin can delete any message
+                    // (own or user's). Calls deleteChatMsg(commentId) which confirms then
+                    // deletes the comment doc; firestore.rules now allows delete: if isAdmin().
+                    const delBtnColor = isAdmin ? '#94a3b8' : 'rgba(255,255,255,0.7)';
+                    const delBtnHover = isAdmin ? '#dc2626' : '#fff';
                     box.innerHTML += `
                         <div style="display:flex; gap:10px; flex-direction:${flexDir}; ${marginSide}">
                             ${pic}
                             <div style="max-width:85%; padding:10px 15px; ${bubbleStyle}">
-                                <div style="font-size:0.7em; opacity:0.7; font-weight:800; margin-bottom:4px;">${m.sender}</div>
+                                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;">
+                                    <span style="font-size:0.7em; opacity:0.7; font-weight:800;">${m.sender}</span>
+                                    <button onclick="deleteChatMsg('${d.id}')" title="Delete message" style="background:none; border:none; color:${delBtnColor}; cursor:pointer; font-size:0.85em; padding:0 4px; line-height:1; opacity:0.6;" onmouseover="this.style.opacity='1'; this.style.color='${delBtnHover}';" onmouseout="this.style.opacity='0.6'; this.style.color='${delBtnColor}';">✕</button>
+                                </div>
                                 <div style="font-size:0.9em; line-height:1.4;">${msg}</div>
                             </div>
                         </div>
-                    `; 
+                    `;
                 }); 
                 box.scrollTop = box.scrollHeight;
             }, err => {
@@ -29729,6 +29737,21 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             } catch (e) {
                 console.error('[sendChat] write failed:', e);
                 alert(`Send failed: ${e.message || 'unknown error'}\n\nMessage preserved in the input field — try again.`);
+            }
+        }
+        // V93.40: admin can delete any chat message in the side_quest comment thread.
+        // Confirms, then removes the comment doc — onSnapshot listener re-renders the
+        // box without the deleted bubble. Firestore rule: side_quests/{id}/comments
+        // allow delete: if isAdmin().
+        async function deleteChatMsg(commentId) {
+            const id = document.getElementById('chat-card-id').value;
+            if (!id || !commentId) return;
+            if (!confirm('ลบข้อความนี้?')) return;
+            try {
+                await db.collection("side_quests").doc(id).collection("comments").doc(commentId).delete();
+            } catch (e) {
+                console.error('[deleteChatMsg] failed:', e);
+                alert(`Delete failed: ${e.message || 'unknown error'}`);
             }
         }
         async function openArchiveModal() {
