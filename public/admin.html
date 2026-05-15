@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.36</title>
+    <title>Nika V93.37</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -9720,6 +9720,19 @@
                                 <div class="q-text-split">
                                     <div class="q-text-pane">
                                         <div class="q-text-pane-label">📝 Markdown</div>
+                                        <!-- [V93.37] Markdown helper toolbar — inserts syntax into textarea without breaking the markdown-native translation pipeline -->
+                                        <div class="md-toolbar" style="display:flex; gap:4px; margin-bottom:6px; flex-wrap:wrap;">
+                                            <button type="button" onclick="mdToolbarInsert('quiz-case-content', 'bold')" title="Bold (wraps selection in **...**)" style="background:#1e293b; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; font-weight:900; cursor:pointer;">B</button>
+                                            <button type="button" onclick="mdToolbarInsert('quiz-case-content', 'italic')" title="Italic (wraps selection in *...*)" style="background:#1e293b; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; font-style:italic; cursor:pointer;">I</button>
+                                            <span style="width:1px; background:#334155; margin:2px 2px;"></span>
+                                            <button type="button" onclick="mdToolbarInsert('quiz-case-content', 'h2')" title="Heading 2 (## at line start)" style="background:#1e293b; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; font-weight:700; cursor:pointer;">H2</button>
+                                            <button type="button" onclick="mdToolbarInsert('quiz-case-content', 'h3')" title="Heading 3 (### at line start)" style="background:#1e293b; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; font-weight:700; cursor:pointer;">H3</button>
+                                            <span style="width:1px; background:#334155; margin:2px 2px;"></span>
+                                            <button type="button" onclick="mdToolbarInsert('quiz-case-content', 'ul')" title="Bullet list (- at line start)" style="background:#1e293b; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; cursor:pointer;">• List</button>
+                                            <button type="button" onclick="mdToolbarInsert('quiz-case-content', 'ol')" title="Ordered list (1. at line start)" style="background:#1e293b; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; cursor:pointer;">1. List</button>
+                                            <span style="width:1px; background:#334155; margin:2px 2px;"></span>
+                                            <button type="button" onclick="mdToolbarInsert('quiz-case-content', 'link')" title="Insert link (prompts for URL, wraps selection)" style="background:#1e293b; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; cursor:pointer;">🔗 Link</button>
+                                        </div>
                                         <textarea id="quiz-case-content" oninput="renderQTextPreview(this)" placeholder="Markdown supported: **bold**, *italic*, - list, [link](url)..." style="width:100%; padding:12px; border:1.5px solid #334155; border-radius:12px; font-size:0.85em; background:#0f172a; color:#f1f5f9; height:140px; resize:vertical; box-sizing:border-box; line-height:1.55;"></textarea>
                                     </div>
                                     <div class="q-text-pane">
@@ -14164,6 +14177,101 @@ For "changes": list every meaningful edit between original and improved. Each en
             const div = document.createElement('div');
             div.textContent = str;
             return div.innerHTML;
+        };
+
+        // [V93.37] Markdown helper toolbar — inserts markdown syntax into a textarea
+        // at the current selection (or cursor position). Used by Case Study Content
+        // editor (#quiz-case-content) to give admins WYSIWYG-like buttons WITHOUT
+        // breaking the markdown-native pipeline (V93 translation + intern marked.js
+        // rendering both expect markdown plaintext). Inline-wrap markdown (bold/italic/
+        // link) wraps the selection; block-level (heading/list) inserts at line start.
+        // After insertion fires an `input` event so renderQTextPreview re-renders.
+        window.mdToolbarInsert = function(textareaId, type) {
+            const ta = document.getElementById(textareaId);
+            if (!ta) return;
+            const start = ta.selectionStart;
+            const end = ta.selectionEnd;
+            const selected = ta.value.substring(start, end);
+            const before = ta.value.substring(0, start);
+            const after = ta.value.substring(end);
+            let replacement = '';
+            let cursorStart = start;
+            let cursorEnd = start;
+
+            // Helper: find the start of the line containing `pos` (used by block ops)
+            const lineStart = (pos) => {
+                const nl = ta.value.lastIndexOf('\n', pos - 1);
+                return nl === -1 ? 0 : nl + 1;
+            };
+
+            switch (type) {
+                case 'bold': {
+                    const placeholder = selected || 'bold text';
+                    replacement = `**${placeholder}**`;
+                    cursorStart = start + 2;
+                    cursorEnd = start + 2 + placeholder.length;
+                    ta.value = before + replacement + after;
+                    break;
+                }
+                case 'italic': {
+                    const placeholder = selected || 'italic text';
+                    replacement = `*${placeholder}*`;
+                    cursorStart = start + 1;
+                    cursorEnd = start + 1 + placeholder.length;
+                    ta.value = before + replacement + after;
+                    break;
+                }
+                case 'h2':
+                case 'h3': {
+                    const prefix = type === 'h2' ? '## ' : '### ';
+                    const ls = lineStart(start);
+                    const beforeLs = ta.value.substring(0, ls);
+                    const rest = ta.value.substring(ls);
+                    // If line already starts with #/##/### or has prefix — toggle off; else add
+                    const stripped = rest.replace(/^#{1,6}\s+/, '');
+                    const lineEnd = stripped.indexOf('\n');
+                    const lineText = lineEnd === -1 ? stripped : stripped.substring(0, lineEnd);
+                    const restAfterLine = lineEnd === -1 ? '' : stripped.substring(lineEnd);
+                    const placeholder = lineText || (type === 'h2' ? 'Heading 2' : 'Heading 3');
+                    replacement = prefix + placeholder + restAfterLine;
+                    ta.value = beforeLs + replacement;
+                    cursorStart = beforeLs.length + prefix.length;
+                    cursorEnd = cursorStart + placeholder.length;
+                    break;
+                }
+                case 'ul':
+                case 'ol': {
+                    const marker = type === 'ul' ? '- ' : '1. ';
+                    const ls = lineStart(start);
+                    const beforeLs = ta.value.substring(0, ls);
+                    const rest = ta.value.substring(ls);
+                    const lineEnd = rest.indexOf('\n');
+                    const lineText = lineEnd === -1 ? rest : rest.substring(0, lineEnd);
+                    const restAfterLine = lineEnd === -1 ? '' : rest.substring(lineEnd);
+                    const placeholder = lineText || (type === 'ul' ? 'list item' : 'first item');
+                    replacement = marker + placeholder + restAfterLine;
+                    ta.value = beforeLs + replacement;
+                    cursorStart = beforeLs.length + marker.length;
+                    cursorEnd = cursorStart + placeholder.length;
+                    break;
+                }
+                case 'link': {
+                    const url = prompt('Link URL:', 'https://');
+                    if (!url) return;
+                    const placeholder = selected || 'link text';
+                    replacement = `[${placeholder}](${url})`;
+                    cursorStart = start + 1;
+                    cursorEnd = start + 1 + placeholder.length;
+                    ta.value = before + replacement + after;
+                    break;
+                }
+                default:
+                    return;
+            }
+
+            ta.focus();
+            ta.setSelectionRange(cursorStart, cursorEnd);
+            ta.dispatchEvent(new Event('input', { bubbles: true }));
         };
 
         // Markdown preview for q-text (Phase 1, V91.35)
