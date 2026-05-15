@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.37</title>
+    <title>Nika V93.38</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13350,10 +13350,27 @@
                         ['bold', 'italic', 'underline'],
                         [{ 'header': [false, 2, 3] }],
                         [{ 'list': 'bullet' }, { 'list': 'ordered' }],
-                        ['link', 'clean']
+                        // [V93.38] 'image' added — handler overridden below to upload via Firebase Storage instead of Quill's default base64 embed.
+                        ['link', 'image', 'clean']
                     ]
                 }
             });
+            // [V93.38] Override Quill's default base64 image handler with Firebase Storage upload.
+            // Quill default: file picker → base64 inline → bloats Firestore (1MB doc limit ≈ ~700KB image).
+            // Override: file picker → upload to `editor-images/{timestamp}_{safeName}` → insert as <img src=storageUrl>.
+            // Reuses the same Firebase Storage SDK already loaded for podcasts (admin.html:3428).
+            try {
+                const tbModule = window.quillReflective.getModule('toolbar');
+                if (tbModule && typeof tbModule.addHandler === 'function') {
+                    tbModule.addHandler('image', function() {
+                        if (typeof window.uploadImageForQuill === 'function') {
+                            window.uploadImageForQuill(window.quillReflective);
+                        }
+                    });
+                }
+            } catch (e) {
+                console.warn('[V93.38] Quill image handler override failed:', e);
+            }
             // Sync hidden textarea on every change so legacy .value reads keep working.
             window.quillReflective.on('text-change', function() {
                 const textarea = document.getElementById('reflective-review-comment');
@@ -13363,6 +13380,53 @@
                 }
             });
             return window.quillReflective;
+        };
+
+        // [V93.38] File-picker → Firebase Storage upload → insert <img> at Quill cursor.
+        // Cap: 2 MB per file. Path: editor-images/{timestamp}_{sanitized-original-name}.
+        // Same auth profile as podcast uploads (admin email — rules managed in Firebase Console,
+        // not in this repo's storage.rules because the file doesn't exist; Console catches all).
+        // If admin sees "permission-denied" on first use, the Firebase Console storage rule
+        // needs to whitelist `editor-images/**` writes — see PR description for the snippet.
+        window.uploadImageForQuill = function(quillInstance) {
+            if (!quillInstance) return;
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = async function() {
+                const file = input.files && input.files[0];
+                if (!file) return;
+                if (!file.type.startsWith('image/')) {
+                    alert('Please choose an image file.');
+                    return;
+                }
+                const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+                if (file.size > MAX_BYTES) {
+                    alert('Image too large — max 2 MB. Selected: ' + Math.round(file.size / 1024) + ' KB');
+                    return;
+                }
+                // Quill loses selection when modal interactions take focus; capture before await.
+                const range = quillInstance.getSelection(true) || { index: quillInstance.getLength() };
+                const safeName = String(file.name || 'image').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-60);
+                const filename = 'editor-images/' + Date.now() + '_' + safeName;
+                try {
+                    if (typeof showToast === 'function') showToast('📤 Uploading image…');
+                    const ref = firebase.storage().ref(filename);
+                    const snap = await ref.put(file, { contentType: file.type || 'image/png' });
+                    const url = await snap.ref.getDownloadURL();
+                    quillInstance.insertEmbed(range.index, 'image', url, 'user');
+                    quillInstance.setSelection(range.index + 1, 0, 'silent');
+                    if (typeof showToast === 'function') showToast('✅ Image uploaded');
+                } catch (err) {
+                    console.error('[V93.38] Quill image upload failed:', err);
+                    const msg = err && err.message ? err.message : 'Unknown error';
+                    const hint = /permission|denied|unauthorized/i.test(msg)
+                        ? '\n\nStorage rules likely block editor-images/**. Update rules in Firebase Console (see PR notes).'
+                        : '';
+                    alert('Image upload failed: ' + msg + hint);
+                }
+            };
+            input.click();
         };
 
         // [V93.35] Helpers to load/save Quill content with sanitization + backward compat.
