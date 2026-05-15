@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.49</title>
+    <title>Nika V93.50</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -10158,7 +10158,7 @@
             <div class="modal-content reflective-liquid-modal">
                 <div class="reflective-liquid-header" style="margin-bottom:10px;">
                     <h3 class="reflective-liquid-title">Reflective Review</h3>
-                    <button type="button" class="reflective-close-btn" onclick="forceHideModal('reflectiveReviewModal')" aria-label="Close review modal" style="width:28px; height:28px; border-radius:8px;">
+                    <button type="button" class="reflective-close-btn" onclick="closeReflectiveReviewWithCleanup()" aria-label="Close review modal" style="width:28px; height:28px; border-radius:8px;">
                         <i class="fa-solid fa-xmark" style="font-size:0.8em;"></i>
                     </button>
                 </div>
@@ -10278,7 +10278,7 @@
 
                 <div class="reflective-review-actions">
                     <button class="magic-btn reflective-review-save-btn" onclick="saveReflectiveReview()" title="Save & Score (Ctrl/⌘ + Enter)">Save & Score<kbd class="reflective-kbd-hint">Ctrl+↵</kbd></button>
-                    <button class="btn-sm btn-dark reflective-review-cancel-btn" onclick="forceHideModal('reflectiveReviewModal')" title="Cancel (Esc)">Cancel</button>
+                    <button class="btn-sm btn-dark reflective-review-cancel-btn" onclick="closeReflectiveReviewWithCleanup()" title="Cancel (Esc)">Cancel</button>
                 </div>
             </div>
         </div>
@@ -13714,6 +13714,14 @@
                     }
                     quillInstance.insertEmbed(range.index, 'image', url, 'user');
                     quillInstance.setSelection(range.index + 1, 0, 'silent');
+                    // V93.48 Storage GC: track FRESH uploads (not dedup-reuse hits) so we can
+                    // delete the orphan file later if admin removes the image before save OR
+                    // discards the modal without saving. Reuse hits aren't tracked because
+                    // another reflective_logs doc may already reference the same file via the
+                    // SHA-256 path (V93.43) — deleting it would 404 the other doc's <img src>.
+                    if (!reused && window._quillSessionUploads instanceof Set) {
+                        window._quillSessionUploads.add(filename);
+                    }
                     if (typeof showToast === 'function') showToast(reused ? '♻️ Reused existing image (dedup)' : '✅ Image uploaded');
                 } catch (err) {
                     console.error('[V93.43] Quill image upload failed:', err);
@@ -13727,8 +13735,53 @@
             input.click();
         };
 
+        // V93.48 Storage GC for Quill image uploads.
+        //
+        // Lifecycle (Reflective Review modal):
+        //   - openReflectiveReviewModal → loadReflectiveQuillContent() resets the
+        //     tracking Set (fresh session).
+        //   - uploadImageForQuill (above) adds the Storage path on every FRESH put().
+        //     Dedup-reuse hits are skipped because another doc may reference the
+        //     file via the SHA-256 path (V93.43).
+        //   - saveReflectiveReview → cleanupQuillSessionUploads(commentHtml) deletes
+        //     tracked files whose basename is NOT present in the final saved HTML
+        //     (admin uploaded then removed the image before saving).
+        //   - closeReflectiveReviewWithCleanup → cleanupQuillSessionUploads('') deletes
+        //     EVERY tracked file (admin uploaded but discarded the modal entirely).
+        //
+        // Fire-and-forget: Storage delete failures are logged but never block the UI.
+        // The basename test catches both raw paths and percent-encoded download URLs
+        // because Firebase Storage URLs embed the unencoded basename after %2F.
+        window._quillSessionUploads = window._quillSessionUploads || new Set();
+        window.cleanupQuillSessionUploads = async function(keepHtml) {
+            const set = window._quillSessionUploads;
+            if (!(set instanceof Set) || set.size === 0) return;
+            const keep = String(keepHtml || '');
+            const toDelete = [];
+            set.forEach(path => {
+                const basename = path.split('/').pop();
+                if (basename && !keep.includes(basename)) toDelete.push(path);
+            });
+            for (const path of toDelete) {
+                try {
+                    await firebase.storage().ref(path).delete();
+                } catch (e) {
+                    console.warn('[V93.48] Quill image GC: failed to delete', path, e && e.message);
+                }
+            }
+            window._quillSessionUploads = new Set();
+        };
+        window.closeReflectiveReviewWithCleanup = function() {
+            window.cleanupQuillSessionUploads('').catch(() => {});
+            forceHideModal('reflectiveReviewModal');
+        };
+
         // [V93.35] Helpers to load/save Quill content with sanitization + backward compat.
         window.loadReflectiveQuillContent = function(adminCommentHtml, adminCommentPlain) {
+            // V93.48: reset Storage GC tracking on every modal open — anything uploaded
+            // before this call belongs to a prior session and is either persisted in a
+            // saved doc or already GC'd. Fresh Set = fresh accounting.
+            window._quillSessionUploads = new Set();
             const q = window.initReflectiveQuill();
             const textarea = document.getElementById('reflective-review-comment');
             const plain = adminCommentPlain || '';
@@ -33286,6 +33339,13 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
                 await logRef.update(upData);
                 showToast(`Reviewed! User can claim +${bonus} points ✨`);
+                // V93.48: GC orphan Storage uploads from this session. Files whose
+                // basename is absent from the committed commentHtml were uploaded but
+                // not retained — safe to delete because dedup-reuse uploads (which
+                // could be shared with other docs) were never tracked. Fire-and-forget.
+                if (typeof window.cleanupQuillSessionUploads === 'function') {
+                    window.cleanupQuillSessionUploads(commentHtml || '').catch(() => {});
+                }
                 forceHideModal('reflectiveReviewModal');
             } catch (e) {
                 alert("Error: " + e.message);
