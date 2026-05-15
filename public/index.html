@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.60)</title>
+    <title>Internship Portfolio (V94.61)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -9216,7 +9216,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                             <span style="color:#28a745; font-size:0.85em;">+0.1 pts</span>
                         </div>
                         <div style="color:#555; white-space:pre-wrap;">${log.content}</div>
-                        ${log.adminComment ? `<div style="margin-top:8px; padding:8px; background:#f0f7ff; border-radius:8px; font-size:0.9em; color:#0056b3; border-left:3px solid #0056b3;"><i class="fa-solid fa-reply"></i> <b>Admin:</b> ${log.adminComment} ${log.adminBonus ? `<span style="font-weight:bold;">(+${log.adminBonus})</span>` : ''}</div>` : ''}
+                        ${(log.adminComment || log.adminCommentHtml) ? `<div style="margin-top:8px; padding:8px; background:#f0f7ff; border-radius:8px; font-size:0.9em; color:#0056b3; border-left:3px solid #0056b3;"><i class="fa-solid fa-reply"></i> <b>Admin:</b> ${renderAdminCommentSafe(log)} ${log.adminBonus ? `<span style="font-weight:bold;">(+${log.adminBonus})</span>` : ''}</div>` : ''}
                         ${claimBtn}
                         ${claimedBadge}
                     `;
@@ -10087,12 +10087,36 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
         }
 
         // 🔥 Claim Reflective Log Bonus Points
+        // [V94.61] Intern-side mirror of admin V93.36 helper. Prefers sanitized
+        // adminCommentHtml (Quill records from V93.35+); falls back to escape+nl2br
+        // for legacy plaintext-only reflective_logs records. DOMPurify already loaded
+        // at index.html:24. Used by both list-item render and the feedback modal so
+        // the rich format authored in admin shows through end-to-end on the intern app.
+        window.renderAdminCommentSafe = function(item) {
+            if (item && item.adminCommentHtml && typeof DOMPurify !== 'undefined') {
+                return DOMPurify.sanitize(item.adminCommentHtml);
+            }
+            const plain = String((item && item.adminComment) || '').trim();
+            if (!plain) return '';
+            return plain
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\n/g, '<br>');
+        };
+
         function openReflectiveFeedback(logId) {
             const log = (window.myReflectiveLogsCache || []).find(l => l.id === logId);
             if (!log) return;
 
             const modal = document.getElementById('reflectiveFeedbackModal');
-            document.getElementById('rf-feedback-text').innerText = log.adminComment || "พี่เลี้ยงตรวจให้แล้วครับ (ไม่มีความเห็นเพิ่มเติม)";
+            // [V94.61] Honor Quill HTML when present; fall back to plaintext or default message.
+            const fbEl = document.getElementById('rf-feedback-text');
+            if (log.adminCommentHtml || log.adminComment) {
+                fbEl.innerHTML = renderAdminCommentSafe(log);
+            } else {
+                fbEl.innerText = "พี่เลี้ยงตรวจให้แล้วครับ (ไม่มีความเห็นเพิ่มเติม)";
+            }
 
             const mood = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
             document.getElementById('rf-mood-emoji').innerText = mood;
