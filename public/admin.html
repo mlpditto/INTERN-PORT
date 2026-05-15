@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.42</title>
+    <title>Nika V93.43</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13441,6 +13441,32 @@
         // not in this repo's storage.rules because the file doesn't exist; Console catches all).
         // If admin sees "permission-denied" on first use, the Firebase Console storage rule
         // needs to whitelist `editor-images/**` writes — see PR description for the snippet.
+        // V93.43: SHA-256 content-addressed deduplication. The filename is the
+        // hash itself, so two uploads of the same image bytes always resolve to
+        // the same Storage path. We probe getDownloadURL() first; if the file
+        // already exists, skip the upload entirely and reuse the URL. Saves
+        // bandwidth + Storage space + dedupes the same screenshot pasted into
+        // multiple notes/reviews.
+        //
+        // Storage rules note: existence check needs READ on editor-images/**.
+        // The V93.38 rule already permits admin read+write on that prefix, so
+        // no rules change. Only the `storage/object-not-found` error path
+        // triggers a fresh upload — every other error propagates.
+        async function _sha256Hex(file) {
+            const buf = await file.arrayBuffer();
+            const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+            return Array.from(new Uint8Array(hashBuf))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+        }
+        const _MIME_TO_EXT = {
+            'image/png': '.png',
+            'image/jpeg': '.jpg',
+            'image/jpg': '.jpg',
+            'image/gif': '.gif',
+            'image/webp': '.webp',
+            'image/svg+xml': '.svg',
+        };
         window.uploadImageForQuill = function(quillInstance) {
             if (!quillInstance) return;
             const input = document.createElement('input');
@@ -13460,18 +13486,28 @@
                 }
                 // Quill loses selection when modal interactions take focus; capture before await.
                 const range = quillInstance.getSelection(true) || { index: quillInstance.getLength() };
-                const safeName = String(file.name || 'image').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-60);
-                const filename = 'editor-images/' + Date.now() + '_' + safeName;
                 try {
-                    if (typeof showToast === 'function') showToast('📤 Uploading image…');
+                    if (typeof showToast === 'function') showToast('🔐 Hashing image…');
+                    const hash = await _sha256Hex(file);
+                    const ext = _MIME_TO_EXT[file.type] || '.png';
+                    const filename = 'editor-images/' + hash + ext;
                     const ref = firebase.storage().ref(filename);
-                    const snap = await ref.put(file, { contentType: file.type || 'image/png' });
-                    const url = await snap.ref.getDownloadURL();
+                    let url;
+                    let reused = false;
+                    try {
+                        url = await ref.getDownloadURL();
+                        reused = true;
+                    } catch (probeErr) {
+                        if (probeErr && probeErr.code !== 'storage/object-not-found') throw probeErr;
+                        if (typeof showToast === 'function') showToast('📤 Uploading image…');
+                        const snap = await ref.put(file, { contentType: file.type || 'image/png' });
+                        url = await snap.ref.getDownloadURL();
+                    }
                     quillInstance.insertEmbed(range.index, 'image', url, 'user');
                     quillInstance.setSelection(range.index + 1, 0, 'silent');
-                    if (typeof showToast === 'function') showToast('✅ Image uploaded');
+                    if (typeof showToast === 'function') showToast(reused ? '♻️ Reused existing image (dedup)' : '✅ Image uploaded');
                 } catch (err) {
-                    console.error('[V93.38] Quill image upload failed:', err);
+                    console.error('[V93.43] Quill image upload failed:', err);
                     const msg = err && err.message ? err.message : 'Unknown error';
                     const hint = /permission|denied|unauthorized/i.test(msg)
                         ? '\n\nStorage rules likely block editor-images/**. Update rules in Firebase Console (see PR notes).'
