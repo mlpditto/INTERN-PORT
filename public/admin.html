@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.47</title>
+    <title>Nika V93.49</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6109,6 +6109,15 @@
                                                         <span style="font-size:0.7em; color:#065f46;">Upload a 5–30 s sample. Voice attributes below are ignored.</span>
                                                     </div>
                                                     <div id="tts-omnivoice-clone-section" style="display:none; margin-bottom:12px; padding:12px; background:white; border:1.5px solid #6ee7b7; border-radius:12px;">
+                                                        <!-- V93.49 Phase 2.1: per-admin reusable voice preset row. Sits above the file picker; selecting a preset auto-fills audio + transcript + instruct. Save uploads current audio to voice-refs/{hash}.{ext} + persists Firestore doc. -->
+                                                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px; padding:8px 10px; background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:10px;">
+                                                            <label for="tts-omnivoice-preset-select" style="font-size:0.72em; color:#047857; font-weight:800; margin:0; white-space:nowrap;">💼 Preset:</label>
+                                                            <select id="tts-omnivoice-preset-select" onchange="applyTtsVoicePreset(this.value)" style="flex:1; min-width:0; padding:6px 9px; font-size:0.82em; border:1.5px solid #d1fae5; border-radius:8px; background:white; color:#064e3b; cursor:pointer;">
+                                                                <option value="">— Select preset —</option>
+                                                            </select>
+                                                            <button type="button" onclick="saveCurrentTtsVoicePreset()" title="Save current audio + transcript + instruct as a reusable preset" style="background:#10b981; color:white; border:none; border-radius:8px; padding:6px 10px; font-size:0.78em; font-weight:800; cursor:pointer; white-space:nowrap;">💾 Save</button>
+                                                            <button type="button" onclick="deleteCurrentTtsVoicePreset()" title="Delete the selected preset" style="background:white; color:#7f1d1d; border:1.5px solid #fecaca; border-radius:8px; padding:6px 10px; font-size:0.85em; font-weight:700; cursor:pointer;">🗑️</button>
+                                                        </div>
                                                         <label class="laboon-field-label" for="tts-omnivoice-clone-audio" style="color:#047857;">Reference Audio (5–30 s clip)</label>
                                                         <input type="file" id="tts-omnivoice-clone-audio" accept="audio/*" onchange="onOmnivoiceCloneAudioPick(this)" style="margin:6px 0 8px; font-size:0.85em;">
                                                         <audio id="tts-omnivoice-clone-preview" controls preload="metadata" style="display:none; width:100%; margin-bottom:10px;"></audio>
@@ -7722,6 +7731,12 @@
                 const designSection = document.getElementById('tts-omnivoice-design-section');
                 if (cloneSection) cloneSection.style.display = enabled ? 'block' : 'none';
                 if (designSection) designSection.style.display = enabled ? 'none' : 'block';
+                // V93.49 Phase 2.1: lazy-load preset list the first time admin reveals
+                // the clone panel. Cached on window._ttsPresetsCache; reloads happen on
+                // save/delete which call loadTtsVoicePresets explicitly.
+                if (enabled && !window._ttsPresetsLoaded && typeof window.loadTtsVoicePresets === 'function') {
+                    window.loadTtsVoicePresets();
+                }
             };
 
             window.onOmnivoiceCloneAudioPick = function(input) {
@@ -7733,6 +7748,12 @@
                     delete preview.dataset.blobUrl;
                 }
                 if (file) {
+                    // V93.49: a fresh file pick supersedes any active preset selection
+                    // (otherwise the preset's URL would still be sourced into dispatch).
+                    window._activePresetAudioUrl = '';
+                    window._activePresetAudioPath = '';
+                    const sel = document.getElementById('tts-omnivoice-preset-select');
+                    if (sel) sel.value = '';
                     const url = URL.createObjectURL(file);
                     preview.src = url;
                     preview.dataset.blobUrl = url;
@@ -7743,15 +7764,209 @@
                 }
             };
 
-            window.getOmnivoiceCloneInputs = function() {
+            // V93.49 Phase 2.1: async because a preset-sourced ref audio must be
+            // fetched from Storage on demand (URL → blob → File). Fresh file picks
+            // bypass the fetch. Dispatch site awaits this — see selectedEngine==='omnivoice'.
+            window.getOmnivoiceCloneInputs = async function() {
                 const toggle = document.getElementById('tts-omnivoice-clone-toggle');
                 if (!toggle || !toggle.checked) return null;
                 const fileInput = document.getElementById('tts-omnivoice-clone-audio');
-                const file = fileInput && fileInput.files && fileInput.files[0];
-                if (!file) return null;
+                let refAudio = fileInput && fileInput.files && fileInput.files[0];
+                if (!refAudio && window._activePresetAudioUrl) {
+                    try {
+                        const fetched = await fetch(window._activePresetAudioUrl);
+                        if (!fetched.ok) throw new Error(`Preset audio fetch failed: ${fetched.status}`);
+                        const blob = await fetched.blob();
+                        const presetName = (window._activePresetAudioPath || '').split('/').pop() || 'preset.wav';
+                        refAudio = new File([blob], presetName, { type: blob.type || 'audio/wav' });
+                    } catch (e) {
+                        console.warn('[V93.49] Preset audio fetch failed:', e && e.message);
+                        return null;
+                    }
+                }
+                if (!refAudio) return null;
                 const refText = (document.getElementById('tts-omnivoice-clone-text')?.value || '').trim();
                 const instruct = (document.getElementById('tts-omnivoice-clone-instruct')?.value || '').trim();
-                return { refAudio: file, refText, instruct };
+                return { refAudio, refText, instruct };
+            };
+
+            // V93.49 Phase 2.1: preset persistence helpers. Per-admin scoping via
+            // `createdBy == auth.uid` in both the Firestore rule and the list query.
+            // Audio is content-addressed under voice-refs/{sha256}.{ext} (mirrors
+            // V93.43 editor-images dedup). Save reuses _sha256Hex + _MIME_TO_EXT
+            // from the Quill upload pipeline. Delete does a cross-doc check before
+            // touching Storage so two presets pointing at the same dedup'd file
+            // don't break each other.
+            window._ttsPresetsCache = [];
+            window._ttsPresetsLoaded = false;
+            window._activePresetAudioUrl = '';
+            window._activePresetAudioPath = '';
+            const _TTS_PRESET_AUDIO_MIME = {
+                'audio/wav': '.wav', 'audio/x-wav': '.wav',
+                'audio/mpeg': '.mp3', 'audio/mp3': '.mp3',
+                'audio/ogg': '.ogg', 'audio/webm': '.webm',
+                'audio/mp4': '.m4a', 'audio/x-m4a': '.m4a',
+                'audio/flac': '.flac'
+            };
+
+            window.loadTtsVoicePresets = async function() {
+                if (!auth || !auth.currentUser) return;
+                try {
+                    const snap = await db.collection('tts_voice_presets')
+                        .where('createdBy', '==', auth.currentUser.uid)
+                        .orderBy('createdAt', 'desc')
+                        .get();
+                    window._ttsPresetsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    window._ttsPresetsLoaded = true;
+                    window.renderTtsPresetDropdown();
+                } catch (e) {
+                    console.warn('[V93.49] Voice presets load failed:', e && e.message);
+                }
+            };
+
+            window.renderTtsPresetDropdown = function() {
+                const sel = document.getElementById('tts-omnivoice-preset-select');
+                if (!sel) return;
+                const prevValue = sel.value;
+                sel.innerHTML = '<option value="">— Select preset —</option>';
+                window._ttsPresetsCache.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.textContent = p.name || '(unnamed)';
+                    sel.appendChild(opt);
+                });
+                if (prevValue && window._ttsPresetsCache.some(p => p.id === prevValue)) {
+                    sel.value = prevValue;
+                }
+            };
+
+            window.applyTtsVoicePreset = function(presetId) {
+                if (!presetId) {
+                    window._activePresetAudioUrl = '';
+                    window._activePresetAudioPath = '';
+                    return;
+                }
+                const preset = window._ttsPresetsCache.find(p => p.id === presetId);
+                if (!preset) return;
+                const fileInput = document.getElementById('tts-omnivoice-clone-audio');
+                const preview = document.getElementById('tts-omnivoice-clone-preview');
+                const textInput = document.getElementById('tts-omnivoice-clone-text');
+                const instructInput = document.getElementById('tts-omnivoice-clone-instruct');
+                if (textInput) textInput.value = preset.refText || '';
+                if (instructInput) instructInput.value = preset.instruct || '';
+                window._activePresetAudioUrl = preset.audioUrl || '';
+                window._activePresetAudioPath = preset.audioPath || '';
+                if (preview && preset.audioUrl) {
+                    if (preview.dataset.blobUrl) {
+                        URL.revokeObjectURL(preview.dataset.blobUrl);
+                        delete preview.dataset.blobUrl;
+                    }
+                    preview.src = preset.audioUrl;
+                    preview.style.display = 'block';
+                }
+                if (fileInput) fileInput.value = '';
+                if (typeof showToast === 'function') showToast(`Loaded preset: ${preset.name || '(unnamed)'}`);
+            };
+
+            window.saveCurrentTtsVoicePreset = async function() {
+                if (!auth || !auth.currentUser) {
+                    alert('Not signed in.');
+                    return;
+                }
+                const fileInput = document.getElementById('tts-omnivoice-clone-audio');
+                const file = fileInput && fileInput.files && fileInput.files[0];
+                // Allow saving from an active preset selection too — admin may want to
+                // duplicate an existing preset with a tweaked transcript or new name.
+                if (!file && !window._activePresetAudioUrl) {
+                    alert('Upload a reference audio file (or select an existing preset) before saving.');
+                    return;
+                }
+                const refText = (document.getElementById('tts-omnivoice-clone-text')?.value || '').trim();
+                if (!refText) {
+                    alert('Reference transcript is required before saving as preset.');
+                    return;
+                }
+                const instruct = (document.getElementById('tts-omnivoice-clone-instruct')?.value || '').trim();
+                const name = prompt('Preset name (e.g. "Doctor A — calm narration"):', '');
+                if (!name || !name.trim()) return;
+                try {
+                    if (typeof showToast === 'function') showToast('💾 Saving preset…');
+                    let audioPath = window._activePresetAudioPath;
+                    let audioUrl = window._activePresetAudioUrl;
+                    if (file) {
+                        // Content-addressed audio upload (mirrors V93.43 editor-images flow).
+                        const hash = await _sha256Hex(file);
+                        const ext = _TTS_PRESET_AUDIO_MIME[file.type] || '.wav';
+                        audioPath = 'voice-refs/' + hash + ext;
+                        const ref = firebase.storage().ref(audioPath);
+                        try {
+                            audioUrl = await ref.getDownloadURL();
+                        } catch (probeErr) {
+                            if (probeErr && probeErr.code !== 'storage/object-not-found') throw probeErr;
+                            const snap = await ref.put(file, { contentType: file.type || 'audio/wav' });
+                            audioUrl = await snap.ref.getDownloadURL();
+                        }
+                    }
+                    await db.collection('tts_voice_presets').add({
+                        name: name.trim(),
+                        audioPath,
+                        audioUrl,
+                        refText,
+                        instruct,
+                        createdBy: auth.currentUser.uid,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    if (typeof showToast === 'function') showToast(`✅ Saved preset "${name.trim()}"`);
+                    await window.loadTtsVoicePresets();
+                } catch (e) {
+                    console.error('[V93.49] Save preset failed:', e);
+                    const hint = /permission|denied|unauthorized/i.test(e && e.message ? e.message : '')
+                        ? '\n\nStorage rules likely block voice-refs/**. Update rules in Firebase Console.'
+                        : '';
+                    alert('Save preset failed: ' + (e && e.message ? e.message : 'Unknown error') + hint);
+                }
+            };
+
+            window.deleteCurrentTtsVoicePreset = async function() {
+                const sel = document.getElementById('tts-omnivoice-preset-select');
+                const presetId = sel && sel.value;
+                if (!presetId) {
+                    alert('Select a preset to delete first.');
+                    return;
+                }
+                const preset = window._ttsPresetsCache.find(p => p.id === presetId);
+                if (!preset) return;
+                if (!confirm(`Delete preset "${preset.name || '(unnamed)'}"?`)) return;
+                try {
+                    // Cross-doc reference check: only delete the Storage file if no OTHER
+                    // preset points at the same audioPath (multiple presets may have been
+                    // saved from the same source audio via dedup).
+                    let storageStillUsed = false;
+                    if (preset.audioPath) {
+                        const dupSnap = await db.collection('tts_voice_presets')
+                            .where('audioPath', '==', preset.audioPath)
+                            .limit(2)
+                            .get();
+                        storageStillUsed = dupSnap.size > 1;
+                    }
+                    await db.collection('tts_voice_presets').doc(presetId).delete();
+                    if (preset.audioPath && !storageStillUsed) {
+                        try {
+                            await firebase.storage().ref(preset.audioPath).delete();
+                        } catch (e) {
+                            console.warn('[V93.49] Voice preset Storage delete failed:', e && e.message);
+                        }
+                    }
+                    if (window._activePresetAudioPath === preset.audioPath) {
+                        window._activePresetAudioUrl = '';
+                        window._activePresetAudioPath = '';
+                    }
+                    if (typeof showToast === 'function') showToast(`Deleted preset "${preset.name || '(unnamed)'}"`);
+                    await window.loadTtsVoicePresets();
+                } catch (e) {
+                    console.error('[V93.49] Delete preset failed:', e);
+                    alert('Delete preset failed: ' + (e && e.message ? e.message : 'Unknown error'));
+                }
             };
 
             window.selectTtsBackend = function(backend, options = {}) {
@@ -8357,7 +8572,11 @@
                         const omniVoiceDesign = window.getOmnivoiceVoiceDesign
                             ? window.getOmnivoiceVoiceDesign()
                             : { gender: 'Random', age: 'Adult', pitch: 'Medium', style: 'Calm', accentEn: 'American', dialectCn: 'Mandarin' };
-                        const omniClone = window.getOmnivoiceCloneInputs ? window.getOmnivoiceCloneInputs() : null;
+                        // V93.49 Phase 2.1: getOmnivoiceCloneInputs is now async — preset-sourced
+                        // ref audio is fetched from Storage on demand (URL → blob → File).
+                        const omniClone = window.getOmnivoiceCloneInputs
+                            ? await window.getOmnivoiceCloneInputs()
+                            : null;
 
                         if (!window._gradioClientModulePromise) {
                             window._gradioClientModulePromise = import('https://esm.sh/@gradio/client');

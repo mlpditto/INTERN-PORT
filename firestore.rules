@@ -160,6 +160,16 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // 25. TTS Voice Presets (OmniVoice Phase 2.1 — per-admin reusable voice cloning refs)
+    // Read is broad-admin (the client filters by createdBy in its query so each admin
+    // sees only their own list). Mutations are uid-scoped: only the creator can update
+    // or delete a preset. createdBy is locked to request.auth.uid on create.
+    match /tts_voice_presets/{presetId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if isAdmin() && resource.data.createdBy == request.auth.uid;
+    }
+
     // 23. Learning Path Entries (PONEGLYPH learning path system)
     // V92.09: Admin inline edit + audit trail. editHistory[] and lastAdminEdit{} are
     // append-only audit fields — non-admin writers (the entry owner) cannot create or
