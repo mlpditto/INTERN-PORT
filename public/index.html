@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.62)</title>
+    <title>Internship Portfolio (V94.63)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -9711,7 +9711,13 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 }).join(' ');
                 const dateMs = e.createdAt?.toMillis ? e.createdAt.toMillis() : (new Date(e.createdAt || 0)).getTime();
                 const dateStr = dateMs ? new Date(dateMs).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
-                const content = escapeHtml(e.contentMarkdown || '');
+                // V94.63: render LP entry content as markdown (matches admin's
+                // markdown-native authoring pipeline V93.39/V93.46 toolbars). Prior
+                // escapeHtml + white-space:pre-wrap rendered admin's **bold** / lists /
+                // links as literal asterisks and hyphens on the intern app. Falls back
+                // to escaped text via window.renderMd's own try/catch if marked or
+                // DOMPurify fail to load. Diff site within `lnInternRenderHistory`.
+                const content = window.renderMd(e.contentMarkdown || '');
                 const score = typeof e.adminBonus === 'number' ? e.adminBonus : 0;
                 const scoreHtml = score > 0
                     ? `<span style="background:#ecfdf5; color:#059669; padding:2px 8px; border-radius:999px; font-size:0.7em; font-weight:800;">+${score.toFixed(2)}</span>`
@@ -9728,7 +9734,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     </div>
                     ${editedBadgeHtml ? `<div style="margin-bottom:6px;">${editedBadgeHtml}</div>` : ''}
                     ${tagsHtml ? `<div style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:6px;">${tagsHtml}</div>` : ''}
-                    ${content ? `<div style="font-size:0.78em; color:#475569; line-height:1.5; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; white-space:pre-wrap; margin-bottom:6px;">${content}</div>` : ''}
+                    ${content ? `<div class="md-render" style="font-size:0.78em; color:#475569; line-height:1.5; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; margin-bottom:6px;">${content}</div>` : ''}
                     <div style="font-size:0.7em; color:#94a3b8; font-weight:600;">${dateStr}</div>
                 </div>`;
             }).join('');
