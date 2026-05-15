@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.45</title>
+    <title>Nika V93.46</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -14424,8 +14424,15 @@ For "changes": list every meaningful edit between original and improved. Each en
         // rendering both expect markdown plaintext). Inline-wrap markdown (bold/italic/
         // link) wraps the selection; block-level (heading/list) inserts at line start.
         // After insertion fires an `input` event so renderQTextPreview re-renders.
-        window.mdToolbarInsert = function(textareaId, type) {
-            const ta = document.getElementById(textareaId);
+        // V93.46: accepts either an ID string (existing call sites — Case Study,
+        // LP/Poneglyph editors) or a textarea element reference (new q-text /
+        // q-page-content toolbars inside addQuestionUI, where each question
+        // card has its own anonymous textarea and using IDs would require
+        // generating uniques per question).
+        window.mdToolbarInsert = function(textareaIdOrEl, type) {
+            const ta = (typeof textareaIdOrEl === 'string')
+                ? document.getElementById(textareaIdOrEl)
+                : textareaIdOrEl;
             if (!ta) return;
             const start = ta.selectionStart;
             const end = ta.selectionEnd;
@@ -14510,6 +14517,18 @@ For "changes": list every meaningful edit between original and improved. Each en
             ta.focus();
             ta.setSelectionRange(cursorStart, cursorEnd);
             ta.dispatchEvent(new Event('input', { bubbles: true }));
+        };
+
+        // V93.46: scoped wrapper for toolbar buttons inside dynamically-created
+        // .quiz-q-item cards (q-text + q-page-content). Resolves the textarea
+        // relative to the click target so a single toolbar template can drive
+        // any number of question cards without minting per-question IDs.
+        window.mdToolbarInsertInQ = function(buttonEl, textareaSelector, type) {
+            const item = buttonEl && buttonEl.closest && buttonEl.closest('.quiz-q-item');
+            if (!item) return;
+            const ta = item.querySelector(textareaSelector);
+            if (!ta) return;
+            window.mdToolbarInsert(ta, type);
         };
 
         // Markdown preview for q-text (Phase 1, V91.35)
@@ -15701,6 +15720,19 @@ For "changes": list every meaningful edit between original and improved. Each en
                     <div class="q-text-split" style="margin-bottom:15px;">
                         <div class="q-text-pane">
                             <div class="q-text-pane-label">📝 Markdown</div>
+                            <!-- [V93.46] Markdown helper toolbar — scoped via mdToolbarInsertInQ to target the .q-text inside this .quiz-q-item -->
+                            <div class="md-toolbar" style="display:flex; gap:4px; margin-bottom:6px; flex-wrap:wrap;">
+                                <button type="button" onclick="mdToolbarInsertInQ(this, '.q-text', 'bold')" title="Bold (wraps selection in **...**)" style="background:#0f172a; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; font-weight:900; cursor:pointer;">B</button>
+                                <button type="button" onclick="mdToolbarInsertInQ(this, '.q-text', 'italic')" title="Italic (wraps selection in *...*)" style="background:#0f172a; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; font-style:italic; cursor:pointer;">I</button>
+                                <span style="width:1px; background:#334155; margin:2px 2px;"></span>
+                                <button type="button" onclick="mdToolbarInsertInQ(this, '.q-text', 'h2')" title="Heading 2 (## at line start)" style="background:#0f172a; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; font-weight:700; cursor:pointer;">H2</button>
+                                <button type="button" onclick="mdToolbarInsertInQ(this, '.q-text', 'h3')" title="Heading 3 (### at line start)" style="background:#0f172a; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; font-weight:700; cursor:pointer;">H3</button>
+                                <span style="width:1px; background:#334155; margin:2px 2px;"></span>
+                                <button type="button" onclick="mdToolbarInsertInQ(this, '.q-text', 'ul')" title="Bullet list (- at line start)" style="background:#0f172a; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; cursor:pointer;">• List</button>
+                                <button type="button" onclick="mdToolbarInsertInQ(this, '.q-text', 'ol')" title="Ordered list (1. at line start)" style="background:#0f172a; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; cursor:pointer;">1. List</button>
+                                <span style="width:1px; background:#334155; margin:2px 2px;"></span>
+                                <button type="button" onclick="mdToolbarInsertInQ(this, '.q-text', 'link')" title="Insert link (prompts for URL, wraps selection)" style="background:#0f172a; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; cursor:pointer;">🔗 Link</button>
+                            </div>
                             <textarea class="q-text" onpaste="handleQuestionPaste(event, this)" oninput="renderQTextPreview(this)" placeholder="Type question (Markdown supported: **bold**, *italic*, - list, [link](url))..." style="width:100%; height:140px; font-size:1.05em; border-radius:16px; border:1.5px solid #334155; padding:15px; background:#0f172a; color:#f1f5f9; box-shadow:inset 0 2px 4px rgba(0,0,0,0.2); line-height:1.6; box-sizing:border-box;"></textarea>
                         </div>
                         <div class="q-text-pane">
@@ -15708,12 +15740,25 @@ For "changes": list every meaningful edit between original and improved. Each en
                             <div class="q-text-preview"></div>
                         </div>
                     </div>
-                
+
                 <div class="q-page-content-area" style="display:none; margin-bottom:15px; position:relative; padding-top:10px;">
                     <label style="position:absolute; top:-10px; left:20px; background:#1e293b; padding:0 10px; font-size:0.75em; font-weight:900; color:#818cf8; z-index:1; border-radius:4px; text-transform:uppercase; letter-spacing:0.5px;">📖 Page Details</label>
                     <div class="q-text-split">
                         <div class="q-text-pane">
                             <div class="q-text-pane-label">📝 Markdown</div>
+                            <!-- [V93.46] Markdown helper toolbar — scoped to .q-page-content -->
+                            <div class="md-toolbar" style="display:flex; gap:4px; margin-bottom:6px; flex-wrap:wrap;">
+                                <button type="button" onclick="mdToolbarInsertInQ(this, '.q-page-content', 'bold')" title="Bold" style="background:#0f172a; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; font-weight:900; cursor:pointer;">B</button>
+                                <button type="button" onclick="mdToolbarInsertInQ(this, '.q-page-content', 'italic')" title="Italic" style="background:#0f172a; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; font-style:italic; cursor:pointer;">I</button>
+                                <span style="width:1px; background:#334155; margin:2px 2px;"></span>
+                                <button type="button" onclick="mdToolbarInsertInQ(this, '.q-page-content', 'h2')" title="Heading 2" style="background:#0f172a; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; font-weight:700; cursor:pointer;">H2</button>
+                                <button type="button" onclick="mdToolbarInsertInQ(this, '.q-page-content', 'h3')" title="Heading 3" style="background:#0f172a; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; font-weight:700; cursor:pointer;">H3</button>
+                                <span style="width:1px; background:#334155; margin:2px 2px;"></span>
+                                <button type="button" onclick="mdToolbarInsertInQ(this, '.q-page-content', 'ul')" title="Bullet list" style="background:#0f172a; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; cursor:pointer;">• List</button>
+                                <button type="button" onclick="mdToolbarInsertInQ(this, '.q-page-content', 'ol')" title="Ordered list" style="background:#0f172a; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; cursor:pointer;">1. List</button>
+                                <span style="width:1px; background:#334155; margin:2px 2px;"></span>
+                                <button type="button" onclick="mdToolbarInsertInQ(this, '.q-page-content', 'link')" title="Insert link" style="background:#0f172a; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:4px 9px; font-size:0.78em; cursor:pointer;">🔗 Link</button>
+                            </div>
                             <textarea class="q-page-content" oninput="renderQTextPreview(this)" placeholder="Page content (Markdown supported: **bold**, *italic*, - list)..." style="width:100%; height:140px; font-size:0.95em; border:1.5px solid #334155; border-radius:15px; padding:15px; background:#0f172a; color:#f1f5f9; box-sizing:border-box; line-height:1.6;">${data ? (data.content || '') : ''}</textarea>
                         </div>
                         <div class="q-text-pane">
