@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.35</title>
+    <title>Nika V93.36</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13394,6 +13394,24 @@
             }
         };
 
+        // [V93.36] Single helper for all admin render sites that need to display the
+        // Reflective Log admin feedback. Prefers sanitized adminCommentHtml (rich format
+        // from V93.35 Quill records); falls back to escaped+nl2br plaintext for legacy
+        // records that have only adminComment. Also closes latent XSS at sites that
+        // currently raw-interpolate adminComment (kanban-style table 💬 + LaughTale card).
+        window.renderAdminCommentSafe = function(item) {
+            if (item && item.adminCommentHtml && typeof DOMPurify !== 'undefined') {
+                return DOMPurify.sanitize(item.adminCommentHtml);
+            }
+            const plain = String((item && item.adminComment) || '').trim();
+            if (!plain) return '';
+            return plain
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\n/g, '<br>');
+        };
+
         // --- [V91.44] Reflection history strip ---
         window.renderReflectiveHistoryStrip = function(uid, currentLogId) {
             const strip = document.getElementById('reflective-history-strip');
@@ -25472,6 +25490,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         docId: d.id,
                         fullContent: x.content,
                         adminComment: x.adminComment || "",
+                        // [V93.36] carry Quill HTML so downstream render sites can show rich format
+                        adminCommentHtml: x.adminCommentHtml || "",
                         moodEmoji: { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[x.mood] || '📝'
                     });
                     dash.logs += score;
@@ -26916,6 +26936,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         docId: doc.id,
                         fullContent: x.content,
                         adminComment: x.adminComment || "",
+                        // [V93.36] carry Quill HTML so downstream render sites can show rich format
+                        adminCommentHtml: x.adminCommentHtml || "",
                         mood: x.mood || null,
                         moodSecondary: x.moodSecondary || null,
                         learningTools: Array.isArray(x.learningTools) ? x.learningTools : []
@@ -29774,11 +29796,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             </div>
                             `;
                         })() : ''}
-                        ${item.adminComment ? `
+                        ${(item.adminComment || item.adminCommentHtml) ? `
                             <div style="background:#ede9fe; padding:12px; border-radius:8px; border-left:3px solid #7c3aed; margin-bottom:12px;">
                                 <div style="font-size:0.75em; color:#5b21b6; font-weight:700; text-transform:uppercase; margin-bottom:8px;">Admin Comment</div>
                                 <div style="color:#5b21b6; font-size:0.9em; line-height:1.5;">
-                                    ${item.adminComment.replace(/\\n/g, '<br/>')}
+                                    ${renderAdminCommentSafe(item)}
                                 </div>
                             </div>
                         ` : ''}
@@ -31281,7 +31303,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     <td style="font-size:0.85em; color:#444;">
                                         <div style="font-weight:500;">${log.content}</div>
                                         ${getNegativeBadgeHtml(log.content)}
-                                        ${log.adminComment ? `<div style="font-size:0.9em; color:#d35400; border-top:1px dashed #eee; margin-top:5px; padding-top:3px;">💬 ${log.adminComment}</div>` : ''}
+                                        ${(log.adminComment || log.adminCommentHtml) ? `<div style="font-size:0.9em; color:#d35400; border-top:1px dashed #eee; margin-top:5px; padding-top:3px;">💬 ${renderAdminCommentSafe(log)}</div>` : ''}
                                     </td>
                                     <td>
                                         <button class="btn-sm" style="background:#d35400; color:white; border:none;" onclick="event.stopPropagation(); reviewReflective('${log.id}')">
@@ -31548,7 +31570,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         <div style="border-top:2px solid var(--border-color); padding-top:25px; margin-top:auto;">
                             <div style="font-size:0.85em; font-weight:900; color:#d35400; letter-spacing:1.5px; margin-bottom:12px; text-transform:uppercase;">ADMIN FEEDBACK:</div>
                             <div class="lt-admin-feedback" style="font-size:1.05em; color:var(--text-main); line-height:1.7; font-weight:500;">
-                                ${log.adminComment || '-'}
+                                ${(log.adminComment || log.adminCommentHtml) ? renderAdminCommentSafe(log) : '-'}
                             </div>
                             ${log.adminBonus ? `<div style="margin-top:20px; text-align:right;"><span style="background:rgba(16,185,129,0.15); color:#10b981; padding:8px 22px; border-radius:40px; font-weight:900; font-size:1em; box-shadow:0 4px 12px rgba(16,185,129,0.15);">+${log.adminBonus} PTS</span></div>` : ''}
                         </div>
