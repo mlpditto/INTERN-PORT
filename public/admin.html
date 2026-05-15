@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.41</title>
+    <title>Nika V93.42</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12582,16 +12582,30 @@
                 3. SELF-CHECK before returning: re-read each improvedQuestion.q and confirm its language matches the source Q[qNumber] from STEP 0. If you find a mismatch, REGENERATE that item in the correct language. A language mismatch is a hard format error.`;
                 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-2.5-pro';
-                
-                const { text: resultRaw, tokens: aiTokens, model: aiModel } = await callUniversalAI(selectedModel, prompt, true);
-                
-                let result;
-                try {
+
+                // V93.42: auto-retry once if the AI returns non-JSON. GPT/Claude/Gemini
+                // occasionally wrap output in prose ("Here is the JSON:") or markdown
+                // notes despite the "MANDATORY JSON" instruction — a single fresh
+                // sample usually resolves it. On second failure, surface the first
+                // 300 chars of the raw response in the error so admin can see what
+                // the model actually returned instead of a generic "try again" hint.
+                // Matches the diagnostic pattern used by sibling AI calls at
+                // admin.html:12777, 12932, 13014, 14542, 20161, 36003.
+                let resultRaw = '', aiTokens = 0, aiModel = '', result = null;
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    const aiResp = await callUniversalAI(selectedModel, prompt, true);
+                    resultRaw = aiResp.text;
+                    aiTokens = aiResp.tokens;
+                    aiModel = aiResp.model;
                     result = safeJsonParse(resultRaw);
-                    if (!result) throw new Error("Parse yielded null");
-                } catch(e) {
-                    console.error("JSON Parse Error:", resultRaw);
-                    throw new Error("AI returned invalid data format. Please try again.");
+                    if (result) break;
+                    if (attempt === 1) {
+                        console.warn('[analyzeQuizAI] attempt 1 returned non-JSON, retrying. Snippet:', String(resultRaw || '').slice(0, 200));
+                    }
+                }
+                if (!result) {
+                    console.error('JSON Parse Error (after 2 attempts):', resultRaw);
+                    throw new Error('AI returned invalid JSON after 2 attempts. First 300 chars:\n\n' + String(resultRaw || '').slice(0, 300));
                 }
 
                 const analysis = result.analysisText || "Analysis complete.";
