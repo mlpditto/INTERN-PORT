@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.40</title>
+    <title>Nika V93.41</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16396,6 +16396,30 @@ For "changes": list every meaningful edit between original and improved. Each en
             }
         }
 
+        // V93.41: in-modal banner replaces confirm() dialogs. Chrome (and other
+        // browsers) increasingly throttle confirm() inside setTimeout callbacks
+        // even after a user gesture, which silently dropped the Smart Paste prompt
+        // for some admins. The banner is injected above the textarea, lives inside
+        // the modal, and is impossible to suppress by browser dialog policy.
+        function showSmartPasteBanner(textarea, label, buttonText, onAccept) {
+            const pane = textarea.closest('.q-text-pane') || textarea.parentElement;
+            if (!pane) return;
+            pane.querySelectorAll('.smart-paste-banner').forEach(b => b.remove());
+            const banner = document.createElement('div');
+            banner.className = 'smart-paste-banner';
+            banner.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:10px; background:linear-gradient(135deg, #fef3c7, #fde68a); border:1.5px solid #f59e0b; border-radius:10px; padding:8px 12px; margin-bottom:8px; font-size:0.85em; color:#78350f; font-weight:700; box-shadow:0 2px 8px rgba(245,158,11,0.2);';
+            banner.innerHTML = `
+                <span style="flex:1;">${label}</span>
+                <div style="display:flex; gap:6px; flex-shrink:0;">
+                    <button type="button" class="smart-paste-accept" style="background:#f59e0b; color:white; border:none; border-radius:8px; padding:5px 12px; font-weight:900; font-size:0.85em; cursor:pointer;">${buttonText}</button>
+                    <button type="button" class="smart-paste-dismiss" style="background:transparent; color:#92400e; border:1px solid #f59e0b; border-radius:8px; padding:5px 10px; font-weight:700; font-size:0.85em; cursor:pointer;">Dismiss</button>
+                </div>
+            `;
+            banner.querySelector('.smart-paste-accept').onclick = () => { banner.remove(); onAccept(); };
+            banner.querySelector('.smart-paste-dismiss').onclick = () => banner.remove();
+            pane.insertBefore(banner, textarea);
+        }
+
         function handleQuestionPaste(e, textarea) {
             // Check for image in clipboard ([Version: V87.28])
             const items = (e.clipboardData || e.originalEvent.clipboardData).items;
@@ -16403,9 +16427,12 @@ For "changes": list every meaningful edit between original and improved. Each en
                 if (items[i].type.indexOf("image") !== -1) {
                     const blob = items[i].getAsFile();
                     const item = textarea.closest('.quiz-q-item');
-                    if (confirm("Image detected in clipboard. Use AI Vision to scan and import this question?")) {
-                        processQuizVision(blob, item);
-                    }
+                    showSmartPasteBanner(
+                        textarea,
+                        '🖼️ Image detected in clipboard',
+                        'AI Vision Scan',
+                        () => processQuizVision(blob, item)
+                    );
                     return; // Stop processing text if it was an image
                 }
             }
@@ -16417,9 +16444,12 @@ For "changes": list every meaningful edit between original and improved. Each en
 
             if (hasPrefix || lines.length >= 3) {
                 setTimeout(() => {
-                    if (confirm("Question/Option pattern detected. Would you like to auto-split them using Smart Paste?")) {
-                        processQuizPaste(text, textarea.closest('.quiz-q-item'));
-                    }
+                    showSmartPasteBanner(
+                        textarea,
+                        '✂️ Question/Option pattern detected',
+                        'Smart Split',
+                        () => processQuizPaste(text, textarea.closest('.quiz-q-item'))
+                    );
                 }, 100);
             }
         }
