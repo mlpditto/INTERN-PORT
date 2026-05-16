@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.58</title>
+    <title>Nika V93.59</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -8166,8 +8166,11 @@
                 
                 const renderTo = (container, inputId, currentVal) => {
                     if (!container) return;
-                    const source = filtered.length ? filtered : voices;
-                    source.forEach((v) => {
+                    if (filtered.length === 0) {
+                        container.innerHTML = '<div style="grid-column:1/-1; padding:14px; text-align:center; color:#94a3b8; font-size:0.8em; font-style:italic;">No preset voices for this language. Voice Design (if available) handles narration directly.</div>';
+                        return;
+                    }
+                    filtered.forEach((v) => {
                         const btn = document.createElement('button');
                         btn.type = 'button';
                         btn.className = 'tts-chip' + (v.id === currentVal ? ' active' : '');
@@ -8187,18 +8190,24 @@
                     });
                 };
 
-                const source = filtered.length ? filtered : voices;
-                const currentSingleRaw = voiceSelect.value.split(':')[1] || source[0]?.id;
-                const currentSingle = source.some(v => v.id === currentSingleRaw) ? currentSingleRaw : source[0]?.id;
+                if (filtered.length === 0) {
+                    renderTo(chipContainer, 'tts-voice-select', null);
+                    renderTo(s1Container, 'tts-voice-s1', null);
+                    renderTo(s2Container, 'tts-voice-s2', null);
+                    if (typeof window.updateQwenModeUi === 'function') window.updateQwenModeUi();
+                    return;
+                }
+                const currentSingleRaw = voiceSelect.value.split(':')[1] || filtered[0]?.id;
+                const currentSingle = filtered.some(v => v.id === currentSingleRaw) ? currentSingleRaw : filtered[0]?.id;
                 if (voiceSelect && currentSingle) voiceSelect.value = `${engine === 'gemini' ? 'gemini' : 'qwen'}:${currentSingle}`;
                 renderTo(chipContainer, 'tts-voice-select', currentSingle);
-                
-                const currentS1Raw = document.getElementById('tts-voice-s1').value || source[0]?.id;
-                const currentS1 = source.some(v => v.id === currentS1Raw) ? currentS1Raw : source[0]?.id;
+
+                const currentS1Raw = document.getElementById('tts-voice-s1').value || filtered[0]?.id;
+                const currentS1 = filtered.some(v => v.id === currentS1Raw) ? currentS1Raw : filtered[0]?.id;
                 renderTo(s1Container, 'tts-voice-s1', currentS1);
-                
-                const currentS2Raw = document.getElementById('tts-voice-s2').value || source[1]?.id || source[0]?.id;
-                const currentS2 = source.some(v => v.id === currentS2Raw) ? currentS2Raw : (source[1]?.id || source[0]?.id);
+
+                const currentS2Raw = document.getElementById('tts-voice-s2').value || filtered[1]?.id || filtered[0]?.id;
+                const currentS2 = filtered.some(v => v.id === currentS2Raw) ? currentS2Raw : (filtered[1]?.id || filtered[0]?.id);
                 renderTo(s2Container, 'tts-voice-s2', currentS2);
                 if (typeof window.updateQwenModeUi === 'function') window.updateQwenModeUi();
             };
