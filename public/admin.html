@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.64</title>
+    <title>Nika V93.65</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -2838,6 +2838,60 @@
             font-weight: 700;
             letter-spacing: 0.08em;
             text-transform: uppercase;
+        }
+        /* V93.65 Phase B: ElevenLabs-style sticky bottom bar. Lives inside
+           #hub-tts-studio so it inherits display:none when the studio is
+           hidden — no JS visibility toggle needed. */
+        #laboon-sticky-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 80;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            padding: 14px 28px;
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-top: 1px solid #e2e8f0;
+            box-shadow: 0 -4px 18px rgba(15, 23, 42, 0.06);
+        }
+        #laboon-sticky-bar .laboon-sticky-left,
+        #laboon-sticky-bar .laboon-sticky-center,
+        #laboon-sticky-bar .laboon-sticky-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        #laboon-sticky-bar .laboon-sticky-center {
+            flex: 1;
+            justify-content: center;
+        }
+        #laboon-sticky-bar #tts-transcript-counter {
+            background: #f8fafc;
+            color: #475569;
+            padding: 5px 11px;
+            border-radius: 8px;
+            font-size: 0.74em;
+            font-weight: 700;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        #laboon-sticky-bar #btn-generate-tts:hover:not(:disabled) {
+            background: #1e293b;
+        }
+        #laboon-sticky-bar #btn-generate-tts:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+        /* Page-level padding so content isn't hidden behind the bar */
+        body.onepiece-scope #tab-ai-hub #hub-view-laboon {
+            padding-bottom: 80px;
         }
         @keyframes ttsFadeIn {
             from { opacity: 0; transform: translateY(10px); }
@@ -5917,9 +5971,6 @@
                                                     </button>
                                                 </div>
                                             </div>
-                                            <div id="tts-transcript-counter" style="background:#f8fafc; color:#64748b; padding:4px 10px; border-radius:10px; font-size:0.7em; font-weight:800; border:1.5px solid #f1f5f9; display:flex; align-items:center; gap:4px;">
-                                                <i class="fa-solid fa-font"></i> <span id="tts-transcript-counter-text">0 chars</span>
-                                            </div>
                                         </div>
                                         <textarea id="tts-input" placeholder="Enter script here..." style="min-height: 380px; width:100%; border:2px solid #f1f5f9; border-radius:16px; padding:18px; font-family:inherit; font-size:1em; line-height:1.5; resize:vertical; background:#fff; outline:none; transition:0.3s; box-sizing:border-box; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); color:#1e293b;"></textarea>
                                         <div style="margin-top:14px; border:1.5px solid #e0e7ff; background:linear-gradient(180deg, #f8faff 0%, #f5f7ff 100%); border-radius:16px; padding:14px;">
@@ -6231,29 +6282,12 @@
                                                     <div id="tts-audio-settings-help" style="margin-top:8px; font-size:0.74em; color:#64748b; line-height:1.45;"></div>
                                                 </div>
 
-                                                <div class="laboon-section-shell" id="tts-preflight-panel" style="padding:12px; margin-bottom:12px; border:1.5px solid #e2e8f0; background:#ffffff;">
-                                                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;">
-                                                        <div class="laboon-section-title" style="margin:0; font-size:0.82em;">Generate Readiness</div>
-                                                        <span id="tts-readiness-chip" style="font-size:0.72em; font-weight:900; padding:5px 10px; border-radius:999px; background:#dcfce7; color:#166534;">Safe</span>
-                                                    </div>
+                                                <div class="laboon-section-shell" id="tts-preflight-panel" style="padding:12px; margin-bottom:12px; border:1px solid #e2e8f0; background:#ffffff;">
+                                                    <div class="laboon-section-title" style="margin:0 0 6px; font-size:0.82em;">Readiness Detail</div>
                                                     <div id="tts-preflight-summary" style="font-size:0.76em; color:#334155; line-height:1.5;">
                                                         Ready to estimate transcript length and audio settings.
                                                     </div>
                                                 </div>
-                                                
-                                                <div id="tts-progress-container" style="display:none; margin-bottom:12px;">
-                                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
-                                                        <span style="font-size:0.7em; font-weight:800; color:#3b82f6;" id="tts-progress-text">Processing...</span>
-                                                        <span style="font-size:0.7em; font-weight:800; color:#3b82f6;" id="tts-progress-percent">0%</span>
-                                                    </div>
-                                                    <div style="width:100%; height:6px; background:#eff6ff; border-radius:10px; overflow:hidden; border:1px solid #dbeafe;">
-                                                        <div id="tts-progress-bar" style="width:0%; height:100%; background:linear-gradient(90deg, #3b82f6, #6366f1); transition:width 0.3s;"></div>
-                                                    </div>
-                                                </div>
-
-                                                <button class="laboon-primary-btn" id="btn-generate-tts" type="button" onclick="generateGeminiTTS()" style="width:100%; height:50px; font-size:1.1em; border-radius:14px; box-shadow:0 4px 15px rgba(59,130,246,0.2); position:relative; overflow:hidden;">
-                                                    <span id="btn-generate-text">🔊 Generate Audio</span>
-                                                </button>
 
                                                 <button class="laboon-secondary-btn" id="btn-send-to-podcast" type="button" onclick="useLatestTtsAudioForPodcast()" style="display:none; width:100%; height:42px; font-size:0.85em; border-radius:12px; background:#f0f9ff; color:#0369a1; border-color:#bae6fd; margin-top:10px;">
                                                     <i class="fa-solid fa-microphone-lines"></i> Send to Podcast Studio
@@ -6271,6 +6305,31 @@
                                                 <button class="laboon-neutral-btn" type="button" onclick="clearGeminiTTS()" style="min-height:auto; padding:6px; font-size:0.7em; opacity:0.6;">Reset Studio</button>
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+                                <!-- V93.65 Phase B: Eleven-style sticky bottom bar (fixed; hidden when #hub-tts-studio is display:none via parent inheritance). Holds char counter + readiness chip + progress + Generate CTA. -->
+                                <div id="laboon-sticky-bar">
+                                    <div class="laboon-sticky-left">
+                                        <div id="tts-transcript-counter">
+                                            <i class="fa-solid fa-font"></i> <span id="tts-transcript-counter-text">0 chars</span>
+                                        </div>
+                                    </div>
+                                    <div class="laboon-sticky-center">
+                                        <span id="tts-readiness-chip" style="font-size:0.74em; font-weight:800; padding:5px 12px; border-radius:999px; background:#dcfce7; color:#166534;">Safe</span>
+                                        <div id="tts-progress-container" style="display:none;">
+                                            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                                                <span style="font-size:0.7em; font-weight:700; color:#475569;" id="tts-progress-text">Processing...</span>
+                                                <span style="font-size:0.7em; font-weight:700; color:#475569;" id="tts-progress-percent">0%</span>
+                                            </div>
+                                            <div style="width:180px; height:4px; background:#f1f5f9; border-radius:999px; overflow:hidden; margin-top:3px;">
+                                                <div id="tts-progress-bar" style="width:0%; height:100%; background:#0f172a; transition:width 0.3s;"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="laboon-sticky-right">
+                                        <button class="laboon-primary-btn" id="btn-generate-tts" type="button" onclick="generateGeminiTTS()" style="height:40px; padding:0 22px; font-size:0.92em; font-weight:800; border-radius:10px; background:#0f172a; color:white; border:none; cursor:pointer; transition:background 0.15s ease;">
+                                            <span id="btn-generate-text">🔊 Generate Audio</span>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
