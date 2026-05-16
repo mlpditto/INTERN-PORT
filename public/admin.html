@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.62</title>
+    <title>Nika V93.63</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -7673,13 +7673,68 @@
                 return { ok: true, estimate };
             };
 
+            // V93.63: HF Space k2-fsa/OmniVoice schema drifted from V93.32 — labels are
+            // now bilingual EN / 中文, "Random" became "Auto", Style collapsed to
+            // {Auto, Whisper}, English Accent gained Chinese/Korean/Portuguese/Russian/
+            // Japanese and lost Irish/Scottish/Welsh/South African/New Zealand, and
+            // Chinese Dialect is now mainland regional (Henan/Sichuan/...) instead of
+            // language-family (Cantonese/Wu/Min/...). `value` is sent to the Space
+            // verbatim; `label` is what the chip UI shows (English part only — bilingual
+            // strings are long and crowd the chip rail).
             const OMNIVOICE_VOICE_DESIGN_OPTIONS = {
-                gender: ['Random', 'Male', 'Female'],
-                age: ['Random', 'Young', 'Adult', 'Middle-Aged', 'Senior', 'Elderly'],
-                pitch: ['Random', 'Very Low', 'Low', 'Medium', 'High', 'Very High'],
-                style: ['Random', 'Calm'],
-                accentEn: ['Random', 'American', 'British', 'Australian', 'Indian', 'Canadian', 'Irish', 'Scottish', 'Welsh', 'South African', 'New Zealand'],
-                dialectCn: ['Random', 'Mandarin', 'Cantonese', 'Shanghainese', 'Sichuanese', 'Wu', 'Min', 'Hakka', 'Xiang', 'Gan', 'Hui', 'Yue', 'Jin']
+                gender: [
+                    { value: 'Auto', label: 'Auto' },
+                    { value: 'Male / 男', label: 'Male' },
+                    { value: 'Female / 女', label: 'Female' }
+                ],
+                age: [
+                    { value: 'Auto', label: 'Auto' },
+                    { value: 'Child / 儿童', label: 'Child' },
+                    { value: 'Teenager / 少年', label: 'Teen' },
+                    { value: 'Young Adult / 青年', label: 'Young Adult' },
+                    { value: 'Middle-aged / 中年', label: 'Middle-aged' },
+                    { value: 'Elderly / 老年', label: 'Elderly' }
+                ],
+                pitch: [
+                    { value: 'Auto', label: 'Auto' },
+                    { value: 'Very Low Pitch / 极低音调', label: 'Very Low' },
+                    { value: 'Low Pitch / 低音调', label: 'Low' },
+                    { value: 'Moderate Pitch / 中音调', label: 'Medium' },
+                    { value: 'High Pitch / 高音调', label: 'High' },
+                    { value: 'Very High Pitch / 极高音调', label: 'Very High' }
+                ],
+                style: [
+                    { value: 'Auto', label: 'Auto' },
+                    { value: 'Whisper / 耳语', label: 'Whisper' }
+                ],
+                accentEn: [
+                    { value: 'Auto', label: 'Auto' },
+                    { value: 'American Accent / 美式口音', label: 'American' },
+                    { value: 'British Accent / 英国口音', label: 'British' },
+                    { value: 'Australian Accent / 澳大利亚口音', label: 'Australian' },
+                    { value: 'Canadian Accent / 加拿大口音', label: 'Canadian' },
+                    { value: 'Indian Accent / 印度口音', label: 'Indian' },
+                    { value: 'Chinese Accent / 中国口音', label: 'Chinese' },
+                    { value: 'Korean Accent / 韩国口音', label: 'Korean' },
+                    { value: 'Japanese Accent / 日本口音', label: 'Japanese' },
+                    { value: 'Portuguese Accent / 葡萄牙口音', label: 'Portuguese' },
+                    { value: 'Russian Accent / 俄罗斯口音', label: 'Russian' }
+                ],
+                dialectCn: [
+                    { value: 'Auto', label: 'Auto' },
+                    { value: 'Henan Dialect / 河南话', label: 'Henan' },
+                    { value: 'Shaanxi Dialect / 陕西话', label: 'Shaanxi' },
+                    { value: 'Sichuan Dialect / 四川话', label: 'Sichuan' },
+                    { value: 'Guizhou Dialect / 贵州话', label: 'Guizhou' },
+                    { value: 'Yunnan Dialect / 云南话', label: 'Yunnan' },
+                    { value: 'Guilin Dialect / 桂林话', label: 'Guilin' },
+                    { value: 'Jinan Dialect / 济南话', label: 'Jinan' },
+                    { value: 'Shijiazhuang Dialect / 石家庄话', label: 'Shijiazhuang' },
+                    { value: 'Gansu Dialect / 甘肃话', label: 'Gansu' },
+                    { value: 'Ningxia Dialect / 宁夏话', label: 'Ningxia' },
+                    { value: 'Qingdao Dialect / 青岛话', label: 'Qingdao' },
+                    { value: 'Northeast Dialect / 东北话', label: 'Northeast' }
+                ]
             };
 
             const OMNIVOICE_CHIP_GROUPS = [
@@ -7699,13 +7754,17 @@
                     if (container.dataset.omniRendered === '1') return;
                     container.innerHTML = '';
                     const options = OMNIVOICE_VOICE_DESIGN_OPTIONS[group.key] || [];
-                    options.forEach(label => {
+                    // V93.63: reset stale localStorage / hidden-input value if it isn't
+                    // in the current schema (e.g. saved "Random" from pre-drift session).
+                    const validValues = options.map(o => o.value);
+                    if (!validValues.includes(input.value)) input.value = options[0]?.value || '';
+                    options.forEach(opt => {
                         const btn = document.createElement('button');
                         btn.type = 'button';
-                        btn.className = 'tts-chip' + (label === input.value ? ' active' : '');
-                        btn.textContent = label;
+                        btn.className = 'tts-chip' + (opt.value === input.value ? ' active' : '');
+                        btn.textContent = opt.label;
                         btn.onclick = () => {
-                            input.value = label;
+                            input.value = opt.value;
                             container.querySelectorAll('.tts-chip').forEach(c => c.classList.remove('active'));
                             btn.classList.add('active');
                         };
@@ -7718,12 +7777,12 @@
             window.getOmnivoiceVoiceDesign = function() {
                 const read = (id, fallback) => (document.getElementById(id)?.value || fallback);
                 return {
-                    gender:    read('tts-omnivoice-gender', 'Random'),
-                    age:       read('tts-omnivoice-age', 'Adult'),
-                    pitch:     read('tts-omnivoice-pitch', 'Medium'),
-                    style:     read('tts-omnivoice-style', 'Calm'),
-                    accentEn:  read('tts-omnivoice-accent-en', 'American'),
-                    dialectCn: read('tts-omnivoice-dialect-cn', 'Mandarin')
+                    gender:    read('tts-omnivoice-gender', 'Auto'),
+                    age:       read('tts-omnivoice-age', 'Young Adult / 青年'),
+                    pitch:     read('tts-omnivoice-pitch', 'Moderate Pitch / 中音调'),
+                    style:     read('tts-omnivoice-style', 'Auto'),
+                    accentEn:  read('tts-omnivoice-accent-en', 'American Accent / 美式口音'),
+                    dialectCn: read('tts-omnivoice-dialect-cn', 'Auto')
                 };
             };
 
@@ -8699,7 +8758,7 @@
                         const omniLang = omniLangMap[selectedLanguageCode] || 'English';
                         const omniVoiceDesign = window.getOmnivoiceVoiceDesign
                             ? window.getOmnivoiceVoiceDesign()
-                            : { gender: 'Random', age: 'Adult', pitch: 'Medium', style: 'Calm', accentEn: 'American', dialectCn: 'Mandarin' };
+                            : { gender: 'Auto', age: 'Young Adult / 青年', pitch: 'Moderate Pitch / 中音调', style: 'Auto', accentEn: 'American Accent / 美式口音', dialectCn: 'Auto' };
                         // V93.49 Phase 2.1: getOmnivoiceCloneInputs is now async — preset-sourced
                         // ref audio is fetched from Storage on demand (URL → blob → File).
                         const omniClone = window.getOmnivoiceCloneInputs
