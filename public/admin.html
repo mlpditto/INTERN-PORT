@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.69</title>
+    <title>Nika V93.70</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6054,6 +6054,7 @@
                                                     <div id="tts-preflight-summary" style="font-size:0.76em; color:#334155; line-height:1.5;">
                                                         Ready to estimate transcript length and audio settings.
                                                     </div>
+                                                    <button id="btn-generate-tts-inline" type="button" onclick="generateGeminiTTS()" style="margin-top:10px; width:100%; height:40px; padding:0 16px; font-size:0.9em; font-weight:800; border-radius:10px; background:#0f172a; color:white; border:none; cursor:pointer; transition:background 0.15s ease; display:flex; align-items:center; justify-content:center; gap:8px;" title="Same as the Generate Audio button in the bottom bar"><i class="fa-solid fa-volume-high"></i> Generate Audio</button>
                                                 </div>
 
                                                 <button class="laboon-secondary-btn" id="btn-send-to-podcast" type="button" onclick="useLatestTtsAudioForPodcast()" style="display:none; width:100%; height:42px; font-size:0.85em; border-radius:12px; background:#f0f9ff; color:#0369a1; border-color:#bae6fd; margin-top:10px;">
@@ -8632,6 +8633,8 @@
                 const downloadEl = document.getElementById('tts-download-link');
                 const btnEl = document.getElementById('btn-generate-tts');
                 const btnText = document.getElementById('btn-generate-text');
+                const btnElInline = document.getElementById('btn-generate-tts-inline'); // V93.70: duplicate Generate CTA inside Readiness Detail card
+                if (btnEl && btnEl.disabled) return; // V93.70 guard: if a previous Generate is still running, ignore re-entry
                 const progressContainer = document.getElementById('tts-progress-container');
                 const progressBar = document.getElementById('tts-progress-bar');
                 const progressPercent = document.getElementById('tts-progress-percent');
@@ -8685,6 +8688,7 @@
                 }
 
                 btnEl.disabled = true;
+                if (btnElInline) { btnElInline.disabled = true; btnElInline.style.opacity = '0.55'; btnElInline.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Producing...'; }
                 clearTtsDebugMeta();
                 if (btnText) btnText.textContent = "🎙️ Producing...";
                 if (progressContainer) progressContainer.style.display = 'block';
@@ -9008,6 +9012,7 @@
                 } finally {
                     btnEl.disabled = false;
                     if (btnText) btnText.textContent = "🔊 Generate Audio";
+                    if (btnElInline) { btnElInline.disabled = false; btnElInline.style.opacity = '1'; btnElInline.innerHTML = '<i class="fa-solid fa-volume-high"></i> Generate Audio'; }
                     setTimeout(() => {
                         if (progressContainer) progressContainer.style.display = 'none';
                     }, 3000);
