@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.54</title>
+    <title>Nika V93.55</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -5911,6 +5911,9 @@
                                                     <button id="btn-tts-dialogue-tpl" class="laboon-secondary-btn" style="display:none; padding:0 12px; font-size:0.75em; height:36px; border-radius:10px; align-items:center; gap:6px; color:#6366f1; border-color:#e0e7ff; background:#f5f7ff;" type="button" onclick="insertTtsDialogueTemplate()">
                                                         <i class="fa-solid fa-table-list"></i> Template
                                                     </button>
+                                                    <button id="btn-pronunciation-helper" class="laboon-secondary-btn" style="display:none; padding:0 12px; font-size:0.75em; height:36px; border-radius:10px; align-items:center; gap:6px; color:#047857; border:1.5px solid #a7f3d0; background:#ecfdf5;" type="button" onclick="openPronunciationHelper()" title="Look up English pronunciation and insert CMU phoneme markup at cursor (OmniVoice only)">
+                                                        <i class="fa-solid fa-language"></i> Pronunciation
+                                                    </button>
                                                     <button class="laboon-secondary-btn" style="width:36px; height:36px; padding:0; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#ef4444; border:1.5px solid #fee2e2; background:#fff1f2; cursor:pointer; transition:0.2s;" type="button" onclick="if(confirm('Clear transcript?')) { document.getElementById('tts-input').value=''; updateTtsTranscriptCounter(); }" title="Clear Transcript">
                                                         <i class="fa-solid fa-trash-can"></i>
                                                     </button>
@@ -7790,6 +7793,109 @@
                 return { refAudio, refText, instruct };
             };
 
+            // V93.55 Phase 3: Pronunciation Helper — Datamuse CMU lookup.
+            // OmniVoice reads [CMU phonemes] in brackets as English pronunciation
+            // override (per upstream docs: e.g. "[B AE1 S] fish" = bass fish).
+            // We use api.datamuse.com (free, CORS-ok, no key) which returns ARPAbet
+            // via the "pron:" tag when md=r is requested. Per-session memory cache.
+            window._pronunCache = window._pronunCache || {};
+            window.openPronunciationHelper = function() {
+                const ttsInput = document.getElementById('tts-input');
+                if (ttsInput) window._pronunSavedSelStart = ttsInput.selectionStart;
+                document.getElementById('pronun-word-input').value = '';
+                document.getElementById('pronun-result-box').style.display = 'none';
+                document.getElementById('pronun-status').style.display = 'none';
+                document.getElementById('pronun-insert-btn').disabled = true;
+                forceShowModal('pronunciationHelperModal');
+                setTimeout(() => document.getElementById('pronun-word-input').focus(), 50);
+            };
+            window.lookupPronunciation = async function() {
+                const wordRaw = (document.getElementById('pronun-word-input').value || '').trim().toLowerCase();
+                const statusEl = document.getElementById('pronun-status');
+                const resultBox = document.getElementById('pronun-result-box');
+                const insertBtn = document.getElementById('pronun-insert-btn');
+                resultBox.style.display = 'none';
+                insertBtn.disabled = true;
+                if (!wordRaw) {
+                    statusEl.style.display = 'block';
+                    statusEl.style.background = '#fef3c7';
+                    statusEl.style.border = '1.5px solid #fde68a';
+                    statusEl.style.color = '#92400e';
+                    statusEl.textContent = 'Type a word first.';
+                    return;
+                }
+                if (!/^[a-z][a-z' -]{0,50}$/i.test(wordRaw)) {
+                    statusEl.style.display = 'block';
+                    statusEl.style.background = '#fee2e2';
+                    statusEl.style.border = '1.5px solid #fecaca';
+                    statusEl.style.color = '#991b1b';
+                    statusEl.textContent = 'English letters / hyphens / apostrophes only.';
+                    return;
+                }
+                statusEl.style.display = 'block';
+                statusEl.style.background = '#e0f2fe';
+                statusEl.style.border = '1.5px solid #bae6fd';
+                statusEl.style.color = '#075985';
+                statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Looking up via Datamuse...';
+                let cmu = window._pronunCache[wordRaw];
+                if (!cmu) {
+                    try {
+                        const res = await fetch(`https://api.datamuse.com/words?sp=${encodeURIComponent(wordRaw)}&md=r&max=1`);
+                        if (!res.ok) throw new Error('Datamuse HTTP ' + res.status);
+                        const arr = await res.json();
+                        const hit = arr && arr[0];
+                        if (!hit || (hit.word || '').toLowerCase() !== wordRaw) {
+                            statusEl.style.background = '#fef3c7';
+                            statusEl.style.border = '1.5px solid #fde68a';
+                            statusEl.style.color = '#92400e';
+                            statusEl.innerHTML = 'Not found in Datamuse. Try the <a href="http://www.speech.cs.cmu.edu/cgi-bin/cmudict" target="_blank" rel="noopener" style="color:#92400e; text-decoration:underline;">CMU dictionary online</a> and paste phonemes manually as <code>[...]</code> in the textarea.';
+                            return;
+                        }
+                        const pronTag = (hit.tags || []).find(t => t.startsWith('pron:'));
+                        if (!pronTag) {
+                            statusEl.style.background = '#fef3c7';
+                            statusEl.style.border = '1.5px solid #fde68a';
+                            statusEl.style.color = '#92400e';
+                            statusEl.textContent = 'Found in Datamuse but no pronunciation tag available.';
+                            return;
+                        }
+                        cmu = pronTag.slice(5).trim();
+                        window._pronunCache[wordRaw] = cmu;
+                    } catch (e) {
+                        statusEl.style.background = '#fee2e2';
+                        statusEl.style.border = '1.5px solid #fecaca';
+                        statusEl.style.color = '#991b1b';
+                        statusEl.textContent = 'Lookup failed: ' + (e && e.message ? e.message : 'network error');
+                        return;
+                    }
+                }
+                statusEl.style.display = 'none';
+                document.getElementById('pronun-result-cmu').textContent = cmu;
+                document.getElementById('pronun-result-markup').textContent = '[' + cmu + ']';
+                resultBox.style.display = 'block';
+                insertBtn.disabled = false;
+                window._pronunLastCmu = cmu;
+            };
+            window.insertPronunciationAtCursor = function() {
+                const cmu = window._pronunLastCmu;
+                if (!cmu) return;
+                const ttsInput = document.getElementById('tts-input');
+                if (!ttsInput) return;
+                const markup = '[' + cmu + ']';
+                const start = (typeof window._pronunSavedSelStart === 'number') ? window._pronunSavedSelStart : ttsInput.value.length;
+                const before = ttsInput.value.slice(0, start);
+                const after = ttsInput.value.slice(start);
+                const needsLeadingSpace = before.length > 0 && !/\s$/.test(before);
+                const needsTrailingSpace = after.length > 0 && !/^\s/.test(after);
+                const insert = (needsLeadingSpace ? ' ' : '') + markup + (needsTrailingSpace ? ' ' : '');
+                ttsInput.value = before + insert + after;
+                const newCursor = start + insert.length;
+                forceHideModal('pronunciationHelperModal');
+                ttsInput.focus();
+                ttsInput.setSelectionRange(newCursor, newCursor);
+                if (typeof updateTtsTranscriptCounter === 'function') updateTtsTranscriptCounter();
+            };
+
             // V93.49 Phase 2.1: preset persistence helpers. Per-admin scoping via
             // `createdBy == auth.uid` in both the Firestore rule and the list query.
             // Audio is content-addressed under voice-refs/{sha256}.{ext} (mirrors
@@ -7992,6 +8098,9 @@
                     omniPanel.style.display = resolvedBackend === 'omnivoice' ? 'block' : 'none';
                     if (resolvedBackend === 'omnivoice') window.renderOmnivoiceVoiceDesignChips();
                 }
+
+                const pronunBtn = document.getElementById('btn-pronunciation-helper');
+                if (pronunBtn) pronunBtn.style.display = resolvedBackend === 'omnivoice' ? 'inline-flex' : 'none';
 
                 if (resolvedBackend === 'qwen' && window._ttsMode === 'dialogue' && typeof showToast === 'function' && !options.silent) {
                     showToast('Dialogue mode works best with Gemini TTS right now.', 'warning');
@@ -9619,6 +9728,38 @@
                 <h2 style="color:#ef233c;">⚠️ Delete Card?</h2>
                 <p>Press the confirm button within the specified time.</p><button id="btn-del-card-confirm" class="magic-btn"
                     style="background:#ef233c;width:100%;">Confirm (5)</button>
+            </div>
+        </div>
+        <!-- 🔤 Pronunciation Helper (V93.55, OmniVoice Phase 3) — CMU phoneme lookup via Datamuse, insert as [...] at tts-input cursor -->
+        <div id="pronunciationHelperModal" class="modal" style="z-index:2400;">
+            <div class="modal-content" style="max-width:480px;">
+                <span class="close-modal" onclick="forceHideModal('pronunciationHelperModal')">&times;</span>
+                <h3 style="margin:0 0 6px; color:#047857; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-language"></i> Pronunciation Helper</h3>
+                <p style="font-size:0.8em; color:#64748b; margin:0 0 14px;">Look up English CMU phonemes and insert as <code style="background:#f1f5f9; padding:1px 5px; border-radius:4px;">[PHONEMES]</code> at the cursor — OmniVoice reads brackets as pronunciation override. Useful for medical loanwords mid-Thai narration.</p>
+                <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+                    <input type="text" id="pronun-word-input" placeholder="Type English word (e.g. sertraline)" style="flex:1; padding:9px 12px; border:1.5px solid #d1fae5; border-radius:10px; background:#f0fdf4; color:#064e3b; font-size:0.95em; outline:none;" onkeydown="if(event.key==='Enter'){lookupPronunciation();}">
+                    <button class="magic-btn" style="background:linear-gradient(135deg,#10b981,#059669); padding:9px 16px; border-radius:10px; font-size:0.85em; font-weight:800;" type="button" onclick="lookupPronunciation()">🔍 Look up</button>
+                </div>
+                <div id="pronun-result-box" style="display:none; margin-bottom:10px; padding:12px 14px; background:#ecfdf5; border:1.5px solid #6ee7b7; border-radius:12px;">
+                    <div style="font-size:0.7em; color:#047857; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; margin-bottom:4px;">CMU Phonemes</div>
+                    <div id="pronun-result-cmu" style="font-family:monospace; font-size:1.05em; color:#064e3b; font-weight:700; letter-spacing:0.04em; user-select:all; margin-bottom:8px;"></div>
+                    <div style="font-size:0.72em; color:#065f46;">Will insert as <code id="pronun-result-markup" style="background:white; padding:1px 6px; border-radius:4px; border:1px solid #a7f3d0;"></code></div>
+                </div>
+                <div id="pronun-status" style="display:none; padding:10px 12px; border-radius:10px; font-size:0.8em; margin-bottom:10px;"></div>
+                <div style="display:flex; gap:8px; justify-content:flex-end;">
+                    <button class="magic-btn" style="background:#64748b; padding:9px 18px; border-radius:10px; font-size:0.85em;" type="button" onclick="forceHideModal('pronunciationHelperModal')">Cancel</button>
+                    <button id="pronun-insert-btn" class="magic-btn" style="background:linear-gradient(135deg,#10b981,#059669); padding:9px 18px; border-radius:10px; font-size:0.85em; font-weight:800;" type="button" onclick="insertPronunciationAtCursor()" disabled>Insert at cursor</button>
+                </div>
+                <details style="margin-top:14px; padding:10px 12px; background:#f8fafc; border-radius:10px; border:1px solid #e2e8f0;">
+                    <summary style="cursor:pointer; font-size:0.78em; color:#475569; font-weight:700;">💡 What is CMU markup? &amp; manual entry</summary>
+                    <div style="margin-top:8px; font-size:0.78em; color:#475569; line-height:1.6;">
+                        OmniVoice (k2-fsa) reads <code>[PHONEMES]</code> brackets as CMU ARPAbet override for English words. Example: <code>[B EY1 S]</code> = "bass" (low), <code>[B AE1 S]</code> = "bass" (fish). Useful when default pronunciation guesses wrong.
+                        <br><br>
+                        <strong>Mandarin pinyin</strong> uses lowercase + tone digits in parentheses, e.g. <code>重(zhong4)</code>. Type that directly in the textarea — no helper needed.
+                        <br><br>
+                        <strong>Not in Datamuse?</strong> Look up at the <a href="http://www.speech.cs.cmu.edu/cgi-bin/cmudict" target="_blank" rel="noopener" style="color:#047857;">CMU Pronouncing Dictionary online</a> and paste the phonemes (without leading word) in brackets manually.
+                    </div>
+                </details>
             </div>
         </div>
         <div id="clearConfirmModal" class="modal" style="z-index:2100;">
