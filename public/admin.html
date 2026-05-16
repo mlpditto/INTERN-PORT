@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.71</title>
+    <title>Nika V93.72</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6199,7 +6199,16 @@
                                                 <div id="tts-single-voice-select-wrap">
                                                 <label class="laboon-field-label">Primary Voice Selection</label>
                                                 <select id="tts-voice-select" style="display:none;"></select>
-                                                <div class="tts-chip-group" id="tts-voice-chips"></div>
+                                                <!-- V93.72 Phase C3: Eleven-style voice picker. Chip rail stays in DOM (filled by syncTtsVoices) but hidden — picker trigger reads the same state. -->
+                                                <button id="tts-voice-picker-trigger" type="button" onclick="openVoicePickerModal()" style="width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; border-radius:10px; border:1.5px solid #e2e8f0; background:#ffffff; color:#1e293b; cursor:pointer; font-size:0.88em; font-weight:700; transition:border-color 0.15s ease, background 0.15s ease;" title="Pick a preset voice (opens picker)">
+                                                    <span style="display:flex; align-items:center; gap:8px; min-width:0;">
+                                                        <i class="fa-solid fa-microphone-lines" style="color:#64748b; flex-shrink:0;"></i>
+                                                        <span id="tts-voice-picker-label" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Pick a voice</span>
+                                                    </span>
+                                                    <i class="fa-solid fa-chevron-down" style="opacity:0.45; font-size:0.85em; flex-shrink:0;"></i>
+                                                </button>
+                                                <div id="tts-voice-picker-empty" style="display:none; padding:10px 12px; font-size:0.78em; color:#64748b; line-height:1.5; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:10px; text-align:center;">No preset voices for this language. Voice Design (if available) handles narration directly.</div>
+                                                <div class="tts-chip-group" id="tts-voice-chips" style="display:none;"></div>
                                                 </div>
                                                 <div id="tts-qwen-voice-design-box" style="display:none; margin-top:10px; padding:12px; border-radius:12px; border:1px solid #c7d2fe; background:#f8fbff;">
                                                     <label class="laboon-field-label" for="tts-qwen-voice-prompt">Voice Design Prompt</label>
@@ -8261,6 +8270,112 @@
                 return window.selectTtsBackend(engine === 'qwen' ? 'qwen' : 'gemini_api');
             };
 
+            // V93.72 Phase C3: Voice Picker overlay. Builds candidate list using the
+            // SAME engine + language logic as syncTtsVoices, then renders a searchable
+            // list in #voicePickerModal. Selecting a row writes to the hidden
+            // #tts-voice-select and updates the picker trigger label.
+            window._voicePickerCandidates = [];
+            window._voicePickerEngine = 'gemini';
+            window.getVoicePickerCandidates = function() {
+                const engine = (LABOON_TTS_BACKEND_MODELS[window.getSelectedTtsBackend()]?.engine) || window._ttsEngine || 'gemini';
+                const lang = window._ttsMode === 'dialogue'
+                    ? document.getElementById('tts-language-select-d')?.value
+                    : document.getElementById('tts-language-select')?.value;
+                let voices = [];
+                if (engine === 'gemini') {
+                    voices = [
+                        { id: 'Kore', label: 'Kore', lang: ['auto', 'th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'], desc: 'Default narrative voice.' },
+                        { id: 'Puck', label: 'Puck', lang: ['auto', 'th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'], desc: 'Bright, energetic delivery.' },
+                        { id: 'Charon', label: 'Charon', lang: ['auto', 'th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'], desc: 'Calm, contemplative tone.' },
+                        { id: 'Achird', label: 'Achird', lang: ['auto', 'th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'], desc: 'Warm, conversational.' },
+                        { id: 'Sulafat', label: 'Sulafat', lang: ['auto', 'th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'], desc: 'Smooth, professional.' },
+                        { id: 'Zephyr', label: 'Zephyr', lang: ['auto', 'th-TH', 'en-US', 'ja-JP', 'zh-CN', 'ko-KR'], desc: 'Light, airy phrasing.' }
+                    ];
+                } else if (engine === 'qwen') {
+                    voices = getQwenConfiguredSpeakerCatalog();
+                } else {
+                    voices = [];
+                }
+                const filtered = lang === 'auto' ? voices.slice() : voices.filter(v => (v.lang || []).includes(lang) || (v.lang || []).includes('auto'));
+                window._voicePickerEngine = engine;
+                return { engine, lang, voices: filtered };
+            };
+            window.openVoicePickerModal = function() {
+                const { engine, lang, voices } = window.getVoicePickerCandidates();
+                window._voicePickerCandidates = voices;
+                const ctxEl = document.getElementById('voice-picker-context');
+                if (ctxEl) {
+                    const engineLabel = engine === 'gemini' ? 'Gemini' : (engine === 'qwen' ? 'Qwen' : 'Selected backend');
+                    const langLabel = lang === 'auto' ? 'Auto' : (lang || '').split('-')[0].toUpperCase();
+                    ctxEl.textContent = `${engineLabel} backend · ${langLabel} · ${voices.length} voice${voices.length === 1 ? '' : 's'}`;
+                }
+                const searchEl = document.getElementById('voice-picker-search');
+                if (searchEl) searchEl.value = '';
+                renderVoicePickerList();
+                forceShowModal('voicePickerModal');
+                setTimeout(() => { if (searchEl) searchEl.focus(); }, 50);
+            };
+            window.renderVoicePickerList = function() {
+                const listEl = document.getElementById('voice-picker-list');
+                if (!listEl) return;
+                const q = (document.getElementById('voice-picker-search')?.value || '').trim().toLowerCase();
+                let rows = window._voicePickerCandidates;
+                if (q) rows = rows.filter(r => ((r.label || '') + ' ' + (r.desc || '')).toLowerCase().includes(q));
+                if (rows.length === 0) {
+                    listEl.innerHTML = '<div style="padding:20px; text-align:center; color:#94a3b8; font-size:0.85em;">No voices match.</div>';
+                    return;
+                }
+                const currentVal = (document.getElementById('tts-voice-select')?.value || '').split(':')[1] || '';
+                const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])));
+                listEl.innerHTML = rows.map(v => {
+                    const active = v.id === currentVal;
+                    const bg = active ? '#eff6ff' : '#ffffff';
+                    const border = active ? '#3b82f6' : '#e2e8f0';
+                    return `<div onclick="selectVoiceFromPicker('${esc(v.id)}')" style="padding:10px 12px; border-radius:10px; border:1.5px solid ${border}; background:${bg}; cursor:pointer; margin-bottom:6px; transition:background 0.15s ease;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='${bg}'">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                            <div style="font-weight:800; color:#1e293b; font-size:0.92em;">${esc(v.label || v.id)}</div>
+                            ${active ? '<i class="fa-solid fa-check" style="color:#3b82f6; font-size:0.85em;"></i>' : ''}
+                        </div>
+                        ${v.desc ? `<div style="font-size:0.78em; color:#64748b; margin-top:2px; line-height:1.4;">${esc(v.desc)}</div>` : ''}
+                    </div>`;
+                }).join('');
+            };
+            window.selectVoiceFromPicker = function(voiceId) {
+                const engine = window._voicePickerEngine || 'gemini';
+                const voiceSelect = document.getElementById('tts-voice-select');
+                const newVal = `${engine === 'gemini' ? 'gemini' : 'qwen'}:${voiceId}`;
+                if (voiceSelect) voiceSelect.value = newVal;
+                // Mirror to existing chip rail (kept in DOM hidden) for any listeners watching the active class
+                const chipRail = document.getElementById('tts-voice-chips');
+                if (chipRail) {
+                    chipRail.querySelectorAll('.tts-chip').forEach(btn => {
+                        btn.classList.toggle('active', btn.textContent.trim().split(/\s+/)[0] === voiceId);
+                    });
+                }
+                // Update picker trigger label
+                window.updateVoicePickerLabel();
+                forceHideModal('voicePickerModal');
+                if (typeof window.onTtsEngineChanged === 'function') window.onTtsEngineChanged(newVal);
+                if (typeof persistLaboonTtsSettings === 'function') persistLaboonTtsSettings(true);
+            };
+            window.updateVoicePickerLabel = function() {
+                const labelEl = document.getElementById('tts-voice-picker-label');
+                const trigger = document.getElementById('tts-voice-picker-trigger');
+                const empty = document.getElementById('tts-voice-picker-empty');
+                if (!labelEl || !trigger) return;
+                const { voices } = window.getVoicePickerCandidates();
+                if (voices.length === 0) {
+                    trigger.style.display = 'none';
+                    if (empty) empty.style.display = 'block';
+                    return;
+                }
+                trigger.style.display = 'flex';
+                if (empty) empty.style.display = 'none';
+                const currentId = (document.getElementById('tts-voice-select')?.value || '').split(':')[1] || '';
+                const match = voices.find(v => v.id === currentId);
+                labelEl.textContent = match ? (match.label || match.id) : (voices[0].label || voices[0].id);
+            };
+
             window.syncTtsVoices = function() {
                 const engine = (LABOON_TTS_BACKEND_MODELS[window.getSelectedTtsBackend()]?.engine) || window._ttsEngine || 'gemini';
                 const lang = window._ttsMode === 'dialogue' 
@@ -8350,6 +8465,7 @@
                 const currentS2 = filtered.some(v => v.id === currentS2Raw) ? currentS2Raw : (filtered[1]?.id || filtered[0]?.id);
                 renderTo(s2Container, 'tts-voice-s2', currentS2);
                 if (typeof window.updateQwenModeUi === 'function') window.updateQwenModeUi();
+                if (typeof window.updateVoicePickerLabel === 'function') window.updateVoicePickerLabel(); // V93.72: keep picker trigger in sync with engine/lang changes
             };
 
             window._ttsMode = 'single';
@@ -9921,6 +10037,19 @@
                         <strong>Not in Datamuse?</strong> Look up at the <a href="http://www.speech.cs.cmu.edu/cgi-bin/cmudict" target="_blank" rel="noopener" style="color:#047857;">CMU Pronouncing Dictionary online</a> and paste the phonemes (without leading word) in brackets manually.
                     </div>
                 </details>
+            </div>
+        </div>
+        <!-- 🎤 Voice Picker Modal (V93.72 Phase C3) — searchable list of voices for current backend + language -->
+        <div id="voicePickerModal" class="modal" style="z-index:2360;">
+            <div class="modal-content" style="max-width:480px;">
+                <span class="close-modal" onclick="forceHideModal('voicePickerModal')">&times;</span>
+                <h3 style="margin:0 0 4px; color:#1e293b; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-microphone-lines"></i> Pick a Voice</h3>
+                <p id="voice-picker-context" style="font-size:0.78em; color:#64748b; margin:0 0 12px;"></p>
+                <input type="text" id="voice-picker-search" placeholder="🔍 Search by name or description..." oninput="renderVoicePickerList()" style="width:100%; padding:9px 12px; border:1.5px solid #e2e8f0; border-radius:10px; background:#f8fafc; color:#1e293b; font-size:0.88em; outline:none; margin-bottom:10px;">
+                <div id="voice-picker-list" style="max-height:50vh; overflow-y:auto; padding:2px;"></div>
+                <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+                    <button class="magic-btn" style="background:#64748b; padding:8px 16px; border-radius:10px; font-size:0.85em;" type="button" onclick="forceHideModal('voicePickerModal')">Cancel</button>
+                </div>
             </div>
         </div>
         <!-- 🌐 Translate Missing — Select-list modal (V93.57, replaces all-or-nothing confirm) -->
