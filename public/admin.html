@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.72</title>
+    <title>Nika V93.73</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -2912,6 +2912,63 @@
         /* Page-level padding so content isn't hidden behind the bar */
         body.onepiece-scope #tab-ai-hub #hub-view-laboon {
             padding-bottom: 80px;
+        }
+        /* V93.73 Phase C4: right rail sticky scroll (desktop) + drawer (mobile) */
+        body.onepiece-scope #tab-ai-hub #laboon-right-rail-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.42);
+            z-index: 85;
+        }
+        @media (min-width: 901px) {
+            body.onepiece-scope #tab-ai-hub #laboon-right-rail {
+                position: sticky;
+                top: 16px;
+                max-height: calc(100vh - 110px); /* viewport minus sticky bar + small margin */
+                overflow-y: auto;
+                align-self: flex-start;
+            }
+            body.onepiece-scope #tab-ai-hub #laboon-right-rail-toggle,
+            body.onepiece-scope #tab-ai-hub #laboon-right-rail-close,
+            body.onepiece-scope #tab-ai-hub #laboon-right-rail-backdrop {
+                display: none !important;
+            }
+        }
+        @media (max-width: 900px) {
+            body.onepiece-scope #tab-ai-hub #laboon-right-rail-toggle {
+                display: inline-flex !important;
+            }
+            body.onepiece-scope #tab-ai-hub #laboon-right-rail-close {
+                display: inline-flex !important;
+            }
+            body.onepiece-scope #tab-ai-hub #laboon-right-rail {
+                position: fixed !important;
+                top: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
+                width: 90vw !important;
+                max-width: 420px !important;
+                background: #ffffff !important;
+                transform: translateX(100%);
+                transition: transform 0.25s ease;
+                box-shadow: -12px 0 32px rgba(15, 23, 42, 0.18);
+                z-index: 90;
+                padding: 20px !important;
+                overflow-y: auto;
+                margin: 0 !important;
+                flex: none !important;
+            }
+            body.onepiece-scope #tab-ai-hub #laboon-right-rail.open {
+                transform: translateX(0);
+            }
+            body.onepiece-scope #tab-ai-hub #laboon-right-rail-backdrop.open {
+                display: block;
+            }
+            /* Hide sticky bar while drawer is open so it doesn't fight the drawer for touches */
+            body.onepiece-scope #tab-ai-hub #laboon-right-rail.open ~ #laboon-sticky-bar {
+                display: none;
+            }
         }
         @keyframes ttsFadeIn {
             from { opacity: 0; transform: translateY(10px); }
@@ -5950,12 +6007,16 @@
                             
                             <!-- TTS Studio: Horizontal Layout ([Version: V90.99.3.5]) -->
                             <div id="hub-tts-studio" class="laboon-creative-card" style="display:none; margin-bottom:0;">
-                                <div class="laboon-studio-header">
+                                <div class="laboon-studio-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
                                         <div style="display:flex; align-items:center; gap:12px;">
                                             <i class="fa-solid fa-music" style="font-size:1.5em; color:#6366f1;"></i>
                                             <h3 class="laboon-studio-title" style="margin:0;">Brook, Soul King</h3>
                                         </div>
+                                        <!-- V93.73 Phase C4: Settings toggle (mobile drawer trigger). Hidden on desktop via CSS. -->
+                                        <button id="laboon-right-rail-toggle" type="button" onclick="toggleLaboonRightRail()" style="display:none; align-items:center; gap:6px; padding:8px 14px; border-radius:10px; border:1.5px solid #e2e8f0; background:#ffffff; color:#1e293b; cursor:pointer; font-size:0.85em; font-weight:700;" aria-label="Open settings"><i class="fa-solid fa-sliders"></i> Settings</button>
                                 </div>
+                                <!-- V93.73 Phase C4: backdrop for mobile drawer. Click closes drawer. -->
+                                <div id="laboon-right-rail-backdrop" onclick="closeLaboonRightRail()"></div>
 
                                 <div class="tts-step-body" style="padding-top:20px; display:flex; flex-direction:row; gap:24px; align-items:stretch;">
                                     <!-- V93.68: laboon-left-col wraps Transcript (step-1) + Produce (step-3 moved here from right rail). -->
@@ -6096,8 +6157,10 @@
                                     </div>
                                     </div><!-- /#laboon-left-col (V93.68) -->
 
-                                    <!-- V93.68: right rail now holds Config only (Produce moved to left col under transcript). -->
+                                    <!-- V93.68: right rail now holds Config only (Produce moved to left col under transcript). V93.73 adds sticky scroll (desktop) + drawer (mobile). -->
                                     <div id="laboon-right-rail" style="flex:1; display:flex; flex-direction:column; min-width:0;">
+                                        <!-- V93.73 Phase C4: close X for mobile drawer; hidden on desktop via CSS. -->
+                                        <button id="laboon-right-rail-close" type="button" onclick="closeLaboonRightRail()" style="display:none; align-self:flex-end; width:32px; height:32px; border:none; background:#f1f5f9; color:#64748b; border-radius:8px; cursor:pointer; margin-bottom:10px;" aria-label="Close settings">✕</button>
                                     <div id="tts-step-2" class="tts-step-content" style="display:block; margin:0;">
 
                                         <!-- 1. Model Selection (V93.71: accordion, open by default) -->
@@ -8375,6 +8438,32 @@
                 const match = voices.find(v => v.id === currentId);
                 labelEl.textContent = match ? (match.label || match.id) : (voices[0].label || voices[0].id);
             };
+
+            // V93.73 Phase C4: mobile drawer toggle for right rail.
+            // CSS owns the layout (sticky on >=901px, fixed slide-in <=900px).
+            // JS just toggles the .open class on the rail and the backdrop.
+            window.toggleLaboonRightRail = function() {
+                const rail = document.getElementById('laboon-right-rail');
+                const backdrop = document.getElementById('laboon-right-rail-backdrop');
+                if (!rail) return;
+                const opening = !rail.classList.contains('open');
+                rail.classList.toggle('open', opening);
+                if (backdrop) backdrop.classList.toggle('open', opening);
+                document.body.style.overflow = opening ? 'hidden' : '';
+            };
+            window.closeLaboonRightRail = function() {
+                const rail = document.getElementById('laboon-right-rail');
+                const backdrop = document.getElementById('laboon-right-rail-backdrop');
+                if (rail) rail.classList.remove('open');
+                if (backdrop) backdrop.classList.remove('open');
+                document.body.style.overflow = '';
+            };
+            // Close drawer on Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && document.getElementById('laboon-right-rail')?.classList.contains('open')) {
+                    window.closeLaboonRightRail();
+                }
+            });
 
             window.syncTtsVoices = function() {
                 const engine = (LABOON_TTS_BACKEND_MODELS[window.getSelectedTtsBackend()]?.engine) || window._ttsEngine || 'gemini';
