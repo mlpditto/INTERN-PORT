@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.60</title>
+    <title>Nika V93.61</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -8545,8 +8545,13 @@
                     : (languageEl?.value || 'th-TH');
                 const selectedQwenMode = getQwenVoiceMode();
                 
-                // Actual engine remains mapped from backend during Sprint 1A.
-                const selectedEngine = selectedBackend === 'qwen' ? 'qwen' : 'gemini';
+                // Engine is the dispatch key for the if-chain below; read it from the
+                // backend table so adding a backend later doesn't need this line edited.
+                // Pre-V93.61 this was a `qwen ? qwen : gemini` ternary that silently
+                // routed every non-qwen backend (incl. omnivoice) to the gemini branch
+                // — which then sent 'k2-fsa/OmniVoice' as a Google model id and got
+                // "GenerateContentRequest.model: unexpected model name format" back.
+                const selectedEngine = LABOON_TTS_BACKEND_MODELS[selectedBackend]?.engine || 'gemini';
 
                 if (isDialogue && selectedEngine !== 'gemini') {
                     showToast('Dialogue mode only supported by Gemini 3.1 Flash currently', 'warning');
