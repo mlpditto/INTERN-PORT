@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.77</title>
+    <title>Nika V93.78</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -3342,6 +3342,13 @@
             <!-- Quiz Insight Container -->
             <!-- Quiz Insight Container -->
             <div id="insight-quiz-view" style="display:none;">
+                <!-- V93.78 — Time-window pill bar (closes pending item #2) -->
+                <div id="quiz-insight-window-bar" style="display:flex; gap:6px; align-items:center; margin-bottom:10px; padding:4px; background:#f8fafc; border:1px solid #f1f5f9; border-radius:12px; width:fit-content;">
+                    <span style="font-size:0.7em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.05em; padding:0 8px;">Window</span>
+                    <button type="button" class="qi-window-pill" data-window="7" onclick="selectQuizInsightWindow(this)" style="padding:5px 12px; border:none; border-radius:8px; font-size:0.75em; font-weight:700; cursor:pointer; background:transparent; color:#64748b;">Last 7d</button>
+                    <button type="button" class="qi-window-pill" data-window="30" onclick="selectQuizInsightWindow(this)" style="padding:5px 12px; border:none; border-radius:8px; font-size:0.75em; font-weight:700; cursor:pointer; background:transparent; color:#64748b;">Last 30d</button>
+                    <button type="button" class="qi-window-pill active" data-window="all" onclick="selectQuizInsightWindow(this)" style="padding:5px 12px; border:none; border-radius:8px; font-size:0.75em; font-weight:700; cursor:pointer; background:#4361ee; color:white;">All-time</button>
+                </div>
                 <div id="quiz-trend-chart" style="width:100%; height:200px; position:relative; margin-bottom:15px; background:#fdfdfd; border:1.5px solid #f1f5f9; border-radius:16px; padding:10px; display:flex; align-items:center; justify-content:center;">
                     <div style="color:#94a3b8; font-size:0.85em; font-style:italic;"><i class="fa-solid fa-spinner fa-spin"></i> Loading Performance Trend...</div>
                 </div>
@@ -27271,7 +27278,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.getElementById('insight-backlog-view').style.display = tab === 'backlog' ? 'block' : 'none';
             document.getElementById('insight-history-view').style.display = tab === 'history' ? 'block' : 'none';
             
-            if (tab === 'quiz' && window._currentPopupUser) renderQuizInsight(window._currentPopupUser);
+            if (tab === 'quiz' && window._currentPopupUser) {
+                if (typeof syncQuizInsightWindowPills === 'function') syncQuizInsightWindowPills();
+                renderQuizInsight(window._currentPopupUser);
+            }
             if (tab === 'backlog' && window._currentPopupUser) renderHubBacklog(window._currentPopupUser);
             if (tab === 'history' && window._currentPopupUser) renderHubHistoryPage();
         };
@@ -29177,11 +29187,46 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         window.openLbPopup = (uid) => openUserHub(uid, 'activity');
         window.showHistory = (uid) => openUserHub(uid, 'history');
 
+        // V93.78: Time-window state (closes pending item #2)
+        function getQuizInsightWindow() {
+            try { return localStorage.getItem('qi_time_window') || 'all'; } catch (e) { return 'all'; }
+        }
+        function getQuizInsightWindowCutoffMs() {
+            const w = getQuizInsightWindow();
+            if (w === 'all') return 0;
+            const days = parseInt(w, 10);
+            if (!Number.isFinite(days) || days <= 0) return 0;
+            return Date.now() - days * 86400000;
+        }
+        window.selectQuizInsightWindow = function(btn) {
+            if (!btn) return;
+            const value = btn.dataset.window || 'all';
+            try { localStorage.setItem('qi_time_window', value); } catch (e) { /* private mode */ }
+            document.querySelectorAll('#quiz-insight-window-bar .qi-window-pill').forEach(p => {
+                const active = p === btn;
+                p.classList.toggle('active', active);
+                p.style.background = active ? '#4361ee' : 'transparent';
+                p.style.color = active ? 'white' : '#64748b';
+            });
+            if (window._currentPopupUser) renderQuizInsight(window._currentPopupUser);
+        };
+        function syncQuizInsightWindowPills() {
+            const current = getQuizInsightWindow();
+            document.querySelectorAll('#quiz-insight-window-bar .qi-window-pill').forEach(p => {
+                const active = (p.dataset.window || 'all') === current;
+                p.classList.toggle('active', active);
+                p.style.background = active ? '#4361ee' : 'transparent';
+                p.style.color = active ? 'white' : '#64748b';
+            });
+        }
+
         // V93.76: Cohort tag stats — aggregate per-question correctness across same-group peers
-        function computeCohortTagStats(groupName, excludeUserId) {
+        // V93.78: respect time-window (cohort uses same window as user for fair comparison)
+        function computeCohortTagStats(groupName, excludeUserId, cutoffMs) {
             if (!groupName) return {};
             const stamp = (quizApprovedData || []).length;
-            const cacheKey = `${groupName}::${excludeUserId || ''}::${stamp}`;
+            const cutoffKey = cutoffMs && cutoffMs > 0 ? String(cutoffMs) : 'all';
+            const cacheKey = `${groupName}::${excludeUserId || ''}::${cutoffKey}::${stamp}`;
             window._cohortTagStatsCache = window._cohortTagStatsCache || {};
             if (window._cohortTagStatsCache[cacheKey]) return window._cohortTagStatsCache[cacheKey];
 
@@ -29198,6 +29243,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
             (quizApprovedData || []).forEach(att => {
                 if (!cohortIds.has(att.userId)) return;
+                if (cutoffMs && cutoffMs > 0) {
+                    const ms = att.timestamp && att.timestamp.toMillis ? att.timestamp.toMillis() : 0;
+                    if (ms < cutoffMs) return;
+                }
                 const qData = quizzesData.find(x => x.id === att.quizId);
                 if (!qData || !Array.isArray(qData.questions)) return;
                 const manualCorrect = att.manualCorrect || {};
@@ -29259,8 +29308,26 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     return;
                 }
 
-                const attempts = snap.docs.map(doc => ({id: doc.id, ...doc.data()})).sort((a,b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
-                
+                const allAttempts = snap.docs.map(doc => ({id: doc.id, ...doc.data()})).sort((a,b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
+
+                // V93.78 — filter by time window; reflects in trend, tag aggregation, S&W, and cohort
+                const cutoffMs = getQuizInsightWindowCutoffMs();
+                const windowLabel = getQuizInsightWindow();
+                const attempts = cutoffMs > 0
+                    ? allAttempts.filter(a => {
+                        const ms = a.timestamp && a.timestamp.toMillis ? a.timestamp.toMillis() : 0;
+                        return ms >= cutoffMs;
+                    })
+                    : allAttempts;
+
+                if (attempts.length === 0) {
+                    const labelTxt = windowLabel === 'all' ? 'all-time' : `the last ${windowLabel} days`;
+                    chartBox.innerHTML = `<div style="color:#94a3b8; font-size:0.85em;">No approved attempts in ${labelTxt}.</div>`;
+                    tagBox.innerHTML = `(No quiz history in ${labelTxt})`;
+                    summaryBox.innerHTML = `Switch window to see broader history.`;
+                    return;
+                }
+
                 // 1. Render Trend SVG
                 chartBox.innerHTML = drawQuizTrendLine(attempts);
 
@@ -29355,9 +29422,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }).sort((a, b) => b.avg - a.avg);
 
                 // V93.76: cohort comparison — same-group peers (excluding self), per-tag avg, mean across cluster tags
+                // V93.78: cohort uses the same time-window as the user for fair comparison
                 const userObj = (usersData || []).find(u => u.id === userId);
                 const myGroup = (userObj && userObj.group) || 'Public';
-                const cohortStats = computeCohortTagStats(myGroup, userId);
+                const cohortStats = computeCohortTagStats(myGroup, userId, cutoffMs);
                 groups.forEach(g => { g.cohortAvg = computeClusterCohortAvg(g, cohortStats); });
 
                 if (!window._hubTagPage) window._hubTagPage = 1;
