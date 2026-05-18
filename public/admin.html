@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.76</title>
+    <title>Nika V93.77</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -14692,6 +14692,11 @@ For "changes": list every meaningful edit between original and improved. Each en
 
                 if (grammarResult.status === 'fulfilled') {
                     renderGrammarAnalysis(grammarResult.value.text, grammarSource);
+                } else {
+                    // V93.77: surface grammar failures instead of silent-hiding the card
+                    const reason = (grammarResult.reason && grammarResult.reason.message) || String(grammarResult.reason || 'Unknown error');
+                    console.error('[reflective-grammar] gemini-2.5-flash call failed:', grammarResult.reason);
+                    renderGrammarAnalysisError(reason);
                 }
 
             } catch (error) {
@@ -14742,6 +14747,25 @@ For "changes": list every meaningful edit between original and improved. Each en
                 if (op.type === 'add') return `<span style="background:#dcfce7; color:#166534; padding:0 3px; border-radius:3px; font-weight:600;">${txt}</span>`;
                 return `<span style="background:#fee2e2; color:#991b1b; padding:0 3px; border-radius:3px; text-decoration:line-through; opacity:0.65;">${txt}</span>`;
             }).join('');
+        }
+
+        // V93.77: visible error state when the grammar call (gemini-2.5-flash) fails or times out.
+        // Previously the card stayed hidden, leaving admins unsure if AI Suggest worked at all.
+        function renderGrammarAnalysisError(reason) {
+            const card = document.getElementById('reflective-grammar-card');
+            const content = document.getElementById('reflective-grammar-content');
+            const badge = document.getElementById('reflective-grammar-score');
+            if (!card || !content) return;
+            if (badge) {
+                badge.textContent = '⚠';
+                badge.style.cssText = 'font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; background:#fef2f2; color:#dc2626; border:1px solid #fca5a5;';
+            }
+            const reasonStr = String(reason || 'Unknown error');
+            const friendly = /NetworkError|Failed to fetch|Load failed|fetch resource/i.test(reasonStr)
+                ? 'Network issue — check connection and try AI Suggest again.'
+                : 'Grammar check unavailable: ' + reasonStr;
+            content.innerHTML = `<div style="font-size:0.82em; color:#7f1d1d; background:#fef2f2; border-left:3px solid #ef4444; padding:8px 11px; border-radius:0 8px 8px 0; line-height:1.5;">${escapeHtml(friendly)}<div style="font-size:0.85em; color:#94a3b8; margin-top:4px;">Open DevTools Console (F12) for the full error.</div></div>`;
+            card.style.display = '';
         }
 
         function renderGrammarAnalysis(rawText, originalText) {
