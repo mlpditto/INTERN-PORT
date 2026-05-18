@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.78</title>
+    <title>Nika V93.79</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -3352,7 +3352,7 @@
                 <div id="quiz-trend-chart" style="width:100%; height:200px; position:relative; margin-bottom:15px; background:#fdfdfd; border:1.5px solid #f1f5f9; border-radius:16px; padding:10px; display:flex; align-items:center; justify-content:center;">
                     <div style="color:#94a3b8; font-size:0.85em; font-style:italic;"><i class="fa-solid fa-spinner fa-spin"></i> Loading Performance Trend...</div>
                 </div>
-                <div id="quiz-insight-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                <div id="quiz-insight-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:15px;">
                     <div style="background:#f8fafc; padding:15px; border-radius:16px; border:1px solid #f1f5f9;">
                          <div style="font-weight:800; color:#334155; font-size:0.85em; margin-bottom:10px;"><i class="fa-solid fa-tags" style="color:#6366f1;"></i> Performance by Tags</div>
                          <div id="quiz-tags-stats" style="font-size:0.8em; color:#64748b;">(No data available)</div>
@@ -3360,6 +3360,13 @@
                     <div style="background:#f8fafc; padding:15px; border-radius:16px; border:1px solid #f1f5f9;">
                          <div style="font-weight:800; color:#334155; font-size:0.85em; margin-bottom:10px;"><i class="fa-solid fa-bolt" style="color:#f59e0b;"></i> Strengths & Weaknesses</div>
                          <div id="quiz-summary-tips" style="font-size:0.8em; color:#64748b;">Analysis pending...</div>
+                    </div>
+                    <!-- V93.79 — Spider chart (closes pending item #4) -->
+                    <div style="background:#f8fafc; padding:15px; border-radius:16px; border:1px solid #f1f5f9;">
+                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                             <div style="font-weight:800; color:#334155; font-size:0.85em;"><i class="fa-solid fa-spider" style="color:#8b5cf6;"></i> Topic Coverage <span style="font-size:0.75em; color:#94a3b8; font-weight:600;">(top 6)</span></div>
+                         </div>
+                         <div id="quiz-spider-chart" style="font-size:0.8em; color:#64748b;">(No data available)</div>
                     </div>
                 </div>
             </div>
@@ -29325,6 +29332,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     chartBox.innerHTML = `<div style="color:#94a3b8; font-size:0.85em;">No approved attempts in ${labelTxt}.</div>`;
                     tagBox.innerHTML = `(No quiz history in ${labelTxt})`;
                     summaryBox.innerHTML = `Switch window to see broader history.`;
+                    const spiderEmpty = document.getElementById('quiz-spider-chart');
+                    if (spiderEmpty) spiderEmpty.innerHTML = `<div style="padding:20px; text-align:center; color:#94a3b8; font-size:0.8em;">(No data in ${labelTxt})</div>`;
                     return;
                 }
 
@@ -29427,6 +29436,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const myGroup = (userObj && userObj.group) || 'Public';
                 const cohortStats = computeCohortTagStats(myGroup, userId, cutoffMs);
                 groups.forEach(g => { g.cohortAvg = computeClusterCohortAvg(g, cohortStats); });
+
+                // V93.79: Topic Coverage spider — top 6 clusters by total questions, user + cohort overlay
+                const spiderBox = document.getElementById('quiz-spider-chart');
+                if (spiderBox) spiderBox.innerHTML = drawQuizSpiderChart(groups, myGroup);
 
                 if (!window._hubTagPage) window._hubTagPage = 1;
                 const groupsPerPage = 5;
@@ -29765,6 +29778,99 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
 
             bodyEl.innerHTML = html;
+        }
+
+        // V93.79 — Spider/radar chart: top 6 clusters by total questions, user polygon + cohort overlay.
+        // Closes pending item #4 (Quiz Insight Tier 3 → Spider chart visualization).
+        function drawQuizSpiderChart(groups, myGroupName) {
+            if (!Array.isArray(groups) || groups.length < 3) {
+                return '<div style="padding:20px; text-align:center; color:#94a3b8; font-size:0.8em;">Need at least 3 tag clusters to render the radar.</div>';
+            }
+            const top = [...groups].sort((a, b) => (b.total || 0) - (a.total || 0)).slice(0, 6);
+            const N = top.length;
+            const w = 280, h = 280;
+            const cx = w / 2, cy = h / 2;
+            const r = 95;
+            const labelR = r + 18;
+            const startAngle = -Math.PI / 2;
+            const step = (2 * Math.PI) / N;
+
+            const polar = (axisIdx, pct) => {
+                const ang = startAngle + axisIdx * step;
+                const dist = (Math.max(0, Math.min(100, pct)) / 100) * r;
+                return { x: cx + dist * Math.cos(ang), y: cy + dist * Math.sin(ang) };
+            };
+
+            // Concentric grid (25 / 50 / 75 / 100)
+            let grid = '';
+            [25, 50, 75, 100].forEach(level => {
+                const pts = top.map((_, i) => {
+                    const p = polar(i, level);
+                    return `${p.x},${p.y}`;
+                }).join(' ');
+                grid += `<polygon points="${pts}" fill="none" stroke="#e2e8f0" stroke-width="1" />`;
+            });
+            // Axis spokes
+            let spokes = '';
+            top.forEach((_, i) => {
+                const p = polar(i, 100);
+                spokes += `<line x1="${cx}" y1="${cy}" x2="${p.x}" y2="${p.y}" stroke="#e2e8f0" stroke-width="1" />`;
+            });
+            // Axis labels (tag name + score)
+            let labels = '';
+            top.forEach((g, i) => {
+                const ang = startAngle + i * step;
+                const lx = cx + labelR * Math.cos(ang);
+                const ly = cy + labelR * Math.sin(ang);
+                const anchor = Math.abs(Math.cos(ang)) < 0.2 ? 'middle' : (Math.cos(ang) > 0 ? 'start' : 'end');
+                const tag = g.tags[0] || '';
+                const short = tag.length > 14 ? tag.slice(0, 13) + '…' : tag;
+                labels += `<text x="${lx}" y="${ly + 4}" text-anchor="${anchor}" font-size="9.5" font-weight="700" fill="#475569">${escapeHtml(short)}</text>`;
+                labels += `<text x="${lx}" y="${ly + 16}" text-anchor="${anchor}" font-size="8.5" font-weight="600" fill="#94a3b8">${g.avg.toFixed(0)}%</text>`;
+            });
+
+            // User polygon
+            const userPts = top.map((g, i) => {
+                const p = polar(i, g.avg || 0);
+                return `${p.x},${p.y}`;
+            }).join(' ');
+            const userDots = top.map((g, i) => {
+                const p = polar(i, g.avg || 0);
+                return `<circle cx="${p.x}" cy="${p.y}" r="3.5" fill="#4361ee" stroke="white" stroke-width="1.5"><title>${escapeHtml(g.tags[0] || '')}: ${g.avg.toFixed(1)}% (${g.correct}/${g.total})</title></circle>`;
+            }).join('');
+
+            // Cohort polygon (overlay) — only if at least one cohort value is non-null
+            const hasCohort = top.some(g => typeof g.cohortAvg === 'number');
+            let cohortLayer = '';
+            if (hasCohort) {
+                const cohortPts = top.map((g, i) => {
+                    const v = typeof g.cohortAvg === 'number' ? g.cohortAvg : 0;
+                    const p = polar(i, v);
+                    return `${p.x},${p.y}`;
+                }).join(' ');
+                cohortLayer = `<polygon points="${cohortPts}" fill="rgba(139,92,246,0.06)" stroke="#8b5cf6" stroke-width="1.5" stroke-dasharray="4,3" />`;
+            }
+
+            const legendCohort = hasCohort
+                ? `<span style="display:inline-flex; align-items:center; gap:5px; margin-left:10px;"><span style="display:inline-block; width:12px; height:0; border-top:2px dashed #8b5cf6; vertical-align:middle;"></span>Cohort${myGroupName ? ` (${escapeHtml(myGroupName)})` : ''}</span>`
+                : '';
+
+            return `
+                <div style="display:flex; flex-direction:column; align-items:center;">
+                    <svg width="100%" height="auto" viewBox="0 0 ${w} ${h}" style="max-width:300px; overflow:visible;">
+                        ${grid}
+                        ${spokes}
+                        ${cohortLayer}
+                        <polygon points="${userPts}" fill="rgba(67,97,238,0.18)" stroke="#4361ee" stroke-width="2" />
+                        ${userDots}
+                        ${labels}
+                    </svg>
+                    <div style="font-size:0.7em; color:#94a3b8; font-weight:700; margin-top:8px;">
+                        <span style="display:inline-flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; background:rgba(67,97,238,0.5); border:1.5px solid #4361ee; border-radius:2px;"></span>User</span>
+                        ${legendCohort}
+                    </div>
+                </div>
+            `;
         }
 
         function drawQuizTrendLine(attempts) {
