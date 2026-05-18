@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.79</title>
+    <title>Nika V93.80</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -11434,6 +11434,29 @@
             </div>
             <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid #f1f5f9;">
                 <button onclick="closeDuplicateQuestModal()" style="padding:8px 18px; background:#f1f5f9; color:#475569; border:none; border-radius:10px; font-weight:700; font-size:0.85em; cursor:pointer;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- V93.80: Quiz Insight LINE Reminder modal (closes pending items #3 + #5) -->
+    <div id="lineReminderModal" class="modal" style="z-index:4290;">
+        <div class="modal-content" style="max-width:520px; width:95%; text-align:left;">
+            <span class="close-modal" onclick="closeLineReminderModal()">&times;</span>
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid #f1f5f9;">
+                <i class="fa-brands fa-line" style="color:#06c755; font-size:1.6em;"></i>
+                <div>
+                    <div style="font-weight:900; color:#1e293b; font-size:1.05em;">Send LINE reminder</div>
+                    <div id="line-reminder-recipient" style="font-size:0.78em; color:#64748b; font-weight:700; margin-top:2px;">-</div>
+                </div>
+            </div>
+            <div style="margin-bottom:10px;">
+                <label style="display:block; font-size:0.72em; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Message <span id="line-reminder-char-count" style="color:#94a3b8; font-weight:600; text-transform:none; letter-spacing:0; margin-left:6px;">0/1000</span></label>
+                <textarea id="line-reminder-textarea" rows="6" style="width:100%; padding:10px 12px; border:1.5px solid #e2e8f0; border-radius:10px; font-size:0.9em; line-height:1.5; resize:vertical; font-family:inherit;" oninput="updateLineReminderCharCount()" placeholder="Write a short reminder..."></textarea>
+            </div>
+            <div id="line-reminder-status" style="font-size:0.78em; font-weight:700; margin-bottom:10px; min-height:1.2em;"></div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; padding-top:8px; border-top:1px solid #f1f5f9;">
+                <button onclick="closeLineReminderModal()" style="padding:8px 16px; background:#f1f5f9; color:#475569; border:none; border-radius:10px; font-weight:700; font-size:0.85em; cursor:pointer;">Cancel</button>
+                <button id="line-reminder-send-btn" onclick="sendQuizLineReminder()" style="padding:8px 18px; background:#06c755; color:white; border:none; border-radius:10px; font-weight:800; font-size:0.85em; cursor:pointer;"><i class="fa-brands fa-line"></i> Send</button>
             </div>
         </div>
     </div>
@@ -29593,6 +29616,138 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (modal) modal.style.display = 'none';
         };
 
+        // V93.80 — LINE reminder modal (closes pending items #3 + #5).
+        // Reuses the V93.76 _quizInsightCtx.userId as recipient.
+        window._lineReminderCtx = null;
+        window.openLineReminderModal = function(prefilledMessage, quizTitle) {
+            const ctx = window._quizInsightCtx;
+            if (!ctx || !ctx.userId) { showToast('No user context — reopen the popup.'); return; }
+            const userId = ctx.userId;
+            if (!userId.startsWith('U')) {
+                showToast('This user is not LINE-linked (id must start with "U").');
+                return;
+            }
+            const user = (usersData || []).find(u => u.id === userId) || {};
+            window._lineReminderCtx = { userId, quizTitle: quizTitle || '' };
+            const recipientEl = document.getElementById('line-reminder-recipient');
+            if (recipientEl) recipientEl.textContent = `To: ${user.displayName || user.nickName || userId}`;
+            const ta = document.getElementById('line-reminder-textarea');
+            if (ta) ta.value = String(prefilledMessage || '');
+            updateLineReminderCharCount();
+            const statusEl = document.getElementById('line-reminder-status');
+            if (statusEl) { statusEl.textContent = ''; statusEl.style.color = ''; }
+            const sendBtn = document.getElementById('line-reminder-send-btn');
+            if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<i class="fa-brands fa-line"></i> Send'; }
+            const modal = document.getElementById('lineReminderModal');
+            if (modal) modal.style.display = 'block';
+        };
+
+        window.closeLineReminderModal = function() {
+            const modal = document.getElementById('lineReminderModal');
+            if (modal) modal.style.display = 'none';
+            window._lineReminderCtx = null;
+        };
+
+        window.updateLineReminderCharCount = function() {
+            const ta = document.getElementById('line-reminder-textarea');
+            const counter = document.getElementById('line-reminder-char-count');
+            if (!ta || !counter) return;
+            const len = ta.value.length;
+            counter.textContent = `${len}/1000`;
+            counter.style.color = len > 1000 ? '#dc2626' : (len > 800 ? '#f59e0b' : '#94a3b8');
+        };
+
+        window.sendQuizLineReminder = async function() {
+            const ctx = window._lineReminderCtx;
+            const ta = document.getElementById('line-reminder-textarea');
+            const statusEl = document.getElementById('line-reminder-status');
+            const sendBtn = document.getElementById('line-reminder-send-btn');
+            if (!ctx || !ta) return;
+            const message = ta.value.trim();
+            if (!message) {
+                if (statusEl) { statusEl.textContent = 'Message required.'; statusEl.style.color = '#dc2626'; }
+                return;
+            }
+            if (message.length > 1000) {
+                if (statusEl) { statusEl.textContent = 'Too long (max 1000 chars).'; statusEl.style.color = '#dc2626'; }
+                return;
+            }
+            try {
+                if (sendBtn) { sendBtn.disabled = true; sendBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...'; }
+                if (statusEl) { statusEl.textContent = ''; statusEl.style.color = ''; }
+                const fn = firebase.functions().httpsCallable('notifyQuizReminder');
+                const res = await fn({ userId: ctx.userId, message, quizTitle: ctx.quizTitle || '' });
+                const data = res && res.data ? res.data : {};
+                if (data.ok && data.pushed) {
+                    showToast('✓ LINE reminder sent');
+                    closeLineReminderModal();
+                } else {
+                    const codeMap = { 'no-friend': 'User has not added the official LINE account as a friend.', 'invalid-user': 'LINE userId not recognized.', 'rate-limit': 'LINE rate limit — try again later.', 'token': 'LINE token issue — contact engineering.', 'invalid': 'LINE rejected the message format.', 'token-missing': 'LINE token not configured server-side.' };
+                    const reason = codeMap[data.code] || (data.skipped ? `Skipped: ${data.reason}` : 'LINE push failed.');
+                    if (statusEl) { statusEl.textContent = reason; statusEl.style.color = '#dc2626'; }
+                    if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<i class="fa-brands fa-line"></i> Send'; }
+                }
+            } catch (err) {
+                console.error('[sendQuizLineReminder] failed:', err);
+                if (statusEl) { statusEl.textContent = `Error: ${(err && err.message) || 'unknown'}`; statusEl.style.color = '#dc2626'; }
+                if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<i class="fa-brands fa-line"></i> Send'; }
+            }
+        };
+
+        // V93.80 — Side Quest creation from Quiz Insight suggested quiz card.
+        // Creates a Kanban task assigned to the viewed user, surfaces it in Mission section.
+        window.assignSideQuestForQuiz = async function(quizId, quizTitle, kind) {
+            const ctx = window._quizInsightCtx;
+            if (!ctx || !ctx.userId) { showToast('No user context — reopen the popup.'); return; }
+            const userId = ctx.userId;
+            const user = (usersData || []).find(u => u.id === userId) || {};
+            const prefix = kind === 'retake' ? '🔁 Retake' : '📚 Practice';
+            const title = `${prefix}: ${quizTitle || '(Untitled quiz)'}`;
+            const confirmMsg = `Assign as Side Quest to ${user.displayName || user.nickName || userId}?\n\n${title}`;
+            if (!confirm(confirmMsg)) return;
+            try {
+                await db.collection('side_quests').add({
+                    title,
+                    description: quizId ? `Quiz ID: ${quizId}` : '',
+                    priority: 'normal',
+                    dueDate: '',
+                    isProject: false,
+                    assigneeIds: [userId],
+                    assignees: [{ uid: userId, name: user.displayName || user.nickName || userId, pic: user.pictureUrl || '' }],
+                    status: 'Backlog',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    sourceQuizId: quizId || null,
+                    sourceKind: 'quiz-insight-suggestion'
+                });
+                showToast(`✓ Side Quest created — ${user.displayName || 'user'}`);
+            } catch (err) {
+                console.error('[assignSideQuestForQuiz] failed:', err);
+                alert('Failed to create Side Quest: ' + (err.message || 'unknown'));
+            }
+        };
+
+        // V93.80 — message template builders used by drill-down card buttons.
+        function buildWrongQuestionReminderTemplate(quizTitle, qIdx, primaryTag) {
+            const lines = [
+                `📝 ${quizTitle}`,
+                `เจอข้อ ${qIdx + 1} ที่ตอบไม่ตรง${primaryTag ? ` (tag: ${primaryTag})` : ''}`,
+                '',
+                'ลองทบทวนหัวข้อนี้และทำซ้ำได้นะ — มีตรงไหนสงสัยถามได้เลย'
+            ];
+            return lines.join('\n');
+        }
+        function buildSuggestedQuizReminderTemplate(quizTitle, kind, primaryTag) {
+            const verb = kind === 'retake' ? 'ลองทำซ้ำ' : 'ลองทำ';
+            const lines = [
+                `📚 แอดมินแนะนำ quiz`,
+                `${quizTitle}`,
+                primaryTag ? `Tag: ${primaryTag}` : '',
+                '',
+                `${verb} quiz นี้เพื่อแข็งแกร่งในหัวข้อนี้ขึ้นนะ`
+            ].filter(Boolean);
+            return lines.join('\n');
+        }
+
         function questionMatchesGroup(q, qData, groupTags) {
             const perQRaw = (q && q.tags) ? String(q.tags).trim() : '';
             const quizFallbackRaw = qData && qData.tags ? String(qData.tags).trim() : '';
@@ -29703,7 +29858,32 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             } catch (e) { return ''; }
         }
 
+        // V93.80 — Action registry for drill-down card buttons.
+        // Stashes per-card payloads so onclick handlers only need to reference an index,
+        // sidestepping HTML-attribute quoting issues with multi-line / Thai / special chars.
+        // Re-initialized each renderTagDrillDownContent call.
+        window._drillDownActions = { line: [], assign: [] };
+        function registerLineReminderAction(template, quizTitle) {
+            window._drillDownActions.line.push({ template, quizTitle });
+            return window._drillDownActions.line.length - 1;
+        }
+        function registerAssignAction(quizId, quizTitle, kind) {
+            window._drillDownActions.assign.push({ quizId, quizTitle, kind });
+            return window._drillDownActions.assign.length - 1;
+        }
+        window.invokeLineReminderAction = function(idx) {
+            const a = window._drillDownActions && window._drillDownActions.line && window._drillDownActions.line[idx];
+            if (!a) return;
+            openLineReminderModal(a.template, a.quizTitle);
+        };
+        window.invokeAssignAction = function(idx) {
+            const a = window._drillDownActions && window._drillDownActions.assign && window._drillDownActions.assign[idx];
+            if (!a) return;
+            assignSideQuestForQuiz(a.quizId, a.quizTitle, a.kind);
+        };
+
         function renderTagDrillDownContent(group, wrong, practice, retake) {
+            window._drillDownActions = { line: [], assign: [] }; // reset per-render
             const titleEl = document.getElementById('drilldown-title');
             const statsEl = document.getElementById('drilldown-stats');
             const bodyEl = document.getElementById('drilldown-body');
@@ -29727,6 +29907,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 wrong.forEach(w => {
                     const qText = w.question.q || '';
                     const truncated = qText.length > 220 ? qText.slice(0, 220) + '…' : qText;
+                    // V93.80: per-card LINE reminder CTA (closes pending item #3).
+                    // Stash {template, quizTitle} in registry so onclick passes only an index
+                    // (avoids attribute-quoting issues with multi-line + special chars).
+                    const tmplIdx = registerLineReminderAction(buildWrongQuestionReminderTemplate(w.quizTitle, w.qIdx, primary), w.quizTitle);
+                    const lineBtn = `<button onclick="invokeLineReminderAction(${tmplIdx})" style="padding:5px 10px; background:#06c755; color:white; border:none; border-radius:8px; font-size:0.72em; font-weight:800; cursor:pointer;"><i class="fa-brands fa-line"></i> Send LINE</button>`;
                     html += `
                         <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:12px; padding:12px; margin-bottom:8px;">
                             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px;">
@@ -29734,10 +29919,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 <span style="font-size:0.6em; padding:2px 8px; border-radius:6px; background:#fee2e2; color:#991b1b; font-weight:800; white-space:nowrap;">Q${w.qIdx + 1} WRONG</span>
                             </div>
                             <div style="font-size:0.85em; color:#1e293b; font-weight:700; margin-bottom:10px; line-height:1.5; word-break:break-word;">${escapeHtml(truncated)}</div>
-                            <div style="display:flex; flex-direction:column; gap:4px; font-size:0.78em;">
+                            <div style="display:flex; flex-direction:column; gap:4px; font-size:0.78em; margin-bottom:10px;">
                                 <div><span style="color:#94a3b8; font-weight:700;">Your answer:</span> <span style="color:#991b1b; font-weight:700;">${renderAnswerLabel(w.question, w.userAnswer)}</span></div>
                                 <div><span style="color:#94a3b8; font-weight:700;">Correct:</span> <span style="color:#065f46; font-weight:700;">${renderAnswerLabel(w.question, w.question.correct)}</span></div>
                             </div>
+                            <div style="display:flex; justify-content:flex-end; gap:6px;">${lineBtn}</div>
                         </div>
                     `;
                 });
@@ -29750,6 +29936,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (practice.length > 0) {
                     html += `<div style="font-size:0.72em; font-weight:800; color:#6366f1; margin-bottom:6px;">📚 PRACTICE <span style="color:#94a3b8; font-weight:600;">(not yet attempted)</span></div>`;
                     practice.forEach(p => {
+                        // V93.80 — closes pending item #5 (assign + LINE on suggested cards)
+                        const assignIdx = registerAssignAction(p.id, p.title, 'practice');
+                        const lineIdx = registerLineReminderAction(buildSuggestedQuizReminderTemplate(p.title, 'practice', primary), p.title);
                         html += `
                             <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:6px;">
                                 <i class="fa-solid fa-graduation-cap" style="color:#6366f1; flex-shrink:0;"></i>
@@ -29757,6 +29946,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     <div style="font-size:0.85em; font-weight:700; color:#1e293b; word-break:break-word;">${escapeHtml(p.title)}</div>
                                     <div style="font-size:0.7em; color:#94a3b8; font-weight:600;">${p.overlap} matching tag${p.overlap !== 1 ? 's' : ''}${p.questionCount ? ` &middot; ${p.questionCount} question${p.questionCount !== 1 ? 's' : ''}` : ''}</div>
                                 </div>
+                                <button onclick="invokeAssignAction(${assignIdx})" title="Assign as Side Quest (Kanban task)" style="padding:5px 9px; background:#6366f1; color:white; border:none; border-radius:8px; font-size:0.7em; font-weight:800; cursor:pointer; white-space:nowrap;"><i class="fa-solid fa-plus"></i> Quest</button>
+                                <button onclick="invokeLineReminderAction(${lineIdx})" title="Send LINE reminder" style="padding:5px 9px; background:#06c755; color:white; border:none; border-radius:8px; font-size:0.7em; font-weight:800; cursor:pointer; white-space:nowrap;"><i class="fa-brands fa-line"></i> LINE</button>
                             </div>
                         `;
                     });
@@ -29764,6 +29955,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (retake.length > 0) {
                     html += `<div style="font-size:0.72em; font-weight:800; color:#f59e0b; margin:10px 0 6px;">🔁 RETAKE <span style="color:#94a3b8; font-weight:600;">(previous score &lt; 70%)</span></div>`;
                     retake.forEach(r => {
+                        const assignIdx = registerAssignAction(r.id, r.title, 'retake');
+                        const lineIdx = registerLineReminderAction(buildSuggestedQuizReminderTemplate(r.title, 'retake', primary), r.title);
                         html += `
                             <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; margin-bottom:6px;">
                                 <i class="fa-solid fa-rotate-right" style="color:#f59e0b; flex-shrink:0;"></i>
@@ -29771,6 +29964,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                     <div style="font-size:0.85em; font-weight:700; color:#1e293b; word-break:break-word;">${escapeHtml(r.title)}</div>
                                     <div style="font-size:0.7em; color:#94a3b8; font-weight:600;">${r.overlap} matching tag${r.overlap !== 1 ? 's' : ''}${typeof r.prevScore === 'number' ? ` &middot; previous score ${r.prevScore}%` : ''}</div>
                                 </div>
+                                <button onclick="invokeAssignAction(${assignIdx})" title="Assign as Side Quest (Kanban task)" style="padding:5px 9px; background:#f59e0b; color:white; border:none; border-radius:8px; font-size:0.7em; font-weight:800; cursor:pointer; white-space:nowrap;"><i class="fa-solid fa-plus"></i> Quest</button>
+                                <button onclick="invokeLineReminderAction(${lineIdx})" title="Send LINE reminder" style="padding:5px 9px; background:#06c755; color:white; border:none; border-radius:8px; font-size:0.7em; font-weight:800; cursor:pointer; white-space:nowrap;"><i class="fa-brands fa-line"></i> LINE</button>
                             </div>
                         `;
                     });
