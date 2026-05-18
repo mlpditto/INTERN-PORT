@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.80</title>
+    <title>Nika V93.81</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -29795,6 +29795,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return wrong;
         }
 
+        // V93.81 — Per-question tag matching at quiz-recommendation time (closes pending item #6).
+        // Previously this function only considered quiz-level tags (`qd.tags`), so a quiz with
+        // rich per-question tags but no quiz-level tag was invisible to the recommender. Now
+        // walks `qd.questions[]` and uses the same per-question priority + quiz-level fallback
+        // pattern as the V92.28 / V93.76 tag aggregation. A question "matches" the cluster if
+        // any of its effective tags overlaps the cluster's tag set.
         function computeSuggestedQuizzes(group, ctx) {
             const groupTagSet = new Set(group.tags);
             const userAttemptedQuizIds = new Set(ctx.attempts.map(a => a.quizId));
@@ -29811,15 +29817,34 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const practice = [];
             const retake = [];
             (Array.isArray(quizzesData) ? quizzesData : []).forEach(qd => {
-                if (!qd || !qd.tags) return;
-                const tags = String(qd.tags).split(',').map(t => t.trim()).filter(Boolean);
-                const overlapCount = tags.filter(t => groupTagSet.has(t)).length;
-                if (overlapCount === 0) return;
+                if (!qd) return;
+                const questions = Array.isArray(qd.questions) ? qd.questions : [];
+                const quizFallbackRaw = qd.tags ? String(qd.tags).trim() : '';
+                const hasAnyTag = questions.some(q => q && q.tags) || quizFallbackRaw;
+                if (!hasAnyTag) return;
+
+                let matchCount = 0;
+                if (questions.length === 0) {
+                    // No questions array — fall back to quiz-level tag match (preserves pre-V93.81
+                    // behaviour for older docs without questions[]).
+                    const tags = quizFallbackRaw.split(',').map(t => t.trim()).filter(Boolean);
+                    if (tags.some(t => groupTagSet.has(t))) matchCount = 1;
+                } else {
+                    questions.forEach(q => {
+                        const perQRaw = (q && q.tags) ? String(q.tags).trim() : '';
+                        const tagStr = perQRaw || quizFallbackRaw;
+                        if (!tagStr) return;
+                        const qTags = tagStr.split(',').map(t => t.trim()).filter(Boolean);
+                        if (qTags.some(t => groupTagSet.has(t))) matchCount++;
+                    });
+                }
+                if (matchCount === 0) return;
+
                 const card = {
                     id: qd.id,
                     title: qd.title || qd.shortTitle || '(Untitled)',
-                    overlap: overlapCount,
-                    questionCount: Array.isArray(qd.questions) ? qd.questions.length : 0
+                    matchCount,
+                    questionCount: questions.length
                 };
                 if (userAttemptedQuizIds.has(qd.id)) {
                     if (lowScoreQuizIds.has(qd.id)) {
@@ -29830,7 +29855,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
             });
 
-            practice.sort((a, b) => b.overlap - a.overlap);
+            // Sort by match density first (matchCount / questionCount) when both have questions,
+            // tiebreak by raw matchCount — favours focused quizzes over broad ones with a couple
+            // of relevant questions buried in.
+            const density = c => (c.questionCount > 0 ? c.matchCount / c.questionCount : 0);
+            practice.sort((a, b) => (density(b) - density(a)) || (b.matchCount - a.matchCount));
             retake.sort((a, b) => (a.prevScore || 0) - (b.prevScore || 0));
             return { practice: practice.slice(0, 5), retake: retake.slice(0, 5) };
         }
@@ -29944,7 +29973,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 <i class="fa-solid fa-graduation-cap" style="color:#6366f1; flex-shrink:0;"></i>
                                 <div style="flex:1; min-width:0;">
                                     <div style="font-size:0.85em; font-weight:700; color:#1e293b; word-break:break-word;">${escapeHtml(p.title)}</div>
-                                    <div style="font-size:0.7em; color:#94a3b8; font-weight:600;">${p.overlap} matching tag${p.overlap !== 1 ? 's' : ''}${p.questionCount ? ` &middot; ${p.questionCount} question${p.questionCount !== 1 ? 's' : ''}` : ''}</div>
+                                    <div style="font-size:0.7em; color:#94a3b8; font-weight:600;">${p.matchCount} matching question${p.matchCount !== 1 ? 's' : ''}${p.questionCount ? ` of ${p.questionCount}` : ''}</div>
                                 </div>
                                 <button onclick="invokeAssignAction(${assignIdx})" title="Assign as Side Quest (Kanban task)" style="padding:5px 9px; background:#6366f1; color:white; border:none; border-radius:8px; font-size:0.7em; font-weight:800; cursor:pointer; white-space:nowrap;"><i class="fa-solid fa-plus"></i> Quest</button>
                                 <button onclick="invokeLineReminderAction(${lineIdx})" title="Send LINE reminder" style="padding:5px 9px; background:#06c755; color:white; border:none; border-radius:8px; font-size:0.7em; font-weight:800; cursor:pointer; white-space:nowrap;"><i class="fa-brands fa-line"></i> LINE</button>
@@ -29962,7 +29991,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 <i class="fa-solid fa-rotate-right" style="color:#f59e0b; flex-shrink:0;"></i>
                                 <div style="flex:1; min-width:0;">
                                     <div style="font-size:0.85em; font-weight:700; color:#1e293b; word-break:break-word;">${escapeHtml(r.title)}</div>
-                                    <div style="font-size:0.7em; color:#94a3b8; font-weight:600;">${r.overlap} matching tag${r.overlap !== 1 ? 's' : ''}${typeof r.prevScore === 'number' ? ` &middot; previous score ${r.prevScore}%` : ''}</div>
+                                    <div style="font-size:0.7em; color:#94a3b8; font-weight:600;">${r.matchCount} matching question${r.matchCount !== 1 ? 's' : ''}${r.questionCount ? ` of ${r.questionCount}` : ''}${typeof r.prevScore === 'number' ? ` &middot; previous score ${r.prevScore}%` : ''}</div>
                                 </div>
                                 <button onclick="invokeAssignAction(${assignIdx})" title="Assign as Side Quest (Kanban task)" style="padding:5px 9px; background:#f59e0b; color:white; border:none; border-radius:8px; font-size:0.7em; font-weight:800; cursor:pointer; white-space:nowrap;"><i class="fa-solid fa-plus"></i> Quest</button>
                                 <button onclick="invokeLineReminderAction(${lineIdx})" title="Send LINE reminder" style="padding:5px 9px; background:#06c755; color:white; border:none; border-radius:8px; font-size:0.7em; font-weight:800; cursor:pointer; white-space:nowrap;"><i class="fa-brands fa-line"></i> LINE</button>
