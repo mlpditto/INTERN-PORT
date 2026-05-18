@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.75</title>
+    <title>Nika V93.76</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -29153,6 +29153,73 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         window.openLbPopup = (uid) => openUserHub(uid, 'activity');
         window.showHistory = (uid) => openUserHub(uid, 'history');
 
+        // V93.76: Cohort tag stats — aggregate per-question correctness across same-group peers
+        function computeCohortTagStats(groupName, excludeUserId) {
+            if (!groupName) return {};
+            const stamp = (quizApprovedData || []).length;
+            const cacheKey = `${groupName}::${excludeUserId || ''}::${stamp}`;
+            window._cohortTagStatsCache = window._cohortTagStatsCache || {};
+            if (window._cohortTagStatsCache[cacheKey]) return window._cohortTagStatsCache[cacheKey];
+
+            const cohortIds = new Set(
+                (usersData || [])
+                    .filter(u => !u.isIgnored && (u.group || 'Public') === groupName && u.id !== excludeUserId)
+                    .map(u => u.id)
+            );
+            const tagStats = {};
+            if (cohortIds.size === 0) {
+                window._cohortTagStatsCache[cacheKey] = tagStats;
+                return tagStats;
+            }
+
+            (quizApprovedData || []).forEach(att => {
+                if (!cohortIds.has(att.userId)) return;
+                const qData = quizzesData.find(x => x.id === att.quizId);
+                if (!qData || !Array.isArray(qData.questions)) return;
+                const manualCorrect = att.manualCorrect || {};
+                const gradedAnswers = att.gradedAnswers || {};
+                const answers = att.answers || [];
+                const quizFallbackRaw = qData.tags ? String(qData.tags).trim() : '';
+                qData.questions.forEach((q, qi) => {
+                    const perQRaw = (q && q.tags) ? String(q.tags).trim() : '';
+                    const tagStr = perQRaw || quizFallbackRaw;
+                    if (!tagStr) return;
+                    const tags = tagStr.split(',').map(t => t.trim()).filter(Boolean);
+                    if (tags.length === 0) return;
+                    let isCorrect = false;
+                    if (manualCorrect[qi] === true) {
+                        isCorrect = true;
+                    } else if ((q.type || 'choice') === 'choice') {
+                        const userAns = answers[qi];
+                        const target = q.correct;
+                        const sAns = Array.isArray(userAns) ? userAns : (userAns !== undefined && userAns !== null ? [userAns] : []);
+                        const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
+                        isCorrect = sAns.length > 0 && sAns.length === tAns.length && sAns.every(v => tAns.includes(v));
+                    } else {
+                        isCorrect = !!gradedAnswers[qi];
+                    }
+                    tags.forEach(t => {
+                        if (!tagStats[t]) tagStats[t] = { correct: 0, total: 0 };
+                        tagStats[t].correct += isCorrect ? 1 : 0;
+                        tagStats[t].total += 1;
+                    });
+                });
+            });
+
+            window._cohortTagStatsCache[cacheKey] = tagStats;
+            return tagStats;
+        }
+
+        function computeClusterCohortAvg(cluster, cohortStats) {
+            if (!cluster || !Array.isArray(cluster.tags) || cluster.tags.length === 0) return null;
+            const pcts = cluster.tags
+                .map(t => cohortStats[t])
+                .filter(s => s && s.total > 0)
+                .map(s => (s.correct / s.total) * 100);
+            if (pcts.length === 0) return null;
+            return pcts.reduce((a, b) => a + b, 0) / pcts.length;
+        }
+
         async function renderQuizInsight(userId) {
             const chartBox = document.getElementById('quiz-trend-chart');
             const tagBox = document.getElementById('quiz-tags-stats');
@@ -29263,6 +29330,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     };
                 }).sort((a, b) => b.avg - a.avg);
 
+                // V93.76: cohort comparison — same-group peers (excluding self), per-tag avg, mean across cluster tags
+                const userObj = (usersData || []).find(u => u.id === userId);
+                const myGroup = (userObj && userObj.group) || 'Public';
+                const cohortStats = computeCohortTagStats(myGroup, userId);
+                groups.forEach(g => { g.cohortAvg = computeClusterCohortAvg(g, cohortStats); });
+
                 if (!window._hubTagPage) window._hubTagPage = 1;
                 const groupsPerPage = 5;
                 const totalTagPages = Math.ceil(groups.length / groupsPerPage);
@@ -29277,6 +29350,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         ? { icon: '⬇', color: '#ef4444', title: 'Declining — recent score is lower than earlier (last 3 attempts vs prior)' }
                         : { icon: '➡', color: '#94a3b8', title: 'Stable — recent vs earlier within ±5%' };
                     return ` <span title="${cfg.title}" style="color:${cfg.color}; font-weight:900;">${cfg.icon}</span>`;
+                };
+
+                // V93.76 — cohort badge: user vs same-group peers (mean of cohort avg per tag in cluster)
+                const cohortBadge = (userAvg, cohortAvg) => {
+                    if (cohortAvg === null || cohortAvg === undefined) return '';
+                    const delta = userAvg - cohortAvg;
+                    let arrow, color;
+                    if (Math.abs(delta) < 5) { arrow = '≈'; color = '#94a3b8'; }
+                    else if (delta > 0) { arrow = '▲'; color = '#10b981'; }
+                    else { arrow = '▼'; color = '#ef4444'; }
+                    const dir = delta >= 0 ? 'above' : 'below';
+                    const title = `Cohort (${myGroup}) average is ${cohortAvg.toFixed(1)}% — this user is ${Math.abs(delta).toFixed(1)} pts ${dir} peers`;
+                    return ` <span title="${title}" style="font-size:0.78em; color:#64748b; font-weight:600;">vs ${cohortAvg.toFixed(1)}% <span style="color:${color}; font-weight:800;">${arrow}</span></span>`;
                 };
 
                 let tagHtml = "";
@@ -29299,7 +29385,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             <div onclick="openTagDrillDown(${globalIdx})" title="Click for question-level detail" style="margin-bottom:10px; padding:6px 8px 10px; border-radius:10px; cursor:pointer; transition:background 0.15s; ${!isLast ? 'border-bottom:1px dashed #e2e8f0;' : ''}" onmouseover="this.style.background='rgba(99,102,241,0.04)'" onmouseout="this.style.background='transparent'">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                     <div style="font-weight:700; font-size:0.85em; color:#475569;">${primary}${coLabel}</div>
-                                    <span style="font-size:0.85em; color:${color}; font-weight:800;">${g.avg.toFixed(1)}%${trendBadge(g.trend)}</span>
+                                    <span style="font-size:0.85em; color:${color}; font-weight:800;">${g.avg.toFixed(1)}%${trendBadge(g.trend)}${cohortBadge(g.avg, g.cohortAvg)}</span>
                                 </div>
                                 <div style="width:100%; height:6px; background:#e2e8f0; border-radius:10px; overflow:hidden;">
                                     <div style="width:${g.avg}%; height:100%; background:${color}; border-radius:10px; transition:width 0.5s ease-out;"></div>
@@ -29351,7 +29437,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         return `
                             <div onclick="openTagDrillDown(${globalIdx})" title="Click for question-level detail" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; border-radius:8px; margin-bottom:3px; cursor:pointer; transition:background 0.15s; gap:8px;" onmouseover="this.style.background='rgba(0,0,0,0.04)'" onmouseout="this.style.background='transparent'">
                                 <div style="font-size:0.82em; font-weight:700; color:#475569; line-height:1.4; min-width:0; flex:1;">${label}${lowNBadge}</div>
-                                <div style="font-size:0.82em; font-weight:800; color:${color}; white-space:nowrap;">${g.avg.toFixed(1)}%${trendBadge(g.trend)} <span style="color:#94a3b8; font-weight:600; font-size:0.88em;">(${g.correct}/${g.total})</span></div>
+                                <div style="font-size:0.82em; font-weight:800; color:${color}; white-space:nowrap;">${g.avg.toFixed(1)}%${trendBadge(g.trend)}${cohortBadge(g.avg, g.cohortAvg)} <span style="color:#94a3b8; font-weight:600; font-size:0.88em;">(${g.correct}/${g.total})</span></div>
                             </div>
                         `;
                     };
