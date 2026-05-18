@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.81</title>
+    <title>Nika V93.82</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -9990,6 +9990,19 @@
                             <input type="number" id="q-score" value="1" step="0.1" min="0" style="text-align:center; width:100%; margin:0; border:none; background:transparent; font-size:1.25em; font-weight:900; color:#581c87; padding:0; outline:none;">
                         </div>
                     </div>
+
+                    <!-- V93.82 — Daily Quest live preview (closes pending item #7).
+                         Mirrors the intern's "none"-state quest card while admin types. -->
+                    <details id="dq-preview-section" open style="margin-bottom:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; overflow:hidden;">
+                        <summary style="cursor:pointer; padding:10px 14px; font-size:0.78em; font-weight:800; color:#475569; user-select:none; display:flex; align-items:center; gap:6px; list-style:none;">
+                            <i class="fa-solid fa-eye" style="color:#6366f1;"></i> Live Preview <span style="font-weight:600; color:#94a3b8;">— what the intern will see</span>
+                        </summary>
+                        <div id="dq-preview-content" style="padding:14px; background:#eef2f7; border-top:1px solid #e2e8f0;">
+                            <div id="dq-preview-card" class="dq-preview-card">
+                                <!-- Rendered by renderDailyQuestPreview() -->
+                            </div>
+                        </div>
+                    </details>
 
                     <!-- Action buttons -->
                     <div style="display:flex; gap:10px; justify-content:flex-end; align-items:center; border-top:1px solid #eef2f7; padding-top:14px;">
@@ -31223,6 +31236,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 renderDQTagCards();
                 // V92.33: refresh Schedule button gating when entering quest tab
                 if (typeof updateScheduleButtonState === 'function') updateScheduleButtonState();
+                // V93.82: wire + render the intern-facing live preview
+                if (typeof wireDailyQuestPreviewInputs === 'function') wireDailyQuestPreviewInputs();
             }
         }
         async function saveSideQuest() { const id = document.getElementById('edit-id').value; const t = document.getElementById('sq-title').value; if (!t) return alert("Title?"); const d = { title: t, description: document.getElementById('sq-desc').value, priority: document.getElementById('sq-priority').value, dueDate: document.getElementById('sq-due').value, isProject: document.getElementById('sq-isProject').checked, assigneeIds: [...document.querySelectorAll('.sq-user-check:checked')].map(c => c.value), assignees: [...document.querySelectorAll('.sq-user-check:checked')].map(c => ({ uid: c.value, name: c.dataset.name, pic: c.dataset.pic })) }; if (id) { await db.collection("side_quests").doc(id).update(d); showToast("Updated"); } else { d.status = "Backlog"; d.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").add(d); showToast("Created"); } document.getElementById('taskModal').style.display = 'none'; }
@@ -32122,6 +32137,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const el = document.getElementById('q-tag');
             if (el) el.value = (tag || '');
             renderDQTagCards();
+            // V93.82: hidden input doesn't fire 'input' on programmatic set — nudge the preview
+            if (typeof scheduleDailyQuestPreview === 'function') scheduleDailyQuestPreview();
         }
 
         function renderDQGroupCards() {
@@ -32171,6 +32188,81 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.75em;font-weight:700;background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;">${u.displayName || u.id}</span>`
             ).join('');
             el.innerHTML = `<span style="font-weight:700;color:#475569;">Will send to ${members.length} recipients จะส่งถึง คน:</span> <span style="display:inline-flex;flex-wrap:wrap;gap:4px;margin-left:4px;">${chips}</span>`;
+        }
+
+        // V93.82 — Daily Quest live preview (closes pending item #7).
+        // Mirrors the intern's quest card in the "none" state (the one they see before
+        // clicking "Start Quest"). Reads form values directly; debounced via rAF so
+        // typing in the prompt textarea doesn't thrash innerHTML.
+        const _dqTagColors = { DIS: '#3b82f6', INFOGRAPHIC: '#8b5cf6', WRITING: '#10b981', CASE_STUDY: '#f59e0b', PRESENTATION: '#ef4444', RESEARCH: '#06b6d4', REVIEW: '#6366f1', OTHER: '#6b7280' };
+        let _dqPreviewRafId = null;
+        function scheduleDailyQuestPreview() {
+            if (_dqPreviewRafId !== null) return;
+            _dqPreviewRafId = requestAnimationFrame(() => {
+                _dqPreviewRafId = null;
+                renderDailyQuestPreview();
+            });
+        }
+        function renderDailyQuestPreview() {
+            const card = document.getElementById('dq-preview-card');
+            if (!card) return;
+            const text = (document.getElementById('q-text') || {}).value || '';
+            const tag = (document.getElementById('q-tag') || {}).value || '';
+            const startVal = (document.getElementById('q-start-time') || {}).value || '';
+            const hours = parseFloat((document.getElementById('q-hours') || {}).value) || 0;
+            const duration = parseInt((document.getElementById('q-duration') || {}).value) || 0;
+            const score = parseFloat((document.getElementById('q-score') || {}).value) || 0;
+
+            const startMs = startVal ? new Date(startVal).getTime() : Date.now();
+            const deadlineMs = startMs + (hours > 0 ? hours * 3600000 : 0);
+            const diffMs = deadlineMs - Date.now();
+            let deadlineHtml = '';
+            if (hours > 0) {
+                if (diffMs > 0) {
+                    const h = Math.floor(diffMs / 3600000);
+                    const m = Math.floor((diffMs % 3600000) / 60000);
+                    deadlineHtml = `<span style="color:#f39c12;"><i class="fa-solid fa-hourglass-half"></i> ${h}h ${m}m left เหลือเวลา ${h}ชม. ${m}น.</span>`;
+                } else {
+                    deadlineHtml = `<span style="color:#ef233c;">Expired</span>`;
+                }
+            }
+
+            const meta = [];
+            if (duration > 0) meta.push(`<div style="font-size:0.78em; color:#64748b; display:inline-flex; align-items:center; gap:5px; padding:3px 9px; background:#f1f5f9; border-radius:999px;"><i class="fa-regular fa-clock"></i> ${duration} min</div>`);
+            if (score > 0) meta.push(`<div style="font-size:0.78em; color:#667eea; font-weight:700; display:inline-flex; align-items:center; gap:5px; padding:3px 9px; background:#eef2ff; border-radius:999px;"><i class="fa-solid fa-star"></i> ${score} pts</div>`);
+
+            const tagChip = tag ? `<span style="display:inline-block; background:${_dqTagColors[tag] || '#6b7280'}; color:white; padding:2px 9px; border-radius:999px; font-size:0.7em; font-weight:800; margin-left:5px;">${escapeHtml(tag)}</span>` : '';
+            const promptText = text.trim() ? escapeHtml(text) : '<span style="color:#94a3b8; font-style:italic; font-weight:500;">(prompt is empty — start typing above)</span>';
+
+            card.innerHTML = `
+                <div style="background:white; border:1px solid #e2e8f0; border-radius:16px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.05); max-width:480px; margin:0 auto;">
+                    <div style="display:flex; gap:11px; align-items:flex-start;">
+                        <div style="width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="fa-solid fa-scroll"></i></div>
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-weight:700; font-size:1em; color:#333; line-height:1.4; white-space:pre-wrap; word-break:break-word;">${promptText}</div>
+                            <div style="margin-top:5px;">
+                                <span style="display:inline-block; background:#f1f5f9; color:#64748b; padding:2px 9px; border-radius:999px; font-size:0.7em; font-weight:700;">Daily Quest</span>${tagChip}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-top:11px; display:flex; flex-wrap:wrap; gap:6px;">${meta.join('')}</div>
+                    ${deadlineHtml ? `<div style="margin-top:10px; font-size:0.85em; color:#666;">${deadlineHtml}</div>` : ''}
+                    <div style="margin-top:13px; display:flex; justify-content:flex-end;">
+                        <button type="button" disabled style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; border:none; padding:9px 18px; border-radius:10px; font-weight:800; font-size:0.85em; cursor:default; opacity:0.95;">⚡ Start Quest</button>
+                    </div>
+                </div>
+            `;
+        }
+        function wireDailyQuestPreviewInputs() {
+            const ids = ['q-text', 'q-tag', 'q-start-time', 'q-hours', 'q-duration', 'q-score'];
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el || el.dataset.dqPreviewWired === '1') return;
+                el.addEventListener('input', scheduleDailyQuestPreview);
+                el.addEventListener('change', scheduleDailyQuestPreview);
+                el.dataset.dqPreviewWired = '1';
+            });
+            renderDailyQuestPreview();
         }
 
         async function createQuest(action = 'post') {
