@@ -56,6 +56,15 @@ const LINE_I18N = {
         pts:       { en: 'pts',                   th: 'คะแนน',               kr: '점' },
         noContent: { en: '(no content)',          th: '(ไม่มีเนื้อหา)',     kr: '(내용 없음)' }
     },
+    // V93.80 — Quiz Insight reminder push (closes pending items #3 + #5).
+    // Used by notifyQuizReminder. Body text passes through verbatim from
+    // the admin's edited message — only chrome is i18n'd.
+    quizReminder: {
+        title:            { en: '🎯 Quiz reminder from admin', th: '🎯 แอดมินส่งโจทย์มาให้ฝึก', kr: '🎯 관리자가 보낸 퀴즈 알림' },
+        altPrefix:        { en: 'Admin reminder: ',            th: 'แอดมินเตือน: ',              kr: '관리자 알림: ' },
+        button:           { en: 'Open quiz in LIFF →',         th: 'เปิดในแอป →',                kr: 'LIFF에서 열기 →' },
+        subtitleFallback: { en: 'Practice suggestion',         th: 'คำแนะนำสำหรับฝึก',           kr: '연습 추천' }
+    },
     adminEdit: {
         headerDelete:  { en: '🗑️ Admin Deleted Your Note',  th: '🗑️ แอดมินลบโน้ตของคุณ',   kr: '🗑️ 관리자가 노트를 삭제했습니다' },
         headerRestore: { en: '↩️ Admin Restored Your Note', th: '↩️ แอดมินกู้คืนโน้ต',      kr: '↩️ 관리자가 노트를 복원했습니다' },
@@ -761,6 +770,136 @@ exports.notifyOnReviewMessage = onCall(
 
         console.error(`[notifyOnReviewMessage] PUSH_FAILED  code=${code}  status=${status || 'no-response'}  lineUserId=${lineUserId}  submission=${submissionId}  msg=${messageId}  message=${JSON.stringify(lineMessage)}`);
         return { ok: false, code, status: status || null, lineUserId, submissionId, messageId };
+    }
+});
+
+// ============================================================
+// notifyQuizReminder (V93.80 — closes pending items #3 + #5)
+// ------------------------------------------------------------
+// Pushes a LINE Flex Message to a single intern with an admin-authored
+// reminder, typically launched from the Quiz Insight tag drill-down
+// modal (wrong-question cards + suggested quiz cards). Caller-side
+// invocation pattern (no Eventarc, per asia-southeast3 region limit —
+// see `feedback_firestore_trigger_region_limitation.md`).
+//
+// Caller: public/admin.html  sendQuizLineReminder()
+//
+// Input:  { userId: string, message: string, quizTitle?: string }
+//         - userId  = users/{id} doc ID = LINE rawLiffUserId (same
+//           pattern as learning_path_entries.userId, V92.11).
+//         - message = admin-edited body (1-1000 chars, plain text).
+//         - quizTitle = optional, surfaced in subtitle if present.
+// Auth:   admin custom claim required.
+// Output: { ok, pushed?, code?, status?, lineUserId }
+//
+// Language: per-recipient TH/KR/EN via LINE_I18N.quizReminder (added
+// below) + resolvePreferredLanguage(lineUserId). Admin's edited body
+// passes through verbatim — the i18n strings only cover chrome.
+// ============================================================
+exports.notifyQuizReminder = onCall(
+    { secrets: ['LINE_CHANNEL_ACCESS_TOKEN'] },
+    async (request) => {
+    if (!request.auth || request.auth.token.admin !== true) {
+        throw new HttpsError('permission-denied', 'Admin required');
+    }
+
+    const data = request.data || {};
+    const userId = typeof data.userId === 'string' ? data.userId.trim() : '';
+    const messageRaw = typeof data.message === 'string' ? data.message.trim() : '';
+    const quizTitle = typeof data.quizTitle === 'string' ? data.quizTitle.trim() : '';
+
+    if (!userId || !userId.startsWith('U')) {
+        throw new HttpsError('invalid-argument', 'userId must be a LINE rawLiffUserId starting with U');
+    }
+    if (!messageRaw) {
+        throw new HttpsError('invalid-argument', 'message required');
+    }
+    if (messageRaw.length > 1000) {
+        throw new HttpsError('invalid-argument', 'message too long (max 1000 chars)');
+    }
+
+    const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    if (!accessToken) {
+        console.warn(`[notifyQuizReminder] LINE_CHANNEL_ACCESS_TOKEN secret missing — skipping push for userId=${userId}`);
+        return { skipped: true, reason: 'token-missing' };
+    }
+
+    const lang = await resolvePreferredLanguage(userId);
+    const bodyText = messageRaw.length > 800 ? messageRaw.slice(0, 797) + '…' : messageRaw;
+    const altText = `${lineT('quizReminder', 'altPrefix', lang)}${messageRaw.slice(0, 100)}`.slice(0, 400);
+    const liffUri = 'https://liff.line.me/2008959998-yjcNpaGt?tab=quiz';
+
+    const subtitleParts = [];
+    if (quizTitle) subtitleParts.push(`📚 ${quizTitle.slice(0, 60)}`);
+    const subtitle = subtitleParts.join(' · ') || lineT('quizReminder', 'subtitleFallback', lang);
+
+    const flex = {
+        type: 'flex',
+        altText: altText,
+        contents: {
+            type: 'bubble',
+            size: 'kilo',
+            header: {
+                type: 'box',
+                layout: 'vertical',
+                backgroundColor: '#6366f1',
+                paddingAll: '12px',
+                contents: [
+                    { type: 'text', text: lineT('quizReminder', 'title', lang), weight: 'bold', size: 'sm', color: '#ffffff' },
+                    { type: 'text', text: subtitle, size: 'xs', color: '#e0e7ff', margin: 'xs', wrap: true }
+                ]
+            },
+            body: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '16px',
+                contents: [
+                    { type: 'text', text: bodyText, wrap: true, size: 'sm', color: '#1f2937' }
+                ]
+            },
+            footer: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '12px',
+                contents: [
+                    {
+                        type: 'button',
+                        style: 'primary',
+                        color: '#6366f1',
+                        height: 'sm',
+                        action: { type: 'uri', label: lineT('quizReminder', 'button', lang), uri: liffUri }
+                    }
+                ]
+            }
+        }
+    };
+
+    try {
+        await axios.post('https://api.line.me/v2/bot/message/push', {
+            to: userId,
+            messages: [flex]
+        }, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 8000
+        });
+        console.log(`[notifyQuizReminder] PUSHED  lineUserId=${userId}  quizTitle=${quizTitle || '(none)'}  bodyLen=${messageRaw.length}`);
+        return { ok: true, pushed: true, lineUserId: userId };
+    } catch (err) {
+        const status = err && err.response ? err.response.status : null;
+        const lineMessage = (err && err.response && err.response.data && err.response.data.message) || (err && err.message) || 'unknown';
+        let code;
+        if (status === 400) code = 'invalid';
+        else if (status === 401) code = 'token';
+        else if (status === 403) code = 'no-friend';
+        else if (status === 404) code = 'invalid-user';
+        else if (status === 429) code = 'rate-limit';
+        else if (status >= 500 && status < 600) code = 'transient';
+        else code = 'network';
+        console.error(`[notifyQuizReminder] PUSH_FAILED  code=${code}  status=${status || 'no-response'}  lineUserId=${userId}  message=${JSON.stringify(lineMessage)}`);
+        return { ok: false, code, status: status || null, lineUserId: userId };
     }
 });
 
