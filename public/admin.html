@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.91</title>
+    <title>Nika V93.92</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -11176,6 +11176,8 @@
                 <div id="quiz-participants-info" style="margin:10px 0 15px; font-size:0.9em; color:#666;"></div>
                 <!-- V93.91 Quiz Quality Q6: per-question stats injected by renderQuizPerQuestionStatsHtml -->
                 <div id="quiz-question-stats"></div>
+                <!-- V93.92 Quiz Quality Q7: security summary injected by renderQuizSecuritySummaryHtml -->
+                <div id="quiz-security-summary"></div>
                 <div id="quiz-participants-container" style="max-height: 500px; overflow-y: auto;">
                     <!-- Content injected by JS showQuizParticipants -->
                 </div>
@@ -19514,6 +19516,56 @@ ${JSON.stringify(sourceObj)}`;
             </div>`;
         }
 
+        // V93.92 Quiz Quality Q7: aggregate cheat-detector.js output per quiz.
+        // Reads attempt.cheatMonitoring.summary.riskLabel (None/Low/Moderate/High)
+        // written by public/cheat-detector.js — we DO NOT touch detection logic
+        // or thresholds; just aggregate + surface so admin can review.
+        // False-positive note: Moderate often hits legitimate slow mobile users —
+        // never auto-flag, only surface for human review.
+        function computeQuizCheatStats(attempts) {
+            const out = { None: 0, Low: 0, Moderate: 0, High: 0, withData: 0, total: (attempts || []).length };
+            (attempts || []).forEach(a => {
+                const label = a && a.cheatMonitoring && a.cheatMonitoring.summary && a.cheatMonitoring.summary.riskLabel;
+                if (!label) return;
+                out.withData += 1;
+                if (out[label] !== undefined) out[label] += 1;
+            });
+            out.riskyCount = out.Moderate + out.High;
+            return out;
+        }
+
+        function renderQuizSecuritySummaryHtml(attempts) {
+            if (!attempts || attempts.length === 0) return '';
+            const s = computeQuizCheatStats(attempts);
+            if (s.withData === 0) return ''; // no cheat data captured — older attempts or non-graded modes
+            const pct = (n) => s.withData > 0 ? Math.round((n / s.withData) * 100) : 0;
+            const chip = (label, count, color, bg, border) => `<div style="display:flex; align-items:center; gap:6px; padding:6px 12px; background:${bg}; color:${color}; border:1px solid ${border}; border-radius:10px; font-size:0.82em; font-weight:700;">
+                <span>${label}</span>
+                <span style="font-weight:900; font-variant-numeric:tabular-nums;">${count}</span>
+                <span style="opacity:0.7; font-weight:600;">(${pct(count)}%)</span>
+            </div>`;
+            const totalNote = s.withData < s.total ? `<span style="font-size:0.72em; color:#94a3b8; margin-left:8px;">${s.total - s.withData} attempt${s.total - s.withData === 1 ? '' : 's'} pre-monitoring (no data)</span>` : '';
+            const riskyAlert = s.riskyCount > 0
+                ? `<span style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; padding:3px 10px; border-radius:8px; font-size:0.8em; font-weight:800;">⚠️ ${s.riskyCount} attempt${s.riskyCount === 1 ? '' : 's'} flagged (Moderate+High)</span>`
+                : `<span style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0; padding:3px 10px; border-radius:8px; font-size:0.8em; font-weight:800;">✅ No risky attempts</span>`;
+
+            return `<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:14px; margin:14px 0;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+                    <h4 style="margin:0; font-size:1em; color:#1e293b;">🚨 Security Summary <span style="font-size:0.72em; color:#64748b; font-weight:500;">cheat-detector signals</span></h4>
+                    <div style="display:flex; align-items:center; gap:8px;">${riskyAlert}${totalNote}</div>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    ${chip('🟢 None', s.None, '#166534', '#dcfce7', '#bbf7d0')}
+                    ${chip('🟡 Low', s.Low, '#a16207', '#fef9c3', '#fde047')}
+                    ${chip('🟠 Moderate', s.Moderate, '#9a3412', '#ffedd5', '#fdba74')}
+                    ${chip('🔴 High', s.High, '#991b1b', '#fee2e2', '#fca5a5')}
+                </div>
+                <div style="margin-top:10px; font-size:0.72em; color:#94a3b8; line-height:1.5;">
+                    Detector signals: tab-switch · window blur · fullscreen exit · blocked copy-paste · mouse boundary exit. Moderate often hits legitimate slow mobile users — review per-attempt before action.
+                </div>
+            </div>`;
+        }
+
         async function showQuizParticipants(quizId) {
             lastQuizIdForParticipants = quizId;
             
@@ -19568,6 +19620,8 @@ ${JSON.stringify(sourceObj)}`;
                     avgBadge.innerText = "Avg: -";
                     const statsEmpty = document.getElementById('quiz-question-stats');
                     if (statsEmpty) statsEmpty.innerHTML = '';
+                    const secEmpty = document.getElementById('quiz-security-summary');
+                    if (secEmpty) secEmpty.innerHTML = '';
                     return;
                 }
 
@@ -19586,6 +19640,10 @@ ${JSON.stringify(sourceObj)}`;
                 // V93.91 Quiz Quality Q6: per-question stats panel (10+ attempt low-N gate inside)
                 const statsContainer = document.getElementById('quiz-question-stats');
                 if (statsContainer) statsContainer.innerHTML = renderQuizPerQuestionStatsHtml(quiz, activeAttempts);
+
+                // V93.92 Quiz Quality Q7: cheat-detector aggregate (skips silently if no monitoring data)
+                const secContainer = document.getElementById('quiz-security-summary');
+                if (secContainer) secContainer.innerHTML = renderQuizSecuritySummaryHtml(activeAttempts);
 
                 let html = `
                     <table style="font-size:0.9em;">
@@ -22293,13 +22351,19 @@ ${JSON.stringify(sourceObj)}`;
                     ? `<span title="${_outliers.tooHard.length} too-hard question(s) (<20% correct): Q${_outliers.tooHard.map(i => i + 1).join(', Q')}" style="font-size:0.7em; background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe; padding:2px 6px; border-radius:8px; font-weight:800; cursor:help; white-space:nowrap;" onclick="event.stopPropagation(); showQuizParticipants('${q.id}')">🧊 ${_outliers.tooHard.length}</span>`
                     : '';
 
+                // V93.92 Quiz Quality Q7: cheat-risk badge (Mod+High count, omit when 0 or no data)
+                const _cheatStats = computeQuizCheatStats(_qAttempts);
+                const _cheatBadge = _cheatStats.withData > 0 && _cheatStats.riskyCount > 0
+                    ? `<span title="${_cheatStats.riskyCount} attempt(s) flagged by cheat-detector: ${_cheatStats.High} High, ${_cheatStats.Moderate} Moderate (of ${_cheatStats.withData} monitored). Click to review." style="font-size:0.7em; background:#fef2f2; color:#991b1b; border:1px solid #fecaca; padding:2px 6px; border-radius:8px; font-weight:800; cursor:help; white-space:nowrap;" onclick="event.stopPropagation(); showQuizParticipants('${q.id}')">⚠️ ${_cheatStats.riskyCount}</span>`
+                    : '';
+
                 return `
                     <tr class="lang-no-toggle">
                         <td>
                             <div style="font-weight:800; color:#333; margin-bottom:3px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                                 ${q.title ? q.title.replace(/\s*\(Template\)$/i, '') : '-'}
                                 <span id="fb-badge-${q.id}" style="font-size:0.7em; background:#fff7ed; color:#b45309; border:1px solid #fed7aa; border-radius:8px; padding:2px 7px; font-weight:800; cursor:pointer; white-space:nowrap;" onclick="event.stopPropagation(); showQuizFeedbackPanel('${q.id}')" title="View user feedback">⭐ —</span>
-                                ${_easyBadge}${_hardBadge}
+                                ${_easyBadge}${_hardBadge}${_cheatBadge}
                             </div>
                             <div style="display:flex; flex-wrap:wrap; gap:3px; align-items:center;">
                                 ${modeLabel} ${oneTimeLabel} ${homeworkLabel} 
