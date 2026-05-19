@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.92</title>
+    <title>Nika V93.93</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13396,7 +13396,10 @@
                     btn.disabled = true;
                 }
                 
-                const prompt = `You are a high-level Assessment Specialist. Analyze these quiz questions for redundancy, logical variety, and cognitive depth (Bloom's Taxonomy).
+                const prompt = `FORMAT CONTRACT — READ FIRST, OBEY ABSOLUTELY:
+                Respond with ONE single JSON object. Begin your response with the character \`{\` and end with \`}\`. No prose before. No prose after. No markdown fences. No preamble like "Here is the analysis" or "Based on the provided…". Any text outside the JSON object is a hard format violation and will be rejected.
+
+                You are a high-level Assessment Specialist. Analyze these quiz questions for redundancy, logical variety, and cognitive depth (Bloom's Taxonomy).
 
                 ⚠️ STEP 0 — PER-QUESTION LANGUAGE DETECTION (DO THIS BEFORE ANYTHING ELSE):
                 For EACH source question Q[n] in the list below, identify its predominant language by looking at the question stem (NOT the options):
@@ -13470,8 +13473,36 @@
                     }
                 }
                 if (!result) {
+                    // V93.93: graceful prose fallback. When the model ignores the JSON
+                    // contract entirely (essay mode, no `{...}` anywhere), don't lose
+                    // the admin's work — render the prose in the same modal shell with
+                    // a warning banner + Retry button. Beats alert-and-die per
+                    // feedback_hotfix_first_pattern.md.
                     console.error('JSON Parse Error (after 2 attempts):', resultRaw);
-                    throw new Error('AI returned invalid JSON after 2 attempts. First 300 chars:\n\n' + String(resultRaw || '').slice(0, 300));
+                    const fallbackDiv = document.createElement('div');
+                    fallbackDiv.id = "ai-analysis-popup";
+                    fallbackDiv.className = "lang-no-toggle";
+                    fallbackDiv.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:850px; max-height:85vh; background:white; padding:30px; border-radius:30px; box-shadow:0 20px 60px rgba(0,0,0,0.3); z-index:10001; overflow-y:auto; font-family:'Inter', sans-serif; border: 1px solid #eee;";
+                    fallbackDiv.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f8f9fa; padding-bottom:15px; margin-bottom:15px;">
+                            <h2 style="margin:0; color:var(--primary); font-size:1.5em;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Quiz Analysis</h2>
+                            <button onclick="this.parentElement.parentElement.remove()" style="border:none; background:#f8f9fa; color:#666; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">✕</button>
+                        </div>
+                        <div style="background:#fef3c7; border:1px solid #fcd34d; color:#92400e; padding:14px 18px; border-radius:14px; margin-bottom:18px; font-size:0.95em; line-height:1.5;">
+                            <b><i class="fa-solid fa-triangle-exclamation"></i> Model returned prose instead of JSON.</b><br>
+                            The per-question Fix / Compare actions are unavailable, but the model's narrative analysis is shown below. Try <b>Analyze</b> again, or switch to a different model (Flash / Pro usually return strict JSON).
+                        </div>
+                        <div style="white-space:pre-wrap; line-height:1.8; color:#333; font-size:1em; margin-bottom:20px; background:#fafafa; padding:20px; border-radius:20px; border:1px solid #f0f0f0;">${escapeHtml(String(resultRaw || ''))}</div>
+                        <div style="text-align:right; display:flex; gap:10px; justify-content:flex-end;">
+                            <button class="btn-sm" style="background:#4361ee; color:white; border:none; padding:8px 22px; border-radius:10px; font-weight:600; cursor:pointer;" onclick="this.parentElement.parentElement.remove(); analyzeQuizAI();"><i class="fa-solid fa-arrows-rotate"></i> Retry</button>
+                            <button class="btn-sm btn-dark" onclick="this.parentElement.parentElement.remove()" style="padding:8px 25px; border-radius:10px;">Close</button>
+                        </div>
+                        <div style="margin-top:20px; padding-top:15px; border-top:1px solid #eee; font-size:0.7em; color:#999;">
+                            🚀 Model: <b>${escapeHtml(aiModel || selectedModel || 'unknown')}</b> | 💡 Tokens: <b>${(aiTokens || 0).toLocaleString()}</b> | Mode: prose-fallback
+                        </div>
+                    `;
+                    document.body.appendChild(fallbackDiv);
+                    return;
                 }
 
                 const analysis = result.analysisText || "Analysis complete.";
