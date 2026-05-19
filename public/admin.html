@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.88</title>
+    <title>Nika V93.89</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13430,7 +13430,8 @@
                         "type": "choice",
                         "options": ["<<<distractor, same language as q>>>", "<<<correct answer, same language as q>>>", "<<<distractor, same language as q>>>", "<<<distractor, same language as q>>>"],
                         "correct": [1],
-                        "timer": 60
+                        "timer": 60,
+                        "explanation": "<<<learner-facing rationale, same language as q, ~150 chars — explain WHY the correct answer is correct and briefly WHY the strongest distractor is wrong>>>"
                       }
                     }
                   ]
@@ -13439,7 +13440,8 @@
                 CRITICAL INSTRUCTIONS:
                 1. The "improvedQuestion" MUST incorporate 'Professional-Grade' distractors and higher-order challenge (Analysis/Application).
                 2. Omit perfect questions — don't return an item for them.
-                3. SELF-CHECK before returning: re-read each improvedQuestion.q and confirm its language matches the source Q[qNumber] from STEP 0. If you find a mismatch, REGENERATE that item in the correct language. A language mismatch is a hard format error.`;
+                3. SELF-CHECK before returning: re-read each improvedQuestion.q and confirm its language matches the source Q[qNumber] from STEP 0. If you find a mismatch, REGENERATE that item in the correct language. A language mismatch is a hard format error.
+                4. "improvedQuestion.explanation" is shown to LEARNERS post-submit (not admin meta) — write it as concise teaching, NOT as a critique. Same language as improvedQuestion.q. The other fields ("issue", "suggestion") stay admin-facing in Thai.`;
                 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-2.5-pro';
 
@@ -35467,15 +35469,56 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 if (index < 0 || index >= currentQs.length) return alert("Question index out of sync.");
                 const currentQ = currentQs[index];
 
-                const renderQInner = (q, label, color, qIdxNum) => {
+                // V93.89 Quiz Quality Q4-A: word-level diff highlighter (LCS).
+                // Token preserves whitespace so reconstructed strings retain spacing.
+                // For Thai (no inter-word spaces) the algorithm degrades to one big
+                // diff chunk per Q — acceptable since AI rewrites usually swap whole
+                // clauses anyway. side='original' renders eq+del, 'improved' renders eq+add.
+                const wordLevelDiff = (a, b) => {
+                    const aw = (a || '').split(/(\s+)/);
+                    const bw = (b || '').split(/(\s+)/);
+                    const n = aw.length, m = bw.length;
+                    const dp = Array(n + 1).fill().map(() => Array(m + 1).fill(0));
+                    for (let i = n - 1; i >= 0; i--) {
+                        for (let j = m - 1; j >= 0; j--) {
+                            dp[i][j] = aw[i] === bw[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+                        }
+                    }
+                    const out = [];
+                    let i = 0, j = 0;
+                    while (i < n && j < m) {
+                        if (aw[i] === bw[j]) { out.push({ t: 'eq', v: aw[i] }); i++; j++; }
+                        else if (dp[i + 1][j] >= dp[i][j + 1]) { out.push({ t: 'del', v: aw[i] }); i++; }
+                        else { out.push({ t: 'add', v: bw[j] }); j++; }
+                    }
+                    while (i < n) out.push({ t: 'del', v: aw[i++] });
+                    while (j < m) out.push({ t: 'add', v: bw[j++] });
+                    return out;
+                };
+                const renderDiffSide = (diff, side) => diff.map(d => {
+                    if (d.t === 'eq') return escapeHtml(d.v);
+                    if (d.t === 'del' && side === 'original') return `<span style="background:#fee2e2; color:#991b1b; text-decoration:line-through; padding:0 3px; border-radius:3px;">${escapeHtml(d.v)}</span>`;
+                    if (d.t === 'add' && side === 'improved') return `<span style="background:#dcfce7; color:#166534; font-weight:700; padding:0 3px; border-radius:3px;">${escapeHtml(d.v)}</span>`;
+                    return '';
+                }).join('');
+                const stemDiff = wordLevelDiff(currentQ.q || '', improvedQ.q || '');
+
+                const renderQInner = (q, label, color, qIdxNum, side) => {
+                    const otherOpts = side === 'original' ? (improvedQ.options || []) : (currentQ.options || []);
                     const optionsHtml = (q.options || []).map((opt, i) => {
                         const isCorrect = q.correct && q.correct.includes(i);
+                        const otherOpt = otherOpts[i] || '';
+                        const optDiff = wordLevelDiff(
+                            side === 'original' ? (opt || '') : otherOpt,
+                            side === 'original' ? otherOpt : (opt || '')
+                        );
+                        const optHtml = renderDiffSide(optDiff, side) || '<span style="opacity:0.4; font-style:italic;">(empty)</span>';
                         return `<div style="padding:6px 12px; margin:4px 0; border-radius:10px; font-size:0.85em; background:${isCorrect ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.5)'}; border:1px solid ${isCorrect ? 'rgba(34,197,94,0.2)' : 'rgba(0,0,0,0.05)'}; display:flex; align-items:center; gap:8px;">
                             <span style="font-size:1.1em;">${isCorrect ? '✅' : '⚪'}</span>
-                            <span style="color:${isCorrect ? '#15803d' : '#475569'}; font-weight:${isCorrect ? '700' : '500'};">${opt}</span>
+                            <span style="color:${isCorrect ? '#15803d' : '#475569'}; font-weight:${isCorrect ? '700' : '500'};">${optHtml}</span>
                         </div>`;
                     }).join('');
-
+                    const stemHtml = renderDiffSide(stemDiff, side) || '(No Question Text)';
                     return `
                         <div style="flex:1; min-width:300px; display:flex; flex-direction:column;">
                             <div style="background:${color}; color:white; padding:10px 16px; border-radius:16px 16px 0 0; font-weight:800; font-size:0.85em; display:flex; align-items:center; justify-content:space-between; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
@@ -35483,7 +35526,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                                 <span style="background:rgba(255,255,255,0.2); padding:2px 10px; border-radius:20px; font-size:0.8em; text-transform:uppercase;">${q.type || 'choice'}</span>
                             </div>
                             <div style="background:rgba(255,255,255,0.8); backdrop-filter:blur(10px); border:1.5px solid rgba(0,0,0,0.05); border-top:none; border-radius:0 0 16px 16px; padding:20px; flex:1; box-shadow:0 10px 30px rgba(0,0,0,0.05);">
-                                <div style="font-weight:700; color:#1e293b; margin-bottom:15px; font-size:1.05em; line-height:1.5;">${q.q || '(No Question Text)'}</div>
+                                <div style="font-weight:700; color:#1e293b; margin-bottom:15px; font-size:1.05em; line-height:1.5;">${stemHtml}</div>
                                 <div style="margin-bottom:15px;">${optionsHtml || '<div style="color:#94a3b8; font-style:italic;">No options provided</div>'}</div>
                                 <div style="font-size:0.75em; color:#64748b; display:flex; gap:15px; padding-top:10px; border-top:1px dashed #e2e8f0;">
                                     <span>⏱️ <b>${q.timer || 60}s</b></span>
@@ -35545,9 +35588,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                         </div>
 
                         <div style="padding:30px; overflow-y:auto; flex:1; display:flex; flex-wrap:wrap; gap:25px; align-items:stretch; background:linear-gradient(to bottom right, #f8fafc, #eff6ff);">
-                            ${renderQInner(currentQ, 'ORIGINAL', '#64748b', index)}
+                            ${renderQInner(currentQ, 'ORIGINAL', '#64748b', index, 'original')}
                             <div style="display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:1.5em; flex-shrink:0;">➡️</div>
-                            ${renderQInner(improvedQ, 'IMPROVED', 'linear-gradient(135deg, #6366f1, #4338ca)', index)}
+                            ${renderQInner(improvedQ, 'IMPROVED', 'linear-gradient(135deg, #6366f1, #4338ca)', index, 'improved')}
                         </div>
 
                         <div style="padding:20px 30px; background:#fff; border-top:1.5px solid #edf2f7; display:flex; justify-content:flex-end; gap:12px;">
@@ -35656,7 +35699,14 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 }
                 if (!confirm(`Apply improved version to Question ${index + 1}?`)) return;
 
-                allQs[index] = improvedQ;
+                // V93.89 Quiz Quality Q4-C: chain AI explanation into Q2's .q-explanation,
+                // but ONLY when admin's field is blank (preserve manually-typed explanations).
+                const existingExp = (allQs[index].explanation || '').trim();
+                const aiExp = (improvedQ.explanation || '').trim();
+                const mergedQ = (!existingExp && aiExp)
+                    ? { ...improvedQ, explanation: aiExp }
+                    : { ...improvedQ, explanation: existingExp || aiExp };
+                allQs[index] = mergedQ;
 
                 const container = document.getElementById('quiz-questions-container');
                 container.innerHTML = "";
