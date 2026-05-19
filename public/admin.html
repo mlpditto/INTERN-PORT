@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.93</title>
+    <title>Nika V93.94</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15076,26 +15076,7 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
 }`;
 
                 const grammarSource = rawContent || logContent;
-                const grammarPrompt = `You are an expert Thai-English writing coach. Analyze this reflective writing from a learner:
-
-"${grammarSource}"
-
-The learner may write in Thai, English, or mixed. Analyze grammar, sentence structure, and clarity.
-
-Respond ONLY with valid JSON (no markdown, no extra text):
-{
-  "grade": "ดี" or "พอใช้" or "ควรปรับ",
-  "issues": ["concise issue in Thai (max 3 items)"],
-  "suggestions": ["practical suggestion in Thai (max 3 items)"],
-  "improved": "improved rewrite in the same language as original",
-  "changes": [
-    {"from": "exact substring from the original", "to": "exact replacement substring in the improved version", "reason": "the writing principle behind this edit (clarity, specificity, grammar, tone, conciseness, etc.) — 1 short sentence in Thai"}
-  ]
-}
-
-If you have nothing concrete to flag, return empty arrays for issues/suggestions — NEVER include empty strings, single punctuation marks, or placeholder text. Each item must be a real, actionable sentence. Keep suggestions kind and constructive.
-
-For "changes": list every meaningful edit between original and improved. Each entry MUST have non-empty "from" and "to" substrings copied verbatim from the texts (include 1–3 words of surrounding context if the change is a single word, so the learner can locate it). Reasons must explain the writing principle, not just describe what changed (e.g. "ทำให้ชัดเจนขึ้นว่าอาหารถูกจัดเตรียมมา" — not "เพิ่มคำว่า provided"). If improved equals original verbatim, return an empty changes array.`;
+                const grammarPrompt = buildGrammarPrompt(grammarSource);
 
                 // Run admin feedback (JSON: feedback + bonus suggestion) + grammar check in parallel
                 const [feedbackResult, grammarResult] = await Promise.allSettled([
@@ -15133,11 +15114,20 @@ For "changes": list every meaningful edit between original and improved. Each en
 
                 if (grammarResult.status === 'fulfilled') {
                     renderGrammarAnalysis(grammarResult.value.text, grammarSource);
+                    saveGrammarCache(grammarResult.value.text, grammarSource);
                 } else {
-                    // V93.77: surface grammar failures instead of silent-hiding the card
+                    // V93.77: surface grammar failures instead of silent-hiding the card.
+                    // V93.94: fall back to cached grammar (if any, same content) before showing the error banner —
+                    // a single transient Gemini outage shouldn't blank a card the admin already saw work.
                     const reason = (grammarResult.reason && grammarResult.reason.message) || String(grammarResult.reason || 'Unknown error');
                     console.error('[reflective-grammar] gemini-2.5-flash call failed:', grammarResult.reason);
-                    renderGrammarAnalysisError(reason);
+                    const cached = loadGrammarCache(grammarSource);
+                    if (cached) {
+                        renderGrammarAnalysis(cached.rawText, cached.originalText);
+                        setReflectiveReviewStatus('Showing previous grammar — Gemini unavailable, retry from the card.', 'error');
+                    } else {
+                        renderGrammarAnalysisError(reason);
+                    }
                 }
 
             } catch (error) {
@@ -15190,8 +15180,89 @@ For "changes": list every meaningful edit between original and improved. Each en
             }).join('');
         }
 
+        // V93.94: Grammar prompt + per-log cache + retry helper.
+        // Extracted from getAISuggestion so the Retry button in the error banner can re-run
+        // the grammar half alone without re-billing the user-selected feedback model.
+        // Cache is in-memory, session-scoped, keyed by reflective_logs doc id. We also keep
+        // originalText so reopen-time restore only fires when the log content hasn't changed.
+        function buildGrammarPrompt(grammarSource) {
+            return `You are an expert Thai-English writing coach. Analyze this reflective writing from a learner:
+
+"${grammarSource}"
+
+The learner may write in Thai, English, or mixed. Analyze grammar, sentence structure, and clarity.
+
+Respond ONLY with valid JSON (no markdown, no extra text):
+{
+  "grade": "ดี" or "พอใช้" or "ควรปรับ",
+  "issues": ["concise issue in Thai (max 3 items)"],
+  "suggestions": ["practical suggestion in Thai (max 3 items)"],
+  "improved": "improved rewrite in the same language as original",
+  "changes": [
+    {"from": "exact substring from the original", "to": "exact replacement substring in the improved version", "reason": "the writing principle behind this edit (clarity, specificity, grammar, tone, conciseness, etc.) — 1 short sentence in Thai"}
+  ]
+}
+
+If you have nothing concrete to flag, return empty arrays for issues/suggestions — NEVER include empty strings, single punctuation marks, or placeholder text. Each item must be a real, actionable sentence. Keep suggestions kind and constructive.
+
+For "changes": list every meaningful edit between original and improved. Each entry MUST have non-empty "from" and "to" substrings copied verbatim from the texts (include 1–3 words of surrounding context if the change is a single word, so the learner can locate it). Reasons must explain the writing principle, not just describe what changed (e.g. "ทำให้ชัดเจนขึ้นว่าอาหารถูกจัดเตรียมมา" — not "เพิ่มคำว่า provided"). If improved equals original verbatim, return an empty changes array.`;
+        }
+
+        function saveGrammarCache(rawText, originalText) {
+            try {
+                const logId = document.getElementById('reflective-review-id').value;
+                if (!logId) return;
+                if (!window._reflectiveGrammarCache) window._reflectiveGrammarCache = {};
+                window._reflectiveGrammarCache[logId] = { rawText, originalText, ts: Date.now() };
+            } catch (e) { /* non-fatal */ }
+        }
+
+        function loadGrammarCache(currentSource) {
+            try {
+                const logId = document.getElementById('reflective-review-id').value;
+                if (!logId || !window._reflectiveGrammarCache) return null;
+                const entry = window._reflectiveGrammarCache[logId];
+                if (!entry) return null;
+                // Only honor cache when content hasn't changed since the cached run.
+                if (String(entry.originalText || '').trim() !== String(currentSource || '').trim()) return null;
+                return entry;
+            } catch (e) { return null; }
+        }
+
+        window.runGrammarOnly = async function(btn) {
+            const logContent = document.getElementById('reflective-review-user-info').innerText;
+            const rawContent = document.getElementById('reflective-review-raw-content').value.trim();
+            const grammarSource = rawContent || logContent;
+            if (!grammarSource || grammarSource.length < 5) return;
+
+            const originalBtnHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Retrying...';
+            }
+            try {
+                const result = await window.callUniversalAI('gemini-2.5-flash', buildGrammarPrompt(grammarSource));
+                renderGrammarAnalysis(result.text, grammarSource);
+                saveGrammarCache(result.text, grammarSource);
+                setReflectiveReviewStatus('');
+            } catch (err) {
+                const reason = (err && err.message) || String(err || 'Unknown error');
+                console.error('[reflective-grammar] retry failed:', err);
+                renderGrammarAnalysisError(reason);
+            } finally {
+                // Button is rerendered by either renderGrammarAnalysis (replaces innerHTML) or
+                // renderGrammarAnalysisError (also replaces innerHTML), so restoring here is
+                // only relevant on the rare path where the button still lives in the DOM.
+                if (btn && document.body.contains(btn)) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalBtnHtml || '<i class="fa-solid fa-rotate"></i> Retry grammar';
+                }
+            }
+        };
+
         // V93.77: visible error state when the grammar call (gemini-2.5-flash) fails or times out.
         // Previously the card stayed hidden, leaving admins unsure if AI Suggest worked at all.
+        // V93.94: added inline Retry button that calls runGrammarOnly (skips feedback re-billing).
         function renderGrammarAnalysisError(reason) {
             const card = document.getElementById('reflective-grammar-card');
             const content = document.getElementById('reflective-grammar-content');
@@ -15205,7 +15276,7 @@ For "changes": list every meaningful edit between original and improved. Each en
             const friendly = /NetworkError|Failed to fetch|Load failed|fetch resource/i.test(reasonStr)
                 ? 'Network issue — check connection and try AI Suggest again.'
                 : 'Grammar check unavailable: ' + reasonStr;
-            content.innerHTML = `<div style="font-size:0.82em; color:#7f1d1d; background:#fef2f2; border-left:3px solid #ef4444; padding:8px 11px; border-radius:0 8px 8px 0; line-height:1.5;">${escapeHtml(friendly)}<div style="font-size:0.85em; color:#94a3b8; margin-top:4px;">Open DevTools Console (F12) for the full error.</div></div>`;
+            content.innerHTML = `<div style="font-size:0.82em; color:#7f1d1d; background:#fef2f2; border-left:3px solid #ef4444; padding:8px 11px; border-radius:0 8px 8px 0; line-height:1.5;">${escapeHtml(friendly)}<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:6px; font-size:0.85em;"><button type="button" onclick="runGrammarOnly(this)" style="background:#ffffff; border:1px solid #fca5a5; color:#b91c1c; padding:3px 10px; border-radius:8px; font-weight:700; cursor:pointer;"><i class="fa-solid fa-rotate"></i> Retry grammar</button><span style="color:#94a3b8;">Open DevTools Console (F12) for the full error.</span></div></div>`;
             card.style.display = '';
         }
 
@@ -35327,6 +35398,12 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             const grammarCard = document.getElementById('reflective-grammar-card');
             if (grammarCard) { grammarCard.style.display = 'none'; document.getElementById('reflective-grammar-content').innerHTML = ''; document.getElementById('reflective-grammar-score').textContent = ''; }
             setReflectiveReviewStatus('');
+            // V93.94: surface cached grammar on reopen when log content hasn't changed since the cached run.
+            // Saves the admin a Gemini call when revisiting a reviewed log within the same session.
+            try {
+                const cached = loadGrammarCache(log.content || '');
+                if (cached) renderGrammarAnalysis(cached.rawText, cached.originalText);
+            } catch (e) { /* non-fatal */ }
             // [V91.41] Sync pills/chips with current state on modal open
             try {
                 if (typeof syncReflectiveBonusChips === 'function') syncReflectiveBonusChips(document.getElementById('reflective-review-bonus').value);
