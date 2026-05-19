@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.90</title>
+    <title>Nika V93.91</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -11174,6 +11174,8 @@
                     </div>
                 </div>
                 <div id="quiz-participants-info" style="margin:10px 0 15px; font-size:0.9em; color:#666;"></div>
+                <!-- V93.91 Quiz Quality Q6: per-question stats injected by renderQuizPerQuestionStatsHtml -->
+                <div id="quiz-question-stats"></div>
                 <div id="quiz-participants-container" style="max-height: 500px; overflow-y: auto;">
                     <!-- Content injected by JS showQuizParticipants -->
                 </div>
@@ -19378,6 +19380,140 @@ ${JSON.stringify(sourceObj)}`;
             if (lastQuizIdForParticipants) showQuizParticipants(lastQuizIdForParticipants);
         }
 
+        // V93.91 Quiz Quality Q6: per-question analytics aggregator.
+        // Mirrors the per-Q correctness logic in renderQuizInsight (V93.78) so the two
+        // views give the same numbers. For choice Q, also accumulates option-pick split.
+        // Caller filters attempts by quizId beforehand.
+        function computeQuizPerQuestionStats(quiz, attempts) {
+            if (!quiz || !Array.isArray(quiz.questions) || quiz.questions.length === 0) return null;
+            const perQ = quiz.questions.map((q, qi) => ({
+                qIndex: qi,
+                qText: q.q || '',
+                type: q.type || 'choice',
+                options: Array.isArray(q.options) ? q.options : [],
+                correctIndices: Array.isArray(q.correct) ? q.correct : (q.correct !== undefined && q.correct !== null ? [q.correct] : []),
+                totalAnswered: 0,
+                correctCount: 0,
+                optionPicks: Array.isArray(q.options) ? q.options.map(() => 0) : []
+            }));
+
+            (attempts || []).forEach(att => {
+                const answers = att.answers || [];
+                const manualCorrect = att.manualCorrect || {};
+                const gradedAnswers = att.gradedAnswers || {};
+                quiz.questions.forEach((q, qi) => {
+                    const userAns = answers[qi];
+                    const hasChoice = (q.type || 'choice') === 'choice';
+                    const hasAnswer = userAns !== undefined && userAns !== null;
+                    const hasManual = manualCorrect[qi] !== undefined || gradedAnswers[qi] !== undefined;
+                    if (!hasAnswer && !hasManual) return;
+
+                    perQ[qi].totalAnswered += 1;
+                    let isCorrect = false;
+                    if (manualCorrect[qi] === true) {
+                        isCorrect = true;
+                    } else if (hasChoice) {
+                        const target = q.correct;
+                        const sAns = Array.isArray(userAns) ? userAns : (userAns !== undefined && userAns !== null ? [userAns] : []);
+                        const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
+                        isCorrect = sAns.length > 0 && sAns.length === tAns.length && sAns.every(v => tAns.includes(v));
+                        sAns.forEach(idx => {
+                            const i = Number(idx);
+                            if (Number.isFinite(i) && i >= 0 && i < perQ[qi].optionPicks.length) {
+                                perQ[qi].optionPicks[i] += 1;
+                            }
+                        });
+                    } else {
+                        isCorrect = !!gradedAnswers[qi];
+                    }
+                    if (isCorrect) perQ[qi].correctCount += 1;
+                });
+            });
+
+            return perQ.map(s => ({
+                ...s,
+                correctPct: s.totalAnswered > 0 ? (s.correctCount / s.totalAnswered) * 100 : 0
+            }));
+        }
+
+        // V93.91: outlier classifier for Quiz Engine row badges.
+        // Returns { tooEasy: [qIndex...], tooHard: [qIndex...] } based on >=95% / <=20%.
+        // Returns null when total attempts <10 (low-N gate from Q6 spec).
+        function classifyQuizOutliers(quiz, attempts) {
+            if (!attempts || attempts.length < 10) return null;
+            const stats = computeQuizPerQuestionStats(quiz, attempts);
+            if (!stats) return null;
+            const tooEasy = [], tooHard = [];
+            stats.forEach(s => {
+                if (s.totalAnswered < 10) return;
+                if (s.correctPct >= 95) tooEasy.push(s.qIndex);
+                if (s.correctPct <= 20) tooHard.push(s.qIndex);
+            });
+            return { tooEasy, tooHard, totalAttempts: attempts.length };
+        }
+
+        function renderQuizPerQuestionStatsHtml(quiz, attempts) {
+            const n = (attempts || []).length;
+            if (!quiz || n === 0) return '';
+            if (n < 10) {
+                return `<div style="background:#fef9c3; border:1px solid #fde047; border-radius:12px; padding:12px; margin:14px 0; font-size:0.85em; color:#854d0e;">
+                    <i class="fa-solid fa-info-circle"></i> <b>Per-question stats hidden — need 10+ attempts for reliable analytics (current: ${n}).</b>
+                </div>`;
+            }
+            const stats = computeQuizPerQuestionStats(quiz, attempts);
+            if (!stats || stats.length === 0) return '';
+
+            const cardsHtml = stats.map(s => {
+                const isChoice = s.type === 'choice' && s.options.length > 0;
+                const lowN = s.totalAnswered < 10;
+                const easyBadge = !lowN && s.correctPct >= 95 ? '<span style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:0.7em; padding:2px 8px; border-radius:8px; font-weight:800;">🔥 too easy</span>' : '';
+                const hardBadge = !lowN && s.correctPct <= 20 ? '<span style="background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe; font-size:0.7em; padding:2px 8px; border-radius:8px; font-weight:800;">🧊 too hard</span>' : '';
+                const lowNBadge = lowN ? `<span style="background:#f1f5f9; color:#64748b; border:1px solid #cbd5e1; font-size:0.7em; padding:2px 8px; border-radius:8px; font-weight:800;">N=${s.totalAnswered}</span>` : '';
+                const pctColor = s.correctPct >= 80 ? '#15803d' : (s.correctPct >= 50 ? '#a16207' : '#b91c1c');
+                const pctBg = s.correctPct >= 80 ? '#dcfce7' : (s.correctPct >= 50 ? '#fef9c3' : '#fee2e2');
+
+                let optionBarsHtml = '';
+                if (isChoice) {
+                    optionBarsHtml = `<div style="margin-top:8px; display:flex; flex-direction:column; gap:4px;">` + s.options.map((opt, oi) => {
+                        const isCorrect = s.correctIndices.includes(oi);
+                        const pickCount = s.optionPicks[oi] || 0;
+                        const pickPct = s.totalAnswered > 0 ? (pickCount / s.totalAnswered) * 100 : 0;
+                        const barColor = isCorrect ? '#22c55e' : '#94a3b8';
+                        const barBg = isCorrect ? '#dcfce7' : '#f1f5f9';
+                        return `<div style="display:flex; align-items:center; gap:8px; font-size:0.8em;">
+                            <span style="min-width:24px; color:${isCorrect ? '#15803d' : '#475569'}; font-weight:${isCorrect ? '900' : '600'};">${String.fromCharCode(65 + oi)}${isCorrect ? ' ✓' : ''}</span>
+                            <div style="flex:1; background:${barBg}; height:18px; border-radius:6px; overflow:hidden; position:relative;">
+                                <div style="background:${barColor}; height:100%; width:${pickPct}%; transition:width 0.3s;"></div>
+                            </div>
+                            <span style="min-width:70px; text-align:right; color:#64748b; font-variant-numeric:tabular-nums;">${pickPct.toFixed(0)}% (${pickCount})</span>
+                        </div>`;
+                    }).join('') + `</div>`;
+                }
+
+                return `<div class="lang-no-toggle" style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:12px; margin-bottom:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:4px;">
+                        <div style="flex:1; min-width:0;">
+                            <b style="color:#1e293b;">Q${s.qIndex + 1}</b>
+                            <span style="color:#475569; font-size:0.85em; margin-left:6px;">${escapeHtml((s.qText || '').slice(0, 110))}${s.qText.length > 110 ? '…' : ''}</span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:5px; flex-shrink:0;">
+                            ${easyBadge}${hardBadge}${lowNBadge}
+                            <span style="background:${pctBg}; color:${pctColor}; padding:3px 10px; border-radius:8px; font-weight:900; font-size:0.85em; white-space:nowrap;">${s.correctPct.toFixed(0)}%</span>
+                        </div>
+                    </div>
+                    ${optionBarsHtml}
+                </div>`;
+            }).join('');
+
+            return `<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:14px; margin:14px 0;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h4 style="margin:0; font-size:1em; color:#1e293b;">📊 Per-Question Stats</h4>
+                    <span style="font-size:0.75em; color:#64748b;">based on ${n} attempt${n === 1 ? '' : 's'}</span>
+                </div>
+                ${cardsHtml}
+            </div>`;
+        }
+
         async function showQuizParticipants(quizId) {
             lastQuizIdForParticipants = quizId;
             
@@ -19430,6 +19566,8 @@ ${JSON.stringify(sourceObj)}`;
                 if (attempts.length === 0) {
                     container.innerHTML = "<p style='text-align:center; padding:20px; color:#999;'>No one has taken this quiz yet.</p>";
                     avgBadge.innerText = "Avg: -";
+                    const statsEmpty = document.getElementById('quiz-question-stats');
+                    if (statsEmpty) statsEmpty.innerHTML = '';
                     return;
                 }
 
@@ -19444,6 +19582,10 @@ ${JSON.stringify(sourceObj)}`;
                 });
                 const avgPct = participantCount > 0 ? (totalScorePct / participantCount * 100).toFixed(1) : 0;
                 avgBadge.innerText = `Avg: ${avgPct}% (${participantCount}/${attempts.length})`;
+
+                // V93.91 Quiz Quality Q6: per-question stats panel (10+ attempt low-N gate inside)
+                const statsContainer = document.getElementById('quiz-question-stats');
+                if (statsContainer) statsContainer.innerHTML = renderQuizPerQuestionStatsHtml(quiz, activeAttempts);
 
                 let html = `
                     <table style="font-size:0.9em;">
@@ -22139,12 +22281,25 @@ ${JSON.stringify(sourceObj)}`;
                 const pointsBorder = pointsVal > 5 ? '#d81b60' : (pointsVal > 1.1 ? '#8338ec' : (pointsVal > 1 ? '#ff9f1c' : '#e0e0e0'));
                 const pointsBg = pointsVal > 1 ? '#f8f0ff' : '#fff';
 
+                // V93.91 Quiz Quality Q6: outlier flags from per-Q stats (10+ attempt low-N gate inside)
+                const _qAttempts = (typeof quizAttemptsAllCache !== 'undefined' && Array.isArray(quizAttemptsAllCache))
+                    ? quizAttemptsAllCache.filter(a => a.quizId === q.id)
+                    : [];
+                const _outliers = classifyQuizOutliers(q, _qAttempts);
+                const _easyBadge = _outliers && _outliers.tooEasy.length > 0
+                    ? `<span title="${_outliers.tooEasy.length} too-easy question(s) (>95% correct): Q${_outliers.tooEasy.map(i => i + 1).join(', Q')}" style="font-size:0.7em; background:#fef3c7; color:#92400e; border:1px solid #fde68a; padding:2px 6px; border-radius:8px; font-weight:800; cursor:help; white-space:nowrap;" onclick="event.stopPropagation(); showQuizParticipants('${q.id}')">🔥 ${_outliers.tooEasy.length}</span>`
+                    : '';
+                const _hardBadge = _outliers && _outliers.tooHard.length > 0
+                    ? `<span title="${_outliers.tooHard.length} too-hard question(s) (<20% correct): Q${_outliers.tooHard.map(i => i + 1).join(', Q')}" style="font-size:0.7em; background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe; padding:2px 6px; border-radius:8px; font-weight:800; cursor:help; white-space:nowrap;" onclick="event.stopPropagation(); showQuizParticipants('${q.id}')">🧊 ${_outliers.tooHard.length}</span>`
+                    : '';
+
                 return `
                     <tr class="lang-no-toggle">
                         <td>
-                            <div style="font-weight:800; color:#333; margin-bottom:3px; display:flex; align-items:center; gap:8px;">
+                            <div style="font-weight:800; color:#333; margin-bottom:3px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                                 ${q.title ? q.title.replace(/\s*\(Template\)$/i, '') : '-'}
                                 <span id="fb-badge-${q.id}" style="font-size:0.7em; background:#fff7ed; color:#b45309; border:1px solid #fed7aa; border-radius:8px; padding:2px 7px; font-weight:800; cursor:pointer; white-space:nowrap;" onclick="event.stopPropagation(); showQuizFeedbackPanel('${q.id}')" title="View user feedback">⭐ —</span>
+                                ${_easyBadge}${_hardBadge}
                             </div>
                             <div style="display:flex; flex-wrap:wrap; gap:3px; align-items:center;">
                                 ${modeLabel} ${oneTimeLabel} ${homeworkLabel} 
