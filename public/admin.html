@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.86</title>
+    <title>Nika V93.87</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -10578,6 +10578,41 @@
                             </div>
                         </div>
                     </details>
+
+                <!-- V93.87 Quiz Quality Q1: Blueprint (optional) — ground truth for Q3 audit + Q6 analytics.
+                     Three fields only (difficulty / Bloom / objective); tags/topic/case content reuse existing infra. -->
+                <details style="margin-bottom:8px; border:1px solid #334155; border-radius:12px; background:rgba(30,41,59,0.5); backdrop-filter:blur(10px);">
+                    <summary style="padding:10px 15px; cursor:pointer; font-size:0.8em; font-weight:700; color:#fbbf24; text-transform:uppercase; letter-spacing:0.8px; user-select:none; list-style:none; display:flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-chevron-right" style="font-size:0.7em;"></i>
+                        <i class="fa-solid fa-clipboard-list"></i> Blueprint <span style="font-size:0.85em; font-weight:500; color:#64748b; text-transform:none; letter-spacing:0;">(optional — used by Quality Audit + per-question analytics)</span>
+                    </summary>
+                    <div style="padding:12px; border-top:1px solid #334155; display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                        <div>
+                            <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:4px;"><i class="fa-solid fa-gauge-high"></i> Difficulty <span style="opacity:0.7;">(1 = easy · 5 = expert)</span></label>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <input type="range" id="quiz-bp-difficulty" min="0" max="5" step="1" value="0" oninput="document.getElementById('quiz-bp-difficulty-out').textContent = this.value === '0' ? '—' : this.value" style="flex:1;">
+                                <span id="quiz-bp-difficulty-out" style="min-width:22px; text-align:center; font-weight:800; color:#fbbf24; font-size:1.05em;">—</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:4px;"><i class="fa-solid fa-layer-group"></i> Bloom's Level</label>
+                            <select id="quiz-bp-bloom" style="width:100%; padding:5px 8px; border:1px solid #334155; border-radius:6px; font-size:0.85em; background:#0f172a; color:#f1f5f9;">
+                                <option value="">— not set —</option>
+                                <option value="Remember">Remember (recall facts)</option>
+                                <option value="Understand">Understand (explain)</option>
+                                <option value="Apply">Apply (use in new situation)</option>
+                                <option value="Analyze">Analyze (break down)</option>
+                                <option value="Evaluate">Evaluate (judge / critique)</option>
+                                <option value="Create">Create (design / synthesise)</option>
+                            </select>
+                        </div>
+                        <div style="grid-column:1 / -1;">
+                            <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:4px;"><i class="fa-solid fa-bullseye"></i> Learning Objective <span style="opacity:0.7;">(what learners can do after — keep under 240 chars)</span></label>
+                            <textarea id="quiz-bp-objective" maxlength="240" placeholder="e.g. Recognise first-line treatment options for hyperpigmentation in skin types IV–VI..." class="lang-no-toggle" style="width:100%; padding:6px 10px; border:1px solid #334155; border-radius:8px; font-size:0.85em; background:#0f172a; color:#f1f5f9; min-height:44px; max-height:90px; resize:vertical;"></textarea>
+                        </div>
+                    </div>
+                </details>
+
                 <!-- Homework User Picker -->
                 <div id="homework-assign-area"
                     style="display:none; margin-top:8px; background:rgba(22,163,74,0.1); border:1px solid rgba(22,163,74,0.2); border-radius:10px; padding:12px;">
@@ -16097,6 +16132,18 @@ For "changes": list every meaningful edit between original and improved. Each en
             toggleCaseUI();
             updatePollUI();
 
+            // V93.87 Quiz Quality Q1: blueprint fields (optional, all default to unset)
+            const bp = q.blueprint || {};
+            const bpDiffEl = document.getElementById('quiz-bp-difficulty');
+            const bpDiffOut = document.getElementById('quiz-bp-difficulty-out');
+            const bpDiff = Number.isFinite(bp.difficulty) && bp.difficulty >= 1 && bp.difficulty <= 5 ? bp.difficulty : 0;
+            if (bpDiffEl) bpDiffEl.value = bpDiff;
+            if (bpDiffOut) bpDiffOut.textContent = bpDiff === 0 ? '—' : String(bpDiff);
+            const bpBloomEl = document.getElementById('quiz-bp-bloom');
+            if (bpBloomEl) bpBloomEl.value = bp.bloomLevel || "";
+            const bpObjEl = document.getElementById('quiz-bp-objective');
+            if (bpObjEl) bpObjEl.value = bp.learningObjective || "";
+
             const fmt = (d) => {
                 if (!d) return "";
                 // Handle both Firestore Timestamp and ISO string (from draft)
@@ -16151,6 +16198,15 @@ For "changes": list every meaningful edit between original and improved. Each en
             if (window.renderQTextPreview) window.renderQTextPreview(document.getElementById('quiz-case-content'));
             toggleCaseUI();
             updatePollUI();
+            // V93.87 Quiz Quality Q1: reset blueprint fields
+            const bpDiffEl = document.getElementById('quiz-bp-difficulty');
+            const bpDiffOut = document.getElementById('quiz-bp-difficulty-out');
+            if (bpDiffEl) bpDiffEl.value = 0;
+            if (bpDiffOut) bpDiffOut.textContent = '—';
+            const bpBloomEl = document.getElementById('quiz-bp-bloom');
+            if (bpBloomEl) bpBloomEl.value = "";
+            const bpObjEl = document.getElementById('quiz-bp-objective');
+            if (bpObjEl) bpObjEl.value = "";
             document.getElementById('quiz-start-time').value = "";
             document.getElementById('quiz-deadline').value = "";
             document.getElementById('quiz-questions-container').innerHTML = "";
@@ -16362,6 +16418,16 @@ For "changes": list every meaningful edit between original and improved. Each en
             const caseContent = document.getElementById('quiz-case-content').value;
             const tags = document.getElementById('quiz-tags').value.trim();
 
+            // V93.87 Quiz Quality Q1: read blueprint, build only if any field set.
+            // Keeps Firestore noise out of quizzes that never touched the panel.
+            const bpDiffRaw = parseInt(document.getElementById('quiz-bp-difficulty')?.value, 10);
+            const bpDifficulty = (bpDiffRaw >= 1 && bpDiffRaw <= 5) ? bpDiffRaw : null;
+            const bpBloom = (document.getElementById('quiz-bp-bloom')?.value || '').trim() || null;
+            const bpObjective = (document.getElementById('quiz-bp-objective')?.value || '').trim() || null;
+            const blueprint = (bpDifficulty || bpBloom || bpObjective)
+                ? Object.fromEntries(Object.entries({ difficulty: bpDifficulty, bloomLevel: bpBloom, learningObjective: bpObjective }).filter(([, v]) => v !== null))
+                : null;
+
             const qItems = document.querySelectorAll('.quiz-q-item');
             const questions = [];
             qItems.forEach(item => {
@@ -16388,7 +16454,7 @@ For "changes": list every meaningful edit between original and improved. Each en
             });
 
             return {
-                title, shortTitle, targetGroup, description, tags, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, quizType, feedbackLimit, caseContent, questions,
+                title, shortTitle, targetGroup, description, tags, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, quizType, feedbackLimit, caseContent, questions, blueprint,
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
             };
@@ -18544,6 +18610,7 @@ ${JSON.stringify(sourceObj)}`;
                 quizType: formData.quizType || 'standard',
                 feedbackLimit: formData.feedbackLimit || 280,
                 questions: validQuestions,
+                blueprint: formData.blueprint || null,
                 startTime: convertDate(formData.startTime),
                 deadline: convertDate(formData.deadline),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
