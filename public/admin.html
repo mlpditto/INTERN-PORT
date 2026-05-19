@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.87</title>
+    <title>Nika V93.88</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -10683,7 +10683,8 @@
                             </div>
                             <input type="hidden" id="ai-analyzer-model-val" value="gemini-2.5-pro">
                             <div style="display:flex; gap:4px;">
-                                <button class="btn-sm" onclick="analyzeQuizAI(this)" title="Analyze Quiz" style="background:#7c3aed; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-brain"></i> Specialist</button>
+                                <button class="btn-sm" onclick="analyzeQuizAI(this)" title="Analyze Quiz (rewrite suggestions)" style="background:#7c3aed; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-brain"></i> Specialist</button>
+                                <button class="btn-sm" onclick="auditQuizAI(this)" title="Quality Audit — 5-dim scorecard per question (V93.88 Q3)" style="background:#0891b2; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-clipboard-check"></i> Audit</button>
                                 <button class="btn-sm" onclick="openPdfToQuizModal()" title="Import PDF" style="background:#0ea5e9; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                                 <button class="btn-sm" onclick="openSuggestMoreModal()" title="Expand" style="background:#f59e0b; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-sparkles"></i> Expand</button>
                             </div>
@@ -13602,6 +13603,173 @@
             }
 
         };
+
+        // V93.88 Quiz Quality Q3: 5-dimension scorecard audit. Sibling to analyzeQuizAI ("Specialist")
+        // but conceptually different — Specialist proposes rewrites, Audit judges each question on a
+        // fixed rubric and surfaces raw scores so admin can prioritise fixes. 1-pass for now;
+        // self-confirmation bias monitored, 2nd critic pass deferred.
+        window.auditQuizAI = async function(clickedBtn) {
+            const oldModal = document.getElementById('ai-audit-popup');
+            if (oldModal) oldModal.remove();
+
+            const formData = getQuizFormData();
+            if (!formData.questions || formData.questions.length < 1) return alert('Add at least 1 question to audit.');
+
+            const btn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
+            const oldText = btn ? btn.innerHTML : 'Audit';
+
+            const bp = formData.blueprint || {};
+            const bpLines = [];
+            if (bp.difficulty) bpLines.push(`- intended difficulty: ${bp.difficulty}/5`);
+            if (bp.bloomLevel) bpLines.push(`- intended Bloom level: ${bp.bloomLevel}`);
+            if (bp.learningObjective) bpLines.push(`- learning objective: ${bp.learningObjective}`);
+            const blueprintBlock = bpLines.length
+                ? `\n\nBLUEPRINT CONTEXT (admin's stated intent — judge each Q against this):\n${bpLines.join('\n')}\n`
+                : '\n\nNote: no blueprint set — judge each Q on absolute merit; for "bloomLevel" use detected demand only.\n';
+
+            const qList = formData.questions.map((q, i) => {
+                const opts = (q.options || []).map((o, oi) => `    ${String.fromCharCode(65 + oi)}. ${o}`).join('\n');
+                const correctIdx = Array.isArray(q.correct) ? q.correct : [q.correct];
+                const correctLabels = correctIdx.map(c => String.fromCharCode(65 + c)).join(',');
+                return `Q${i + 1} (${q.type}): ${q.q}\n${opts}\n  correct: ${correctLabels}`;
+            }).join('\n\n');
+
+            try {
+                if (btn) { btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Auditing...`; btn.disabled = true; }
+
+                const prompt = `You are a Quality Auditor for medical-education multiple-choice questions.
+
+RUBRIC — score each question on 5 dimensions, INTEGER 1-5 (1 = poor, 5 = excellent):
+  1. clarity             — Is the stem unambiguous, well-worded, free of double-barrel?
+  2. distractorQuality   — Are wrong options plausible to a learner? 1 = obvious giveaways, 5 = distractors that test real understanding
+  3. bloomLevel          — Cognitive demand of the question:
+                           1 = Remember (recall facts),
+                           2 = Understand (explain in own words),
+                           3 = Apply (use in a new situation),
+                           4 = Analyze (break down, compare),
+                           5 = Evaluate or Create (judge / design)
+  4. clinicalDepth       — Clinical reasoning required: 1 = pure factoid, 3 = single-step clinical inference, 5 = multi-step synthesis (diagnose + plan)
+  5. languageConsistency — Polish and consistency: 1 = mixed languages / typos / jargon errors, 5 = clean polished prose throughout
+${blueprintBlock}
+QUESTIONS:
+${qList}
+
+OUTPUT FORMAT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
+{
+  "overallScore": 3.4,
+  "perQuestionAudit": [
+    {
+      "qNumber": 1,
+      "scores": { "clarity": 4, "distractorQuality": 2, "bloomLevel": 3, "clinicalDepth": 5, "languageConsistency": 5 },
+      "averageScore": 3.8,
+      "detectedBloomName": "Apply",
+      "rationale": "Thai feedback ≤200 chars: cite the lowest-scoring dim and ONE concrete fix."
+    }
+  ]
+}
+
+RULES:
+- "rationale" MUST be in Thai (admin-facing).
+- Scores are INTEGERS 1-5 only. averageScore = mean of the 5 scores rounded to 1 decimal.
+- overallScore = mean of all perQuestionAudit[].averageScore rounded to 1 decimal.
+- "detectedBloomName" is one of: Remember, Understand, Apply, Analyze, Evaluate, Create (descriptive label of the bloomLevel score).
+- Return one entry per question in input order. Do NOT skip any.`;
+
+                const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-2.5-pro';
+
+                let resultRaw = '', aiTokens = 0, aiModel = '', result = null;
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    const aiResp = await callUniversalAI(selectedModel, prompt, true);
+                    resultRaw = aiResp.text;
+                    aiTokens = aiResp.tokens;
+                    aiModel = aiResp.model;
+                    result = safeJsonParse(resultRaw);
+                    if (result) break;
+                    if (attempt === 1) console.warn('[auditQuizAI] attempt 1 non-JSON, retrying. Snippet:', String(resultRaw || '').slice(0, 200));
+                }
+                if (!result || !Array.isArray(result.perQuestionAudit)) {
+                    throw new Error('AI returned invalid JSON after 2 attempts. First 300 chars:\n\n' + String(resultRaw || '').slice(0, 300));
+                }
+
+                renderAuditScorecard(result, aiModel, aiTokens, bp);
+
+            } catch (e) {
+                console.error('Audit error:', e);
+                alert('Audit error: ' + e.message);
+            } finally {
+                if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
+            }
+        };
+
+        function renderAuditScorecard(result, aiModel, aiTokens, blueprint) {
+            const blueprintBloom = (blueprint && blueprint.bloomLevel) || null;
+            const stars = (n) => {
+                const v = Math.max(0, Math.min(5, Math.round(n)));
+                return '<span style="color:#fbbf24; letter-spacing:1px;">' + '★'.repeat(v) + '<span style="color:#cbd5e1;">' + '☆'.repeat(5 - v) + '</span></span>';
+            };
+            const dimLabel = {
+                clarity: 'Clarity',
+                distractorQuality: 'Distractor Quality',
+                bloomLevel: 'Bloom Level',
+                clinicalDepth: 'Clinical Depth',
+                languageConsistency: 'Language Consistency'
+            };
+            const overall = Number(result.overallScore || 0).toFixed(1);
+            const overallBg = result.overallScore >= 4 ? '#dcfce7' : result.overallScore >= 3 ? '#fef9c3' : '#fee2e2';
+            const overallColor = result.overallScore >= 4 ? '#15803d' : result.overallScore >= 3 ? '#a16207' : '#b91c1c';
+
+            const perQHtml = result.perQuestionAudit.map(q => {
+                const dims = q.scores || {};
+                const dimRows = Object.keys(dimLabel).map(k => {
+                    const v = Number(dims[k]) || 0;
+                    let badge = '';
+                    if (k === 'bloomLevel' && blueprintBloom && q.detectedBloomName) {
+                        const match = String(q.detectedBloomName).toLowerCase() === String(blueprintBloom).toLowerCase();
+                        badge = match
+                            ? ' <span style="color:#15803d; font-weight:700; font-size:0.85em;" title="matches blueprint">✓</span>'
+                            : ` <span style="color:#b91c1c; font-weight:700; font-size:0.85em;" title="blueprint expected ${escapeHtml(blueprintBloom)}, detected ${escapeHtml(q.detectedBloomName)}">⚠</span>`;
+                    } else if (k === 'bloomLevel' && q.detectedBloomName) {
+                        badge = ` <span style="color:#64748b; font-size:0.8em;">(${escapeHtml(q.detectedBloomName)})</span>`;
+                    }
+                    return `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #f1f5f9; font-size:0.85em;">
+                        <span style="color:#475569; font-weight:500;">${dimLabel[k]}${badge}</span>
+                        <span>${stars(v)} <span style="color:#475569; font-weight:700; margin-left:6px;">${v}</span></span>
+                    </div>`;
+                }).join('');
+                const avg = Number(q.averageScore || 0).toFixed(1);
+                const headerBg = q.averageScore >= 4 ? '#dcfce7' : q.averageScore >= 3 ? '#fef9c3' : '#fee2e2';
+                return `<div style="background:#fcfdff; border:1.5px solid #e2e8f0; border-radius:14px; padding:14px; margin-bottom:10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding:6px 10px; background:${headerBg}; border-radius:8px;">
+                        <b style="color:#1e293b; font-size:1em;">Q${q.qNumber}</b>
+                        <span style="font-size:0.9em;">${stars(q.averageScore)} <b style="margin-left:6px;">avg ${avg}</b></span>
+                    </div>
+                    ${dimRows}
+                    ${q.rationale ? `<div class="lang-no-toggle" style="margin-top:10px; padding:8px 12px; background:#f8fafc; border-left:3px solid #0891b2; border-radius:6px; font-size:0.85em; color:#334155; line-height:1.55;"><i class="fa-solid fa-message" style="color:#0891b2; margin-right:6px;"></i>${escapeHtml(q.rationale)}</div>` : ''}
+                </div>`;
+            }).join('');
+
+            const modal = document.createElement('div');
+            modal.id = 'ai-audit-popup';
+            modal.className = 'lang-no-toggle';
+            modal.style = 'position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:92%; max-width:780px; max-height:85vh; background:white; padding:26px; border-radius:24px; box-shadow:0 20px 60px rgba(0,0,0,0.3); z-index:10001; overflow-y:auto; font-family:Inter, sans-serif;';
+            modal.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f1f5f9; padding-bottom:14px; margin-bottom:18px;">
+                    <h2 style="margin:0; color:#0891b2; font-size:1.4em;"><i class="fa-solid fa-clipboard-check"></i> Quality Audit</h2>
+                    <button onclick="document.getElementById('ai-audit-popup').remove()" style="border:none; background:#f1f5f9; color:#64748b; width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:1.1em;">✕</button>
+                </div>
+                <div style="background:${overallBg}; padding:18px; border-radius:14px; margin-bottom:18px; text-align:center;">
+                    <div style="font-size:0.75em; color:${overallColor}; font-weight:800; letter-spacing:0.8px; text-transform:uppercase; margin-bottom:6px;">Overall Quality</div>
+                    <div style="font-size:1.6em; color:${overallColor}; font-weight:900;">${stars(result.overallScore)} ${overall} / 5</div>
+                    <div style="font-size:0.75em; color:${overallColor}; opacity:0.8; margin-top:4px;">${result.perQuestionAudit.length} question${result.perQuestionAudit.length === 1 ? '' : 's'} audited${blueprintBloom ? ` · blueprint Bloom = ${escapeHtml(blueprintBloom)}` : ''}</div>
+                </div>
+                ${perQHtml}
+                <div style="margin-top:14px; padding-top:12px; border-top:1px solid #e2e8f0; font-size:0.7em; color:#94a3b8; display:flex; justify-content:space-between;">
+                    <span>🚀 Model: <b>${escapeHtml(aiModel || '')}</b> · 💡 Tokens: <b>${aiTokens.toLocaleString()}</b></span>
+                    <span style="opacity:0.7;">V93.88 Q3 · 1-pass</span>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
 
         window.applyQuizImprovements = async function() {
             const btn = document.getElementById('btn-apply-ai-improve');
