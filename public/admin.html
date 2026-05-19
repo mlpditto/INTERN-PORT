@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.89</title>
+    <title>Nika V93.90</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13773,6 +13773,146 @@ RULES:
             document.body.appendChild(modal);
         }
 
+        // V93.90 Quiz Quality Q5: generate 5 MCQs from an Alabasta case note.
+        // PII strategy = defence in depth: (1) explicit AI prompt instructions,
+        // (2) post-gen regex sweep on every output string, (3) admin gates final
+        // save via the Quiz modal. We never auto-mutate AI output — pattern hits
+        // surface as a warning toast for admin to review/edit before saving.
+        function piiSweepText(text) {
+            if (!text) return [];
+            const hits = [];
+            const s = String(text);
+            // HN-like numeric: "12/345/67", "12-34-56", or 6-9 contiguous digits
+            if (/\b\d{1,3}[\/\-]\d{1,3}([\/\-]\d{1,4})?\b/.test(s)) hits.push('HN-like');
+            if (/\b\d{6,9}\b/.test(s)) hits.push('long-digit');
+            // Elderly age 90+
+            if (/\b(9\d|1\d{2})\s*(years|ปี|y\.?o\.?|yr|year-old)\b/i.test(s)) hits.push('age 90+');
+            // Specific date DD/MM/YYYY or YYYY-MM-DD
+            if (/\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b/.test(s)) hits.push('date');
+            if (/\b20\d{2}[\/\-]\d{1,2}[\/\-]\d{1,2}\b/.test(s)) hits.push('iso-date');
+            return hits;
+        }
+        function piiPostSweep(result) {
+            const allHits = new Set();
+            const scan = (txt) => piiSweepText(txt).forEach(h => allHits.add(h));
+            scan(result.redactedCaseContent);
+            (result.questions || []).forEach(q => {
+                scan(q.q);
+                (q.options || []).forEach(o => scan(o));
+                scan(q.explanation);
+            });
+            return Array.from(allHits);
+        }
+
+        window.generateQuizFromCase = async function(caseId) {
+            const caseItem = (casesData || []).find(c => c.id === caseId);
+            if (!caseItem) return alert('Case not found · 케이스를 찾을 수 없습니다.');
+            const note = (caseItem.note || '').trim();
+            if (note.length < 30) return alert('Case note too short to generate questions from (need 30+ chars).');
+
+            if (!confirm(`Generate 5 quiz questions from case ${caseItem.caseId || caseId}?\n\nPII (HN, attending name, ward, date, age 90+) will be anonymised by the AI prompt + post-checked.\n\nThe new quiz opens in the editor for review — nothing is saved until you click Save Quiz.`)) return;
+
+            const model = document.getElementById('ai-analyzer-model-val')?.value || 'gemini-2.5-pro';
+            showToast(`🧠 Generating quiz from case ${caseItem.caseId || ''}…`);
+
+            const prompt = `You are a medical-education quiz writer. Generate EXACTLY 5 multiple-choice questions from the clinical case below.
+
+⚠️ STEP 0 — PII REDACTION (DO THIS BEFORE ANYTHING ELSE):
+Build "redactedCaseContent" by replacing the following PII categories in the source case note:
+  • HN / patient ID / medical record numbers      → "[HN]"
+  • Specific patient name                          → "[Patient]"
+  • Ages 90 or above                               → "[elderly]" (ages 18–89 may stay as "55y" or similar)
+  • Ward / room / unit names ("ICU", "Med 2")     → "[Ward]"
+  • Attending / consulting / doctor full names    → "[Attending]"
+  • Specific dates (DD/MM/YYYY, YYYY-MM-DD, ปี พ.ศ.) → "[Date]"
+  • Hospital / location specifics                  → "[Location]"
+Use ONLY the redacted version when generating questions. Self-check: scan your final output once for any remaining PII and re-redact.
+
+CASE NOTE (raw — for redaction):
+---
+${note}
+---
+
+OUTPUT FORMAT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
+{
+  "redactedCaseContent": "<<<the PII-redacted case content, same language as input>>>",
+  "title": "<<<short descriptive title for the quiz, ~60 chars, same language as case>>>",
+  "shortTitle": "<<<≤20 char code-style label, ASCII preferred (e.g. CASE-ANE-01)>>>",
+  "description": "<<<1-line description of what this quiz tests, ~120 chars, same language as case>>>",
+  "questions": [
+    {
+      "q": "<<<question stem, same language as case>>>",
+      "type": "choice",
+      "options": ["<<<distractor>>>", "<<<correct answer>>>", "<<<distractor>>>", "<<<distractor>>>"],
+      "correct": [1],
+      "timer": 60,
+      "explanation": "<<<≤150 char learner-facing rationale — why correct is correct, why top distractor is wrong>>>"
+    }
+  ]
+}
+
+RULES:
+- EXACTLY 5 questions, each with EXACTLY 4 options.
+- Mix Bloom levels: at least 1 Apply, 1 Analyze, 1 Evaluate/Create across the set. Max 2 pure Recall.
+- Distractors must be plausible misconceptions a learner could realistically hold.
+- Questions must be answerable from the redacted case content alone (no external knowledge required).
+- All output text in the SAME language as the case note (Thai → Thai, English → English).
+- "explanation" is for learners — concise teaching tone, NOT critique.
+- ABSOLUTELY NO PII anywhere in the output (questions, options, explanations, or redactedCaseContent).`;
+
+            try {
+                let result = null, raw = '', model_used = '', tokens = 0;
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    const aiResp = await callUniversalAI(model, prompt, true);
+                    raw = aiResp.text; model_used = aiResp.model; tokens = aiResp.tokens;
+                    result = safeJsonParse(raw);
+                    if (result && Array.isArray(result.questions) && result.questions.length > 0) break;
+                    if (attempt === 1) console.warn('[generateQuizFromCase] attempt 1 non-JSON, retrying');
+                }
+                if (!result || !Array.isArray(result.questions) || result.questions.length === 0) {
+                    throw new Error('AI returned no valid questions. First 300 chars:\n\n' + String(raw || '').slice(0, 300));
+                }
+
+                const piiHits = piiPostSweep(result);
+
+                const quizData = {
+                    title: result.title || `Case-based: ${caseItem.disease || caseItem.caseId || 'Untitled'}`,
+                    shortTitle: (result.shortTitle || `CASE-${(caseItem.caseId || caseId).toString().slice(0, 14)}`).slice(0, 32),
+                    description: result.description || `Generated from Alabasta case ${caseItem.caseId || caseId}`,
+                    tags: 'AI_FROM_CASE',
+                    quizType: 'case_study',
+                    caseContent: result.redactedCaseContent || note,
+                    totalPoints: 1.0,
+                    isPoll: false, oneTimeMode: false, isHomework: false, assignedUsers: [],
+                    timerMode: 'per_question', totalTimer: 300, shuffleChoices: true,
+                    targetGroup: 'Public',
+                    questions: result.questions.map(q => ({
+                        q: q.q || '',
+                        type: q.type || 'choice',
+                        options: Array.isArray(q.options) ? q.options : [],
+                        correct: Array.isArray(q.correct) ? q.correct : [Number(q.correct) || 0],
+                        timer: Number(q.timer) || 60,
+                        explanation: q.explanation || ''
+                    }))
+                };
+
+                await openQuizModal(null);
+                // Defer fillQuizForm until the modal's resetQuizForm + addQuestionUI(initial) have run.
+                setTimeout(() => {
+                    fillQuizForm(quizData);
+                    if (piiHits.length > 0) {
+                        showToast(`⚠️ Possible PII detected (${piiHits.join(', ')}) — review before saving`);
+                        console.warn('[Case-to-Quiz] PII sweep hits:', piiHits, '— admin to review');
+                    } else {
+                        showToast(`✅ Draft quiz ready (${quizData.questions.length} Q · ${model_used}, ${tokens.toLocaleString()} tok)`);
+                    }
+                }, 350);
+            } catch (e) {
+                console.error('Case-to-Quiz error:', e);
+                alert('Generation failed: ' + e.message);
+            }
+        };
+
         window.applyQuizImprovements = async function() {
             const btn = document.getElementById('btn-apply-ai-improve');
             if (!btn) return;
@@ -24191,6 +24331,7 @@ ${JSON.stringify(sourceObj)}`;
                         <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaLaboon('${c.id}');"><span class="alabasta-emoji">🐳</span> Ask Laboon · Laboon에게 묻기</button>
                         <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaCaseCard('${c.id}');"><span class="alabasta-emoji">🖼️</span> Generate Case Card · 카드 생성</button>
                         <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); openAlabastaPoneglyph('${c.id}');"><span class="alabasta-emoji">🪨</span> ${hasPoneglyphLink ? 'Open Poneglyph draft · 초안 열기' : 'Promote to Poneglyph · 승격'}</button>
+                        <button type="button" class="alabasta-more-menu-item" onclick="closeAlabastaMoreMenus(); generateQuizFromCase('${c.id}');"><span class="alabasta-emoji">📝</span> Generate Quiz from Case · 케이스에서 퀴즈 생성</button>
                     </div>
                 </details>`;
                 const actionBtn = `<div class="alabasta-action-row">${editBtn}${statusBtn}${deleteBtn}${moreBtn}</div>`;
