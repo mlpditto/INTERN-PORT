@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.68)</title>
+    <title>Internship Portfolio (V94.69)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3455,6 +3455,10 @@
                     style="display:none; background:#fff; border:1px solid #eee; border-top:none; border-radius:0 0 10px 10px; padding:15px; font-size:0.95em; line-height:1.6; color:#444; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02); max-height:200px; overflow-y:auto; white-space:pre-wrap;">
                 </div>
             </div>
+            <div id="quiz-save-banner" class="lang-no-toggle" style="display:none; margin:12px 0; padding:10px 14px; background:#fff3cd; border:1px solid #ffe69c; border-radius:10px; font-size:0.88em; color:#664d03; align-items:center; gap:10px;">
+                <span style="flex:1; line-height:1.45;">⚠️ บันทึกคำตอบไม่สำเร็จ — ตรวจการเชื่อมต่อแล้วกด Retry / Couldn't save your progress — check your connection and tap Retry.</span>
+                <button type="button" onclick="retryQuizSave()" style="flex-shrink:0; background:#664d03; color:#fff; border:none; border-radius:8px; padding:7px 14px; font-weight:bold; font-size:0.95em; cursor:pointer; min-height:auto;">Retry</button>
+            </div>
             <div id="quiz-run-container">
                 <!-- Quiz content dynamically injected -->
             </div>
@@ -5933,6 +5937,7 @@
                 const el = document.getElementById(id);
                 if (el) el.disabled = false;
             });
+            hideQuizSaveBanner(); // V94.69 PR 2a: clear any stale save-failure banner from a prior quiz
             document.getElementById('quizModal').style.display = 'flex';
             renderQuizStep(isResuming);
             initCheatDetector();
@@ -5956,6 +5961,36 @@
         }
         window.addEventListener('beforeunload', markQuizAbandonedOnExit);
         window.addEventListener('pagehide', markQuizAbandonedOnExit);
+
+        // V94.69 PR 2a: surface silent mid-quiz auto-save failures. The quiz_attempts
+        // merge-set in selectReadOnlyPoll/handleOrderingClick/nextQuizStep used to fail
+        // into a console.warn (or nothing at all) — an intern on a flaky LINE connection
+        // lost progress with no signal. Route all three through here so a failure raises
+        // an in-modal banner with a Retry that replays the latest payload.
+        let _quizSaveRetryData = null;
+        function saveQuizProgress(data) {
+            if (!userId || isPracticeMode || !currentQuiz) return;
+            db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`)
+                .set(data, { merge: true })
+                .then(() => hideQuizSaveBanner())
+                .catch(err => {
+                    console.warn("Auto-save failed:", err);
+                    showQuizSaveBanner(data);
+                });
+        }
+        function showQuizSaveBanner(data) {
+            _quizSaveRetryData = data;
+            const b = document.getElementById('quiz-save-banner');
+            if (b) b.style.display = 'flex';
+        }
+        function hideQuizSaveBanner() {
+            _quizSaveRetryData = null;
+            const b = document.getElementById('quiz-save-banner');
+            if (b) b.style.display = 'none';
+        }
+        function retryQuizSave() {
+            if (_quizSaveRetryData) saveQuizProgress(_quizSaveRetryData);
+        }
 
         async function requestLateQuiz(quizId, isRetake = false) {
             const q = quizzesCache.find(x => x.id === quizId);
@@ -6231,11 +6266,11 @@
             // Auto-save progress
             if (userId && !isPracticeMode) {
                 const saveVal = Array.isArray(idx) ? idx.join("\n---\n") : idx;
-                db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
+                saveQuizProgress({
                     answers: userAnswers.map(ans => Array.isArray(ans) ? ans.join("\n---\n") : ans),
                     currentStep: currentStep,
                     lastActive: firebase.firestore.FieldValue.serverTimestamp()
-                }, { merge: true });
+                });
             }
         }
 
@@ -6882,11 +6917,11 @@
 
             if (userId && !isPracticeMode) {
                 const finalAnswers = userAnswers.map(ans => Array.isArray(ans) ? ans.join("\n---\n") : ans);
-                db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
+                saveQuizProgress({
                     answers: finalAnswers,
                     currentStep: currentStep,
                     lastActive: firebase.firestore.FieldValue.serverTimestamp()
-                }, { merge: true });
+                });
             }
         }
 
@@ -7119,12 +7154,12 @@
                             if (Array.isArray(ans)) return ans.join("\n---\n");
                             return ans;
                         });
-                        db.collection("quiz_attempts").doc(`${currentQuiz.id}_${userId}`).set({
+                        saveQuizProgress({
                             answers: finalAnswers,
                             currentStep: currentStep,
                             lastActive: firebase.firestore.FieldValue.serverTimestamp(),
                             accumulatedTime: accumulatedTime
-                        }, { merge: true }).catch(err => console.warn("Auto-save failed:", err));
+                        });
                     }
                 } else {
                     console.log('[Quiz] Already at last step, cannot go next');
