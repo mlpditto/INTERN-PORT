@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.65)</title>
+    <title>Internship Portfolio (V94.66)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5276,7 +5276,13 @@
                 if (!isActive) return;
 
                 const status = attempt ? attempt.status : 'none';
-                const score = attempt ? (attempt.score || 0) : 0;
+                // V94.66: match the card's score formula (correctCount/totalQuestions);
+                // attempt.score is often empty, which let graded quizzes leak past the hide filter.
+                const score = attempt
+                    ? (attempt.totalQuestions
+                        ? (attempt.correctCount / attempt.totalQuestions) * (q.totalPoints || 1.0)
+                        : (attempt.score || 0))
+                    : 0;
 
                 // 🔥 V84.3 Fix: Hide expired quizzes that haven't been started to reduce clutter
                 if (isExpired && status === 'none') return;
