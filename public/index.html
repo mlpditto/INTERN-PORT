@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.66)</title>
+    <title>Internship Portfolio (V94.67)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5938,16 +5938,24 @@
             initCheatDetector();
         }
 
-        // 🔥 Added V77.24: Mark as abandoned if user closes tab
-        window.addEventListener('beforeunload', (event) => {
+        // 🔥 V77.24 / V94.67: mark the attempt abandoned when the user leaves mid-quiz.
+        // beforeunload is unreliable in the LINE in-app WKWebView (iOS often skips it),
+        // so also listen for pagehide — the WebKit-reliable unload signal. The Firestore
+        // write is idempotent; the !isSubmittingQuiz guard avoids racing a submit in
+        // flight (pagehide firing more reliably could otherwise overwrite a fresh submit).
+        function markQuizAbandonedOnExit() {
             if (window.cheatMonitor?.active) {
                 stopCheatDetector();
             }
-            if (currentQuiz && (document.getElementById('quizModal').style.display === 'flex' || document.getElementById('quizModal').style.display === 'block')) {
+            const modal = document.getElementById('quizModal');
+            const open = modal && (modal.style.display === 'flex' || modal.style.display === 'block');
+            if (currentQuiz && open && !isSubmittingQuiz) {
                 const docId = `${currentQuiz.id}_${userId}`;
                 db.collection("quiz_attempts").doc(docId).update({ status: 'abandoned' });
             }
-        });
+        }
+        window.addEventListener('beforeunload', markQuizAbandonedOnExit);
+        window.addEventListener('pagehide', markQuizAbandonedOnExit);
 
         async function requestLateQuiz(quizId, isRetake = false) {
             const q = quizzesCache.find(x => x.id === quizId);
