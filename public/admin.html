@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.96</title>
+    <title>Nika V93.97</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -10780,6 +10780,7 @@
                 <div style="margin-top: 15px; text-align: right; position: sticky; bottom: 0; background: white; padding: 10px 0; border-top: 1px solid #eee;">
                     <button class="btn-sm" style="background:#0ea5e9; color:white; border:none; font-size:1.2em;" onclick="openTimingRiskConfigModal()" title="Timing Config">⚙</button>
                     <button class="btn-sm" style="background:#ef4444; color:white; border:none;" onclick="exportIncorrectToPDF()"><i class="fa-solid fa-file-pdf"></i> Export Incorrect</button>
+                    <button class="btn-sm" style="background:#f59e0b; color:white; border:none;" onclick="showQuizFeedbackPanel(window._reviewCurrentQuizId, window._reviewCurrentUserId)" title="Jump to this learner's feedback for this quiz">⭐ User Feedback</button>
                     <button class="btn-sm btn-dark"
                         onclick="document.getElementById('quizReviewModal').style.display='none'">Close</button>
                 </div>
@@ -19935,6 +19936,11 @@ ${JSON.stringify(sourceObj)}`;
                 const att = attemptDoc.data();
                 const quiz = quizzesData.find(x => x.id === att.quizId);
                 if (!quiz) return alert("Quiz Reference missing");
+
+                // V93.97: remember quiz + learner so the footer "User Feedback"
+                // button can jump straight to this person's feedback for this quiz.
+                window._reviewCurrentQuizId = att.quizId || '';
+                window._reviewCurrentUserId = att.userId || '';
 
                 // Set ID for export function
                 const idInput = document.getElementById('review-attempt-id');
@@ -36482,7 +36488,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             return String(resp || '').trim();
         }
 
-        async function showQuizFeedbackPanel(quizId) {
+        async function showQuizFeedbackPanel(quizId, highlightUserId) {
             _qfpCurrentId = quizId;
             _qfpFeedbacks = [];
             document.getElementById('qfp-ai-result').innerText = '';
@@ -36609,7 +36615,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 const cardBg = rawComment ? 'white' : '#fef2f2';
                 const cardBorder = rawComment ? '1px solid #e2e8f0' : '1px solid #fca5a5';
                 return `
-                    <div style="background:${cardBg};border:${cardBorder};border-radius:12px;padding:14px 16px;">
+                    <div data-fb-user="${f.userId || ''}" style="background:${cardBg};border:${cardBorder};border-radius:12px;padding:14px 16px;">
                         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
                             <div>
                                 <span style="font-weight:800;font-size:0.9em;color:#1e293b;">${f.displayName || 'Anonymous'}</span>
@@ -36651,6 +36657,19 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                         </div>
                     </div>`;
             }).join('');
+
+            // V93.97: when opened from the Review Quiz Attempt modal, scroll to and
+            // briefly highlight the reviewed learner's own feedback card.
+            if (highlightUserId) {
+                const card = document.querySelector(`#qfp-comments [data-fb-user="${CSS.escape(highlightUserId)}"]`);
+                if (card) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    card.style.boxShadow = '0 0 0 3px #f59e0b';
+                    setTimeout(() => { card.style.boxShadow = ''; }, 3000);
+                } else if (typeof showToast === 'function') {
+                    showToast('This learner has no feedback for this quiz');
+                }
+            }
         }
 
         async function runAIFeedbackScoring(feedbackId) {
