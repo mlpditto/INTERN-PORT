@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.67)</title>
+    <title>Internship Portfolio (V94.68)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -7322,20 +7322,20 @@
                             }).catch(e => console.error("BG Kanban Sync Err:", e));
                     }
 
-                    // B. Dynamic Duration Adjustment
-                    db.collection("quizzes").doc(currentQuiz.id).get().then(doc => {
-                        const qData = doc.data();
-                        if (qData && qData.deadline) {
-                            const nowTime = new Date();
-                            const dead = qData.deadline.toDate();
-                            if (dead > nowTime) {
-                                const reductionMs = (dead.getTime() - nowTime.getTime()) * 0.1;
-                                db.collection("quizzes").doc(currentQuiz.id).update({
-                                    deadline: firebase.firestore.Timestamp.fromMillis(dead.getTime() - reductionMs)
-                                });
-                            }
+                    // B. Dynamic Duration Adjustment — V94.68: moved server-side.
+                    // The intern client cannot write `quizzes` (admin-only rule), so the
+                    // old client-side deadline update silently permission-denied every
+                    // time. The adjustQuizDeadline callable shrinks the deadline 10% per
+                    // submit, floored at 50% of the original window. Best-effort —
+                    // submission must never fail because of this.
+                    try {
+                        if (typeof firebase !== 'undefined' && firebase.functions) {
+                            firebase.functions().httpsCallable('adjustQuizDeadline')({ quizId: currentQuiz.id })
+                                .catch(e => console.warn('[adjustQuizDeadline] non-critical:', (e && e.message) || e));
                         }
-                    }).catch(e => console.error("BG Duration Adj Err:", e));
+                    } catch (e) {
+                        console.warn('[adjustQuizDeadline] non-critical:', (e && e.message) || e);
+                    }
                 }
 
                 // --- 6. Final UX Feedback ---

@@ -168,6 +168,62 @@ exports.generatePreviewToken = onCall(async (request) => {
     });
     return { token };
 });
+
+// === V94.68: server-side quiz deadline auto-shrink (capped at 50%) ===
+// Each non-practice quiz submission pulls the quiz `deadline` in by 10% of the
+// time still remaining — but never past 50% of the original window. This used
+// to run on the intern client, which silently permission-denied every time
+// (the `quizzes` collection is admin-write-only). asia-southeast3 Firestore
+// blocks Eventarc triggers (see memory feedback_firestore_trigger_region_limitation),
+// so the intern calls this onCall directly, best-effort, after a successful submit.
+exports.adjustQuizDeadline = onCall(async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'Login required');
+    }
+    const quizId = (request.data && request.data.quizId) || '';
+    if (!quizId) {
+        throw new HttpsError('invalid-argument', 'quizId required');
+    }
+    const db = admin.firestore();
+    const ref = db.collection('quizzes').doc(quizId);
+    const tsToMs = (t) => (t && typeof t.toMillis === 'function') ? t.toMillis() : null;
+
+    return db.runTransaction(async (tx) => {
+        const doc = await tx.get(ref);
+        if (!doc.exists) return { ok: false, skipped: 'not-found' };
+        const q = doc.data() || {};
+
+        const deadMs = tsToMs(q.deadline);
+        if (deadMs == null) return { ok: true, skipped: 'no-deadline' };
+        const now = Date.now();
+        if (deadMs <= now) return { ok: true, skipped: 'already-expired' };
+
+        // Floor = midpoint of the original window. The deadline can be pulled in
+        // by repeated submissions but never past 50% of the admin-set duration.
+        // Computed once (first run, while `deadline` is still the original value)
+        // and stored as `deadlineFloor` so every later run shares the same floor.
+        const storedFloorMs = tsToMs(q.deadlineFloor);
+        let floorMs = storedFloorMs;
+        if (floorMs == null) {
+            const startMs = tsToMs(q.startTime) ?? tsToMs(q.createdAt) ?? now;
+            floorMs = startMs + (deadMs - startMs) * 0.5;
+        }
+
+        const reducedMs = deadMs - (deadMs - now) * 0.1;
+        const newDeadMs = Math.max(reducedMs, floorMs);
+
+        const update = {};
+        if (newDeadMs < deadMs) {
+            update.deadline = admin.firestore.Timestamp.fromMillis(newDeadMs);
+        }
+        if (storedFloorMs == null) {
+            update.deadlineFloor = admin.firestore.Timestamp.fromMillis(floorMs);
+        }
+        if (Object.keys(update).length > 0) tx.update(ref, update);
+
+        return { ok: true, shrunk: !!update.deadline, atFloor: newDeadMs <= floorMs + 1 };
+    });
+});
 const { GoogleAuth } = require("google-auth-library");
 const axios = require("axios");
 
