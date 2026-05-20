@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.94</title>
+    <title>Nika V93.96</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -5131,6 +5131,11 @@
                     <i class="fa-brands fa-line" style="margin-right:5px;"></i>
                     LINE
                 </button>
+            </div>
+
+            <div id="firefox-login-hint" style="display:none; margin-top:10px; font-size:0.8em; color:#856404; background:#fff3cd; border:1px solid #ffe69c; border-radius:8px; padding:8px 10px; text-align:left;">
+                <i class="fa-solid fa-circle-info" style="margin-right:5px;"></i>
+                Firefox may block the Google popup. If nothing opens, use <b>✨ Send Login Link</b> above.
             </div>
 
             <div id="login-error" style="color:red; margin-top:10px; font-size:0.9em;"></div>
@@ -16216,6 +16221,16 @@ For "changes": list every meaningful edit between original and improved. Each en
                 return;
             }
 
+            // V93.96: a leftover anonymous session — e.g. carried over from the LIFF
+            // intern app on the same mlpditto.github.io origin — is not a failed admin
+            // login. Sign it out quietly instead of firing an "Access Denied" alert on
+            // page load, before the user has clicked anything.
+            if (user.isAnonymous) {
+                console.warn('Admin auth: cleared a leftover anonymous session', { uid: user.uid });
+                auth.signOut();
+                return;
+            }
+
             const providerIds = (user.providerData || []).map(p => p.providerId).filter(Boolean).join(', ') || 'unknown';
             const loginErrorEl = document.getElementById('login-error');
 
@@ -16234,6 +16249,14 @@ For "changes": list every meaningful edit between original and improved. Each en
             console.warn('Admin auth denied', { uid: user.uid, email: resolvedEmailRaw || user.email, providerIds });
             auth.signOut();
         });
+
+        // V93.96: Firefox's Total Cookie Protection blocks Firebase's Google sign-in
+        // popup (third-party iframe storage). Surface the Magic Link as the recommended
+        // path so Firefox admins aren't stuck on a silently-blocked popup.
+        if (/firefox/i.test(navigator.userAgent)) {
+            const ffHint = document.getElementById('firefox-login-hint');
+            if (ffHint) ffHint.style.display = 'block';
+        }
 
         // 🔥 Google Sign-In Logic
         let googleLoginInProgress = false;
