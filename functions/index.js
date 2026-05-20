@@ -290,22 +290,33 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             const token = await client.getAccessToken();
 
             let actualModelName = model || "gemini-2.5-flash";
-            
-            // Standardize model name for Vertex AI targeting (V89.90 - April 2026)
-            if (model?.startsWith('gemini-') || !model) {
-                if (model?.includes('pro')) {
-                    actualModelName = "gemini-3.1-pro-001"; // Latest Pro on Vertex
-                } else if (model?.includes('3.1')) {
-                    actualModelName = "gemini-3.1-flash-001"; 
-                } else if (model?.includes('3')) {
-                    actualModelName = "gemini-3-flash-001";
-                } else {
-                    // Fallback for generic 'gemini-' or legacy requests
-                    actualModelName = "gemini-3-flash-001";
-                }
+
+            // V93.95: Normalize only legacy/alias model names; pass current `gemini-2.5-*`
+            // ids straight through. The previous block (V89.90) rewrote EVERY `gemini-*`
+            // request to a `gemini-3*` family that does not exist on Vertex AI for this
+            // project — every gemini proxy call returned 404 "Publisher Model not found".
+            // Vertex GA is the 2.5 family and the frontend already sends specific 2.5 ids
+            // (V93.31 PR #262); only callers passing `multimodal` / `gemini-flash` / legacy
+            // 1.5 / 2.0 / mistaken gemini-3 names need mapping to a current GA model.
+            const reqModel = (model || '').toLowerCase();
+            const isLegacyAlias = !reqModel
+                || reqModel === 'multimodal'
+                || reqModel === 'gemini-flash'
+                || reqModel === 'gemini-pro'
+                || reqModel.includes('1.5')
+                || reqModel.includes('2.0')
+                || reqModel.includes('gemini-3');
+            if (isLegacyAlias) {
+                actualModelName = reqModel.includes('pro') ? "gemini-2.5-pro" : "gemini-2.5-flash";
             }
 
-            const endpoint = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/publishers/google/models/${actualModelName}:predict`;
+            // V93.95: Gemini on Vertex AI must use the :generateContent endpoint. The
+            // :predict / :rawPredict API rejects Gemini models with HTTP 400 ("Gemini
+            // cannot be accessed through Vertex Predict/RawPredict API"). The request
+            // body and response shape differ accordingly: contents/generationConfig at
+            // the top level (not wrapped in instances/parameters), and candidates are
+            // returned directly on the response (not under a predictions[] array).
+            const endpoint = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/publishers/google/models/${actualModelName}:generateContent`;
 
             const parts = [{ text: prompt }];
             if (visionData) {
@@ -319,8 +330,8 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             }
 
             const response = await axios.post(endpoint, {
-                instances: [{ contents: [{ role: "user", parts: parts }] }],
-                parameters: {
+                contents: [{ role: "user", parts: parts }],
+                generationConfig: {
                     temperature: 0.2,
                     maxOutputTokens: 2048,
                     ...(isJson ? { responseMimeType: "application/json" } : {})
@@ -329,8 +340,8 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 headers: { "Authorization": `Bearer ${token.token}`, "Content-Type": "application/json" }
             });
 
-            const text = response.data.predictions[0].candidates[0].content.parts[0].text;
-            const tokens = response.data.metadata?.tokenMetadata?.totalTokenCount || 0;
+            const text = response.data.candidates[0].content.parts[0].text;
+            const tokens = response.data.usageMetadata?.totalTokenCount || 0;
             return res.json({ text: text, tokens: tokens, model: actualModelName });
         }
 
