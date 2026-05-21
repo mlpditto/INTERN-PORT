@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.69)</title>
+    <title>Internship Portfolio (V94.70)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5639,13 +5639,19 @@
             document.getElementById('section-assignments').scrollIntoView({ behavior: 'smooth' });
         }
 
+        // V94.70 PR 2c: module-level cache for quiz-avatar user profiles so it survives
+        // across renderAssignments/pagination calls instead of being rebuilt every time.
+        let _quizAvatarUserCache = {};
+
         // 🔥 V91.47: Populate Quiz Avatar Stacks
         async function populateQuizAvatarStacks() {
             const stacks = document.querySelectorAll('.quiz-avatar-stack');
             if (!stacks.length) return;
 
-            // Cache for user data to avoid repeated fetches
-            const userCache = {};
+            // V94.70 PR 2c: alias the module-level cache (was `{}` rebuilt per call → N
+            // users/{id} reads on every renderAssignments/pagination). Profiles change
+            // rarely, so a session-lived cache is fine; a stale avatar self-heals on reload.
+            const userCache = _quizAvatarUserCache;
 
             for (const stackEl of stacks) {
                 const quizId = stackEl.dataset.quizId;
