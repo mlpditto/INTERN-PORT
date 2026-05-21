@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.05</title>
+    <title>Nika V94.06</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15181,11 +15181,25 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
         };
 
         // V92.82: word-level LCS diff for Writing Analysis Improved Sample.
-        // Returns array of {type: 'eq'|'add'|'del', text}. For Thai-only text without
-        // spaces, the entire run becomes a single token — diff degrades to whole-chunk
-        // replace, still functional just less granular.
+        // Returns array of {type: 'eq'|'add'|'del', text}. V94.06: Thai (which has no
+        // inter-word spaces) is tokenized via Intl.Segmenter so it diffs by word like
+        // English, instead of collapsing the whole sentence into one token.
         function diffWords(a, b) {
-            const tokenize = s => String(s || '').split(/(\s+)/).filter(t => t.length);
+            // V94.06: tokenize via Intl.Segmenter (word granularity) so Thai — which
+            // has no inter-word spaces — diffs by word. The old whitespace split
+            // collapsed a whole Thai sentence into ONE token, so any micro-change
+            // rendered the entire sentence as a full delete + insert. Falls back to
+            // the whitespace split if Intl.Segmenter is unavailable.
+            const tokenize = s => {
+                s = String(s || '');
+                if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+                    try {
+                        const seg = new Intl.Segmenter('th', { granularity: 'word' });
+                        return Array.from(seg.segment(s), x => x.segment).filter(t => t.length);
+                    } catch (e) { /* fall through to whitespace split */ }
+                }
+                return s.split(/(\s+)/).filter(t => t.length);
+            };
             const aw = tokenize(a), bw = tokenize(b);
             const m = aw.length, n = bw.length;
             if (m === 0 && n === 0) return [];
