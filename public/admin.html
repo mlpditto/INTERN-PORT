@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.03</title>
+    <title>Nika V94.04</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -5478,6 +5478,17 @@
                         <div id="quiz-tag-chips" style="display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; flex:1; min-width:120px;">
                             <!-- Tag chips injected by renderQuizzes -->
                         </div>
+                    </div>
+                </div>
+
+                <!-- V94.04: bulk quiz actions bar — hidden until ≥1 row checkbox is ticked -->
+                <div id="quiz-bulk-bar" style="display:none; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; padding:8px 14px; background:#eef2ff; border:1px solid #c7d2fe; border-radius:10px; flex-wrap:wrap;">
+                    <div style="font-size:0.85em; font-weight:800; color:#3730a3;"><i class="fa-solid fa-square-check"></i> <span id="quiz-bulk-count">0</span> quiz selected</div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <button onclick="bulkSetQuizActive(true)" style="padding:6px 14px; border:none; border-radius:8px; background:#10b981; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">🚀 Activate</button>
+                        <button onclick="bulkSetQuizActive(false)" style="padding:6px 14px; border:none; border-radius:8px; background:#64748b; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">⏹️ Deactivate</button>
+                        <button onclick="bulkDeleteQuizzes()" style="padding:6px 14px; border:none; border-radius:8px; background:#ef4444; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">🗑️ Delete</button>
+                        <button onclick="clearQuizSelection()" style="padding:6px 12px; border:1px solid #c7d2fe; border-radius:8px; background:#fff; color:#3730a3; font-size:0.78em; font-weight:800; cursor:pointer;">Clear</button>
                     </div>
                 </div>
 
@@ -22500,6 +22511,13 @@ ${JSON.stringify(sourceObj)}`;
                 }
             });
 
+            // V94.04: prune bulk selection of quizzes that no longer exist, then refresh
+            // the bulk-action bar. generateRow below reads selectedQuizIds for each row's
+            // checkbox, so pruning here keeps the rendered checkboxes in sync.
+            const _liveQuizIds = new Set(quizzesData.map(q => q.id));
+            selectedQuizIds.forEach(id => { if (!_liveQuizIds.has(id)) selectedQuizIds.delete(id); });
+            updateQuizBulkBar();
+
             // Update Tag Chips UI ([Version: V89.50]; V93.27: chips set quiz-search-global)
             const chipContainer = document.getElementById('quiz-tag-chips');
             if (chipContainer && !searchVal) {
@@ -22601,6 +22619,7 @@ ${JSON.stringify(sourceObj)}`;
                     <tr class="lang-no-toggle">
                         <td>
                             <div style="font-weight:800; color:#333; margin-bottom:3px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                <input type="checkbox" class="quiz-bulk-cb" onchange="toggleQuizSelection('${q.id}', this.checked)" ${selectedQuizIds.has(q.id) ? 'checked' : ''} title="Select for bulk action" style="width:15px; height:15px; cursor:pointer; flex-shrink:0;">
                                 ${q.title ? q.title.replace(/\s*\(Template\)$/i, '') : '-'}
                                 <span id="fb-badge-${q.id}" style="font-size:0.7em; background:#fff7ed; color:#b45309; border:1px solid #fed7aa; border-radius:8px; padding:2px 7px; font-weight:800; cursor:pointer; white-space:nowrap;" onclick="event.stopPropagation(); showQuizFeedbackPanel('${q.id}')" title="View user feedback">⭐ —</span>
                                 ${_easyBadge}${_hardBadge}${_cheatBadge}
@@ -22937,6 +22956,64 @@ ${JSON.stringify(sourceObj)}`;
             showToast(updates.isActive ? "Quiz Started!" : "Quiz Ended!");
         }
         async function deleteQuiz(id) { if (confirm("Delete this quiz?")) await db.collection("quizzes").doc(id).delete(); }
+
+        // V94.04: bulk quiz actions. selectedQuizIds is the single source of truth —
+        // generateRow renders each row checkbox from it, so selection survives the
+        // debounced, snapshot-driven renderQuizzesNow rebuilds with no re-apply step.
+        const selectedQuizIds = new Set();
+        function toggleQuizSelection(id, checked) {
+            if (checked) selectedQuizIds.add(id); else selectedQuizIds.delete(id);
+            updateQuizBulkBar();
+        }
+        function clearQuizSelection() {
+            selectedQuizIds.clear();
+            document.querySelectorAll('.quiz-bulk-cb').forEach(cb => { cb.checked = false; });
+            updateQuizBulkBar();
+        }
+        function updateQuizBulkBar() {
+            const bar = document.getElementById('quiz-bulk-bar');
+            if (!bar) return;
+            const n = selectedQuizIds.size;
+            const countEl = document.getElementById('quiz-bulk-count');
+            if (countEl) countEl.textContent = n;
+            bar.style.display = n > 0 ? 'flex' : 'none';
+        }
+        async function bulkSetQuizActive(active) {
+            const ids = [...selectedQuizIds];
+            if (ids.length === 0) return;
+            if (!confirm(`${active ? 'Activate' : 'Deactivate'} ${ids.length} quiz(zes)?`)) return;
+            try {
+                const batch = db.batch();
+                ids.forEach(id => {
+                    // mirror toggleQuizStatus: deactivating also marks the quiz as a template
+                    const upd = active ? { isActive: true } : { isActive: false, isTemplate: true };
+                    batch.update(db.collection("quizzes").doc(id), upd);
+                });
+                await batch.commit();
+                selectedQuizIds.clear();
+                updateQuizBulkBar();
+                showToast(`${active ? 'Activated' : 'Deactivated'} ${ids.length} quiz(zes)`);
+            } catch (e) {
+                console.error('[bulkSetQuizActive]', e);
+                alert('Bulk update failed: ' + e.message);
+            }
+        }
+        async function bulkDeleteQuizzes() {
+            const ids = [...selectedQuizIds];
+            if (ids.length === 0) return;
+            if (!confirm(`⚠️ Delete ${ids.length} quiz(zes)? This cannot be undone.`)) return;
+            try {
+                const batch = db.batch();
+                ids.forEach(id => batch.delete(db.collection("quizzes").doc(id)));
+                await batch.commit();
+                selectedQuizIds.clear();
+                updateQuizBulkBar();
+                showToast(`Deleted ${ids.length} quiz(zes)`);
+            } catch (e) {
+                console.error('[bulkDeleteQuizzes]', e);
+                alert('Bulk delete failed: ' + e.message);
+            }
+        }
         async function toggleTemplateStatus(id, current) {
             try {
                 await db.collection("quizzes").doc(id).update({ isTemplate: !current });
