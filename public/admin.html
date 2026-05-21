@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.98</title>
+    <title>Nika V93.99</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -22378,8 +22378,19 @@ ${JSON.stringify(sourceObj)}`;
             }
         }
 
+        // V93.99 PR 2b: renderQuizzes() is fired by two snapshot listeners (quizzes +
+        // every quiz_attempts change) and a 1s countdown interval, plus filter/sort/
+        // pagination clicks — all undebounced. Coalesce bursts (notably the cache+server
+        // snapshot pair on load) into one render. Every existing caller, including the
+        // inline onclick handlers, keeps calling renderQuizzes() and is debounced free.
+        let _renderQuizzesTimer = null;
         function renderQuizzes() {
-            
+            clearTimeout(_renderQuizzesTimer);
+            _renderQuizzesTimer = setTimeout(renderQuizzesNow, 120);
+        }
+
+        function renderQuizzesNow() {
+
             const tbodyActive = document.querySelector("#quizzesTableActive tbody");
             const tbodyInactive = document.querySelector("#quizzesTableInactive tbody");
             
@@ -22461,6 +22472,17 @@ ${JSON.stringify(sourceObj)}`;
                 chipContainer.innerHTML = `<span class="badge" onclick="document.getElementById('quiz-search-global').value=''; renderQuizzes();" style="background:#fee2e2; color:#ef4444; font-size:0.75em; cursor:pointer; padding:6px 14px; border:1px solid #fecaca; border-radius:10px; font-weight:800; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-circle-xmark"></i> Clear Search Filter</span>`;
             }
 
+            // V93.99 PR 2b: group all attempts by quizId once per render so generateRow
+            // reads attemptsByQuiz[q.id] instead of re-scanning quizAttemptsAllCache for
+            // every row (was O(rows × attempts)).
+            const attemptsByQuiz = {};
+            if (typeof quizAttemptsAllCache !== 'undefined' && Array.isArray(quizAttemptsAllCache)) {
+                quizAttemptsAllCache.forEach(a => {
+                    if (!a.quizId) return;
+                    (attemptsByQuiz[a.quizId] || (attemptsByQuiz[a.quizId] = [])).push(a);
+                });
+            }
+
             // Helper to render row
             const generateRow = (q, isActiveSection) => {
                 const getSafeDate = (ts) => {
@@ -22528,9 +22550,7 @@ ${JSON.stringify(sourceObj)}`;
                 const pointsBg = pointsVal > 1 ? '#f8f0ff' : '#fff';
 
                 // V93.91 Quiz Quality Q6: outlier flags from per-Q stats (10+ attempt low-N gate inside)
-                const _qAttempts = (typeof quizAttemptsAllCache !== 'undefined' && Array.isArray(quizAttemptsAllCache))
-                    ? quizAttemptsAllCache.filter(a => a.quizId === q.id)
-                    : [];
+                const _qAttempts = attemptsByQuiz[q.id] || [];
                 const _outliers = classifyQuizOutliers(q, _qAttempts);
                 const _easyBadge = _outliers && _outliers.tooEasy.length > 0
                     ? `<span title="${_outliers.tooEasy.length} too-easy question(s) (>95% correct): Q${_outliers.tooEasy.map(i => i + 1).join(', Q')}" style="font-size:0.7em; background:#fef3c7; color:#92400e; border:1px solid #fde68a; padding:2px 6px; border-radius:8px; font-weight:800; cursor:help; white-space:nowrap;" onclick="event.stopPropagation(); showQuizParticipants('${q.id}')">🔥 ${_outliers.tooEasy.length}</span>`
@@ -37115,24 +37135,41 @@ Reply ONLY with raw JSON, no markdown:
         }
 
         // Load feedback badges for all quizzes after quiz list renders
+        // V93.99 PR 2b: cache the quiz_feedback aggregate. loadQuizFeedbackBadges runs at
+        // the tail of every renderQuizzes() — it used to do an unbounded full-collection
+        // .get() each time. Now it fetches at most once per 60s; the badge DOM (wiped on
+        // every render) is re-applied from cache. Admin never writes quiz_feedback, so a
+        // 60s lag on a freshly-submitted rating is fine; the detail panel reads live.
+        let _quizFeedbackAgg = null;
+        let _quizFeedbackAggTime = 0;
+        const QUIZ_FEEDBACK_CACHE_TTL = 60000;
+
+        function applyQuizFeedbackBadges(agg) {
+            Object.entries(agg).forEach(([qid, { sum, count }]) => {
+                const badge = document.getElementById(`fb-badge-${qid}`);
+                if (badge && count > 0) {
+                    const avg = (sum / count).toFixed(1);
+                    badge.innerText = `⭐ ${avg} (${count})`;
+                }
+            });
+        }
+
         async function loadQuizFeedbackBadges() {
             if (!quizzesData.length) return;
             try {
-                const snap = await db.collection('quiz_feedback').get();
-                const agg = {};
-                snap.docs.forEach(d => {
-                    const f = d.data();
-                    if (!f.quizId) return;
-                    if (!agg[f.quizId]) agg[f.quizId] = { sum: 0, count: 0 };
-                    if (typeof f.rating === 'number') { agg[f.quizId].sum += f.rating; agg[f.quizId].count++; }
-                });
-                Object.entries(agg).forEach(([qid, { sum, count }]) => {
-                    const badge = document.getElementById(`fb-badge-${qid}`);
-                    if (badge && count > 0) {
-                        const avg = (sum / count).toFixed(1);
-                        badge.innerText = `⭐ ${avg} (${count})`;
-                    }
-                });
+                if (!_quizFeedbackAgg || Date.now() - _quizFeedbackAggTime > QUIZ_FEEDBACK_CACHE_TTL) {
+                    const snap = await db.collection('quiz_feedback').get();
+                    const agg = {};
+                    snap.docs.forEach(d => {
+                        const f = d.data();
+                        if (!f.quizId) return;
+                        if (!agg[f.quizId]) agg[f.quizId] = { sum: 0, count: 0 };
+                        if (typeof f.rating === 'number') { agg[f.quizId].sum += f.rating; agg[f.quizId].count++; }
+                    });
+                    _quizFeedbackAgg = agg;
+                    _quizFeedbackAggTime = Date.now();
+                }
+                applyQuizFeedbackBadges(_quizFeedbackAgg);
             } catch (e) {
                 console.warn('Quiz feedback badge load error:', e.message);
             }
