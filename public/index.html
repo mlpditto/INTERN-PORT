@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.70)</title>
+    <title>Internship Portfolio (V94.71)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5284,7 +5284,7 @@
                 // attempt.score is often empty, which let graded quizzes leak past the hide filter.
                 const score = attempt
                     ? (attempt.totalQuestions
-                        ? (attempt.correctCount / attempt.totalQuestions) * (q.totalPoints || 1.0)
+                        ? computeQuizScore(attempt.correctCount, attempt.totalQuestions, q.totalPoints)
                         : (attempt.score || 0))
                     : 0;
 
@@ -5490,7 +5490,7 @@
                             actionHtml = `<button class="btn-primary" onclick="confirmRunQuiz('${q.id}')">🚀 Start ${isOneTime ? 'Real Exam' : 'Quiz'} เริ่ม${isOneTime ? 'สอบจริง' : 'ทำแบบทดสอบ'}</button>`;
                         } else {
                             // Pending/Done
-                            const score = attempt.totalQuestions ? (attempt.correctCount / attempt.totalQuestions) * (q.totalPoints || 1.0) : 0;
+                            const score = computeQuizScore(attempt.correctCount, attempt.totalQuestions, q.totalPoints);
                             const isApproved = attempt.status === 'approved';
                             // V94.54: badge text + score color now keyed off `isApproved` (strict),
                             // not `!isPending`. Previously `text = isPending ? 'Pending' : 'Approved'`
@@ -6973,13 +6973,23 @@
             refreshTweetstormUI();
         }
 
+        // V94.71 PR 3a: single source of truth for the quiz score formula. The
+        // (correctCount / totalQuestions) * totalPoints formula was duplicated 6× across
+        // index.html with drifted guards — the V94.66 hide-filter bug came from one copy
+        // diverging. Behaviour-preserving: callers keep their own attempt.score / groupScore
+        // fallback for the totalQuestions-missing case; this is only the core formula.
+        function computeQuizScore(correctCount, totalQuestions, totalPoints) {
+            if (!totalQuestions) return 0;
+            return (correctCount / totalQuestions) * (totalPoints || 1.0);
+        }
+
         // --- View Answers Logic ---
         async function viewQuizAnswers(quizId) {
             const q = quizzesCache.find(x => x.id === quizId);
             const attempt = quizAttemptsCache[quizId];
 
             if (!q || !attempt) return alert("Data not found");
-            const score = attempt.totalQuestions ? (attempt.correctCount / attempt.totalQuestions) * (q.totalPoints || 1.0) : 0;
+            const score = computeQuizScore(attempt.correctCount, attempt.totalQuestions, q.totalPoints);
             if (score <= 0) return alert("คะแนนเป็น 0.00 ไม่สามารถดูเฉลยได้ครับ กรุณาขอสอบใหม่แทน");
 
             const quizResultContainer = document.getElementById('quiz-result-container');
@@ -7284,7 +7294,7 @@
                     }
                 });
 
-                const pointsAwarded = (correctCount / (totalQ || 1)) * (currentQuiz.totalPoints || 1.0);
+                const pointsAwarded = computeQuizScore(correctCount, totalQ, currentQuiz.totalPoints);
                 const isPoll = currentQuiz.isPoll === true;
                 const finalAnswers = userAnswers.map(ans => Array.isArray(ans) ? ans.join("\n---\n") : ans);
 
@@ -7922,7 +7932,7 @@
                     // Fallback to auto-calculated score if missing
                     if (!Number.isFinite(s) || s === 0) {
                         if (att.correctCount !== undefined && att.totalQuestions) {
-                            s = (att.correctCount / att.totalQuestions) * (quiz ? (quiz.totalPoints || 1.0) : 1.0);
+                            s = computeQuizScore(att.correctCount, att.totalQuestions, quiz && quiz.totalPoints);
                         }
                     }
                     if (s > 0) {
@@ -10942,7 +10952,7 @@ async function archiveDoneCard(cardId) {
                         // V90.74: Fallback to calculation if score is missing but correctCount exists
                         if (!Number.isFinite(score) || score === 0) {
                             if (att.correctCount !== undefined && att.totalQuestions) {
-                                score = (att.correctCount / att.totalQuestions) * (quiz ? (quiz.totalPoints || 1.0) : 1.0);
+                                score = computeQuizScore(att.correctCount, att.totalQuestions, quiz && quiz.totalPoints);
                             } else {
                                 score = 0;
                             }
