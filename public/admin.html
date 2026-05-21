@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.06</title>
+    <title>Nika V94.07</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15341,8 +15341,11 @@ For "changes": list every meaningful edit between original and improved. Each en
                 const match = rawText.match(/\{[\s\S]*\}/);
                 data = JSON.parse(match ? match[0] : rawText);
             } catch (e) {
-                card.style.display = '';
-                content.innerHTML = `<div style="font-size:0.82em; color:#475569; line-height:1.6;">${escapeHtml(rawText)}</div>`;
+                // V94.07: a truncated / non-JSON model response (e.g. output cut off
+                // mid-string) used to dump the raw ```json text straight into the card.
+                // Show the standard error banner + Retry instead.
+                console.warn('[reflective-grammar] unparseable grammar response:', e, String(rawText || '').slice(0, 200));
+                renderGrammarAnalysisError('AI returned an incomplete or unreadable response.');
                 return;
             }
 
