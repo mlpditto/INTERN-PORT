@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.01</title>
+    <title>Nika V94.02</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -19120,6 +19120,18 @@ ${JSON.stringify(sourceObj)}`;
                 
                 let savedQuizId;
                 if (id) {
+                    // V94.02: if the deadline changed, drop the stored deadlineFloor.
+                    // adjustQuizDeadline computed it once from the OLD deadline (midpoint
+                    // of the original window); leaving it stale would floor the per-submit
+                    // shrink at the wrong time. Clearing it lets the next submission
+                    // recompute the floor from the new window. No-op if never stored.
+                    const prevQuiz = quizzesData.find(q => q.id === id);
+                    if (prevQuiz) {
+                        const toMs = (d) => (d && typeof d.toMillis === 'function') ? d.toMillis() : null;
+                        if (toMs(prevQuiz.deadline) !== toMs(data.deadline)) {
+                            data.deadlineFloor = firebase.firestore.FieldValue.delete();
+                        }
+                    }
                     await db.collection("quizzes").doc(id).update(data);
                     savedQuizId = id;
                     showToast("Quiz Updated!");
