@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V93.99</title>
+    <title>Nika V94.00</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -19083,13 +19083,6 @@ ${JSON.stringify(sourceObj)}`;
                 if (!proceed) return;
             }
 
-            const convertDate = (val) => {
-                if (!val || val.trim() === "") return null;
-                const d = new Date(val);
-                if (isNaN(d.getTime())) return null;
-                return firebase.firestore.Timestamp.fromDate(d);
-            };
-
             const data = {
                 title: formData.title,
                 shortTitle: formData.shortTitle,
@@ -19225,13 +19218,6 @@ ${JSON.stringify(sourceObj)}`;
             // Force Active
             const formData = getQuizFormData();
             const id = document.getElementById('edit-quiz-id').value;
-
-            const convertDate = (val) => {
-                if (!val || val.trim() === "") return null;
-                const d = new Date(val);
-                if (isNaN(d.getTime())) return null;
-                return firebase.firestore.Timestamp.fromDate(d);
-            };
 
             const data = {
                 ...formData,
@@ -22378,6 +22364,23 @@ ${JSON.stringify(sourceObj)}`;
             }
         }
 
+        // V94.00 PR 3b: shared date helpers — getSafeDate coerces a Firestore Timestamp /
+        // Date / {seconds} object to a JS Date; convertDate coerces a form input value to
+        // a Firestore Timestamp. Each was duplicated ×2 inline before this.
+        function getSafeDate(ts) {
+            if (!ts) return null;
+            if (typeof ts.toDate === 'function') return ts.toDate();
+            if (ts instanceof Date) return ts;
+            if (ts.seconds) return new Date(ts.seconds * 1000);
+            return null;
+        }
+        function convertDate(val) {
+            if (!val || val.trim() === "") return null;
+            const d = new Date(val);
+            if (isNaN(d.getTime())) return null;
+            return firebase.firestore.Timestamp.fromDate(d);
+        }
+
         // V93.99 PR 2b: renderQuizzes() is fired by two snapshot listeners (quizzes +
         // every quiz_attempts change) and a 1s countdown interval, plus filter/sort/
         // pagination clicks — all undebounced. Coalesce bursts (notably the cache+server
@@ -22421,13 +22424,6 @@ ${JSON.stringify(sourceObj)}`;
             };
 
             quizzesData.forEach(q => {
-                const getSafeDate = (ts) => {
-                    if (!ts) return null;
-                    if (typeof ts.toDate === 'function') return ts.toDate();
-                    if (ts instanceof Date) return ts;
-                    if (ts.seconds) return new Date(ts.seconds * 1000);
-                    return null;
-                };
                 const dead = getSafeDate(q.deadline);
                 const isActuallyActive = q.isActive && (!dead || now <= dead);
 
@@ -22485,13 +22481,6 @@ ${JSON.stringify(sourceObj)}`;
 
             // Helper to render row
             const generateRow = (q, isActiveSection) => {
-                const getSafeDate = (ts) => {
-                    if (!ts) return null;
-                    if (typeof ts.toDate === 'function') return ts.toDate();
-                    if (ts instanceof Date) return ts;
-                    if (ts.seconds) return new Date(ts.seconds * 1000);
-                    return null;
-                };
                 let statusInfo = "";
                 const start = getSafeDate(q.startTime);
                 const dead = getSafeDate(q.deadline);
