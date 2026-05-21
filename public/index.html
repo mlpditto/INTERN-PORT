@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.72)</title>
+    <title>Internship Portfolio (V94.73)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5482,7 +5482,7 @@
                             bodyHtml = `
                                 <div style="color:#666; font-size:0.9em;">
                                     Practice completed ✅ คุณได้ฝึกซ้อมแล้ว<br>
-                                    <span style="font-weight:bold;">Practice Score: ${attempt.practiceScore || 0}/${attempt.practiceTotalQ || '?'}</span>
+                                    <span style="font-weight:bold;">Practice Score: ${formatQuizCount(attempt.practiceScore || 0)}/${attempt.practiceTotalQ || '?'}</span>
                                 </div>
                             `;
                             actionHtml = `
@@ -7019,6 +7019,14 @@
             return (correctCount / totalQuestions) * (totalPoints || 1.0);
         }
 
+        // V94.73 PR 4b: ordering questions yield fractional partial credit, so a
+        // quiz's correctCount / practiceScore can be non-integer. Render integers
+        // cleanly and round fractions to 2dp wherever the raw count is shown.
+        function formatQuizCount(n) {
+            if (typeof n !== 'number' || !isFinite(n)) return n;
+            return Number.isInteger(n) ? String(n) : n.toFixed(2);
+        }
+
         // --- View Answers Logic ---
         async function viewQuizAnswers(quizId) {
             const q = quizzesCache.find(x => x.id === quizId);
@@ -7318,9 +7326,17 @@
                             correctCount++; // poll
                         }
                     } else if (qType === 'ordering') {
+                        // V94.73 PR 4b: position-based partial credit — credit the
+                        // fraction of items placed in their correct slot instead of
+                        // all-or-nothing. Per-position String() compare mirrors the
+                        // old `.join(',')` equality check's type looseness.
                         const target = q.correct || q.options.map((_, idx) => idx);
-                        if (Array.isArray(mine) && target.join(',') === mine.join(',')) {
-                            correctCount++;
+                        if (Array.isArray(mine) && target.length > 0) {
+                            let hit = 0;
+                            for (let p = 0; p < target.length; p++) {
+                                if (String(mine[p]) === String(target[p])) hit++;
+                            }
+                            correctCount += hit / target.length;
                         }
                     } else {
                         // Subjective/Tweetstorm
@@ -7478,7 +7494,7 @@
             let html = `
                 <div style="text-align:center; margin-bottom:20px; padding:20px; background:linear-gradient(135deg, #fff3cd, #ffeaa7); border-radius:12px;">
                     <div style="font-size:1.2em; font-weight:bold; color:#856404;">🔄 Practice Result ผลฝึกซ้อม</div>
-                    <div style="font-size:2.5em; font-weight:bold; color:#f57f17; margin:10px 0;">${correctCount} / ${quiz.questions.length}</div>
+                    <div style="font-size:2.5em; font-weight:bold; color:#f57f17; margin:10px 0;">${formatQuizCount(correctCount)} / ${quiz.questions.length}</div>
                     <div style="font-size:0.9em; color:#856404;">Practice only — not counted คะแนนนี้ไม่นับจริง</div>
                 </div>
             `;
@@ -11495,7 +11511,7 @@ async function archiveDoneCard(cardId) {
                 bar = `<div style="margin-bottom:10px;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.78em;">
                         <span style="color:#64748b; font-weight:700;">Score</span>
-                        <span style="color:${c}; font-weight:800;">${correct}/${total} · ${pct}%</span>
+                        <span style="color:${c}; font-weight:800;">${formatQuizCount(correct)}/${total} · ${pct}%</span>
                     </div>
                     <div style="height:6px; background:#f1f5f9; border-radius:3px; overflow:hidden;">
                         <div style="height:100%; width:${pct}%; background:${c}; border-radius:3px;"></div>
