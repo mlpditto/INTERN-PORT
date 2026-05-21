@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.00</title>
+    <title>Nika V94.01</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -22052,6 +22052,23 @@ ${JSON.stringify(sourceObj)}`;
         };
 
 
+        // V94.01: best-effort LINE push when an admin approves a quiz attempt — tells
+        // the intern their quiz was graded and to open the app to review their answers.
+        // Reuses the already-deployed notifyQuizReminder callable; failures are swallowed
+        // so an approval never fails on a notify error. No-ops for non-LINE userIds.
+        function notifyQuizGraded(userId, quizTitle, message) {
+            if (!userId || typeof userId !== 'string' || !userId.startsWith('U')) return;
+            try {
+                firebase.functions().httpsCallable('notifyQuizReminder')({
+                    userId: userId,
+                    quizTitle: quizTitle || '',
+                    message: message
+                }).catch(e => console.warn('[notifyQuizGraded] non-critical:', (e && e.message) || e));
+            } catch (e) {
+                console.warn('[notifyQuizGraded] non-critical:', (e && e.message) || e);
+            }
+        }
+
         async function approveQuizAttempt(attemptId) {
             if (!confirm("Approve this attempt? This will mark all questions as manually CORRECT and update the score to 100%.")) return;
             try {
@@ -22102,6 +22119,7 @@ ${JSON.stringify(sourceObj)}`;
                     if (cacheIndex !== -1) pendingQuizzesCache.splice(cacheIndex, 1);
                 }
                 
+                notifyQuizGraded(att.userId, quiz.shortTitle || quiz.title, '📋 อาจารย์ตรวจแบบทดสอบของคุณแล้ว ได้คะแนนเต็ม 🎉 เปิดแอปเพื่อดูเฉลยและทบทวนได้เลยครับ\nYour quiz has been graded — full marks! Open the app to review.');
                 showToast("✅ Attempt Approved & Points Added!");
                 closeReviewOverlay();
                 
@@ -22175,6 +22193,7 @@ ${JSON.stringify(sourceObj)}`;
                     if (cacheIndex !== -1) pendingQuizzesCache.splice(cacheIndex, 1);
                 }
                 
+                notifyQuizGraded(att.userId, quiz.shortTitle || quiz.title, `📋 อาจารย์ตรวจแบบทดสอบของคุณแล้ว ✅ ได้ ${curCorrect}/${totalQ} ข้อ เปิดแอปเพื่อดูข้อที่ตอบผิดและคำอธิบายได้เลยครับ\nYour quiz has been graded — open the app to review your answers.`);
                 showToast(`✅ Approved with score: ${curCorrect}/${totalQ} (${pointsToAdd} pts)`);
                 closeReviewOverlay();
                 
@@ -22298,6 +22317,7 @@ ${JSON.stringify(sourceObj)}`;
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 await b.commit();
+                notifyQuizGraded(uid, quizName, '📋 อาจารย์ตรวจแบบทดสอบของคุณแล้ว ✅ เปิดแอปเพื่อดูเฉลยและข้อที่ตอบผิดได้เลยครับ\nYour quiz has been graded — open the app to review your answers.');
                 showToast("Approved & Points added!");
 
                 // 🔥 [Version: V78.2] Auto-move linked Kanban card for homework
