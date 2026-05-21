@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.02</title>
+    <title>Nika V94.03</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13393,6 +13393,7 @@
             if (formData.questions.length < 1) return alert("Add at least 1 question to analyze.");
             
             const qList = formData.questions.map((q, i) => `Q${i+1} (${q.type}): ${q.q}\nOptions: ${q.options ? q.options.join(', ') : 'N/A'}`).join('\n\n');
+            const tagStr = Array.isArray(formData.tags) ? formData.tags.join(', ') : (formData.tags || '');
             const btn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
             const oldText = btn ? btn.innerHTML : "Analyze";
 
@@ -13425,12 +13426,21 @@
                 2. Evaluate Distractor Quality: Mark questions where distractors are too easy or obviously wrong.
                 3. Suggest scenarios/clinical contexts to make the assessment more realistic and challenging.
 
+                Quiz tags (subject/topic labels the admin assigned to this quiz): ${tagStr || '(no tags set — infer the topic from the questions)'}
+
                 Questions list:
                 ${qList}
 
+                ⚠️ TITLE RULE for "suggestedTitles" (the most common mistake — read carefully):
+                "suggestedTitles" must name the QUIZ ITSELF by its subject matter — the title a learner sees on the quiz card. It is NOT a title for this analysis report. Derive it from what the questions actually test, anchored to the Quiz tags above.
+                - "full"  = a descriptive quiz title, roughly 4-12 words.
+                - "short" = a compact label, roughly 1-4 words, for cards and lists.
+                - Write BOTH in the dominant language of the questions (per STEP 0).
+                - FORBIDDEN words: "วิเคราะห์", "ปรับปรุง", "ข้อเสนอแนะ", "ประเมิน", "Analysis", "Improvement", "Review", "Assessment of". Those describe THIS report, not the quiz. If a title contains any of them, you titled the wrong thing — regenerate it.
+
                 OUTPUT FORMAT (MANDATORY JSON — placeholders are language-neutral on purpose; fill them in the language demanded by STEP 0):
                 {
-                  "suggestedTitles": { "full": "...", "short": "..." },
+                  "suggestedTitles": { "full": "<<<descriptive quiz title naming the subject, per TITLE RULE>>>", "short": "<<<compact quiz label, per TITLE RULE>>>" },
                   "analysisText": "Professional summary in Thai, evaluating the overall Challenge Level (Low/Med/High) and suggesting a better balance of question types.",
                   "items": [
                     {
@@ -13454,7 +13464,8 @@
                 1. The "improvedQuestion" MUST incorporate 'Professional-Grade' distractors and higher-order challenge (Analysis/Application).
                 2. Omit perfect questions — don't return an item for them.
                 3. SELF-CHECK before returning: re-read each improvedQuestion.q and confirm its language matches the source Q[qNumber] from STEP 0. If you find a mismatch, REGENERATE that item in the correct language. A language mismatch is a hard format error.
-                4. "improvedQuestion.explanation" is shown to LEARNERS post-submit (not admin meta) — write it as concise teaching, NOT as a critique. Same language as improvedQuestion.q. The other fields ("issue", "suggestion") stay admin-facing in Thai.`;
+                4. "improvedQuestion.explanation" is shown to LEARNERS post-submit (not admin meta) — write it as concise teaching, NOT as a critique. Same language as improvedQuestion.q. The other fields ("issue", "suggestion") stay admin-facing in Thai.
+                5. SELF-CHECK "suggestedTitles" before returning: do both titles name the quiz's subject matter (aligned with the Quiz tags), and are they free of every FORBIDDEN word? If not, regenerate them — a title describing the analysis is a hard error.`;
                 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-2.5-pro';
 
