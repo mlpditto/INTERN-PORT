@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.71)</title>
+    <title>Internship Portfolio (V94.72)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5464,9 +5464,18 @@
                         const isStarted = attempt.status === 'started';
 
                         if (isStarted) {
-                            statusBadge = `<span class="assign-tag" style="background:#fff3cd; color:#856404;">⏳ In Progress กำลังทำ</span>`;
-                            bodyHtml = `<div style="color:#666;">You're working on this quiz... คุณกำลังทำแบบทดสอบนี้อยู่...</div>`;
-                            actionHtml = `<button class="btn-warning" onclick="runQuiz('${q.id}')">▶️ Resume ทำต่อ</button>`;
+                            if (q.quizType === 'read_only') {
+                                statusBadge = `<span class="assign-tag" style="background:#fff3cd; color:#856404;">⏳ In Progress กำลังทำ</span>`;
+                                bodyHtml = `<div style="color:#666;">You're working on this quiz... คุณกำลังทำแบบทดสอบนี้อยู่...</div>`;
+                                actionHtml = `<button class="btn-warning" onclick="runQuiz('${q.id}')">▶️ Resume ทำต่อ</button>`;
+                            } else {
+                                // V94.72 PR 4a: graded quizzes brick on exit for exam integrity.
+                                // Show an honest interrupted state instead of a Resume button
+                                // that would just fire the 🚫 "contact admin" alert.
+                                statusBadge = `<span class="assign-tag" style="background:#f8d7da; color:#721c24;">⚠️ Interrupted หยุดกลางคัน</span>`;
+                                bodyHtml = `<div style="color:#666;">This attempt was interrupted before submitting. Please contact the admin to retry. แบบทดสอบนี้หยุดกลางคันก่อนส่ง กรุณาติดต่อแอดมินเพื่อทำใหม่</div>`;
+                                actionHtml = `<button class="btn-dark" disabled>🚫 Contact Admin</button>`;
+                            }
                         } else if (attempt.status === 'practice_done') {
                             // 🔥 V78: ONE-TIME practice completed
                             statusBadge = `<span class="assign-tag" style="background:#fff3cd; color:#856404;">🔄 Practice complete ฝึกซ้อมเสร็จแล้ว</span>`;
@@ -5847,13 +5856,38 @@
             let isResuming = false;
 
             if (existing && (existing.status === 'started' || existing.status === 'abandoned')) {
-                // 🔥 Refined V77.24: Treat exits/reloads as completed attempts unless approved
-                alert("🚫 You already started this quiz and exited before submitting.\n\nThe system treats this attempt as completed. Contact the admin to retry.");
-                // Mark as abandoned if it was just 'started'
-                if (existing.status === 'started') {
-                    db.collection("quiz_attempts").doc(`${quizId}_${userId}`).update({ status: 'abandoned' });
+                if (currentQuiz.quizType === 'read_only') {
+                    // V94.72 PR 4a: read_only (learning) quizzes resume from the saved page
+                    // instead of bricking — exam integrity doesn't apply to learning material.
+                    // Graded quizzes keep the brick-on-exit in the else branch below.
+                    isResuming = true;
+                    isPracticeMode = false;
+                    currentStep = Math.min(existing.currentStep || 0, currentQuiz.questions.length);
+                    accumulatedTime = existing.accumulatedTime || 0;
+                    durationsPerQuestion = new Array(currentQuiz.questions.length).fill(0);
+                    stepStartTimestamp = Date.now();
+                    // The auto-save joins multi-select (ordering) answers with "\n---\n";
+                    // reverse that here so userAnswers holds real arrays again.
+                    userAnswers = (Array.isArray(existing.answers) ? existing.answers : []).map(a =>
+                        (typeof a === 'string' && a.includes('\n---\n'))
+                            ? a.split('\n---\n').map(x => { const n = Number(x); return Number.isNaN(n) ? x : n; })
+                            : a
+                    );
+                    while (userAnswers.length < currentQuiz.questions.length) userAnswers.push(null);
+                    timeLeftForStep = 3600;
+                    if (existing.status === 'abandoned') {
+                        db.collection("quiz_attempts").doc(`${quizId}_${userId}`).update({ status: 'started' });
+                    }
+                } else {
+                    // 🔥 Refined V77.24: graded quizzes treat exits/reloads as completed
+                    // attempts unless approved — exam integrity.
+                    alert("🚫 You already started this quiz and exited before submitting.\n\nThe system treats this attempt as completed. Contact the admin to retry.");
+                    // Mark as abandoned if it was just 'started'
+                    if (existing.status === 'started') {
+                        db.collection("quiz_attempts").doc(`${quizId}_${userId}`).update({ status: 'abandoned' });
+                    }
+                    return;
                 }
-                return;
             } else if (existing && existing.status === 'allowed') {
                 // Admin allowed a re-take
                 isPracticeMode = false; // Real exam mode
@@ -5954,13 +5988,15 @@
         // so also listen for pagehide — the WebKit-reliable unload signal. The Firestore
         // write is idempotent; the !isSubmittingQuiz guard avoids racing a submit in
         // flight (pagehide firing more reliably could otherwise overwrite a fresh submit).
+        // V94.72 PR 4a: read_only (learning) quizzes are exempt — they resume on re-entry
+        // instead of bricking, so exiting must leave their status as 'started'.
         function markQuizAbandonedOnExit() {
             if (window.cheatMonitor?.active) {
                 stopCheatDetector();
             }
             const modal = document.getElementById('quizModal');
             const open = modal && (modal.style.display === 'flex' || modal.style.display === 'block');
-            if (currentQuiz && open && !isSubmittingQuiz) {
+            if (currentQuiz && currentQuiz.quizType !== 'read_only' && open && !isSubmittingQuiz) {
                 const docId = `${currentQuiz.id}_${userId}`;
                 db.collection("quiz_attempts").doc(docId).update({ status: 'abandoned' });
             }
