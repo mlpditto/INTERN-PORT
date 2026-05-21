@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.04</title>
+    <title>Nika V94.05</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4885,6 +4885,14 @@
             background: #8e44ad !important;
             border-color: #8e44ad !important;
             box-shadow: 0 4px 12px rgba(142, 68, 173, 0.25);
+        }
+
+        /* V94.05 a11y: visible keyboard-focus ring for the click-only toggle / action
+           divs that are now focusable (role=button + tabindex via wireToggleA11y). */
+        .glass-toggle-item:focus-visible,
+        .ai-act-btn:focus-visible {
+            outline: 2px solid #4361ee;
+            outline-offset: 2px;
         }
 
         body.dark-mode .glass-toggle-container {
@@ -27271,6 +27279,39 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function closeAlabastaRejectModal() {
             document.getElementById('alabastaRejectModal').style.display = 'none';
         }
+
+        // V94.05 a11y: keyboard support for click-only quiz toggle / action <div>s —
+        // .glass-toggle-item (quiz question-type + AI-model pickers) and .ai-act-btn
+        // (AI research action bar). Each gets role=button + tabindex so it is focusable
+        // and announced; a delegated keydown activates it on Enter/Space. A
+        // MutationObserver covers instances rendered later (per-question type toggles
+        // are built dynamically into question cards).
+        (function () {
+            const A11Y_TOGGLE_SEL = '.glass-toggle-item, .ai-act-btn';
+            function applyToggleA11y(el) {
+                if (el.getAttribute('role') === 'button') return; // already wired
+                el.setAttribute('role', 'button');
+                if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
+            }
+            function wireToggleA11y(node) {
+                if (!node || node.nodeType !== 1) return;
+                if (node.matches && node.matches(A11Y_TOGGLE_SEL)) applyToggleA11y(node);
+                if (node.querySelectorAll) node.querySelectorAll(A11Y_TOGGLE_SEL).forEach(applyToggleA11y);
+            }
+            document.addEventListener('keydown', function (e) {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                const el = e.target && e.target.closest && e.target.closest(A11Y_TOGGLE_SEL);
+                if (el) { e.preventDefault(); el.click(); }
+            });
+            function initToggleA11y() {
+                wireToggleA11y(document.body);
+                new MutationObserver(function (muts) {
+                    muts.forEach(function (m) { m.addedNodes.forEach(wireToggleA11y); });
+                }).observe(document.body, { childList: true, subtree: true });
+            }
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initToggleA11y);
+            else initToggleA11y();
+        })();
 
         function toggleAlabastaRejectCustom() {
             document.getElementById('alabasta-reject-custom-toggle').style.display = 'none';
