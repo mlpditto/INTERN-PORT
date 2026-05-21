@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.73)</title>
+    <title>Internship Portfolio (V94.74)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5537,10 +5537,13 @@
                                 ${retryBtn}
                              `;
 
-                            // 🔥 Feature: View Answers Button (Only if Approved and score > 0)
+                            // V94.74: View/Review button shows for any graded (non-pending)
+                            // non-poll attempt. Score-0 attempts get a "Review Mistakes"
+                            // label — viewQuizAnswers withholds the answer key at score 0.
                             let viewBtn = "";
-                            if (!isPending && score > 0) {
-                                viewBtn = `<button class="btn-sm btn-info" onclick="viewQuizAnswers('${q.id}')" style="margin-top:5px; width:100%; border-radius:6px;">👁️ View Answers ดูเฉลย</button>`;
+                            if (!isPending && !q.isPoll) {
+                                const viewLabel = score > 0 ? '👁️ View Answers ดูเฉลย' : '🔍 Review Mistakes ดูข้อที่ตอบผิด';
+                                viewBtn = `<button class="btn-sm btn-info" onclick="viewQuizAnswers('${q.id}')" style="margin-top:5px; width:100%; border-radius:6px;">${viewLabel}</button>`;
                             }
 
                             actionHtml = `
@@ -7034,7 +7037,10 @@
 
             if (!q || !attempt) return alert("Data not found");
             const score = computeQuizScore(attempt.correctCount, attempt.totalQuestions, q.totalPoints);
-            if (score <= 0) return alert("คะแนนเป็น 0.00 ไม่สามารถดูเฉลยได้ครับ กรุณาขอสอบใหม่แทน");
+            // V94.74: score-0 attempts may still review which questions were wrong and
+            // the explanation, but the correct-answer key stays hidden — a retake is
+            // still on offer, and revealing the key would make it meaningless.
+            const revealKey = score > 0;
 
             const quizResultContainer = document.getElementById('quiz-result-container');
             quizResultContainer.innerHTML = `<div style="text-align:center; padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>`;
@@ -7055,6 +7061,15 @@
                         "${attempt.adminComment}"
                     </div>
                     ${attempt.adminBonus ? `<div style="margin-top:8px; font-weight:bold; font-size:0.85em; display:flex; align-items:center; gap:5px;"><i class="fa-solid fa-coins"></i> +${attempt.adminBonus} Bonus Points</div>` : ''}
+                </div>`;
+            }
+
+            if (!revealKey) {
+                html += `
+                <div style="background:#fff8e1; border:1px solid #ffe082; padding:12px 14px; border-radius:10px; margin-bottom:18px; font-size:0.88em; color:#7a5b00; line-height:1.55;">
+                    <b>🔍 Review Mode โหมดทบทวน</b><br>
+                    แสดงเฉพาะข้อที่ตอบผิดและคำอธิบาย — เฉลยข้อที่ถูกจะปลดล็อกเมื่อทำคะแนนผ่าน (ขอสอบใหม่ได้)<br>
+                    <span style="opacity:0.85;">Showing your mistakes and explanations only — the answer key unlocks once you pass.</span>
                 </div>`;
             }
 
@@ -7116,7 +7131,7 @@
                 // stay visible in EN-only mode. Without these, lang-toggle.js
                 // wraps Thai runs in .lang-th and hides everything but a trailing ":".
                 let correctAnsText = "";
-                if (!isCorrect) {
+                if (!isCorrect && revealKey) {
                     if (isChoice || isFlash) {
                         const targetArr = Array.isArray(question.correct) ? question.correct : [question.correct];
                         correctAnsText = `<div style="margin-top:5px; color:#155724; font-size:0.9em;"><b>Correct<span class="lang-th"> เฉลย</span>:</b> <span class="lang-no-toggle">${targetArr.map(idx => question.options[idx]).join(', ')}</span></div>`;
