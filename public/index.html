@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.77)</title>
+    <title>Internship Portfolio (V94.78)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5638,7 +5638,11 @@
                     // practice_done) must render normally: collapsing a graded attempt also
                     // hid its "View Answers" button (the footer is display:none when
                     // collapsed), so interns couldn't review answers admin had graded.
-                    const isCollapsed = isExpired && (!attempt || attempt.status === 'abandoned');
+                    // V94.78: also collapse once the intern has reviewed the answers
+                    // (localStorage flag set by viewQuizAnswers) — declutters the list;
+                    // the card stays expandable.
+                    const hasViewedAnswers = !!attempt && !!localStorage.getItem('quizAnswersViewed_' + q.id);
+                    const isCollapsed = (isExpired && (!attempt || attempt.status === 'abandoned')) || hasViewedAnswers;
 
                     // V94.46/V94.48: card tint by state.
                     // V94.48: status-retake (orange) takes precedence — covers the surprise
@@ -5655,7 +5659,9 @@
                             <div class="assign-info">
                                 <h4 style="${isCollapsed ? 'font-size:0.95em; color:#666;' : ''} white-space:normal; line-height:1.2;">
                                     ${q.title}
-                                    ${isCollapsed ? '<small style="color:#ef233c; font-weight:normal; margin-left:5px;">Expired หมดเวลา</small>' : ''}
+                                    ${isCollapsed ? (hasViewedAnswers
+                                        ? '<small style="color:#94a3b8; font-weight:normal; margin-left:5px;">✓ Reviewed ดูเฉลยแล้ว</small>'
+                                        : '<small style="color:#ef233c; font-weight:normal; margin-left:5px;">Expired หมดเวลา</small>') : ''}
                                 </h4>
                                 ${quizMetaTitleSuffix ? `<div style="margin-top:4px;">${quizMetaTitleSuffix}</div>` : ''}
                                 <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
@@ -7093,6 +7099,11 @@
             const quizResultContainer = document.getElementById('quiz-result-container');
             quizResultContainer.innerHTML = `<div style="text-align:center; padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>`;
             document.getElementById('quizResultModal').style.display = 'flex';
+
+            // V94.78: mark this quiz's answers as reviewed (per-device) so renderAssignments
+            // collapses the card — declutters the Quiz list; the card stays expandable.
+            localStorage.setItem('quizAnswersViewed_' + quizId, '1');
+            if (typeof renderAssignments === 'function') renderAssignments();
 
             let html = "";
             let totalScore = 0;
