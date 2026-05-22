@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.08</title>
+    <title>Nika V94.09</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15117,7 +15117,9 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
                 // Run admin feedback (JSON: feedback + bonus suggestion) + grammar check in parallel
                 const [feedbackResult, grammarResult] = await Promise.allSettled([
                     window.callUniversalAI(selectedModelName, feedbackPrompt, true),
-                    window.callUniversalAI('gemini-2.5-flash', grammarPrompt)
+                    // V94.09: isJson=true → proxy sets responseMimeType:application/json
+                    // so the grammar response is raw JSON (no ```json markdown fences).
+                    window.callUniversalAI('gemini-2.5-flash', grammarPrompt, true)
                 ]);
 
                 if (feedbackResult.status === 'fulfilled') {
@@ -15291,7 +15293,7 @@ For "changes": list every meaningful edit between original and improved. Each en
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Retrying...';
             }
             try {
-                const result = await window.callUniversalAI('gemini-2.5-flash', buildGrammarPrompt(grammarSource));
+                const result = await window.callUniversalAI('gemini-2.5-flash', buildGrammarPrompt(grammarSource), true);
                 renderGrammarAnalysis(result.text, grammarSource);
                 saveGrammarCache(result.text, grammarSource);
                 setReflectiveReviewStatus('');
