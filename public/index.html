@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.75)</title>
+    <title>Internship Portfolio (V94.76)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3751,8 +3751,14 @@
             <!-- Row: วันเกิด -->
             <div style="margin-bottom:10px;">
                 <label style="font-size:0.78em; font-weight:bold; display:block; margin-bottom:4px; color:#555;">🎂 Date of Birth วันเกิด</label>
-                <input type="date" id="pi-birthday"
-                    style="width:100%; padding:9px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.9em;">
+                <!-- V94.76: native <input type="date"> rendered as a grey blob in the
+                     LINE iOS WKWebView; 3 selects render consistently + are friendlier
+                     for picking a birth year. Options filled by populateBirthdaySelects(). -->
+                <div style="display:flex; gap:6px;">
+                    <select id="pi-bday-day" style="flex:1; min-width:0; padding:9px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.9em; background:white;"><option value="">Day วัน</option></select>
+                    <select id="pi-bday-month" style="flex:1; min-width:0; padding:9px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.9em; background:white;"><option value="">Month เดือน</option></select>
+                    <select id="pi-bday-year" style="flex:1.3; min-width:0; padding:9px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.9em; background:white;"><option value="">Year ปี</option></select>
+                </div>
             </div>
 
             <!-- ที่อยู่ -->
@@ -4577,7 +4583,41 @@
             }, (e) => handleFirestoreListenerError('user profile listener', e));
         }
 
+        // V94.76: Date-of-Birth uses 3 selects (day / month / year) instead of
+        // <input type="date">, which renders as a grey blob in the LINE iOS WKWebView.
+        // The stored `birthday` field stays in ISO YYYY-MM-DD format for backward compat.
+        function populateBirthdaySelects() {
+            const daySel = document.getElementById('pi-bday-day');
+            const monthSel = document.getElementById('pi-bday-month');
+            const yearSel = document.getElementById('pi-bday-year');
+            if (!daySel || !monthSel || !yearSel || daySel.dataset.filled) return;
+            daySel.dataset.filled = '1';
+            for (let d = 1; d <= 31; d++) daySel.insertAdjacentHTML('beforeend', `<option value="${d}">${d}</option>`);
+            for (let m = 1; m <= 12; m++) monthSel.insertAdjacentHTML('beforeend', `<option value="${m}">${m}</option>`);
+            const thisYear = new Date().getFullYear();
+            for (let y = thisYear; y >= thisYear - 80; y--) yearSel.insertAdjacentHTML('beforeend', `<option value="${y}">${y}</option>`);
+        }
+        function setBirthdaySelects(iso) {
+            populateBirthdaySelects();
+            const daySel = document.getElementById('pi-bday-day');
+            const monthSel = document.getElementById('pi-bday-month');
+            const yearSel = document.getElementById('pi-bday-year');
+            if (!daySel || !monthSel || !yearSel) return;
+            const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(iso || '').trim());
+            daySel.value = m ? String(parseInt(m[3], 10)) : '';
+            monthSel.value = m ? String(parseInt(m[2], 10)) : '';
+            yearSel.value = m ? String(parseInt(m[1], 10)) : '';
+        }
+        function getBirthdayValue() {
+            const d = (document.getElementById('pi-bday-day') || {}).value || '';
+            const mo = (document.getElementById('pi-bday-month') || {}).value || '';
+            const y = (document.getElementById('pi-bday-year') || {}).value || '';
+            if (!d || !mo || !y) return '';
+            return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        }
+
         function openPersonalInfoModal() {
+            populateBirthdaySelects(); // V94.76: fill day/month/year options before load
             // Load current data
             db.collection("users").doc(userId).get().then(doc => {
                 if (doc.exists) {
@@ -4591,7 +4631,7 @@
                     document.getElementById('pi-institute').value = d.institute || "";
                     document.getElementById('pi-phone').value = d.phone || "";
                     document.getElementById('pi-email').value = d.email || "";
-                    document.getElementById('pi-birthday').value = d.birthday || "";
+                    setBirthdaySelects(d.birthday || "");
                     document.getElementById('pi-address').value = d.address || "";
                 }
                 document.getElementById('personalInfoModal').style.display = 'flex';
@@ -4608,11 +4648,16 @@
             const institute = document.getElementById('pi-institute').value.trim();
             const phone = document.getElementById('pi-phone').value.trim();
             const email = document.getElementById('pi-email').value.trim();
-            const birthday = document.getElementById('pi-birthday').value.trim();
+            const birthday = getBirthdayValue();
             const address = document.getElementById('pi-address').value.trim();
 
             if (!fname || !lname) return alert("Please enter your real first and last name");
             if (!fnameEn || !lnameEn) return alert("Please enter First Name and Last Name (English) for the certificate");
+            if (birthday) {
+                const [_by, _bm, _bd] = birthday.split('-').map(Number);
+                const _dt = new Date(_by, _bm - 1, _bd);
+                if (_dt.getMonth() !== _bm - 1 || _dt.getDate() !== _bd) return alert("Date of Birth is not a valid date / วันเกิดไม่ถูกต้อง");
+            }
 
             try {
                 const fullNameEn = mnameEn ? `${fnameEn} ${mnameEn} ${lnameEn}` : `${fnameEn} ${lnameEn}`;
