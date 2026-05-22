@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.10</title>
+    <title>Nika V94.11</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -8063,7 +8063,26 @@
             // We use api.datamuse.com (free, CORS-ok, no key) which returns ARPAbet
             // via the "pron:" tag when md=r is requested. Per-session memory cache.
             window._pronunCache = window._pronunCache || {};
+            // V94.11 Phase 3.1: persist looked-up CMU phonemes to a shared Firestore
+            // doc (tts_pronunciation_dict/shared) so the same words skip the Datamuse
+            // round-trip on later sessions — for this admin and every other admin.
+            window._pronunDictLoaded = false;
+            window.loadPronunciationDict = async function() {
+                if (window._pronunDictLoaded) return;
+                window._pronunDictLoaded = true;
+                try {
+                    const snap = await db.collection('tts_pronunciation_dict').doc('shared').get();
+                    const entries = (snap.exists && snap.data().entries) || {};
+                    Object.keys(entries).forEach(w => {
+                        if (!window._pronunCache[w]) window._pronunCache[w] = entries[w];
+                    });
+                } catch (e) {
+                    window._pronunDictLoaded = false;
+                    console.warn('[V94.11] Pronunciation dict load failed:', e && e.message);
+                }
+            };
             window.openPronunciationHelper = function() {
+                if (typeof loadPronunciationDict === 'function') loadPronunciationDict();
                 const ttsInput = document.getElementById('tts-input');
                 if (ttsInput) window._pronunSavedSelStart = ttsInput.selectionStart;
                 document.getElementById('pronun-word-input').value = '';
@@ -8125,6 +8144,18 @@
                         }
                         cmu = pronTag.slice(5).trim();
                         window._pronunCache[wordRaw] = cmu;
+                        // V94.11 Phase 3.1: persist this fresh lookup to the shared
+                        // dict (fire-and-forget — a failed save just costs a re-lookup
+                        // next session, never blocks the insert).
+                        try {
+                            if (auth && auth.currentUser) {
+                                db.collection('tts_pronunciation_dict').doc('shared').set({
+                                    entries: { [wordRaw]: cmu },
+                                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                    updatedBy: auth.currentUser.uid
+                                }, { merge: true }).catch(err => console.warn('[V94.11] Pronunciation dict save failed:', err && err.message));
+                            }
+                        } catch (e) { /* non-fatal */ }
                     } catch (e) {
                         statusEl.style.background = '#fee2e2';
                         statusEl.style.border = '1.5px solid #fecaca';
