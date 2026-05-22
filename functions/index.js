@@ -389,7 +389,15 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 contents: [{ role: "user", parts: parts }],
                 generationConfig: {
                     temperature: 0.2,
-                    maxOutputTokens: 2048,
+                    // 2048 starved structured JSON outputs (e.g. grammar analysis) into
+                    // mid-string truncation — gemini-2.5 thinking tokens count against
+                    // this budget. 8192 leaves ample room.
+                    maxOutputTokens: 8192,
+                    // Disable thinking for flash — these are structured extraction tasks,
+                    // not reasoning-heavy, and thinking tokens otherwise eat the output
+                    // budget. thinkingBudget:0 is flash-only; gemini-2.5-pro cannot
+                    // disable thinking (it has a floor), so pro is left untouched.
+                    ...(actualModelName.includes('flash') ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
                     ...(isJson ? { responseMimeType: "application/json" } : {})
                 }
             }, {
