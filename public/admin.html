@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.23</title>
+    <title>Nika V94.24</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15291,7 +15291,8 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
 }`;
 
                 const grammarSource = rawContent || logContent;
-                const grammarPrompt = buildGrammarPrompt(grammarSource);
+                const grammarLang = detectLanguage(grammarSource);
+                const grammarPrompt = buildGrammarPrompt(grammarSource, grammarLang);
 
                 // Run admin feedback (JSON: feedback + bonus suggestion) + grammar check in parallel
                 // V94.18: grammar model now driven by chip rail in Writing Analysis card header
@@ -15415,28 +15416,60 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
             }).join('');
         }
 
+        // V94.24: language heuristic for grammar prompt routing. Counts Thai-script chars
+        // (Unicode block ฀-๿) vs Latin alpha; ignores whitespace / punctuation /
+        // digits. ≥80% of EITHER side → that language; otherwise 'mixed' (current bilingual
+        // prompt). Threshold is intentionally high — "mostly Thai with a few English words"
+        // should still hit Thai prompt; only genuinely bilingual entries fall to mixed.
+        function detectLanguage(text) {
+            const s = String(text || '');
+            let thai = 0, latin = 0;
+            for (let i = 0; i < s.length; i++) {
+                const c = s.charCodeAt(i);
+                if (c >= 0x0E00 && c <= 0x0E7F) thai++;
+                else if ((c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A)) latin++;
+            }
+            const total = thai + latin;
+            if (total === 0) return 'mixed';
+            if (thai / total >= 0.80) return 'th';
+            if (latin / total >= 0.80) return 'en';
+            return 'mixed';
+        }
+
         // V93.94: Grammar prompt + per-log cache + retry helper.
         // Extracted from getAISuggestion so the Retry button in the error banner can re-run
         // the grammar half alone without re-billing the user-selected feedback model.
         // Cache is in-memory, session-scoped, keyed by reflective_logs doc id. We also keep
         // originalText so reopen-time restore only fires when the log content hasn't changed.
-        function buildGrammarPrompt(grammarSource) {
+        // V94.24: lang parameter routes the prompt to a language-locked template. Grade enum
+        // stays Thai across all three branches because V94.22 persistence + V94.23 trend chart
+        // + renderGrammarAnalysis gradeMap all key on the Thai literals.
+        function buildGrammarPrompt(grammarSource, lang) {
+            const LANG_CONTRACT = {
+                'th': 'The original is mostly in Thai. ALL string output (issue, suggestions, improved, changes.from/to/reason) MUST be in Thai.',
+                'en': 'The original is mostly in English. ALL string output (issue, suggestions, improved, changes.from/to/reason) MUST be in English.',
+                'mixed': 'The learner writes in Thai, English, or mixed. Match the dominant language of the original for issue/suggestions/changes.reason; "improved" mirrors the language mix of the original.'
+            };
+            const contract = LANG_CONTRACT[lang] || LANG_CONTRACT['mixed'];
             return `You are an expert Thai-English writing coach. Analyze this reflective writing from a learner:
 
 "${grammarSource}"
 
-The learner may write in Thai, English, or mixed. Analyze grammar, sentence structure, and clarity.
+LANGUAGE CONTRACT (HARD REQUIREMENT — read before responding):
+- "grade" MUST always be one of the Thai strings: "ดี", "พอใช้", "ควรปรับ". DO NOT translate the grade.
+- ${contract}
+- If you respond in the wrong language for the string fields, the response is unusable.
 
 Respond ONLY with valid JSON (no markdown, no extra text):
 {
   "grade": "ดี" or "พอใช้" or "ควรปรับ",
   "issues": [
-    {"issue": "concise issue in Thai (1 sentence)", "severity": "high" or "medium" or "low"}
+    {"issue": "concise issue (1 sentence)", "severity": "high" or "medium" or "low"}
   ],
-  "suggestions": ["practical suggestion in Thai (max 3 items)"],
-  "improved": "improved rewrite in the same language as original",
+  "suggestions": ["practical suggestion (max 3 items)"],
+  "improved": "improved rewrite",
   "changes": [
-    {"from": "exact substring from the original", "to": "exact replacement substring in the improved version", "reason": "the writing principle behind this edit (clarity, specificity, grammar, tone, conciseness, etc.) — 1 short sentence in Thai"}
+    {"from": "exact substring from the original", "to": "exact replacement substring in the improved version", "reason": "the writing principle behind this edit (clarity, specificity, grammar, tone, conciseness, etc.) — 1 short sentence"}
   ]
 }
 
@@ -15448,7 +15481,9 @@ Max 5 items in "issues". Sort by severity DESC inside the array (high first). Ev
 
 If you have nothing concrete to flag, return empty arrays for issues/suggestions — NEVER include empty strings, single punctuation marks, or placeholder text. Each item must be a real, actionable sentence. Keep suggestions kind and constructive.
 
-For "changes": list every meaningful edit between original and improved. Each entry MUST have non-empty "from" and "to" substrings copied verbatim from the texts (include 1–3 words of surrounding context if the change is a single word, so the learner can locate it). Reasons must explain the writing principle, not just describe what changed (e.g. "ทำให้ชัดเจนขึ้นว่าอาหารถูกจัดเตรียมมา" — not "เพิ่มคำว่า provided"). If improved equals original verbatim, return an empty changes array.`;
+For "changes": list every meaningful edit between original and improved. Each entry MUST have non-empty "from" and "to" substrings copied verbatim from the texts (include 1–3 words of surrounding context if the change is a single word, so the learner can locate it). Reasons must explain the writing principle, not just describe what changed. If improved equals original verbatim, return an empty changes array.
+
+SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string field is in the wrong language, fix it before sending.`;
         }
 
         function saveGrammarCache(rawText, originalText) {
@@ -15505,7 +15540,7 @@ For "changes": list every meaningful edit between original and improved. Each en
             try {
                 // V94.18: honor chip rail selection on Retry too — admin can switch Flash→Pro and re-run.
                 const grammarModel = getGrammarModel();
-                const result = await window.callUniversalAI(grammarModel, buildGrammarPrompt(grammarSource), true);
+                const result = await window.callUniversalAI(grammarModel, buildGrammarPrompt(grammarSource, detectLanguage(grammarSource)), true);
                 renderGrammarAnalysis(result.text, grammarSource);
                 saveGrammarCache(result.text, grammarSource);
                 persistGrammarGrade(result.text, grammarModel);
