@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.17</title>
+    <title>Nika V94.18</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -258,6 +258,11 @@
         .reflective-review-lang-chip { border:0; background:transparent; color:#64748b; padding:4px 9px; border-radius:9px; font-size:0.7em; font-weight:900; letter-spacing:0.02em; cursor:pointer; transition:transform 0.18s ease, background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease; }
         .reflective-review-lang-chip:hover { color:#1e293b; transform:translateY(-1px); }
         .reflective-review-lang-chip.active { background:linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,247,237,0.9) 100%); color:#9a3412; box-shadow:0 6px 14px rgba(245,158,11,0.18), inset 0 1px 0 rgba(255,255,255,0.85); }
+        /* V94.18: compact 2-chip rail in Writing Analysis card header (Flash / Pro). Mirrors lang-pill palette. */
+        .reflective-grammar-model-rail { display:inline-flex; align-items:center; gap:2px; padding:3px; border-radius:12px; background:linear-gradient(180deg, rgba(255,255,255,0.68) 0%, rgba(241,245,249,0.55) 100%); border:1px solid rgba(226,232,240,0.92); box-shadow:inset 0 1px 0 rgba(255,255,255,0.7); }
+        .reflective-grammar-model-chip { border:0; background:transparent; color:#64748b; padding:4px 9px; border-radius:9px; font-size:0.7em; font-weight:900; letter-spacing:0.02em; cursor:pointer; transition:transform 0.18s ease, background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease; }
+        .reflective-grammar-model-chip:hover { color:#1e293b; transform:translateY(-1px); }
+        .reflective-grammar-model-chip.active { background:linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,247,237,0.9) 100%); color:#9a3412; box-shadow:0 6px 14px rgba(245,158,11,0.18), inset 0 1px 0 rgba(255,255,255,0.85); }
         .reflective-review-secondary-controls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
         .reflective-review-select { padding:9px 12px; border-radius:14px; font-size:0.78em; font-weight:800; cursor:pointer; }
         .reflective-review-select.lang { min-width:86px; flex:0 0 auto; }
@@ -10974,7 +10979,15 @@
                 <div id="reflective-grammar-card" class="reflective-review-card reflective-review-field" style="display:none;">
                     <div class="reflective-review-label-row" style="margin-bottom:8px;">
                         <label class="reflective-review-label">✍️ Writing Analysis</label>
-                        <span id="reflective-grammar-score" style="font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; border:1px solid transparent;"></span>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <!-- V94.18: Phase 3 model picker (Gemini Flash/Pro). Applies to the next grammar call (AI Suggest or Retry). -->
+                            <div class="reflective-grammar-model-rail lang-no-toggle" role="group" aria-label="Grammar Model">
+                                <button type="button" class="reflective-grammar-model-chip active" data-value="gemini-3.5-flash" onclick="selectGrammarModel(this)" title="Faster, lower cost">Flash</button>
+                                <button type="button" class="reflective-grammar-model-chip" data-value="gemini-3.5-pro" onclick="selectGrammarModel(this)" title="Deeper analysis, slower">Pro</button>
+                            </div>
+                            <input type="hidden" id="ai-model-grammar" value="gemini-3.5-flash">
+                            <span id="reflective-grammar-score" style="font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; border:1px solid transparent;"></span>
+                        </div>
                     </div>
                     <div id="reflective-grammar-content" class="lang-no-toggle"></div>
                 </div>
@@ -14666,6 +14679,24 @@ RULES:
             if (hiddenInput) hiddenInput.value = btn.dataset.value || 'gpt-4o';
         };
 
+        // V94.18: Phase 3 model picker for grammar (Flash / Pro). Persists per-admin via localStorage
+        // so the next modal open + next AI Suggest call uses the chosen model.
+        window.selectGrammarModel = function(btn) {
+            if (!btn) return;
+            document.querySelectorAll('.reflective-grammar-model-chip').forEach(chip => chip.classList.remove('active'));
+            btn.classList.add('active');
+            const val = btn.dataset.value || 'gemini-3.5-flash';
+            const hidden = document.getElementById('ai-model-grammar');
+            if (hidden) hidden.value = val;
+            try { localStorage.setItem('ai_default_grammar_model', val); } catch (e) { /* non-fatal */ }
+        };
+
+        function getGrammarModel() {
+            const hidden = document.getElementById('ai-model-grammar');
+            const val = hidden && hidden.value;
+            return val || 'gemini-3.5-flash';
+        }
+
         // V92.15: TH/EN/KR segmented pills replace the language <select>. Hidden input keeps id "ai-lang-review"
         // so existing readers (getAISuggestion, applyReflectiveFocusLanguage caller) work unchanged.
         window.selectReflectiveReviewLang = function(btn) {
@@ -15256,11 +15287,14 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
                 const grammarPrompt = buildGrammarPrompt(grammarSource);
 
                 // Run admin feedback (JSON: feedback + bonus suggestion) + grammar check in parallel
+                // V94.18: grammar model now driven by chip rail in Writing Analysis card header
+                // (#ai-model-grammar hidden input, default gemini-3.5-flash). Helper getGrammarModel().
+                const grammarModel = getGrammarModel();
                 const [feedbackResult, grammarResult] = await Promise.allSettled([
                     window.callUniversalAI(selectedModelName, feedbackPrompt, true),
                     // V94.09: isJson=true → proxy sets responseMimeType:application/json
                     // so the grammar response is raw JSON (no ```json markdown fences).
-                    window.callUniversalAI('gemini-3.5-flash', grammarPrompt, true)
+                    window.callUniversalAI(grammarModel, grammarPrompt, true)
                 ]);
 
                 if (feedbackResult.status === 'fulfilled') {
@@ -15299,7 +15333,7 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
                     // V93.94: fall back to cached grammar (if any, same content) before showing the error banner —
                     // a single transient Gemini outage shouldn't blank a card the admin already saw work.
                     const reason = (grammarResult.reason && grammarResult.reason.message) || String(grammarResult.reason || 'Unknown error');
-                    console.error('[reflective-grammar] gemini-3.5-flash call failed:', grammarResult.reason);
+                    console.error(`[reflective-grammar] ${grammarModel} call failed:`, grammarResult.reason);
                     const cached = loadGrammarCache(grammarSource);
                     if (cached) {
                         renderGrammarAnalysis(cached.rawText, cached.originalText);
@@ -15434,13 +15468,15 @@ For "changes": list every meaningful edit between original and improved. Each en
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Retrying...';
             }
             try {
-                const result = await window.callUniversalAI('gemini-3.5-flash', buildGrammarPrompt(grammarSource), true);
+                // V94.18: honor chip rail selection on Retry too — admin can switch Flash→Pro and re-run.
+                const grammarModel = getGrammarModel();
+                const result = await window.callUniversalAI(grammarModel, buildGrammarPrompt(grammarSource), true);
                 renderGrammarAnalysis(result.text, grammarSource);
                 saveGrammarCache(result.text, grammarSource);
                 setReflectiveReviewStatus('');
             } catch (err) {
                 const reason = (err && err.message) || String(err || 'Unknown error');
-                console.error('[reflective-grammar] retry failed:', err);
+                console.error(`[reflective-grammar] retry failed (${getGrammarModel()}):`, err);
                 renderGrammarAnalysisError(reason);
             } finally {
                 // Button is rerendered by either renderGrammarAnalysis (replaces innerHTML) or
@@ -35839,6 +35875,13 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 if (defaultPill) defaultPill.classList.add('active');
                 const hidden = document.getElementById('ai-preset-review');
                 if (hidden) hidden.value = 'encourage';
+                // V94.18: restore grammar model chip from localStorage (Flash default).
+                const grammarPref = localStorage.getItem('ai_default_grammar_model') || 'gemini-3.5-flash';
+                const grammarHidden = document.getElementById('ai-model-grammar');
+                if (grammarHidden) grammarHidden.value = grammarPref;
+                document.querySelectorAll('.reflective-grammar-model-chip').forEach(chip => {
+                    chip.classList.toggle('active', chip.dataset.value === grammarPref);
+                });
                 // [V91.42] Refresh rewrite chips state based on draft length
                 if (typeof updateReflectiveRewriteChipsState === 'function') updateReflectiveRewriteChipsState();
                 // [V91.43] Hide stale bonus suggestion from previous review
