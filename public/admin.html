@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.14</title>
+    <title>Nika V94.15</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6362,6 +6362,10 @@
                                                             <button type="button" onclick="saveCurrentTtsVoicePreset()" title="Save current audio + transcript + instruct as a reusable preset" style="background:#10b981; color:white; border:none; border-radius:8px; padding:6px 10px; font-size:0.78em; font-weight:800; cursor:pointer; white-space:nowrap;">💾 Save</button>
                                                             <button type="button" onclick="deleteCurrentTtsVoicePreset()" title="Delete the selected preset" style="background:white; color:#7f1d1d; border:1.5px solid #fecaca; border-radius:8px; padding:6px 10px; font-size:0.85em; font-weight:700; cursor:pointer;">🗑️</button>
                                                         </div>
+                                                        <!-- V94.15: admin one-shot tool — find voice-refs/ Storage files not referenced by any tts_voice_presets doc -->
+                                                        <div style="text-align:right; margin:-4px 0 8px;">
+                                                            <button type="button" onclick="openVoiceRefOrphanScan()" title="List voice-refs/ Storage files not referenced by any preset, then optionally delete them" style="background:transparent; color:#047857; border:1px dashed #6ee7b7; border-radius:8px; padding:3px 10px; font-size:0.7em; font-weight:700; cursor:pointer;">🔍 Scan orphan voice refs</button>
+                                                        </div>
                                                         <label class="laboon-field-label" for="tts-omnivoice-clone-audio" style="color:#047857;">Reference Audio (5–30 s clip)</label>
                                                         <input type="file" id="tts-omnivoice-clone-audio" accept="audio/*" onchange="onOmnivoiceCloneAudioPick(this)" style="margin:6px 0 8px; font-size:0.85em;">
                                                         <audio id="tts-omnivoice-clone-preview" controls preload="metadata" style="display:none; width:100%; margin-bottom:10px;"></audio>
@@ -8370,6 +8374,92 @@
                 }
             };
 
+            // V94.15: one-shot orphan scanner for voice-refs/ Storage. Lists every
+            // object under voice-refs/ via listAll() and diffs against every
+            // tts_voice_presets doc's audioPath. Orphans = Storage files with no
+            // preset pointing at them (e.g. test uploads before V93.49 or presets
+            // whose Storage cleanup didn't fire). Manually triggered from the
+            // cloning panel — not part of any automated cleanup.
+            window._voiceRefOrphans = [];
+            window.openVoiceRefOrphanScan = async function() {
+                forceShowModal('voiceRefOrphanModal');
+                const statusEl = document.getElementById('voiceRefOrphanStatus');
+                const summaryEl = document.getElementById('voiceRefOrphanSummary');
+                const listEl = document.getElementById('voiceRefOrphanList');
+                const delBtn = document.getElementById('voice-ref-orphan-delete-btn');
+                statusEl.style.display = 'block';
+                statusEl.style.background = '#e0f2fe';
+                statusEl.style.border = '1.5px solid #bae6fd';
+                statusEl.style.color = '#075985';
+                statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Scanning…';
+                summaryEl.style.display = 'none';
+                listEl.style.display = 'none';
+                delBtn.style.display = 'none';
+                delBtn.disabled = false;
+                window._voiceRefOrphans = [];
+                try {
+                    const [storageList, presetSnap] = await Promise.all([
+                        firebase.storage().ref('voice-refs').listAll(),
+                        db.collection('tts_voice_presets').get()
+                    ]);
+                    const storagePaths = storageList.items.map(i => i.fullPath);
+                    const referenced = new Set();
+                    presetSnap.docs.forEach(d => {
+                        const p = d.data().audioPath;
+                        if (p) referenced.add(p);
+                    });
+                    const orphans = storagePaths.filter(p => !referenced.has(p));
+                    window._voiceRefOrphans = orphans;
+                    statusEl.style.display = 'none';
+                    summaryEl.style.display = 'block';
+                    summaryEl.innerHTML = `<b>${storagePaths.length}</b> file(s) in <code>voice-refs/</code> · <b>${referenced.size}</b> referenced by presets · <b style="color:${orphans.length ? '#dc2626' : '#10b981'};">${orphans.length}</b> orphan${orphans.length === 1 ? '' : 's'}`;
+                    if (orphans.length === 0) {
+                        summaryEl.innerHTML += ' <i class="fa-solid fa-check" style="color:#10b981;"></i>';
+                        return;
+                    }
+                    listEl.style.display = 'block';
+                    listEl.innerHTML = orphans.map(p => `<div style="padding:3px 0; border-bottom:1px dashed #fde68a; word-break:break-all;">${p}</div>`).join('');
+                    delBtn.style.display = 'inline-block';
+                    delBtn.textContent = `Delete ${orphans.length} orphan${orphans.length === 1 ? '' : 's'}`;
+                } catch (e) {
+                    statusEl.style.background = '#fee2e2';
+                    statusEl.style.border = '1.5px solid #fecaca';
+                    statusEl.style.color = '#991b1b';
+                    statusEl.textContent = 'Scan failed: ' + (e && e.message ? e.message : 'unknown error');
+                }
+            };
+            window.deleteVoiceRefOrphans = async function() {
+                const orphans = window._voiceRefOrphans || [];
+                if (orphans.length === 0) return;
+                if (!confirm(`Delete ${orphans.length} orphan voice-ref file${orphans.length === 1 ? '' : 's'} from Storage?\n\nSafe to proceed — no preset references these files. Cannot be undone.`)) return;
+                const statusEl = document.getElementById('voiceRefOrphanStatus');
+                const delBtn = document.getElementById('voice-ref-orphan-delete-btn');
+                delBtn.disabled = true;
+                statusEl.style.display = 'block';
+                statusEl.style.background = '#e0f2fe';
+                statusEl.style.border = '1.5px solid #bae6fd';
+                statusEl.style.color = '#075985';
+                let ok = 0, fail = 0;
+                for (const path of orphans) {
+                    try {
+                        await firebase.storage().ref(path).delete();
+                        ok++;
+                    } catch (e) {
+                        fail++;
+                        console.warn('[V94.15] Failed to delete orphan', path, e && e.message);
+                    }
+                    statusEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Deleted ${ok}/${orphans.length}${fail ? ` · ${fail} failed` : ''}`;
+                }
+                delBtn.style.display = 'none';
+                document.getElementById('voiceRefOrphanList').style.display = 'none';
+                statusEl.style.background = fail ? '#fef3c7' : '#ecfdf5';
+                statusEl.style.border = fail ? '1.5px solid #fde68a' : '1.5px solid #6ee7b7';
+                statusEl.style.color = fail ? '#92400e' : '#065f46';
+                statusEl.innerHTML = `<i class="fa-solid fa-check"></i> Deleted ${ok} orphan${ok === 1 ? '' : 's'}${fail ? ` · ${fail} failed (see console)` : ''}`;
+                window._voiceRefOrphans = [];
+                if (typeof showToast === 'function') showToast(`🧹 Voice-refs cleanup: ${ok} deleted${fail ? `, ${fail} failed` : ''}`);
+            };
+
             window.selectTtsBackend = function(backend, options = {}) {
                 const resolvedBackend = LABOON_TTS_BACKEND_MODELS[backend] ? backend : getDefaultLaboonTtsBackend();
                 const hiddenBackend = document.getElementById('tts-backend-select');
@@ -10190,6 +10280,21 @@
             </div>
         </div>
         <!-- 🔤 Pronunciation Helper (V93.55, OmniVoice Phase 3) — CMU phoneme lookup via Datamuse, insert as [...] at tts-input cursor -->
+        <!-- V94.15: orphan scanner for voice-refs/ Storage. One-shot admin tool reachable from the OmniVoice cloning panel. -->
+        <div id="voiceRefOrphanModal" class="modal" style="z-index:2410;">
+            <div class="modal-content" style="max-width:560px;">
+                <span class="close-modal" onclick="forceHideModal('voiceRefOrphanModal')">&times;</span>
+                <h3 style="margin:0 0 6px; color:#047857; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-broom"></i> Voice Ref Orphan Scan</h3>
+                <p style="font-size:0.8em; color:#64748b; margin:0 0 12px;">Lists files under <code style="background:#f1f5f9; padding:1px 5px; border-radius:4px;">voice-refs/</code> in Firebase Storage that are not referenced by any <code style="background:#f1f5f9; padding:1px 5px; border-radius:4px;">tts_voice_presets</code> doc. Deleting an orphan frees storage; safe because no preset can load it.</p>
+                <div id="voiceRefOrphanStatus" style="display:none; padding:10px 12px; border-radius:10px; font-size:0.82em;"></div>
+                <div id="voiceRefOrphanSummary" style="display:none; margin-top:10px; padding:10px 12px; border-radius:10px; font-size:0.85em; background:#f8fafc; border:1px solid #e2e8f0; color:#1e293b;"></div>
+                <div id="voiceRefOrphanList" style="display:none; max-height:38vh; overflow-y:auto; margin-top:10px; padding:8px 10px; background:#fefce8; border:1px solid #fde68a; border-radius:10px; font-family:monospace; font-size:0.78em; color:#451a03;"></div>
+                <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
+                    <button class="magic-btn" style="background:#64748b; padding:9px 18px; border-radius:10px; font-size:0.85em;" type="button" onclick="forceHideModal('voiceRefOrphanModal')">Close</button>
+                    <button id="voice-ref-orphan-delete-btn" class="magic-btn" style="background:#dc2626; padding:9px 18px; border-radius:10px; font-size:0.85em; font-weight:800; display:none;" type="button" onclick="deleteVoiceRefOrphans()">Delete orphans</button>
+                </div>
+            </div>
+        </div>
         <div id="pronunciationHelperModal" class="modal" style="z-index:2400;">
             <div class="modal-content" style="max-width:480px;">
                 <span class="close-modal" onclick="forceHideModal('pronunciationHelperModal')">&times;</span>
