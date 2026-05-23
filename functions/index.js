@@ -366,6 +366,24 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 actualModelName = reqModel.includes('pro') ? "gemini-2.5-pro" : "gemini-3.5-flash";
             }
 
+            // V94.16 HOTFIX: Vertex AI in this project's region does not currently
+            //   host the Gemini 3.x family — proxy calls just hang because axios has
+            //   no default timeout and Vertex never returns. V93.95 originally kept
+            //   the `gemini-3` substring catch specifically because of this; V94.12
+            //   removed that catch when refreshing the frontend Flash chips to
+            //   gemini-3.5-flash so legitimate AI-Studio-hosted 3.5 calls weren't
+            //   blocked. Surface the fix on the proxy side instead: fast-fail any
+            //   gemini-3.x request so callUniversalAI's catch path in admin.html
+            //   falls back to the local @google/generative-ai SDK, which targets
+            //   generativelanguage.googleapis.com — where 3.5 IS GA. Remove this
+            //   guard once Vertex AI catches up to Gemini 3.5.
+            if (actualModelName.startsWith('gemini-3.')) {
+                return res.status(404).json({
+                    error: `Vertex AI in ${REGION} does not host ${actualModelName} yet; client falls back to the local Google AI Studio SDK.`,
+                    clientShouldFallback: true
+                });
+            }
+
             // V93.95: Gemini on Vertex AI must use the :generateContent endpoint. The
             // :predict / :rawPredict API rejects Gemini models with HTTP 400 ("Gemini
             // cannot be accessed through Vertex Predict/RawPredict API"). The request
