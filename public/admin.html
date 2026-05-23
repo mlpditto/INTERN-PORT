@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.18</title>
+    <title>Nika V94.19</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15422,13 +15422,21 @@ The learner may write in Thai, English, or mixed. Analyze grammar, sentence stru
 Respond ONLY with valid JSON (no markdown, no extra text):
 {
   "grade": "ดี" or "พอใช้" or "ควรปรับ",
-  "issues": ["concise issue in Thai (max 3 items)"],
+  "issues": [
+    {"issue": "concise issue in Thai (1 sentence)", "severity": "high" or "medium" or "low"}
+  ],
   "suggestions": ["practical suggestion in Thai (max 3 items)"],
   "improved": "improved rewrite in the same language as original",
   "changes": [
     {"from": "exact substring from the original", "to": "exact replacement substring in the improved version", "reason": "the writing principle behind this edit (clarity, specificity, grammar, tone, conciseness, etc.) — 1 short sentence in Thai"}
   ]
 }
+
+V94.19: Severity criteria for "issues" — judge how much each issue hurts the reader:
+- "high"   = grammar error or unclear phrasing that changes meaning, breaks comprehension, or makes the sentence hard to read.
+- "medium" = awkward wording, run-on, or style issue that is understandable but slows the reader down.
+- "low"    = minor polish — preference, redundancy, or small word choice that doesn't affect meaning.
+Max 5 items in "issues". Sort by severity DESC inside the array (high first). Every entry MUST be an object with non-empty "issue" string + a valid "severity" value.
 
 If you have nothing concrete to flag, return empty arrays for issues/suggestions — NEVER include empty strings, single punctuation marks, or placeholder text. Each item must be a real, actionable sentence. Keep suggestions kind and constructive.
 
@@ -15545,13 +15553,36 @@ For "changes": list every meaningful edit between original and improved. Each en
             // variation selectors, all \p{C}\p{Default_Ignorable_Code_Point}) drop
             // out instead of rendering as empty colored bars. Same defensive pattern
             // as V92.86/88/89 in the Quiz Feedback Panel.
-            const cleanIssues = (data.issues || []).filter(x => qfpNormalizeTopic(x));
+            // V94.19: Phase 3 severity per issue. New shape = [{issue, severity:'high|medium|low'}],
+            // legacy shape = string[] (V93.94 cache still serves pre-V94.19 outputs). Normalize both,
+            // sort high→medium→low, color-code per tier (red/orange/gray).
+            const SEV_ORDER = { high: 0, medium: 1, low: 2 };
+            const SEV_STYLE = {
+                high:   { label: 'High',   border: '#ef4444', bg: '#fef2f2', text: '#7f1d1d', badgeBg: '#dc2626', badgeText: '#ffffff' },
+                medium: { label: 'Med',    border: '#fb923c', bg: '#fff7ed', text: '#7c2d12', badgeBg: '#ea580c', badgeText: '#ffffff' },
+                low:    { label: 'Low',    border: '#94a3b8', bg: '#f1f5f9', text: '#475569', badgeBg: '#64748b', badgeText: '#ffffff' }
+            };
+            const normalizeIssue = (x) => {
+                if (x && typeof x === 'object') {
+                    const text = qfpNormalizeTopic(x.issue || x.text);
+                    if (!text) return null;
+                    const sev = String(x.severity || '').toLowerCase();
+                    return { text, severity: SEV_STYLE[sev] ? sev : 'medium' };
+                }
+                const text = qfpNormalizeTopic(x);
+                return text ? { text, severity: 'medium' } : null;
+            };
+            const cleanIssues = (data.issues || []).map(normalizeIssue).filter(Boolean)
+                .sort((a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity]);
             const cleanSuggestions = (data.suggestions || []).filter(x => qfpNormalizeTopic(x));
 
             if (cleanIssues.length > 0) {
                 html += `<div style="margin-bottom:8px;">
                     <div style="font-size:0.7em; font-weight:900; color:#ef4444; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">⚠ Issues to fix จุดที่ควรแก้ไข</div>
-                    ${cleanIssues.map(i => `<div style="font-size:0.8em; color:#7f1d1d; background:#fef2f2; border-left:3px solid #ef4444; padding:5px 9px; border-radius:0 8px 8px 0; margin-bottom:4px; line-height:1.5;">${escapeHtml(i)}</div>`).join('')}
+                    ${cleanIssues.map(i => {
+                        const s = SEV_STYLE[i.severity];
+                        return `<div style="font-size:0.8em; color:${s.text}; background:${s.bg}; border-left:3px solid ${s.border}; padding:5px 9px; border-radius:0 8px 8px 0; margin-bottom:4px; line-height:1.5; display:flex; align-items:flex-start; gap:7px;"><span style="flex:0 0 auto; font-size:0.72em; font-weight:900; background:${s.badgeBg}; color:${s.badgeText}; padding:1px 7px; border-radius:999px; letter-spacing:0.04em; text-transform:uppercase; margin-top:1px;">${s.label}</span><span style="flex:1 1 auto;">${escapeHtml(i.text)}</span></div>`;
+                    }).join('')}
                 </div>`;
             }
 
