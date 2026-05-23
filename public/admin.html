@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.22</title>
+    <title>Nika V94.23</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -11477,6 +11477,13 @@
                         <div style="margin-bottom:5px;"><span style="color:var(--text-sub);">Start:</span> <strong id="profile-start">-</strong></div>
                         <div><span style="color:var(--text-sub);">End:</span> <strong id="profile-end">-</strong></div>
                     </div>
+                </div>
+
+                <!-- V94.23: Writing Quality trend (Grammar Phase 3). Hidden until loader resolves; -->
+                <!-- empty state (no graded logs) stays hidden so non-graded users see no clutter.   -->
+                <div id="profile-writing-quality-section" style="margin-bottom:15px; display:none;">
+                    <h3 style="color:var(--primary); margin-bottom:10px;">📖 Writing Quality</h3>
+                    <div id="profile-writing-quality" style="background:var(--col-bg); padding:10px; border-radius:8px; font-size:0.9em;"></div>
                 </div>
 
                 <div style="background:#f0f8ff; padding:10px; border-radius:8px; border-left:4px solid #4361ee; margin-bottom:15px;">
@@ -33300,7 +33307,80 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             
             // Show modal
             document.getElementById('userProfileModal').style.display = 'block';
+
+            // V94.23: load Writing Quality trend async (don't block modal display)
+            loadUserWritingQuality(userId);
         }
+
+        // V94.23: render last 5 grammar grades + V92.30-style trend arrow on userProfileModal.
+        // Reads latestGrammarGrade / latestGrammarTs persisted by V94.22 persistGrammarGrade().
+        // Trend threshold ±0.3 on the 1-3 grade scale ≈ "one full level shift" — coarser than
+        // V92.30's ±5% on 0-100 because grades are 3-level discrete.
+        async function loadUserWritingQuality(userId) {
+            const section = document.getElementById('profile-writing-quality-section');
+            const box = document.getElementById('profile-writing-quality');
+            if (!section || !box) return;
+            section.style.display = 'none';
+            box.innerHTML = '';
+            try {
+                const snap = await db.collection('reflective_logs')
+                    .where('userId', '==', userId).get();
+                const graded = [];
+                snap.forEach(doc => {
+                    const d = doc.data() || {};
+                    if (d.latestGrammarGrade && d.latestGrammarTs && typeof d.latestGrammarTs.toMillis === 'function') {
+                        graded.push({ grade: d.latestGrammarGrade, ts: d.latestGrammarTs.toMillis() });
+                    }
+                });
+                if (graded.length === 0) return;
+                graded.sort((a, b) => a.ts - b.ts);
+
+                const GRADE_NUM = { 'ดี': 3, 'พอใช้': 2, 'ควรปรับ': 1 };
+                const GRADE_COLOR = {
+                    'ดี':      { color:'#15803d', bg:'#f0fdf4', border:'#86efac' },
+                    'พอใช้':   { color:'#b45309', bg:'#fffbeb', border:'#fcd34d' },
+                    'ควรปรับ': { color:'#dc2626', bg:'#fef2f2', border:'#fca5a5' }
+                };
+
+                let trend = null;
+                if (graded.length >= 4) {
+                    const recent = graded.slice(-3);
+                    const earlier = graded.slice(0, -3);
+                    const mean = arr => arr.reduce((s, x) => s + (GRADE_NUM[x.grade] || 2), 0) / arr.length;
+                    const delta = mean(recent) - mean(earlier);
+                    if (Math.abs(delta) < 0.3) trend = 'stable';
+                    else trend = delta > 0 ? 'up' : 'down';
+                }
+                const trendCfg = trend === 'up' ? { icon:'⬆', color:'#10b981', title:'Improving — last 3 grades higher than earlier' }
+                    : trend === 'down' ? { icon:'⬇', color:'#ef4444', title:'Declining — last 3 grades lower than earlier' }
+                    : trend === 'stable' ? { icon:'➡', color:'#94a3b8', title:'Stable — last 3 grades within ±0.3 of earlier mean' }
+                    : null;
+                const trendIcon = trendCfg
+                    ? `<span title="${trendCfg.title}" style="color:${trendCfg.color}; font-weight:900; font-size:1.1em;">${trendCfg.icon}</span>`
+                    : '';
+
+                const lastN = graded.slice(-5);
+                const chips = lastN.map(g => {
+                    const c = GRADE_COLOR[g.grade] || GRADE_COLOR['พอใช้'];
+                    return `<span style="font-size:0.75em; font-weight:800; padding:2px 8px; border-radius:999px; background:${c.bg}; color:${c.color}; border:1px solid ${c.border}; white-space:nowrap;">${g.grade}</span>`;
+                }).join('<span style="color:#cbd5e1; font-weight:700;">→</span>');
+
+                const footer = graded.length >= 4
+                    ? `${graded.length} logs graded · trend on last 3 vs prior`
+                    : `${graded.length} ${graded.length === 1 ? 'log' : 'logs'} graded · need ${4 - graded.length} more for trend`;
+
+                box.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+                        ${chips} ${trendIcon}
+                    </div>
+                    <div style="font-size:0.72em; color:#94a3b8;">${footer}</div>
+                `;
+                section.style.display = '';
+            } catch (e) {
+                console.warn('[writing-quality] load failed:', e);
+            }
+        }
+
         async function moveCard(id, dir) { const q = sideQuestsCache[id]; const f = ['Backlog', 'Doing', 'Review', 'Done']; const c = f.indexOf(q.status); let n = q.status; if (dir === 'next' && c < 3) n = f[c + 1]; if (dir === 'prev' && c > 0) n = f[c - 1]; if (n !== q.status) { const u = { status: n }; if (n === 'Done') u.doneAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").doc(id).update(u); } }
         
         async function giveScore(id) { const q = sideQuestsCache[id]; if (!q) return; const s = prompt("Score:", "0.5"); if (!s) return; const n = prompt("Note:", q.title); const b = db.batch(); q.assigneeIds.forEach(u => { b.update(db.collection("users").doc(u), { score: firebase.firestore.FieldValue.increment(parseFloat(s)) }); b.set(db.collection("checkin_logs").doc(), { userId: u, type: 'manual', amount: parseFloat(s), note: n, timestamp: firebase.firestore.FieldValue.serverTimestamp() }) }); b.update(db.collection("side_quests").doc(id), { status: 'Done', isScored: true, archiveScore: parseFloat(s), doneAt: firebase.firestore.FieldValue.serverTimestamp() }); await b.commit(); showToast("Scored!"); }
