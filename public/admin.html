@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.24</title>
+    <title>Nika V94.25</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -11047,6 +11047,10 @@
                             <button type="button" id="btn-ai-suggest" class="reflective-review-ai-btn" onclick="getAISuggestion(this)" title="AI Suggest (Ctrl/⌘ + /)" style="padding:6px 12px; border-radius:12px; font-size:0.75em;">
                                 <i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggest
                             </button>
+                            <!-- V94.25: Phase 4 grammar on/off toggle. Off skips the parallel grammar call entirely. -->
+                            <button type="button" id="btn-grammar-toggle" class="lang-no-toggle" onclick="toggleGrammarPref(this)" title="Toggle Writing Analysis on/off — off saves one Gemini call per Suggest" style="padding:6px 10px; border-radius:12px; font-size:0.7em; border:1px solid #e2e8f0; background:#fff; color:#475569; cursor:pointer; white-space:nowrap; font-weight:700;">
+                                <i class="fa-solid fa-spell-check"></i> <span id="grammar-toggle-label">Grammar: On</span>
+                            </button>
                         </div>
                     </div>
                     
@@ -14704,6 +14708,33 @@ RULES:
             return val || 'gemini-3.5-flash';
         }
 
+        // V94.25: Phase 4 grammar on/off toggle. Persists per-admin via localStorage.
+        // When off, getAISuggestion skips the parallel grammar call entirely (1 API call saved).
+        function isGrammarOff() {
+            try { return localStorage.getItem('ai_grammar_off') === '1'; } catch (e) { return false; }
+        }
+
+        window.toggleGrammarPref = function() {
+            const next = !isGrammarOff();
+            try { localStorage.setItem('ai_grammar_off', next ? '1' : '0'); } catch (e) { /* non-fatal */ }
+            if (next) {
+                const card = document.getElementById('reflective-grammar-card');
+                if (card) card.style.display = 'none';
+            }
+            syncGrammarToggleUI();
+        };
+
+        function syncGrammarToggleUI() {
+            const btn = document.getElementById('btn-grammar-toggle');
+            const label = document.getElementById('grammar-toggle-label');
+            if (!btn || !label) return;
+            const off = isGrammarOff();
+            label.textContent = off ? 'Grammar: Off' : 'Grammar: On';
+            btn.style.background = off ? '#fef2f2' : '#fff';
+            btn.style.color = off ? '#b91c1c' : '#475569';
+            btn.style.borderColor = off ? '#fca5a5' : '#e2e8f0';
+        }
+
         // V92.15: TH/EN/KR segmented pills replace the language <select>. Hidden input keeps id "ai-lang-review"
         // so existing readers (getAISuggestion, applyReflectiveFocusLanguage caller) work unchanged.
         window.selectReflectiveReviewLang = function(btn) {
@@ -15298,11 +15329,13 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
                 // V94.18: grammar model now driven by chip rail in Writing Analysis card header
                 // (#ai-model-grammar hidden input, default gemini-3.5-flash). Helper getGrammarModel().
                 const grammarModel = getGrammarModel();
+                // V94.25: Phase 4 — admin can toggle grammar off to save the second AI call.
+                const grammarOff = isGrammarOff();
                 const [feedbackResult, grammarResult] = await Promise.allSettled([
                     window.callUniversalAI(selectedModelName, feedbackPrompt, true),
                     // V94.09: isJson=true → proxy sets responseMimeType:application/json
                     // so the grammar response is raw JSON (no ```json markdown fences).
-                    window.callUniversalAI(grammarModel, grammarPrompt, true)
+                    grammarOff ? Promise.resolve(null) : window.callUniversalAI(grammarModel, grammarPrompt, true)
                 ]);
 
                 if (feedbackResult.status === 'fulfilled') {
@@ -15333,7 +15366,11 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
                     throw feedbackResult.reason;
                 }
 
-                if (grammarResult.status === 'fulfilled') {
+                if (grammarOff) {
+                    // V94.25: grammar disabled via toggle — keep card hidden, skip render+persist.
+                    const card = document.getElementById('reflective-grammar-card');
+                    if (card) card.style.display = 'none';
+                } else if (grammarResult.status === 'fulfilled') {
                     renderGrammarAnalysis(grammarResult.value.text, grammarSource);
                     saveGrammarCache(grammarResult.value.text, grammarSource);
                     persistGrammarGrade(grammarResult.value.text, grammarModel);
@@ -15527,6 +15564,12 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         }
 
         window.runGrammarOnly = async function(btn) {
+            // V94.25: respect the Phase 4 grammar toggle — if off, hide card and bail.
+            if (isGrammarOff()) {
+                const card = document.getElementById('reflective-grammar-card');
+                if (card) card.style.display = 'none';
+                return;
+            }
             const logContent = document.getElementById('reflective-review-user-info').innerText;
             const rawContent = document.getElementById('reflective-review-raw-content').value.trim();
             const grammarSource = rawContent || logContent;
@@ -36192,6 +36235,8 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 document.querySelectorAll('.reflective-grammar-model-chip').forEach(chip => {
                     chip.classList.toggle('active', chip.dataset.value === grammarPref);
                 });
+                // V94.25: Phase 4 grammar on/off toggle — sync UI from localStorage.
+                if (typeof syncGrammarToggleUI === 'function') syncGrammarToggleUI();
                 // [V91.42] Refresh rewrite chips state based on draft length
                 if (typeof updateReflectiveRewriteChipsState === 'function') updateReflectiveRewriteChipsState();
                 // [V91.43] Hide stale bonus suggestion from previous review
