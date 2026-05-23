@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.21</title>
+    <title>Nika V94.22</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15328,6 +15328,7 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
                 if (grammarResult.status === 'fulfilled') {
                     renderGrammarAnalysis(grammarResult.value.text, grammarSource);
                     saveGrammarCache(grammarResult.value.text, grammarSource);
+                    persistGrammarGrade(grammarResult.value.text, grammarModel);
                 } else {
                     // V93.77: surface grammar failures instead of silent-hiding the card.
                     // V93.94: fall back to cached grammar (if any, same content) before showing the error banner —
@@ -15464,6 +15465,25 @@ For "changes": list every meaningful edit between original and improved. Each en
             } catch (e) { return null; }
         }
 
+        // V94.22: best-effort write of latest grammar grade for PR 2 trend chart on userProfileModal.
+        async function persistGrammarGrade(rawText, model) {
+            try {
+                const logId = document.getElementById('reflective-review-id').value;
+                if (!logId) return;
+                const match = String(rawText || '').match(/\{[\s\S]*\}/);
+                const parsed = JSON.parse(match ? match[0] : rawText);
+                const grade = parsed && parsed.grade;
+                if (!['ดี', 'พอใช้', 'ควรปรับ'].includes(grade)) return;
+                await db.collection('reflective_logs').doc(logId).update({
+                    latestGrammarGrade: grade,
+                    latestGrammarModel: String(model || ''),
+                    latestGrammarTs: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } catch (e) {
+                console.warn('[reflective-grammar] persist failed (non-fatal):', e);
+            }
+        }
+
         window.runGrammarOnly = async function(btn) {
             const logContent = document.getElementById('reflective-review-user-info').innerText;
             const rawContent = document.getElementById('reflective-review-raw-content').value.trim();
@@ -15481,6 +15501,7 @@ For "changes": list every meaningful edit between original and improved. Each en
                 const result = await window.callUniversalAI(grammarModel, buildGrammarPrompt(grammarSource), true);
                 renderGrammarAnalysis(result.text, grammarSource);
                 saveGrammarCache(result.text, grammarSource);
+                persistGrammarGrade(result.text, grammarModel);
                 setReflectiveReviewStatus('');
             } catch (err) {
                 const reason = (err && err.message) || String(err || 'Unknown error');
