@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.20</title>
+    <title>Nika V94.21</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15604,19 +15604,162 @@ For "changes": list every meaningful edit between original and improved. Each en
             }
 
             const cleanChanges = (data.changes || []).filter(c => c && qfpNormalizeTopic(c.from) && qfpNormalizeTopic(c.to) && qfpNormalizeTopic(c.reason));
+
+            // V94.21: Phase 3 Apply suggestion buttons. Session-only in-memory sandbox
+            // per log id. Admin cherry-picks individual changes; the original learner
+            // content is NEVER mutated (read-only by current UI contract).
+            // Register changes for click handlers (avoids inline onclick string escapes).
+            const logIdNow = (document.getElementById('reflective-review-id') || {}).value || '';
+            if (logIdNow && cleanChanges.length > 0) {
+                if (!window._grammarChangesByLog) window._grammarChangesByLog = {};
+                window._grammarChangesByLog[logIdNow] = cleanChanges;
+            }
+            if (logIdNow && cleanChanges.length > 0) {
+                html += renderGrammarSandboxPanel(logIdNow, originalText, cleanChanges);
+            }
+
             if (cleanChanges.length > 0) {
                 html += `<div>
                     <div style="font-size:0.7em; font-weight:900; color:#0e7490; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">📚 Why these changes ทำไมถึงปรับ</div>
-                    ${cleanChanges.map(c => `<div style="font-size:0.8em; background:#f0f9ff; border-left:3px solid #0ea5e9; padding:6px 9px; border-radius:0 8px 8px 0; margin-bottom:5px; line-height:1.5;">
-                        <div style="font-size:0.92em; margin-bottom:3px;"><span style="background:#fee2e2; color:#991b1b; padding:1px 5px; border-radius:3px; text-decoration:line-through; opacity:0.75;">${escapeHtml(c.from)}</span> <span style="color:#64748b; font-weight:700; padding:0 4px;">→</span> <span style="background:#dcfce7; color:#166534; padding:1px 5px; border-radius:3px; font-weight:600;">${escapeHtml(c.to)}</span></div>
-                        <div style="color:#0c4a6e;">${escapeHtml(c.reason)}</div>
-                    </div>`).join('')}
+                    ${cleanChanges.map((c, idx) => {
+                        const sandbox = logIdNow ? getGrammarSandbox(logIdNow, originalText) : null;
+                        const applied = sandbox && sandbox.applied[idx];
+                        const applyBtn = logIdNow
+                            ? (applied
+                                ? `<button type="button" disabled title="Already applied" style="flex:0 0 auto; background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:3px 9px; border-radius:8px; font-weight:800; font-size:0.78em; cursor:not-allowed;">✓ Applied</button>`
+                                : `<button type="button" onclick="grammarApplyChange(${idx})" title="Apply this change to the preview below" style="flex:0 0 auto; background:#ffffff; border:1px solid #0ea5e9; color:#0369a1; padding:3px 9px; border-radius:8px; font-weight:800; font-size:0.78em; cursor:pointer;">Apply</button>`)
+                            : '';
+                        return `<div style="font-size:0.8em; background:#f0f9ff; border-left:3px solid #0ea5e9; padding:6px 9px; border-radius:0 8px 8px 0; margin-bottom:5px; line-height:1.5;">
+                            <div style="display:flex; align-items:flex-start; gap:8px;">
+                                <div style="flex:1 1 auto; min-width:0;">
+                                    <div style="font-size:0.92em; margin-bottom:3px;"><span style="background:#fee2e2; color:#991b1b; padding:1px 5px; border-radius:3px; text-decoration:line-through; opacity:0.75;">${escapeHtml(c.from)}</span> <span style="color:#64748b; font-weight:700; padding:0 4px;">→</span> <span style="background:#dcfce7; color:#166534; padding:1px 5px; border-radius:3px; font-weight:600;">${escapeHtml(c.to)}</span></div>
+                                    <div style="color:#0c4a6e;">${escapeHtml(c.reason)}</div>
+                                </div>
+                                ${applyBtn}
+                            </div>
+                        </div>`;
+                    }).join('')}
                 </div>`;
             }
 
             content.innerHTML = html || `<div style="font-size:0.82em; color:#15803d;">✅ Writing looks good — no issues to fix การเขียนดี ไม่พบจุดที่ต้องแก้ไข</div>`;
             card.style.display = '';
         }
+
+        // V94.21: Sandbox state (session-only, in-memory, keyed by log id + original text).
+        // Resets when the original text changes (admin switches logs or edits the source).
+        // Original learner content is NEVER mutated — this is a working copy for admin reference.
+        function getGrammarSandbox(logId, originalText) {
+            if (!window._grammarSandbox) window._grammarSandbox = {};
+            const key = String(logId || '');
+            let entry = window._grammarSandbox[key];
+            if (!entry || entry.original !== originalText) {
+                entry = { text: String(originalText || ''), original: String(originalText || ''), applied: {} };
+                window._grammarSandbox[key] = entry;
+            }
+            return entry;
+        }
+
+        function renderGrammarSandboxPanel(logId, originalText, cleanChanges) {
+            const sandbox = getGrammarSandbox(logId, originalText);
+            const total = cleanChanges.length;
+            const appliedCount = Object.values(sandbox.applied).filter(Boolean).length;
+            const isEmpty = appliedCount === 0;
+            const previewBody = isEmpty
+                ? `<div style="font-size:0.82em; color:#64748b; font-style:italic;">Click <b>Apply</b> on individual changes below to build a polished version here. Original learner content is not modified.</div>`
+                : `<div style="font-size:0.85em; color:#1e293b; line-height:1.6;">${renderWordDiff(sandbox.original, sandbox.text)}</div>`;
+            const allApplied = appliedCount >= total;
+            const applyAllBtn = allApplied
+                ? `<button type="button" disabled style="background:#e2e8f0; color:#94a3b8; border:0; padding:4px 10px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:not-allowed;">All applied</button>`
+                : `<button type="button" onclick="grammarApplyAll()" title="Apply every remaining change to the preview" style="background:#0ea5e9; color:white; border:0; padding:4px 10px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:pointer;">Apply all</button>`;
+            const resetBtn = isEmpty
+                ? `<button type="button" disabled style="background:#f1f5f9; color:#94a3b8; border:1px solid #e2e8f0; padding:4px 10px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:not-allowed;">Reset</button>`
+                : `<button type="button" onclick="grammarResetSandbox()" title="Discard applied changes — sandbox returns to original" style="background:#ffffff; color:#475569; border:1px solid #cbd5e1; padding:4px 10px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:pointer;">Reset</button>`;
+            const copyBtn = isEmpty
+                ? `<button type="button" disabled style="background:#f1f5f9; color:#94a3b8; border:1px solid #e2e8f0; padding:4px 10px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:not-allowed;">Copy</button>`
+                : `<button type="button" onclick="grammarCopySandbox()" title="Copy the current preview text to clipboard" style="background:#ffffff; color:#475569; border:1px solid #cbd5e1; padding:4px 10px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:pointer;">📋 Copy</button>`;
+            return `<div style="margin-bottom:8px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:5px;">
+                    <div style="font-size:0.7em; font-weight:900; color:#4338ca; text-transform:uppercase; letter-spacing:0.05em;">🛠 Edited preview (admin sandbox)</div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="font-size:0.7em; font-weight:800; color:${appliedCount > 0 ? '#4338ca' : '#94a3b8'};">${appliedCount} / ${total} applied</span>
+                        ${applyAllBtn}
+                        ${resetBtn}
+                        ${copyBtn}
+                    </div>
+                </div>
+                <div style="background:${isEmpty ? '#f8fafc' : '#eef2ff'}; border:1px dashed ${isEmpty ? '#cbd5e1' : '#a5b4fc'}; padding:9px 11px; border-radius:10px;">${previewBody}</div>
+            </div>`;
+        }
+
+        function getGrammarCurrentLogId() {
+            return (document.getElementById('reflective-review-id') || {}).value || '';
+        }
+
+        window.grammarApplyChange = function(idx) {
+            const logId = getGrammarCurrentLogId();
+            const changes = ((window._grammarChangesByLog || {})[logId]) || [];
+            const ch = changes[idx];
+            if (!ch) return;
+            const cached = ((window._reflectiveGrammarCache || {})[logId]) || {};
+            const sandbox = getGrammarSandbox(logId, cached.originalText || '');
+            if (sandbox.applied[idx]) return;
+            const from = String(ch.from || '');
+            const to = String(ch.to || '');
+            if (!from) return;
+            if (sandbox.text.indexOf(from) < 0) {
+                if (typeof showToast === 'function') showToast(`⚠ "${from.slice(0, 30)}${from.length > 30 ? '…' : ''}" not found in current preview`);
+                return;
+            }
+            sandbox.text = sandbox.text.replace(from, to);
+            sandbox.applied[idx] = true;
+            // Re-render the Writing Analysis card from cache to refresh sandbox panel + button state.
+            if (cached.rawText) renderGrammarAnalysis(cached.rawText, cached.originalText);
+        };
+
+        window.grammarApplyAll = function() {
+            const logId = getGrammarCurrentLogId();
+            const changes = ((window._grammarChangesByLog || {})[logId]) || [];
+            const cached = ((window._reflectiveGrammarCache || {})[logId]) || {};
+            const sandbox = getGrammarSandbox(logId, cached.originalText || '');
+            let appliedCount = 0;
+            let skippedCount = 0;
+            changes.forEach((ch, idx) => {
+                if (sandbox.applied[idx]) return;
+                const from = String(ch.from || '');
+                const to = String(ch.to || '');
+                if (!from || sandbox.text.indexOf(from) < 0) { skippedCount++; return; }
+                sandbox.text = sandbox.text.replace(from, to);
+                sandbox.applied[idx] = true;
+                appliedCount++;
+            });
+            if (typeof showToast === 'function') {
+                if (appliedCount && !skippedCount) showToast(`✓ Applied ${appliedCount} change${appliedCount > 1 ? 's' : ''}`);
+                else if (appliedCount && skippedCount) showToast(`✓ Applied ${appliedCount}, skipped ${skippedCount} (substring not found)`);
+                else if (skippedCount) showToast(`⚠ Skipped ${skippedCount} — substrings not found in preview`);
+            }
+            if (cached.rawText) renderGrammarAnalysis(cached.rawText, cached.originalText);
+        };
+
+        window.grammarResetSandbox = function() {
+            const logId = getGrammarCurrentLogId();
+            if (!window._grammarSandbox || !window._grammarSandbox[logId]) return;
+            delete window._grammarSandbox[logId];
+            const cached = ((window._reflectiveGrammarCache || {})[logId]) || {};
+            if (cached.rawText) renderGrammarAnalysis(cached.rawText, cached.originalText);
+        };
+
+        window.grammarCopySandbox = async function() {
+            const logId = getGrammarCurrentLogId();
+            const sandbox = (window._grammarSandbox || {})[logId];
+            if (!sandbox || !sandbox.text) return;
+            try {
+                await navigator.clipboard.writeText(sandbox.text);
+                if (typeof showToast === 'function') showToast('📋 Copied edited preview to clipboard');
+            } catch (e) {
+                if (typeof showToast === 'function') showToast('Copy failed — select and copy manually');
+            }
+        };
 
         window.copyQuestionToClipboard = function(btn) {
             const item = btn.closest('.quiz-q-item');
