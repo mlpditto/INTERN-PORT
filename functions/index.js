@@ -345,25 +345,25 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             const client = await auth.getClient();
             const token = await client.getAccessToken();
 
-            let actualModelName = model || "gemini-2.5-flash";
+            let actualModelName = model || "gemini-3.5-flash";
 
-            // V93.95: Normalize only legacy/alias model names; pass current `gemini-2.5-*`
-            // ids straight through. The previous block (V89.90) rewrote EVERY `gemini-*`
-            // request to a `gemini-3*` family that does not exist on Vertex AI for this
-            // project — every gemini proxy call returned 404 "Publisher Model not found".
-            // Vertex GA is the 2.5 family and the frontend already sends specific 2.5 ids
-            // (V93.31 PR #262); only callers passing `multimodal` / `gemini-flash` / legacy
-            // 1.5 / 2.0 / mistaken gemini-3 names need mapping to a current GA model.
+            // V93.95: Normalize only legacy/alias model names; pass current ids straight
+            //   through. The previous block (V89.90) rewrote EVERY `gemini-*` request to a
+            //   `gemini-3*` family that did not exist on Vertex AI then — every gemini
+            //   proxy call returned 404 "Publisher Model not found".
+            // V94.12: Flash chips refreshed to gemini-3.5-flash (Google I/O 2026 GA).
+            //   Removed the `gemini-3` substring catch from V93.95 — it would have
+            //   rewritten the new 3.5-flash chip back to 2.5. Pro alias still maps to
+            //   2.5-pro because gemini-3.5-pro is not GA yet (Google: June 2026).
             const reqModel = (model || '').toLowerCase();
             const isLegacyAlias = !reqModel
                 || reqModel === 'multimodal'
                 || reqModel === 'gemini-flash'
                 || reqModel === 'gemini-pro'
                 || reqModel.includes('1.5')
-                || reqModel.includes('2.0')
-                || reqModel.includes('gemini-3');
+                || reqModel.includes('2.0');
             if (isLegacyAlias) {
-                actualModelName = reqModel.includes('pro') ? "gemini-2.5-pro" : "gemini-2.5-flash";
+                actualModelName = reqModel.includes('pro') ? "gemini-2.5-pro" : "gemini-3.5-flash";
             }
 
             // V93.95: Gemini on Vertex AI must use the :generateContent endpoint. The
