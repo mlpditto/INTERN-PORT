@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.19</title>
+    <title>Nika V94.20</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -36635,12 +36635,53 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             return { improvedQ: normalizedImprovedQ, allQs };
         }
 
-        function pickAiInsertMode() {
-            const mode = (prompt('Insert improved question where?\n- before\n- after\n- end', 'after') || '').trim().toLowerCase();
-            if (!mode) return null;
-            if (mode === 'before' || mode === 'after' || mode === 'end') return mode;
-            alert("Invalid position. Please use: before, after, or end.");
-            return null;
+        // V94.20: Replace blocking prompt() with a 3-button modal picker.
+        // Returns Promise<'before'|'after'|'end'|null>. null = cancelled.
+        // Why: prompt() is throttled inside timer callbacks (see feedback_browser_dialog_throttle.md
+        // V93.41 incident), free-typed positions invite typos, and 3 fixed choices map cleanly to buttons.
+        function pickAiInsertMode(currentIndex) {
+            return new Promise(resolve => {
+                const qLabel = Number.isFinite(currentIndex) ? `Q${currentIndex + 1}` : 'the current question';
+                const overlay = document.createElement('div');
+                overlay.id = 'ai-insert-mode-overlay';
+                overlay.style.cssText = 'position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:100001; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);';
+                overlay.innerHTML = `
+                    <div role="dialog" aria-label="Insert position" style="background:#ffffff; border-radius:18px; padding:22px 24px; max-width:420px; width:90%; box-shadow:0 24px 60px rgba(15,23,42,0.28); border:1px solid rgba(226,232,240,0.9);">
+                        <div style="font-size:1.05em; font-weight:900; color:#0f172a; margin-bottom:6px;">Insert improved question where?</div>
+                        <div style="font-size:0.85em; color:#64748b; margin-bottom:16px; line-height:1.5;">Pick a position relative to <b>${qLabel}</b>.</div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:12px;">
+                            <button type="button" data-mode="before" style="padding:12px 8px; border-radius:12px; border:1.5px solid #cbd5e1; background:#f8fafc; color:#0f172a; font-weight:800; font-size:0.85em; cursor:pointer; transition:all 0.15s ease;">⬆ Before<br><span style="font-size:0.75em; color:#64748b; font-weight:600;">${qLabel}</span></button>
+                            <button type="button" data-mode="after" autofocus style="padding:12px 8px; border-radius:12px; border:1.5px solid #0ea5e9; background:linear-gradient(135deg,#0ea5e9 0%,#0284c7 100%); color:white; font-weight:800; font-size:0.85em; cursor:pointer; box-shadow:0 6px 16px rgba(14,165,233,0.28); transition:all 0.15s ease;">⬇ After<br><span style="font-size:0.75em; color:rgba(255,255,255,0.85); font-weight:600;">${qLabel}</span></button>
+                            <button type="button" data-mode="end" style="padding:12px 8px; border-radius:12px; border:1.5px solid #cbd5e1; background:#f8fafc; color:#0f172a; font-weight:800; font-size:0.85em; cursor:pointer; transition:all 0.15s ease;">⤓ At end<br><span style="font-size:0.75em; color:#64748b; font-weight:600;">of quiz</span></button>
+                        </div>
+                        <div style="display:flex; justify-content:flex-end;">
+                            <button type="button" data-mode="cancel" style="padding:8px 16px; border-radius:10px; border:1px solid #e2e8f0; background:#ffffff; color:#475569; font-weight:700; font-size:0.82em; cursor:pointer;">Cancel</button>
+                        </div>
+                    </div>
+                `;
+                const close = (mode) => {
+                    document.removeEventListener('keydown', onKey);
+                    overlay.remove();
+                    resolve(mode);
+                };
+                const onKey = (e) => {
+                    if (e.key === 'Escape') close(null);
+                    else if (e.key === 'Enter') close('after');
+                };
+                overlay.addEventListener('click', (e) => {
+                    if (e.target === overlay) return close(null);
+                    const btn = e.target.closest('button[data-mode]');
+                    if (!btn) return;
+                    const mode = btn.dataset.mode;
+                    close(mode === 'cancel' ? null : mode);
+                });
+                document.addEventListener('keydown', onKey);
+                document.body.appendChild(overlay);
+                requestAnimationFrame(() => {
+                    const def = overlay.querySelector('button[data-mode="after"]');
+                    if (def) def.focus();
+                });
+            });
         }
 
         function ensureQuizTag(tagName) {
@@ -36704,21 +36745,21 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             }
         };
 
-        window.addSingleAiAsNewQuestion = function(index, improvedArg) {
+        window.addSingleAiAsNewQuestion = async function(index, improvedArg) {
             try {
                 const { improvedQ, allQs } = getImprovedQuestionPayload(index, improvedArg);
                 const diffState = window.getAiImprovementDiffState(allQs[index], improvedQ);
                 if (!diffState.hasMeaningfulDiff) {
                     return alert("This improved version is still too similar to the original. Please regenerate a different fix first.");
                 }
-                const mode = pickAiInsertMode();
+                // V94.20: button modal replaces prompt(). Selecting a button = confirmation,
+                // so the legacy second confirm() step was removed (admin already made a deliberate choice).
+                const mode = await pickAiInsertMode(index);
                 if (!mode) return;
 
                 let insertAt = Math.min(allQs.length, index + 1);
                 if (mode === 'before') insertAt = Math.max(0, index);
                 if (mode === 'end') insertAt = allQs.length;
-
-                if (!confirm(`Add improved version as a NEW question (${mode})?`)) return;
 
                 allQs.splice(insertAt, 0, improvedQ);
                 ensureQuizTag('AI_VARIANT');
