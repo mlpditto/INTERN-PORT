@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.25</title>
+    <title>Nika V94.26</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -14735,6 +14735,34 @@ RULES:
             btn.style.borderColor = off ? '#fca5a5' : '#e2e8f0';
         }
 
+        // V94.26: Phase 4 Item 2 — per-user grammar opt-out (privacy hook).
+        // Intern can flip users/{uid}.grammarOptOut from the Settings modal in index.html.
+        // When true, admin's getAISuggestion + runGrammarOnly skip the grammar call and
+        // render a banner instead. Independent of the admin-side isGrammarOff() global toggle.
+        async function isUserGrammarOptedOut(uid) {
+            if (!uid) return false;
+            try {
+                const snap = await db.collection('users').doc(uid).get();
+                return !!(snap.exists && snap.data() && snap.data().grammarOptOut === true);
+            } catch (e) {
+                console.warn('[reflective-grammar] opt-out lookup failed (treating as opted-in):', e.message);
+                return false;
+            }
+        }
+
+        function renderGrammarOptOutBanner() {
+            const card = document.getElementById('reflective-grammar-card');
+            const content = document.getElementById('reflective-grammar-content');
+            const badge = document.getElementById('reflective-grammar-score');
+            if (!card || !content) return;
+            if (badge) {
+                badge.textContent = '🔒';
+                badge.style.cssText = 'font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;';
+            }
+            content.innerHTML = '<div style="font-size:0.82em; color:#475569; background:#f8fafc; border-left:3px solid #94a3b8; padding:8px 11px; border-radius:0 8px 8px 0; line-height:1.5;"><i class="fa-solid fa-shield-halved" style="margin-right:6px; color:#64748b;"></i>User opted out of grammar analysis.<div style="font-size:0.88em; color:#94a3b8; margin-top:4px;">Privacy preference set in their Settings.</div></div>';
+            card.style.display = '';
+        }
+
         // V92.15: TH/EN/KR segmented pills replace the language <select>. Hidden input keeps id "ai-lang-review"
         // so existing readers (getAISuggestion, applyReflectiveFocusLanguage caller) work unchanged.
         window.selectReflectiveReviewLang = function(btn) {
@@ -15330,12 +15358,16 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
                 // (#ai-model-grammar hidden input, default gemini-3.5-flash). Helper getGrammarModel().
                 const grammarModel = getGrammarModel();
                 // V94.25: Phase 4 — admin can toggle grammar off to save the second AI call.
+                // V94.26: Phase 4 Item 2 — per-user opt-out (privacy hook). Reads users/{uid}.grammarOptOut.
                 const grammarOff = isGrammarOff();
+                const reviewUid = (document.getElementById('reflective-review-uid') || {}).value || '';
+                const userOptedOut = grammarOff ? false : await isUserGrammarOptedOut(reviewUid);
+                const skipGrammar = grammarOff || userOptedOut;
                 const [feedbackResult, grammarResult] = await Promise.allSettled([
                     window.callUniversalAI(selectedModelName, feedbackPrompt, true),
                     // V94.09: isJson=true → proxy sets responseMimeType:application/json
                     // so the grammar response is raw JSON (no ```json markdown fences).
-                    grammarOff ? Promise.resolve(null) : window.callUniversalAI(grammarModel, grammarPrompt, true)
+                    skipGrammar ? Promise.resolve(null) : window.callUniversalAI(grammarModel, grammarPrompt, true)
                 ]);
 
                 if (feedbackResult.status === 'fulfilled') {
@@ -15370,6 +15402,9 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
                     // V94.25: grammar disabled via toggle — keep card hidden, skip render+persist.
                     const card = document.getElementById('reflective-grammar-card');
                     if (card) card.style.display = 'none';
+                } else if (userOptedOut) {
+                    // V94.26: intern set grammarOptOut=true — show banner, skip persist.
+                    renderGrammarOptOutBanner();
                 } else if (grammarResult.status === 'fulfilled') {
                     renderGrammarAnalysis(grammarResult.value.text, grammarSource);
                     saveGrammarCache(grammarResult.value.text, grammarSource);
@@ -15568,6 +15603,12 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             if (isGrammarOff()) {
                 const card = document.getElementById('reflective-grammar-card');
                 if (card) card.style.display = 'none';
+                return;
+            }
+            // V94.26: respect per-user opt-out — render banner instead of retrying.
+            const reviewUid = (document.getElementById('reflective-review-uid') || {}).value || '';
+            if (await isUserGrammarOptedOut(reviewUid)) {
+                renderGrammarOptOutBanner();
                 return;
             }
             const logContent = document.getElementById('reflective-review-user-info').innerText;
@@ -36214,9 +36255,16 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             setReflectiveReviewStatus('');
             // V93.94: surface cached grammar on reopen when log content hasn't changed since the cached run.
             // Saves the admin a Gemini call when revisiting a reviewed log within the same session.
+            // V94.26: skip cached-render if the intern has since opted out — show banner instead so
+            // privacy preference takes effect even on cached results from before they opted out.
             try {
                 const cached = loadGrammarCache(log.content || '');
-                if (cached) renderGrammarAnalysis(cached.rawText, cached.originalText);
+                if (cached) {
+                    isUserGrammarOptedOut(uid).then(optedOut => {
+                        if (optedOut) renderGrammarOptOutBanner();
+                        else renderGrammarAnalysis(cached.rawText, cached.originalText);
+                    }).catch(() => renderGrammarAnalysis(cached.rawText, cached.originalText));
+                }
             } catch (e) { /* non-fatal */ }
             // [V91.41] Sync pills/chips with current state on modal open
             try {
