@@ -45,6 +45,23 @@ async function resolvePreferredLanguage(lineUserId) {
     }
 }
 
+// γ.4b.5 — per-user opt-out for admin → student LINE pushes. Intern flips
+// users/{lineUserId}.lineNotifyOptOut from the Settings modal in index.html.
+// Returns true only when the field is explicitly true so missing/legacy docs
+// (16+ existing users without the field) continue to receive notifications.
+// Lookup failures are treated as opted-in to avoid silently dropping pushes
+// on a permissions glitch.
+async function isLineNotifyOptedOut(lineUserId) {
+    if (!lineUserId) return false;
+    try {
+        const doc = await admin.firestore().collection('users').doc(lineUserId).get();
+        return !!(doc.exists && doc.data() && doc.data().lineNotifyOptOut === true);
+    } catch (err) {
+        console.warn(`[line-notify] opt-out lookup failed for ${lineUserId}:`, err.message);
+        return false;
+    }
+}
+
 const LINE_I18N = {
     reviewReply: {
         title:     { en: '💬 Admin Review Reply', th: '💬 แอดมินตอบรีวิว',  kr: '💬 관리자 리뷰 답변' },
@@ -764,6 +781,11 @@ exports.notifyOnReviewMessage = onCall(
     if (!lineUserId || typeof lineUserId !== 'string' || !lineUserId.startsWith('U')) {
         console.warn(`[notifyOnReviewMessage] invalid rawLiffUserId for authUid=${studentAuthUid}: ${lineUserId}`);
         return { skipped: true, reason: 'invalid-lineUserId' };
+    }
+
+    if (await isLineNotifyOptedOut(lineUserId)) {
+        console.log(`[notifyOnReviewMessage] skip — user-opt-out lineUserId=${lineUserId}`);
+        return { skipped: true, reason: 'user-opt-out' };
     }
 
     const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
