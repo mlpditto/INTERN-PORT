@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.26</title>
+    <title>Nika V94.27</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -5962,9 +5962,21 @@
                                     <div style="font-size:0.72em; color:#6b5cea; background:#f0efff; padding:6px 12px; border-radius:10px; display:inline-flex; align-items:center; gap:8px; font-weight:800; border:1px solid #dcd4ff; max-width:fit-content; margin-bottom:5px;">
                                         <i class="fa-solid fa-wand-sparkles"></i> <span style="text-transform:uppercase; letter-spacing:0.5px;">Master Formula:</span> Context + Goal + Source + Expectations
                                     </div>
-                                    <textarea id="design-prompt" placeholder="[Context + Goal + Source + Expectations] Describe the image, object, or location you want AI to generate..." 
+                                    <textarea id="design-prompt" placeholder="[Context + Goal + Source + Expectations] Describe the image, object, or location you want AI to generate..."
                                         style="height:150px; border-radius:24px; border:2px solid #f1f3f5; background:#f9fbff; padding:25px; font-size:1.1em; width:100%; box-sizing:border-box; outline:none; transition:0.3s; resize:none;"></textarea>
-                                    
+
+                                    <!-- V94.27: Phase 3-C — Step 1 enhancer model picker (Thai→English + artistic enhancement).
+                                         Chip rail mirrors V94.18 grammar picker. Default keeps Gemini 3.5 Flash (no regression);
+                                         OpenRouter GPT-4o-mini added as the all-OpenRouter consistency option from the parked plan. -->
+                                    <div style="display:flex; align-items:center; gap:10px; padding:8px 14px; background:#f8fafc; border-radius:14px; border:1px solid #edf2f7; flex-wrap:wrap;">
+                                        <span style="font-size:0.66em; text-transform:uppercase; letter-spacing:0.6px; color:#94a3b8; font-weight:800; flex-shrink:0;"><i class="fa-solid fa-pen-fancy"></i> Enhancer</span>
+                                        <div class="alabasta-genmage-quick-rail" role="radiogroup" aria-label="Step 1 enhancer model" style="flex-wrap:wrap;">
+                                            <button type="button" class="alabasta-genmage-quick-chip active" data-value="gemini-3.5-flash" onclick="selectAIDesignEnhancerModel(this)" title="Google Vertex — Gemini 3.5 Flash. Default. Has local SDK fallback if proxy fails.">⚡ Gemini Flash · Vertex</button>
+                                            <button type="button" class="alabasta-genmage-quick-chip" data-value="or/openai/gpt-4o-mini" onclick="selectAIDesignEnhancerModel(this)" title="OpenRouter — OpenAI GPT-4o mini. Lightweight + fast; no local fallback.">🤖 GPT-4o mini · OR</button>
+                                        </div>
+                                        <input type="hidden" id="ai-model-design-enhancer" value="gemini-3.5-flash">
+                                    </div>
+
                                     <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:15px; background:#f8fafc; padding:15px 20px; border-radius:20px; border:1px solid #edf2f7;">
                                         <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
                                             <i class="fa-solid fa-microchip" style="color:#94a3b8; flex-shrink:0;"></i>
@@ -14546,6 +14558,47 @@ RULES:
             else apply();
         })();
 
+        // V94.27: Phase 3-C — Step 1 enhancer model picker (sister rail to selectDesignEngine).
+        // Default 'gemini-3.5-flash' preserves prior behavior; OpenRouter chips are opt-in.
+        // Plain text task (Thai→English prompt enhancement) — no JSON contract, so model choice
+        // is low-risk. Falls back to default if a stale saved value is no longer in the rail.
+        window.AI_DESIGN_ENHANCER_PREF_KEY = 'ai_default_design_enhancer_model';
+        window.AI_DESIGN_ENHANCER_VALID = ['gemini-3.5-flash', 'or/openai/gpt-4o-mini'];
+
+        window.selectAIDesignEnhancerModel = function(btn) {
+            if (!btn) return;
+            const value = btn.dataset.value || 'gemini-3.5-flash';
+            document.querySelectorAll('.alabasta-genmage-quick-rail[aria-label="Step 1 enhancer model"] .alabasta-genmage-quick-chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.value === value);
+            });
+            const hidden = document.getElementById('ai-model-design-enhancer');
+            if (hidden) hidden.value = value;
+            try { localStorage.setItem(window.AI_DESIGN_ENHANCER_PREF_KEY, value); } catch (e) {}
+        };
+
+        window.getAIDesignEnhancerModel = function() {
+            const hidden = document.getElementById('ai-model-design-enhancer');
+            const val = hidden && hidden.value;
+            return val || 'gemini-3.5-flash';
+        };
+
+        (function restoreAIDesignEnhancerPref() {
+            const apply = function() {
+                try {
+                    const saved = localStorage.getItem(window.AI_DESIGN_ENHANCER_PREF_KEY);
+                    if (!saved) return;
+                    if (!window.AI_DESIGN_ENHANCER_VALID.includes(saved)) {
+                        localStorage.removeItem(window.AI_DESIGN_ENHANCER_PREF_KEY);
+                        return;
+                    }
+                    const chip = document.querySelector('.alabasta-genmage-quick-rail[aria-label="Step 1 enhancer model"] .alabasta-genmage-quick-chip[data-value="' + saved + '"]');
+                    if (chip) window.selectAIDesignEnhancerModel(chip);
+                } catch (e) {}
+            };
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);
+            else apply();
+        })();
+
         window.generateAIDesign = async function() {
             const promptInput = document.getElementById('design-prompt');
             const style = document.getElementById('selected-design-style').value;
@@ -14589,7 +14642,10 @@ RULES:
                     OUTPUT ONLY THE STRUCTURED ENGLISH PROMPT. NO EXPLANATIONS.`;
                 }
                 
-                const { text: enhancedPrompt } = await callUniversalAI('gemini-3.5-flash', enhancerPrompt);
+                // V94.27: Phase 3-C — Step 1 enhancer model driven by chip rail (#ai-model-design-enhancer).
+                // Default 'gemini-3.5-flash' preserves prior behavior; admin can switch to OpenRouter chips.
+                const enhancerModel = getAIDesignEnhancerModel();
+                const { text: enhancedPrompt } = await callUniversalAI(enhancerModel, enhancerPrompt);
                 
                 // Step 2: Show Prompt Editor Modal ([Version: V87.17])
                 const finalPrompt = await new Promise((resolve) => {
