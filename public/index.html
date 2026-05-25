@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.83)</title>
+    <title>Internship Portfolio (V94.84)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -519,6 +519,70 @@
                 margin-bottom: 8px;
             }
         }
+
+        /* V94.84: ⋯ More dropdown for the 3 least-used Quick Actions
+           (Leaderboard / Enrollment Key / Personal Info). Mirrors the
+           admin-side .alabasta-more-menu + .quiz-more-menu pattern —
+           same <details>-based menu + click-outside coordinator JS. */
+        .profile-more-menu {
+            position: relative;
+            display: inline-block;
+        }
+        .profile-more-menu > summary {
+            list-style: none;
+            cursor: pointer;
+            user-select: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            padding: 0;
+            background: #f8fafc;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+        }
+        .profile-more-menu > summary::-webkit-details-marker { display: none; }
+        .profile-more-menu[open] > summary {
+            box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.32);
+        }
+        .profile-more-menu-body {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            min-width: 220px;
+            max-width: 280px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 16px 32px rgba(15, 23, 42, 0.14);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            z-index: 50;
+        }
+        .profile-more-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-align: left;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            padding: 9px 12px;
+            cursor: pointer;
+            color: #1f2937;
+            font-size: 0.86em;
+            font-weight: 700;
+            white-space: nowrap;
+            font-family: inherit;
+            transition: background 0.15s ease;
+        }
+        .profile-more-menu-item:hover { background: #f1f5f9; }
+        .profile-more-menu-item i { width: 18px; text-align: center; }
 
         /* Grid-optimized card styling */
         #assignments-container .assignment-card {
@@ -1761,18 +1825,24 @@
                 style="padding: 12px; position: relative; border-left: 5px solid #e67e22;">
                 <!-- Quick Actions (Top Right) -->
                 <div id="profile-quick-actions" style="position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 10;">
-                    <button class="btn-sm" onclick="openLeaderboard()"
-                        style="width: 28px; height: 28px; border-radius: 50%; padding: 0; background: #eef2ff; color: #4361ee; border: 1px solid #dbeafe; display: flex; align-items: center; justify-content: center; min-height: auto; font-size: 0.8em;">
-                        <i class="fa-solid fa-ranking-star"></i>
-                    </button>
-                    <button class="btn-sm" onclick="openEnrollmentCodeMatcher()" title="Match with Enrollment Key"
-                        style="width: 28px; height: 28px; border-radius: 50%; padding: 0; background: #f5f3ff; color: #6f42c1; border: 1px solid #ddd6fe; display: flex; align-items: center; justify-content: center; min-height: auto; font-size: 0.8em;">
-                        <i class="fa-solid fa-key"></i>
-                    </button>
-                    <button class="btn-sm" onclick="openPersonalInfoModal()"
-                        style="width: 28px; height: 28px; border-radius: 50%; padding: 0; background: #fff7ed; color: #e67e22; border: 1px solid #ffedd5; display: flex; align-items: center; justify-content: center; min-height: auto; font-size: 0.8em;">
-                        <i class="fa-solid fa-user-pen"></i>
-                    </button>
+                    <!-- V94.84: Phase 2 — collapse 3 least-used actions into a ⋯ More dropdown.
+                         Leaderboard / Enrollment Key / Personal Info live inside; KR/TH/Settings/Refresh stay visible. -->
+                    <details class="profile-more-menu">
+                        <summary title="More actions" aria-label="More actions">
+                            <i class="fa-solid fa-ellipsis"></i>
+                        </summary>
+                        <div class="profile-more-menu-body">
+                            <button type="button" class="profile-more-menu-item" onclick="closeProfileMoreMenus(); openLeaderboard();">
+                                <i class="fa-solid fa-ranking-star" style="color:#4361ee;"></i> Leaderboard
+                            </button>
+                            <button type="button" class="profile-more-menu-item" onclick="closeProfileMoreMenus(); openEnrollmentCodeMatcher();">
+                                <i class="fa-solid fa-key" style="color:#6f42c1;"></i> Match with Enrollment Key
+                            </button>
+                            <button type="button" class="profile-more-menu-item" onclick="closeProfileMoreMenus(); openPersonalInfoModal();">
+                                <i class="fa-solid fa-user-pen" style="color:#e67e22;"></i> Personal Info
+                            </button>
+                        </div>
+                    </details>
                     <!-- V94.23 Phase α: Language toggles (KR + TH) -->
                     <button id="lang-toggle-kr" class="btn-sm lang-toggle-btn" onclick="toggleLang('kr')" title="Toggle Korean labels" aria-pressed="false" aria-label="Toggle Korean labels">KR</button>
                     <button id="lang-toggle-th" class="btn-sm lang-toggle-btn" onclick="toggleLang('th')" title="Toggle Thai labels" aria-pressed="false" aria-label="Toggle Thai labels">TH</button>
@@ -5304,6 +5374,33 @@
             switchLeaderboardMode(leaderboardMode);
             renderLeaderboard();
         }
+
+        // V94.84: ⋯ More dropdown for the profile-card Quick Actions row.
+        // Mirrors the admin closeAlabastaMoreMenus / closeQuizMoreMenus pattern:
+        // click anywhere outside an open <details.profile-more-menu> closes it,
+        // and opening one menu closes any sibling menus (here only one exists,
+        // but the pattern is forward-compatible).
+        function closeProfileMoreMenus() {
+            document.querySelectorAll('details.profile-more-menu[open]').forEach(d => d.removeAttribute('open'));
+        }
+        (function setupProfileMoreMenuListeners() {
+            if (window._profileMoreMenuWired) return;
+            window._profileMoreMenuWired = true;
+            document.addEventListener('click', (e) => {
+                document.querySelectorAll('details.profile-more-menu[open]').forEach(d => {
+                    if (!d.contains(e.target)) d.removeAttribute('open');
+                });
+            });
+            // toggle doesn't bubble — capture phase
+            document.addEventListener('toggle', (e) => {
+                const t = e.target;
+                if (t && t.classList && t.classList.contains('profile-more-menu') && t.open) {
+                    document.querySelectorAll('details.profile-more-menu[open]').forEach(d => {
+                        if (d !== t) d.removeAttribute('open');
+                    });
+                }
+            }, true);
+        })();
 
         function renderLeaderboard() {
             const leaderboardContainer = document.getElementById('lb-list');
