@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.81)</title>
+    <title>Internship Portfolio (V94.82)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -13371,6 +13371,15 @@ async function archiveDoneCard(cardId) {
 
         function loadMyCases() {
             if (!userId) return;
+            // V94.82: query by BOTH the resolved userId (from resolveEffectiveUserId)
+            // and the raw LIFF userId. Submit-time and view-time can resolve to
+            // different userIds when an admin links a legacy users/{id} doc
+            // between sessions, leaving cases tagged with a userId the current
+            // resolver no longer returns. Firestore rule's hasLinkedEffectiveUserId
+            // was extended in V94.82 to OR-check `rawLiffUserId` on the auth link,
+            // so both queries pass permission checks.
+            const rawLiffUserId = (userProfile && userProfile.userId) ? userProfile.userId : userId;
+            const userIdsToQuery = [...new Set([userId, rawLiffUserId].filter(Boolean))];
             ensureFirebaseAuthReady(10000).then((authUser) => {
                 if (!authUser) throw new Error("Firebase auth is required");
                 // NOTE: No .orderBy() — avoids composite index requirement.
@@ -13378,7 +13387,7 @@ async function archiveDoneCard(cardId) {
                 // Promise.allSettled so one query failing won't hide the other.
                 return Promise.allSettled([
                     db.collection("cases").where("authUid", "==", authUser.uid).get(),
-                    db.collection("cases").where("userId", "==", userId).get()
+                    ...userIdsToQuery.map(id => db.collection("cases").where("userId", "==", id).get())
                 ]);
             }).then((results) => {
                 const merged = new Map();

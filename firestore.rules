@@ -18,10 +18,18 @@ service cloud.firestore {
       return isSignedIn() && resource.data.authUid == request.auth.uid;
     }
 
+    // V94.82: also accept rawLiffUserId so a case tagged with the raw LIFF
+    // userId stays readable after admin-side legacy-user linking flips
+    // effectiveUserId to a different value (Joeylive scenario). Both fields
+    // live on the same user_auth_links/{authUid} doc that's already upserted
+    // on every LIFF login — no migration needed.
     function hasLinkedEffectiveUserId() {
       return isSignedIn()
         && exists(/databases/$(database)/documents/user_auth_links/$(request.auth.uid))
-        && get(/databases/$(database)/documents/user_auth_links/$(request.auth.uid)).data.effectiveUserId == resource.data.userId;
+        && (
+          get(/databases/$(database)/documents/user_auth_links/$(request.auth.uid)).data.effectiveUserId == resource.data.userId
+          || get(/databases/$(database)/documents/user_auth_links/$(request.auth.uid)).data.rawLiffUserId == resource.data.userId
+        );
     }
 
     function hasAuthLinkToUserId(userId) {
