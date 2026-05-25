@@ -346,7 +346,10 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 messages: [{ role: "user", content: tailoredPrompt }],
                 response_format: (isJson && !actualModel.includes('o1')) ? { type: "json_object" } : undefined,
                 temperature: (actualModel.includes('o1') || actualModel.includes('gpt-5.4')) ? undefined : 0.7,
-                [actualModel.includes('o1') ? 'max_completion_tokens' : 'max_tokens']: isJson ? 4096 : 4096
+                // 2026-05-25: GPT-5.x family also requires `max_completion_tokens` (same as o1/o3).
+                // The proxy rewrites legacy `gpt-4*` → `gpt-5.4-mini` at line ~336, so anything
+                // gpt-4 from the client lands here as gpt-5.x and would 400 with `max_tokens`.
+                [(actualModel.includes('o1') || actualModel.includes('gpt-5')) ? 'max_completion_tokens' : 'max_tokens']: isJson ? 4096 : 4096
             };
 
             const response = await axios.post("https://api.openai.com/v1/chat/completions", body, {
@@ -523,16 +526,22 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             if (!apiKey) return res.status(500).json({ error: "Anthropic API Key not configured on server." });
 
             // Robust model mapping (V88.40 + Claude 4 family routing)
-            let actualModel = "claude-3-5-sonnet-20241022";
+            // 2026-05-25: Defaults bumped to Claude 4.x — verified that 3-5-sonnet-20241022
+            // (and other 3.x dated ids) now 404 on Anthropic API. AI Refine in admin (default
+            // chip = "claude-3-5-sonnet-latest") was breaking because it fell through to the
+            // 3-5-sonnet-20241022 fallback below. New defaults match the Claude 4 family the
+            // explicit branch already uses, so behavior is unified: any Claude request lands
+            // on a current model id regardless of legacy aliasing.
+            let actualModel = "claude-sonnet-4-6";
             // Claude 4 family — checked first so "claude-4-haiku" routes to 4.x haiku, not 3.5
             if (model.includes('claude-4') || model.includes('sonnet-4') || model.includes('haiku-4') || model.includes('opus-4')) {
                 if (model.includes('haiku')) actualModel = "claude-haiku-4-5";
                 else if (model.includes('opus')) actualModel = "claude-opus-4-7";
                 else actualModel = "claude-sonnet-4-6"; // default Claude 4 = Sonnet 4.6
             }
-            // Legacy Claude 3.x family
-            else if (model.includes('haiku')) actualModel = "claude-3-5-haiku-20241022";
-            else if (model.includes('opus')) actualModel = "claude-3-opus-20240229";
+            // Legacy 3.x aliases route to Claude 4 equivalents — the 3.x dated ids are gone.
+            else if (model.includes('haiku')) actualModel = "claude-haiku-4-5";
+            else if (model.includes('opus')) actualModel = "claude-opus-4-7";
 
             // If isJson is true, we must NOT use response_format for Claude. 
             // Instead, we ensure the prompt includes JSON instructions.
