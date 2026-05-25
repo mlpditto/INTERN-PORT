@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.86)</title>
+    <title>Internship Portfolio (V94.87)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5731,13 +5731,15 @@
                     const dead = q.deadline ? q.deadline.toDate() : null;
                     const qTitle = q.shortTitle || q.title;
 
-                    // 🔥 Better Type Tags (V82.0)
+                    // V94.87: primary type (Graded / Learning Mode) lifted out of typeTags into a
+                    // local primaryType — the meta line below the title now carries it alongside
+                    // items / pts. As a separate badge row it was pure noise when 100% of an
+                    // intern's quiz roster is Graded. Secondary tags (Sequence / Fast Flash /
+                    // One-Time) stay in typeTags because they're conditional, so they earn the row.
+                    const primaryType = (q.quizType === 'read_only')
+                        ? { icon: 'fa-book-open', label: 'Learning Mode', color: '#0d47a1' }
+                        : { icon: 'fa-certificate', label: 'Graded Quiz', color: '#c9184a' };
                     const typeTags = [];
-                    if (q.quizType === 'read_only') {
-                        typeTags.push(`<span class="assign-tag" style="background:#e3f2fd; color:#0d47a1;"><i class="fa-solid fa-book-open"></i> Learning Mode</span>`);
-                    } else {
-                        typeTags.push(`<span class="assign-tag" style="background:#fff0f3; color:#c9184a;"><i class="fa-solid fa-certificate"></i> Graded Quiz</span>`);
-                    }
                     if (q.questions && q.questions.some(x => x.type === 'ordering')) {
                         typeTags.push(`<span class="assign-tag" style="background:#f3e5f5; color:#7b1fa2;"><i class="fa-solid fa-sort-numeric-up"></i> Sequence</span>`);
                     }
@@ -5859,8 +5861,9 @@
                         }
 
                     } else {
-                        // Not Started
-                        statusBadge = `<span class="assign-tag" style="background:#e2e6ea;">Not Started ยังไม่ทำ</span>`;
+                        // V94.87: dropped the "Not Started ยังไม่ทำ" status badge — it was redundant
+                        // with the Start Quiz CTA at the bottom of the card. Type now lives in the
+                        // meta line below alongside items / pts (separated by · for readability).
                         let deadlineHtml = "";
                         if (dead) {
                             deadlineHtml = `<div class="meta-item quiz-global-expiry" data-dead="${dead.getTime()}" style="color:#ef233c; font-weight:bold;"><i class="fa-solid fa-circle-exclamation"></i> Loading...</div>`;
@@ -5872,8 +5875,11 @@
 
                         let itemLabel = q.questions ? q.questions.length : '?';
                         let pointLabel = q.totalPoints || 1;
+                        // V94.87: meta line carries items · pts · primary type with subtle ·
+                        // separators. Type icon + label are color-tinted so Graded (red) vs
+                        // Learning Mode (blue) still reads at a glance without a dedicated badge.
                         // 🔥 V91.47: Add Avatar Stack placeholder (will be populated by JS)
-                        quizMetaTitleSuffix = ` <span style="font-size:0.75em; font-weight:normal; color:#888; background:#f0f0f0; padding:2px 8px; border-radius:6px; margin-left:5px;"><i class="fa-solid fa-list-ol" style="font-size:0.8em;"></i> ${itemLabel} Items <i class="fa-solid fa-trophy" style="font-size:0.8em; margin-left:5px;"></i> ${pointLabel} pts</span><span class="quiz-avatar-stack" data-quiz-id="${q.id}" style="display:inline-flex; align-items:center;"></span>`;
+                        quizMetaTitleSuffix = ` <span style="font-size:0.75em; font-weight:normal; color:#888; background:#f0f0f0; padding:2px 8px; border-radius:6px; margin-left:5px;"><i class="fa-solid fa-list-ol" style="font-size:0.8em;"></i> ${itemLabel} items <span style="opacity:0.4; margin:0 3px;">·</span> <i class="fa-solid fa-trophy" style="font-size:0.8em;"></i> ${pointLabel} pts <span style="opacity:0.4; margin:0 3px;">·</span> <i class="fa-solid ${primaryType.icon}" style="font-size:0.8em; color:${primaryType.color};"></i> <span style="color:${primaryType.color}; font-weight:600;">${primaryType.label}</span></span><span class="quiz-avatar-stack" data-quiz-id="${q.id}" style="display:inline-flex; align-items:center;"></span>`;
 
                         // Clean up description if it's identical to title
                         let displayDesc = q.description || (q.quizType === 'read_only' ? "Learning Material" : "Quiz Assessment");
