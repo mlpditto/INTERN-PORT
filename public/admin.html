@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.31</title>
+    <title>Nika V94.32</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -622,6 +622,77 @@
             border-color:transparent;
             color:#fff;
             box-shadow:0 6px 14px rgba(124,58,237,0.28);
+        }
+
+        /* V94.32: Phase 3 escalation — HTML overlay composite container.
+           Rendered off-screen at 1024×1024 (matches the AI image output),
+           then html2canvas → PNG. AI handles illustration only (prompt
+           suffix instructs no text); the text overlay below uses real
+           browser fonts so titles never garble like "Mussie-tension". */
+        .casecard-composite-container {
+            position: fixed;
+            left: -10000px;
+            top: 0;
+            width: 1024px;
+            height: 1024px;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            font-family: 'Kanit', 'Inter', system-ui, sans-serif;
+            overflow: hidden;
+        }
+        .casecard-composite-image {
+            flex: 0 0 65%;
+            background-color: #f4f4f5;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+        .casecard-composite-text-panel {
+            flex: 1 1 35%;
+            padding: 40px 56px;
+            background: linear-gradient(135deg, #fffbeb 0%, #fde68a 100%);
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            color: #1c1917;
+        }
+        .casecard-composite-system-badge {
+            display: inline-block;
+            background: #c2410c;
+            color: #fff;
+            padding: 8px 20px;
+            border-radius: 999px;
+            font-size: 20px;
+            font-weight: 900;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            align-self: flex-start;
+        }
+        .casecard-composite-disease {
+            font-size: 64px;
+            font-weight: 900;
+            line-height: 1.05;
+            color: #7c2d12;
+            margin: 0;
+            letter-spacing: -0.02em;
+            word-wrap: break-word;
+        }
+        .casecard-composite-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: auto;
+        }
+        .casecard-composite-tag {
+            background: #fff;
+            color: #92400e;
+            padding: 10px 20px;
+            border-radius: 999px;
+            font-size: 22px;
+            font-weight: 700;
+            border: 2px solid #fcd34d;
+            white-space: nowrap;
         }
 
         @keyframes alabastaSkeletonSweep {
@@ -12428,6 +12499,12 @@
                             <button type="button" id="alabasta-case-card-regenerate-btn" class="btn-sm alabasta-casecard-btn refine alabasta-genmage-regenerate-btn" onclick="generateAlabastaCaseCardImage()" title="Regenerate with the currently selected model · 현재 모델로 다시 생성">
                                 <i class="fa-solid fa-rotate"></i> Regenerate · 다시 생성
                             </button>
+                            <!-- V94.32 Phase 3 escalation: choose between AI image (Mode A, AI handles everything — text inside the image, may garble) vs Illustration + HTML overlay (Mode B, AI draws illustration only, real text composited via html2canvas). -->
+                            <div class="alabasta-genmage-quick-rail" id="alabasta-case-card-mode-rail" aria-label="Choose composite mode">
+                                <span class="alabasta-genmage-quick-label">Mode:</span>
+                                <button type="button" class="alabasta-genmage-quick-chip active" data-value="ai" onclick="selectCaseCardCompositeMode('ai')" title="AI generates the entire image including text. Faster, but titles may garble on small text.">🖼️ AI image</button>
+                                <button type="button" class="alabasta-genmage-quick-chip" data-value="html-overlay" onclick="selectCaseCardCompositeMode('html-overlay')" title="AI generates illustration only (no text in image). Disease/system/tags are overlaid as real HTML text and composited via html2canvas → never garbles.">🎨 Illustration + HTML</button>
+                            </div>
                             <!-- V92.57 Phase 3-A: 2 OpenRouter chips only — GPT-5.4 Image 2 (default active) + Nano Banana 2. Mirrors V92.56 Goldenweek 2-model pattern. -->
                             <div class="alabasta-genmage-quick-rail" id="alabasta-case-card-quick-rail" aria-label="Switch image model">
                                 <span class="alabasta-genmage-quick-label">Switch:</span>
@@ -12490,6 +12567,19 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- V94.32 Phase 3 escalation: off-screen composite container. When Mode = HTML overlay,
+         generateAlabastaCaseCardImage drops the AI illustration into the top section and writes
+         disease/system/tags into the panel below, then html2canvas the whole node → PNG. The
+         container is `position: fixed; left: -10000px` so it's never visible but still rendered. -->
+    <div id="casecard-composite-container" class="casecard-composite-container" aria-hidden="true">
+        <div id="casecard-composite-image" class="casecard-composite-image"></div>
+        <div class="casecard-composite-text-panel">
+            <span id="casecard-composite-system-badge" class="casecard-composite-system-badge">SYSTEM</span>
+            <h1 id="casecard-composite-disease" class="casecard-composite-disease">Disease Name</h1>
+            <div id="casecard-composite-tags" class="casecard-composite-tags"></div>
         </div>
     </div>
 
@@ -26500,6 +26590,10 @@ ${JSON.stringify(sourceObj)}`;
             forceShowModal('alabastaCaseCardModal');
             // V92.44: lazy-init the step IntersectionObserver after the modal is in the DOM
             requestAnimationFrame(() => setupAlabastaCaseCardStepObserver());
+            // V94.32: restore the admin's last composite mode choice (ai / html-overlay).
+            if (typeof selectCaseCardCompositeMode === 'function') {
+                selectCaseCardCompositeMode(getCaseCardCompositeMode());
+            }
         }
 
         async function refreshAlabastaCaseCardDraft() {
@@ -26582,6 +26676,84 @@ ${JSON.stringify(sourceObj)}`;
             }
         }
 
+        // V94.32 Phase 3 escalation: HTML overlay composite mode for Case Card.
+        // Mode A ('ai') = current behavior, AI image gen handles everything inc. text.
+        // Mode B ('html-overlay') = AI generates illustration only (no text) + real
+        // disease/system/tags HTML overlay composited via html2canvas → real fonts,
+        // no garbled "Mussie-tension" anymore. Mode persists in localStorage.
+        const _CASECARD_COMPOSITE_MODE_KEY = 'alabasta_casecard_composite_mode';
+        const _CASECARD_VALID_MODES = ['ai', 'html-overlay'];
+
+        function getCaseCardCompositeMode() {
+            try {
+                const v = localStorage.getItem(_CASECARD_COMPOSITE_MODE_KEY);
+                return _CASECARD_VALID_MODES.includes(v) ? v : 'ai';
+            } catch (_) { return 'ai'; }
+        }
+
+        function selectCaseCardCompositeMode(mode) {
+            if (!_CASECARD_VALID_MODES.includes(mode)) mode = 'ai';
+            try { localStorage.setItem(_CASECARD_COMPOSITE_MODE_KEY, mode); } catch (_) { }
+            const rail = document.getElementById('alabasta-case-card-mode-rail');
+            if (rail) {
+                rail.querySelectorAll('.alabasta-genmage-quick-chip').forEach(c => {
+                    const matches = c.getAttribute('data-value') === mode;
+                    c.classList.toggle('active', matches);
+                    c.setAttribute('aria-checked', matches ? 'true' : 'false');
+                });
+            }
+        }
+
+        function _appendNoTextPromptSuffix(prompt) {
+            const suffix = '\n\nCRITICAL: Illustration only. ABSOLUTELY NO text, NO words, NO letters, NO numbers, NO labels, NO captions, NO writing of any kind anywhere in the image. Pure visual illustration only — leave the bottom third of the canvas visually quiet so a separate text overlay can be added later.';
+            return String(prompt || '').trim() + suffix;
+        }
+
+        // Renders the off-screen #casecard-composite-container with the AI illustration
+        // as the top-section background + disease/system/tags in the bottom text panel,
+        // then html2canvas the whole node and resolves to a fresh PNG data URL.
+        // caseItem fields: disease, diseaseSystemKey/Label, symptomTags[].
+        async function _renderCaseCardHtmlComposite(imageDataUrl, caseItem) {
+            if (typeof html2canvas !== 'function') {
+                throw new Error('html2canvas is not loaded');
+            }
+            const container = document.getElementById('casecard-composite-container');
+            const imageBg = document.getElementById('casecard-composite-image');
+            const systemBadge = document.getElementById('casecard-composite-system-badge');
+            const diseaseEl = document.getElementById('casecard-composite-disease');
+            const tagsEl = document.getElementById('casecard-composite-tags');
+            if (!container || !imageBg || !systemBadge || !diseaseEl || !tagsEl) {
+                throw new Error('Composite container nodes missing');
+            }
+            imageBg.style.backgroundImage = `url("${imageDataUrl}")`;
+            const disease = String(caseItem.disease || 'Case').trim();
+            const systemLabel = String(caseItem.diseaseSystemLabel || caseItem.diseaseSystemKey || '').trim();
+            const tags = Array.isArray(caseItem.symptomTags) ? caseItem.symptomTags.filter(Boolean) : [];
+            diseaseEl.textContent = disease;
+            if (systemLabel) {
+                systemBadge.textContent = systemLabel.split('/')[0].trim().toUpperCase();
+                systemBadge.style.display = 'inline-block';
+            } else {
+                systemBadge.style.display = 'none';
+            }
+            tagsEl.innerHTML = tags.length
+                ? tags.slice(0, 6).map(t => `<span class="casecard-composite-tag">${String(t).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`).join('')
+                : '';
+            // Wait a frame so layout settles before html2canvas snapshots.
+            await new Promise(r => requestAnimationFrame(() => r()));
+            const canvas = await html2canvas(container, {
+                scale: 1,
+                backgroundColor: '#ffffff',
+                useCORS: true,
+                logging: false,
+                width: 1024,
+                height: 1024,
+                windowWidth: 1024,
+                windowHeight: 1024
+            });
+            return canvas.toDataURL('image/png');
+        }
+
         async function generateAlabastaCaseCardImage() {
             const caseDocId = document.getElementById('alabasta-case-card-id')?.value || '';
             const metaEl = document.getElementById('alabasta-case-card-meta');
@@ -26593,8 +26765,11 @@ ${JSON.stringify(sourceObj)}`;
             const selectedModel = document.getElementById('alabasta-case-card-model')?.value || 'as/gemini-2.5-flash-image-preview';
             const caseItem = getAlabastaCaseById(caseDocId);
             if (!caseItem || !caseDocId) return alert('Case not found');
-            const prompt = await rebuildAlabastaCaseCardPromptFromInputs({ quiet: true });
-            if (!prompt) return alert('Prompt is empty');
+            // V94.32: read composite mode + amend prompt if HTML overlay mode is on.
+            const compositeMode = getCaseCardCompositeMode();
+            const basePrompt = await rebuildAlabastaCaseCardPromptFromInputs({ quiet: true });
+            if (!basePrompt) return alert('Prompt is empty');
+            const prompt = compositeMode === 'html-overlay' ? _appendNoTextPromptSuffix(basePrompt) : basePrompt;
 
             const originalHtml = genBtn ? genBtn.innerHTML : '';
             try {
@@ -26636,11 +26811,30 @@ ${JSON.stringify(sourceObj)}`;
                     throw new Error('Image response not returned as a valid data URL');
                 }
 
-                if (imageEl) imageEl.src = imageDataUrl;
-                if (dlEl) dlEl.href = imageDataUrl;
+                // V94.32: if HTML overlay mode is selected, composite the AI
+                // illustration with real-font disease/system/tags via html2canvas
+                // before showing/downloading. Falls back to the raw AI image on
+                // composite failure so a single broken render doesn't lose the
+                // generated illustration.
+                let finalDataUrl = imageDataUrl;
+                let compositedNote = '';
+                if (compositeMode === 'html-overlay') {
+                    try {
+                        if (metaEl) metaEl.textContent = 'Compositing with HTML overlay... · HTML 오버레이로 합성 중...';
+                        finalDataUrl = await _renderCaseCardHtmlComposite(imageDataUrl, caseItem);
+                        compositedNote = ' · composited';
+                    } catch (compErr) {
+                        console.warn('[V94.32] HTML composite failed, falling back to raw AI image:', compErr);
+                        if (typeof showToast === 'function') showToast('⚠ HTML overlay composite failed — showing raw AI image');
+                        finalDataUrl = imageDataUrl;
+                    }
+                }
+
+                if (imageEl) imageEl.src = finalDataUrl;
+                if (dlEl) dlEl.href = finalDataUrl;
                 if (imageWrap) imageWrap.style.display = 'block';
                 setAlabastaCaseCardImageLoadingState(false, model || selectedModel);
-                if (imageMetaEl) imageMetaEl.textContent = `Generated with ${model || selectedModel}`;
+                if (imageMetaEl) imageMetaEl.textContent = `Generated with ${model || selectedModel}${compositedNote}`;
                 // V92.42: removed redundant "Generated image is ready" footer line —
                 // the READY pill in the toolbar already conveys this. Keep footer meta as
                 // the static privacy reminder so users always see why this modal exists.
