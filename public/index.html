@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.88)</title>
+    <title>Internship Portfolio (V94.89)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5525,54 +5525,73 @@
             }, e => handleFirestoreListenerError('quiz attempts listener', e));
         }
 
-        // V94.88: contextual quiz-card icons. Pre-V94.88 every Graded Quiz card
-        // showed the same blue 🧠 brain icon — when an intern's roster is 9
-        // graded quizzes the whole grid looked like "ข้อสอบสมอง". Pattern-matches
-        // the quiz title (EN + Thai keywords) against a medical-domain rule
-        // table; first match wins, fallback stays brain. Ordered most-specific
-        // first so e.g. "Women's Infection Care" hits women's-health before
-        // generic infection. Each rule supplies a FA icon class + gradient bg.
-        const QUIZ_ICON_RULES = [
+        // V94.89: tie quiz card icon to CASE_SYSTEMS disease taxonomy. The same
+        // 12 systems used in Alabasta case submission (defined in case-taxonomy.js,
+        // exposed as window.CASE_SYSTEMS) now drive the visual identity of quiz
+        // cards in Mission. Emoji + label are owned by CASE_SYSTEMS — only the
+        // gradient bg lives locally (taxonomy doesn't carry brand colors).
+        //
+        // Resolver runs in 4 steps:
+        //   1. q.diseaseSystemKey (admin override, forward-compat) → CASE_SYSTEMS
+        //   2. Demographic / cross-cutting topics (women / pediatric / geriatric /
+        //      cancer) — render with FA icon since CASE_SYSTEMS has no OB or
+        //      pediatric system. Run before system rules because a quiz like
+        //      "Women's Infection Care" should show ♀ not the more generic
+        //      skin/heme system the disease itself might match.
+        //   3. CASE_SYSTEMS keyword match → emoji + system palette
+        //   4. Non-system topics (preceptorship / guideline / wound / vaccine /
+        //      case / generic drug) — FA icon fallback
+        //   5. Default brain (no match)
+        const QUIZ_SYSTEM_PALETTE = {
+            respiratory: 'linear-gradient(135deg, #26c6da, #00838f)',
+            cardio:      'linear-gradient(135deg, #ef5350, #c62828)',
+            gi:          'linear-gradient(135deg, #ff9800, #e65100)',
+            neuro:       'linear-gradient(135deg, #7e57c2, #5e35b1)',
+            ent:         'linear-gradient(135deg, #ab47bc, #6a1b9a)',
+            skin:        'linear-gradient(135deg, #ff7043, #e64a19)',
+            msk:         'linear-gradient(135deg, #8d6e63, #5d4037)',
+            renal:       'linear-gradient(135deg, #5c6bc0, #3949ab)',
+            endocrine:   'linear-gradient(135deg, #f57c00, #ef6c00)',
+            heme:        'linear-gradient(135deg, #d81b60, #ad1457)',
+            mental:      'linear-gradient(135deg, #ab47bc, #7b1fa2)',
+            other:       'linear-gradient(135deg, #607d8b, #455a64)',
+        };
+
+        const QUIZ_ICON_RESOLUTION = [
+            // Demographic / cross-cutting (run before disease systems)
             { re: /women|female|gyne|obs|ob[-\s]?gyn|\bvvc\b|\bbv\b|vaginal|cervical|breast|ผู้หญิง|สตรี|มดลูก|เต้านม/i,
               icon: 'fa-venus', bg: 'linear-gradient(135deg, #ec407a, #d81b60)' },
-            { re: /stem[-\s]?cell|car[-\s]?t|gene therapy|\bdna\b|genetic|cell therapy|สเต็มเซลล์|เซลล์บำบัด/i,
-              icon: 'fa-dna', bg: 'linear-gradient(135deg, #8e24aa, #6a1b9a)' },
             { re: /pediatric|child|baby|infant|neonatal|ทารก|เด็ก|กุมาร/i,
               icon: 'fa-baby', bg: 'linear-gradient(135deg, #42a5f5, #1976d2)' },
             { re: /geriatric|elderly|aged|ผู้สูงอายุ|สูงวัย/i,
               icon: 'fa-person-cane', bg: 'linear-gradient(135deg, #795548, #5d4037)' },
-            { re: /wound|gauze|bandage|dressing|ulcer|แผล/i,
-              icon: 'fa-bandage', bg: 'linear-gradient(135deg, #ef5350, #e53935)' },
-            { re: /anxio|sedat|sleep|insomnia|depress|psych|ssri|benzo|bipolar|schizo|วิตก|นอนไม่หลับ|ซึมเศร้า|จิต/i,
-              icon: 'fa-brain', bg: 'linear-gradient(135deg, #7e57c2, #5e35b1)' },
-            { re: /cardio|heart|\bbp\b|blood[-\s]?pressure|hypertension|stroke|\bchf\b|cholesterol|หัวใจ|ความดัน/i,
-              icon: 'fa-heart-pulse', bg: 'linear-gradient(135deg, #ef5350, #c62828)' },
-            { re: /lung|asthma|copd|respir|inhaler|pneumon|ปอด|หอบหืด/i,
-              icon: 'fa-lungs', bg: 'linear-gradient(135deg, #26c6da, #00838f)' },
-            { re: /skin|dermat|cortico|eczema|psoriasis|topical|cutaneous|acne|rash|ผิวหนัง|ผื่น/i,
-              icon: 'fa-hand-dots', bg: 'linear-gradient(135deg, #ff7043, #e64a19)' },
-            { re: /kidney|renal|dialysis|nephro|ไต/i,
-              icon: 'fa-droplet', bg: 'linear-gradient(135deg, #5c6bc0, #3949ab)' },
-            { re: /liver|hepat|ตับ/i,
-              icon: 'fa-shield-virus', bg: 'linear-gradient(135deg, #9e9d24, #827717)' },
-            { re: /bone|ortho|fracture|osteo|กระดูก/i,
-              icon: 'fa-bone', bg: 'linear-gradient(135deg, #8d6e63, #5d4037)' },
-            { re: /\beye\b|ophth|glaucoma|cataract|retina|ตา|จอประสาท/i,
-              icon: 'fa-eye', bg: 'linear-gradient(135deg, #00897b, #00695c)' },
-            { re: /diabet|insulin|\bsugar\b|hba1c|hyperglyc|hypoglyc|thyroid|endocr|เบาหวาน|ไทรอยด์/i,
-              icon: 'fa-syringe', bg: 'linear-gradient(135deg, #f57c00, #e65100)' },
-            { re: /cancer|onco|tumor|chemo|leukemia|lymphoma|มะเร็ง/i,
+            { re: /cancer|onco|tumor|chemo|มะเร็ง/i,
               icon: 'fa-ribbon', bg: 'linear-gradient(135deg, #d81b60, #ad1457)' },
-            { re: /antifungal|fungal|candida|clotrimazole|bifonazole|fluconazole|ketoconazole|miconazole|เชื้อรา/i,
-              icon: 'fa-bacterium', bg: 'linear-gradient(135deg, #7cb342, #558b2f)' },
-            { re: /antibiotic|\babx\b|amoxicillin|penicillin|infection|sepsis|\buti\b|\btb\b|ติดเชื้อ|ยาฆ่าเชื้อ/i,
-              icon: 'fa-virus', bg: 'linear-gradient(135deg, #5e35b1, #4527a0)' },
-            { re: /vaccin|immun|วัคซีน|ภูมิคุ้มกัน/i,
-              icon: 'fa-shield-heart', bg: 'linear-gradient(135deg, #26a69a, #00796b)' },
+
+            // CASE_SYSTEMS disease taxonomy (emoji from window.CASE_SYSTEMS, bg from palette above)
+            { re: /cardio|heart|\bbp\b|blood[-\s]?pressure|hypertension|stroke|\bchf\b|cholesterol|atrial|fibrillation|หัวใจ|ความดัน/i, system: 'cardio' },
+            { re: /lung|asthma|copd|respir|inhaler|pneumon|bronch|ปอด|หอบ/i, system: 'respiratory' },
+            { re: /diabet|insulin|\bsugar\b|hba1c|hyperglyc|hypoglyc|thyroid|endocr|cortisol|adrenal|เบาหวาน|ไทรอยด์|ต่อมไร้ท่อ/i, system: 'endocrine' },
+            { re: /anxio|sedat|sleep|insomnia|depress|psych|ssri|benzo|bipolar|schizo|panic|วิตก|นอน|ซึมเศร้า|จิต/i, system: 'mental' },
+            { re: /stem[-\s]?cell|car[-\s]?t|gene therapy|leukemia|lymphoma|anemia|coagul|thrombo|hematology|สเต็มเซลล์|เซลล์บำบัด|เลือด/i, system: 'heme' },
+            { re: /kidney|renal|dialysis|nephro|\buti\b|urinary|bladder|ไต|ปัสสาวะ/i, system: 'renal' },
+            { re: /bone|ortho|fracture|osteo|joint|arthritis|กระดูก|ข้อ/i, system: 'msk' },
+            { re: /\beye\b|ophth|glaucoma|cataract|retina|hearing|\bear\b|sinus|nasal|throat|ตา|หู|จมูก|คอ/i, system: 'ent' },
+            { re: /\bgi\b|gastro|stomach|nausea|vomit|diarrhea|constipat|hepat|liver|abdomin|กระเพาะ|ตับ|ลำไส้|ท้องเสีย/i, system: 'gi' },
+            { re: /skin|dermat|cortico|eczema|psoriasis|topical|cutaneous|acne|rash|antifungal|fungal|candida|clotrimazole|bifonazole|fluconazole|ketoconazole|miconazole|ผิวหนัง|ผื่น|เชื้อรา/i, system: 'skin' },
+            { re: /\bneuro\b|seizure|epilep|parkin|alzheim|migraine|headache|ประสาท|ชัก|สมอง/i, system: 'neuro' },
+
+            // Non-system topics (FA icon)
             { re: /preceptor|mentor|training|coaching|education|teaching|พี่เลี้ยง|สอน|ฝึก/i,
               icon: 'fa-chalkboard-user', bg: 'linear-gradient(135deg, #3949ab, #283593)' },
             { re: /guideline|protocol|\bsop\b|standard care|แนวทาง|แนวปฏิบัติ|มาตรฐาน/i,
               icon: 'fa-book-medical', bg: 'linear-gradient(135deg, #00acc1, #00838f)' },
+            { re: /wound|gauze|bandage|dressing|ulcer|แผล/i,
+              icon: 'fa-bandage', bg: 'linear-gradient(135deg, #ef5350, #e53935)' },
+            { re: /vaccin|immuniz|วัคซีน|ภูมิคุ้มกัน/i,
+              icon: 'fa-shield-heart', bg: 'linear-gradient(135deg, #26a69a, #00796b)' },
+            { re: /antibiotic|\babx\b|amoxicillin|penicillin|infection|sepsis|\btb\b|ติดเชื้อ|ยาฆ่าเชื้อ/i,
+              icon: 'fa-virus', bg: 'linear-gradient(135deg, #5e35b1, #4527a0)' },
             { re: /\bcase\b|patient|เคส|ผู้ป่วย/i,
               icon: 'fa-stethoscope', bg: 'linear-gradient(135deg, #43a047, #2e7d32)' },
             { re: /\bdrug\b|\bmed\b|pill|tablet|capsule|pharmaco|pharmacy|ประเมินยา|\bยา\b/i,
@@ -5580,10 +5599,27 @@
         ];
 
         function getQuizIconStyle(q) {
-            const haystack = `${String(q.title || '')} ${String(q.shortTitle || '')} ${String(q.description || '')}`;
-            for (const rule of QUIZ_ICON_RULES) {
-                if (rule.re.test(haystack)) return { icon: rule.icon, bg: rule.bg };
+            // 1. Explicit admin override via diseaseSystemKey field (matches case schema).
+            //    Forward-compat: if quiz editor ever adds a system <select>, render snaps
+            //    to the chosen system immediately without changing this resolver.
+            if (q.diseaseSystemKey && QUIZ_SYSTEM_PALETTE[q.diseaseSystemKey]) {
+                const sys = (window.CASE_SYSTEMS || []).find(s => s.key === q.diseaseSystemKey);
+                if (sys) return { emoji: sys.emoji, bg: QUIZ_SYSTEM_PALETTE[q.diseaseSystemKey] };
             }
+
+            const haystack = `${String(q.title || '')} ${String(q.shortTitle || '')} ${String(q.description || '')}`;
+            for (const rule of QUIZ_ICON_RESOLUTION) {
+                if (!rule.re.test(haystack)) continue;
+                if (rule.system) {
+                    const sys = (window.CASE_SYSTEMS || []).find(s => s.key === rule.system);
+                    const bg = QUIZ_SYSTEM_PALETTE[rule.system];
+                    if (sys && bg) return { emoji: sys.emoji, bg };
+                    // fall through if CASE_SYSTEMS not loaded yet
+                }
+                if (rule.icon) return { icon: rule.icon, bg: rule.bg };
+            }
+
+            // Default: V94.87 blue brain
             return { icon: 'fa-brain', bg: 'linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%)' };
         }
 
@@ -5816,11 +5852,14 @@
                     } else if (q.isHomework) {
                         icon = `<div class="assign-icon" style="background:linear-gradient(135deg, #2e7d32, #66bb6a); color:white; border-radius:12px; width:42px; height:42px; display:flex; align-items:center; justify-content:center; font-size:1.2em;"><i class="fa-solid fa-book"></i></div>`;
                     } else {
-                        // V94.88: contextual icon via getQuizIconStyle keyword match on title/desc.
-                        // Fallback (no match) stays the V94.87 blue brain so behavior is identical
-                        // for quizzes whose title doesn't hint at a medical domain.
+                        // V94.89: getQuizIconStyle now returns either { emoji, bg } (when matched
+                        // to a CASE_SYSTEMS disease) or { icon, bg } (FA icon for non-system
+                        // topics and the brain fallback). Render branches on which key is present.
                         const iconStyle = getQuizIconStyle(q);
-                        icon = `<div class="assign-icon" style="background:${iconStyle.bg}; color:white; border-radius:12px; width:42px; height:42px; display:flex; align-items:center; justify-content:center; font-size:1.2em;"><i class="fa-solid ${iconStyle.icon}"></i></div>`;
+                        const iconInner = iconStyle.emoji
+                            ? `<span style="font-size:1.35em; line-height:1;">${iconStyle.emoji}</span>`
+                            : `<i class="fa-solid ${iconStyle.icon}"></i>`;
+                        icon = `<div class="assign-icon" style="background:${iconStyle.bg}; color:white; border-radius:12px; width:42px; height:42px; display:flex; align-items:center; justify-content:center; font-size:1.2em;">${iconInner}</div>`;
                     }
                     let statusBadge = "";
                     let bodyHtml = "";
