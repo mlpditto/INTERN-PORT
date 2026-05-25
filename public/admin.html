@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.30</title>
+    <title>Nika V94.31</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -10320,6 +10320,25 @@
                 </div>
             </div>
         </div>
+
+        <!-- V94.31: Sister tool to voiceRefOrphanModal — one-shot scan for orphans
+             in editor-images/ Storage (Quill rich-text editor uploads from
+             reflective_logs.adminCommentHtml). Reachable from the Reflective Review
+             modal footer. Mirrors the same scan → list → confirm-delete pattern. -->
+        <div id="quillImageOrphanModal" class="modal" style="z-index:2410;">
+            <div class="modal-content" style="max-width:560px;">
+                <span class="close-modal" onclick="forceHideModal('quillImageOrphanModal')">&times;</span>
+                <h3 style="margin:0 0 6px; color:#1d4ed8; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-broom"></i> Quill Image Orphan Scan</h3>
+                <p style="font-size:0.8em; color:#64748b; margin:0 0 12px;">Lists files under <code style="background:#f1f5f9; padding:1px 5px; border-radius:4px;">editor-images/</code> in Firebase Storage that are not referenced by any <code style="background:#f1f5f9; padding:1px 5px; border-radius:4px;">reflective_logs</code> doc via <code style="background:#f1f5f9; padding:1px 5px; border-radius:4px;">adminCommentHtml</code>. Orphans accumulate from pre-V93.48 sessions (before per-session GC) or from edge cases where dedup-reuse uploads outlived the only doc that referenced them.</p>
+                <div id="quillImageOrphanStatus" style="display:none; padding:10px 12px; border-radius:10px; font-size:0.82em;"></div>
+                <div id="quillImageOrphanSummary" style="display:none; margin-top:10px; padding:10px 12px; border-radius:10px; font-size:0.85em; background:#f8fafc; border:1px solid #e2e8f0; color:#1e293b;"></div>
+                <div id="quillImageOrphanList" style="display:none; max-height:38vh; overflow-y:auto; margin-top:10px; padding:8px 10px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; font-family:monospace; font-size:0.78em; color:#1e3a8a;"></div>
+                <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
+                    <button class="magic-btn" style="background:#64748b; padding:9px 18px; border-radius:10px; font-size:0.85em;" type="button" onclick="forceHideModal('quillImageOrphanModal')">Close</button>
+                    <button id="quill-image-orphan-delete-btn" class="magic-btn" style="background:#dc2626; padding:9px 18px; border-radius:10px; font-size:0.85em; font-weight:800; display:none;" type="button" onclick="deleteQuillImageOrphans()">Delete orphans</button>
+                </div>
+            </div>
+        </div>
         <div id="pronunciationHelperModal" class="modal" style="z-index:2400;">
             <div class="modal-content" style="max-width:480px;">
                 <span class="close-modal" onclick="forceHideModal('pronunciationHelperModal')">&times;</span>
@@ -11105,6 +11124,8 @@
                 <div class="reflective-review-actions">
                     <button class="magic-btn reflective-review-save-btn" onclick="saveReflectiveReview()" title="Save & Score (Ctrl/⌘ + Enter)">Save & Score<kbd class="reflective-kbd-hint">Ctrl+↵</kbd></button>
                     <button class="btn-sm btn-dark reflective-review-cancel-btn" onclick="closeReflectiveReviewWithCleanup()" title="Cancel (Esc)">Cancel</button>
+                    <!-- V94.31: one-shot maintenance — scan editor-images/ Storage for orphans not referenced by any reflective_logs.adminCommentHtml. -->
+                    <button type="button" onclick="openQuillImageOrphanScan()" title="Scan editor-images/ Storage for orphans not referenced by any reflective_logs doc" style="background:transparent; color:#1d4ed8; border:1px dashed #93c5fd; border-radius:8px; padding:6px 12px; font-size:0.75em; font-weight:700; cursor:pointer; margin-left:auto;">🧹 Scan orphan images</button>
                 </div>
             </div>
         </div>
@@ -15127,6 +15148,116 @@ RULES:
         window.closeReflectiveReviewWithCleanup = function() {
             window.cleanupQuillSessionUploads('').catch(() => {});
             forceHideModal('reflectiveReviewModal');
+        };
+
+        // V94.31: cross-doc Quill image orphan scan. Sister tool to the V94.15
+        // voice-refs orphan scanner. Lists every object under editor-images/
+        // via listAll() and diffs against every basename referenced by any
+        // reflective_logs/{id}.adminCommentHtml field. Orphans = Storage files
+        // with no doc pointing at them (pre-V93.48 uploads or dedup-reuse
+        // edge cases where the original referencing doc was deleted).
+        //
+        // Why basename match (not full path): Firebase Storage download URLs
+        // embed the unencoded basename after `%2F` plus a `?alt=media&token=`
+        // suffix. Comparing basenames sidesteps URL encoding and token churn.
+        // SHA-256 hashes collide with negligible probability so basename
+        // identity ≈ file identity for this prefix.
+        //
+        // adminCommentHtml is the ONLY field that writes Quill HTML in this
+        // codebase (verified via grep: single write site at saveReflectiveReview).
+        // If a second Quill instance ever lands on another field/collection,
+        // extend the scan loop below — keep the basename Set, add another
+        // collection scan, diff stays identical.
+        window._quillImageOrphans = [];
+        window.openQuillImageOrphanScan = async function() {
+            forceShowModal('quillImageOrphanModal');
+            const statusEl = document.getElementById('quillImageOrphanStatus');
+            const summaryEl = document.getElementById('quillImageOrphanSummary');
+            const listEl = document.getElementById('quillImageOrphanList');
+            const delBtn = document.getElementById('quill-image-orphan-delete-btn');
+            statusEl.style.display = 'block';
+            statusEl.style.background = '#dbeafe';
+            statusEl.style.border = '1.5px solid #bfdbfe';
+            statusEl.style.color = '#1e3a8a';
+            statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Scanning…';
+            summaryEl.style.display = 'none';
+            listEl.style.display = 'none';
+            delBtn.style.display = 'none';
+            delBtn.disabled = false;
+            window._quillImageOrphans = [];
+            try {
+                const [storageList, logsSnap] = await Promise.all([
+                    firebase.storage().ref('editor-images').listAll(),
+                    db.collection('reflective_logs').get()
+                ]);
+                const storagePaths = storageList.items.map(i => i.fullPath);
+                const referencedBasenames = new Set();
+                const reEncoded = /editor-images%2F([^?&"'\s<>]+)/g;
+                const rePlain = /editor-images\/([^?&"'\s<>]+)/g;
+                logsSnap.docs.forEach(d => {
+                    const html = String(d.data().adminCommentHtml || '');
+                    if (!html) return;
+                    let m;
+                    while ((m = reEncoded.exec(html)) !== null) {
+                        referencedBasenames.add(decodeURIComponent(m[1]));
+                    }
+                    while ((m = rePlain.exec(html)) !== null) {
+                        referencedBasenames.add(m[1]);
+                    }
+                });
+                const orphans = storagePaths.filter(p => {
+                    const basename = p.split('/').pop();
+                    return basename && !referencedBasenames.has(basename);
+                });
+                window._quillImageOrphans = orphans;
+                statusEl.style.display = 'none';
+                summaryEl.style.display = 'block';
+                summaryEl.innerHTML = `<b>${storagePaths.length}</b> file(s) in <code>editor-images/</code> · <b>${referencedBasenames.size}</b> referenced by reflective_logs · <b style="color:${orphans.length ? '#dc2626' : '#10b981'};">${orphans.length}</b> orphan${orphans.length === 1 ? '' : 's'}`;
+                if (orphans.length === 0) {
+                    summaryEl.innerHTML += ' <i class="fa-solid fa-check" style="color:#10b981;"></i>';
+                    return;
+                }
+                listEl.style.display = 'block';
+                listEl.innerHTML = orphans.map(p => `<div style="padding:3px 0; border-bottom:1px dashed #bfdbfe; word-break:break-all;">${p}</div>`).join('');
+                delBtn.style.display = 'inline-block';
+                delBtn.textContent = `Delete ${orphans.length} orphan${orphans.length === 1 ? '' : 's'}`;
+            } catch (e) {
+                statusEl.style.background = '#fee2e2';
+                statusEl.style.border = '1.5px solid #fecaca';
+                statusEl.style.color = '#991b1b';
+                statusEl.textContent = 'Scan failed: ' + (e && e.message ? e.message : 'unknown error');
+            }
+        };
+        window.deleteQuillImageOrphans = async function() {
+            const orphans = window._quillImageOrphans || [];
+            if (orphans.length === 0) return;
+            if (!confirm(`Delete ${orphans.length} orphan editor-image file${orphans.length === 1 ? '' : 's'} from Storage?\n\nSafe to proceed — no reflective_logs doc references these files. Cannot be undone.`)) return;
+            const statusEl = document.getElementById('quillImageOrphanStatus');
+            const delBtn = document.getElementById('quill-image-orphan-delete-btn');
+            delBtn.disabled = true;
+            statusEl.style.display = 'block';
+            statusEl.style.background = '#dbeafe';
+            statusEl.style.border = '1.5px solid #bfdbfe';
+            statusEl.style.color = '#1e3a8a';
+            let ok = 0, fail = 0;
+            for (const path of orphans) {
+                try {
+                    await firebase.storage().ref(path).delete();
+                    ok++;
+                } catch (e) {
+                    fail++;
+                    console.warn('[V94.31] Failed to delete orphan', path, e && e.message);
+                }
+                statusEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Deleted ${ok}/${orphans.length}${fail ? ` · ${fail} failed` : ''}`;
+            }
+            delBtn.style.display = 'none';
+            document.getElementById('quillImageOrphanList').style.display = 'none';
+            statusEl.style.background = fail ? '#fef3c7' : '#ecfdf5';
+            statusEl.style.border = fail ? '1.5px solid #fde68a' : '1.5px solid #6ee7b7';
+            statusEl.style.color = fail ? '#92400e' : '#065f46';
+            statusEl.innerHTML = `<i class="fa-solid fa-check"></i> Deleted ${ok} orphan${ok === 1 ? '' : 's'}${fail ? ` · ${fail} failed (see console)` : ''}`;
+            window._quillImageOrphans = [];
+            if (typeof showToast === 'function') showToast(`🧹 Editor-images cleanup: ${ok} deleted${fail ? `, ${fail} failed` : ''}`);
         };
 
         // [V93.35] Helpers to load/save Quill content with sanitization + backward compat.
