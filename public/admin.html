@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.29</title>
+    <title>Nika V94.30</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1970,6 +1970,14 @@
             color: #7c2d12;
             line-height: 1.5;
         }
+
+        /* V94.30: per-modal language toggle for editCaseNoteModal.
+           Default `data-lang="both"` shows EN · KO; `en` / `ko` hide the other
+           half plus the separator. Placeholders + title attrs are swapped via JS. */
+        #editCaseNoteModal[data-lang="en"] [data-ecn="ko"],
+        #editCaseNoteModal[data-lang="en"] [data-ecn="sep"] { display: none !important; }
+        #editCaseNoteModal[data-lang="ko"] [data-ecn="en"],
+        #editCaseNoteModal[data-lang="ko"] [data-ecn="sep"] { display: none !important; }
 
         .case-score-modal-shell {
             max-width: 460px;
@@ -11745,12 +11753,16 @@
             <span class="close-modal" onclick="closeEditCaseNoteModal()" style="top:14px; right:16px;">&times;</span>
             <div class="edit-case-note-header">
                 <div>
-                    <h3 style="margin:0; color:#92400e; font-size:1.45em; font-weight:900; display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-pen-to-square"></i> Edit Case Note · 케이스 메모 편집</h3>
-                    <div style="margin-top:6px; font-size:0.88em; color:#78716c;">Adjust the submitted note while keeping the case context visible for admin review.<br>검토를 위해 케이스 정보를 유지하면서 제출된 메모를 수정합니다.</div>
+                    <h3 style="margin:0; color:#92400e; font-size:1.45em; font-weight:900; display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-pen-to-square"></i> <span data-ecn="en">Edit Case Note</span><span data-ecn="sep"> · </span><span data-ecn="ko">케이스 메모 편집</span></h3>
+                    <div style="margin-top:6px; font-size:0.88em; color:#78716c;"><span data-ecn="en">Adjust the submitted note while keeping the case context visible for admin review.</span><br data-ecn="sep"><span data-ecn="ko">검토를 위해 케이스 정보를 유지하면서 제출된 메모를 수정합니다.</span></div>
                 </div>
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <!-- V94.30: cycle EN → KO → Both for this modal's static labels. -->
+                    <button type="button" id="ecn-lang-toggle-btn" onclick="ecnCycleLang()" title="Toggle language" style="background:#fff; color:#1f2937; border:1px solid #cbd5e1; border-radius:999px; padding:6px 12px; font-size:0.78em; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-language"></i> <span id="ecn-lang-toggle-label">Both</span>
+                    </button>
                     <!-- V92.67 Phase 3-E: copy a deep-link to this case so admins can share the URL. -->
-                    <button type="button" id="edit-case-share-btn" onclick="copyEditCaseShareLink()" title="Copy share link · 공유 링크 복사" style="background:#fff; color:#1f2937; border:1px solid #cbd5e1; border-radius:999px; padding:6px 12px; font-size:0.78em; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                    <button type="button" id="edit-case-share-btn" onclick="copyEditCaseShareLink()" title="Copy share link" style="background:#fff; color:#1f2937; border:1px solid #cbd5e1; border-radius:999px; padding:6px 12px; font-size:0.78em; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
                         <i class="fa-solid fa-link"></i> Copy Link
                     </button>
                     <span style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; border-radius:999px; padding:6px 12px; font-size:0.76em; font-weight:800;">Alabasta</span>
@@ -11761,23 +11773,23 @@
 
             <div class="edit-case-note-grid">
                 <div style="background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px;">
-                    <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">User · 사용자</div>
+                    <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;"><span data-ecn="en">User</span><span data-ecn="sep"> · </span><span data-ecn="ko">사용자</span></div>
                     <div id="edit-case-note-user" style="margin-top:4px; color:#1f2937; font-weight:800; word-break:break-word;">-</div>
                 </div>
                 <div style="background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px;">
-                    <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">HN / Ref · 참조</div>
+                    <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;"><span data-ecn="en">HN / Ref</span><span data-ecn="sep"> · </span><span data-ecn="ko">참조</span></div>
                     <div id="edit-case-note-ref" style="margin-top:4px; color:#1f2937; font-weight:800; word-break:break-word;">-</div>
                 </div>
                 <div style="background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px;">
-                    <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Disease · 질병</div>
+                    <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;"><span data-ecn="en">Disease</span><span data-ecn="sep"> · </span><span data-ecn="ko">질병</span></div>
                     <div id="edit-case-note-disease" style="margin-top:4px; color:#1f2937; font-weight:800; word-break:break-word;">-</div>
                 </div>
                 <div style="background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px;">
-                    <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Customer · 환자</div>
+                    <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;"><span data-ecn="en">Customer</span><span data-ecn="sep"> · </span><span data-ecn="ko">환자</span></div>
                     <div id="edit-case-note-customer" style="margin-top:4px; color:#1f2937; font-weight:800; word-break:break-word;">-</div>
                 </div>
                 <div style="background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px;">
-                    <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Score · 점수</div>
+                    <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;"><span data-ecn="en">Score</span><span data-ecn="sep"> · </span><span data-ecn="ko">점수</span></div>
                     <div id="edit-case-note-score" style="margin-top:4px; color:#166534; font-weight:900; word-break:break-word;">0.00 pts</div>
                 </div>
             </div>
@@ -11785,15 +11797,15 @@
             <div class="edit-case-taxonomy-card">
                 <div class="edit-case-taxonomy-head">
                     <div>
-                        <div style="font-size:0.95em; color:#92400e; font-weight:900;">Unified Tags & Taxonomy · 통합 태그 & 분류</div>
-                        <div style="margin-top:4px; font-size:0.8em; color:#78716c; line-height:1.5;">Normalize disease system and symptom tags here so Alabasta, Poneglyph, and downstream filters use the same structure.<br>여기서 질병 계통과 증상 태그를 정규화하여 Alabasta, Poneglyph 및 하위 필터가 동일한 구조를 사용합니다.</div>
+                        <div style="font-size:0.95em; color:#92400e; font-weight:900;"><span data-ecn="en">Unified Tags &amp; Taxonomy</span><span data-ecn="sep"> · </span><span data-ecn="ko">통합 태그 &amp; 분류</span></div>
+                        <div style="margin-top:4px; font-size:0.8em; color:#78716c; line-height:1.5;"><span data-ecn="en">Normalize disease system and symptom tags here so Alabasta, Poneglyph, and downstream filters use the same structure.</span><br data-ecn="sep"><span data-ecn="ko">여기서 질병 계통과 증상 태그를 정규화하여 Alabasta, Poneglyph 및 하위 필터가 동일한 구조를 사용합니다.</span></div>
                     </div>
-                    <span style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; border-radius:999px; padding:5px 10px; font-size:0.72em; font-weight:800;">Admin Taxonomy · 관리자 분류</span>
+                    <span style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; border-radius:999px; padding:5px 10px; font-size:0.72em; font-weight:800;"><span data-ecn="en">Admin Taxonomy</span><span data-ecn="sep"> · </span><span data-ecn="ko">관리자 분류</span></span>
                 </div>
 
                 <div class="edit-case-taxonomy-grid">
                     <div>
-                        <label class="edit-case-taxonomy-label" for="edit-case-taxonomy-system"><span class="cs-step-num">1</span>Primary System · 주요 계통</label>
+                        <label class="edit-case-taxonomy-label" for="edit-case-taxonomy-system"><span class="cs-step-num">1</span><span data-ecn="en">Primary System</span><span data-ecn="sep"> · </span><span data-ecn="ko">주요 계통</span></label>
                         <div id="primary-system-btn-group" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;"></div>
                         <input type="hidden" id="edit-case-taxonomy-system" value="">
                         <script>
@@ -11828,35 +11840,35 @@
                         </script>
                     </div>
                     <div>
-                        <label class="edit-case-taxonomy-label" for="edit-case-taxonomy-custom"><span class="cs-step-num">3</span>Custom Tag · 사용자 정의 태그</label>
+                        <label class="edit-case-taxonomy-label" for="edit-case-taxonomy-custom"><span class="cs-step-num">3</span><span data-ecn="en">Custom Tag</span><span data-ecn="sep"> · </span><span data-ecn="ko">사용자 정의 태그</span></label>
                         <div style="display:flex; gap:8px; align-items:center;">
                             <input id="edit-case-taxonomy-custom" type="text" placeholder="Add custom tag · 사용자 정의 태그 추가..." style="margin:0; border-radius:12px;" onkeydown="handleEditCaseTaxonomyKeydown(event)">
-                            <button type="button" class="btn-sm" onclick="addEditCaseCustomTag()" style="min-width:88px; background:#334155; color:#fff; border:none; border-radius:12px; padding:10px 12px; font-weight:800;">Add 추가</button>
+                            <button type="button" class="btn-sm" onclick="addEditCaseCustomTag()" style="min-width:88px; background:#334155; color:#fff; border:none; border-radius:12px; padding:10px 12px; font-weight:800;"><span data-ecn="en">Add</span><span data-ecn="sep"> </span><span data-ecn="ko">추가</span></button>
                         </div>
                     </div>
                 </div>
 
                 <div>
-                    <label class="edit-case-taxonomy-label"><span class="cs-step-num">2</span>Suggested Tags · 추천 태그</label>
+                    <label class="edit-case-taxonomy-label"><span class="cs-step-num">2</span><span data-ecn="en">Suggested Tags</span><span data-ecn="sep"> · </span><span data-ecn="ko">추천 태그</span></label>
                     <div id="edit-case-taxonomy-suggestions" class="edit-case-taxonomy-chips"></div>
                 </div>
 
                 <div style="margin-top:10px;">
-                    <label class="edit-case-taxonomy-label"><span class="cs-step-num">4</span>Selected Tags · 선택된 태그</label>
+                    <label class="edit-case-taxonomy-label"><span class="cs-step-num">4</span><span data-ecn="en">Selected Tags</span><span data-ecn="sep"> · </span><span data-ecn="ko">선택된 태그</span></label>
                     <div id="edit-case-taxonomy-selected" class="edit-case-taxonomy-chips"></div>
                 </div>
 
-                <div id="edit-case-taxonomy-preview" class="edit-case-taxonomy-preview">Choose a primary system to generate a canonical taxonomy summary.<br>주요 계통을 선택하면 정규 분류 요약이 생성됩니다.</div>
+                <div id="edit-case-taxonomy-preview" class="edit-case-taxonomy-preview"><span data-ecn="en">Choose a primary system to generate a canonical taxonomy summary.</span><br data-ecn="sep"><span data-ecn="ko">주요 계통을 선택하면 정규 분류 요약이 생성됩니다.</span></div>
             </div>
 
-            <label for="edit-case-note-text" style="display:block; margin-bottom:8px; font-weight:800; color:#374151;">Case Note · 케이스 메모</label>
+            <label for="edit-case-note-text" style="display:block; margin-bottom:8px; font-weight:800; color:#374151;"><span data-ecn="en">Case Note</span><span data-ecn="sep"> · </span><span data-ecn="ko">케이스 메모</span></label>
             <textarea id="edit-case-note-text" placeholder="Edit case note · 케이스 메모 편집..." style="width:100%; min-height:180px; resize:vertical; padding:14px 16px; border-radius:16px; border:1.5px solid #fcd34d; background:#fffef8; color:#111827; font-size:0.98em; line-height:1.55; box-shadow:inset 0 2px 6px rgba(245,158,11,0.06);"></textarea>
 
             <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:14px; flex-wrap:wrap;">
-                <div id="edit-case-note-meta" style="font-size:0.8em; color:#6b7280;">Changes will be saved with admin audit fields. · 변경 사항은 관리자 감사 필드와 함께 저장됩니다.</div>
+                <div id="edit-case-note-meta" style="font-size:0.8em; color:#6b7280;"></div>
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                    <button type="button" class="btn-sm" onclick="closeEditCaseNoteModal()" style="min-width:120px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;">Cancel · 취소</button>
-                    <button type="button" id="edit-case-note-save-btn" class="btn-sm" onclick="saveEditedCaseNote()" style="min-width:170px; background:linear-gradient(135deg,#f59e0b,#ea580c); color:white; border:none; border-radius:12px; padding:10px 18px; font-weight:900; box-shadow:0 8px 20px rgba(234,88,12,0.22);"><i class="fa-solid fa-save"></i> Save Changes · 변경 저장</button>
+                    <button type="button" class="btn-sm" onclick="closeEditCaseNoteModal()" style="min-width:120px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 16px; font-weight:800;"><span data-ecn="en">Cancel</span><span data-ecn="sep"> · </span><span data-ecn="ko">취소</span></button>
+                    <button type="button" id="edit-case-note-save-btn" class="btn-sm" onclick="saveEditedCaseNote()" style="min-width:170px; background:linear-gradient(135deg,#f59e0b,#ea580c); color:white; border:none; border-radius:12px; padding:10px 18px; font-weight:900; box-shadow:0 8px 20px rgba(234,88,12,0.22);"><i class="fa-solid fa-save"></i> <span data-ecn="en">Save Changes</span><span data-ecn="sep"> · </span><span data-ecn="ko">변경 저장</span></button>
                 </div>
             </div>
         </div>
@@ -25647,6 +25659,61 @@ ${JSON.stringify(sourceObj)}`;
             }
         }
 
+        // V94.30: per-modal language toggle for editCaseNoteModal.
+        // CSS in the V91.88 block hides the non-active language via
+        // `[data-ecn]` selectors; this script swaps placeholders + title attrs
+        // (which can't host child spans), and writes the dynamic meta line
+        // through ecnSetMetaText so both halves stay in sync with the toggle.
+        const ECN_LANG_MODES = ['en', 'ko', 'both'];
+        const ECN_LANG_LABEL = { en: 'EN', ko: 'KO', both: 'Both' };
+        const ECN_PLACEHOLDERS = [
+            { id: 'edit-case-note-text', en: 'Edit case note...', ko: '케이스 메모 편집...', both: 'Edit case note · 케이스 메모 편집...' },
+            { id: 'edit-case-taxonomy-custom', en: 'Add custom tag...', ko: '사용자 정의 태그 추가...', both: 'Add custom tag · 사용자 정의 태그 추가...' }
+        ];
+
+        function ecnGetLang() {
+            try {
+                const v = localStorage.getItem('editCaseNote_lang');
+                return ECN_LANG_MODES.includes(v) ? v : 'both';
+            } catch (_) { return 'both'; }
+        }
+
+        function ecnSetLang(mode) {
+            if (!ECN_LANG_MODES.includes(mode)) mode = 'both';
+            const modal = document.getElementById('editCaseNoteModal');
+            if (modal) modal.dataset.lang = mode;
+            try { localStorage.setItem('editCaseNote_lang', mode); } catch (_) { }
+            const label = document.getElementById('ecn-lang-toggle-label');
+            if (label) label.textContent = ECN_LANG_LABEL[mode];
+            ECN_PLACEHOLDERS.forEach(p => {
+                const el = document.getElementById(p.id);
+                if (el) el.placeholder = p[mode];
+            });
+        }
+
+        function ecnCycleLang() {
+            const modal = document.getElementById('editCaseNoteModal');
+            const cur = (modal && modal.dataset.lang) || ecnGetLang();
+            const idx = ECN_LANG_MODES.indexOf(cur);
+            const next = ECN_LANG_MODES[(idx + 1) % ECN_LANG_MODES.length];
+            ecnSetLang(next);
+        }
+
+        function ecnSetMetaText(enText, koText) {
+            const el = document.getElementById('edit-case-note-meta');
+            if (!el) return;
+            const enSpan = document.createElement('span');
+            enSpan.setAttribute('data-ecn', 'en');
+            enSpan.textContent = enText;
+            const sepSpan = document.createElement('span');
+            sepSpan.setAttribute('data-ecn', 'sep');
+            sepSpan.textContent = ' · ';
+            const koSpan = document.createElement('span');
+            koSpan.setAttribute('data-ecn', 'ko');
+            koSpan.textContent = koText;
+            el.replaceChildren(enSpan, sepSpan, koSpan);
+        }
+
         function editCaseNote(caseDocId) {
             const caseItem = casesData.find(c => c.id === caseDocId);
             if (!caseItem) {
@@ -25679,9 +25746,11 @@ ${JSON.stringify(sourceObj)}`;
                 const updatedAt = caseItem.adminUpdatedAt && caseItem.adminUpdatedAt.toDate
                     ? caseItem.adminUpdatedAt.toDate().toLocaleString('th-TH')
                     : null;
-                metaEl.textContent = updatedAt
-                    ? `Last edited ${updatedAt}`
-                    : 'Changes will be saved with admin audit fields.';
+                if (updatedAt) {
+                    ecnSetMetaText(`Last edited ${updatedAt}`, `마지막 편집 ${updatedAt}`);
+                } else {
+                    ecnSetMetaText('Changes will be saved with admin audit fields.', '변경 사항은 관리자 감사 필드와 함께 저장됩니다.');
+                }
             }
             window.editCaseTaxonomyState = {
                 selectedTags: Array.isArray(caseItem.symptomTags) ? [...caseItem.symptomTags] : []
@@ -25696,6 +25765,9 @@ ${JSON.stringify(sourceObj)}`;
             const customEl = document.getElementById('edit-case-taxonomy-custom');
             if (customEl) customEl.value = '';
             renderEditCaseTaxonomyCard();
+
+            // V94.30: restore the admin's last toggle choice for this modal.
+            ecnSetLang(ecnGetLang());
 
             forceShowModal('editCaseNoteModal');
             // V92.67 Phase 3-E: stamp ?case={id} into the URL so refresh / back-forward / share keep the modal context.
