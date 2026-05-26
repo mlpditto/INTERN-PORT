@@ -291,5 +291,48 @@ service cloud.firestore {
     match /tts_pronunciation_dict/{docId} {
       allow read, write: if isAdmin();
     }
+
+    // 28. Drug Codex (PONEGLYPH evolution — Phase 1, V93.96).
+    // Published A-Z clinical drug reference. Read by any signed-in user (intern
+    // reads it as a learning resource — LIFF auth is the access gate, matching
+    // reflective_logs/quiz_attempts posture). Write is admin-only; Phase 2
+    // wires the ⚙️ CRUD modal. Drafts authored by interns flow through
+    // drug_codex_drafts/ and are copied here on admin approval (Phase 5).
+    match /drug_codex/{drugId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // 29. Drug Codex Drafts (intern submissions awaiting admin moderation).
+    // Workflow: intern creates {status:'pending'} → admin reviews/edits → on
+    // approve, admin copies the doc to drug_codex/ and flips status to
+    // 'approved' (or 'rejected'). Owner intern can read/update/delete only
+    // while status='pending'; once admin moves it past pending the draft is
+    // locked to admin to preserve the moderation trail.
+    //
+    // Server-side guards (Phase 1, minimal):
+    //   - submittedBy is locked to request.auth.uid on create.
+    //   - Initial status must be 'pending'; intern cannot self-approve.
+    //   - genericName is required (basic shape check; full field validation
+    //     happens client-side until Phase 5 wires the submit form).
+    match /drug_codex_drafts/{draftId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.submittedBy == request.auth.uid);
+      allow create: if isSignedIn()
+        && request.resource.data.submittedBy == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.genericName is string
+        && request.resource.data.genericName.size() > 0;
+      allow update: if isAdmin()
+        || (isSignedIn()
+          && resource.data.submittedBy == request.auth.uid
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'pending'
+          && request.resource.data.submittedBy == resource.data.submittedBy);
+      allow delete: if isAdmin()
+        || (isSignedIn()
+          && resource.data.submittedBy == request.auth.uid
+          && resource.data.status == 'pending');
+    }
   }
 }
