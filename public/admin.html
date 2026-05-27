@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.34</title>
+    <title>Nika V94.35</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1403,6 +1403,24 @@
         }
         .dca-draft-submitter {
             font-size: 0.78em; color: #92400e; font-weight: 700;
+        }
+        /* V94.35 Phase 5: intern's note snippet in draft row + full-text banner in Review form */
+        .dca-draft-notes-snippet {
+            font-size: 0.78em; color: #475569; background: #f8fafc;
+            border: 1px solid #e2e8f0; border-radius: 6px;
+            padding: 4px 8px; margin-top: 6px;
+            white-space: pre-wrap; word-wrap: break-word;
+        }
+        .dca-form-intern-notes-banner {
+            margin: 0 0 12px; padding: 10px 14px; border-radius: 10px;
+            background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+            border: 1px solid #c4b5fd; color: #5b21b6;
+            font-size: 0.85em; line-height: 1.5;
+            white-space: pre-wrap; word-wrap: break-word;
+        }
+        .dca-form-intern-notes-banner-label {
+            font-size: 0.7em; font-weight: 900; color: #6b21a8;
+            text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 4px;
         }
         .dca-draft-actions { display: flex; gap: 6px; flex-wrap: wrap; }
         .dca-draft-approve-btn {
@@ -12510,6 +12528,11 @@
                     </div>
                     <div style="font-size:0.78em; color:#94a3b8;" id="dca-form-doc-id"></div>
                 </div>
+
+                <!-- V94.35 Phase 5: intern's free-text note to admin (drafts only).
+                     Shown only when reviewing a draft that has a non-empty
+                     internNotes field. Includes targetDrugId context when present. -->
+                <div id="dca-form-intern-notes-banner" class="dca-form-intern-notes-banner" style="display:none;"></div>
 
                 <!-- Section 1: Core identity -->
                 <div class="dca-form-section">
@@ -28694,13 +28717,29 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const submitter = draft.submittedByName || draft.submittedBy || 'unknown';
                 const created = draft.createdAt && draft.createdAt.toDate ? draft.createdAt.toDate() : null;
                 const dateStr = created ? created.toLocaleDateString('th-TH') : '—';
-                const target = draft.targetDrugId ? `<span class="dca-row-meta-chip">edit · ${dcaEscapeHtml(draft.targetDrugId)}</span>` : '<span class="dca-row-meta-chip">new entry</span>';
+                // V94.35 Phase 5: resolve targetDrugId → published drug name so the
+                // edit-request shows "edit · Metformin" instead of a 20-char doc id.
+                let target;
+                if (draft.targetDrugId) {
+                    const targetDrug = dcaState.codex.find(d => d._id === draft.targetDrugId);
+                    const targetLabel = targetDrug ? targetDrug.genericName : draft.targetDrugId;
+                    target = `<span class="dca-row-meta-chip" title="edit request targeting ${dcaEscapeHtml(draft.targetDrugId)}">✨ edit · ${dcaEscapeHtml(targetLabel)}</span>`;
+                } else {
+                    target = '<span class="dca-row-meta-chip">📥 new entry</span>';
+                }
+                // V94.35 Phase 5: surface intern's free-text note to admin as a
+                // truncated snippet under the submitter line. Full text is also
+                // injected into the Review form's banner (see dcaReviewDraft).
+                const notesSnippet = draft.internNotes
+                    ? `<div class="dca-draft-notes-snippet">📝 ${dcaEscapeHtml(String(draft.internNotes).slice(0, 120))}${String(draft.internNotes).length > 120 ? '…' : ''}</div>`
+                    : '';
                 return `
                     <div class="dca-draft-row">
                         <div class="dca-draft-row-head">
-                            <div>
+                            <div style="flex:1; min-width:0;">
                                 <div class="dca-row-name">${dcaEscapeHtml(draft.genericName || '(no name)')}</div>
                                 <div class="dca-draft-submitter">submitted by ${dcaEscapeHtml(submitter)} · ${dateStr}</div>
+                                ${notesSnippet}
                             </div>
                             <div class="dca-draft-actions">
                                 ${target}
@@ -28769,6 +28808,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaState.isDraftEdit = false;
             const modeLabel = document.getElementById('dca-form-mode-label');
             if (modeLabel) modeLabel.textContent = 'Add Drug';
+            dcaHideInternNotesBanner();
             dcaFillForm({});
             dcaSwitchView('form');
         }
@@ -28780,6 +28820,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaState.isDraftEdit = false;
             const modeLabel = document.getElementById('dca-form-mode-label');
             if (modeLabel) modeLabel.textContent = 'Edit · ' + (drug.genericName || drugId);
+            dcaHideInternNotesBanner();
             dcaFillForm(drug);
             dcaSwitchView('form');
         }
@@ -28793,8 +28834,37 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaState.isDraftEdit = true;
             const modeLabel = document.getElementById('dca-form-mode-label');
             if (modeLabel) modeLabel.textContent = 'Review Draft · ' + (draft.genericName || draftId);
+            // V94.35 Phase 5: surface intern's full internNotes + targetDrugId context
+            // as a banner above the form so admin reviews with full context.
+            dcaShowInternNotesBanner(draft);
             dcaFillForm(draft);
             dcaSwitchView('form');
+        }
+
+        function dcaShowInternNotesBanner(draft) {
+            const banner = document.getElementById('dca-form-intern-notes-banner');
+            if (!banner) return;
+            const hasNotes = draft && draft.internNotes && String(draft.internNotes).trim();
+            const hasTarget = draft && draft.targetDrugId;
+            if (!hasNotes && !hasTarget) { banner.style.display = 'none'; banner.innerHTML = ''; return; }
+            const parts = [];
+            if (hasTarget) {
+                const targetDrug = dcaState.codex.find(d => d._id === draft.targetDrugId);
+                const targetLabel = targetDrug ? targetDrug.genericName : draft.targetDrugId;
+                parts.push(`<div><strong>✨ Suggest edit for:</strong> ${dcaEscapeHtml(targetLabel)} <span style="color:#a78bfa; font-size:0.85em;">(${dcaEscapeHtml(draft.targetDrugId)})</span></div>`);
+            }
+            if (hasNotes) {
+                parts.push(`
+                    <div class="dca-form-intern-notes-banner-label" style="margin-top:${hasTarget ? '8px' : '0'};">📝 intern's note</div>
+                    <div>${dcaEscapeHtml(String(draft.internNotes))}</div>`);
+            }
+            banner.innerHTML = parts.join('');
+            banner.style.display = 'block';
+        }
+
+        function dcaHideInternNotesBanner() {
+            const banner = document.getElementById('dca-form-intern-notes-banner');
+            if (banner) { banner.style.display = 'none'; banner.innerHTML = ''; }
         }
 
         async function dcaDelete(drugId, btn) {
