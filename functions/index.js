@@ -1538,11 +1538,21 @@ exports.notifyPurgeDigest = onSchedule({
 // Audit 2026-05-28: no chip in this codebase routes to any of the three
 // restricted ids (all Gemini text chips map to gemini-3.5-flash or
 // gemini-2.5-pro). This scheduled keep-alive preserves the OPTION to use
-// these models later without re-applying for access.
+// the two surviving models later without re-applying for access.
 //
-// Cron: 0 3 1 */2 * Asia/Bangkok = 03:00 ICT on the 1st of every even
-// month (Jun/Aug/Oct/Dec/Feb/Apr) ≈ every 60 days; first run 2026-06-01
-// (≥ 2 weeks before the 2026-06-15 cutoff).
+// Cron: 0 3 1 */2 * Asia/Bangkok = 03:00 ICT on the 1st of every odd
+// month (Jan/Mar/May/Jul/Sep/Nov) — unix-cron `*/2` in the month field
+// counts from 1, so the matching months are odd-numbered. Interval is
+// 59-62 days, comfortably under Google's 90-day inactivity threshold.
+// Initial smoke test fired 2026-05-28 (Force Run via Cloud Console);
+// next scheduled run 2026-07-01.
+//
+// 2026-05-28 follow-up: gemini-3-flash-preview removed from the ping list
+// because Vertex us-central1 does not host it ("Publisher Model not
+// found"). The project will lose access to that specific model on
+// 2026-06-15 — acceptable because no chip uses it. To regain access
+// later, ping it via a region that hosts the 3.x family or via the
+// `global` endpoint and add it back here.
 // ============================================================
 exports.pingRestrictedGeminiModels = onSchedule({
     schedule: '0 3 1 */2 *',
@@ -1551,7 +1561,7 @@ exports.pingRestrictedGeminiModels = onSchedule({
     timeoutSeconds: 120,
     memory: '256MiB'
 }, async () => {
-    const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3-flash-preview'];
+    const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
     const auth = new GoogleAuth({ scopes: 'https://www.googleapis.com/auth/cloud-platform' });
     let token;
     try {

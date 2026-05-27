@@ -3,9 +3,14 @@
 # Keep-alive smoke test for Gemini models restricted by Google's 90-day rule
 # (effective 2026-06-15 for new/inactive projects). A project is considered
 # "active" per-model when it has issued at least one Vertex generateContent
-# call to that model in the last 90 days. None of these three models are
-# wired into any chip in this codebase today — this script exists so we can
+# call to that model in the last 90 days. Neither of these models is wired
+# into any chip in this codebase today — this script exists so we can
 # manually preserve access in case we want to use them later.
+#
+# gemini-3-flash-preview was originally on this list but Vertex us-central1
+# returns 404 ("Publisher Model not found") for it; access to that specific
+# model id will lapse on 2026-06-15. Add it back here (under a region that
+# hosts it, or the `global` endpoint) if it becomes available later.
 #
 # Project: intern-port-edfa7   Region: us-central1
 #
@@ -17,7 +22,8 @@
 #   .\scripts\ping-vertex-models.ps1
 #
 # Note: the recurring keep-alive is handled by the `pingRestrictedGeminiModels`
-# Cloud Function (every 60 days). This script is the manual fallback.
+# Cloud Function (cron `0 3 1 */2 *` Asia/Bangkok = odd months, ~60-day cadence).
+# This script is the manual fallback.
 
 $ErrorActionPreference = 'Stop'
 
@@ -34,8 +40,7 @@ try {
 
 $MODELS = @(
     'gemini-2.5-flash',
-    'gemini-2.5-flash-lite',
-    'gemini-3-flash-preview'
+    'gemini-2.5-flash-lite'
 )
 
 $body = @{
