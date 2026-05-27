@@ -1526,3 +1526,59 @@ exports.notifyPurgeDigest = onSchedule({
     }
 });
 
+// ============================================================
+// pingRestrictedGeminiModels
+//
+// Google Cloud product update (email 2026-05-28): starting 2026-06-15,
+// access to gemini-2.5-flash / gemini-2.5-flash-lite / gemini-3-flash-preview
+// is revoked for projects with zero generateContent calls to the specific
+// model id in the trailing 90 days. Activity is evaluated per-model, so a
+// call to e.g. gemini-2.5-pro does NOT preserve access to gemini-2.5-flash.
+//
+// Audit 2026-05-28: no chip in this codebase routes to any of the three
+// restricted ids (all Gemini text chips map to gemini-3.5-flash or
+// gemini-2.5-pro). This scheduled keep-alive preserves the OPTION to use
+// these models later without re-applying for access.
+//
+// Cron: 0 3 1 */2 * Asia/Bangkok = 03:00 ICT on the 1st of every even
+// month (Jun/Aug/Oct/Dec/Feb/Apr) ≈ every 60 days; first run 2026-06-01
+// (≥ 2 weeks before the 2026-06-15 cutoff).
+// ============================================================
+exports.pingRestrictedGeminiModels = onSchedule({
+    schedule: '0 3 1 */2 *',
+    timeZone: 'Asia/Bangkok',
+    region: 'us-central1',
+    timeoutSeconds: 120,
+    memory: '256MiB'
+}, async () => {
+    const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3-flash-preview'];
+    const auth = new GoogleAuth({ scopes: 'https://www.googleapis.com/auth/cloud-platform' });
+    let token;
+    try {
+        const client = await auth.getClient();
+        token = (await client.getAccessToken()).token;
+    } catch (err) {
+        console.error('[pingRestrictedGeminiModels] auth failed:', err.message);
+        return;
+    }
+
+    const body = {
+        contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
+        generationConfig: { maxOutputTokens: 8 }
+    };
+
+    for (const m of MODELS) {
+        const url = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/publishers/google/models/${m}:generateContent`;
+        try {
+            await axios.post(url, body, {
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                timeout: 30000
+            });
+            console.log(`[pingRestrictedGeminiModels] ${m} OK`);
+        } catch (err) {
+            const status = err && err.response ? err.response.status : null;
+            const apiMessage = (err && err.response && err.response.data && err.response.data.error && err.response.data.error.message) || (err && err.message) || 'unknown';
+            console.warn(`[pingRestrictedGeminiModels] ${m} FAIL status=${status || 'no-response'} message=${JSON.stringify(apiMessage)}`);
+        }
+    }
+});
