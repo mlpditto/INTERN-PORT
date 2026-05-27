@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.35</title>
+    <title>Nika V94.36</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1266,6 +1266,15 @@
         }
         .dca-ai-go-btn:hover { background: linear-gradient(135deg, #d97706, #b45309); }
         .dca-ai-go-btn:disabled { background: #cbd5e1; cursor: wait; }
+        /* V93.99 Phase 5.1: inline AI fill button shown only in Review-draft form mode */
+        .dca-ai-fill-btn {
+            padding: 4px 10px; border-radius: 8px; border: none;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #fff; font-weight: 700; cursor: pointer; font-size: 0.76em;
+            white-space: nowrap;
+        }
+        .dca-ai-fill-btn:hover { background: linear-gradient(135deg, #d97706, #b45309); }
+        .dca-ai-fill-btn:disabled { background: #cbd5e1; cursor: wait; }
         .dca-ai-error {
             margin-top: 10px; padding: 8px 12px; border-radius: 8px;
             background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
@@ -12522,9 +12531,15 @@
                 <div id="dca-form-error" class="dca-form-error" style="display:none;"></div>
 
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <div style="font-weight:800; color:#1e40af; display:flex; align-items:center; gap:8px;">
+                    <div style="font-weight:800; color:#1e40af; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                         <span id="dca-form-mode-label">Add Drug</span>
                         <span id="dca-form-ai-badge" class="dca-ai-badge" style="display:none;">🤖 AI-drafted · verify before save</span>
+                        <!-- V93.99 Phase 5.1: AI fill empty fields button. Visible only in draft-review mode.
+                             Uses intern's data as seed + Phase 3 saved model chip. -->
+                        <button type="button" id="dca-form-ai-fill-btn" class="dca-ai-fill-btn" style="display:none;"
+                                onclick="dcaAiFillEmptyFields()" title="Use AI to fill the fields intern left empty, using their data as seed">
+                            🤖 AI fill empty fields
+                        </button>
                     </div>
                     <div style="font-size:0.78em; color:#94a3b8;" id="dca-form-doc-id"></div>
                 </div>
@@ -28473,11 +28488,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         // ===================================================================
-        // 💊 DRUG CODEX — [Version: V93.98 Phase 3]
+        // 💊 DRUG CODEX — [Version: V93.99 Phase 5.1]
         // Admin CRUD modal for drug_codex (published) + drug_codex_drafts
         // (intern submissions awaiting moderation). Schema + rules shipped
         // in V93.96 PR #398. Phase 2 (full CRUD modal) shipped V93.97 PR #399.
-        // Phase 3 (AI auto-draft) wired at end of this block — see Phase 3 section.
+        // Phase 3 (AI auto-draft) wired at end of this block.
+        // Phase 5 (intern submission review banner) shipped V94.35 PR #402.
+        // Phase 5.1 (AI re-draft from intern submission) wired after Phase 3 —
+        // augments an intern's partial draft by filling only the empty fields.
         // ===================================================================
         const DCA_FIELD_KEYS = [
             'genericName', 'brandNames', 'atcCode', 'class',
@@ -28809,6 +28827,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const modeLabel = document.getElementById('dca-form-mode-label');
             if (modeLabel) modeLabel.textContent = 'Add Drug';
             dcaHideInternNotesBanner();
+            dcaHideAiFillButton();
             dcaFillForm({});
             dcaSwitchView('form');
         }
@@ -28821,6 +28840,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const modeLabel = document.getElementById('dca-form-mode-label');
             if (modeLabel) modeLabel.textContent = 'Edit · ' + (drug.genericName || drugId);
             dcaHideInternNotesBanner();
+            dcaHideAiFillButton();
             dcaFillForm(drug);
             dcaSwitchView('form');
         }
@@ -28837,6 +28857,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // V94.35 Phase 5: surface intern's full internNotes + targetDrugId context
             // as a banner above the form so admin reviews with full context.
             dcaShowInternNotesBanner(draft);
+            // V93.99 Phase 5.1: enable AI fill button so admin can augment intern's
+            // partial submission with the missing technical fields.
+            dcaShowAiFillButton();
             dcaFillForm(draft);
             dcaSwitchView('form');
         }
@@ -28865,6 +28888,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function dcaHideInternNotesBanner() {
             const banner = document.getElementById('dca-form-intern-notes-banner');
             if (banner) { banner.style.display = 'none'; banner.innerHTML = ''; }
+        }
+
+        // V93.99 Phase 5.1: AI fill empty fields button toggle.
+        // Visible only in Review-draft form mode (isDraftEdit === true).
+        // Hide also resets disabled/text — defense vs static-modal state leak
+        // (feedback_static_modal_state_leak).
+        function dcaShowAiFillButton() {
+            const btn = document.getElementById('dca-form-ai-fill-btn');
+            if (btn) { btn.style.display = 'inline-flex'; btn.disabled = false; btn.textContent = '🤖 AI fill empty fields'; }
+        }
+        function dcaHideAiFillButton() {
+            const btn = document.getElementById('dca-form-ai-fill-btn');
+            if (btn) { btn.style.display = 'none'; btn.disabled = false; btn.textContent = '🤖 AI fill empty fields'; }
         }
 
         async function dcaDelete(drugId, btn) {
@@ -29226,6 +29262,220 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 '',
                 'DRUG TO DRAFT: <<<' + drugName + '>>>'
             ].join('\n');
+        }
+
+        // V93.99 Phase 5.1: AI fill empty fields — augments an intern's partial draft
+        // with the technical fields they didn't fill. Uses intern's data as seed,
+        // preserves anything admin has already typed in the form, and reuses Phase 3's
+        // saved model chip silently (no UI for model picking in this surface).
+        // genericName + references are NEVER auto-filled: genericName is required
+        // input; references are per Phase 3 design admin-verified manually.
+        const DCA_AI_FILL_SKIP = new Set(['genericName', 'references']);
+
+        async function dcaAiFillEmptyFields() {
+            const btn = document.getElementById('dca-form-ai-fill-btn');
+            const errEl = document.getElementById('dca-form-error');
+            if (typeof window.callUniversalAI !== 'function') {
+                if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'AI core not loaded yet — try again in a moment.'; }
+                return;
+            }
+
+            // Collect current form state — admin may have edited some fields already.
+            const current = dcaCollectForm();
+            if (!current.genericName) {
+                if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Generic Name is required before AI fill (so the model knows which drug).'; }
+                return;
+            }
+
+            // Identify empty fields. Array fields → empty array; string fields → empty/whitespace.
+            const emptyKeys = DCA_FIELD_KEYS.filter(key => {
+                if (DCA_AI_FILL_SKIP.has(key)) return false;
+                const v = current[key];
+                if (DCA_ARRAY_FIELDS[key]) return !Array.isArray(v) || v.length === 0;
+                return !v || !String(v).trim();
+            });
+
+            if (emptyKeys.length === 0) {
+                if (typeof showToast === 'function') showToast('All fields already filled — nothing for AI to add.');
+                else if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'All fields already filled — nothing for AI to add.'; }
+                return;
+            }
+
+            // Reuse Phase 3 saved chip silently.
+            let selectedModel = DCA_AI_FALLBACK_MODEL;
+            try {
+                const saved = localStorage.getItem(DCA_AI_LS_KEY);
+                if (saved) selectedModel = saved;
+            } catch (_) { /* ignore */ }
+
+            if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ Filling ' + emptyKeys.length + ' field' + (emptyKeys.length === 1 ? '' : 's') + '…'; }
+
+            const prompt = dcaBuildAiFillPrompt(current, emptyKeys);
+
+            try {
+                const resp = await window.callUniversalAI(selectedModel, prompt, true);
+                const rawText = (resp && resp.text) ? resp.text : (typeof resp === 'string' ? resp : '');
+                if (!rawText) throw new Error('Empty response from AI');
+
+                let parsed = dcaParseAutoDraftResponse(rawText);
+                if (!parsed) {
+                    // single silent retry (feedback_ai_json_diagnostic_pattern)
+                    const resp2 = await window.callUniversalAI(selectedModel, prompt, true);
+                    const rawText2 = (resp2 && resp2.text) ? resp2.text : (typeof resp2 === 'string' ? resp2 : '');
+                    parsed = dcaParseAutoDraftResponse(rawText2);
+                    if (!parsed) {
+                        const preview = String(rawText2 || rawText || '').slice(0, 300);
+                        throw new Error('AI returned invalid JSON after retry.\nFirst 300 chars: ' + preview);
+                    }
+                }
+
+                // Merge: fill ONLY empty keys. Admin's existing data + intern's seed both preserved.
+                const merged = Object.assign({}, current);
+                merged._id = dcaState.editingId; // restore doc-id strip via dcaFillForm
+                merged.aiDrafted = true;          // surface the badge until first human save
+                let filledCount = 0;
+                emptyKeys.forEach(key => {
+                    const v = parsed[key];
+                    if (DCA_ARRAY_FIELDS[key]) {
+                        if (Array.isArray(v) && v.length > 0) {
+                            merged[key] = v.filter(Boolean);
+                            filledCount++;
+                        }
+                    } else {
+                        const s = v == null ? '' : String(v).trim();
+                        if (s) { merged[key] = s; filledCount++; }
+                    }
+                });
+
+                dcaFillForm(merged);
+
+                if (typeof showToast === 'function') {
+                    const modelLabel = (resp && resp.model) ? resp.model : selectedModel;
+                    const skipped = emptyKeys.length - filledCount;
+                    const skipNote = skipped > 0 ? ` · ${skipped} left empty by model (uncertain)` : '';
+                    showToast(`🤖 Filled ${filledCount}/${emptyKeys.length} field${emptyKeys.length === 1 ? '' : 's'} with ${modelLabel}${skipNote}. Verify before save.`);
+                }
+            } catch (err) {
+                console.error('[drug-codex] AI fill failed:', err);
+                if (errEl) {
+                    errEl.style.display = 'block';
+                    errEl.textContent = 'AI fill failed: ' + (err && err.message ? err.message : 'unknown error');
+                }
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = '🤖 AI fill empty fields'; }
+            }
+        }
+
+        // Per-field content guide. Only used for keys AI is asked to fill (not the seed keys).
+        const DCA_AI_FIELD_GUIDE = {
+            'brandNames':       'array of common brand names in Thailand + global · empty array if unknown',
+            'atcCode':          'WHO ATC code e.g. A10BA02 · empty string if unknown',
+            'class':            'pharmacologic class · medical English',
+            'indication':       'approved clinical uses · medical English · short bullets with \\n- prefix',
+            'dosing':           'medical English · Adult / Pediatric / Renal sections',
+            'contraindication': 'absolute and relative · medical English · short bullets with \\n- prefix',
+            'sideEffects':      'Common: ... ; Serious: ... · medical English',
+            'interactions':     'drug-drug · drug-food · enzyme inducers/inhibitors · medical English',
+            'mechanism':        'mechanism of action · medical English',
+            'pharmacokinetics': 'ADME summary · medical English',
+            'monitoring':       'labs and clinical signs · medical English',
+            'patientCounseling':'Thai counseling points · ภาษาไทยเท่านั้น · 2-5 bullet points',
+            'pearls':           'high-yield clinical pearls · mix EN+TH ok'
+        };
+
+        function dcaBuildAiFillPrompt(seedData, emptyFieldKeys) {
+            // FORMAT CONTRACT leads (feedback_ai_prose_mode_recovery).
+            // SEED block carries intern + admin-edited data so the model can stay consistent.
+            // LANGUAGE RULE explicit (feedback_ai_prompt_language_neutral).
+
+            // Build seed JSON — every DCA_FIELD_KEYS value that is NOT in the empty list.
+            // Filters out empty placeholders so the seed only reflects what intern actually wrote.
+            const seedJson = {};
+            DCA_FIELD_KEYS.forEach(key => {
+                if (emptyFieldKeys.includes(key)) return;
+                const v = seedData[key];
+                if (DCA_ARRAY_FIELDS[key]) {
+                    if (Array.isArray(v) && v.length > 0) seedJson[key] = v;
+                } else {
+                    const s = v == null ? '' : String(v).trim();
+                    if (s) seedJson[key] = s;
+                }
+            });
+
+            // Surface intern's internNotes + targetDrugId context — these live on the
+            // draft doc, not in the form, so pull from dcaState.drafts via editingId.
+            let internNotes = '';
+            let targetDrugContext = '';
+            if (dcaState.isDraftEdit && dcaState.editingId) {
+                const draft = (dcaState.drafts || []).find(d => d._id === dcaState.editingId);
+                if (draft) {
+                    if (draft.internNotes) internNotes = String(draft.internNotes).trim();
+                    if (draft.targetDrugId) {
+                        const targetDrug = (dcaState.codex || []).find(d => d._id === draft.targetDrugId);
+                        targetDrugContext = targetDrug ? targetDrug.genericName : draft.targetDrugId;
+                    }
+                }
+            }
+
+            const requestedKeys = emptyFieldKeys.map(k => '  "' + k + '"').join(',\n');
+            const lines = [
+                'ROLE: clinical pharmacology reference compiler. An intern submitted a partial drug monograph; you augment it by filling ONLY the technical fields they left empty. Output is for an internal medical-intern study tool (Thailand).',
+                '',
+                'FORMAT CONTRACT — RESPOND WITH PURE JSON ONLY.',
+                'NO MARKDOWN. NO PROSE OUTSIDE JSON. NO ```json``` FENCE.',
+                'Root object must contain EXACTLY these keys (and ONLY these keys):',
+                '{',
+                requestedKeys,
+                '}',
+                '',
+                'INTERN-SUPPLIED SEED (already verified — DO NOT echo these keys back, DO NOT contradict them):',
+                '```',
+                JSON.stringify(seedJson, null, 2),
+                '```'
+            ];
+
+            if (internNotes) {
+                lines.push('');
+                lines.push("INTERN'S FREE-TEXT NOTE (context about why they submitted — may inform your fill):");
+                lines.push('<<<' + internNotes + '>>>');
+            }
+            if (targetDrugContext) {
+                lines.push('');
+                lines.push('SUGGEST-EDIT CONTEXT: this draft proposes edits to an existing codex entry "' + targetDrugContext + '".');
+            }
+
+            lines.push('');
+            lines.push('PER-FIELD CONTENT GUIDE (only for the keys you must fill — produce no other keys):');
+            emptyFieldKeys.forEach(key => {
+                if (DCA_AI_FIELD_GUIDE[key]) lines.push('- "' + key + '": ' + DCA_AI_FIELD_GUIDE[key]);
+            });
+
+            lines.push('');
+            lines.push('LANGUAGE RULE — STRICT:');
+            lines.push('- "patientCounseling" MUST be Thai (ภาษาไทย). This is counseling spoken to a Thai-speaking patient. Use everyday Thai, not transliterated English.');
+            lines.push('- ALL other prose fields MUST be in English (international medical convention).');
+            lines.push('- "pearls" may mix Thai + English where pedagogically useful (e.g. Thai mnemonics with English drug terms).');
+            lines.push('- Medical loanwords like "MRI", "GFR", "QT prolongation" stay in English even inside Thai text — do not transliterate them.');
+
+            lines.push('');
+            lines.push('CONTENT RULES:');
+            lines.push('- If uncertain about a specific field (e.g. ATC code), return an empty string for that field rather than guessing.');
+            lines.push('- Keep each text field under 600 characters. Use \\n for line breaks. Use "- " prefix for bullet items.');
+            lines.push('- Do NOT contradict the intern-supplied seed. Your fills must be internally consistent with the seed (indication, dosing, class, etc).');
+            lines.push('- Do NOT include disclaimers like "consult a physician" in JSON values — the platform handles that.');
+            lines.push('- Do NOT include any seed key in your response — admin already has those values.');
+
+            lines.push('');
+            lines.push('SELF-CHECK before responding:');
+            lines.push('1. Is the response valid JSON (no markdown fence, no prose outside the braces)?');
+            lines.push('2. Does the response contain ONLY these keys: ' + emptyFieldKeys.map(k => '"' + k + '"').join(', ') + '?');
+            lines.push('3. Is "patientCounseling" written in Thai script (if among the requested keys)?');
+            lines.push('4. Are all other prose fields written in English?');
+            lines.push("5. Are your fills consistent with the intern's seed data above?");
+            lines.push('If any check fails, regenerate before sending.');
+
+            return lines.join('\n');
         }
 
         function closeCaseReviewScoreModal(shouldSubmit) {
