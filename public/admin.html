@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.39</title>
+    <title>Nika V94.40</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12653,13 +12653,29 @@
                     </div>
                 </div>
 
-                <!-- Section 3b: Pharmacokinetics (V94.39: split from Pharmacology) -->
+                <!-- Section 3b: Pharmacokinetics · ADMET (V94.40: split into 5 sub-fields).
+                     Legacy `pharmacokinetics` free-form field is no longer rendered here
+                     but is preserved in Firestore for old docs (not in DCA_FIELD_KEYS,
+                     so dcaSaveForm never touches it). Intern view falls back to legacy
+                     when all 5 ADMET fields are empty. -->
                 <div class="dca-form-section" data-tab="pk">
-                    <div class="dca-form-section-header">📊 Pharmacokinetics</div>
+                    <div class="dca-form-section-header">📊 Pharmacokinetics · ADMET</div>
                     <div class="dca-form-section-body">
                         <div class="dca-form-grid">
-                            <label for="dca-f-pharmacokinetics">Pharmacokinetics</label>
-                            <textarea id="dca-f-pharmacokinetics" rows="5" placeholder="ADME summary · Absorption / Distribution / Metabolism / Excretion…"></textarea>
+                            <label for="dca-f-absorption">Absorption</label>
+                            <textarea id="dca-f-absorption" rows="3" placeholder="Bioavailability · Tmax · food effect · route…"></textarea>
+
+                            <label for="dca-f-distribution">Distribution</label>
+                            <textarea id="dca-f-distribution" rows="3" placeholder="Vd · protein binding · BBB / tissue penetration…"></textarea>
+
+                            <label for="dca-f-metabolism">Metabolism</label>
+                            <textarea id="dca-f-metabolism" rows="3" placeholder="Enzymes (CYP3A4, etc.) · active/inactive metabolites · first-pass…"></textarea>
+
+                            <label for="dca-f-excretion">Excretion</label>
+                            <textarea id="dca-f-excretion" rows="3" placeholder="Routes (urine / feces / bile) · t½ · renal / hepatic dose adjustment…"></textarea>
+
+                            <label for="dca-f-toxicity">Toxicity</label>
+                            <textarea id="dca-f-toxicity" rows="3" placeholder="Overdose effects · organ toxicity · LD50 if known · antidote…"></textarea>
                         </div>
                     </div>
                 </div>
@@ -28558,7 +28574,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         const DCA_FIELD_KEYS = [
             'genericName', 'brandNames', 'atcCode', 'class',
             'indication', 'dosing', 'contraindication', 'sideEffects', 'interactions',
-            'mechanism', 'pharmacokinetics',
+            'mechanism',
+            // V94.40: ADMET split — replaces the single `pharmacokinetics` field.
+            // Legacy `pharmacokinetics` field is preserved in Firestore for old docs
+            // (not in DCA_FIELD_KEYS so dcaCollectForm never touches it on save),
+            // and is rendered as a fallback in intern view when all 5 ADMET keys are empty.
+            'absorption', 'distribution', 'metabolism', 'excretion', 'toxicity',
             'monitoring', 'patientCounseling', 'pearls',
             'references'
         ];
@@ -28572,7 +28593,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             { key: 'core',     fields: ['genericName', 'brandNames', 'atcCode', 'class'], required: ['genericName'] },
             { key: 'clinical', fields: ['indication', 'dosing', 'contraindication', 'sideEffects', 'interactions'] },
             { key: 'moa',      fields: ['mechanism'] },          // V94.39: split from 'pharm'
-            { key: 'pk',       fields: ['pharmacokinetics'] },   // V94.39: split from 'pharm'
+            { key: 'pk',       fields: ['absorption', 'distribution', 'metabolism', 'excretion', 'toxicity'] },   // V94.40: ADMET — replaces single 'pharmacokinetics' field
             { key: 'edu',      fields: ['monitoring', 'patientCounseling', 'pearls'] },
             { key: 'refs',     fields: ['references'] }
         ];
@@ -29341,7 +29362,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 '  "sideEffects":     "<<<Common: ... ; Serious: ... · medical English>>>",',
                 '  "interactions":    "<<<drug-drug · drug-food · enzyme inducers/inhibitors · medical English>>>",',
                 '  "mechanism":       "<<<mechanism of action · medical English>>>",',
-                '  "pharmacokinetics":"<<<ADME summary · medical English>>>",',
+                // V94.40: ADMET split — 5 keys replace the single pharmacokinetics field.
+                '  "absorption":      "<<<bioavailability · Tmax · food effect · route · medical English>>>",',
+                '  "distribution":    "<<<Vd · protein binding · BBB / tissue penetration · medical English>>>",',
+                '  "metabolism":      "<<<enzymes (CYP3A4 etc.) · active/inactive metabolites · first-pass · medical English>>>",',
+                '  "excretion":       "<<<routes (urine / feces / bile) · t½ · renal/hepatic dose adjustment · medical English>>>",',
+                '  "toxicity":        "<<<overdose effects · organ toxicity · LD50 if known · antidote · medical English · empty string if not well-characterized>>>",',
                 '  "monitoring":      "<<<labs and clinical signs · medical English>>>",',
                 '  "patientCounseling":"<<<Thai counseling points · ภาษาไทยเท่านั้น · 2-5 bullet points>>>",',
                 '  "pearls":          "<<<high-yield clinical pearls · mix EN+TH ok>>>",',
@@ -29491,7 +29517,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             'sideEffects':      'Common: ... ; Serious: ... · medical English',
             'interactions':     'drug-drug · drug-food · enzyme inducers/inhibitors · medical English',
             'mechanism':        'mechanism of action · medical English',
-            'pharmacokinetics': 'ADME summary · medical English',
+            // V94.40: ADMET split — replaces single 'pharmacokinetics' guide entry.
+            'absorption':       'bioavailability · Tmax · food effect · route · medical English',
+            'distribution':     'Vd · protein binding · BBB / tissue penetration · medical English',
+            'metabolism':       'enzymes (CYP3A4 etc.) · active/inactive metabolites · first-pass · medical English',
+            'excretion':        'routes (urine / feces / bile) · t½ · renal/hepatic dose adjustment · medical English',
+            'toxicity':         'overdose effects · organ toxicity · LD50 if known · antidote · medical English · empty string if not well-characterized',
             'monitoring':       'labs and clinical signs · medical English',
             'patientCounseling':'Thai counseling points · ภาษาไทยเท่านั้น · 2-5 bullet points',
             'pearls':           'high-yield clinical pearls · mix EN+TH ok'
