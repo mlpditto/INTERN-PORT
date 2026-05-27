@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.40</title>
+    <title>Nika V94.41</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1464,6 +1464,22 @@
         .dca-form-tab-badge.error { background: #ef4444; }
         .dca-form-section[data-tab] { display: none; }
         .dca-form-section[data-tab].active-tab { display: block; }
+        /* V94.41: Copy buttons — global (form header, full label) + per-section (icon-only, right-aligned). */
+        .dca-form-copy-btn {
+            padding: 4px 10px; border-radius: 6px;
+            background: #f1f5f9; color: #475569;
+            border: 1px solid #e2e8f0;
+            font-size: 0.78em; font-weight: 700;
+            cursor: pointer;
+            display: inline-flex; align-items: center; gap: 4px;
+            transition: background 0.12s, color 0.12s, border-color 0.12s;
+        }
+        .dca-form-copy-btn:hover { background: #e0e7ff; color: #1e40af; border-color: #c7d2fe; }
+        .dca-form-copy-btn.copied { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+        .dca-form-section-header .dca-form-copy-btn {
+            margin-left: auto;
+            padding: 2px 8px; font-size: 0.72em;
+        }
         .dca-draft-actions { display: flex; gap: 6px; flex-wrap: wrap; }
         .dca-draft-approve-btn {
             padding: 5px 12px; border-radius: 8px; border: none;
@@ -12576,6 +12592,12 @@
                                 onclick="dcaAiFillEmptyFields()" title="Use AI to fill the fields intern left empty, using their data as seed">
                             🤖 AI fill empty fields
                         </button>
+                        <!-- V94.41: Copy whole drug entry as Markdown to clipboard. Uses current form
+                             values (dcaCollectForm) so admin can copy WIP state before saving. -->
+                        <button type="button" id="dca-form-copy-btn" class="dca-form-copy-btn"
+                                onclick="dcaCopyDrugAsMarkdown('all', this)" title="Copy this drug entry as Markdown to clipboard (current form state)">
+                            📋 Copy
+                        </button>
                     </div>
                     <div style="font-size:0.78em; color:#94a3b8;" id="dca-form-doc-id"></div>
                 </div>
@@ -12601,7 +12623,7 @@
 
                 <!-- Section 1: Core identity -->
                 <div class="dca-form-section active-tab" data-tab="core">
-                    <div class="dca-form-section-header">📛 Core Identity</div>
+                    <div class="dca-form-section-header"><span>📛 Core Identity</span><button type="button" class="dca-form-copy-btn" onclick="dcaCopyDrugAsMarkdown('core', this)" title="Copy this section as Markdown">📋</button></div>
                     <div class="dca-form-section-body">
                         <div class="dca-form-grid">
                             <label for="dca-f-genericName" class="required">Generic Name</label>
@@ -12621,7 +12643,7 @@
 
                 <!-- Section 2: Clinical use -->
                 <div class="dca-form-section" data-tab="clinical">
-                    <div class="dca-form-section-header">🩺 Clinical Use</div>
+                    <div class="dca-form-section-header"><span>🩺 Clinical Use</span><button type="button" class="dca-form-copy-btn" onclick="dcaCopyDrugAsMarkdown('clinical', this)" title="Copy this section as Markdown">📋</button></div>
                     <div class="dca-form-section-body">
                         <div class="dca-form-grid">
                             <label for="dca-f-indication">Indication</label>
@@ -12644,7 +12666,7 @@
 
                 <!-- Section 3a: Mechanism of Action (V94.39: split from Pharmacology) -->
                 <div class="dca-form-section" data-tab="moa">
-                    <div class="dca-form-section-header">💊 Mechanism of Action</div>
+                    <div class="dca-form-section-header"><span>💊 Mechanism of Action</span><button type="button" class="dca-form-copy-btn" onclick="dcaCopyDrugAsMarkdown('moa', this)" title="Copy this section as Markdown">📋</button></div>
                     <div class="dca-form-section-body">
                         <div class="dca-form-grid">
                             <label for="dca-f-mechanism">Mechanism</label>
@@ -12659,7 +12681,7 @@
                      so dcaSaveForm never touches it). Intern view falls back to legacy
                      when all 5 ADMET fields are empty. -->
                 <div class="dca-form-section" data-tab="pk">
-                    <div class="dca-form-section-header">📊 Pharmacokinetics · ADMET</div>
+                    <div class="dca-form-section-header"><span>📊 Pharmacokinetics · ADMET</span><button type="button" class="dca-form-copy-btn" onclick="dcaCopyDrugAsMarkdown('pk', this)" title="Copy this section as Markdown">📋</button></div>
                     <div class="dca-form-section-body">
                         <div class="dca-form-grid">
                             <label for="dca-f-absorption">Absorption</label>
@@ -12682,7 +12704,7 @@
 
                 <!-- Section 4: Education -->
                 <div class="dca-form-section" data-tab="edu">
-                    <div class="dca-form-section-header">📖 Education</div>
+                    <div class="dca-form-section-header"><span>📖 Education</span><button type="button" class="dca-form-copy-btn" onclick="dcaCopyDrugAsMarkdown('edu', this)" title="Copy this section as Markdown">📋</button></div>
                     <div class="dca-form-section-body">
                         <div class="dca-form-grid">
                             <label for="dca-f-monitoring">Monitoring</label>
@@ -12699,7 +12721,7 @@
 
                 <!-- Section 5: References -->
                 <div class="dca-form-section" data-tab="refs">
-                    <div class="dca-form-section-header">🔗 References</div>
+                    <div class="dca-form-section-header"><span>🔗 References</span><button type="button" class="dca-form-copy-btn" onclick="dcaCopyDrugAsMarkdown('refs', this)" title="Copy this section as Markdown">📋</button></div>
                     <div class="dca-form-section-body">
                         <div class="dca-form-grid">
                             <label for="dca-f-references">Citation URLs</label>
@@ -28605,6 +28627,93 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.querySelectorAll('.dca-form-section[data-tab]').forEach(sec => {
                 sec.classList.toggle('active-tab', sec.dataset.tab === sectionKey);
             });
+        }
+
+        // V94.41: Copy drug entry (or one section) as Markdown to clipboard.
+        // Uses current form values (dcaCollectForm) so WIP state is captured. The
+        // section title + label map mirror the form UI exactly so paste reads natural.
+        const DCA_SECTION_TITLES = {
+            core:     '📛 Core Identity',
+            clinical: '🩺 Clinical Use',
+            moa:      '💊 Mechanism of Action',
+            pk:       '📊 Pharmacokinetics · ADMET',
+            edu:      '📖 Education',
+            refs:     '🔗 References'
+        };
+        const DCA_FIELD_LABELS = {
+            genericName: 'Generic Name', brandNames: 'Brand Names', atcCode: 'ATC Code', class: 'Class',
+            indication: 'Indication', dosing: 'Dosing', contraindication: 'Contraindication',
+            sideEffects: 'Side Effects', interactions: 'Interactions',
+            mechanism: 'Mechanism',
+            absorption: 'Absorption', distribution: 'Distribution', metabolism: 'Metabolism',
+            excretion: 'Excretion', toxicity: 'Toxicity',
+            monitoring: 'Monitoring', patientCounseling: 'Patient Counseling', pearls: 'Clinical Pearls',
+            references: 'References'
+        };
+        async function dcaCopyDrugAsMarkdown(scopeKey, btnEl) {
+            const data = dcaCollectForm();
+            const name = (data.genericName || '').trim() || '(unnamed drug)';
+            const sectionDefs = (scopeKey === 'all')
+                ? DCA_SECTION_DEFS
+                : DCA_SECTION_DEFS.filter(d => d.key === scopeKey);
+
+            const lines = [];
+            if (scopeKey === 'all') {
+                lines.push('# ' + name);
+                lines.push('');
+            }
+            let nonEmptyCount = 0;
+            sectionDefs.forEach(def => {
+                const populated = def.fields.filter(k => {
+                    const v = data[k];
+                    if (DCA_ARRAY_FIELDS[k]) return Array.isArray(v) && v.length > 0;
+                    return v && String(v).trim();
+                });
+                if (populated.length === 0) return;
+                lines.push('## ' + (DCA_SECTION_TITLES[def.key] || def.key));
+                lines.push('');
+                populated.forEach(k => {
+                    const label = DCA_FIELD_LABELS[k] || k;
+                    const v = data[k];
+                    if (DCA_ARRAY_FIELDS[k] === 'csv') {
+                        lines.push('**' + label + '**: ' + (v || []).join(', '));
+                    } else if (DCA_ARRAY_FIELDS[k] === 'lines') {
+                        lines.push('**' + label + '**:');
+                        (v || []).forEach(line => lines.push('- ' + line));
+                    } else {
+                        const text = String(v || '').trim();
+                        if (text.indexOf('\n') !== -1) {
+                            lines.push('**' + label + '**:');
+                            lines.push(text);
+                        } else {
+                            lines.push('**' + label + '**: ' + text);
+                        }
+                    }
+                    lines.push('');
+                    nonEmptyCount++;
+                });
+            });
+
+            const md = lines.join('\n').trim();
+            if (!md || nonEmptyCount === 0) {
+                if (typeof showToast === 'function') showToast('Nothing to copy — fields are empty');
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(md);
+                const scope = (scopeKey === 'all')
+                    ? (nonEmptyCount + ' field' + (nonEmptyCount === 1 ? '' : 's'))
+                    : (DCA_SECTION_TITLES[scopeKey] || scopeKey);
+                if (typeof showToast === 'function') showToast('📋 Copied ' + scope + ' as Markdown');
+                // Brief visual ack on the button itself (defense vs toast being missed).
+                if (btnEl) {
+                    btnEl.classList.add('copied');
+                    setTimeout(() => btnEl.classList.remove('copied'), 1200);
+                }
+            } catch (err) {
+                console.error('[drug-codex] copy failed:', err);
+                alert('Copy failed: ' + (err && err.message ? err.message : 'clipboard API blocked — try a focused tab over HTTPS'));
+            }
         }
 
         // Recompute badge state for every section based on the current form values.
