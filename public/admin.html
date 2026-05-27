@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.37</title>
+    <title>Nika V94.38</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1431,6 +1431,39 @@
             font-size: 0.7em; font-weight: 900; color: #6b21a8;
             text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 4px;
         }
+        /* V94.38: Form tab navigation — one section visible at a time. Tab badges
+           reflect fill status (green=has data, gray=empty, red=required missing).
+           Banner sits above tabs so intern-notes context persists across tabs. */
+        .dca-form-tabs {
+            display: flex; gap: 6px; flex-wrap: wrap;
+            margin: 0 0 12px; padding: 4px;
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;
+        }
+        .dca-form-tab-btn {
+            flex: 1; min-width: 90px;
+            padding: 8px 10px; border: 1px solid transparent; border-radius: 8px;
+            background: transparent; color: #64748b;
+            cursor: pointer; font-weight: 700; font-size: 0.85em;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            transition: background 0.12s, color 0.12s, border-color 0.12s;
+        }
+        .dca-form-tab-btn:hover { background: #fff; color: #1e40af; }
+        .dca-form-tab-btn.active {
+            background: #fff; color: #1e40af;
+            border-color: #c7d2fe;
+            box-shadow: 0 1px 3px rgba(99,102,241,0.12);
+        }
+        .dca-form-tab-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 16px; height: 16px; border-radius: 50%;
+            font-size: 0.66em; font-weight: 900;
+            background: #cbd5e1; color: #fff;
+        }
+        .dca-form-tab-badge.full  { background: #10b981; }
+        .dca-form-tab-badge.empty { background: #cbd5e1; }
+        .dca-form-tab-badge.error { background: #ef4444; }
+        .dca-form-section[data-tab] { display: none; }
+        .dca-form-section[data-tab].active-tab { display: block; }
         .dca-draft-actions { display: flex; gap: 6px; flex-wrap: wrap; }
         .dca-draft-approve-btn {
             padding: 5px 12px; border-radius: 8px; border: none;
@@ -12549,11 +12582,24 @@
 
                 <!-- V94.35 Phase 5: intern's free-text note to admin (drafts only).
                      Shown only when reviewing a draft that has a non-empty
-                     internNotes field. Includes targetDrugId context when present. -->
+                     internNotes field. Includes targetDrugId context when present.
+                     V94.38: positioned above the tab rail so context persists across tabs. -->
                 <div id="dca-form-intern-notes-banner" class="dca-form-intern-notes-banner" style="display:none;"></div>
 
+                <!-- V94.38: Tab navigation — focus one section at a time. Default tab = Core
+                     (set by dcaAddNew/dcaEdit/dcaReviewDraft). dcaAutoDraftGo and
+                     dcaAiFillEmptyFields intentionally don't switch tabs so admin stays
+                     on whatever section they were verifying. -->
+                <div class="dca-form-tabs" id="dca-form-tabs" role="tablist">
+                    <button type="button" class="dca-form-tab-btn active" data-section="core"     onclick="dcaSwitchSection('core')"     role="tab">📛 Core <span class="dca-form-tab-badge empty" data-section-badge="core">○</span></button>
+                    <button type="button" class="dca-form-tab-btn"        data-section="clinical" onclick="dcaSwitchSection('clinical')" role="tab">🩺 Clinical <span class="dca-form-tab-badge empty" data-section-badge="clinical">○</span></button>
+                    <button type="button" class="dca-form-tab-btn"        data-section="pharm"    onclick="dcaSwitchSection('pharm')"    role="tab">🧬 Pharm <span class="dca-form-tab-badge empty" data-section-badge="pharm">○</span></button>
+                    <button type="button" class="dca-form-tab-btn"        data-section="edu"      onclick="dcaSwitchSection('edu')"      role="tab">📖 Edu <span class="dca-form-tab-badge empty" data-section-badge="edu">○</span></button>
+                    <button type="button" class="dca-form-tab-btn"        data-section="refs"     onclick="dcaSwitchSection('refs')"     role="tab">🔗 Refs <span class="dca-form-tab-badge empty" data-section-badge="refs">○</span></button>
+                </div>
+
                 <!-- Section 1: Core identity -->
-                <div class="dca-form-section">
+                <div class="dca-form-section active-tab" data-tab="core">
                     <div class="dca-form-section-header">📛 Core Identity</div>
                     <div class="dca-form-section-body">
                         <div class="dca-form-grid">
@@ -12573,7 +12619,7 @@
                 </div>
 
                 <!-- Section 2: Clinical use -->
-                <div class="dca-form-section">
+                <div class="dca-form-section" data-tab="clinical">
                     <div class="dca-form-section-header">🩺 Clinical Use</div>
                     <div class="dca-form-section-body">
                         <div class="dca-form-grid">
@@ -12596,7 +12642,7 @@
                 </div>
 
                 <!-- Section 3: Pharmacology -->
-                <div class="dca-form-section">
+                <div class="dca-form-section" data-tab="pharm">
                     <div class="dca-form-section-header">🧬 Pharmacology</div>
                     <div class="dca-form-section-body">
                         <div class="dca-form-grid">
@@ -12610,7 +12656,7 @@
                 </div>
 
                 <!-- Section 4: Education -->
-                <div class="dca-form-section">
+                <div class="dca-form-section" data-tab="edu">
                     <div class="dca-form-section-header">📖 Education</div>
                     <div class="dca-form-section-body">
                         <div class="dca-form-grid">
@@ -12627,7 +12673,7 @@
                 </div>
 
                 <!-- Section 5: References -->
-                <div class="dca-form-section">
+                <div class="dca-form-section" data-tab="refs">
                     <div class="dca-form-section-header">🔗 References</div>
                     <div class="dca-form-section-body">
                         <div class="dca-form-grid">
@@ -28511,6 +28557,50 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // comma-separated (brandNames) or newline-separated (references).
         const DCA_ARRAY_FIELDS = { brandNames: 'csv', references: 'lines' };
 
+        // V94.38: Tab navigation — section key → fields list. `required` flags fields
+        // that must be non-empty for the section to clear the error badge state.
+        const DCA_SECTION_DEFS = [
+            { key: 'core',     fields: ['genericName', 'brandNames', 'atcCode', 'class'], required: ['genericName'] },
+            { key: 'clinical', fields: ['indication', 'dosing', 'contraindication', 'sideEffects', 'interactions'] },
+            { key: 'pharm',    fields: ['mechanism', 'pharmacokinetics'] },
+            { key: 'edu',      fields: ['monitoring', 'patientCounseling', 'pearls'] },
+            { key: 'refs',     fields: ['references'] }
+        ];
+
+        function dcaSwitchSection(sectionKey) {
+            document.querySelectorAll('.dca-form-tab-btn[data-section]').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.section === sectionKey);
+            });
+            document.querySelectorAll('.dca-form-section[data-tab]').forEach(sec => {
+                sec.classList.toggle('active-tab', sec.dataset.tab === sectionKey);
+            });
+        }
+
+        // Recompute badge state for every section based on the current form values.
+        // Badge states: 'error' (required field empty), 'full' (any field filled), 'empty' (all empty).
+        function dcaUpdateSectionBadges() {
+            DCA_SECTION_DEFS.forEach(def => {
+                const badge = document.querySelector(`.dca-form-tab-badge[data-section-badge="${def.key}"]`);
+                if (!badge) return;
+                const reqMissing = (def.required || []).some(k => {
+                    const el = document.getElementById('dca-f-' + k);
+                    return !el || !String(el.value || '').trim();
+                });
+                const anyFilled = def.fields.some(k => {
+                    const el = document.getElementById('dca-f-' + k);
+                    if (!el) return false;
+                    return String(el.value || '').trim().length > 0;
+                });
+                let state, glyph;
+                if (reqMissing) { state = 'error'; glyph = '!'; }
+                else if (anyFilled) { state = 'full'; glyph = '✓'; }
+                else { state = 'empty'; glyph = '○'; }
+                badge.classList.remove('empty', 'full', 'error');
+                badge.classList.add(state);
+                badge.textContent = glyph;
+            });
+        }
+
         var dcaState = {
             view: 'published',     // 'published' | 'drafts' | 'form'
             editingId: null,       // doc id being edited, null = add new
@@ -28808,6 +28898,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // Clear error
             const err = document.getElementById('dca-form-error');
             if (err) { err.style.display = 'none'; err.textContent = ''; }
+            // V94.38: refresh tab badges after form re-fill (Add/Edit/Review/AI auto-draft/AI fill empty all flow through here)
+            dcaUpdateSectionBadges();
         }
 
         function dcaCollectForm() {
@@ -28832,6 +28924,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaHideInternNotesBanner();
             dcaHideAiFillButton();
             dcaFillForm({});
+            dcaSwitchSection('core');
             dcaSwitchView('form');
         }
 
@@ -28845,6 +28938,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaHideInternNotesBanner();
             dcaHideAiFillButton();
             dcaFillForm(drug);
+            dcaSwitchSection('core');
             dcaSwitchView('form');
         }
 
@@ -28864,6 +28958,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // partial submission with the missing technical fields.
             dcaShowAiFillButton();
             dcaFillForm(draft);
+            dcaSwitchSection('core');
             dcaSwitchView('form');
         }
 
@@ -28927,6 +29022,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // Validation: genericName required + non-empty (matches rules-layer check on drafts).
             if (!payload.genericName) {
                 if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Generic Name is required.'; }
+                // V94.38: jump back to the section holding the missing required field
+                dcaSwitchSection('core');
+                const nameEl = document.getElementById('dca-f-genericName');
+                if (nameEl) nameEl.focus();
+                dcaUpdateSectionBadges();
                 return;
             }
             // Duplicate guard: same genericName already exists in codex (ignore when editing same doc).
