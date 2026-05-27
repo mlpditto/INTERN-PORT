@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.93)</title>
+    <title>Internship Portfolio (V94.94)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -10231,9 +10231,23 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 if (drug.aiDrafted) chips.push('<span class="dc-detail-chip dc-detail-chip-ai" title="AI-drafted entry — admin still curates">🤖 AI draft</span>');
                 chipsEl.innerHTML = chips.join('');
             }
-            // Body: 5 sections
+            // Body: 6 sections (V94.94: 5 → 6 after splitting Pharmacology into MoA + ADMET-PK).
             const body = document.getElementById('dc-detail-body');
             if (!body) return;
+            // V94.94: PK section — show 5 ADMET sub-fields if any have content; else
+            // fall back to the legacy single `pharmacokinetics` field for old docs
+            // that were authored before V94.40 (admin) introduced the ADMET split.
+            const admetFields = [
+                ['Absorption', drug.absorption],
+                ['Distribution', drug.distribution],
+                ['Metabolism', drug.metabolism],
+                ['Excretion', drug.excretion],
+                ['Toxicity', drug.toxicity]
+            ];
+            const hasAnyAdmet = admetFields.some(([, v]) => v && String(v).trim());
+            const pkSection = hasAnyAdmet
+                ? { title: '📊 Pharmacokinetics · ADMET', open: false, fields: admetFields }
+                : { title: '📊 Pharmacokinetics', open: false, fields: [['Pharmacokinetics', drug.pharmacokinetics]] };
             const sections = [
                 {
                     title: '🩺 Clinical Use',
@@ -10247,13 +10261,13 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     ]
                 },
                 {
-                    title: '🧬 Pharmacology',
+                    title: '💊 Mechanism of Action',
                     open: false,
                     fields: [
-                        ['Mechanism', drug.mechanism],
-                        ['Pharmacokinetics', drug.pharmacokinetics]
+                        ['Mechanism', drug.mechanism]
                     ]
                 },
+                pkSection,
                 {
                     title: '📖 Education',
                     open: true,
