@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.96)</title>
+    <title>Internship Portfolio (V94.97)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2702,16 +2702,31 @@
                 .dc-toolbar input[type="text"]:focus {
                     border-color: #2563eb; outline: none;
                 }
+                /* V94.97: defensive explicit row layout — buttons were rendering as a
+                   vertical stack (one-letter-per-row) because some inherited rule was
+                   stretching each .dc-az-letter to full width. Force flex-direction:row
+                   + inline-flex + flex:0 0 auto so letters stay compact and wrap into
+                   neat rows regardless of any global button styling. */
                 .dc-az-rail {
-                    display: flex; flex-wrap: wrap; gap: 3px;
+                    display: flex;
+                    flex-direction: row;
+                    flex-wrap: wrap;
+                    justify-content: center;
+                    gap: 3px;
                     padding: 6px 16px; margin: 0;
                     background: transparent;
                 }
                 .dc-az-letter {
-                    min-width: 24px; padding: 3px 6px; border-radius: 6px;
+                    display: inline-flex;
+                    flex: 0 0 auto;
+                    align-items: center;
+                    justify-content: center;
+                    min-width: 24px; height: 24px;
+                    padding: 0 6px; border-radius: 6px;
                     border: 1px solid transparent; background: transparent;
                     font-size: 0.78em; font-weight: 700; color: #cbd5e1;
                     cursor: not-allowed; font-family: inherit;
+                    line-height: 1;
                 }
                 .dc-az-letter.has-content {
                     color: #1d4ed8; background: #eff6ff; border-color: #dbeafe;
@@ -10218,7 +10233,9 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             dcState.currentDrug = drug;
             dcRenderDetail(drug);
             const modal = document.getElementById('drugCodexDetailModal');
-            if (modal) modal.style.display = 'block';
+            // V94.97: use 'flex' so the .modal class's align-items:center + justify-content:center
+            // actually fire — 'block' was leaving the modal-content stuck to the top-left.
+            if (modal) modal.style.display = 'flex';
         }
 
         function dcCloseDetail() {
@@ -10660,7 +10677,8 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 });
             }
             const modal = document.getElementById('drugCodexSubmitModal');
-            if (modal) modal.style.display = 'block';
+            // V94.97: 'flex' instead of 'block' so the .modal centering rules fire.
+            if (modal) modal.style.display = 'flex';
             // If opened from Suggest-edit while detail modal is up, close detail
             // so the submit modal isn't visually buried.
             const detailModal = document.getElementById('drugCodexDetailModal');
