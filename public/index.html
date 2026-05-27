@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.94)</title>
+    <title>Internship Portfolio (V94.95)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -10059,6 +10059,11 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     dcState.loaded = true;
                     dcLoadCodex();
                 }
+                // V94.95: every expand resets to Browse — defense against the trap
+                // where an intern was last on My Drafts (e.g. auto-switched after
+                // submit per V94.92), then closed the section, and on reopen
+                // couldn't see admin-published drugs because My Drafts is empty.
+                if (typeof dcSwitchView === 'function') dcSwitchView('browse');
             } else {
                 content.style.display = 'none';
                 if (icon) icon.style.transform = 'rotate(0deg)';
@@ -10490,7 +10495,11 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             const list = document.getElementById('dc-mydrafts-list');
             if (!list) return;
             if (dcMyDraftsState.drafts.length === 0) {
-                list.innerHTML = '<div class="dc-empty-state">ยังไม่มี draft<br><small style="color:#cbd5e1;">กด 📥 Submit New Drug ด้านล่างเพื่อส่งร่างยา</small></div>';
+                // V94.95: empty state nudges intern toward Browse tab — otherwise
+                // an intern who lands here (e.g. via auto-switch after submit, or
+                // by manual tab click out of curiosity) sees nothing and may
+                // assume the whole Drug Codex is empty.
+                list.innerHTML = '<div class="dc-empty-state">ยังไม่มี draft ที่ส่ง<br><small style="color:#64748b;">📚 <a href="#" onclick="event.preventDefault(); dcSwitchView(\'browse\');" style="color:#2563eb; font-weight:600; text-decoration:underline;">ดูรายการยาที่ admin ลงไว้แล้วใน Browse tab</a><br>หรือกด 📥 Submit New Drug ด้านล่างเพื่อส่งร่างยา</small></div>';
                 return;
             }
             list.innerHTML = dcMyDraftsState.drafts.map(draft => {
