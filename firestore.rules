@@ -301,6 +301,16 @@ service cloud.firestore {
     match /drug_codex/{drugId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
+
+      // 28a. Per-drug discussion comments (Phase 6 — V94.93).
+      // Mirrors quiz_discussions/{id}/comments posture: any signed-in user
+      // can read + post; admin moderates (delete bad content). Owner cannot
+      // edit or delete own comment — keeps audit trail clean and prevents
+      // post-then-edit-to-malicious abuse.
+      match /comments/{commentId} {
+        allow read, create: if isSignedIn();
+        allow update, delete: if isAdmin();
+      }
     }
 
     // 29. Drug Codex Drafts (intern submissions awaiting admin moderation).

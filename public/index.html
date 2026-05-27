@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.92)</title>
+    <title>Internship Portfolio (V94.93)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2870,6 +2870,98 @@
                     .dc-detail-section > summary { padding: 10px 16px; }
                     .dc-detail-section-body { padding: 8px 16px 14px; }
                     .dc-list { max-height: 65vh; }
+                }
+
+                /* --- V94.93 Phase 6: per-drug discussion thread (mirrors quiz_discussions chat bubbles, escaped) --- */
+                .dc-discussion-box {
+                    display: flex; flex-direction: column; gap: 10px;
+                    max-height: 40vh; min-height: 80px; overflow-y: auto;
+                    padding: 10px; background: #f8fafc;
+                    border: 1px solid #e2e8f0; border-radius: 10px;
+                    margin-bottom: 10px;
+                }
+                .dc-discussion-empty {
+                    text-align: center; padding: 24px 10px; color: #94a3b8;
+                    font-size: 0.88em;
+                }
+                .dc-discussion-loading {
+                    text-align: center; padding: 18px 10px; color: #64748b;
+                    font-size: 0.85em;
+                }
+                .dc-discussion-error {
+                    text-align: center; padding: 14px 10px; color: #b91c1c;
+                    font-size: 0.85em;
+                }
+                .dc-discussion-row {
+                    display: flex; gap: 8px; align-items: flex-end;
+                    max-width: 88%;
+                }
+                .dc-discussion-row.me {
+                    flex-direction: row-reverse; align-self: flex-end;
+                }
+                .dc-discussion-row.other {
+                    align-self: flex-start;
+                }
+                .dc-discussion-avatar {
+                    width: 28px; height: 28px; border-radius: 50%;
+                    border: 1px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                    flex-shrink: 0; object-fit: cover; background: #cbd5e1;
+                }
+                .dc-discussion-bubble {
+                    padding: 8px 12px; border-radius: 14px;
+                    background: #fff; color: #0f172a;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+                    font-size: 0.9em; position: relative;
+                    word-break: break-word; white-space: pre-wrap;
+                }
+                .dc-discussion-row.me .dc-discussion-bubble {
+                    background: #3b82f6; color: #fff;
+                    border-radius: 14px 14px 4px 14px;
+                }
+                .dc-discussion-row.other .dc-discussion-bubble {
+                    border-radius: 14px 14px 14px 4px;
+                }
+                .dc-discussion-author {
+                    font-size: 0.72em; opacity: 0.85; font-weight: 700;
+                    margin-bottom: 2px;
+                }
+                .dc-discussion-time {
+                    font-size: 0.66em; opacity: 0.7;
+                    margin-top: 4px; text-align: right;
+                }
+                .dc-discussion-del {
+                    background: transparent; border: none; cursor: pointer;
+                    color: #94a3b8; font-size: 0.9em; padding: 0 4px;
+                    align-self: flex-end;
+                }
+                .dc-discussion-del:hover { color: #ef4444; }
+                .dc-discussion-form {
+                    display: flex; gap: 8px; align-items: stretch;
+                }
+                .dc-discussion-input {
+                    flex: 1; min-height: 38px; max-height: 120px;
+                    padding: 8px 12px; border: 1.5px solid #cbd5e1;
+                    border-radius: 10px; font-size: 0.9em; resize: vertical;
+                    font-family: inherit;
+                }
+                .dc-discussion-input:focus {
+                    border-color: #3b82f6; outline: none;
+                }
+                .dc-discussion-send {
+                    padding: 8px 16px; border: none; border-radius: 10px;
+                    background: linear-gradient(135deg, #3b82f6, #2563eb);
+                    color: #fff; font-weight: 800; cursor: pointer;
+                    font-size: 0.88em; white-space: nowrap;
+                }
+                .dc-discussion-send:hover {
+                    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+                }
+                .dc-discussion-send:disabled {
+                    background: #cbd5e1; cursor: wait;
+                }
+                .dc-discussion-signin-hint {
+                    text-align: center; padding: 10px;
+                    color: #94a3b8; font-size: 0.82em;
                 }
 
                 /* --- V94.92 Phase 5: My Drafts tab bar + submit form + status chips --- */
@@ -9945,6 +10037,16 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             currentDrug: null   // drug currently open in detail modal
         };
 
+        // V94.93 Phase 6: per-drug discussion thread state.
+        // unsub is the comments onSnapshot teardown; drugId tracks who's wired.
+        // wired flips true on first <details> toggle-open so we don't re-listen
+        // if user expands+collapses+expands while modal is still on the same drug.
+        var dcDiscussionState = {
+            unsub: null,
+            drugId: null,
+            wired: false
+        };
+
         function toggleDrugCodex() {
             const content = document.getElementById('dc-section-content');
             const icon = document.getElementById('dc-section-icon');
@@ -10109,6 +10211,9 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             const modal = document.getElementById('drugCodexDetailModal');
             if (modal) modal.style.display = 'none';
             dcState.currentDrug = null;
+            // V94.93 Phase 6: tear down discussion listener so background reads
+            // stop when the user leaves the drug.
+            dcDiscussionTeardown();
         }
 
         function dcRenderDetail(drug) {
@@ -10205,7 +10310,32 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                         <div class="dc-detail-section-body">${fieldsHtml}</div>
                     </details>`;
             }).filter(Boolean).join('');
-            body.innerHTML = html || '<div class="dc-empty-state" style="padding:20px;">ยานี้ยังไม่มีรายละเอียด · entry may still be in draft.</div>';
+            // V94.93 Phase 6: discussion section is always rendered, even when
+            // the drug body is otherwise empty. Tear down any prior listener
+            // (drugId may have changed without modal close — e.g. "→ See in Codex"
+            // jumps between drugs without closing).
+            dcDiscussionTeardown();
+            const discussionHtml = `
+                <details class="dc-detail-section" id="dc-discussion-details" data-dc-drug-id="${escapeHtml(drug._id || '')}">
+                    <summary>💬 Discussion <span id="dc-discussion-count" style="opacity:0.7; font-size:0.85em; margin-left:4px;"></span></summary>
+                    <div class="dc-detail-section-body">
+                        <div id="dc-discussion-box" class="dc-discussion-box">
+                            <div class="dc-discussion-loading">รอแป๊บ…</div>
+                        </div>
+                        <div id="dc-discussion-form-wrap"></div>
+                    </div>
+                </details>`;
+            body.innerHTML = (html || '<div class="dc-empty-state" style="padding:20px;">ยานี้ยังไม่มีรายละเอียด · entry may still be in draft.</div>') + discussionHtml;
+            // Wire discussion onSnapshot on first toggle-open (lazy — interns
+            // who never expand the section pay zero read cost).
+            const detailsEl = document.getElementById('dc-discussion-details');
+            if (detailsEl) {
+                detailsEl.addEventListener('toggle', () => {
+                    if (detailsEl.open && !dcDiscussionState.wired) {
+                        dcDiscussionWire(detailsEl.dataset.dcDrugId);
+                    }
+                });
+            }
             // Scroll body to top so new drug opens at the start, not where the
             // last drug was scrolled to.
             body.scrollTop = 0;
@@ -10645,6 +10775,158 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 errEl.style.color = '#92400e';
                 errEl.style.borderColor = '#fde68a';
                 errEl.textContent = '↻ ฟิลด์ถูกเติมจาก draft ที่ถูก reject · แก้ตามความเห็น admin แล้วกด Submit ใหม่';
+            }
+        }
+
+        // ===================================================================
+        // 💬 V94.93 Phase 6: Drug Codex per-drug discussion thread
+        // Stored at drug_codex/{drugId}/comments — mirrors quiz_discussions
+        // posture (read+create=signed-in, delete=admin per firestore.rules
+        // rule 28a). XSS-safe: all displayed strings escaped via escapeHtml.
+        // Lazy-wired: onSnapshot only attaches on first <details> toggle-open.
+        // Teardown on modal close + on drug-switch within open modal.
+        // ===================================================================
+        function dcDiscussionTeardown() {
+            if (dcDiscussionState.unsub) {
+                try { dcDiscussionState.unsub(); } catch (_) {}
+            }
+            dcDiscussionState.unsub = null;
+            dcDiscussionState.drugId = null;
+            dcDiscussionState.wired = false;
+        }
+
+        function dcDiscussionWire(drugId) {
+            if (!drugId || !window.db) return;
+            // Defensive: if a listener is already wired for any drug, tear it
+            // down first. (Shouldn't happen given the wired flag, but cheap.)
+            if (dcDiscussionState.unsub) {
+                try { dcDiscussionState.unsub(); } catch (_) {}
+            }
+            dcDiscussionState.drugId = drugId;
+            dcDiscussionState.wired = true;
+            dcDiscussionRenderForm(drugId);
+            const box = document.getElementById('dc-discussion-box');
+            if (!box) return;
+            box.innerHTML = '<div class="dc-discussion-loading">รอแป๊บ…</div>';
+            try {
+                dcDiscussionState.unsub = window.db.collection('drug_codex').doc(drugId)
+                    .collection('comments').orderBy('createdAt', 'asc')
+                    .onSnapshot(snap => {
+                        // Stale-listener guard: user may have closed/switched drug
+                        // while this snapshot was in flight.
+                        if (dcDiscussionState.drugId !== drugId) return;
+                        const countEl = document.getElementById('dc-discussion-count');
+                        if (countEl) countEl.textContent = snap.empty ? '' : `· ${snap.size}`;
+                        if (snap.empty) {
+                            box.innerHTML = '<div class="dc-discussion-empty">ยังไม่มีใครเริ่มคุย · มาเป็นคนแรกถามเรื่องยานี้!</div>';
+                            return;
+                        }
+                        const rows = [];
+                        snap.forEach(doc => {
+                            const c = doc.data() || {};
+                            rows.push(dcDiscussionRenderRow(doc.id, c));
+                        });
+                        box.innerHTML = rows.join('');
+                        box.scrollTop = box.scrollHeight;
+                    }, err => {
+                        console.error('[drug-codex discussion] load error:', err);
+                        box.innerHTML = `<div class="dc-discussion-error">ดึง comments ไม่สำเร็จ: ${escapeHtml(err.message || 'unknown error')}</div>`;
+                    });
+            } catch (err) {
+                console.error('[drug-codex discussion] wire failed:', err);
+                box.innerHTML = `<div class="dc-discussion-error">ดึง comments ไม่สำเร็จ: ${escapeHtml(err.message || 'unknown error')}</div>`;
+            }
+        }
+
+        function dcDiscussionRenderRow(commentId, c) {
+            const isMe = c.userId && c.userId === userId;
+            const time = (c.createdAt && typeof c.createdAt.toDate === 'function')
+                ? c.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : '…';
+            const author = isMe ? 'You' : (c.displayName || 'Anonymous');
+            const pic = c.pictureUrl ? escapeHtml(c.pictureUrl) : '';
+            const avatarHtml = pic
+                ? `<img class="dc-discussion-avatar" src="${pic}" alt="" referrerpolicy="no-referrer">`
+                : '<div class="dc-discussion-avatar"></div>';
+            const text = escapeHtml(String(c.text == null ? '' : c.text));
+            // Admin moderation: per design (mirror quiz_discussions strict),
+            // only admin can delete. Owner-self-delete intentionally absent
+            // to preserve audit trail.
+            const delBtn = isAdmin
+                ? `<button type="button" class="dc-discussion-del" onclick="dcDiscussionDelete('${escapeHtml(commentId)}', this)" title="ลบ comment นี้ (admin)">🗑️</button>`
+                : '';
+            return `
+                <div class="dc-discussion-row ${isMe ? 'me' : 'other'}">
+                    ${avatarHtml}
+                    <div class="dc-discussion-bubble">
+                        <div class="dc-discussion-author">${escapeHtml(author)}</div>
+                        <div>${text}</div>
+                        <div class="dc-discussion-time">${escapeHtml(time)}</div>
+                    </div>
+                    ${delBtn}
+                </div>`;
+        }
+
+        function dcDiscussionRenderForm(drugId) {
+            const wrap = document.getElementById('dc-discussion-form-wrap');
+            if (!wrap) return;
+            if (!userId) {
+                wrap.innerHTML = '<div class="dc-discussion-signin-hint">เข้าสู่ระบบเพื่อร่วมคุยกับเพื่อน intern</div>';
+                return;
+            }
+            wrap.innerHTML = `
+                <div class="dc-discussion-form">
+                    <textarea id="dc-discussion-input" class="dc-discussion-input" rows="1"
+                              placeholder="ถาม/แชร์เกี่ยวกับยานี้…" maxlength="1000"></textarea>
+                    <button type="button" class="dc-discussion-send" onclick="dcDiscussionSend()">ส่ง</button>
+                </div>`;
+        }
+
+        async function dcDiscussionSend() {
+            const input = document.getElementById('dc-discussion-input');
+            if (!input) return;
+            const text = String(input.value || '').trim();
+            const drugId = dcDiscussionState.drugId;
+            if (!text || !drugId) return;
+            if (!userId) { alert('Sign-in required to post.'); return; }
+            const sendBtn = document.querySelector('.dc-discussion-send');
+            // Optimistic UI — clear input immediately so user feels feedback.
+            const originalText = input.value;
+            input.value = '';
+            if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '⏳'; }
+            try {
+                await window.db.collection('drug_codex').doc(drugId)
+                    .collection('comments').add({
+                        userId,
+                        displayName: (userProfile && userProfile.displayName) || 'Intern',
+                        pictureUrl: (userProfile && userProfile.pictureUrl) || '',
+                        text,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+            } catch (err) {
+                console.error('[drug-codex discussion] send failed:', err);
+                // Restore the unsent text so the user doesn't lose what they typed.
+                input.value = originalText;
+                alert('ส่ง comment ไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
+            } finally {
+                if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'ส่ง'; }
+            }
+        }
+
+        async function dcDiscussionDelete(commentId, btn) {
+            const drugId = dcDiscussionState.drugId;
+            if (!drugId || !commentId) return;
+            if (!isAdmin) return; // UI guard; rules enforce server-side too.
+            if (!confirm('ลบ comment นี้? (admin moderation — ลบแล้วเรียกคืนไม่ได้)')) return;
+            if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+            try {
+                await window.db.collection('drug_codex').doc(drugId)
+                    .collection('comments').doc(commentId).delete();
+                // onSnapshot will refresh the list. No manual remove needed.
+            } catch (err) {
+                console.error('[drug-codex discussion] delete failed:', err);
+                alert('ลบไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
+                if (btn) { btn.disabled = false; btn.textContent = '🗑️'; }
             }
         }
 
