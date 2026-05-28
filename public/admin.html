@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.58</title>
+    <title>Nika V94.59</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -29593,7 +29593,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             style: 'infographic',
             lastImageDataUrl: '',
             lastModelLabel: '',
-            generating: false
+            generating: false,
+            // V94.59: lastError persists generation-time exceptions through
+            // the finally block so dcaPkVisualShowGenerateError can render
+            // them after renderPreview has wiped the diagnostic box.
+            lastError: null,
+            lastErrorModelLabel: ''
         };
         const DCA_PK_VISUAL_MODEL_LABELS = {
             'as/gemini-2.5-flash-image-preview':        'Nano Banana · AI Studio',
@@ -29727,6 +29732,32 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const errBox = document.getElementById('dcaPkVisualErrorBox');
             if (errBox) errBox.style.display = 'none';
         }
+        // V94.59: persistent surface for generation-time exceptions (network
+        // fail / proxy 500 / parser fail) — these throw before <img> ever
+        // gets a chance to fire onerror, so V94.57's load-error path didn't
+        // cover them. Toasts auto-dismiss in ~3s and admin was missing the
+        // message. Render the same diagnostic shape (red panel + error
+        // details + stack tail + raw response if any).
+        function dcaPkVisualShowGenerateError(err, modelLabel) {
+            const errBox = document.getElementById('dcaPkVisualErrorBox');
+            const img = document.getElementById('dcaPkVisualPreviewImg');
+            const placeholder = document.getElementById('dcaPkVisualPlaceholder');
+            if (!errBox) return;
+            const msg = (err && err.message) ? String(err.message) : String(err || 'unknown error');
+            const stack = (err && err.stack) ? String(err.stack).split('\n').slice(0, 4).join('\n') : '';
+            const raw = String(window._dcaPkVisualLastRaw || '');
+            const rawPreview = raw ? (raw.slice(0, 280) + (raw.length > 280 ? '…' : '')) : '';
+            errBox.style.display = 'block';
+            errBox.innerHTML = '<strong style="color:#9f1239;">❌ Generation failed.</strong><br>'
+                + '<span style="color:#64748b;">The Generate call threw an exception before the preview could render.</span><br><br>'
+                + '<strong>Model:</strong> ' + dcaEscapeHtml(modelLabel || '(unknown)') + '<br>'
+                + '<strong>Error:</strong>'
+                + '<pre style="white-space:pre-wrap; word-break:break-word; background:#fff; border:1px solid #fecaca; border-radius:6px; padding:6px 8px; margin:6px 0; font-size:0.8em; max-height:120px; overflow:auto; color:#7f1d1d;">' + dcaEscapeHtml(msg) + '</pre>'
+                + (stack ? ('<details style="margin-top:6px;"><summary style="cursor:pointer; color:#475569; font-size:0.78em;">Stack (first 4 lines)</summary><pre style="white-space:pre-wrap; word-break:break-word; background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:6px 8px; margin:6px 0; font-size:0.75em; max-height:120px; overflow:auto; color:#475569;">' + dcaEscapeHtml(stack) + '</pre></details>') : '')
+                + (rawPreview ? ('<details style="margin-top:6px;"><summary style="cursor:pointer; color:#475569; font-size:0.78em;">Raw response (if any)</summary><pre style="white-space:pre-wrap; word-break:break-all; background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:6px 8px; margin:6px 0; font-size:0.78em; max-height:140px; overflow:auto;">' + dcaEscapeHtml(rawPreview) + '</pre><button type="button" onclick="dcaPkVisualCopyRaw()" style="padding:4px 10px; border-radius:6px; border:1px solid #cbd5e1; background:#fff; cursor:pointer; font-weight:700; font-size:0.82em;">📋 Copy full raw response</button></details>') : '');
+            if (img) img.style.display = 'none';
+            if (placeholder) placeholder.style.display = 'none';
+        }
         function dcaPkVisualCopyRaw() {
             const raw = String(window._dcaPkVisualLastRaw || '');
             if (!raw) return;
@@ -29810,6 +29841,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const prompt = dcaBuildPkVisualPrompt(current, dcaPkVisualState.style);
             const modelLabel = DCA_PK_VISUAL_MODEL_LABELS[dcaPkVisualState.model] || dcaPkVisualState.model;
 
+            // V94.59: clear any persistent error from the previous Generate so
+            // a fresh attempt doesn't show stale error text underneath the
+            // spinner. Cleared here (not in finally) so an error remains visible
+            // until the admin explicitly clicks Generate again.
+            dcaPkVisualState.lastError = null;
+            dcaPkVisualState.lastErrorModelLabel = '';
             dcaPkVisualState.generating = true;
             dcaPkVisualRenderPreview();
             if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
@@ -29880,12 +29917,27 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
             } catch (err) {
                 console.error('[drug-codex pk-visual]', err);
+                // V94.59: persistent error display. Toasts auto-dismiss in ~3s
+                // so failed generations were nearly impossible to read — admin
+                // had to F12 to recover the message. Stash on state so the
+                // finally block can render after renderPreview clears the
+                // error box (otherwise the call here gets immediately hidden).
+                dcaPkVisualState.lastError = err;
+                dcaPkVisualState.lastErrorModelLabel = modelLabel;
                 if (typeof showToast === 'function') {
                     showToast(`🎨 Generation failed: ${err && err.message ? err.message : 'unknown error'}`);
                 }
             } finally {
                 dcaPkVisualState.generating = false;
                 dcaPkVisualRenderPreview();
+                // V94.59: re-show the persistent error AFTER renderPreview has
+                // run its top-of-function reset of the error box.
+                if (dcaPkVisualState.lastError) {
+                    dcaPkVisualShowGenerateError(
+                        dcaPkVisualState.lastError,
+                        dcaPkVisualState.lastErrorModelLabel
+                    );
+                }
                 if (btn) { btn.disabled = false; btn.textContent = '🎨 Generate'; }
             }
         }
