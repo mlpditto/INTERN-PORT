@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.61</title>
+    <title>Nika V94.62</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -29881,11 +29881,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     '',      // quickApiKey
                     { size: '1792x1024' }
                 );
-                const raw = (resp && (resp.text
-                    || resp.imageDataUrl
+                // V94.62: prefer imageDataUrl/dataUrl over text. The proxy's
+                // gemini-aistudio image-gen branch returns BOTH fields when
+                // Google's response includes both inlineData and a text part
+                // (model's optional explanation). Old order picked text first
+                // → admin saw the explanation wrapped as a broken base64 src.
+                // Reordering puts the actual image bytes first; text is a
+                // fallback for chat models that stuffed image into the text
+                // field (or genuine text-only responses we shouldn't render).
+                const raw = (resp && (resp.imageDataUrl
                     || resp.dataUrl
-                    || (resp.raw && (resp.raw.imageDataUrl || resp.raw.dataUrl || resp.raw.text))
+                    || (resp.raw && (resp.raw.imageDataUrl || resp.raw.dataUrl))
                     || (resp.raw && resp.raw.data && resp.raw.data[0] && (resp.raw.data[0].url || resp.raw.data[0].b64_json))
+                    || resp.text
+                    || (resp.raw && resp.raw.text)
                 )) || '';
                 // V94.57 diagnostic: log the actual shape of resp + raw so admin
                 // can paste the console output when reporting "image doesn't
