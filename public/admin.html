@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.52</title>
+    <title>Nika V94.53</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12849,7 +12849,7 @@
                             <span class="dca-edu-lang-rail-label lang-no-toggle">Lang</span>
                             <button type="button" class="dca-edu-lang-chip" data-lang="th" onclick="dcaSelectEduLang('th')">🇹🇭 TH</button>
                             <button type="button" class="dca-edu-lang-chip active" data-lang="en" onclick="dcaSelectEduLang('en')">🇬🇧 EN</button>
-                            <button type="button" class="dca-edu-lang-chip" data-lang="kr" onclick="dcaSelectEduLang('kr')">🇰🇷 KR</button>
+                            <button type="button" class="dca-edu-lang-chip" data-lang="ko" onclick="dcaSelectEduLang('ko')">🇰🇷 KR</button>
                             <button type="button" class="dca-edu-lang-chip" data-lang="ja" onclick="dcaSelectEduLang('ja')">🇯🇵 JA</button>
                             <button type="button" class="dca-edu-lang-chip" data-lang="zh" onclick="dcaSelectEduLang('zh')">🇨🇳 ZH</button>
                             <!-- V94.51 Phase 2: section-wide bulk re-translate. Re-fills all 3
@@ -28801,6 +28801,51 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // comma-separated (brandNames) or newline-separated (references).
         const DCA_ARRAY_FIELDS = { brandNames: 'csv', references: 'lines' };
 
+        // V94.53: translator helper inlined from public/index.html (Quiz V93 helper).
+        // Drug Codex Edu i18n needs this server-side since admin.html doesn't
+        // load intern code. Wire under window.* so the existing
+        // `typeof window.qtTranslateText !== 'function'` guard in
+        // dcaTranslateEducationI18n keeps working when admin is on an older
+        // build where this block isn't loaded yet. Mirror exact behavior
+        // (Tier A device Translator → Tier B Typhoon via callAIProxy) so
+        // intern's per-drug `dctr_{drugId}_{lang}` cache stays
+        // interchangeable with admin-side translate output.
+        const QT_LANG_NAMES_ADMIN = { th: 'Thai', en: 'English', ko: 'Korean', ja: 'Japanese', zh: 'Simplified Chinese' };
+        function qtDetectSourceLangAdmin(text) {
+            if (/[฀-๿]/.test(text)) return 'th';
+            if (/[가-힯]/.test(text)) return 'ko';
+            if (/[぀-ヿ]/.test(text)) return 'ja';
+            if (/[一-鿿]/.test(text)) return 'zh';
+            return 'en';
+        }
+        window.qtTranslateText = async function (text, targetLang) {
+            if (!text || !text.trim()) return { text: text || '', source: 'empty' };
+            if (targetLang === 'orig') return { text, source: 'orig' };
+            const sourceLang = qtDetectSourceLangAdmin(text);
+            if (sourceLang === targetLang) return { text, source: 'noop' };
+            // Tier A: on-device Translator API (Chrome 138+). Skips silently
+            // when the source/target pair isn't supported on-device.
+            if (typeof Translator !== 'undefined' && 'create' in Translator) {
+                try {
+                    const t = await Translator.create({ sourceLanguage: sourceLang, targetLanguage: targetLang });
+                    return { text: await t.translate(text), source: 'device' };
+                } catch (e) { /* fall through to Tier B */ }
+            }
+            // Tier B: Typhoon via callAIProxy.
+            const target = QT_LANG_NAMES_ADMIN[targetLang] || targetLang;
+            const prompt = `Translate the following text to ${target}. Output ONLY the translation, no explanations, no quotes, no markdown fences.\n\n${text}`;
+            const PROXY_URL = 'https://us-central1-intern-port-edfa7.cloudfunctions.net/callAIProxy';
+            const resp = await fetch(PROXY_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-mlp-secret': 'mlp-secret-8888' },
+                body: JSON.stringify({ provider: 'typhoon', model: 'typhoon-v2.5-30b-a3b-instruct', prompt, isJson: false })
+            });
+            if (!resp.ok) throw new Error(`Typhoon HTTP ${resp.status}`);
+            const data = await resp.json();
+            if (data.error) throw new Error(data.error);
+            return { text: (data.text || '').trim().replace(/^["']|["']$/g, ''), source: 'typhoon' };
+        };
+
         // V94.50: Education i18n — 3 fields × 5 langs nested object stored at
         // `educationI18n` on each drug_codex doc. Schema is additive: legacy
         // docs without educationI18n still load via the primary-lang fallback.
@@ -28813,7 +28858,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // content, and translation flows through qtTranslateText (EN→TH/KR/JA/ZH)
         // produce proper Thai pearls when admin clicks 🌐.
         const DCA_EDU_I18N_FIELDS = ['monitoring', 'patientCounseling', 'pearls'];
-        const DCA_EDU_I18N_LANGS = ['th', 'en', 'kr', 'ja', 'zh'];
+        // V94.53: aligned with intern's DC_LANGS code 'ko' (was 'kr' in
+        // V94.50-V94.52). Mismatch meant drugs saved with `educationI18n.X.kr`
+        // were invisible to intern's dcTranslateDrug which checks `.ko`.
+        // dcaFillForm migrates legacy `.kr` keys to `.ko` on form open.
+        const DCA_EDU_I18N_LANGS = ['th', 'en', 'ko', 'ja', 'zh'];
         const DCA_EDU_I18N_PRIMARY = { monitoring: 'en', patientCounseling: 'th', pearls: 'en' };
 
         // In-memory state for the Edu chip-rail UI. dcaFillForm seeds .data
@@ -29374,6 +29423,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaEduI18nState.currentLang = 'en';
             DCA_EDU_I18N_FIELDS.forEach(field => {
                 if (!dcaEduI18nState.data[field]) dcaEduI18nState.data[field] = {};
+                // V94.53 migration: legacy V94.50-V94.52 saved Korean text under
+                // `kr` key, but intern dcTranslateDrug looks up `.ko`. Migrate
+                // forward; next save writes correct shape without `kr`.
+                if (dcaEduI18nState.data[field].kr && !dcaEduI18nState.data[field].ko) {
+                    dcaEduI18nState.data[field].ko = dcaEduI18nState.data[field].kr;
+                }
+                delete dcaEduI18nState.data[field].kr;
                 const pLang = DCA_EDU_I18N_PRIMARY[field];
                 if (!dcaEduI18nState.data[field][pLang] && data && data[field]) {
                     dcaEduI18nState.data[field][pLang] = String(data[field]);
