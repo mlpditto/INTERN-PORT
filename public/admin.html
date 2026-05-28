@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.54</title>
+    <title>Nika V94.55</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1502,6 +1502,88 @@
             background: #4338ca; border-color: #3730a3;
         }
         .dca-edu-regen-all-btn:disabled { opacity: 0.55; cursor: wait; }
+        /* V94.55 Phase 1: PK Visual generator — section-header button +
+           modal scaffolding. Image generation reuses the OpenRouter pattern
+           from Alabasta Case Card (V92.46/V92.70) via callUniversalAI with
+           a size:'1024x1024' generation option. */
+        .dca-pk-visual-btn {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 3px 10px; border-radius: 8px;
+            background: linear-gradient(135deg, #ddd6fe, #c4b5fd);
+            color: #5b21b6; border: 1px solid #a78bfa;
+            cursor: pointer; font-weight: 700; font-size: 0.82em;
+            transition: background 0.15s ease;
+        }
+        .dca-pk-visual-btn:hover { background: linear-gradient(135deg, #c4b5fd, #a78bfa); }
+        .dca-pk-visual-btn:disabled { opacity: 0.55; cursor: wait; }
+        /* PK Visual modal — sits on top of the Drug Codex admin modal so we
+           bump z-index above 4402. Two chip rails (model + style) followed
+           by a preview pane. */
+        .dca-pk-visual-section-label {
+            font-size: 0.72em; color: #4338ca; font-weight: 800;
+            text-transform: uppercase; letter-spacing: 0.6px;
+            margin: 12px 0 6px 0;
+        }
+        .dca-pk-visual-chip-rail {
+            display: flex; flex-wrap: wrap; gap: 6px;
+            padding: 8px 10px; background: #eef2ff;
+            border: 1px solid #c7d2fe; border-radius: 10px;
+        }
+        .dca-pk-visual-chip {
+            padding: 4px 12px; border-radius: 999px;
+            border: 1px solid #c7d2fe; background: #fff;
+            color: #4338ca; cursor: pointer;
+            font-weight: 700; font-size: 0.82em;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        .dca-pk-visual-chip:hover { background: #e0e7ff; }
+        .dca-pk-visual-chip.active {
+            background: #4f46e5; color: #fff; border-color: #4f46e5;
+        }
+        .dca-pk-visual-preview-wrap {
+            margin-top: 14px; min-height: 280px;
+            background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            padding: 16px; position: relative;
+        }
+        .dca-pk-visual-preview-img {
+            max-width: 100%; max-height: 480px; border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+        }
+        .dca-pk-visual-preview-placeholder {
+            color: #94a3b8; font-size: 0.86em; text-align: center; line-height: 1.5;
+        }
+        .dca-pk-visual-spinner {
+            display: flex; flex-direction: column; align-items: center; gap: 8px;
+            color: #4338ca; font-size: 0.85em;
+        }
+        .dca-pk-visual-actions {
+            display: flex; justify-content: space-between; gap: 8px;
+            margin-top: 14px; flex-wrap: wrap;
+        }
+        .dca-pk-visual-btn-generate {
+            padding: 8px 18px; border-radius: 10px;
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: #fff; border: none; cursor: pointer;
+            font-weight: 800; font-size: 0.92em;
+        }
+        .dca-pk-visual-btn-generate:hover:not(:disabled) {
+            background: linear-gradient(135deg, #4f46e5, #4338ca);
+        }
+        .dca-pk-visual-btn-generate:disabled { opacity: 0.55; cursor: wait; }
+        .dca-pk-visual-btn-save {
+            padding: 8px 18px; border-radius: 10px;
+            background: #94a3b8; color: #fff; border: none; cursor: not-allowed;
+            font-weight: 800; font-size: 0.92em;
+        }
+        .dca-pk-visual-btn-cancel {
+            padding: 8px 14px; border-radius: 10px;
+            background: #fff; color: #475569; border: 1px solid #cbd5e1;
+            cursor: pointer; font-weight: 700; font-size: 0.88em;
+        }
+        .dca-pk-visual-meta {
+            margin-top: 10px; font-size: 0.78em; color: #64748b;
+        }
         /* Draft view */
         .dca-draft-row {
             background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
@@ -12811,7 +12893,17 @@
                      so dcaSaveForm never touches it). Intern view falls back to legacy
                      when all 5 ADMET fields are empty. -->
                 <div class="dca-form-section" data-tab="pk">
-                    <div class="dca-form-section-header"><span>📊 Pharmacokinetics · ADMET</span><button type="button" class="dca-form-copy-btn" onclick="dcaCopyDrugAsMarkdown('pk', this)" title="Copy this section as Markdown">📋</button></div>
+                    <div class="dca-form-section-header">
+                        <span>📊 Pharmacokinetics · ADMET</span>
+                        <span style="display:inline-flex; gap:6px; align-items:center;">
+                            <!-- V94.55 Phase 1: ADMET visual generator. Opens #dcaPkVisualModal
+                                 for image gen via OpenRouter (GPT-5.4 Image 2 / Nano Banana 2 / Grok).
+                                 Save is disabled in Phase 1 — preview only. Phase 2 (V94.56) wires
+                                 SHA-256 + Storage upload + Firestore persistence. -->
+                            <button type="button" class="dca-pk-visual-btn" onclick="dcaOpenPkVisualModal()" title="Generate an ADMET infographic / anatomical / diagram via AI image gen (preview only — save coming in Phase 2)">🎨 Visual</button>
+                            <button type="button" class="dca-form-copy-btn" onclick="dcaCopyDrugAsMarkdown('pk', this)" title="Copy this section as Markdown">📋</button>
+                        </span>
+                    </div>
                     <div class="dca-form-section-body">
                         <div class="dca-form-grid">
                             <label class="dc-cat-label dc-field-reference" for="dca-f-absorption">Absorption</label>
@@ -12892,6 +12984,56 @@
                 <div style="display:flex; justify-content:space-between; gap:10px; margin-top:14px;">
                     <button type="button" onclick="dcaBackToList()" class="lpt-form-back-btn">← Back to list</button>
                     <button type="button" id="dca-form-save-btn" onclick="dcaSaveForm()" class="lpt-form-save-btn">💾 Save Drug</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- V94.55 Phase 1: PK Visual (ADMET infographic) generator modal.
+         Admin clicks 🎨 in PK section header → modal opens. Two chip rails
+         (model + style), Generate button calls OpenRouter image gen via
+         callUniversalAI, preview pane shows dataURL response. Save is
+         disabled in Phase 1 — Storage upload + Firestore persistence ships
+         in Phase 2 (V94.56). z-index higher than drugCodexAdminModal (4402). -->
+    <div id="dcaPkVisualModal" class="modal" style="z-index:4502;">
+        <div class="modal-content" style="max-width:760px;">
+            <span class="close-modal" onclick="dcaClosePkVisualModal()">&times;</span>
+            <h3 style="margin:0 0 4px 0; color:#5b21b6; display:flex; align-items:center; gap:8px;">
+                🎨 <span>Generate ADMET Visual</span>
+                <span class="dca-ai-badge" style="background:linear-gradient(135deg,#fef3c7,#fde68a); color:#92400e;">🚧 Phase 1 · preview only</span>
+            </h3>
+            <p style="margin:4px 0 14px 0; color:#64748b; font-size:0.86em;">
+                Generates an ADMET infographic from the 5 PK fields (Absorption / Distribution / Metabolism / Excretion / Toxicity). Pick a model + style, click Generate. Save persists to Firestore — coming in Phase 2.
+            </p>
+            <div class="dca-pk-visual-section-label">Model</div>
+            <div class="dca-pk-visual-chip-rail" id="dcaPkVisualModelRail">
+                <button type="button" class="dca-pk-visual-chip active" data-value="or/openai/gpt-5.4-image-2" onclick="dcaSelectPkVisualModel(this)" title="OpenRouter — OpenAI GPT-5.4 Image 2 · quality สูง prompt-following ดี">🆕 GPT-5.4 Image 2</button>
+                <button type="button" class="dca-pk-visual-chip" data-value="or/google/gemini-3.1-flash-image-preview" onclick="dcaSelectPkVisualModel(this)" title="OpenRouter — Google Gemini 3.1 Flash Image Preview (Nano Banana 2)">🍌 Nano Banana 2</button>
+                <button type="button" class="dca-pk-visual-chip" data-value="or/x-ai/grok-2-image" onclick="dcaSelectPkVisualModel(this)" title="OpenRouter — xAI Grok 2 Image · varied style. Model ID may need adjustment if OpenRouter returns 404.">✨ Grok Imagine</button>
+            </div>
+            <div class="dca-pk-visual-section-label">Style</div>
+            <div class="dca-pk-visual-chip-rail" id="dcaPkVisualStyleRail">
+                <button type="button" class="dca-pk-visual-chip active" data-value="infographic" onclick="dcaSelectPkVisualStyle(this)" title="Clean clinical infographic · vector icons · color-coded sections · pathway flow">📊 Infographic</button>
+                <button type="button" class="dca-pk-visual-chip" data-value="anatomical" onclick="dcaSelectPkVisualStyle(this)" title="Medical textbook cross-section · organs labeled (GI / liver / kidney)">🫀 Anatomical</button>
+                <button type="button" class="dca-pk-visual-chip" data-value="diagram" onclick="dcaSelectPkVisualStyle(this)" title="Flowchart · boxes + arrows · schematic only · no anatomy">🔀 Diagram</button>
+            </div>
+            <div class="dca-pk-visual-preview-wrap" id="dcaPkVisualPreviewWrap">
+                <div class="dca-pk-visual-preview-placeholder" id="dcaPkVisualPlaceholder">
+                    Click <strong>Generate</strong> below to render an ADMET infographic.<br>
+                    Generation takes ~10-20 seconds depending on the model.
+                </div>
+                <div class="dca-pk-visual-spinner" id="dcaPkVisualSpinner" style="display:none;">
+                    <i class="fa-solid fa-spinner fa-spin" style="font-size:1.4em;"></i>
+                    <span>Generating · this can take 10-30s…</span>
+                </div>
+                <img id="dcaPkVisualPreviewImg" class="dca-pk-visual-preview-img" style="display:none;" alt="Generated ADMET visual">
+            </div>
+            <div class="dca-pk-visual-meta" id="dcaPkVisualMeta"></div>
+            <div class="dca-pk-visual-actions">
+                <button type="button" class="dca-pk-visual-btn-cancel" onclick="dcaClosePkVisualModal()">Close</button>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" id="dcaPkVisualGenerateBtn" class="dca-pk-visual-btn-generate" onclick="dcaGeneratePkVisual()">🎨 Generate</button>
+                    <button type="button" id="dcaPkVisualSaveBtn" class="dca-pk-visual-btn-save" disabled title="Persistence ships in Phase 2 (V94.56)">💾 Save · Phase 2</button>
                 </div>
             </div>
         </div>
@@ -29419,6 +29561,227 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
             } finally {
                 if (btn) { btn.disabled = false; btn.textContent = '🌐 All langs'; }
+            }
+        }
+
+        // ===================================================================
+        // V94.55 Phase 1 — PK Visual (ADMET infographic) generator
+        // ===================================================================
+
+        // In-memory state for the PK Visual modal. lastImageDataUrl holds the
+        // most recent Generate result so Phase 2 Save can hash + upload it
+        // without re-calling the AI. Reset on every modal open.
+        const dcaPkVisualState = {
+            model: 'or/openai/gpt-5.4-image-2',
+            style: 'infographic',
+            lastImageDataUrl: '',
+            lastModelLabel: '',
+            generating: false
+        };
+        const DCA_PK_VISUAL_MODEL_LABELS = {
+            'or/openai/gpt-5.4-image-2':                'GPT-5.4 Image 2',
+            'or/google/gemini-3.1-flash-image-preview': 'Nano Banana 2',
+            'or/x-ai/grok-2-image':                     'Grok Imagine'
+        };
+
+        // Open modal. Snapshots the current PK textareas via dcaCollectForm —
+        // admin may have unsaved edits to ADMET fields that should be included
+        // in the prompt, not just what's in Firestore.
+        function dcaOpenPkVisualModal() {
+            const current = dcaCollectForm();
+            // Need at least 1 ADMET field non-empty to make sense
+            const hasAnyAdmet = ['absorption', 'distribution', 'metabolism', 'excretion', 'toxicity']
+                .some(k => current[k] && String(current[k]).trim());
+            if (!hasAnyAdmet) {
+                if (typeof showToast === 'function') {
+                    showToast('🎨 Fill at least one ADMET field (PK tab) before generating a visual.');
+                }
+                return;
+            }
+            if (!current.genericName) {
+                if (typeof showToast === 'function') {
+                    showToast('🎨 Generic Name is required before generating a visual.');
+                }
+                return;
+            }
+            // Reset preview state, keep model/style choice across opens
+            dcaPkVisualState.lastImageDataUrl = '';
+            dcaPkVisualState.lastModelLabel = '';
+            dcaPkVisualState.generating = false;
+            dcaPkVisualRenderPreview();
+            const modal = document.getElementById('dcaPkVisualModal');
+            if (modal) modal.style.display = 'flex';
+        }
+
+        function dcaClosePkVisualModal() {
+            const modal = document.getElementById('dcaPkVisualModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function dcaSelectPkVisualModel(btn) {
+            if (!btn || !btn.dataset || !btn.dataset.value) return;
+            dcaPkVisualState.model = btn.dataset.value;
+            const rail = document.getElementById('dcaPkVisualModelRail');
+            if (rail) {
+                rail.querySelectorAll('.dca-pk-visual-chip').forEach(c => {
+                    c.classList.toggle('active', c.dataset.value === btn.dataset.value);
+                });
+            }
+        }
+
+        function dcaSelectPkVisualStyle(btn) {
+            if (!btn || !btn.dataset || !btn.dataset.value) return;
+            dcaPkVisualState.style = btn.dataset.value;
+            const rail = document.getElementById('dcaPkVisualStyleRail');
+            if (rail) {
+                rail.querySelectorAll('.dca-pk-visual-chip').forEach(c => {
+                    c.classList.toggle('active', c.dataset.value === btn.dataset.value);
+                });
+            }
+        }
+
+        // Repaint the preview pane based on current state.generating + lastImageDataUrl.
+        // Three visible states: placeholder (no image yet), spinner (generating),
+        // image (last result available).
+        function dcaPkVisualRenderPreview() {
+            const placeholder = document.getElementById('dcaPkVisualPlaceholder');
+            const spinner = document.getElementById('dcaPkVisualSpinner');
+            const img = document.getElementById('dcaPkVisualPreviewImg');
+            const meta = document.getElementById('dcaPkVisualMeta');
+            if (!placeholder || !spinner || !img) return;
+            if (dcaPkVisualState.generating) {
+                placeholder.style.display = 'none';
+                spinner.style.display = 'flex';
+                img.style.display = 'none';
+            } else if (dcaPkVisualState.lastImageDataUrl) {
+                placeholder.style.display = 'none';
+                spinner.style.display = 'none';
+                img.src = dcaPkVisualState.lastImageDataUrl;
+                img.style.display = 'block';
+            } else {
+                placeholder.style.display = 'block';
+                spinner.style.display = 'none';
+                img.style.display = 'none';
+            }
+            if (meta) {
+                if (dcaPkVisualState.lastModelLabel && !dcaPkVisualState.generating) {
+                    meta.textContent = `Last generated with ${dcaPkVisualState.lastModelLabel} · ${dcaPkVisualState.style} style`;
+                } else {
+                    meta.textContent = '';
+                }
+            }
+        }
+
+        // Builds the prompt for the chosen style. Drug name + 5 ADMET fields
+        // (omits empty fields so the AI doesn't have to fabricate). Common
+        // visual constraints (English labels, 1024×1024, no photorealistic
+        // humans) live at the end of each template.
+        function dcaBuildPkVisualPrompt(drug, style) {
+            const fields = [
+                ['Absorption',   drug.absorption],
+                ['Distribution', drug.distribution],
+                ['Metabolism',   drug.metabolism],
+                ['Excretion',    drug.excretion],
+                ['Toxicity',     drug.toxicity]
+            ].filter(([, v]) => v && String(v).trim());
+            const admetBlock = fields.map(([k, v]) => `${k.toUpperCase()}: ${String(v).trim()}`).join('\n\n');
+            const drugName = drug.genericName || 'this drug';
+            const commonRules = [
+                '',
+                'STYLE CONSTRAINTS:',
+                '- English labels only (medical terms stay in English: CYP3A4, eGFR, t½, etc.).',
+                '- 1024×1024 square format.',
+                '- No photorealistic humans or faces — illustration / diagram only.',
+                '- Clean, professional medical aesthetic. White or light background.',
+                '- Make field names readable at a glance.'
+            ].join('\n');
+
+            if (style === 'anatomical') {
+                return [
+                    `Generate an anatomical pharmacokinetics diagram for the drug ${drugName}.`,
+                    '',
+                    'VISUAL DIRECTION: Medical-textbook anatomical illustration. Show a semi-transparent human body in cross-section with the GI tract, liver, kidneys, and circulatory system labeled. Draw arrows showing the drug pathway from administration through systemic circulation, hepatic metabolism, and renal/biliary excretion. Annotate each anatomical site with the relevant ADMET facts.',
+                    '',
+                    admetBlock,
+                    commonRules
+                ].join('\n');
+            }
+
+            if (style === 'diagram') {
+                return [
+                    `Generate a flowchart-style pharmacokinetic schematic for the drug ${drugName}.`,
+                    '',
+                    'VISUAL DIRECTION: Clean flowchart with rectangular boxes connected by directional arrows. Minimal color palette (medical blues with one accent color for warnings). Each box contains a stage label (Absorption / Distribution / Metabolism / Excretion / Toxicity) and the corresponding key facts in monospace-style text. Schematic only — no anatomical illustration, no human figures.',
+                    '',
+                    admetBlock,
+                    commonRules
+                ].join('\n');
+            }
+
+            // default = infographic
+            return [
+                `Generate a clean medical infographic summarizing the pharmacokinetics (ADMET) of the drug ${drugName}.`,
+                '',
+                'VISUAL DIRECTION: Modern clinical reference card. Color-coded sections (one color per ADMET stage). Vector-style icons next to each section (pill, droplet, liver, kidney, warning triangle). Clear typography hierarchy with the drug name as the title. Arrows or layout flow suggesting administration → systemic circulation → metabolism → elimination. Treat it as a single-page educational poster.',
+                '',
+                admetBlock,
+                commonRules
+            ].join('\n');
+        }
+
+        async function dcaGeneratePkVisual() {
+            const btn = document.getElementById('dcaPkVisualGenerateBtn');
+            const current = dcaCollectForm();
+            if (typeof window.callUniversalAI !== 'function') {
+                if (typeof showToast === 'function') {
+                    showToast('🎨 AI core not loaded — refresh and retry.');
+                }
+                return;
+            }
+            const prompt = dcaBuildPkVisualPrompt(current, dcaPkVisualState.style);
+            const modelLabel = DCA_PK_VISUAL_MODEL_LABELS[dcaPkVisualState.model] || dcaPkVisualState.model;
+
+            dcaPkVisualState.generating = true;
+            dcaPkVisualRenderPreview();
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
+
+            try {
+                // Mirror the Alabasta Case Card call shape (V92.46/V92.70) —
+                // size hint goes through the proxy's generationOptions field.
+                const resp = await window.callUniversalAI(
+                    dcaPkVisualState.model,
+                    prompt,
+                    false,   // isJson
+                    null,    // visionData
+                    '',      // quickApiKey
+                    { size: '1024x1024' }
+                );
+                const raw = (resp && (resp.text
+                    || resp.imageDataUrl
+                    || resp.dataUrl
+                    || (resp.raw && (resp.raw.imageDataUrl || resp.raw.dataUrl || resp.raw.text))
+                    || (resp.raw && resp.raw.data && resp.raw.data[0] && (resp.raw.data[0].url || resp.raw.data[0].b64_json))
+                )) || '';
+                const dataUrl = String(raw).startsWith('data:image/')
+                    ? String(raw)
+                    : (String(raw).length > 100 ? `data:image/png;base64,${raw}` : '');
+                if (!dataUrl) {
+                    throw new Error('Empty or unrecognized image response. Try a different model.');
+                }
+                dcaPkVisualState.lastImageDataUrl = dataUrl;
+                dcaPkVisualState.lastModelLabel = modelLabel;
+                if (typeof showToast === 'function') {
+                    showToast(`🎨 Generated with ${modelLabel} · review before Save (Phase 2).`);
+                }
+            } catch (err) {
+                console.error('[drug-codex pk-visual]', err);
+                if (typeof showToast === 'function') {
+                    showToast(`🎨 Generation failed: ${err && err.message ? err.message : 'unknown error'}`);
+                }
+            } finally {
+                dcaPkVisualState.generating = false;
+                dcaPkVisualRenderPreview();
+                if (btn) { btn.disabled = false; btn.textContent = '🎨 Generate'; }
             }
         }
 
