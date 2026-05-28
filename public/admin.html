@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.62</title>
+    <title>Nika V94.63</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12992,18 +12992,19 @@
     <!-- V94.55 Phase 1: PK Visual (ADMET infographic) generator modal.
          Admin clicks 🎨 in PK section header → modal opens. Two chip rails
          (model + style), Generate button calls OpenRouter image gen via
-         callUniversalAI, preview pane shows dataURL response. Save is
-         disabled in Phase 1 — Storage upload + Firestore persistence ships
-         in Phase 2 (V94.56). z-index higher than drugCodexAdminModal (4402). -->
+         callUniversalAI, preview pane shows dataURL response.
+         V94.63 Phase 2: Save now wired — uploads to pk-visuals/{sha256}.png
+         via storage.rules (admin-only) + persists drug_codex.pkVisual.
+         z-index higher than drugCodexAdminModal (4402). -->
     <div id="dcaPkVisualModal" class="modal" style="z-index:4502;">
         <div class="modal-content" style="max-width:760px;">
             <span class="close-modal" onclick="dcaClosePkVisualModal()">&times;</span>
             <h3 style="margin:0 0 4px 0; color:#5b21b6; display:flex; align-items:center; gap:8px;">
                 🎨 <span>Generate ADMET Visual</span>
-                <span class="dca-ai-badge" style="background:linear-gradient(135deg,#fef3c7,#fde68a); color:#92400e;">🚧 Phase 1 · preview only</span>
+                <span class="dca-ai-badge" style="background:linear-gradient(135deg,#ede9fe,#ddd6fe); color:#5b21b6;">🎨 Phase 2 · persists to Firestore</span>
             </h3>
             <p style="margin:4px 0 14px 0; color:#64748b; font-size:0.86em;">
-                Generates an ADMET infographic from the 5 PK fields (Absorption / Distribution / Metabolism / Excretion / Toxicity). Pick a model + style, click Generate. Save persists to Firestore — coming in Phase 2.
+                Generates an ADMET infographic from the 5 PK fields (Absorption / Distribution / Metabolism / Excretion / Toxicity). Pick a model + style, click Generate to preview, then Save to publish on the intern Drug Codex detail modal.
             </p>
             <div class="dca-pk-visual-section-label">Model</div>
             <div class="dca-pk-visual-chip-rail" id="dcaPkVisualModelRail">
@@ -13047,7 +13048,7 @@
                 <button type="button" class="dca-pk-visual-btn-cancel" onclick="dcaClosePkVisualModal()">Close</button>
                 <div style="display:flex; gap:8px;">
                     <button type="button" id="dcaPkVisualGenerateBtn" class="dca-pk-visual-btn-generate" onclick="dcaGeneratePkVisual()">🎨 Generate</button>
-                    <button type="button" id="dcaPkVisualSaveBtn" class="dca-pk-visual-btn-save" disabled title="Persistence ships in Phase 2 (V94.56)">💾 Save · Phase 2</button>
+                    <button type="button" id="dcaPkVisualSaveBtn" class="dca-pk-visual-btn-save" disabled onclick="dcaSavePkVisual()" title="Upload to Firebase Storage + persist drug_codex.pkVisual. Enabled once an image is generated.">💾 Save Visual</button>
                 </div>
             </div>
         </div>
@@ -29716,6 +29717,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     meta.textContent = '';
                 }
             }
+            // V94.63 Phase 2: Save enabled only when a fresh image is in
+            // memory. The disabled state must lift on Generate success and
+            // re-drop on Open / Generate-start (so admin can't save the
+            // previously-rendered image after switching drugs).
+            const saveBtn = document.getElementById('dcaPkVisualSaveBtn');
+            if (saveBtn) {
+                saveBtn.disabled = !!dcaPkVisualState.generating
+                    || !dcaPkVisualState.lastImageDataUrl;
+            }
         }
 
         // V94.57: handlers for <img> load success/failure. On failure, the
@@ -29963,6 +29973,104 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     );
                 }
                 if (btn) { btn.disabled = false; btn.textContent = '🎨 Generate'; }
+            }
+        }
+
+        // V94.63 Phase 2: persist the previewed image. Upload to Firebase
+        // Storage at pk-visuals/{sha256}.{ext} (content-addressed dedup mirrors
+        // V93.43 Quill + V93.49 voice presets), then update the Firestore drug
+        // doc's pkVisual block. Only valid in Edit-published mode — Add /
+        // Approve-draft must save the drug first because there's no doc id to
+        // attach the visual to (drafts also save into drug_codex_drafts which
+        // isn't the canonical surface intern reads from).
+        async function dcaSavePkVisual() {
+            if (!dcaPkVisualState.lastImageDataUrl) {
+                if (typeof showToast === 'function') showToast('🎨 Generate a visual first.');
+                return;
+            }
+            if (!dcaState.editingId) {
+                if (typeof showToast === 'function') showToast('💾 Save the drug first, then come back to attach a visual.');
+                return;
+            }
+            if (dcaState.isDraftEdit) {
+                if (typeof showToast === 'function') showToast('💾 Approve & publish the draft first, then attach a visual to the published doc.');
+                return;
+            }
+            const saveBtn = document.getElementById('dcaPkVisualSaveBtn');
+            const genBtn = document.getElementById('dcaPkVisualGenerateBtn');
+            const originalText = saveBtn ? saveBtn.innerHTML : '';
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '⏳ Hashing…'; }
+            if (genBtn) genBtn.disabled = true;
+            try {
+                // 1. Decode URL → Blob. fetch() handles both `data:image/...`
+                //    and `https://...` shapes; CORS may block cross-origin
+                //    https URLs from OpenRouter image models (currently all
+                //    marked ⚠ misrouted, so unlikely path).
+                const resp = await fetch(dcaPkVisualState.lastImageDataUrl);
+                if (!resp.ok) {
+                    throw new Error(`Image fetch failed (${resp.status} ${resp.statusText}). If the source is a remote https URL it may be CORS-blocked.`);
+                }
+                const blob = await resp.blob();
+                const mime = blob.type || 'image/png';
+                const ext = _MIME_TO_EXT[mime] || '.png';
+                // 2. SHA-256 the bytes → content-addressed path.
+                const hash = await _sha256Hex(blob);
+                const storagePath = 'pk-visuals/' + hash + ext;
+                const ref = firebase.storage().ref(storagePath);
+                // 3. Probe-then-put dedup.
+                let downloadUrl;
+                let reused = false;
+                if (saveBtn) saveBtn.innerHTML = '🔎 Checking storage…';
+                try {
+                    downloadUrl = await ref.getDownloadURL();
+                    reused = true;
+                } catch (probeErr) {
+                    if (probeErr && probeErr.code !== 'storage/object-not-found') throw probeErr;
+                    if (saveBtn) saveBtn.innerHTML = '📤 Uploading…';
+                    const snap = await ref.put(blob, { contentType: mime });
+                    downloadUrl = await snap.ref.getDownloadURL();
+                }
+                // 4. Persist on the drug doc. Partial update — other fields
+                //    on drug_codex/{editingId} stay intact. arrayUnion on
+                //    contributors keeps the audit trail consistent with the
+                //    V94.46 pattern used by dcaSaveForm.
+                if (saveBtn) saveBtn.innerHTML = '💾 Saving doc…';
+                const nowTs = firebase.firestore.FieldValue.serverTimestamp();
+                const reviewerEmail = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin-ui';
+                await db.collection('drug_codex').doc(dcaState.editingId).update({
+                    pkVisual: {
+                        storagePath: storagePath,
+                        downloadUrl: downloadUrl,
+                        model: dcaPkVisualState.model,
+                        style: dcaPkVisualState.style,
+                        generatedAt: nowTs,
+                        generatedBy: reviewerEmail
+                    },
+                    lastReviewedAt: nowTs,
+                    reviewedBy: reviewerEmail,
+                    updatedAt: nowTs,
+                    contributors: firebase.firestore.FieldValue.arrayUnion('admin:' + reviewerEmail)
+                });
+                if (typeof showToast === 'function') {
+                    showToast(reused
+                        ? '♻️ Reused existing image (dedup) · doc updated'
+                        : '✅ Visual saved to drug_codex');
+                }
+                dcaClosePkVisualModal();
+            } catch (err) {
+                console.error('[drug-codex pk-visual save]', err);
+                const msg = err && err.message ? err.message : 'unknown error';
+                const hint = /permission|denied|unauthorized/i.test(msg)
+                    ? '\n\nStorage rules likely block pk-visuals/**. After merge run: firebase deploy --only storage'
+                    : '';
+                alert('Save failed: ' + msg + hint);
+            } finally {
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = originalText || '💾 Save Visual'; }
+                if (genBtn) genBtn.disabled = false;
+                // Re-sync disabled state via renderPreview (no-op visually; just
+                // ensures the Save button reflects whether a fresh image is in
+                // memory if the modal is reopened without regenerating).
+                dcaPkVisualRenderPreview();
             }
         }
 
