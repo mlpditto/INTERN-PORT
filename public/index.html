@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.00)</title>
+    <title>Internship Portfolio (V95.01)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2876,6 +2876,23 @@
                 .dc-detail-field-value {
                     font-size: 0.88em; color: #1e293b; line-height: 1.55;
                     white-space: pre-wrap; word-wrap: break-word;
+                }
+                /* V95.01 Phase 1: Clinical Risk Color Coding — left-border 3px
+                   + dark-tone label text per clinical category. Palette uses
+                   CSS variables so admin form labels (right-aligned, border on
+                   the right side facing the input) can reuse the same colors. */
+                .dc-field-safe         { --dc-cat-c: #10b981; --dc-cat-t: #065f46; }
+                .dc-field-reference    { --dc-cat-c: #0ea5e9; --dc-cat-t: #0c4a6e; }
+                .dc-field-hard-no      { --dc-cat-c: #f43f5e; --dc-cat-t: #9f1239; }
+                .dc-field-caution      { --dc-cat-c: #f59e0b; --dc-cat-t: #92400e; }
+                .dc-field-interactions { --dc-cat-c: #8b5cf6; --dc-cat-t: #5b21b6; }
+                .dc-field-learn        { --dc-cat-c: #6366f1; --dc-cat-t: #3730a3; }
+                .dc-field-empathy      { --dc-cat-c: #ec4899; --dc-cat-t: #9d174d; }
+                .dc-field-tip          { --dc-cat-c: #eab308; --dc-cat-t: #854d0e; }
+                .dc-detail-field-label.dc-cat-label {
+                    border-left: 3px solid var(--dc-cat-c, #cbd5e1);
+                    padding-left: 8px;
+                    color: var(--dc-cat-t, inherit);
                 }
                 .dc-detail-field-value a {
                     color: #1d4ed8; text-decoration: underline; word-break: break-all;
@@ -10432,34 +10449,35 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             // V94.94: PK section — show 5 ADMET sub-fields if any have content; else
             // fall back to the legacy single `pharmacokinetics` field for old docs
             // that were authored before V94.40 (admin) introduced the ADMET split.
+            // V95.01: 3rd tuple element = clinical risk category (drives label color).
             const admetFields = [
-                ['Absorption', eff.absorption],
-                ['Distribution', eff.distribution],
-                ['Metabolism', eff.metabolism],
-                ['Excretion', eff.excretion],
-                ['Toxicity', eff.toxicity]
+                ['Absorption', eff.absorption, 'reference'],
+                ['Distribution', eff.distribution, 'reference'],
+                ['Metabolism', eff.metabolism, 'reference'],
+                ['Excretion', eff.excretion, 'reference'],
+                ['Toxicity', eff.toxicity, 'caution']
             ];
             const hasAnyAdmet = admetFields.some(([, v]) => v && String(v).trim());
             const pkSection = hasAnyAdmet
                 ? { title: '📊 Pharmacokinetics · ADMET', open: false, fields: admetFields }
-                : { title: '📊 Pharmacokinetics', open: false, fields: [['Pharmacokinetics', eff.pharmacokinetics]] };
+                : { title: '📊 Pharmacokinetics', open: false, fields: [['Pharmacokinetics', eff.pharmacokinetics, 'reference']] };
             const sections = [
                 {
                     title: '🩺 Clinical Use',
                     open: true,
                     fields: [
-                        ['Indication', eff.indication],
-                        ['Dosing', eff.dosing],
-                        ['Contraindication', eff.contraindication],
-                        ['Side Effects', eff.sideEffects],
-                        ['Interactions', eff.interactions]
+                        ['Indication', eff.indication, 'safe'],
+                        ['Dosing', eff.dosing, 'reference'],
+                        ['Contraindication', eff.contraindication, 'hard-no'],
+                        ['Side Effects', eff.sideEffects, 'caution'],
+                        ['Interactions', eff.interactions, 'interactions']
                     ]
                 },
                 {
                     title: '💊 Mechanism of Action',
                     open: false,
                     fields: [
-                        ['Mechanism', eff.mechanism]
+                        ['Mechanism', eff.mechanism, 'learn']
                     ]
                 },
                 pkSection,
@@ -10467,9 +10485,9 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     title: '📖 Education',
                     open: true,
                     fields: [
-                        ['Monitoring', eff.monitoring],
-                        ['Patient Counseling · คำแนะนำผู้ป่วย', eff.patientCounseling],
-                        ['Clinical Pearls', eff.pearls]
+                        ['Monitoring', eff.monitoring, 'safe'],
+                        ['Patient Counseling · คำแนะนำผู้ป่วย', eff.patientCounseling, 'empathy'],
+                        ['Clinical Pearls', eff.pearls, 'tip']
                     ]
                 },
                 {
@@ -10505,11 +10523,14 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                         </details>`;
                 }
                 // Regular field block — drop empty fields entirely.
+                // V95.01: 3rd tuple element = category → CSS class for clinical
+                // risk color coding. Missing/unknown cat falls back to neutral
+                // slate via var() default in .dc-detail-field-label.dc-cat-label.
                 const fieldsHtml = sec.fields
                     .filter(([, v]) => v && String(v).trim())
-                    .map(([label, v]) => `
+                    .map(([label, v, cat]) => `
                         <div class="dc-detail-field">
-                            <div class="dc-detail-field-label">${escapeHtml(label)}</div>
+                            <div class="dc-detail-field-label dc-cat-label${cat ? ' dc-field-' + cat : ''}">${escapeHtml(label)}</div>
                             <div class="dc-detail-field-value">${dcRenderFieldValue(v)}</div>
                         </div>`).join('');
                 if (!fieldsHtml) return '';  // Hide empty sections entirely.
