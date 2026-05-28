@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.57</title>
+    <title>Nika V94.58</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13007,9 +13007,18 @@
             </p>
             <div class="dca-pk-visual-section-label">Model</div>
             <div class="dca-pk-visual-chip-rail" id="dcaPkVisualModelRail">
-                <button type="button" class="dca-pk-visual-chip active" data-value="or/openai/gpt-5.4-image-2" onclick="dcaSelectPkVisualModel(this)" title="OpenRouter — OpenAI GPT-5.4 Image 2 · quality สูง prompt-following ดี">🆕 GPT-5.4 Image 2</button>
-                <button type="button" class="dca-pk-visual-chip" data-value="or/google/gemini-3.1-flash-image-preview" onclick="dcaSelectPkVisualModel(this)" title="OpenRouter — Google Gemini 3.1 Flash Image Preview (Nano Banana 2)">🍌 Nano Banana 2</button>
-                <button type="button" class="dca-pk-visual-chip" data-value="or/x-ai/grok-2-image" onclick="dcaSelectPkVisualModel(this)" title="OpenRouter — xAI Grok 2 Image · varied style. Model ID may need adjustment if OpenRouter returns 404.">✨ Grok Imagine</button>
+                <!-- V94.58: AI Studio Nano Banana is now the working default.
+                     callAIProxy's `gemini-aistudio` provider has proper image-gen
+                     routing (V92.70), so this returns real base64 image data.
+                     The 3 `or/` chips below currently hit callAIProxy's openrouter
+                     branch which uses /chat/completions endpoint — image models
+                     return text descriptions instead of images. Marked ⚠ until
+                     callAIProxy adds /api/v1/images/generations routing for
+                     OpenRouter image models (separate PR + Cloud Function deploy). -->
+                <button type="button" class="dca-pk-visual-chip active" data-value="as/gemini-2.5-flash-image-preview" onclick="dcaSelectPkVisualModel(this)" title="Google AI Studio · Gemini 2.5 Flash Image (Nano Banana) — real image gen via callAIProxy gemini-aistudio provider (V92.70). Works today.">🍌 Nano Banana · AI Studio</button>
+                <button type="button" class="dca-pk-visual-chip" data-value="or/openai/gpt-5.4-image-2" onclick="dcaSelectPkVisualModel(this)" title="⚠ OpenRouter — GPT-5.4 Image 2. callAIProxy currently misroutes OpenRouter image models through /chat/completions → returns text description instead of image. Awaiting proxy fix.">⚠ GPT-5.4 · OR</button>
+                <button type="button" class="dca-pk-visual-chip" data-value="or/google/gemini-3.1-flash-image-preview" onclick="dcaSelectPkVisualModel(this)" title="⚠ OpenRouter — Gemini 3.1 Flash Image Preview (Nano Banana 2). Same callAIProxy misroute as GPT-5.4 · OR — returns text. Awaiting proxy fix.">⚠ Nano Banana 2 · OR</button>
+                <button type="button" class="dca-pk-visual-chip" data-value="or/x-ai/grok-2-image" onclick="dcaSelectPkVisualModel(this)" title="⚠ OpenRouter — xAI Grok 2 Image. Same callAIProxy misroute — returns text. Awaiting proxy fix.">⚠ Grok · OR</button>
             </div>
             <div class="dca-pk-visual-section-label">Style</div>
             <div class="dca-pk-visual-chip-rail" id="dcaPkVisualStyleRail">
@@ -29577,16 +29586,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // most recent Generate result so Phase 2 Save can hash + upload it
         // without re-calling the AI. Reset on every modal open.
         const dcaPkVisualState = {
-            model: 'or/openai/gpt-5.4-image-2',
+            // V94.58: default switched from `or/openai/gpt-5.4-image-2` (which
+            // returns text via callAIProxy chat-route misroute) to AI Studio
+            // Nano Banana — real image gen path proven by Alabasta Case Card.
+            model: 'as/gemini-2.5-flash-image-preview',
             style: 'infographic',
             lastImageDataUrl: '',
             lastModelLabel: '',
             generating: false
         };
         const DCA_PK_VISUAL_MODEL_LABELS = {
-            'or/openai/gpt-5.4-image-2':                'GPT-5.4 Image 2',
-            'or/google/gemini-3.1-flash-image-preview': 'Nano Banana 2',
-            'or/x-ai/grok-2-image':                     'Grok Imagine'
+            'as/gemini-2.5-flash-image-preview':        'Nano Banana · AI Studio',
+            'or/openai/gpt-5.4-image-2':                'GPT-5.4 Image 2 (⚠ misrouted)',
+            'or/google/gemini-3.1-flash-image-preview': 'Nano Banana 2 (⚠ misrouted)',
+            'or/x-ai/grok-2-image':                     'Grok Imagine (⚠ misrouted)'
         };
 
         // Open modal. Snapshots the current PK textareas via dcaCollectForm —
