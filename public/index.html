@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.02)</title>
+    <title>Internship Portfolio (V95.03)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -10145,6 +10145,20 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             failed:  '⚠️ partial',
             noop:    '✓ source'
         };
+        // V95.03 Phase 3: epistemic color cue for the source badge.
+        //   emerald = canonical original          (trust as-is)
+        //   sky     = cached from previous translate (verified earlier)
+        //   indigo  = on-device Translator API    (Chrome stack)
+        //   amber   = AI translated via Typhoon   (verify before clinical use)
+        //   rose    = something failed            (partial/incomplete)
+        // Pending state stays neutral slate — no info yet, just waiting.
+        const DC_SOURCE_COLORS = {
+            cached:  { c: '#075985', bg: '#bae6fd' },
+            device:  { c: '#3730a3', bg: '#c7d2fe' },
+            typhoon: { c: '#92400e', bg: '#fde68a' },
+            failed:  { c: '#9f1239', bg: '#fecaca' },
+            noop:    { c: '#065f46', bg: '#a7f3d0' }
+        };
         const dcLangState = {
             selectedLang: (function () {
                 try { return localStorage.getItem('dcUiLang') || 'orig'; } catch (_) { return 'orig'; }
@@ -10229,11 +10243,19 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
 
         function dcRenderLangBar(eff) {
             const selected = dcGetSelectedLang();
-            const statusBadge = eff && eff._translationPending
-                ? '<span style="font-size:0.75em; color:#94a3b8; margin-left:8px;">⏳ แปลอยู่…</span>'
-                : (selected !== 'orig' && eff && eff._translationSource
-                    ? `<span style="font-size:0.75em; color:#94a3b8; margin-left:8px;">${DC_SOURCE_BADGES[eff._translationSource] || eff._translationSource}</span>`
-                    : '');
+            // V95.03 Phase 3: badge rendered as a colored pill — text/bg tint
+            // signals translation epistemic source (canonical vs cached vs
+            // AI vs failed). Falls back to neutral slate when source isn't
+            // in the palette (defensive: future source codes won't crash).
+            let statusBadge = '';
+            if (eff && eff._translationPending) {
+                statusBadge = '<span style="font-size:0.75em; color:#475569; margin-left:8px; padding:2px 8px; border-radius:999px; background:#e2e8f0; font-weight:700;">⏳ แปลอยู่…</span>';
+            } else if (selected !== 'orig' && eff && eff._translationSource) {
+                const src = eff._translationSource;
+                const pal = DC_SOURCE_COLORS[src] || { c: '#475569', bg: '#f1f5f9' };
+                const label = DC_SOURCE_BADGES[src] || src;
+                statusBadge = `<span style="font-size:0.75em; color:${pal.c}; margin-left:8px; padding:2px 8px; border-radius:999px; background:${pal.bg}; font-weight:700;">${label}</span>`;
+            }
             // Inline styles defeat the global `button { width:100% }` rule that
             // would otherwise stack chips vertically — same fix as Quiz V93.01.
             const chips = DC_LANGS.map(l => {
