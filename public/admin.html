@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.55</title>
+    <title>Nika V94.56</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -29762,9 +29762,27 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     || (resp.raw && (resp.raw.imageDataUrl || resp.raw.dataUrl || resp.raw.text))
                     || (resp.raw && resp.raw.data && resp.raw.data[0] && (resp.raw.data[0].url || resp.raw.data[0].b64_json))
                 )) || '';
-                const dataUrl = String(raw).startsWith('data:image/')
-                    ? String(raw)
-                    : (String(raw).length > 100 ? `data:image/png;base64,${raw}` : '');
+                // V94.56: OpenRouter image models (GPT-5.4 Image 2 at minimum,
+                // possibly others) return a plain `https://...` URL string —
+                // wrapping that in `data:image/png;base64,` corrupts the src
+                // and the <img> falls back to alt text. Detect URLs explicitly
+                // and use them as-is. Order: dataURL → http(s) URL → base64
+                // (long string, no scheme) → empty.
+                const rawStr = String(raw);
+                // Some models also emit markdown `![alt](https://url)` — pull
+                // the URL out of the parens if we see that shape.
+                const mdMatch = rawStr.match(/!\[[^\]]*\]\((https?:\/\/[^)]+)\)/);
+                const extracted = mdMatch ? mdMatch[1] : rawStr;
+                let dataUrl;
+                if (extracted.startsWith('data:image/')) {
+                    dataUrl = extracted;
+                } else if (/^https?:\/\//i.test(extracted)) {
+                    dataUrl = extracted;
+                } else if (extracted.length > 100) {
+                    dataUrl = `data:image/png;base64,${extracted}`;
+                } else {
+                    dataUrl = '';
+                }
                 if (!dataUrl) {
                     throw new Error('Empty or unrecognized image response. Try a different model.');
                 }
