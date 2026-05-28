@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.01)</title>
+    <title>Internship Portfolio (V95.02)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2842,6 +2842,15 @@
                 .dc-detail-section + .dc-detail-section {
                     border-top: 1px solid #f1f5f9;
                 }
+                /* V95.02 Phase 2: section accent borders — left-stripe per
+                   section category. Palette echoes admin section colors
+                   (public/admin.html) so the two surfaces stay consistent. */
+                .dc-detail-section[data-section-key="clinical"]   { border-left: 3px solid #0ea5e9; }
+                .dc-detail-section[data-section-key="moa"]        { border-left: 3px solid #6366f1; }
+                .dc-detail-section[data-section-key="pk"]         { border-left: 3px solid #14b8a6; }
+                .dc-detail-section[data-section-key="edu"]        { border-left: 3px solid #10b981; }
+                .dc-detail-section[data-section-key="refs"]       { border-left: 3px solid #94a3b8; }
+                .dc-detail-section[data-section-key="discussion"] { border-left: 3px solid #a855f7; }
                 .dc-detail-section > summary {
                     list-style: none; cursor: pointer; user-select: none;
                     padding: 10px 20px;
@@ -10459,10 +10468,11 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             ];
             const hasAnyAdmet = admetFields.some(([, v]) => v && String(v).trim());
             const pkSection = hasAnyAdmet
-                ? { title: '📊 Pharmacokinetics · ADMET', open: false, fields: admetFields }
-                : { title: '📊 Pharmacokinetics', open: false, fields: [['Pharmacokinetics', eff.pharmacokinetics, 'reference']] };
+                ? { key: 'pk', title: '📊 Pharmacokinetics · ADMET', open: false, fields: admetFields }
+                : { key: 'pk', title: '📊 Pharmacokinetics', open: false, fields: [['Pharmacokinetics', eff.pharmacokinetics, 'reference']] };
             const sections = [
                 {
+                    key: 'clinical',
                     title: '🩺 Clinical Use',
                     open: true,
                     fields: [
@@ -10474,6 +10484,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     ]
                 },
                 {
+                    key: 'moa',
                     title: '💊 Mechanism of Action',
                     open: false,
                     fields: [
@@ -10482,6 +10493,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 },
                 pkSection,
                 {
+                    key: 'edu',
                     title: '📖 Education',
                     open: true,
                     fields: [
@@ -10491,6 +10503,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     ]
                 },
                 {
+                    key: 'refs',
                     title: '🔗 References',
                     open: false,
                     refs: Array.isArray(eff.references) ? eff.references.filter(Boolean) : []
@@ -10499,9 +10512,10 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             const html = sections.map(sec => {
                 if (sec.refs !== undefined) {
                     // References block — render as anchor list or "not yet curated" hint.
+                    // V95.02: data-section-key drives the left-stripe accent color.
                     if (sec.refs.length === 0) {
                         return `
-                            <details class="dc-detail-section" ${sec.open ? 'open' : ''}>
+                            <details class="dc-detail-section" data-section-key="${sec.key || ''}" ${sec.open ? 'open' : ''}>
                                 <summary>${sec.title}</summary>
                                 <div class="dc-detail-section-body">
                                     <div class="dc-detail-refs-empty">📌 ยังไม่มี references สำหรับยานี้ · admin will add verified citations (PubMed / UpToDate / MIMS / Drugs.com) when reviewing.</div>
@@ -10517,7 +10531,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                         return `<div class="dc-detail-field-value" style="margin-bottom:6px;">${escapeHtml(safeUrl)}</div>`;
                     }).join('');
                     return `
-                        <details class="dc-detail-section" ${sec.open ? 'open' : ''}>
+                        <details class="dc-detail-section" data-section-key="${sec.key || ''}" ${sec.open ? 'open' : ''}>
                             <summary>${sec.title}</summary>
                             <div class="dc-detail-section-body">${refsHtml}</div>
                         </details>`;
@@ -10535,7 +10549,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                         </div>`).join('');
                 if (!fieldsHtml) return '';  // Hide empty sections entirely.
                 return `
-                    <details class="dc-detail-section" ${sec.open ? 'open' : ''}>
+                    <details class="dc-detail-section" data-section-key="${sec.key || ''}" ${sec.open ? 'open' : ''}>
                         <summary>${sec.title}</summary>
                         <div class="dc-detail-section-body">${fieldsHtml}</div>
                     </details>`;
@@ -10546,7 +10560,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             // jumps between drugs without closing).
             dcDiscussionTeardown();
             const discussionHtml = `
-                <details class="dc-detail-section" id="dc-discussion-details" data-dc-drug-id="${escapeHtml(eff._id || '')}">
+                <details class="dc-detail-section" id="dc-discussion-details" data-section-key="discussion" data-dc-drug-id="${escapeHtml(eff._id || '')}">
                     <summary>💬 Discussion <span id="dc-discussion-count" style="opacity:0.7; font-size:0.85em; margin-left:4px;"></span></summary>
                     <div class="dc-detail-section-body">
                         <div id="dc-discussion-box" class="dc-discussion-box">
