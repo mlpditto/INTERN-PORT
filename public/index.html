@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.05)</title>
+    <title>Internship Portfolio (V95.06)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2885,6 +2885,25 @@
                 .dc-detail-field-value {
                     font-size: 0.88em; color: #1e293b; line-height: 1.55;
                     white-space: pre-wrap; word-wrap: break-word;
+                }
+                /* V95.06 PK Visual Phase 2: ADMET infographic styling. Image
+                   sits inside a tap-to-zoom anchor that opens the full-size
+                   asset in a new tab. Rounded container + subtle shadow
+                   matches the existing dc-detail card aesthetic. */
+                .dc-pk-visual-link {
+                    display: block; text-decoration: none;
+                    border-radius: 12px; overflow: hidden;
+                    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+                    border: 1px solid #e2e8f0;
+                }
+                .dc-pk-visual-img {
+                    display: block; width: 100%; height: auto;
+                    background: #f8fafc;
+                }
+                .dc-pk-visual-meta {
+                    margin-top: 8px; font-size: 0.74em; color: #64748b;
+                    text-transform: uppercase; letter-spacing: 0.4px;
+                    font-weight: 700; text-align: right;
                 }
                 /* V95.01 Phase 1: Clinical Risk Color Coding — left-border 3px
                    + dark-tone label text per clinical category. Palette uses
@@ -10502,6 +10521,13 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             const pkSection = hasAnyAdmet
                 ? { key: 'pk', title: '📊 Pharmacokinetics · ADMET', open: false, fields: admetFields }
                 : { key: 'pk', title: '📊 Pharmacokinetics', open: false, fields: [['Pharmacokinetics', eff.pharmacokinetics, 'reference']] };
+            // V95.06 PK Visual Phase 2: ADMET infographic from admin's
+            // Generate ADMET Visual modal. Renders only when pkVisual.downloadUrl
+            // exists. open:true because the image is the most engaging
+            // surface in the modal — interns see it immediately on expand.
+            const pkVisualSection = (eff.pkVisual && eff.pkVisual.downloadUrl)
+                ? { key: 'pkvisual', title: '🎨 ADMET Visual', open: true, visual: eff.pkVisual }
+                : null;
             const sections = [
                 {
                     key: 'clinical',
@@ -10524,6 +10550,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     ]
                 },
                 pkSection,
+                pkVisualSection,
                 {
                     key: 'edu',
                     title: '📖 Education',
@@ -10541,7 +10568,30 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     refs: Array.isArray(eff.references) ? eff.references.filter(Boolean) : []
                 }
             ];
-            const html = sections.map(sec => {
+            const html = sections.filter(Boolean).map(sec => {
+                // V95.06 PK Visual Phase 2: image-only section. Tokenized
+                // Storage download URL bypasses isAdmin() rules so interns
+                // can render without read permission. lazy-load the <img> so
+                // the modal-open paint isn't blocked while the CDN warms up.
+                if (sec.visual) {
+                    const v = sec.visual;
+                    const url = String(v.downloadUrl || '');
+                    if (!url) return '';
+                    const meta = [
+                        v.style ? String(v.style) : '',
+                        v.model ? String(v.model).replace(/^(as|or)\//, '') : ''
+                    ].filter(Boolean).join(' · ');
+                    return `
+                        <details class="dc-detail-section" data-section-key="${sec.key || ''}" ${sec.open ? 'open' : ''}>
+                            <summary>${sec.title}</summary>
+                            <div class="dc-detail-section-body">
+                                <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="dc-pk-visual-link" title="Open full size in a new tab">
+                                    <img src="${escapeHtml(url)}" alt="ADMET visual" loading="lazy" class="dc-pk-visual-img">
+                                </a>
+                                ${meta ? `<div class="dc-pk-visual-meta">Generated · ${escapeHtml(meta)}</div>` : ''}
+                            </div>
+                        </details>`;
+                }
                 if (sec.refs !== undefined) {
                     // References block — render as anchor list or "not yet curated" hint.
                     // V95.02: data-section-key drives the left-stripe accent color.
