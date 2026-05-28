@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.45</title>
+    <title>Nika V94.46</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1421,6 +1421,23 @@
             color: #92400e; padding: 2px 8px; border-radius: 999px;
             font-size: 0.72em; font-weight: 800;
         }
+        /* V94.46: audit-trail metadata strip under the Edit · DRUGNAME header.
+           Contributors as role-coded pills; updated-at as plain inline text. */
+        .dca-form-meta {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+            font-size: 0.78em; color: #64748b;
+            margin: 0 0 10px 2px;
+        }
+        .dca-form-meta .dca-meta-sep { color: #cbd5e1; }
+        .dca-contributor-chip {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 1px 8px; border-radius: 999px;
+            font-size: 0.92em; font-weight: 700;
+            border: 1px solid transparent;
+        }
+        .dca-contrib-admin { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; }
+        .dca-contrib-intern { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+        .dca-contrib-unknown { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
         /* Draft view */
         .dca-draft-row {
             background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
@@ -12642,7 +12659,14 @@
                 <!-- V94.45: AI fill provenance line — shown only when the in-memory form
                      has aiDrafted=true. Mirrors the model name in the pill so admin can
                      also see it after the toast disappears. Cleared on save / form reopen. -->
-                <div id="dca-form-ai-subtitle" style="display:none; font-size:0.78em; color:#64748b; margin:-4px 0 8px 2px;"></div>
+                <div id="dca-form-ai-subtitle" style="display:none; font-size:0.78em; color:#64748b; margin:-4px 0 4px 2px;"></div>
+
+                <!-- V94.46: audit-trail metadata strip — last updated relative time +
+                     contributors role pills. Shown for existing docs (Edit/Review paths)
+                     only; hidden in Add Drug since there's no saved state yet. Renders
+                     from data.updatedAt + data.contributors[]; legacy docs synthesize
+                     a single 'admin:<reviewedBy>' chip as fallback. -->
+                <div id="dca-form-meta" class="dca-form-meta" style="display:none;"></div>
 
                 <!-- V94.35 Phase 5: intern's free-text note to admin (drafts only).
                      Shown only when reviewing a draft that has a non-empty
@@ -29094,6 +29118,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     aiSubtitle.textContent = '';
                 }
             }
+            // V94.46: audit-trail meta strip (Updated + Contributors).
+            // Hides itself on Add Drug; renders from contributors[] with legacy
+            // reviewedBy fallback for pre-V94.46 docs.
+            dcaRenderMeta(data);
             // Doc id strip
             const idEl = document.getElementById('dca-form-doc-id');
             if (idEl) idEl.textContent = (data && data._id) ? `doc: ${data._id}` : '';
@@ -29268,6 +29296,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (dcaState.isDraftEdit) {
                     // Approving via Review & Edit: write payload to drug_codex (new doc),
                     // then delete the draft. Use a batch for atomicity.
+                    // V94.46: seed contributors[] with both the intern submitter and
+                    // the reviewing admin so the published doc's audit trail captures
+                    // both parties from the start. set() requires a literal array
+                    // (arrayUnion sentinel is invalid in set without merge).
+                    const draftDoc = (dcaState.drafts || []).find(d => d._id === dcaState.editingId);
+                    const draftContribs = [];
+                    if (draftDoc && draftDoc.submittedBy) draftContribs.push('intern:' + draftDoc.submittedBy);
+                    draftContribs.push('admin:' + reviewerEmail);
+                    payload.contributors = draftContribs;
                     const batch = db.batch();
                     const newRef = db.collection('drug_codex').doc();
                     batch.set(newRef, Object.assign({ createdAt: nowTs }, payload));
@@ -29276,9 +29313,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     await batch.commit();
                     if (typeof showToast === 'function') showToast(`✅ Published "${payload.genericName}" from draft`);
                 } else if (dcaState.editingId) {
+                    // V94.46: arrayUnion is idempotent — re-saving by the same admin
+                    // is a no-op for contributors. Works on update() (sentinel valid).
+                    payload.contributors = firebase.firestore.FieldValue.arrayUnion('admin:' + reviewerEmail);
                     await db.collection('drug_codex').doc(dcaState.editingId).update(payload);
                     if (typeof showToast === 'function') showToast(`✅ Updated "${payload.genericName}"`);
                 } else {
+                    // V94.46: brand-new drug — only the creating admin is on the trail.
+                    payload.contributors = ['admin:' + reviewerEmail];
                     payload.createdAt = nowTs;
                     await db.collection('drug_codex').add(payload);
                     if (typeof showToast === 'function') showToast(`✅ Added "${payload.genericName}"`);
@@ -29317,6 +29359,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             payload.lastReviewedAt = nowTs;
             payload.reviewedBy = reviewerEmail;
             payload.aiDrafted = false;
+            // V94.46: approve-as-is path — seed contributors[] with both the intern
+            // submitter and the approving admin. Literal array (set() can't use arrayUnion).
+            const approveContribs = [];
+            if (draft.submittedBy) approveContribs.push('intern:' + draft.submittedBy);
+            approveContribs.push('admin:' + reviewerEmail);
+            payload.contributors = approveContribs;
 
             try {
                 const batch = db.batch();
@@ -29381,6 +29429,96 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function dcaFormatModelLabel(rawModel) {
             if (!rawModel) return '';
             return DCA_AI_MODEL_LABELS[rawModel] || rawModel;
+        }
+
+        // V94.46: relative time helper for the meta strip.
+        // Accepts Firestore Timestamp, JS Date, or null. Falls back to absolute
+        // date for anything older than ~30 days so admin still sees provenance
+        // on stale docs. Thai locale for the absolute branch matches the rest of
+        // the admin UI.
+        function dcaFormatRelative(ts) {
+            if (!ts) return '';
+            let d;
+            try {
+                d = ts.toDate ? ts.toDate() : (ts instanceof Date ? ts : new Date(ts));
+            } catch (_) { return ''; }
+            if (!d || isNaN(d.getTime())) return '';
+            const diffSec = (Date.now() - d.getTime()) / 1000;
+            if (diffSec < 60) return 'just now';
+            if (diffSec < 3600) return `${Math.floor(diffSec / 60)} min ago`;
+            if (diffSec < 86400) {
+                const h = Math.floor(diffSec / 3600);
+                return `${h} hr${h === 1 ? '' : 's'} ago`;
+            }
+            if (diffSec < 2592000) {
+                const days = Math.floor(diffSec / 86400);
+                return `${days} day${days === 1 ? '' : 's'} ago`;
+            }
+            return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+
+        // V94.46: render a single contributor entry as a role-coded pill.
+        // identifier is the 'admin:<email>' or 'intern:<uid>' string. Short form
+        // = local-part of email (up to 8 chars) for admins, last 4 chars of uid
+        // for interns. Unknown role → neutral slate pill with raw value.
+        function dcaContributorChipHtml(identifier) {
+            const s = String(identifier || '');
+            const colonIdx = s.indexOf(':');
+            const role = colonIdx > 0 ? s.slice(0, colonIdx) : '';
+            const id = colonIdx > 0 ? s.slice(colonIdx + 1) : s;
+            if (role === 'admin') {
+                const localPart = id.split('@')[0] || id;
+                const short = localPart.length > 8 ? localPart.slice(0, 8) : localPart;
+                return `<span class="dca-contributor-chip dca-contrib-admin" title="${dcaEscapeHtml(id)}">👤 admin (${dcaEscapeHtml(short)})</span>`;
+            }
+            if (role === 'intern') {
+                const short = id.length > 4 ? id.slice(-4) : id;
+                return `<span class="dca-contributor-chip dca-contrib-intern" title="intern UID: ${dcaEscapeHtml(id)}">📝 intern (${dcaEscapeHtml(short)})</span>`;
+            }
+            return `<span class="dca-contributor-chip dca-contrib-unknown">${dcaEscapeHtml(s)}</span>`;
+        }
+
+        // V94.46: paint the meta strip from a drug record (data may be a published
+        // codex doc or {} for Add). Legacy docs without contributors[] fall back to
+        // synthesizing one chip from reviewedBy (set on every save since launch).
+        function dcaRenderMeta(data) {
+            const el = document.getElementById('dca-form-meta');
+            if (!el) return;
+            // Hide entirely for Add Drug (no saved state) and for stripped form data.
+            if (!data || (!data.updatedAt && !data.contributors && !data.reviewedBy)) {
+                el.style.display = 'none';
+                el.innerHTML = '';
+                return;
+            }
+            const parts = [];
+            const updatedRel = dcaFormatRelative(data.updatedAt || data.createdAt);
+            if (updatedRel) {
+                parts.push(`<span><strong>Updated:</strong> ${dcaEscapeHtml(updatedRel)}</span>`);
+            }
+            let contribList = Array.isArray(data.contributors) ? data.contributors.slice() : [];
+            // Legacy fallback: pre-V94.46 docs have only reviewedBy.
+            if (contribList.length === 0 && data.reviewedBy) {
+                contribList = ['admin:' + data.reviewedBy];
+            }
+            if (contribList.length > 0) {
+                // De-dupe (in case of accidental array of duplicates).
+                const seen = new Set();
+                const chips = [];
+                contribList.forEach(item => {
+                    const key = String(item);
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    chips.push(dcaContributorChipHtml(item));
+                });
+                parts.push(`<span><strong>Contributors:</strong></span>${chips.join('')}`);
+            }
+            if (parts.length === 0) {
+                el.style.display = 'none';
+                el.innerHTML = '';
+                return;
+            }
+            el.style.display = 'flex';
+            el.innerHTML = parts.join('<span class="dca-meta-sep">·</span>');
         }
 
         function dcaAutoDraftToggle() {
