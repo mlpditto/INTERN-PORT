@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.64</title>
+    <title>Nika V94.65</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -30026,9 +30026,23 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
                 const blob = await resp.blob();
                 const mime = blob.type || 'image/png';
-                const ext = _MIME_TO_EXT[mime] || '.png';
+                // V94.65 hotfix: cannot reuse _MIME_TO_EXT / _sha256Hex from
+                // the Quill upload pipeline — those live in the <script
+                // type="module"> block (around L16087-L16101). const + function
+                // declarations inside a module are module-scoped, NOT on
+                // window, so this classic <script> tag (L17841+) sees them as
+                // undefined. Inline the only two pieces we need; AI image gen
+                // returns PNG ~99% of the time so the extension table is tiny.
+                const ext = mime === 'image/jpeg' || mime === 'image/jpg' ? '.jpg'
+                          : mime === 'image/webp' ? '.webp'
+                          : mime === 'image/gif'  ? '.gif'
+                          : '.png';
                 // 2. SHA-256 the bytes → content-addressed path.
-                const hash = await _sha256Hex(blob);
+                const buf = await blob.arrayBuffer();
+                const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+                const hash = Array.from(new Uint8Array(hashBuf))
+                    .map(b => b.toString(16).padStart(2, '0'))
+                    .join('');
                 const storagePath = 'pk-visuals/' + hash + ext;
                 const ref = firebase.storage().ref(storagePath);
                 // 3. Probe-then-put dedup.
