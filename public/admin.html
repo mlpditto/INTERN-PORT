@@ -28970,7 +28970,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (typeof Translator !== 'undefined' && 'create' in Translator) {
                 try {
                     const t = await Translator.create({ sourceLanguage: sourceLang, targetLanguage: targetLang });
-                    return { text: await t.translate(text), source: 'device' };
+                    const translated = await t.translate(text);
+                    // V94.54: validate Tier A returned non-empty before accepting.
+                    // Chrome on-device Translator API can resolve with an empty
+                    // string for unsupported language pairs (or transient
+                    // pipeline glitches) instead of throwing — accepting that
+                    // empty string as "success" left state.<field>.<lang>
+                    // permanently blank in dcaTranslateEducationI18n. Fall
+                    // through to Tier B Typhoon when Tier A is empty.
+                    if (translated && translated.trim()) {
+                        return { text: translated, source: 'device' };
+                    }
                 } catch (e) { /* fall through to Tier B */ }
             }
             // Tier B: Typhoon via callAIProxy.
