@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.59</title>
+    <title>Nika V94.60</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13908,8 +13908,27 @@
             const BACKUP_PROXY = DIRECT_PROXY;
             if (window.loadAIKeys) window.loadAIKeys();
 
+            // V94.60: prefix checks moved to TOP of the chain. Before this
+            // fix, models like `as/gemini-2.5-flash-image-preview` hit the
+            // `includes('gemini')` branch first → routed to provider='gemini'
+            // with prefix NOT stripped → local SDK fallback got passed
+            // `as/gemini-...` as model name → Google API built malformed URL
+            // `/v1beta/as/gemini-...:generateContent` → NetworkError.
+            // Same hidden bug affected `or/openai/gpt-5.4-image-2` (`includes('gpt')`),
+            // `or/google/gemini-3.1-flash-image-preview` (`includes('gemini')`),
+            // and `or/anthropic/claude-...` (`includes('claude')`) — every
+            // prefix-routed model since V92.70 was silently misrouted, only
+            // surfacing now because PK Visual V94.55+ exercised the AI Studio
+            // path in earnest.
             let proxyProvider = "";
-            if (modelName.toLowerCase().indexOf('claude') !== -1) {
+            if (modelName.startsWith('or/')) {
+                proxyProvider = "openrouter";
+                modelName = modelName.slice(3);
+            } else if (modelName.startsWith('as/')) {
+                // V92.70: Google AI Studio (Gemini Generative Language API) — Nano Banana image gen + chat
+                proxyProvider = "gemini-aistudio";
+                modelName = modelName.slice(3);
+            } else if (modelName.toLowerCase().indexOf('claude') !== -1) {
                 proxyProvider = "anthropic";
             } else if (modelName.includes('gemini') || modelName === 'multimodal') {
                 proxyProvider = "gemini";
@@ -13919,13 +13938,6 @@
                 proxyProvider = "openai";
             } else if (modelName.includes('typhoon')) {
                 proxyProvider = "typhoon";
-            } else if (modelName.startsWith('or/')) {
-                proxyProvider = "openrouter";
-                modelName = modelName.slice(3);
-            } else if (modelName.startsWith('as/')) {
-                // V92.70: Google AI Studio (Gemini Generative Language API) — Nano Banana image gen + chat
-                proxyProvider = "gemini-aistudio";
-                modelName = modelName.slice(3);
             } else if (modelName.includes('llama')) {
                 proxyProvider = "openrouter";
             } else if (modelName.includes('glm-5.1') || modelName.includes('ollama')) {
