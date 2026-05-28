@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.65</title>
+    <title>Nika V94.66</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -29232,7 +29232,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 dcaState.unsubCodex = db.collection('drug_codex')
                     .orderBy('genericName')
                     .onSnapshot(snap => {
-                        dcaState.codex = snap.docs.map(d => Object.assign({ _id: d.id }, d.data()));
+                        // V94.66: Firestore .orderBy is case-sensitive ASCII (A < a),
+                        // so "Azilsartan" sorted before "alfuzosin" and "FIMASARTAN"
+                        // anchored the F group above lowercase entries. Resort
+                        // client-side with localeCompare sensitivity:'base' for a
+                        // case + diacritic-insensitive A-Z that matches the
+                        // navigation rail.
+                        dcaState.codex = snap.docs
+                            .map(d => Object.assign({ _id: d.id }, d.data()))
+                            .sort((a, b) => (a.genericName || '').localeCompare(
+                                (b.genericName || ''), undefined, { sensitivity: 'base' }));
                         dcaRenderPublishedList();
                         dcaUpdateCounts();
                     }, err => {
