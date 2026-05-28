@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.47</title>
+    <title>Nika V94.48</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1338,6 +1338,15 @@
             font-style: italic;
             word-break: break-word; line-height: 1.4;
         }
+        /* V94.48: per-row audit trail (Updated relative + contributor pills) so
+           admin can scan recency + ownership without opening each drug. Reuses
+           the same .dca-contributor-chip classes from the Edit screen. */
+        .dca-row-meta-trail {
+            display: flex; align-items: center; flex-wrap: wrap;
+            gap: 6px; margin-top: 4px;
+            font-size: 0.74em; color: #94a3b8;
+        }
+        .dca-row-meta-updated { color: #64748b; font-weight: 600; }
         .dca-row-actions { display: flex; gap: 6px; }
         .dca-row-edit-btn {
             padding: 6px 14px; border-radius: 8px; border: 1px solid #cbd5e1;
@@ -29012,6 +29021,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 <div class="dca-row-name">${dcaEscapeHtml(drug.genericName)}</div>
                                 <div class="dca-row-meta">${chips.join('')}</div>
                                 ${brands}
+                                ${dcaListMetaTrailHtml(drug)}
                             </div>
                             <div class="dca-row-actions">
                                 <button type="button" class="dca-row-edit-btn" onclick="dcaEdit('${dcaEscapeHtml(drug._id)}')">Edit</button>
@@ -29479,6 +29489,35 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 return `<span class="dca-contributor-chip dca-contrib-intern" title="intern UID: ${dcaEscapeHtml(id)}">📝 intern (${dcaEscapeHtml(short)})</span>`;
             }
             return `<span class="dca-contributor-chip dca-contrib-unknown">${dcaEscapeHtml(s)}</span>`;
+        }
+
+        // V94.48: HTML-returning variant of the meta strip for use in the
+        // Published list rows so admin sees Updated + Contributors per-drug
+        // without opening each entry. More compact than the Edit-screen strip
+        // (no "Updated:" / "Contributors:" labels), but reuses the same
+        // contributor chip classes + relative-time + legacy-reviewedBy fallback.
+        function dcaListMetaTrailHtml(drug) {
+            if (!drug) return '';
+            const parts = [];
+            const updatedRel = dcaFormatRelative(drug.updatedAt || drug.createdAt);
+            if (updatedRel) {
+                parts.push(`<span class="dca-row-meta-updated">↻ ${dcaEscapeHtml(updatedRel)}</span>`);
+            }
+            let contribList = Array.isArray(drug.contributors) ? drug.contributors.slice() : [];
+            if (contribList.length === 0 && drug.reviewedBy) {
+                contribList = ['admin:' + drug.reviewedBy];
+            }
+            if (contribList.length > 0) {
+                const seen = new Set();
+                contribList.forEach(item => {
+                    const key = String(item);
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    parts.push(dcaContributorChipHtml(item));
+                });
+            }
+            if (parts.length === 0) return '';
+            return `<div class="dca-row-meta-trail">${parts.join('')}</div>`;
         }
 
         // V94.46: paint the meta strip from a drug record (data may be a published
