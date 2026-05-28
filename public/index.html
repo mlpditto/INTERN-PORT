@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V94.98)</title>
+    <title>Internship Portfolio (V94.99)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -10077,6 +10077,153 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             wired: false
         };
 
+        // V94.99: Drug Codex i18n — 5-language toggle (TH/EN/KR/JP/CN) in
+        // detail modal. Mirrors Quiz Translation V93 pattern: reuses
+        // qtTranslateText (Tier A Chrome Translator → Tier B Typhoon via
+        // callAIProxy), per-drug localStorage cache, source-lang detect per
+        // field (Phase 3 prompt produces mixed-lang content — patientCounseling
+        // Thai, others English, pearls mixed). Cache key `dctr_{drugId}_{lang}`
+        // bundles all translatable fields in one entry. Non-translatable
+        // fields (genericName, brandNames, atcCode, references) pass through
+        // untouched. Cache miss renders source instantly + kicks off
+        // background translate + re-renders on completion (same UX pattern
+        // as qtBackgroundTranslate). iOS WKWebView always hits Tier B
+        // (no Translator API) — see project_quiz_translation_V93.
+        const DC_LANGS = [
+            { code: 'orig', label: '⭕', title: 'Original (no translation)' },
+            { code: 'th',   label: '🇹🇭', title: 'ไทย / Thai' },
+            { code: 'en',   label: '🇺🇸', title: 'English' },
+            { code: 'ko',   label: '🇰🇷', title: '한국어 / Korean' },
+            { code: 'ja',   label: '🇯🇵', title: '日本語 / Japanese' },
+            { code: 'zh',   label: '🇨🇳', title: '中文 / Chinese' }
+        ];
+        // Translatable content fields. Keep in sync with dcRenderDetail
+        // section field list. genericName/brandNames/atcCode/references
+        // are identifiers/URLs — not translated.
+        const DC_TRANSLATABLE_FIELDS = [
+            'class', 'indication', 'dosing', 'contraindication', 'sideEffects',
+            'interactions', 'mechanism', 'absorption', 'distribution',
+            'metabolism', 'excretion', 'toxicity', 'pharmacokinetics',
+            'monitoring', 'patientCounseling', 'pearls'
+        ];
+        const DC_SOURCE_BADGES = {
+            cached:  '💾 cached',
+            device:  '⚙️ device',
+            typhoon: '☁️ AI',
+            failed:  '⚠️ partial',
+            noop:    '✓ source'
+        };
+        const dcLangState = {
+            selectedLang: (function () {
+                try { return localStorage.getItem('dcUiLang') || 'orig'; } catch (_) { return 'orig'; }
+            })(),
+            pending: new Set()
+        };
+
+        function dcGetSelectedLang() { return dcLangState.selectedLang; }
+        function dcSetSelectedLang(lang) {
+            dcLangState.selectedLang = lang;
+            try { localStorage.setItem('dcUiLang', lang); } catch (_) {}
+        }
+        function dcCacheKey(drugId, lang) { return `dctr_${drugId}_${lang}`; }
+
+        function dcGetCached(drugId, lang) {
+            try { const raw = localStorage.getItem(dcCacheKey(drugId, lang)); return raw ? JSON.parse(raw) : null; }
+            catch (_) { return null; }
+        }
+        function dcSetCached(drugId, lang, data) {
+            try { localStorage.setItem(dcCacheKey(drugId, lang), JSON.stringify(data)); }
+            catch (e) {
+                // QuotaExceeded — drop oldest translation entries (dctr + qt + qt2)
+                // and retry once. Same eviction pattern as qtSetCached.
+                const keys = Object.keys(localStorage).filter(k => k.startsWith('dctr_') || k.startsWith('qt_') || k.startsWith('qt2_'));
+                keys.slice(0, Math.min(50, keys.length)).forEach(k => localStorage.removeItem(k));
+                try { localStorage.setItem(dcCacheKey(drugId, lang), JSON.stringify(data)); } catch (_) {}
+            }
+        }
+
+        async function dcTranslateDrug(drug, lang) {
+            if (!drug || lang === 'orig') return null;
+            const results = await Promise.all(
+                DC_TRANSLATABLE_FIELDS.map(key =>
+                    qtTranslateText(drug[key] || '', lang)
+                        .catch(() => ({ text: drug[key] || '', source: 'failed' }))
+                )
+            );
+            const fields = {};
+            let bundleSource = 'noop';
+            DC_TRANSLATABLE_FIELDS.forEach((key, i) => {
+                fields[key] = results[i].text;
+                // Promote the strongest source so the badge reflects whether
+                // any field actually went over the wire.
+                const s = results[i].source;
+                if (s === 'typhoon') bundleSource = 'typhoon';
+                else if (s === 'device' && bundleSource !== 'typhoon') bundleSource = 'device';
+                else if (s === 'failed' && bundleSource === 'noop') bundleSource = 'failed';
+            });
+            const bundle = { fields, source: bundleSource, ts: Date.now() };
+            dcSetCached(drug._id, lang, bundle);
+            return bundle;
+        }
+
+        function dcBackgroundTranslate(drug, lang) {
+            if (!drug || lang === 'orig') return;
+            const key = `${drug._id}_${lang}`;
+            if (dcLangState.pending.has(key)) return;
+            dcLangState.pending.add(key);
+            dcTranslateDrug(drug, lang)
+                .then(() => {
+                    // Re-render only if user is still on the same drug + lang.
+                    if (dcState.currentDrug && dcState.currentDrug._id === drug._id && dcGetSelectedLang() === lang) {
+                        dcRenderDetail(dcState.currentDrug);
+                    }
+                })
+                .catch(err => console.warn('[drug-codex translate]', drug._id, lang, err && err.message))
+                .finally(() => dcLangState.pending.delete(key));
+        }
+
+        // Returns a copy of `drug` with translatable fields overridden by
+        // cached translations for `lang`. On cache miss, kicks off background
+        // translate and returns the original drug tagged `_translationPending`.
+        function dcGetEffectiveDrug(drug, lang) {
+            if (!drug || lang === 'orig') return drug;
+            const cached = dcGetCached(drug._id, lang);
+            if (cached && cached.fields) {
+                return Object.assign({}, drug, cached.fields, { _translationSource: cached.source || 'cached' });
+            }
+            dcBackgroundTranslate(drug, lang);
+            return Object.assign({}, drug, { _translationPending: true });
+        }
+
+        function dcRenderLangBar(eff) {
+            const selected = dcGetSelectedLang();
+            const statusBadge = eff && eff._translationPending
+                ? '<span style="font-size:0.75em; color:#94a3b8; margin-left:8px;">⏳ แปลอยู่…</span>'
+                : (selected !== 'orig' && eff && eff._translationSource
+                    ? `<span style="font-size:0.75em; color:#94a3b8; margin-left:8px;">${DC_SOURCE_BADGES[eff._translationSource] || eff._translationSource}</span>`
+                    : '');
+            // Inline styles defeat the global `button { width:100% }` rule that
+            // would otherwise stack chips vertically — same fix as Quiz V93.01.
+            const chips = DC_LANGS.map(l => {
+                const isActive = l.code === selected;
+                const bg = isActive ? '#3b82f6' : '#f1f5f9';
+                const fg = isActive ? '#ffffff' : '#475569';
+                const bd = isActive ? '#3b82f6' : '#cbd5e1';
+                return `<button type="button" onclick="dcApplyLang('${l.code}')" title="${l.title}" style="display:inline-block; padding:6px 10px; margin:0 4px 0 0; border-radius:8px; font-size:0.9em; line-height:1; cursor:pointer; width:auto; min-width:auto; min-height:auto; flex:0 0 auto; background:${bg}; color:${fg}; border:1px solid ${bd};">${l.label}</button>`;
+            }).join('');
+            return `
+                <div class="dc-lang-bar lang-no-toggle" style="display:flex; align-items:center; flex-wrap:wrap; gap:0; padding:8px 12px; margin-bottom:10px; background:#f8fafc; border-radius:8px;">
+                    <span style="font-size:0.8em; color:#64748b; margin-right:6px;">🌐</span>
+                    ${chips}
+                    ${statusBadge}
+                </div>`;
+        }
+
+        function dcApplyLang(lang) {
+            dcSetSelectedLang(lang);
+            if (dcState.currentDrug) dcRenderDetail(dcState.currentDrug);
+        }
+
         function toggleDrugCodex() {
             const content = document.getElementById('dc-section-content');
             const icon = document.getElementById('dc-section-icon');
@@ -10254,18 +10401,23 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
         }
 
         function dcRenderDetail(drug) {
+            // V94.99: i18n — pick effective drug for current language. Cache hit
+            // returns translated overrides; miss returns original + kicks off
+            // background translate that re-renders when done.
+            const lang = dcGetSelectedLang();
+            const eff = dcGetEffectiveDrug(drug, lang);
             // Header: name + chips
             const nameEl = document.getElementById('dc-detail-name');
-            if (nameEl) nameEl.textContent = drug.genericName || '(unnamed)';
+            if (nameEl) nameEl.textContent = eff.genericName || '(unnamed)';
             const chipsEl = document.getElementById('dc-detail-chips');
             if (chipsEl) {
                 const chips = [];
-                if (drug.atcCode) chips.push(`<span class="dc-detail-chip">${escapeHtml(drug.atcCode)}</span>`);
-                if (drug.class) chips.push(`<span class="dc-detail-chip">${escapeHtml(drug.class)}</span>`);
-                if (Array.isArray(drug.brandNames) && drug.brandNames.length > 0) {
-                    chips.push(`<span class="dc-detail-chip" title="Brand names">© ${escapeHtml(drug.brandNames.slice(0, 3).join(', '))}${drug.brandNames.length > 3 ? ` +${drug.brandNames.length - 3}` : ''}</span>`);
+                if (eff.atcCode) chips.push(`<span class="dc-detail-chip">${escapeHtml(eff.atcCode)}</span>`);
+                if (eff.class) chips.push(`<span class="dc-detail-chip">${escapeHtml(eff.class)}</span>`);
+                if (Array.isArray(eff.brandNames) && eff.brandNames.length > 0) {
+                    chips.push(`<span class="dc-detail-chip" title="Brand names">© ${escapeHtml(eff.brandNames.slice(0, 3).join(', '))}${eff.brandNames.length > 3 ? ` +${eff.brandNames.length - 3}` : ''}</span>`);
                 }
-                if (drug.aiDrafted) chips.push('<span class="dc-detail-chip dc-detail-chip-ai" title="AI-drafted entry — admin still curates">🤖 AI draft</span>');
+                if (eff.aiDrafted) chips.push('<span class="dc-detail-chip dc-detail-chip-ai" title="AI-drafted entry — admin still curates">🤖 AI draft</span>');
                 chipsEl.innerHTML = chips.join('');
             }
             // Body: 6 sections (V94.94: 5 → 6 after splitting Pharmacology into MoA + ADMET-PK).
@@ -10275,33 +10427,33 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             // fall back to the legacy single `pharmacokinetics` field for old docs
             // that were authored before V94.40 (admin) introduced the ADMET split.
             const admetFields = [
-                ['Absorption', drug.absorption],
-                ['Distribution', drug.distribution],
-                ['Metabolism', drug.metabolism],
-                ['Excretion', drug.excretion],
-                ['Toxicity', drug.toxicity]
+                ['Absorption', eff.absorption],
+                ['Distribution', eff.distribution],
+                ['Metabolism', eff.metabolism],
+                ['Excretion', eff.excretion],
+                ['Toxicity', eff.toxicity]
             ];
             const hasAnyAdmet = admetFields.some(([, v]) => v && String(v).trim());
             const pkSection = hasAnyAdmet
                 ? { title: '📊 Pharmacokinetics · ADMET', open: false, fields: admetFields }
-                : { title: '📊 Pharmacokinetics', open: false, fields: [['Pharmacokinetics', drug.pharmacokinetics]] };
+                : { title: '📊 Pharmacokinetics', open: false, fields: [['Pharmacokinetics', eff.pharmacokinetics]] };
             const sections = [
                 {
                     title: '🩺 Clinical Use',
                     open: true,
                     fields: [
-                        ['Indication', drug.indication],
-                        ['Dosing', drug.dosing],
-                        ['Contraindication', drug.contraindication],
-                        ['Side Effects', drug.sideEffects],
-                        ['Interactions', drug.interactions]
+                        ['Indication', eff.indication],
+                        ['Dosing', eff.dosing],
+                        ['Contraindication', eff.contraindication],
+                        ['Side Effects', eff.sideEffects],
+                        ['Interactions', eff.interactions]
                     ]
                 },
                 {
                     title: '💊 Mechanism of Action',
                     open: false,
                     fields: [
-                        ['Mechanism', drug.mechanism]
+                        ['Mechanism', eff.mechanism]
                     ]
                 },
                 pkSection,
@@ -10309,15 +10461,15 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     title: '📖 Education',
                     open: true,
                     fields: [
-                        ['Monitoring', drug.monitoring],
-                        ['Patient Counseling · คำแนะนำผู้ป่วย', drug.patientCounseling],
-                        ['Clinical Pearls', drug.pearls]
+                        ['Monitoring', eff.monitoring],
+                        ['Patient Counseling · คำแนะนำผู้ป่วย', eff.patientCounseling],
+                        ['Clinical Pearls', eff.pearls]
                     ]
                 },
                 {
                     title: '🔗 References',
                     open: false,
-                    refs: Array.isArray(drug.references) ? drug.references.filter(Boolean) : []
+                    refs: Array.isArray(eff.references) ? eff.references.filter(Boolean) : []
                 }
             ];
             const html = sections.map(sec => {
@@ -10367,7 +10519,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             // jumps between drugs without closing).
             dcDiscussionTeardown();
             const discussionHtml = `
-                <details class="dc-detail-section" id="dc-discussion-details" data-dc-drug-id="${escapeHtml(drug._id || '')}">
+                <details class="dc-detail-section" id="dc-discussion-details" data-dc-drug-id="${escapeHtml(eff._id || '')}">
                     <summary>💬 Discussion <span id="dc-discussion-count" style="opacity:0.7; font-size:0.85em; margin-left:4px;"></span></summary>
                     <div class="dc-detail-section-body">
                         <div id="dc-discussion-box" class="dc-discussion-box">
@@ -10376,7 +10528,9 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                         <div id="dc-discussion-form-wrap"></div>
                     </div>
                 </details>`;
-            body.innerHTML = (html || '<div class="dc-empty-state" style="padding:20px;">ยานี้ยังไม่มีรายละเอียด · entry may still be in draft.</div>') + discussionHtml;
+            // V94.99: lang bar prefixed to body so the chip rail is always
+            // visible regardless of whether the drug has any text content.
+            body.innerHTML = dcRenderLangBar(eff) + (html || '<div class="dc-empty-state" style="padding:20px;">ยานี้ยังไม่มีรายละเอียด · entry may still be in draft.</div>') + discussionHtml;
             // Wire discussion onSnapshot on first toggle-open (lazy — interns
             // who never expand the section pay zero read cost).
             const detailsEl = document.getElementById('dc-discussion-details');
