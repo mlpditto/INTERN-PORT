@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.51</title>
+    <title>Nika V94.52</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12837,9 +12837,11 @@
                      Chip rail at top swaps the 3 textareas to show one lang at a time.
                      Inline 🌐 button next to each label re-translates that single
                      field from its primary lang (Monitoring=EN, PatientCounseling=TH,
-                     Pearls=TH) to the other 4 langs via qtTranslateText (V93 helper).
-                     AI Auto-Draft + AI fill empty auto-trigger the translate after
-                     filling root fields, so admin sees full 5-lang form by default. -->
+                     Pearls=EN — corrected from TH in V94.52 since AI Auto-Draft
+                     produces English-heavy pearls in practice) to the other 4 langs
+                     via qtTranslateText (V93 helper). AI Auto-Draft + AI fill empty
+                     auto-trigger the translate after filling root fields, so admin
+                     sees full 5-lang form by default. -->
                 <div class="dca-form-section" data-tab="edu">
                     <div class="dca-form-section-header"><span>📖 Education</span><button type="button" class="dca-form-copy-btn" onclick="dcaCopyDrugAsMarkdown('edu', this)" title="Copy this section as Markdown">📋</button></div>
                     <div class="dca-form-section-body">
@@ -12869,7 +12871,7 @@
 
                             <label class="dc-cat-label dc-field-tip dca-edu-field-label" for="dca-f-pearls">
                                 <span>Clinical Pearls</span>
-                                <button type="button" class="dca-i18n-regen-btn" onclick="dcaRegenEduI18n('pearls', this)" title="🌐 Re-translate other 4 langs from TH primary">🌐</button>
+                                <button type="button" class="dca-i18n-regen-btn" onclick="dcaRegenEduI18n('pearls', this)" title="🌐 Re-translate other 4 langs from EN primary">🌐</button>
                             </label>
                             <textarea id="dca-f-pearls" rows="3" placeholder="High-yield tips for intern review…"></textarea>
                         </div>
@@ -28801,12 +28803,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         // V94.50: Education i18n — 3 fields × 5 langs nested object stored at
         // `educationI18n` on each drug_codex doc. Schema is additive: legacy
-        // docs without educationI18n still load via the primary-lang fallback
-        // (Monitoring=EN, PatientCounseling=TH, Pearls=TH per the AI prompt
-        // convention used since V93.99 Auto-Draft launched).
+        // docs without educationI18n still load via the primary-lang fallback.
+        // V94.52: Pearls primary corrected `th` → `en`. The V93.99 AI prompt
+        // says "mix EN+TH ok" for pearls but in practice AI Auto-Draft + AI
+        // fill empty produce English-heavy content (medical drug terminology
+        // is naturally English). Seeding that English content into a `pearls.th`
+        // slot made the TH chip surface English text — looked like a bug to
+        // admin. Treating pearls.en as the canonical source matches actual
+        // content, and translation flows through qtTranslateText (EN→TH/KR/JA/ZH)
+        // produce proper Thai pearls when admin clicks 🌐.
         const DCA_EDU_I18N_FIELDS = ['monitoring', 'patientCounseling', 'pearls'];
         const DCA_EDU_I18N_LANGS = ['th', 'en', 'kr', 'ja', 'zh'];
-        const DCA_EDU_I18N_PRIMARY = { monitoring: 'en', patientCounseling: 'th', pearls: 'th' };
+        const DCA_EDU_I18N_PRIMARY = { monitoring: 'en', patientCounseling: 'th', pearls: 'en' };
 
         // In-memory state for the Edu chip-rail UI. dcaFillForm seeds .data
         // from drug.educationI18n (with primary-lang fallback from root). The
@@ -29440,8 +29448,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     payload[key] = dcaInputToArray(el.value, DCA_ARRAY_FIELDS[key]);
                 } else if (DCA_EDU_I18N_FIELDS.includes(key)) {
                     // Root Edu field stores the PRIMARY-lang value from state
-                    // (Monitoring=EN, PatientCounseling=TH, Pearls=TH) so legacy
-                    // readers + intern fallback keep their expected language.
+                    // (Monitoring=EN, PatientCounseling=TH, Pearls=EN per V94.52)
+                    // so legacy readers + intern fallback keep their expected language.
                     const pLang = DCA_EDU_I18N_PRIMARY[key];
                     const v = (dcaEduI18nState.data[key] && dcaEduI18nState.data[key][pLang]) || '';
                     payload[key] = String(v).trim();
