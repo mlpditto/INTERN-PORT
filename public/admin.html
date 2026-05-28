@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.44</title>
+    <title>Nika V94.45</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12639,6 +12639,11 @@
                     <div style="font-size:0.78em; color:#94a3b8;" id="dca-form-doc-id"></div>
                 </div>
 
+                <!-- V94.45: AI fill provenance line — shown only when the in-memory form
+                     has aiDrafted=true. Mirrors the model name in the pill so admin can
+                     also see it after the toast disappears. Cleared on save / form reopen. -->
+                <div id="dca-form-ai-subtitle" style="display:none; font-size:0.78em; color:#64748b; margin:-4px 0 8px 2px;"></div>
+
                 <!-- V94.35 Phase 5: intern's free-text note to admin (drafts only).
                      Shown only when reviewing a draft that has a non-empty
                      internNotes field. Includes targetDrugId context when present.
@@ -12761,8 +12766,8 @@
                     <div class="dca-form-section-header"><span>🔗 References</span><button type="button" class="dca-form-copy-btn" onclick="dcaCopyDrugAsMarkdown('refs', this)" title="Copy this section as Markdown">📋</button></div>
                     <div class="dca-form-section-body">
                         <div class="dca-form-grid">
-                            <label for="dca-f-references">Citation URLs</label>
-                            <textarea id="dca-f-references" rows="3" placeholder="One URL per line · PubMed / MIMS / UpToDate / Drugs.com"></textarea>
+                            <label for="dca-f-references">References</label>
+                            <textarea id="dca-f-references" rows="3" placeholder="One per line · URLs or source hints (e.g. &quot;PubMed: <search terms>&quot;, &quot;MIMS Thailand&quot;, &quot;UpToDate: <topic>&quot;)"></textarea>
                         </div>
                     </div>
                 </div>
@@ -29066,9 +29071,29 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     el.value = (v == null ? '' : String(v));
                 }
             });
-            // AI-drafted badge
+            // AI-drafted badge + V94.45 model provenance subtitle.
+            // Both surface together; both clear on save (aiDrafted flipped false).
             const aiBadge = document.getElementById('dca-form-ai-badge');
-            if (aiBadge) aiBadge.style.display = data && data.aiDrafted ? 'inline-flex' : 'none';
+            const aiSubtitle = document.getElementById('dca-form-ai-subtitle');
+            const showAiBadge = !!(data && data.aiDrafted);
+            if (aiBadge) {
+                aiBadge.style.display = showAiBadge ? 'inline-flex' : 'none';
+                if (showAiBadge) {
+                    const modelLabel = dcaFormatModelLabel(data && data.aiDraftedModel);
+                    aiBadge.textContent = modelLabel
+                        ? `🤖 AI-drafted by ${modelLabel} · verify before save`
+                        : '🤖 AI-drafted · verify before save';
+                }
+            }
+            if (aiSubtitle) {
+                if (showAiBadge && data && data.aiDraftedModel) {
+                    aiSubtitle.style.display = 'block';
+                    aiSubtitle.textContent = `Last AI fill: ${dcaFormatModelLabel(data.aiDraftedModel)}`;
+                } else {
+                    aiSubtitle.style.display = 'none';
+                    aiSubtitle.textContent = '';
+                }
+            }
             // Doc id strip
             const idEl = document.getElementById('dca-form-doc-id');
             if (idEl) idEl.textContent = (data && data._id) ? `doc: ${data._id}` : '';
@@ -29341,6 +29366,23 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         const DCA_AI_LS_KEY = 'ai_default_drug_codex_model';
         const DCA_AI_FALLBACK_MODEL = 'gemini-2.5-pro';
 
+        // V94.45: friendly labels for AI fill provenance — match the Auto-Draft
+        // chip-rail names so admin sees the same label as the chip they picked.
+        // Used by the pill + the "Last AI fill" subtitle in dcaFillForm.
+        const DCA_AI_MODEL_LABELS = {
+            'gemini-3.5-flash':              'Gemini 3.5 Flash',
+            'gemini-2.5-pro':                'Gemini 2.5 Pro',
+            'gpt-4o':                        'GPT-4o',
+            'claude-4-sonnet-latest':        'Claude Sonnet',
+            'typhoon-v2.5-30b-a3b-instruct': 'Typhoon',
+            'or/xiaomi/mimo-v2.5-pro':       'MiMo-V2.5 Pro',
+            'or/xiaomi/mimo-v2.5':           'MiMo-V2.5'
+        };
+        function dcaFormatModelLabel(rawModel) {
+            if (!rawModel) return '';
+            return DCA_AI_MODEL_LABELS[rawModel] || rawModel;
+        }
+
         function dcaAutoDraftToggle() {
             const row = document.getElementById('dca-ai-input-row');
             if (!row) return;
@@ -29447,7 +29489,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 parsed.genericName = drugName;
 
                 // Sanitise: ensure all schema keys present + arrays are arrays.
-                const draftData = { aiDrafted: true };
+                // V94.45: stamp the in-memory record with the model that drafted
+                // it so the pill + subtitle in dcaFillForm can surface provenance.
+                // Field is in-memory only — payload.aiDrafted=false on save strips it.
+                const draftData = {
+                    aiDrafted: true,
+                    aiDraftedModel: (resp && resp.model) ? resp.model : selectedModel
+                };
                 DCA_FIELD_KEYS.forEach(key => {
                     const v = parsed[key];
                     if (DCA_ARRAY_FIELDS[key]) {
@@ -29524,7 +29572,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 '  "monitoring":      "<<<labs and clinical signs · medical English>>>",',
                 '  "patientCounseling":"<<<Thai counseling points · ภาษาไทยเท่านั้น · 2-5 bullet points>>>",',
                 '  "pearls":          "<<<high-yield clinical pearls · mix EN+TH ok>>>",',
-                '  "references":      []',
+                // V94.45: references now populated as source HINTS (not URLs).
+                '  "references":      ["<<<source hint 1>>>", "<<<source hint 2>>>", "<<<source hint 3>>>"]',
                 '}',
                 '',
                 'LANGUAGE RULE — STRICT:',
@@ -29533,10 +29582,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 '- "pearls" may mix Thai + English where pedagogically useful (e.g. Thai mnemonics with English drug terms).',
                 '- Medical loanwords like "MRI", "GFR", "QT prolongation" stay in English even inside Thai text — do not transliterate them.',
                 '',
-                'REFERENCES RULE:',
-                '- ALWAYS return an EMPTY array for "references".',
-                '- Admin will manually add verified URLs from PubMed / UpToDate / MIMS / Drugs.com.',
-                '- Do NOT invent URLs. Do NOT cite specific papers by URL.',
+                'REFERENCES RULE — SOURCE HINTS ONLY (NOT URLs):',
+                '- Return 3-5 items in the "references" array.',
+                '- Each item names a verifiable source admin can search, e.g. "PubMed: fimasartan hypertension RCT", "MIMS Thailand: fimasartan monograph", "UpToDate: Angiotensin II receptor blockers", "Drugs.com: fimasartan drug page".',
+                '- Do NOT invent http(s) URLs. Do NOT cite specific PMIDs, DOIs, or paper URLs — those are hallucinated too often in medical references.',
+                '- Admin will verify each hint and substitute real links manually before publishing.',
                 '',
                 'CONTENT RULES:',
                 '- If you are uncertain about a field (e.g. ATC code), return an empty string for that field rather than guessing.',
@@ -29548,7 +29598,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 '1. Is the response valid JSON (no markdown fence, no prose outside the braces)?',
                 '2. Is "patientCounseling" written in Thai script?',
                 '3. Are all other prose fields written in English?',
-                '4. Is "references" an empty array (not omitted, not populated)?',
+                '4. Is "references" a 3-5 item array of source HINTS (no http URLs, no PMIDs, no DOIs)?',
                 '5. Are all 15 keys present?',
                 'If any check fails, regenerate before sending.',
                 '',
@@ -29560,9 +29610,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // with the technical fields they didn't fill. Uses intern's data as seed,
         // preserves anything admin has already typed in the form, and reuses Phase 3's
         // saved model chip silently (no UI for model picking in this surface).
-        // genericName + references are NEVER auto-filled: genericName is required
-        // input; references are per Phase 3 design admin-verified manually.
-        const DCA_AI_FILL_SKIP = new Set(['genericName', 'references']);
+        // V94.45: references are now auto-filled as source HINTS (not URLs) — see
+        // DCA_AI_FIELD_GUIDE entry. Admin verifies hints + substitutes real URLs
+        // before saving. genericName stays manual: it's the required prompt anchor.
+        const DCA_AI_FILL_SKIP = new Set(['genericName']);
 
         async function dcaAiFillEmptyFields() {
             const btn = document.getElementById('dca-form-ai-fill-btn');
@@ -29626,6 +29677,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const merged = Object.assign({}, current);
                 merged._id = dcaState.editingId; // restore doc-id strip via dcaFillForm
                 merged.aiDrafted = true;          // surface the badge until first human save
+                // V94.45: stamp the model so the pill + subtitle can name it.
+                merged.aiDraftedModel = (resp && resp.model) ? resp.model : selectedModel;
                 let filledCount = 0;
                 emptyKeys.forEach(key => {
                     const v = parsed[key];
@@ -29678,7 +29731,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             'toxicity':         'overdose effects · organ toxicity · LD50 if known · antidote · medical English · empty string if not well-characterized',
             'monitoring':       'labs and clinical signs · medical English',
             'patientCounseling':'Thai counseling points · ภาษาไทยเท่านั้น · 2-5 bullet points',
-            'pearls':           'high-yield clinical pearls · mix EN+TH ok'
+            'pearls':           'high-yield clinical pearls · mix EN+TH ok',
+            // V94.45: source HINTS only (NOT URLs). AI cannot verify links —
+            // hallucinated PMIDs/DOIs/URLs are a known failure mode for medical
+            // references. Admin substitutes real links before publishing.
+            'references':       'array of source HINTS (NOT URLs) · 3-5 items · each names a verifiable source admin can search, e.g. "PubMed: <search terms>", "MIMS Thailand: <drug> monograph", "UpToDate: <topic>", "Drugs.com: <drug> page" · NO http(s) URLs · NO PMIDs · NO DOIs'
         };
 
         function dcaBuildAiFillPrompt(seedData, emptyFieldKeys) {
