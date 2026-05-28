@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.56</title>
+    <title>Nika V94.57</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13027,6 +13027,11 @@
                     <span>Generating · this can take 10-30s…</span>
                 </div>
                 <img id="dcaPkVisualPreviewImg" class="dca-pk-visual-preview-img" style="display:none;" alt="Generated ADMET visual">
+                <!-- V94.57: diagnostic surface when <img> load fails. Replaces
+                     the previous silent alt-text fallback so admin can see
+                     whether the model returned a refusal / broken URL / bad
+                     base64. Populated by dcaPkVisualShowLoadError. -->
+                <div id="dcaPkVisualErrorBox" style="display:none; width:100%; padding:10px 12px; background:#fff5f5; border:1px solid #fecaca; border-radius:10px; color:#7f1d1d; font-size:0.84em; line-height:1.5; text-align:left;"></div>
             </div>
             <div class="dca-pk-visual-meta" id="dcaPkVisualMeta"></div>
             <div class="dca-pk-visual-actions">
@@ -29648,7 +29653,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const spinner = document.getElementById('dcaPkVisualSpinner');
             const img = document.getElementById('dcaPkVisualPreviewImg');
             const meta = document.getElementById('dcaPkVisualMeta');
+            const errBox = document.getElementById('dcaPkVisualErrorBox');
             if (!placeholder || !spinner || !img) return;
+            if (errBox) errBox.style.display = 'none';
             if (dcaPkVisualState.generating) {
                 placeholder.style.display = 'none';
                 spinner.style.display = 'flex';
@@ -29656,8 +29663,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             } else if (dcaPkVisualState.lastImageDataUrl) {
                 placeholder.style.display = 'none';
                 spinner.style.display = 'none';
-                img.src = dcaPkVisualState.lastImageDataUrl;
                 img.style.display = 'block';
+                // V94.57: attach onerror BEFORE src so a failed load triggers
+                // dcaPkVisualShowLoadError with raw response preview. Without
+                // this, a broken src silently fell back to alt text and admin
+                // had no way to see the actual model response.
+                img.onerror = dcaPkVisualShowLoadError;
+                img.onload = dcaPkVisualHideLoadError;
+                img.src = dcaPkVisualState.lastImageDataUrl;
             } else {
                 placeholder.style.display = 'block';
                 spinner.style.display = 'none';
@@ -29670,6 +29683,49 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     meta.textContent = '';
                 }
             }
+        }
+
+        // V94.57: handlers for <img> load success/failure. On failure, the
+        // diagnostic box surfaces the raw response preview so admin can see
+        // whether the model returned a refusal text, broken URL, or invalid
+        // base64 — three different failure modes that all looked identical
+        // (alt text) in V94.55-V94.56.
+        function dcaPkVisualShowLoadError() {
+            const errBox = document.getElementById('dcaPkVisualErrorBox');
+            const img = document.getElementById('dcaPkVisualPreviewImg');
+            if (!errBox) return;
+            const raw = String(window._dcaPkVisualLastRaw || '');
+            const preview = raw.slice(0, 280);
+            const tail = raw.length > 280 ? '…' : '';
+            const shape = raw.startsWith('data:image/') ? 'dataURL'
+                : /^https?:\/\//i.test(raw) ? 'URL (http/https)'
+                : raw.length > 100 ? 'long string (assumed base64)'
+                : 'short string';
+            errBox.style.display = 'block';
+            errBox.innerHTML = '<strong style="color:#9f1239;">❌ Image failed to load.</strong><br>'
+                + '<span style="color:#64748b;">The model returned something, but the browser couldn\'t render it as an image.</span><br><br>'
+                + '<strong>Detected shape:</strong> ' + shape + ' · ' + raw.length + ' chars<br>'
+                + '<strong>Raw response preview:</strong><br>'
+                + '<pre style="white-space:pre-wrap; word-break:break-all; background:#fff; border:1px solid #fecaca; border-radius:6px; padding:6px 8px; margin:6px 0; font-size:0.8em; max-height:160px; overflow:auto;">' + dcaEscapeHtml(preview) + tail + '</pre>'
+                + '<button type="button" onclick="dcaPkVisualCopyRaw()" style="padding:4px 10px; border-radius:6px; border:1px solid #cbd5e1; background:#fff; cursor:pointer; font-weight:700; font-size:0.82em;">📋 Copy full raw response</button>';
+            if (img) img.style.display = 'none';
+        }
+        function dcaPkVisualHideLoadError() {
+            const errBox = document.getElementById('dcaPkVisualErrorBox');
+            if (errBox) errBox.style.display = 'none';
+        }
+        function dcaPkVisualCopyRaw() {
+            const raw = String(window._dcaPkVisualLastRaw || '');
+            if (!raw) return;
+            navigator.clipboard.writeText(raw).then(() => {
+                if (typeof showToast === 'function') {
+                    showToast('📋 Raw response copied — paste it back to the dev/Claude for diagnosis.');
+                }
+            }, () => {
+                if (typeof showToast === 'function') {
+                    showToast('📋 Clipboard write failed — open DevTools console to see window._dcaPkVisualLastRaw');
+                }
+            });
         }
 
         // Builds the prompt for the chosen style. Drug name + 5 ADMET fields
@@ -29748,13 +29804,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             try {
                 // Mirror the Alabasta Case Card call shape (V92.46/V92.70) —
                 // size hint goes through the proxy's generationOptions field.
+                // V94.57: bumped 1024×1024 → 1792×1024 (max native for GPT-5.4
+                // Image 2 / DALL-E spec). Landscape ratio is better for
+                // infographic + diagram layouts. Nano Banana 2 caps at 1024
+                // and may ignore the hint; Grok behavior unverified.
                 const resp = await window.callUniversalAI(
                     dcaPkVisualState.model,
                     prompt,
                     false,   // isJson
                     null,    // visionData
                     '',      // quickApiKey
-                    { size: '1024x1024' }
+                    { size: '1792x1024' }
                 );
                 const raw = (resp && (resp.text
                     || resp.imageDataUrl
@@ -29762,6 +29822,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     || (resp.raw && (resp.raw.imageDataUrl || resp.raw.dataUrl || resp.raw.text))
                     || (resp.raw && resp.raw.data && resp.raw.data[0] && (resp.raw.data[0].url || resp.raw.data[0].b64_json))
                 )) || '';
+                // V94.57 diagnostic: log the actual shape of resp + raw so admin
+                // can paste the console output when reporting "image doesn't
+                // render". Helps distinguish refusal text vs URL fetch failure
+                // vs malformed base64 — three different root causes that all
+                // surface as the same "<img> alt fallback" symptom.
+                try {
+                    console.log('[drug-codex pk-visual] resp keys:', resp ? Object.keys(resp) : '(no resp)');
+                    console.log('[drug-codex pk-visual] resp.raw keys:', (resp && resp.raw) ? Object.keys(resp.raw) : '(no raw)');
+                    const rawPreview = String(raw).slice(0, 300);
+                    console.log('[drug-codex pk-visual] raw length:', String(raw).length, '· first 300 chars:', rawPreview);
+                    // Stash on window for inspection / copy from devtools
+                    window._dcaPkVisualLastResp = resp;
+                    window._dcaPkVisualLastRaw = raw;
+                } catch (_) { /* logging is best-effort */ }
                 // V94.56: OpenRouter image models (GPT-5.4 Image 2 at minimum,
                 // possibly others) return a plain `https://...` URL string —
                 // wrapping that in `data:image/png;base64,` corrupts the src
