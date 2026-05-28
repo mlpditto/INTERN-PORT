@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.53</title>
+    <title>Nika V94.54</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -28828,7 +28828,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (typeof Translator !== 'undefined' && 'create' in Translator) {
                 try {
                     const t = await Translator.create({ sourceLanguage: sourceLang, targetLanguage: targetLang });
-                    return { text: await t.translate(text), source: 'device' };
+                    const translated = await t.translate(text);
+                    // V94.54: validate Tier A returned non-empty before accepting.
+                    // Chrome on-device Translator API can resolve with an empty
+                    // string for unsupported language pairs (or transient
+                    // pipeline glitches) instead of throwing — accepting that
+                    // empty string as "success" left state.<field>.<lang>
+                    // permanently blank in dcaTranslateEducationI18n. Fall
+                    // through to Tier B Typhoon when Tier A is empty.
+                    if (translated && translated.trim()) {
+                        return { text: translated, source: 'device' };
+                    }
                 } catch (e) { /* fall through to Tier B */ }
             }
             // Tier B: Typhoon via callAIProxy.
