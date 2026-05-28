@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.50</title>
+    <title>Nika V94.51</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1487,6 +1487,21 @@
             background: #e0e7ff; border-color: #a5b4fc;
         }
         .dca-i18n-regen-btn:disabled { opacity: 0.55; cursor: wait; }
+        /* V94.51 Phase 2: section-wide bulk re-translate button at the right
+           end of the chip rail. Filled-indigo style differentiates it from
+           the per-field 🌐 (outlined) — clearly a "do all" action vs scoped. */
+        .dca-edu-regen-all-btn {
+            margin-left: auto;
+            padding: 3px 12px; border-radius: 999px;
+            background: #4f46e5; color: #fff;
+            border: 1px solid #4338ca;
+            cursor: pointer; font-weight: 700; font-size: 0.85em;
+            transition: background 0.15s ease;
+        }
+        .dca-edu-regen-all-btn:hover:not(:disabled) {
+            background: #4338ca; border-color: #3730a3;
+        }
+        .dca-edu-regen-all-btn:disabled { opacity: 0.55; cursor: wait; }
         /* Draft view */
         .dca-draft-row {
             background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
@@ -12835,6 +12850,9 @@
                             <button type="button" class="dca-edu-lang-chip" data-lang="kr" onclick="dcaSelectEduLang('kr')">🇰🇷 KR</button>
                             <button type="button" class="dca-edu-lang-chip" data-lang="ja" onclick="dcaSelectEduLang('ja')">🇯🇵 JA</button>
                             <button type="button" class="dca-edu-lang-chip" data-lang="zh" onclick="dcaSelectEduLang('zh')">🇨🇳 ZH</button>
+                            <!-- V94.51 Phase 2: section-wide bulk re-translate. Re-fills all 3
+                                 Edu fields' non-primary langs from their primary in one click. -->
+                            <button type="button" class="dca-edu-regen-all-btn" onclick="dcaRegenAllEduI18n(this)" title="Re-translate all 3 Edu fields × 4 non-primary langs from primary">🌐 All langs</button>
                         </div>
                         <div class="dca-form-grid">
                             <label class="dc-cat-label dc-field-safe dca-edu-field-label" for="dca-f-monitoring">
@@ -29315,6 +29333,25 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
             } finally {
                 if (btn) { btn.disabled = false; btn.textContent = '🌐'; }
+            }
+        }
+
+        // V94.51 Phase 2: section-wide bulk button at the right end of the chip
+        // rail. Runs the translate across all 3 Edu fields in one click — admin
+        // doesn't have to click 🌐 per field when re-filling everything after
+        // editing primary langs. Reuses dcaTranslateEducationI18n with default
+        // (all 3 fields). Shows toast since admin explicitly invoked it.
+        async function dcaRegenAllEduI18n(btn) {
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ Translating…'; }
+            try {
+                await dcaTranslateEducationI18n({ silent: false });
+            } catch (err) {
+                console.error('[drug-codex i18n] bulk regen:', err);
+                if (typeof showToast === 'function') {
+                    showToast(`🌐 Bulk re-translate failed: ${err && err.message ? err.message : 'unknown error'}`);
+                }
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = '🌐 All langs'; }
             }
         }
 
