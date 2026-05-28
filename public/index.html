@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.03)</title>
+    <title>Internship Portfolio (V95.04)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -10143,7 +10143,12 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             device:  '⚙️ device',
             typhoon: '☁️ AI',
             failed:  '⚠️ partial',
-            noop:    '✓ source'
+            noop:    '✓ source',
+            // V95.04: admin-provided i18n (educationI18n) used at least once
+            // in the bundle. Only wins the bundle badge when no field needed
+            // any runtime translation (otherwise typhoon/device/failed dominate
+            // because those still require verification).
+            manual:  '✏️ admin'
         };
         // V95.03 Phase 3: epistemic color cue for the source badge.
         //   emerald = canonical original          (trust as-is)
@@ -10151,13 +10156,15 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
         //   indigo  = on-device Translator API    (Chrome stack)
         //   amber   = AI translated via Typhoon   (verify before clinical use)
         //   rose    = something failed            (partial/incomplete)
+        //   violet  = admin-provided i18n         (verified at source)  [V95.04]
         // Pending state stays neutral slate — no info yet, just waiting.
         const DC_SOURCE_COLORS = {
             cached:  { c: '#075985', bg: '#bae6fd' },
             device:  { c: '#3730a3', bg: '#c7d2fe' },
             typhoon: { c: '#92400e', bg: '#fde68a' },
             failed:  { c: '#9f1239', bg: '#fecaca' },
-            noop:    { c: '#065f46', bg: '#a7f3d0' }
+            noop:    { c: '#065f46', bg: '#a7f3d0' },
+            manual:  { c: '#5b21b6', bg: '#ddd6fe' }
         };
         const dcLangState = {
             selectedLang: (function () {
@@ -10190,22 +10197,37 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
 
         async function dcTranslateDrug(drug, lang) {
             if (!drug || lang === 'orig') return null;
+            // V95.04: admin-provided educationI18n takes precedence over the
+            // runtime translation path. Admin verified the text directly, so
+            // we skip qtTranslateText for any (field, lang) pair that has an
+            // explicit value in drug.educationI18n. Other fields still flow
+            // through Tier A device → Tier B Typhoon as before.
+            const i18n = (drug.educationI18n && typeof drug.educationI18n === 'object') ? drug.educationI18n : {};
             const results = await Promise.all(
-                DC_TRANSLATABLE_FIELDS.map(key =>
-                    qtTranslateText(drug[key] || '', lang)
-                        .catch(() => ({ text: drug[key] || '', source: 'failed' }))
-                )
+                DC_TRANSLATABLE_FIELDS.map(key => {
+                    const adminText = i18n[key] && typeof i18n[key] === 'object' ? i18n[key][lang] : null;
+                    if (typeof adminText === 'string' && adminText.trim()) {
+                        return Promise.resolve({ text: adminText, source: 'manual' });
+                    }
+                    return qtTranslateText(drug[key] || '', lang)
+                        .catch(() => ({ text: drug[key] || '', source: 'failed' }));
+                })
             );
             const fields = {};
             let bundleSource = 'noop';
             DC_TRANSLATABLE_FIELDS.forEach((key, i) => {
                 fields[key] = results[i].text;
                 // Promote the strongest source so the badge reflects whether
-                // any field actually went over the wire.
+                // any field actually went over the wire. V95.04 priority:
+                //   typhoon > device > failed > manual > noop
+                // 'manual' only wins when no other field needed translation —
+                // any device/typhoon/failed field still gates the bundle on
+                // verification because admin's i18n only covered Edu fields.
                 const s = results[i].source;
                 if (s === 'typhoon') bundleSource = 'typhoon';
                 else if (s === 'device' && bundleSource !== 'typhoon') bundleSource = 'device';
-                else if (s === 'failed' && bundleSource === 'noop') bundleSource = 'failed';
+                else if (s === 'failed' && bundleSource !== 'typhoon' && bundleSource !== 'device') bundleSource = 'failed';
+                else if (s === 'manual' && bundleSource === 'noop') bundleSource = 'manual';
             });
             const bundle = { fields, source: bundleSource, ts: Date.now() };
             dcSetCached(drug._id, lang, bundle);

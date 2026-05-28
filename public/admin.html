@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.49</title>
+    <title>Nika V94.50</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1447,6 +1447,46 @@
         .dca-contrib-admin { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; }
         .dca-contrib-intern { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
         .dca-contrib-unknown { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+        /* V94.50: Edu section i18n — 5-lang chip rail above the 3 textareas
+           plus inline 🌐 regen buttons next to each field label.
+           Chip rail mirrors the intern detail-modal lang chips (5 langs in
+           same order: TH/EN/KR/JA/ZH). Active chip = indigo to match the
+           admin-role color tier. */
+        .dca-edu-lang-rail {
+            display: flex; gap: 6px; flex-wrap: wrap;
+            padding: 8px 10px; margin: 0 0 10px 0;
+            background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 10px;
+            font-size: 0.78em;
+        }
+        .dca-edu-lang-rail-label {
+            color: #4338ca; font-weight: 800; align-self: center;
+            text-transform: uppercase; letter-spacing: 0.4px; margin-right: 4px;
+        }
+        .dca-edu-lang-chip {
+            padding: 3px 10px; border-radius: 999px;
+            border: 1px solid #c7d2fe; background: #fff; color: #4338ca;
+            cursor: pointer; font-weight: 700; font-size: 0.92em;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        .dca-edu-lang-chip:hover { background: #e0e7ff; }
+        .dca-edu-lang-chip.active {
+            background: #4f46e5; color: #fff; border-color: #4f46e5;
+        }
+        /* Inline 🌐 Re-generate button next to each Edu field label.
+           Pairs with the new label-flex layout (.dca-edu-field-label). */
+        .dca-edu-field-label {
+            display: flex; align-items: center; gap: 6px;
+        }
+        .dca-i18n-regen-btn {
+            padding: 1px 7px; border-radius: 6px;
+            background: #eef2ff; color: #4f46e5;
+            border: 1px solid #c7d2fe; cursor: pointer;
+            font-size: 0.85em; line-height: 1;
+        }
+        .dca-i18n-regen-btn:hover:not(:disabled) {
+            background: #e0e7ff; border-color: #a5b4fc;
+        }
+        .dca-i18n-regen-btn:disabled { opacity: 0.55; cursor: wait; }
         /* Draft view */
         .dca-draft-row {
             background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
@@ -12778,17 +12818,41 @@
                 </div>
 
                 <!-- Section 4: Education -->
+                <!-- V94.50: 5-lang i18n via educationI18n nested field.
+                     Chip rail at top swaps the 3 textareas to show one lang at a time.
+                     Inline 🌐 button next to each label re-translates that single
+                     field from its primary lang (Monitoring=EN, PatientCounseling=TH,
+                     Pearls=TH) to the other 4 langs via qtTranslateText (V93 helper).
+                     AI Auto-Draft + AI fill empty auto-trigger the translate after
+                     filling root fields, so admin sees full 5-lang form by default. -->
                 <div class="dca-form-section" data-tab="edu">
                     <div class="dca-form-section-header"><span>📖 Education</span><button type="button" class="dca-form-copy-btn" onclick="dcaCopyDrugAsMarkdown('edu', this)" title="Copy this section as Markdown">📋</button></div>
                     <div class="dca-form-section-body">
+                        <div class="dca-edu-lang-rail">
+                            <span class="dca-edu-lang-rail-label lang-no-toggle">Lang</span>
+                            <button type="button" class="dca-edu-lang-chip" data-lang="th" onclick="dcaSelectEduLang('th')">🇹🇭 TH</button>
+                            <button type="button" class="dca-edu-lang-chip active" data-lang="en" onclick="dcaSelectEduLang('en')">🇬🇧 EN</button>
+                            <button type="button" class="dca-edu-lang-chip" data-lang="kr" onclick="dcaSelectEduLang('kr')">🇰🇷 KR</button>
+                            <button type="button" class="dca-edu-lang-chip" data-lang="ja" onclick="dcaSelectEduLang('ja')">🇯🇵 JA</button>
+                            <button type="button" class="dca-edu-lang-chip" data-lang="zh" onclick="dcaSelectEduLang('zh')">🇨🇳 ZH</button>
+                        </div>
                         <div class="dca-form-grid">
-                            <label class="dc-cat-label dc-field-safe" for="dca-f-monitoring">Monitoring</label>
+                            <label class="dc-cat-label dc-field-safe dca-edu-field-label" for="dca-f-monitoring">
+                                <span>Monitoring</span>
+                                <button type="button" class="dca-i18n-regen-btn" onclick="dcaRegenEduI18n('monitoring', this)" title="🌐 Re-translate other 4 langs from EN primary">🌐</button>
+                            </label>
                             <textarea id="dca-f-monitoring" rows="2" placeholder="Labs / clinical signs to watch…"></textarea>
 
-                            <label class="dc-cat-label dc-field-empathy" for="dca-f-patientCounseling">Patient Counseling</label>
+                            <label class="dc-cat-label dc-field-empathy dca-edu-field-label" for="dca-f-patientCounseling">
+                                <span>Patient Counseling</span>
+                                <button type="button" class="dca-i18n-regen-btn" onclick="dcaRegenEduI18n('patientCounseling', this)" title="🌐 Re-translate other 4 langs from TH primary">🌐</button>
+                            </label>
                             <textarea id="dca-f-patientCounseling" rows="3" placeholder="Thai-friendly counseling points…"></textarea>
 
-                            <label class="dc-cat-label dc-field-tip" for="dca-f-pearls">Clinical Pearls</label>
+                            <label class="dc-cat-label dc-field-tip dca-edu-field-label" for="dca-f-pearls">
+                                <span>Clinical Pearls</span>
+                                <button type="button" class="dca-i18n-regen-btn" onclick="dcaRegenEduI18n('pearls', this)" title="🌐 Re-translate other 4 langs from TH primary">🌐</button>
+                            </label>
                             <textarea id="dca-f-pearls" rows="3" placeholder="High-yield tips for intern review…"></textarea>
                         </div>
                     </div>
@@ -28717,6 +28781,26 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // comma-separated (brandNames) or newline-separated (references).
         const DCA_ARRAY_FIELDS = { brandNames: 'csv', references: 'lines' };
 
+        // V94.50: Education i18n — 3 fields × 5 langs nested object stored at
+        // `educationI18n` on each drug_codex doc. Schema is additive: legacy
+        // docs without educationI18n still load via the primary-lang fallback
+        // (Monitoring=EN, PatientCounseling=TH, Pearls=TH per the AI prompt
+        // convention used since V93.99 Auto-Draft launched).
+        const DCA_EDU_I18N_FIELDS = ['monitoring', 'patientCounseling', 'pearls'];
+        const DCA_EDU_I18N_LANGS = ['th', 'en', 'kr', 'ja', 'zh'];
+        const DCA_EDU_I18N_PRIMARY = { monitoring: 'en', patientCounseling: 'th', pearls: 'th' };
+
+        // In-memory state for the Edu chip-rail UI. dcaFillForm seeds .data
+        // from drug.educationI18n (with primary-lang fallback from root). The
+        // chip-click handler persists the visible textareas to .data before
+        // switching, so unsaved edits survive lang switching. dcaCollectForm
+        // does a final persist then writes .data → payload.educationI18n on
+        // save. Defaults to EN per user choice (V94.50 design).
+        const dcaEduI18nState = {
+            currentLang: 'en',
+            data: {}
+        };
+
         // V94.38: Tab navigation — section key → fields list. `required` flags fields
         // that must be non-empty for the section to clear the error badge state.
         const DCA_SECTION_DEFS = [
@@ -29126,14 +29210,144 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return raw.split(sep).map(s => s.trim()).filter(Boolean);
         }
 
+        // ===================================================================
+        // V94.50 Edu i18n helpers
+        // ===================================================================
+
+        // Snapshot the 3 visible Edu textareas into dcaEduI18nState.data for
+        // the currently selected lang. Called before any lang switch + before
+        // save, so admin edits never get lost when chip-rail changes language.
+        function dcaPersistCurrentEduLang() {
+            const lang = dcaEduI18nState.currentLang;
+            DCA_EDU_I18N_FIELDS.forEach(field => {
+                const el = document.getElementById('dca-f-' + field);
+                if (!el) return;
+                if (!dcaEduI18nState.data[field]) dcaEduI18nState.data[field] = {};
+                dcaEduI18nState.data[field][lang] = String(el.value || '').trim();
+            });
+        }
+
+        // Chip-rail click handler. Persists what's visible, swaps state to
+        // the requested lang, repaints the 3 textareas from state.
+        function dcaSelectEduLang(lang) {
+            if (!DCA_EDU_I18N_LANGS.includes(lang)) return;
+            dcaPersistCurrentEduLang();
+            dcaEduI18nState.currentLang = lang;
+            DCA_EDU_I18N_FIELDS.forEach(field => {
+                const el = document.getElementById('dca-f-' + field);
+                if (!el) return;
+                const langData = dcaEduI18nState.data[field] || {};
+                el.value = langData[lang] || '';
+            });
+            document.querySelectorAll('.dca-edu-lang-chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.lang === lang);
+            });
+            // V94.38 tab badges depend on the 3 root Edu textareas being
+            // populated — refresh so an empty-current-lang doesn't flip the
+            // Edu badge red while another lang in state still has content.
+            if (typeof dcaUpdateSectionBadges === 'function') dcaUpdateSectionBadges();
+        }
+
+        // Translate primary-lang text → other 4 langs via qtTranslateText.
+        // opts.fields: subset of DCA_EDU_I18N_FIELDS (default = all 3).
+        // opts.silent: skip the toast (used by Auto-Draft auto-trigger).
+        // Failures per (field, lang) are independent — partial success OK;
+        // failed langs keep whatever was previously in state (often empty).
+        async function dcaTranslateEducationI18n(opts) {
+            opts = opts || {};
+            const fields = Array.isArray(opts.fields) && opts.fields.length
+                ? opts.fields.filter(f => DCA_EDU_I18N_FIELDS.includes(f))
+                : DCA_EDU_I18N_FIELDS.slice();
+            if (typeof window.qtTranslateText !== 'function') {
+                if (!opts.silent && typeof showToast === 'function') {
+                    showToast('🌐 Translator helper not loaded — refresh and retry.');
+                }
+                return { succeeded: 0, failed: 0, skipped: fields.length * 4 };
+            }
+            // Snapshot textareas so the source text reflects what admin sees.
+            dcaPersistCurrentEduLang();
+            const tasks = [];
+            fields.forEach(field => {
+                const sourceLang = DCA_EDU_I18N_PRIMARY[field];
+                const sourceText = (dcaEduI18nState.data[field] && dcaEduI18nState.data[field][sourceLang]) || '';
+                if (!sourceText) return; // Nothing to translate — skip silently.
+                DCA_EDU_I18N_LANGS.forEach(lang => {
+                    if (lang === sourceLang) return;
+                    tasks.push(
+                        window.qtTranslateText(sourceText, lang)
+                            .then(result => ({ field, lang, text: (result && result.text) || '', ok: true }))
+                            .catch(err => ({ field, lang, text: '', ok: false, err: err && err.message }))
+                    );
+                });
+            });
+            if (tasks.length === 0) {
+                if (!opts.silent && typeof showToast === 'function') {
+                    showToast('🌐 Nothing to translate — primary-lang fields are empty.');
+                }
+                return { succeeded: 0, failed: 0, skipped: 0 };
+            }
+            const results = await Promise.all(tasks);
+            let succeeded = 0, failed = 0;
+            results.forEach(r => {
+                if (!r.ok || !r.text) { failed++; return; }
+                if (!dcaEduI18nState.data[r.field]) dcaEduI18nState.data[r.field] = {};
+                dcaEduI18nState.data[r.field][r.lang] = r.text;
+                succeeded++;
+            });
+            // Repaint textareas in case the current chip was a non-primary lang.
+            dcaSelectEduLang(dcaEduI18nState.currentLang);
+            if (!opts.silent && typeof showToast === 'function') {
+                showToast(`🌐 Edu i18n: ${succeeded} translated${failed ? ` · ${failed} failed (kept previous)` : ''}`);
+            }
+            return { succeeded, failed, skipped: 0 };
+        }
+
+        // Per-field 🌐 button onclick. Toggles button to spinner, runs the
+        // translate scoped to one field, restores button state.
+        async function dcaRegenEduI18n(field, btn) {
+            if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+            try {
+                await dcaTranslateEducationI18n({ fields: [field], silent: false });
+            } catch (err) {
+                console.error('[drug-codex i18n]', field, err);
+                if (typeof showToast === 'function') {
+                    showToast(`🌐 Re-translate failed: ${err && err.message ? err.message : 'unknown error'}`);
+                }
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = '🌐'; }
+            }
+        }
+
         function dcaFillForm(data) {
             // data may be from drug_codex, drug_codex_drafts, or {} for Add.
+            // V94.50: rebuild Edu i18n state BEFORE the textarea loop so the
+            // Edu fields read from state (per current chip lang) instead of
+            // the root field. Legacy docs without educationI18n get seeded
+            // from root into the primary-lang slot so the EN chip still
+            // shows Monitoring content on open.
+            dcaEduI18nState.data = JSON.parse(JSON.stringify((data && data.educationI18n) || {}));
+            dcaEduI18nState.currentLang = 'en';
+            DCA_EDU_I18N_FIELDS.forEach(field => {
+                if (!dcaEduI18nState.data[field]) dcaEduI18nState.data[field] = {};
+                const pLang = DCA_EDU_I18N_PRIMARY[field];
+                if (!dcaEduI18nState.data[field][pLang] && data && data[field]) {
+                    dcaEduI18nState.data[field][pLang] = String(data[field]);
+                }
+            });
+            // Sync chip-rail active state with the (reset) currentLang.
+            document.querySelectorAll('.dca-edu-lang-chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.lang === dcaEduI18nState.currentLang);
+            });
             DCA_FIELD_KEYS.forEach(key => {
                 const el = document.getElementById('dca-f-' + key);
                 if (!el) return;
                 const v = data ? data[key] : undefined;
                 if (DCA_ARRAY_FIELDS[key]) {
                     el.value = dcaArrayToInput(v, DCA_ARRAY_FIELDS[key]);
+                } else if (DCA_EDU_I18N_FIELDS.includes(key)) {
+                    // V94.50: render the current chip's lang value from state.
+                    const langData = dcaEduI18nState.data[key] || {};
+                    el.value = langData[dcaEduI18nState.currentLang] || '';
                 } else {
                     el.value = (v == null ? '' : String(v));
                 }
@@ -29176,16 +29390,32 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         function dcaCollectForm() {
+            // V94.50: persist whatever Edu lang the admin is viewing into state
+            // BEFORE building payload, so root Edu fields end up populated from
+            // the primary-lang slot (not the textarea, which may be on a
+            // non-primary chip and overwrite root with a translation).
+            dcaPersistCurrentEduLang();
             const payload = {};
             DCA_FIELD_KEYS.forEach(key => {
                 const el = document.getElementById('dca-f-' + key);
                 if (!el) return;
                 if (DCA_ARRAY_FIELDS[key]) {
                     payload[key] = dcaInputToArray(el.value, DCA_ARRAY_FIELDS[key]);
+                } else if (DCA_EDU_I18N_FIELDS.includes(key)) {
+                    // Root Edu field stores the PRIMARY-lang value from state
+                    // (Monitoring=EN, PatientCounseling=TH, Pearls=TH) so legacy
+                    // readers + intern fallback keep their expected language.
+                    const pLang = DCA_EDU_I18N_PRIMARY[key];
+                    const v = (dcaEduI18nState.data[key] && dcaEduI18nState.data[key][pLang]) || '';
+                    payload[key] = String(v).trim();
                 } else {
                     payload[key] = String(el.value || '').trim();
                 }
             });
+            // V94.50: full 5-lang bundle on the doc. Deep-clone to detach
+            // from the in-memory state so post-collect edits don't mutate
+            // the payload that's about to be written.
+            payload.educationI18n = JSON.parse(JSON.stringify(dcaEduI18nState.data || {}));
             return payload;
         }
 
@@ -29730,6 +29960,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const modelLabel = (resp && resp.model) ? resp.model : selectedModel;
                     showToast(`🤖 Drafted "${drugName}" with ${modelLabel}. Verify all fields before saving.`);
                 }
+                // V94.50: auto-translate Edu primary-lang fields → other 4 langs.
+                // Silent (no toast) — admin already got the draft toast above.
+                // Fire-and-forget; failures are independent per (field,lang) and
+                // recoverable via the inline 🌐 button later.
+                dcaTranslateEducationI18n({ silent: true }).catch(err => {
+                    console.warn('[drug-codex] Auto-draft Edu i18n translate failed:', err && err.message);
+                });
             } catch (err) {
                 console.error('[drug-codex] auto-draft failed:', err);
                 if (errEl) {
@@ -29893,6 +30130,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // V94.45: stamp the model so the pill + subtitle can name it.
                 merged.aiDraftedModel = (resp && resp.model) ? resp.model : selectedModel;
                 let filledCount = 0;
+                // V94.50: track which Edu fields got new content so we only
+                // re-translate those — admin's existing i18n for already-filled
+                // fields is preserved.
+                const eduFieldsFilled = [];
                 emptyKeys.forEach(key => {
                     const v = parsed[key];
                     if (DCA_ARRAY_FIELDS[key]) {
@@ -29902,7 +30143,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         }
                     } else {
                         const s = v == null ? '' : String(v).trim();
-                        if (s) { merged[key] = s; filledCount++; }
+                        if (s) {
+                            merged[key] = s;
+                            filledCount++;
+                            if (DCA_EDU_I18N_FIELDS.includes(key)) eduFieldsFilled.push(key);
+                        }
                     }
                 });
 
@@ -29913,6 +30158,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const skipped = emptyKeys.length - filledCount;
                     const skipNote = skipped > 0 ? ` · ${skipped} left empty by model (uncertain)` : '';
                     showToast(`🤖 Filled ${filledCount}/${emptyKeys.length} field${emptyKeys.length === 1 ? '' : 's'} with ${modelLabel}${skipNote}. Verify before save.`);
+                }
+                // V94.50: auto-translate any Edu fields that AI just populated.
+                // Scoped to eduFieldsFilled so other-lang content already
+                // entered by admin is preserved.
+                if (eduFieldsFilled.length > 0) {
+                    dcaTranslateEducationI18n({ fields: eduFieldsFilled, silent: true }).catch(err => {
+                        console.warn('[drug-codex] AI-fill Edu i18n translate failed:', err && err.message);
+                    });
                 }
             } catch (err) {
                 console.error('[drug-codex] AI fill failed:', err);
