@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.43</title>
+    <title>Nika V94.44</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -29113,7 +29113,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const modeLabel = document.getElementById('dca-form-mode-label');
             if (modeLabel) modeLabel.textContent = 'Edit · ' + (drug.genericName || drugId);
             dcaHideInternNotesBanner();
-            dcaHideAiFillButton();
+            // V94.44: AI fill is now also offered when editing a published drug —
+            // admin commonly opens an entry to top up missing ADMET or pharmacology
+            // details; same prompt + skip list as draft review (genericName +
+            // references stay manual). Always visible here (user choice (i)); the
+            // fill handler itself toasts "nothing to add" if no fields are blank.
+            dcaShowAiFillButton();
             dcaFillForm(drug);
             dcaSwitchSection('core');
             dcaSwitchView('form');
@@ -29166,7 +29171,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         // V93.99 Phase 5.1: AI fill empty fields button toggle.
-        // Visible only in Review-draft form mode (isDraftEdit === true).
+        // V94.44: scope extended — also shown when editing a published drug
+        // (dcaEdit), not just Review-draft. Add New keeps Hide because Auto-
+        // Draft on the toolbar already covers the blank-form case.
         // Hide also resets disabled/text — defense vs static-modal state leak
         // (feedback_static_modal_state_leak).
         function dcaShowAiFillButton() {
@@ -29710,7 +29717,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
             const requestedKeys = emptyFieldKeys.map(k => '  "' + k + '"').join(',\n');
             const lines = [
-                'ROLE: clinical pharmacology reference compiler. An intern submitted a partial drug monograph; you augment it by filling ONLY the technical fields they left empty. Output is for an internal medical-intern study tool (Thailand).',
+                // V94.44: ROLE / seed labels neutralized so the same prompt works
+                // for both contexts — admin editing a published drug AND admin
+                // reviewing an intern draft. Behavior identical; wording just
+                // doesn't lie about the data source on the published-edit path.
+                'ROLE: clinical pharmacology reference compiler. A partial drug monograph has some fields blank; you augment it by filling ONLY the blank fields. Output is for an internal medical-intern study tool (Thailand).',
                 '',
                 'FORMAT CONTRACT — RESPOND WITH PURE JSON ONLY.',
                 'NO MARKDOWN. NO PROSE OUTSIDE JSON. NO ```json``` FENCE.',
@@ -29719,7 +29730,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 requestedKeys,
                 '}',
                 '',
-                'INTERN-SUPPLIED SEED (already verified — DO NOT echo these keys back, DO NOT contradict them):',
+                'SUPPLIED SEED (already verified — DO NOT echo these keys back, DO NOT contradict them):',
                 '```',
                 JSON.stringify(seedJson, null, 2),
                 '```'
@@ -29752,7 +29763,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             lines.push('CONTENT RULES:');
             lines.push('- If uncertain about a specific field (e.g. ATC code), return an empty string for that field rather than guessing.');
             lines.push('- Keep each text field under 600 characters. Use \\n for line breaks. Use "- " prefix for bullet items.');
-            lines.push('- Do NOT contradict the intern-supplied seed. Your fills must be internally consistent with the seed (indication, dosing, class, etc).');
+            lines.push('- Do NOT contradict the supplied seed. Your fills must be internally consistent with the seed (indication, dosing, class, etc).');
             lines.push('- Do NOT include disclaimers like "consult a physician" in JSON values — the platform handles that.');
             lines.push('- Do NOT include any seed key in your response — admin already has those values.');
 
@@ -29762,7 +29773,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             lines.push('2. Does the response contain ONLY these keys: ' + emptyFieldKeys.map(k => '"' + k + '"').join(', ') + '?');
             lines.push('3. Is "patientCounseling" written in Thai script (if among the requested keys)?');
             lines.push('4. Are all other prose fields written in English?');
-            lines.push("5. Are your fills consistent with the intern's seed data above?");
+            lines.push('5. Are your fills consistent with the supplied seed data above?');
             lines.push('If any check fails, regenerate before sending.');
 
             return lines.join('\n');
