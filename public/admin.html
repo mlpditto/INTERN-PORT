@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.80</title>
+    <title>Nika V94.81</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -30718,10 +30718,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 d = ts.toDate ? ts.toDate() : (ts instanceof Date ? ts : new Date(ts));
             } catch (_) { return ''; }
             if (!d || isNaN(d.getTime())) return '';
-            return d.toLocaleString('th-TH', {
-                day: 'numeric', month: 'short', year: 'numeric',
-                hour: '2-digit', minute: '2-digit'
-            });
+            // V94.81: dd/mm/yyyy (พ.ศ.) + 24h, ASCII-only — replaces the th-TH
+            // month:'short' form whose Thai abbreviation glyphs dropped out in the
+            // list row (rendered as ". 2569 18:23", day+month gone). Numeric slashes
+            // render everywhere; 24-hour clock preserved per the prior form.
+            const pad = n => String(n).padStart(2, '0');
+            const dd = pad(d.getDate());
+            const mm = pad(d.getMonth() + 1);
+            const yyyy = d.getFullYear() + 543;
+            return `${dd}/${mm}/${yyyy} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
         }
 
         // V94.46: render a single contributor entry as a role-coded pill.
