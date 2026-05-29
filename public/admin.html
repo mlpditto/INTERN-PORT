@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.77</title>
+    <title>Nika V94.78</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1439,10 +1439,17 @@
         .dca-ndi-btn:hover:not(:disabled) { background:#e0f2fe; }
         .dca-ndi-btn:disabled { opacity:.55; cursor:default; }
         .dca-ndi-results { margin-top:7px; }
-        .dca-ndi-results-head {
-            display:flex; align-items:center; justify-content:space-between;
-            gap:8px; margin-bottom:5px; flex-wrap:wrap;
+        /* V94.78: box the results so they don't bleed into the form. */
+        .dca-ndi-results.panel {
+            border:1px solid #e2e8f0; background:#f8fafc; border-radius:10px; padding:9px 11px;
         }
+        .dca-ndi-results-head {
+            display:flex; align-items:center; justify-content:space-between; gap:8px;
+        }
+        .dca-ndi-results.panel .dca-ndi-results-head {
+            border-bottom:1px solid #e2e8f0; padding-bottom:7px; margin-bottom:8px;
+        }
+        .dca-ndi-results-head .dca-ndi-hint { flex:1; min-width:0; margin:0; }
         .dca-ndi-head-actions { display:flex; gap:6px; flex-shrink:0; }
         .dca-ndi-action-btn {
             padding:3px 9px; border-radius:12px; font-size:0.72em; font-weight:700;
@@ -1461,6 +1468,10 @@
         }
         .dca-ndi-chip:hover { background:#dbeafe; }
         .dca-ndi-chip.added { background:#dcfce7; border-color:#86efac; color:#166534; cursor:default; }
+        /* V94.78: added brands grouped below the addable ones + faded so the
+           still-addable (+) chips stand out. */
+        .dca-ndi-chips-added { margin-top:4px; }
+        .dca-ndi-chips-added .dca-ndi-chip { opacity:.65; }
         .dca-ndi-err { font-size:0.78em; color:#dc2626; }
         /* V94.42 Phase 1: Clinical Risk Color Coding — palette shared with
            intern detail modal (public/index.html). Admin form labels are
@@ -30259,7 +30270,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // previous drug don't linger when a new form opens (static DOM —
             // see feedback_static_modal_state_leak).
             const ndiRes = document.getElementById('dca-ndi-results');
-            if (ndiRes) { ndiRes.style.display = 'none'; ndiRes.innerHTML = ''; }
+            if (ndiRes) { ndiRes.style.display = 'none'; ndiRes.innerHTML = ''; ndiRes.classList.remove('panel'); }
+            dcaNdiLast = null;
             // V94.75: sync the lookup button enabled-state to the (possibly empty)
             // Generic Name once the form is populated. Deferred so the field is set.
             setTimeout(dcaNdiSyncBtnState, 0);
@@ -30828,55 +30840,64 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return set;
         }
 
-        // V94.75 (A): render chips with already-added ones pre-marked ✓, plus a
-        // head row with ➕ เพิ่มทั้งหมด (bulk add) and ✕ (dismiss results).
+        // V94.78: last rendered lookup, so add/add-all can re-render to keep the
+        // available-first ordering (newly-added chips drop to the faded group).
+        let dcaNdiLast = null;
+
+        // V94.78 (Panel + available-first): results render in a contained panel.
+        // Addable (+) chips show first; already-added (✓) chips are faded and
+        // grouped below. Head bar shows count + ➕ เพิ่มทั้งหมด + ✕ dismiss.
         function dcaNdiRenderResults(generic, brands) {
             const resEl = document.getElementById('dca-ndi-results');
             if (!resEl) return;
+            dcaNdiLast = { generic, brands };
             resEl.style.display = 'block';
             if (!brands.length) {
+                resEl.classList.remove('panel');
                 resEl.innerHTML = `<div class="dca-ndi-hint">ไม่พบชื่อการค้าที่ขึ้นทะเบียน อย. สำหรับ "${dcaEscapeHtml(generic)}"</div>`;
                 return;
             }
             const have = dcaNdiCurrentBrandSet();
-            const chips = brands.map(b => {
-                const added = have.has(b.toLowerCase());
-                return `<span class="dca-ndi-chip${added ? ' added' : ''}" data-brand="${dcaEscapeHtml(b)}" onclick="dcaNdiAddBrand(this)">${added ? '✓ ' : '+ '}${dcaEscapeHtml(b)}</span>`;
-            }).join('');
+            const available = brands.filter(b => !have.has(b.toLowerCase()));
+            const added = brands.filter(b => have.has(b.toLowerCase()));
+            const chip = (b, isAdded) =>
+                `<span class="dca-ndi-chip${isAdded ? ' added' : ''}" data-brand="${dcaEscapeHtml(b)}" onclick="dcaNdiAddBrand(this)">${isAdded ? '✓ ' : '+ '}${dcaEscapeHtml(b)}</span>`;
+            const availHtml = available.length
+                ? `<div class="dca-ndi-chips">${available.map(b => chip(b, false)).join('')}</div>`
+                : '';
+            const addedHtml = added.length
+                ? `<div class="dca-ndi-chips dca-ndi-chips-added">${added.map(b => chip(b, true)).join('')}</div>`
+                : '';
+            const remaining = available.length;
+            resEl.classList.add('panel');
             resEl.innerHTML =
                 `<div class="dca-ndi-results-head">` +
-                    `<span class="dca-ndi-hint">🏥 ชื่อการค้าที่ขึ้นทะเบียน อย. ไทย (${brands.length}) · คลิกเพื่อเพิ่ม</span>` +
+                    `<span class="dca-ndi-hint">🏥 ชื่อการค้า อย. ไทย (${brands.length})</span>` +
                     `<span class="dca-ndi-head-actions">` +
-                        `<button type="button" class="dca-ndi-action-btn dca-ndi-addall" onclick="dcaNdiAddAll()">➕ เพิ่มทั้งหมด</button>` +
+                        `<button type="button" class="dca-ndi-action-btn dca-ndi-addall"${remaining ? '' : ' disabled'} onclick="dcaNdiAddAll()">${remaining ? '➕ เพิ่มทั้งหมด' : '✓ เพิ่มครบแล้ว'}</button>` +
                         `<button type="button" class="dca-ndi-action-btn dca-ndi-dismiss" onclick="dcaNdiDismiss()" title="ปิดผลค้นหา">✕</button>` +
                     `</span>` +
                 `</div>` +
-                `<div class="dca-ndi-chips">${chips}</div>`;
-            dcaNdiRefreshAddAllState();
-        }
-
-        function dcaNdiRefreshAddAllState() {
-            const resEl = document.getElementById('dca-ndi-results');
-            if (!resEl) return;
-            const addAll = resEl.querySelector('.dca-ndi-addall');
-            if (!addAll) return;
-            const remaining = Array.from(resEl.querySelectorAll('.dca-ndi-chip'))
-                .filter(c => !c.classList.contains('added')).length;
-            addAll.disabled = remaining === 0;
-            addAll.textContent = remaining === 0 ? '✓ เพิ่มครบแล้ว' : '➕ เพิ่มทั้งหมด';
+                availHtml + addedHtml;
         }
 
         function dcaNdiAddAll() {
-            const resEl = document.getElementById('dca-ndi-results');
-            if (!resEl) return;
-            resEl.querySelectorAll('.dca-ndi-chip').forEach(c => {
-                if (!c.classList.contains('added')) dcaNdiAddBrand(c);
+            if (!dcaNdiLast) return;
+            const input = document.getElementById('dca-f-brandNames');
+            if (!input) return;
+            const have = dcaNdiCurrentBrandSet();
+            const existing = input.value.split(',').map(s => s.trim()).filter(Boolean);
+            dcaNdiLast.brands.forEach(b => {
+                if (!have.has(b.toLowerCase())) { existing.push(b); have.add(b.toLowerCase()); }
             });
+            input.value = existing.join(', ');
+            dcaNdiRenderResults(dcaNdiLast.generic, dcaNdiLast.brands);
         }
 
         function dcaNdiDismiss() {
             const resEl = document.getElementById('dca-ndi-results');
-            if (resEl) { resEl.style.display = 'none'; resEl.innerHTML = ''; }
+            if (resEl) { resEl.style.display = 'none'; resEl.innerHTML = ''; resEl.classList.remove('panel'); }
+            dcaNdiLast = null;
         }
 
         async function dcaNdiLookup() {
@@ -30887,6 +30908,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const generic = (genEl.value || '').trim();
             if (!generic) {
                 resEl.style.display = 'block';
+                resEl.classList.remove('panel');
                 resEl.innerHTML = '<div class="dca-ndi-err">กรอก Generic Name ก่อนค้น อย.</div>';
                 return;
             }
@@ -30898,6 +30920,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
             if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังค้น…'; }
             resEl.style.display = 'block';
+            resEl.classList.remove('panel');
             resEl.innerHTML = '<div class="dca-ndi-hint">กำลังค้นจากฐานข้อมูล อย. …</div>';
             try {
                 const resp = await fetch('https://us-central1-intern-port-edfa7.cloudfunctions.net/ndiBrandLookup', {
@@ -30911,6 +30934,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 dcaNdiCache[key] = brands;
                 dcaNdiRenderResults(generic, brands);
             } catch (err) {
+                resEl.classList.remove('panel');
                 resEl.innerHTML = `<div class="dca-ndi-err">ค้น อย. ไม่สำเร็จ: ${dcaEscapeHtml(err.message || String(err))}</div>`;
             } finally {
                 if (btn) { btn.textContent = '🔎 ค้น อย.'; }
@@ -30929,9 +30953,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 existing.push(brand);
                 input.value = existing.join(', ');
             }
-            el.classList.add('added');
-            el.textContent = '✓ ' + brand;
-            dcaNdiRefreshAddAllState();
+            // Re-render so this chip drops into the faded "added" group and the
+            // bulk-add count updates (available-first ordering).
+            if (dcaNdiLast) dcaNdiRenderResults(dcaNdiLast.generic, dcaNdiLast.brands);
+            else { el.classList.add('added'); el.textContent = '✓ ' + brand; }
         }
 
         function dcaAutoDraftToggle() {
