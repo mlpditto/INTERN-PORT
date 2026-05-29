@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.74</title>
+    <title>Nika V94.76</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -29078,10 +29078,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (/[一-鿿]/.test(text)) return 'zh';
             return 'en';
         }
-        window.qtTranslateText = async function (text, targetLang) {
+        window.qtTranslateText = async function (text, targetLang, sourceLangHint) {
             if (!text || !text.trim()) return { text: text || '', source: 'empty' };
             if (targetLang === 'orig') return { text, source: 'orig' };
-            const sourceLang = qtDetectSourceLangAdmin(text);
+            // V94.76: callers that already know the authored source language can
+            // pass it explicitly. Drug Codex pearls is intentionally mixed EN+TH,
+            // so auto-detection sees the Thai chars and reports 'th' — translating
+            // EN→TH then no-ops and the TH chip shows the English-heavy original.
+            // Trust the hint over detection when provided.
+            const sourceLang = sourceLangHint || qtDetectSourceLangAdmin(text);
             if (sourceLang === targetLang) return { text, source: 'noop' };
             // Tier A: on-device Translator API (Chrome 138+). Skips silently
             // when the source/target pair isn't supported on-device.
@@ -29668,7 +29673,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 DCA_EDU_I18N_LANGS.forEach(lang => {
                     if (lang === sourceLang) return;
                     tasks.push(
-                        window.qtTranslateText(sourceText, lang)
+                        window.qtTranslateText(sourceText, lang, sourceLang)
                             .then(result => ({ field, lang, text: (result && result.text) || '', ok: true }))
                             .catch(err => ({ field, lang, text: '', ok: false, err: err && err.message }))
                     );
