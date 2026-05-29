@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.70</title>
+    <title>Nika V94.72</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -5307,12 +5307,37 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             transition: visibility 0s, opacity 0.5s linear;
             font-weight: 500;
+            /* V94.72: persistent toast — flex layout for the ✕ button, and
+               selectable text so error/diagnostic messages can be copied. */
+            display: inline-flex;
+            align-items: center;
+            gap: 14px;
+            max-width: min(90vw, 560px);
+            text-align: left;
+            user-select: text;
+            -webkit-user-select: text;
         }
 
+        /* V94.72: no fadeout — toast stays until the ✕ button is clicked. */
         #toast.show {
             visibility: visible;
-            animation: fadein 0.5s, fadeout 0.5s 2.5s;
+            animation: fadein 0.5s;
         }
+
+        .toast-close {
+            flex: 0 0 auto;
+            width: 22px;
+            height: 22px;
+            padding: 0;
+            border: none;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.18);
+            color: #fff;
+            font-size: 13px;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .toast-close:hover { background: rgba(255,255,255,0.35); }
 
         @keyframes fadein {
             from {
@@ -29552,12 +29577,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             });
         }
 
-        // Chip-rail click handler. Persists what's visible, swaps state to
-        // the requested lang, repaints the 3 textareas from state.
-        function dcaSelectEduLang(lang) {
-            if (!DCA_EDU_I18N_LANGS.includes(lang)) return;
-            dcaPersistCurrentEduLang();
-            dcaEduI18nState.currentLang = lang;
+        // Paint the 3 Edu textareas (+ chip active state) from state for the
+        // given lang. PURE repaint — does NOT persist the visible textareas
+        // first. dcaTranslateEducationI18n calls this directly so a fresh
+        // translation isn't clobbered: re-persisting here would read the
+        // stale (pre-repaint) textarea for the viewed lang and overwrite the
+        // just-translated value with '' when that field was empty in that
+        // lang (the V94.71 "4 translated but TH still blank" bug).
+        function dcaRepaintEduTextareas(lang) {
             DCA_EDU_I18N_FIELDS.forEach(field => {
                 const el = document.getElementById('dca-f-' + field);
                 if (!el) return;
@@ -29567,6 +29594,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.querySelectorAll('.dca-edu-lang-chip').forEach(chip => {
                 chip.classList.toggle('active', chip.dataset.lang === lang);
             });
+        }
+
+        // Chip-rail click handler. Persists what's visible, swaps state to
+        // the requested lang, repaints the 3 textareas from state.
+        function dcaSelectEduLang(lang) {
+            if (!DCA_EDU_I18N_LANGS.includes(lang)) return;
+            dcaPersistCurrentEduLang();
+            dcaEduI18nState.currentLang = lang;
+            dcaRepaintEduTextareas(lang);
             // V94.38 tab badges depend on the 3 root Edu textareas being
             // populated — refresh so an empty-current-lang doesn't flip the
             // Edu badge red while another lang in state still has content.
@@ -29640,7 +29676,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 succeeded++;
             });
             // Repaint textareas in case the current chip was a non-primary lang.
-            dcaSelectEduLang(dcaEduI18nState.currentLang);
+            // V94.71: PURE repaint (not dcaSelectEduLang) — the latter re-persists
+            // the still-stale textareas first, which wiped a just-translated value
+            // for the viewed lang when that field's textarea was empty (e.g. 🌐 on
+            // Monitoring while viewing the TH chip → "4 translated" but TH blank).
+            dcaRepaintEduTextareas(dcaEduI18nState.currentLang);
+            if (typeof dcaUpdateSectionBadges === 'function') dcaUpdateSectionBadges();
             if (!opts.silent && typeof showToast === 'function') {
                 showToast(`🌐 Edu i18n: ${succeeded} translated${failed ? ` · ${failed} failed (kept previous)` : ''}`);
             }
@@ -37440,7 +37481,27 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
         function copyHistory() { navigator.clipboard.writeText("Copied!").then(() => showToast("Copied")); }
         function closeModal() { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
-        function showToast(m) { const x = document.getElementById("toast"); x.innerText = m; x.className = "show"; setTimeout(() => x.className = "", 3000); }
+        // V94.72: persistent toast — stays until the user clicks ✕, and the
+        // message text is selectable so error/diagnostic strings can be copied
+        // to report. Replaces the old 3s auto-dismiss. Second arg (type) is
+        // still accepted by callers but unused, as before.
+        function showToast(m) {
+            const x = document.getElementById("toast");
+            if (!x) return;
+            x.innerHTML = "";
+            const msg = document.createElement("span");
+            msg.className = "toast-msg";
+            msg.textContent = m;
+            const close = document.createElement("button");
+            close.type = "button";
+            close.className = "toast-close";
+            close.textContent = "✕";
+            close.setAttribute("aria-label", "Close");
+            close.onclick = () => { x.className = ""; };
+            x.appendChild(msg);
+            x.appendChild(close);
+            x.className = "show";
+        }
         async function svSc(id, uid) {
             const el = document.getElementById(`sc-${id}`);
             let v = el ? el.value : prompt("Score:", "0.5");
