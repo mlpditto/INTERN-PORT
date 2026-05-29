@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.07)</title>
+    <title>Internship Portfolio (V95.08)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2741,6 +2741,14 @@
                 .dc-az-letter.has-content:hover {
                     background: #dbeafe;
                 }
+                /* V95.08: per-letter count badge — small superscript inside
+                   the rail button. Inherits color from the active letter
+                   (blue when has-content, hidden when empty). */
+                .dc-az-letter-count {
+                    font-size: 0.7em; font-weight: 700; opacity: 0.75;
+                    margin-left: 2px; vertical-align: super;
+                    line-height: 1;
+                }
                 .dc-list {
                     max-height: 60vh; overflow-y: auto;
                     padding: 0 12px 12px;
@@ -2767,6 +2775,12 @@
                 .dc-row-name {
                     font-weight: 800; color: #1e293b; font-size: 0.95em;
                     line-height: 1.3;
+                    /* V95.08: visual normalize matching admin .dca-row-name.
+                       Mixed-case storage (INN lowercase / Western title-case /
+                       Asian all-caps) renders uniformly UPPERCASE in the
+                       Browse list. Detail modal name + search input keep
+                       original casing. */
+                    text-transform: uppercase;
                 }
                 .dc-row-brands {
                     font-size: 0.78em; color: #64748b; margin-top: 2px;
@@ -10444,18 +10458,23 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
         function dcRenderAzRail() {
             const rail = document.getElementById('dc-az-rail');
             if (!rail) return;
-            const present = new Set();
+            // V95.08: count drugs per first letter (was present/absent Set).
+            // Counter is filter-aware — typing in the search box updates the
+            // rail badges to reflect post-filter counts, not the whole codex.
+            const counts = new Map();
             const term = (dcState.searchTerm || '').toLowerCase();
-            // Filter-aware rail — only letters with matching drugs after search are active.
             dcState.codex.forEach(d => {
                 if (term && !dcMatchesSearch(d, term)) return;
                 const first = String((d.genericName || '').trim()).charAt(0).toUpperCase();
-                if (first) present.add(first);
+                if (first) counts.set(first, (counts.get(first) || 0) + 1);
             });
             const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
             rail.innerHTML = letters.map(L => {
-                const has = present.has(L);
-                return `<button type="button" class="dc-az-letter${has ? ' has-content' : ''}" ${has ? `onclick="dcJumpToLetter('${L}')"` : 'disabled'}>${L}</button>`;
+                const n = counts.get(L) || 0;
+                const has = n > 0;
+                const countBadge = has ? `<span class="dc-az-letter-count">${n}</span>` : '';
+                const title = has ? ` title="${n} drug${n === 1 ? '' : 's'} starting with ${L}"` : '';
+                return `<button type="button" class="dc-az-letter${has ? ' has-content' : ''}" ${has ? `onclick="dcJumpToLetter('${L}')"` : 'disabled'}${title}>${L}${countBadge}</button>`;
             }).join('');
         }
 

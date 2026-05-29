@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.66</title>
+    <title>Nika V94.67</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1301,6 +1301,14 @@
         .dca-az-letter:disabled {
             color: #cbd5e1; cursor: default;
         }
+        /* V94.67: per-letter count badge — subscript-style number inside the
+           rail button. Inherits the letter's color (slate when empty / blue
+           when has-content) so the badge auto-themes with the button state. */
+        .dca-az-letter-count {
+            font-size: 0.72em; font-weight: 700; opacity: 0.7;
+            margin-left: 2px; vertical-align: super;
+            line-height: 1;
+        }
         .dca-list {
             max-height: 56vh; overflow-y: auto;
             padding-right: 6px;
@@ -1324,6 +1332,12 @@
         .dca-row-name {
             font-weight: 800; color: #0f172a; font-size: 0.96em;
             word-break: break-word;
+            /* V94.67: visual normalize. Authors save in mixed case (INN
+               lowercase / Western title-case / Asian all-caps); display-only
+               uppercase makes the A-Z list look uniform without touching
+               Firestore. Edit form + search input continue to operate on
+               original casing. */
+            text-transform: uppercase;
         }
         .dca-row-meta {
             font-size: 0.78em; color: #64748b; margin-top: 3px;
@@ -29359,16 +29373,21 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function dcaRenderAzRail() {
             const rail = document.getElementById('dca-az-rail');
             if (!rail) return;
-            // Mark letters that have at least one drug starting with them.
-            const present = new Set();
+            // V94.67: count drugs per first letter (was: just present/absent
+            // Set). Count surfaces in the rail badge so admin can spot
+            // heavy/light letters at a glance without scrolling the list.
+            const counts = new Map();
             dcaState.codex.forEach(d => {
                 const first = String((d.genericName || '').trim()).charAt(0).toUpperCase();
-                if (first) present.add(first);
+                if (first) counts.set(first, (counts.get(first) || 0) + 1);
             });
             const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
             rail.innerHTML = letters.map(L => {
-                const has = present.has(L);
-                return `<button type="button" class="dca-az-letter${has ? ' has-content' : ''}" ${has ? `onclick="dcaJumpToLetter('${L}')"` : 'disabled'}>${L}</button>`;
+                const n = counts.get(L) || 0;
+                const has = n > 0;
+                const countBadge = has ? `<span class="dca-az-letter-count">${n}</span>` : '';
+                const title = has ? ` title="${n} drug${n === 1 ? '' : 's'} starting with ${L}"` : '';
+                return `<button type="button" class="dca-az-letter${has ? ' has-content' : ''}" ${has ? `onclick="dcaJumpToLetter('${L}')"` : 'disabled'}${title}>${L}${countBadge}</button>`;
             }).join('');
         }
 
