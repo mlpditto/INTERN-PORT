@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.79</title>
+    <title>Nika V94.80</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1430,15 +1430,20 @@
            separate button row. Input gets right padding so text clears the button. */
         .dca-brand-input-wrap { position:relative; }
         .dca-brand-input-wrap > input {
-            width:100%; padding: 8px 78px 8px 12px; border: 1.5px solid #e2e8f0;
+            width:100%; padding: 8px 88px 8px 12px; border: 1.5px solid #e2e8f0;
             border-radius: 8px; font-size: 0.9em; box-sizing: border-box; font-family: inherit;
         }
         .dca-brand-input-wrap > input:focus { border-color:#2563eb; outline:none; }
+        /* V94.80: font-family:inherit so Thai glyphs render (buttons fall back to a
+           UA font that lacks Thai); inline SVG icon instead of emoji. */
         .dca-ndi-btn {
             position:absolute; right:5px; top:50%; transform:translateY(-50%);
+            display:inline-flex; align-items:center; gap:4px;
             white-space:nowrap; padding:4px 10px; border:1.5px solid #bae6fd; background:#f0f9ff;
             color:#0369a1; border-radius:6px; font-weight:800; font-size:0.74em; cursor:pointer;
+            font-family: inherit;
         }
+        .dca-ndi-btn-ico { flex-shrink:0; }
         .dca-ndi-btn:hover:not(:disabled) { background:#e0f2fe; }
         .dca-ndi-btn:disabled { opacity:.55; cursor:default; }
         .dca-ndi-results { margin-top:7px; }
@@ -1456,7 +1461,7 @@
         .dca-ndi-head-actions { display:flex; gap:6px; flex-shrink:0; }
         .dca-ndi-action-btn {
             padding:3px 9px; border-radius:12px; font-size:0.72em; font-weight:700;
-            cursor:pointer; border:1px solid transparent;
+            cursor:pointer; border:1px solid transparent; font-family: inherit;
         }
         .dca-ndi-addall { background:#ecfdf5; border-color:#86efac; color:#166534; }
         .dca-ndi-addall:hover:not(:disabled) { background:#d1fae5; }
@@ -12960,7 +12965,10 @@
                             <div class="dca-brand-field">
                                 <div class="dca-brand-input-wrap">
                                     <input type="text" id="dca-f-brandNames" placeholder="Comma-separated · e.g. Glucophage, Diaformin">
-                                    <button type="button" id="dca-ndi-btn" class="dca-ndi-btn" onclick="dcaNdiLookup()" title="ค้นชื่อการค้าที่ขึ้นทะเบียนกับ อย. ไทย จาก Generic Name">ค้น อย.</button>
+                                    <button type="button" id="dca-ndi-btn" class="dca-ndi-btn" onclick="dcaNdiLookup()" title="ค้นชื่อการค้าที่ขึ้นทะเบียนกับ อย. ไทย จาก Generic Name">
+                                        <svg class="dca-ndi-btn-ico" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="7" cy="7" r="4.5"></circle><line x1="10.5" y1="10.5" x2="15" y2="15" stroke-linecap="round"></line></svg>
+                                        <span class="dca-ndi-btn-txt">ค้น อย.</span>
+                                    </button>
                                 </div>
                                 <div id="dca-ndi-results" class="dca-ndi-results" style="display:none;"></div>
                             </div>
@@ -30875,9 +30883,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             resEl.classList.add('panel');
             resEl.innerHTML =
                 `<div class="dca-ndi-results-head">` +
-                    `<span class="dca-ndi-hint">🏥 ชื่อการค้า อย. ไทย (${brands.length})</span>` +
+                    `<span class="dca-ndi-hint">ชื่อการค้าที่ขึ้นทะเบียน อย. (${brands.length})</span>` +
                     `<span class="dca-ndi-head-actions">` +
-                        `<button type="button" class="dca-ndi-action-btn dca-ndi-addall"${remaining ? '' : ' disabled'} onclick="dcaNdiAddAll()">${remaining ? '➕ เพิ่มทั้งหมด' : '✓ เพิ่มครบแล้ว'}</button>` +
+                        `<button type="button" class="dca-ndi-action-btn dca-ndi-addall"${remaining ? '' : ' disabled'} onclick="dcaNdiAddAll()">${remaining ? '+ เพิ่มทั้งหมด' : '✓ เพิ่มครบแล้ว'}</button>` +
                         `<button type="button" class="dca-ndi-action-btn dca-ndi-dismiss" onclick="dcaNdiDismiss()" title="ปิดผลค้นหา">✕</button>` +
                     `</span>` +
                 `</div>` +
@@ -30907,6 +30915,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const genEl = document.getElementById('dca-f-genericName');
             const resEl = document.getElementById('dca-ndi-results');
             const btn = document.getElementById('dca-ndi-btn');
+            const btnTxt = btn && btn.querySelector('.dca-ndi-btn-txt');
             if (!genEl || !resEl) return;
             const generic = (genEl.value || '').trim();
             if (!generic) {
@@ -30921,7 +30930,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 dcaNdiRenderResults(generic, dcaNdiCache[key]);
                 return;
             }
-            if (btn) { btn.disabled = true; btn.textContent = 'ค้น…'; }
+            if (btn) { btn.disabled = true; if (btnTxt) btnTxt.textContent = 'ค้น…'; }
             resEl.style.display = 'block';
             resEl.classList.remove('panel');
             resEl.innerHTML = '<div class="dca-ndi-hint">กำลังค้นจากฐานข้อมูล อย. …</div>';
@@ -30940,7 +30949,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 resEl.classList.remove('panel');
                 resEl.innerHTML = `<div class="dca-ndi-err">ค้น อย. ไม่สำเร็จ: ${dcaEscapeHtml(err.message || String(err))}</div>`;
             } finally {
-                if (btn) { btn.textContent = 'ค้น อย.'; }
+                if (btnTxt) btnTxt.textContent = 'ค้น อย.';
                 dcaNdiSyncBtnState();
             }
         }
