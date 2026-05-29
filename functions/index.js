@@ -281,6 +281,64 @@ function getSafeProviderError(err) {
     };
 }
 
+// ============================================================
+// 🏥 Thai FDA (NDI) Brand Lookup — V94.70 / Drug Codex (approach D)
+// Admin clicks "ค้น อย." in the Drug Codex form → this fetches the public
+// NDI search page for a generic (active-ingredient) name and returns the
+// Thai-registered trade names (ชื่อทางการค้า) for admin to pick from.
+// Why server-side: NDI has no JSON API and sends no CORS headers, so the
+// browser cannot fetch it directly — we fetch + parse here.
+// Parsing: each result card is a <div class="top-mainsearch2f"> holding a
+// <table> with 6 `font-size: 16px` spans in fixed order
+// [activeIngredient, tradeName, form, strength, licenseHolder, regNo].
+// We take span[1] (trade name) per card, dedupe case-insensitively.
+// Page is TIS-620 / windows-874 encoded — decode via TextDecoder so any
+// Thai-script trade names survive (most are Latin script and decode fine).
+// ============================================================
+exports.ndiBrandLookup = onRequest({ cors: true, timeoutSeconds: 60, memory: "256MiB" }, async (req, res) => {
+    try {
+        if (req.headers["x-mlp-secret"] !== AUTH_SECRET) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+        const generic = String((req.body && req.body.name) || req.query.name || "").trim();
+        if (!generic) {
+            return res.status(400).json({ error: "Missing generic name" });
+        }
+        if (generic.length > 80) {
+            return res.status(400).json({ error: "Generic name too long" });
+        }
+
+        const url = `https://ndi.fda.moph.go.th/drug_info?brand=&name=${encodeURIComponent(generic)}&rctype=`;
+        const resp = await axios.get(url, {
+            responseType: "arraybuffer",
+            timeout: 20000,
+            headers: { "User-Agent": "Mozilla/5.0 (compatible; INTERN-PORT DrugCodex/1.0)" }
+        });
+        const html = new TextDecoder("windows-874").decode(resp.data);
+
+        // One card per registered product; the 2nd 16px span is the trade name.
+        const cards = html.match(/top-mainsearch2f[\s\S]*?<\/table>/g) || [];
+        const seen = new Set();
+        const brands = [];
+        for (const card of cards) {
+            const spans = [...card.matchAll(/font-size:\s*16px;?\s*">\s*([\s\S]*?)\s*<\/span>/g)]
+                .map(m => m[1].replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim());
+            const tradeName = spans[1];
+            if (!tradeName) continue;
+            const key = tradeName.toLowerCase();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            brands.push(tradeName);
+            if (brands.length >= 40) break;
+        }
+
+        return res.json({ brands, count: brands.length, source: "ndi.fda.moph.go.th" });
+    } catch (err) {
+        console.error("[ndiBrandLookup] failed:", err.message);
+        return res.status(502).json({ error: "ค้นฐานข้อมูล อย. ไม่สำเร็จ" });
+    }
+});
+
 /**
  * 🤖 AI Proxy Function (V89.19)
  * Handles: Gemini, OpenAI, Anthropic, OpenRouter, AI Studio, ThaiLLM, Typhoon, Cloud TTS

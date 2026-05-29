@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.69</title>
+    <title>Nika V94.70</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1414,6 +1414,29 @@
         }
         .dca-form-grid > input:focus,
         .dca-form-grid > textarea:focus { border-color: #2563eb; outline: none; }
+        /* V94.70: Thai FDA (NDI) brand lookup — button + result chips under Brand Names */
+        .dca-brand-row { display:flex; gap:6px; align-items:stretch; }
+        .dca-brand-row > input {
+            flex:1; min-width:0; padding: 8px 12px; border: 1.5px solid #e2e8f0;
+            border-radius: 8px; font-size: 0.9em; box-sizing: border-box; font-family: inherit;
+        }
+        .dca-brand-row > input:focus { border-color:#2563eb; outline:none; }
+        .dca-ndi-btn {
+            white-space:nowrap; padding:0 12px; border:1.5px solid #bae6fd; background:#f0f9ff;
+            color:#0369a1; border-radius:8px; font-weight:800; font-size:0.78em; cursor:pointer;
+        }
+        .dca-ndi-btn:hover:not(:disabled) { background:#e0f2fe; }
+        .dca-ndi-btn:disabled { opacity:.55; cursor:default; }
+        .dca-ndi-results { margin-top:7px; }
+        .dca-ndi-hint { font-size:0.74em; color:#64748b; margin-bottom:4px; }
+        .dca-ndi-chip {
+            display:inline-block; margin:0 5px 5px 0; padding:4px 10px; background:#fff;
+            border:1px solid #93c5fd; color:#1e3a8a; border-radius:14px; font-size:0.78em;
+            cursor:pointer; font-weight:600;
+        }
+        .dca-ndi-chip:hover { background:#dbeafe; }
+        .dca-ndi-chip.added { background:#dcfce7; border-color:#86efac; color:#166534; cursor:default; }
+        .dca-ndi-err { font-size:0.78em; color:#dc2626; }
         /* V94.42 Phase 1: Clinical Risk Color Coding — palette shared with
            intern detail modal (public/index.html). Admin form labels are
            right-aligned (label in 140px column, input on the right) so we
@@ -12870,7 +12893,13 @@
                             <input type="text" id="dca-f-genericName" placeholder="e.g. Metformin" maxlength="100">
 
                             <label for="dca-f-brandNames">Brand Names</label>
-                            <input type="text" id="dca-f-brandNames" placeholder="Comma-separated · e.g. Glucophage, Diaformin">
+                            <div class="dca-brand-field">
+                                <div class="dca-brand-row">
+                                    <input type="text" id="dca-f-brandNames" placeholder="Comma-separated · e.g. Glucophage, Diaformin">
+                                    <button type="button" id="dca-ndi-btn" class="dca-ndi-btn" onclick="dcaNdiLookup()" title="ค้นชื่อการค้าที่ขึ้นทะเบียนกับ อย. ไทย จาก Generic Name">🔎 ค้น อย.</button>
+                                </div>
+                                <div id="dca-ndi-results" class="dca-ndi-results" style="display:none;"></div>
+                            </div>
 
                             <label for="dca-f-atcCode">ATC Code</label>
                             <input type="text" id="dca-f-atcCode" placeholder="e.g. A10BA02" maxlength="20">
@@ -30151,6 +30180,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         function dcaFillForm(data) {
+            // V94.70: clear stale NDI brand-lookup results so chips from a
+            // previous drug don't linger when a new form opens (static DOM —
+            // see feedback_static_modal_state_leak).
+            const ndiRes = document.getElementById('dca-ndi-results');
+            if (ndiRes) { ndiRes.style.display = 'none'; ndiRes.innerHTML = ''; }
             // data may be from drug_codex, drug_codex_drafts, or {} for Add.
             // V94.50: rebuild Edu i18n state BEFORE the textarea loop so the
             // Edu fields read from state (per current chip lang) instead of
@@ -30663,6 +30697,64 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
             el.style.display = 'flex';
             el.innerHTML = parts.join('<span class="dca-meta-sep">·</span>');
+        }
+
+        // V94.70: Thai FDA (NDI) brand lookup (approach D — MVP, no auto-fill,
+        // no schema change). Reads Generic Name → calls the ndiBrandLookup Cloud
+        // Function → renders Thai-registered trade names as clickable chips.
+        // Clicking a chip appends it to the Brand Names CSV input. Admin still
+        // verifies + saves. Server-side because NDI has no JSON API + no CORS.
+        async function dcaNdiLookup() {
+            const genEl = document.getElementById('dca-f-genericName');
+            const resEl = document.getElementById('dca-ndi-results');
+            const btn = document.getElementById('dca-ndi-btn');
+            if (!genEl || !resEl) return;
+            const generic = (genEl.value || '').trim();
+            if (!generic) {
+                resEl.style.display = 'block';
+                resEl.innerHTML = '<div class="dca-ndi-err">กรอก Generic Name ก่อนค้น อย.</div>';
+                return;
+            }
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังค้น…'; }
+            resEl.style.display = 'block';
+            resEl.innerHTML = '<div class="dca-ndi-hint">กำลังค้นจากฐานข้อมูล อย. …</div>';
+            try {
+                const resp = await fetch('https://us-central1-intern-port-edfa7.cloudfunctions.net/ndiBrandLookup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-mlp-secret': 'mlp-secret-8888' },
+                    body: JSON.stringify({ name: generic })
+                });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok || data.error) throw new Error(data.error || ('HTTP ' + resp.status));
+                const brands = Array.isArray(data.brands) ? data.brands : [];
+                if (brands.length === 0) {
+                    resEl.innerHTML = `<div class="dca-ndi-hint">ไม่พบชื่อการค้าที่ขึ้นทะเบียน อย. สำหรับ "${dcaEscapeHtml(generic)}"</div>`;
+                    return;
+                }
+                const chips = brands.map(b =>
+                    `<span class="dca-ndi-chip" data-brand="${dcaEscapeHtml(b)}" onclick="dcaNdiAddBrand(this)">+ ${dcaEscapeHtml(b)}</span>`
+                ).join('');
+                resEl.innerHTML = `<div class="dca-ndi-hint">🏥 ชื่อการค้าที่ขึ้นทะเบียน อย. ไทย (${brands.length}) · คลิกเพื่อเพิ่ม</div>${chips}`;
+            } catch (err) {
+                resEl.innerHTML = `<div class="dca-ndi-err">ค้น อย. ไม่สำเร็จ: ${dcaEscapeHtml(err.message || String(err))}</div>`;
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = '🔎 ค้น อย.'; }
+            }
+        }
+
+        function dcaNdiAddBrand(el) {
+            if (!el || el.classList.contains('added')) return;
+            const brand = (el.dataset.brand || '').trim();
+            if (!brand) return;
+            const input = document.getElementById('dca-f-brandNames');
+            if (!input) return;
+            const existing = input.value.split(',').map(s => s.trim()).filter(Boolean);
+            if (!existing.some(e => e.toLowerCase() === brand.toLowerCase())) {
+                existing.push(brand);
+                input.value = existing.join(', ');
+            }
+            el.classList.add('added');
+            el.textContent = '✓ ' + brand;
         }
 
         function dcaAutoDraftToggle() {
