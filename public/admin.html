@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.67</title>
+    <title>Nika V94.68</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -29564,9 +29564,29 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaPersistCurrentEduLang();
             const tasks = [];
             fields.forEach(field => {
-                const sourceLang = DCA_EDU_I18N_PRIMARY[field];
-                const sourceText = (dcaEduI18nState.data[field] && dcaEduI18nState.data[field][sourceLang]) || '';
-                if (!sourceText) return; // Nothing to translate — skip silently.
+                const primaryLang = DCA_EDU_I18N_PRIMARY[field];
+                const fieldData = (dcaEduI18nState.data && dcaEduI18nState.data[field]) || {};
+                // V94.68: fallback to first non-empty lang slot when primary is
+                // empty. Common scenario: Patient Counseling primary is TH but
+                // admin authored content in EN slot (AI fill defaults to EN
+                // for unspecified primary, and many admins type EN-fluently
+                // even for TH-primary fields). Pre-V94.68 the primary-skip
+                // rule silently left KR/JA/ZH untranslated for that whole
+                // field — user observed "ภาษาเดียวครับ" on tadalafil.
+                // Fallback priority: primary → EN → TH → KO → JA → ZH.
+                let sourceLang = primaryLang;
+                let sourceText = fieldData[primaryLang] || '';
+                if (!sourceText) {
+                    const fallbackOrder = ['en', 'th', 'ko', 'ja', 'zh'].filter(l => l !== primaryLang);
+                    for (const lang of fallbackOrder) {
+                        if (fieldData[lang]) {
+                            sourceLang = lang;
+                            sourceText = fieldData[lang];
+                            break;
+                        }
+                    }
+                }
+                if (!sourceText) return; // Field is empty in every lang slot.
                 DCA_EDU_I18N_LANGS.forEach(lang => {
                     if (lang === sourceLang) return;
                     tasks.push(
@@ -30981,8 +31001,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // V94.50: auto-translate any Edu fields that AI just populated.
                 // Scoped to eduFieldsFilled so other-lang content already
                 // entered by admin is preserved.
+                // V94.68: silent:false so admin sees the "🌐 Edu i18n: N
+                // translated" toast and knows the chain ran. Silent mode
+                // pre-V94.68 left admin guessing whether KR/JA/ZH would be
+                // populated on Save, especially when the user reported the
+                // "ภาษาเดียวครับ" tadalafil case.
                 if (eduFieldsFilled.length > 0) {
-                    dcaTranslateEducationI18n({ fields: eduFieldsFilled, silent: true }).catch(err => {
+                    dcaTranslateEducationI18n({ fields: eduFieldsFilled, silent: false }).catch(err => {
                         console.warn('[drug-codex] AI-fill Edu i18n translate failed:', err && err.message);
                     });
                 }
