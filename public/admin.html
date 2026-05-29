@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.78</title>
+    <title>Nika V94.79</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1426,15 +1426,18 @@
         /* V94.70: Thai FDA (NDI) brand lookup — button + result chips under Brand Names.
            V94.75: input full-width, action button on its own row below to stop the
            cramped side-by-side layout; result head gets ➕ เพิ่มทั้งหมด + ✕ dismiss. */
-        .dca-brand-field > input {
-            width:100%; padding: 8px 12px; border: 1.5px solid #e2e8f0;
+        /* V94.79: lookup trigger docked inside the input's right edge — saves the
+           separate button row. Input gets right padding so text clears the button. */
+        .dca-brand-input-wrap { position:relative; }
+        .dca-brand-input-wrap > input {
+            width:100%; padding: 8px 78px 8px 12px; border: 1.5px solid #e2e8f0;
             border-radius: 8px; font-size: 0.9em; box-sizing: border-box; font-family: inherit;
         }
-        .dca-brand-field > input:focus { border-color:#2563eb; outline:none; }
-        .dca-brand-actions { margin-top:6px; }
+        .dca-brand-input-wrap > input:focus { border-color:#2563eb; outline:none; }
         .dca-ndi-btn {
-            white-space:nowrap; padding:6px 14px; border:1.5px solid #bae6fd; background:#f0f9ff;
-            color:#0369a1; border-radius:8px; font-weight:800; font-size:0.78em; cursor:pointer;
+            position:absolute; right:5px; top:50%; transform:translateY(-50%);
+            white-space:nowrap; padding:4px 10px; border:1.5px solid #bae6fd; background:#f0f9ff;
+            color:#0369a1; border-radius:6px; font-weight:800; font-size:0.74em; cursor:pointer;
         }
         .dca-ndi-btn:hover:not(:disabled) { background:#e0f2fe; }
         .dca-ndi-btn:disabled { opacity:.55; cursor:default; }
@@ -12955,9 +12958,9 @@
 
                             <label for="dca-f-brandNames">Brand Names</label>
                             <div class="dca-brand-field">
-                                <input type="text" id="dca-f-brandNames" placeholder="Comma-separated · e.g. Glucophage, Diaformin">
-                                <div class="dca-brand-actions">
-                                    <button type="button" id="dca-ndi-btn" class="dca-ndi-btn" onclick="dcaNdiLookup()" title="ค้นชื่อการค้าที่ขึ้นทะเบียนกับ อย. ไทย จาก Generic Name">🔎 ค้น อย.</button>
+                                <div class="dca-brand-input-wrap">
+                                    <input type="text" id="dca-f-brandNames" placeholder="Comma-separated · e.g. Glucophage, Diaformin">
+                                    <button type="button" id="dca-ndi-btn" class="dca-ndi-btn" onclick="dcaNdiLookup()" title="ค้นชื่อการค้าที่ขึ้นทะเบียนกับ อย. ไทย จาก Generic Name">ค้น อย.</button>
                                 </div>
                                 <div id="dca-ndi-results" class="dca-ndi-results" style="display:none;"></div>
                             </div>
@@ -30918,7 +30921,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 dcaNdiRenderResults(generic, dcaNdiCache[key]);
                 return;
             }
-            if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังค้น…'; }
+            if (btn) { btn.disabled = true; btn.textContent = 'ค้น…'; }
             resEl.style.display = 'block';
             resEl.classList.remove('panel');
             resEl.innerHTML = '<div class="dca-ndi-hint">กำลังค้นจากฐานข้อมูล อย. …</div>';
@@ -30937,7 +30940,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 resEl.classList.remove('panel');
                 resEl.innerHTML = `<div class="dca-ndi-err">ค้น อย. ไม่สำเร็จ: ${dcaEscapeHtml(err.message || String(err))}</div>`;
             } finally {
-                if (btn) { btn.textContent = '🔎 ค้น อย.'; }
+                if (btn) { btn.textContent = 'ค้น อย.'; }
                 dcaNdiSyncBtnState();
             }
         }
