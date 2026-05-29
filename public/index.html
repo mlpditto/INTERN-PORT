@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.08)</title>
+    <title>Internship Portfolio (V95.09)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -15952,6 +15952,54 @@ async function archiveDoneCard(cardId) {
                 alert("Cannot send comment: " + err.message);
             }
         }
+    </script>
+
+    <!-- V95.09: deploy-detect banner. Polls own URL with Range:bytes=0-500
+         (cheap; falls back to full 200 OK if the server ignores Range).
+         10-min interval + on window focus (catches woke-from-sleep in
+         LIFF webview). Banner is non-blocking at the top; intern can
+         Reload or Dismiss for 1 hour. -->
+    <script>
+        (function dcInstallUpdateDetector() {
+            const titleRe = /V\d+\.\d+/;
+            const localMatch = String(document.title || '').match(titleRe);
+            if (!localMatch) return;
+            const localVersion = localMatch[0];
+            const POLL_MS = 10 * 60 * 1000;
+            const SUPPRESS_MS = 60 * 60 * 1000;
+            const STORAGE_KEY = 'updateBannerSuppressedUntil';
+            function suppressed() {
+                try { return parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10) > Date.now(); } catch (_) { return false; }
+            }
+            function suppress() {
+                try { localStorage.setItem(STORAGE_KEY, String(Date.now() + SUPPRESS_MS)); } catch (_) {}
+            }
+            function showBanner(remoteVersion) {
+                if (suppressed()) return;
+                if (document.getElementById('upd-banner')) return;
+                const bar = document.createElement('div');
+                bar.id = 'upd-banner';
+                bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(135deg,#fde68a,#fbbf24);color:#7c2d12;padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:12px;font-weight:700;font-size:0.9em;box-shadow:0 2px 8px rgba(0,0,0,0.12);flex-wrap:wrap;';
+                bar.innerHTML = '<span>🔄 New version <strong>' + remoteVersion + '</strong> available · current ' + localVersion + '</span>' +
+                    '<button id="upd-banner-reload" style="background:#1d4ed8;color:#fff;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit;">Reload now</button>' +
+                    '<button id="upd-banner-dismiss" style="background:transparent;border:1px solid #92400e;color:#7c2d12;padding:6px 10px;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit;">Dismiss · 1h</button>';
+                document.body.appendChild(bar);
+                document.getElementById('upd-banner-reload').onclick = function() { location.reload(); };
+                document.getElementById('upd-banner-dismiss').onclick = function() { suppress(); bar.remove(); };
+            }
+            async function checkForUpdate() {
+                try {
+                    const resp = await fetch(location.pathname + '?t=' + Date.now(), { cache: 'no-store', headers: { 'Range': 'bytes=0-500' } });
+                    if (!resp.ok && resp.status !== 206) return;
+                    const text = await resp.text();
+                    const m = text.match(/<title>[^<]*(V\d+\.\d+)[^<]*<\/title>/);
+                    if (m && m[1] !== localVersion) showBanner(m[1]);
+                } catch (_) { /* network errors are fine to swallow */ }
+            }
+            setTimeout(checkForUpdate, 30 * 1000);
+            setInterval(checkForUpdate, POLL_MS);
+            window.addEventListener('focus', checkForUpdate);
+        })();
     </script>
 </body>
 
