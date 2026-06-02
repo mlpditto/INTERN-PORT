@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.09)</title>
+    <title>Internship Portfolio (V95.10)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3624,6 +3624,34 @@
                 </div>
             </div>
 
+            <!-- Disease Codex Phase 2b: intern read-only view. A-Z list of
+                 admin-curated disease entries (disease_codex collection, read by
+                 any signed-in user per firestore.rules rule 30). Tap row → detail
+                 modal (#diseaseCodexDetailModal) with 8 read-only sections.
+                 Reuses the .dc-* CSS; dx-/dx prefixed IDs. No submit/i18n in MVP. -->
+            <div id="section-disease-codex" style="margin-bottom: 20px;">
+                <div class="card"
+                    style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #0f766e;">
+                    <div class="gl-minimal-header" onclick="toggleDiseaseCodex()"
+                        style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #f0fdfa;">
+                        <h4 style="margin: 0; font-size: 1.1em; color: #0f766e;">
+                            <i class="fa-solid fa-stethoscope"></i> Disease Codex 질병
+                            <span id="dx-count-badge" style="font-size:0.7em; background:#ccfbf1; color:#0f766e; padding:2px 8px; border-radius:10px; margin-left:6px; display:none;">0</span>
+                        </h4>
+                        <i id="dx-section-icon" class="fa-solid fa-chevron-down" style="color:#0f766e; transition:0.3s; font-size:0.9em;"></i>
+                    </div>
+                    <div id="dx-section-content" style="display:none; border-top:1px solid #f0f0f0; background:#fff;">
+                        <div class="dc-toolbar">
+                            <input type="text" id="dx-search-input" placeholder="ค้นหา · ชื่อโรค / Thai name / ICD-10 / category" oninput="dxRenderList()">
+                        </div>
+                        <div class="dc-az-rail" id="dx-az-rail"></div>
+                        <div id="dx-list" class="dc-list">
+                            <div class="dc-empty-state">🩺 Disease Codex กำลังจัดเตรียม · รอสักครู่</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="section-cases" style="margin-bottom: 25px;">
                 <div class="card"
                     style="padding: 0; overflow: hidden; border: 1px solid #e0e0e0; border-top: 5px solid #4361ee;">
@@ -4195,6 +4223,29 @@
                  quizRunContainer.innerHTML — see feedback_lang_toggle_thai_blank.md. -->
             <div id="dc-detail-body" class="dc-detail-body lang-no-toggle">
                 <!-- Sections injected by dcRenderDetail() -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Disease Codex Phase 2b: intern read-only detail modal. Mirrors the Drug
+         Codex detail shell (reuses .dc-detail-* CSS) but read-only — no
+         suggest-edit, no language bar, no discussion (i18n/submission deferred).
+         8 sections injected by dxRenderDetail(). -->
+    <div id="diseaseCodexDetailModal" class="modal">
+        <div class="modal-content dc-detail-shell">
+            <div class="dc-detail-head">
+                <div class="dc-detail-head-row">
+                    <div style="flex:1; min-width:0;">
+                        <div id="dx-detail-name" class="dc-detail-name">Disease name</div>
+                        <div id="dx-detail-chips" class="dc-detail-chips lang-no-toggle"></div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                        <button type="button" class="dc-detail-close" onclick="dxCloseDetail()" aria-label="Close">×</button>
+                    </div>
+                </div>
+            </div>
+            <div id="dx-detail-body" class="dc-detail-body lang-no-toggle">
+                <!-- Sections injected by dxRenderDetail() -->
             </div>
         </div>
     </div>
@@ -9376,7 +9427,8 @@
                 ['kanban-content', 'kanban-icon'],
                 ['case-section-content', 'case-section-icon'],
                 ['work-section-content', 'work-section-icon'],
-                ['dc-section-content', 'dc-section-icon']
+                ['dc-section-content', 'dc-section-icon'],
+                ['dx-section-content', 'dx-section-icon']
             ];
 
             sectionMap.forEach(([contentId, iconId]) => {
@@ -10344,6 +10396,251 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             }
             if (typeof updateGrandLineDashboard === 'function') updateGrandLineDashboard();
         }
+
+        // ===================================================================
+        // Disease Codex Phase 2b — intern read-only view (dx*).
+        // Mirrors the Drug Codex intern view (dc*) for the disease_codex
+        // collection, reusing the .dc-* CSS. Read-only: no submit, no i18n,
+        // no discussion (deferred per the Disease Codex plan). IDs are dx-
+        // prefixed and unique, so no query-scoping is needed.
+        // ===================================================================
+        var dxState = {
+            codex: [],
+            unsub: null,
+            loaded: false,
+            searchTerm: '',
+            currentDisease: null
+        };
+
+        function toggleDiseaseCodex() {
+            const content = document.getElementById('dx-section-content');
+            const icon = document.getElementById('dx-section-icon');
+            if (!content) return;
+            if (content.style.display === 'none') {
+                closeOtherGrandLineSections('dx-section-content');
+                content.style.display = 'block';
+                if (icon) icon.style.transform = 'rotate(180deg)';
+                if (!dxState.loaded) {
+                    dxState.loaded = true;
+                    dxLoadCodex();
+                }
+            } else {
+                content.style.display = 'none';
+                if (icon) icon.style.transform = 'rotate(0deg)';
+            }
+            if (typeof updateGrandLineDashboard === 'function') updateGrandLineDashboard();
+        }
+
+        function dxLoadCodex() {
+            if (!window.db) return;
+            if (typeof dxState.unsub === 'function') {
+                try { dxState.unsub(); } catch (_) {}
+                dxState.unsub = null;
+            }
+            try {
+                dxState.unsub = db.collection('disease_codex')
+                    .orderBy('diseaseName')
+                    .onSnapshot(snap => {
+                        // Case/diacritic-insensitive A-Z to match the rail (same as
+                        // the Drug Codex intern V95.07 client-side resort).
+                        dxState.codex = snap.docs
+                            .map(d => Object.assign({ _id: d.id }, d.data()))
+                            .sort((a, b) => (a.diseaseName || '').localeCompare(
+                                (b.diseaseName || ''), undefined, { sensitivity: 'base' }));
+                        dxRenderList();
+                        dxUpdateCountBadge();
+                    }, err => {
+                        console.error('[disease-codex intern] snapshot error:', err);
+                        const list = document.getElementById('dx-list');
+                        if (list) list.innerHTML = `<div class="dc-empty-state" style="color:#b91c1c;">โหลด Disease Codex ไม่สำเร็จ · ${err && err.message ? err.message : 'unknown error'}</div>`;
+                    });
+            } catch (err) {
+                console.error('[disease-codex intern] listener setup failed:', err);
+            }
+        }
+
+        function dxUpdateCountBadge() {
+            const badge = document.getElementById('dx-count-badge');
+            if (!badge) return;
+            const n = dxState.codex.length;
+            if (n > 0) { badge.style.display = 'inline-block'; badge.textContent = String(n); }
+            else { badge.style.display = 'none'; }
+        }
+
+        function dxMatchesSearch(disease, term) {
+            if (!term) return true;
+            const t = term.toLowerCase();
+            if ((disease.diseaseName || '').toLowerCase().includes(t)) return true;
+            if ((disease.thaiName || '').toLowerCase().includes(t)) return true;
+            const syn = Array.isArray(disease.synonyms) ? disease.synonyms.join(' ').toLowerCase() : '';
+            if (syn.includes(t)) return true;
+            if ((disease.icd10 || '').toLowerCase().includes(t)) return true;
+            if ((disease.category || '').toLowerCase().includes(t)) return true;
+            return false;
+        }
+
+        function dxRenderList() {
+            const searchEl = document.getElementById('dx-search-input');
+            dxState.searchTerm = searchEl ? String(searchEl.value || '').trim() : '';
+            dxRenderAzRail();
+            const list = document.getElementById('dx-list');
+            if (!list) return;
+            if (dxState.codex.length === 0) {
+                list.innerHTML = '<div class="dc-empty-state">🩺 Disease Codex กำลังจัดเตรียม · รอสักครู่<br><small style="color:#cbd5e1;">Admin is curating entries · check back soon</small></div>';
+                return;
+            }
+            const filtered = dxState.codex.filter(d => dxMatchesSearch(d, dxState.searchTerm));
+            if (filtered.length === 0) {
+                list.innerHTML = `<div class="dc-empty-state">ไม่พบโรคที่ตรงกับ "${escapeHtml(dxState.searchTerm)}"</div>`;
+                return;
+            }
+            const groups = {};
+            filtered.forEach(d => {
+                const first = String((d.diseaseName || '').trim()).charAt(0).toUpperCase();
+                const key = /[A-Z]/.test(first) ? first : '#';
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(d);
+            });
+            const orderedKeys = Object.keys(groups).sort((a, b) => {
+                if (a === '#') return 1;
+                if (b === '#') return -1;
+                return a.localeCompare(b);
+            });
+            list.innerHTML = orderedKeys.map(letter => {
+                const rows = groups[letter].map(disease => {
+                    const thai = disease.thaiName
+                        ? `<div class="dc-row-brands">${escapeHtml(disease.thaiName)}</div>` : '';
+                    const chips = [];
+                    if (disease.icd10) chips.push(`<span class="dc-row-meta-chip">${escapeHtml(disease.icd10)}</span>`);
+                    if (disease.category) chips.push(`<span style="color:#475569;">${escapeHtml(disease.category)}</span>`);
+                    return `
+                        <div class="dc-row" onclick="dxOpenDetail('${escapeHtml(disease._id)}')">
+                            <div class="dc-row-main">
+                                <div class="dc-row-name">${escapeHtml(disease.diseaseName || '(unnamed)')}</div>
+                                ${thai}
+                                ${chips.length ? `<div class="dc-row-meta">${chips.join('')}</div>` : ''}
+                            </div>
+                            <i class="fa-solid fa-chevron-right dc-row-chev"></i>
+                        </div>`;
+                }).join('');
+                return `<div class="dc-letter-heading" data-letter="${letter}">${letter}</div>${rows}`;
+            }).join('');
+        }
+
+        function dxRenderAzRail() {
+            const rail = document.getElementById('dx-az-rail');
+            if (!rail) return;
+            const counts = new Map();
+            const term = (dxState.searchTerm || '').toLowerCase();
+            dxState.codex.forEach(d => {
+                if (term && !dxMatchesSearch(d, term)) return;
+                const first = String((d.diseaseName || '').trim()).charAt(0).toUpperCase();
+                if (first) counts.set(first, (counts.get(first) || 0) + 1);
+            });
+            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+            rail.innerHTML = letters.map(L => {
+                const n = counts.get(L) || 0;
+                const has = n > 0;
+                const countBadge = has ? `<span class="dc-az-letter-count">${n}</span>` : '';
+                const title = has ? ` title="${n} disease${n === 1 ? '' : 's'} starting with ${L}"` : '';
+                return `<button type="button" class="dc-az-letter${has ? ' has-content' : ''}" ${has ? `onclick="dxJumpToLetter('${L}')"` : 'disabled'}${title}>${L}${countBadge}</button>`;
+            }).join('');
+        }
+
+        function dxJumpToLetter(letter) {
+            const list = document.getElementById('dx-list');
+            if (!list) return;
+            const heading = list.querySelector(`[data-letter="${letter}"]`);
+            if (heading && heading.scrollIntoView) heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function dxOpenDetail(diseaseId) {
+            const disease = dxState.codex.find(d => d._id === diseaseId);
+            if (!disease) { console.warn('[disease-codex intern] detail: not found', diseaseId); return; }
+            dxState.currentDisease = disease;
+            dxRenderDetail(disease);
+            const modal = document.getElementById('diseaseCodexDetailModal');
+            if (modal) modal.style.display = 'flex';
+        }
+
+        function dxCloseDetail() {
+            const modal = document.getElementById('diseaseCodexDetailModal');
+            if (modal) modal.style.display = 'none';
+            dxState.currentDisease = null;
+        }
+
+        function dxRenderDetail(disease) {
+            const nameEl = document.getElementById('dx-detail-name');
+            if (nameEl) nameEl.textContent = disease.diseaseName || '(unnamed)';
+            const chipsEl = document.getElementById('dx-detail-chips');
+            if (chipsEl) {
+                const chips = [];
+                if (disease.thaiName) chips.push(`<span class="dc-detail-chip" title="Thai name">🇹🇭 ${escapeHtml(disease.thaiName)}</span>`);
+                if (disease.icd10) chips.push(`<span class="dc-detail-chip" title="ICD-10">${escapeHtml(disease.icd10)}</span>`);
+                if (disease.category) chips.push(`<span class="dc-detail-chip">${escapeHtml(disease.category)}</span>`);
+                if (Array.isArray(disease.synonyms) && disease.synonyms.length > 0) {
+                    chips.push(`<span class="dc-detail-chip" title="Synonyms">= ${escapeHtml(disease.synonyms.slice(0, 3).join(', '))}${disease.synonyms.length > 3 ? ` +${disease.synonyms.length - 3}` : ''}</span>`);
+                }
+                chipsEl.innerHTML = chips.join('');
+            }
+            const body = document.getElementById('dx-detail-body');
+            if (!body) return;
+            const sections = [
+                { key: 'epi',  title: '📈 Epidemiology', open: false, fields: [['Epidemiology', disease.epidemiology]] },
+                { key: 'etio', title: '🧬 Etiology & Pathophysiology', open: false, fields: [['Etiology', disease.etiology], ['Pathophysiology', disease.pathophysiology]] },
+                { key: 'clinical', title: '🩺 Clinical Presentation', open: true, fields: [['Symptoms', disease.symptoms], ['Signs', disease.signs]] },
+                { key: 'dx', title: '🔬 Diagnosis', open: false, fields: [['Diagnostic Criteria', disease.diagnosis], ['Investigations', disease.investigations], ['Differential Diagnosis', disease.differential]] },
+                { key: 'mgmt', title: '💊 Management', open: true, fields: [['Treatment', disease.treatment], ['Non-pharmacologic', disease.nonPharm], ['Complications', disease.complications], ['Prognosis', disease.prognosis]] },
+                { key: 'edu', title: '📖 Education', open: true, fields: [['Patient Counseling · คำแนะนำผู้ป่วย', disease.patientCounseling], ['Red Flags', disease.redFlags], ['Clinical Pearls', disease.pearls]] },
+                { key: 'refs', title: '🔗 References', open: false, refs: Array.isArray(disease.references) ? disease.references.filter(Boolean) : [] }
+            ];
+            const html = sections.map(sec => {
+                if (sec.refs !== undefined) {
+                    if (sec.refs.length === 0) return '';
+                    const refsHtml = sec.refs.map(url => {
+                        const safeUrl = String(url).trim();
+                        const isHttp = /^https?:\/\//i.test(safeUrl);
+                        if (isHttp) return `<div class="dc-detail-field-value" style="margin-bottom:6px;"><a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(safeUrl)}</a></div>`;
+                        return `<div class="dc-detail-field-value" style="margin-bottom:6px;">${escapeHtml(safeUrl)}</div>`;
+                    }).join('');
+                    return `
+                        <details class="dc-detail-section" data-section-key="${sec.key}" ${sec.open ? 'open' : ''}>
+                            <summary>${sec.title}</summary>
+                            <div class="dc-detail-section-body">${refsHtml}</div>
+                        </details>`;
+                }
+                const fieldsHtml = sec.fields
+                    .filter(([, v]) => v && String(v).trim())
+                    .map(([label, v]) => `
+                        <div class="dc-detail-field">
+                            <div class="dc-detail-field-label dc-cat-label">${escapeHtml(label)}</div>
+                            <div class="dc-detail-field-value">${dxRenderFieldValue(v)}</div>
+                        </div>`).join('');
+                if (!fieldsHtml) return '';
+                return `
+                    <details class="dc-detail-section" data-section-key="${sec.key}" ${sec.open ? 'open' : ''}>
+                        <summary>${sec.title}</summary>
+                        <div class="dc-detail-section-body">${fieldsHtml}</div>
+                    </details>`;
+            }).filter(Boolean).join('');
+            body.innerHTML = html || '<div class="dc-empty-state" style="padding:20px;">โรคนี้ยังไม่มีรายละเอียด · entry may still be in draft.</div>';
+            body.scrollTop = 0;
+        }
+
+        function dxRenderFieldValue(raw) {
+            const text = String(raw == null ? '' : raw);
+            if (typeof window.renderMd === 'function') {
+                try { return window.renderMd(text); } catch (_) {}
+            }
+            return escapeHtml(text);
+        }
+
+        // Close the Disease Codex detail modal on backdrop click (matches the
+        // Drug Codex detail modal behavior).
+        document.addEventListener('click', function(ev) {
+            const modal = document.getElementById('diseaseCodexDetailModal');
+            if (modal && ev.target === modal) dxCloseDetail();
+        });
 
         function dcLoadCodex() {
             if (!window.db) return;
