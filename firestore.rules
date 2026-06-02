@@ -344,5 +344,42 @@ service cloud.firestore {
           && resource.data.submittedBy == request.auth.uid
           && resource.data.status == 'pending');
     }
+
+    // 30. Disease Codex (mirror of Drug Codex Rule 28, for diseases — Phase 1).
+    // Published A-Z clinical disease reference. Read by any signed-in user
+    // (intern reads it as a learning resource — LIFF auth is the access gate,
+    // matching drug_codex / reflective_logs posture). Write is admin-only;
+    // Phase 2a wires the ⚙️ CRUD modal. Drafts authored by interns would flow
+    // through disease_codex_drafts/ and be copied here on admin approval (a
+    // future phase). No per-disease discussion subcollection — out of scope
+    // per the Disease Codex plan (discussion comments cut).
+    match /disease_codex/{diseaseId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // 31. Disease Codex Drafts (intern submissions awaiting moderation).
+    // Scaffolded in Phase 1 to mirror drug_codex_drafts Rule 29; no UI ships
+    // until a future intern-submission phase. The required shape field is
+    // diseaseName (vs Drug Codex's genericName).
+    match /disease_codex_drafts/{draftId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.submittedBy == request.auth.uid);
+      allow create: if isSignedIn()
+        && request.resource.data.submittedBy == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.diseaseName is string
+        && request.resource.data.diseaseName.size() > 0;
+      allow update: if isAdmin()
+        || (isSignedIn()
+          && resource.data.submittedBy == request.auth.uid
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'pending'
+          && request.resource.data.submittedBy == resource.data.submittedBy);
+      allow delete: if isAdmin()
+        || (isSignedIn()
+          && resource.data.submittedBy == request.auth.uid
+          && resource.data.status == 'pending');
+    }
   }
 }
