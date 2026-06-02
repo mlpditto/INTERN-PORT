@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.81</title>
+    <title>Nika V94.82</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -9056,7 +9056,9 @@
                     let audioUrl = window._activePresetAudioUrl;
                     if (file) {
                         // Content-addressed audio upload (mirrors V93.43 editor-images flow).
-                        const hash = await _sha256Hex(file);
+                        // V94.82: window._sha256Hex — the bare _sha256Hex is module-scoped
+                        // and invisible from this classic <script> block.
+                        const hash = await window._sha256Hex(file);
                         const ext = _TTS_PRESET_AUDIO_MIME[file.type] || '.wav';
                         audioPath = 'voice-refs/' + hash + ext;
                         const ref = firebase.storage().ref(audioPath);
@@ -16214,6 +16216,12 @@ RULES:
             'image/webp': '.webp',
             'image/svg+xml': '.svg',
         };
+        // V94.82: expose on window so classic <script> call sites can reuse
+        // these (module-scoped declarations are otherwise invisible to sibling
+        // classic scripts — see the OmniVoice preset save at ~L9059 and the
+        // feedback_admin_module_vs_classic_scope note).
+        window._sha256Hex = _sha256Hex;
+        window._MIME_TO_EXT = _MIME_TO_EXT;
         window.uploadImageForQuill = function(quillInstance) {
             if (!quillInstance) return;
             const input = document.createElement('input');
