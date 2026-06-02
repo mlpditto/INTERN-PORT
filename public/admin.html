@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.83</title>
+    <title>Nika V94.84</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13152,8 +13152,36 @@
             <div id="dxa-view-published">
                 <div class="dca-toolbar">
                     <input type="text" id="dxa-search" placeholder="Search by name, Thai name, ICD-10, or category…" oninput="dxaSearch()">
+                    <button type="button" class="dca-ai-draft-btn" onclick="dxaAutoDraftToggle()" title="Generate a starting draft with AI · admin verifies before save">🤖 AI Auto-Draft</button>
                     <button type="button" class="dca-add-btn" onclick="dxaAddNew()">+ Add Disease</button>
                 </div>
+
+                <!-- V94.84 Phase 3: AI auto-draft input row. Hidden until 🤖 button clicked.
+                     Enter disease name + pick model → calls window.callUniversalAI in JSON mode →
+                     fills the 21-field form (mode-label marks it AI-drafted until first save).
+                     Reuses the Drug Codex .dca-ai-* CSS classes — no new styles. -->
+                <div id="dxa-ai-input-row" class="dca-ai-input-row" style="display:none;">
+                    <div class="dca-ai-input-row-head">
+                        <span class="dca-ai-input-row-title">🤖 AI Auto-Draft · type a disease name + pick a model</span>
+                        <button type="button" class="dca-ai-cancel-btn" onclick="dxaAutoDraftCancel()" title="Cancel">×</button>
+                    </div>
+                    <div class="dca-ai-input-row-body">
+                        <input type="text" id="dxa-ai-name" placeholder="Disease name e.g. Type 2 Diabetes · Dengue Fever · Community-acquired Pneumonia" maxlength="120" onkeydown="if(event.key==='Enter'){event.preventDefault();dxaAutoDraftGo();}">
+                        <div class="glass-toggle-container dca-ai-chip-rail" id="dxa-ai-chip-rail">
+                            <div class="glass-toggle-item" data-value="gemini-3.5-flash" onclick="dxaSelectAutoDraftModel(this)">Flash</div>
+                            <div class="glass-toggle-item active" data-value="gemini-2.5-pro" onclick="dxaSelectAutoDraftModel(this)">Pro</div>
+                            <div class="glass-toggle-item" data-value="gpt-4o" onclick="dxaSelectAutoDraftModel(this)">GPT</div>
+                            <div class="glass-toggle-item" data-value="claude-4-sonnet-latest" onclick="dxaSelectAutoDraftModel(this)">Claude</div>
+                            <div class="glass-toggle-item" data-value="typhoon-v2.5-30b-a3b-instruct" onclick="dxaSelectAutoDraftModel(this)" title="Typhoon">🌀</div>
+                            <div class="glass-toggle-item" data-value="or/xiaomi/mimo-v2.5-pro" onclick="dxaSelectAutoDraftModel(this)" title="MiMo-V2.5-Pro via OpenRouter">MiMo Pro</div>
+                            <div class="glass-toggle-item" data-value="or/xiaomi/mimo-v2.5" onclick="dxaSelectAutoDraftModel(this)" title="MiMo-V2.5 base via OpenRouter">MiMo</div>
+                        </div>
+                        <input type="hidden" id="dxa-ai-model-val" value="gemini-2.5-pro">
+                        <button type="button" id="dxa-ai-go-btn" class="dca-ai-go-btn" onclick="dxaAutoDraftGo()">Generate</button>
+                    </div>
+                    <div id="dxa-ai-error" class="dca-ai-error" style="display:none;"></div>
+                </div>
+
                 <div class="dca-az-rail" id="dxa-az-rail"></div>
                 <div id="dxa-list" class="dca-list">
                     <div class="dca-empty-state">Loading…</div>
@@ -31690,6 +31718,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // synonyms entered comma-separated; references entered newline-separated.
         const DXA_ARRAY_FIELDS = { synonyms: 'csv', references: 'lines' };
 
+        // V94.84 Phase 3: AI auto-draft model persistence (mirrors Drug Codex
+        // DCA_AI_LS_KEY / DCA_AI_FALLBACK_MODEL — separate key so disease + drug
+        // remember independent model choices).
+        const DXA_AI_LS_KEY = 'ai_default_disease_codex_model';
+        const DXA_AI_FALLBACK_MODEL = 'gemini-2.5-pro';
+
         // section key → fields. `required` flags fields that gate the error badge.
         const DXA_SECTION_DEFS = [
             { key: 'core',     fields: ['diseaseName', 'thaiName', 'synonyms', 'icd10', 'category'], required: ['diseaseName'] },
@@ -31791,6 +31825,225 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function dxaBackToList() {
             dxaState.editingId = null;
             dxaSwitchView('published');
+        }
+
+        // ===================================================================
+        // V94.84 Phase 3 — AI auto-draft. Admin types a disease name, AI fills
+        // the 21-field form, admin reviews + saves. Mirrors Drug Codex Phase 3
+        // (dcaAutoDraft*). Admin-only; zero infrastructure delta.
+        // ===================================================================
+        function dxaAutoDraftToggle() {
+            const row = document.getElementById('dxa-ai-input-row');
+            if (!row) return;
+            const showing = row.style.display !== 'none';
+            if (showing) {
+                dxaAutoDraftCancel();
+                return;
+            }
+            row.style.display = 'block';
+            dxaSyncAutoDraftChipFromStorage();
+            const nameEl = document.getElementById('dxa-ai-name');
+            if (nameEl) setTimeout(() => nameEl.focus(), 40);
+        }
+
+        function dxaAutoDraftCancel() {
+            const row = document.getElementById('dxa-ai-input-row');
+            if (row) row.style.display = 'none';
+            const nameEl = document.getElementById('dxa-ai-name');
+            if (nameEl) nameEl.value = '';
+            const errEl = document.getElementById('dxa-ai-error');
+            if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+            const goBtn = document.getElementById('dxa-ai-go-btn');
+            if (goBtn) { goBtn.disabled = false; goBtn.textContent = 'Generate'; }
+        }
+
+        function dxaSelectAutoDraftModel(el) {
+            if (typeof window.selectAiToolbarToggle === 'function') {
+                window.selectAiToolbarToggle(el, 'dxa-ai-model-val');
+            } else {
+                const container = el.parentElement;
+                if (container) container.querySelectorAll('.glass-toggle-item').forEach(i => i.classList.remove('active'));
+                el.classList.add('active');
+                const hidden = document.getElementById('dxa-ai-model-val');
+                if (hidden) hidden.value = el.dataset.value;
+            }
+            try { localStorage.setItem(DXA_AI_LS_KEY, el.dataset.value); } catch (_) {}
+        }
+
+        function dxaSyncAutoDraftChipFromStorage() {
+            let saved = null;
+            try { saved = localStorage.getItem(DXA_AI_LS_KEY); } catch (_) {}
+            const rail = document.getElementById('dxa-ai-chip-rail');
+            const hidden = document.getElementById('dxa-ai-model-val');
+            if (!rail || !hidden) return;
+            const chips = Array.from(rail.querySelectorAll('.glass-toggle-item'));
+            let target = saved && chips.find(c => c.dataset.value === saved);
+            if (!target) target = chips.find(c => c.dataset.value === hidden.value);
+            if (!target) target = chips[0];
+            if (!target) return;
+            chips.forEach(c => c.classList.toggle('active', c === target));
+            hidden.value = target.dataset.value;
+        }
+
+        async function dxaAutoDraftGo() {
+            const nameEl = document.getElementById('dxa-ai-name');
+            const errEl = document.getElementById('dxa-ai-error');
+            const goBtn = document.getElementById('dxa-ai-go-btn');
+            const diseaseName = nameEl ? String(nameEl.value || '').trim() : '';
+            if (!diseaseName) {
+                if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Type a disease name first (e.g. Type 2 Diabetes Mellitus).'; }
+                if (nameEl) nameEl.focus();
+                return;
+            }
+            if (typeof window.callUniversalAI !== 'function') {
+                if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'AI core not loaded yet — try again in a moment.'; }
+                return;
+            }
+            const modelEl = document.getElementById('dxa-ai-model-val');
+            const selectedModel = (modelEl && modelEl.value) || DXA_AI_FALLBACK_MODEL;
+
+            // Soft duplicate hint (warning, not blocker — admin may want to regenerate).
+            const dup = dxaState.codex.find(d => (d.diseaseName || '').toLowerCase() === diseaseName.toLowerCase());
+            if (dup) {
+                const proceed = confirm(`"${diseaseName}" already exists in the codex (id ${dup._id}).\n\nGenerate a fresh AI draft anyway? (Saving will be blocked by the duplicate guard unless you change the name.)`);
+                if (!proceed) return;
+            }
+
+            if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+            if (goBtn) { goBtn.disabled = true; goBtn.textContent = '⏳ Generating…'; }
+
+            const prompt = dxaBuildAutoDraftPrompt(diseaseName);
+            try {
+                const resp = await window.callUniversalAI(selectedModel, prompt, true);
+                const rawText = (resp && resp.text) ? resp.text : (typeof resp === 'string' ? resp : '');
+                if (!rawText) throw new Error('Empty response from AI');
+
+                let parsed = dxaParseAutoDraftResponse(rawText);
+                if (!parsed) {
+                    // Single silent retry — fresh sample usually returns clean JSON
+                    // (feedback_ai_json_diagnostic_pattern).
+                    const resp2 = await window.callUniversalAI(selectedModel, prompt, true);
+                    const rawText2 = (resp2 && resp2.text) ? resp2.text : (typeof resp2 === 'string' ? resp2 : '');
+                    parsed = dxaParseAutoDraftResponse(rawText2);
+                    if (!parsed) {
+                        const preview = String(rawText2 || rawText || '').slice(0, 300);
+                        throw new Error('AI returned invalid JSON after retry.\nFirst 300 chars: ' + preview);
+                    }
+                }
+
+                // Force diseaseName to what admin typed (model may "correct" it).
+                parsed.diseaseName = diseaseName;
+
+                // Sanitise: ensure all schema keys present + arrays are arrays.
+                const draftData = {};
+                DXA_FIELD_KEYS.forEach(key => {
+                    const v = parsed[key];
+                    if (DXA_ARRAY_FIELDS[key]) {
+                        draftData[key] = Array.isArray(v) ? v.filter(Boolean) : [];
+                    } else {
+                        draftData[key] = v == null ? '' : String(v);
+                    }
+                });
+
+                // Hide input row + open form view in Add mode with AI marker.
+                dxaAutoDraftCancel();
+                dxaState.editingId = null;
+                const modeLabel = document.getElementById('dxa-form-mode-label');
+                if (modeLabel) modeLabel.textContent = 'Add Disease · 🤖 AI draft';
+                dxaFillForm(draftData);
+                dxaSwitchSection('core');
+                dxaSwitchView('form');
+                if (typeof showToast === 'function') {
+                    const modelLabel = (resp && resp.model) ? resp.model : selectedModel;
+                    showToast(`🤖 Drafted "${diseaseName}" with ${modelLabel}. Verify all fields before saving.`);
+                }
+            } catch (err) {
+                console.error('[disease-codex] auto-draft failed:', err);
+                if (errEl) {
+                    errEl.style.display = 'block';
+                    errEl.textContent = 'Auto-draft failed: ' + (err && err.message ? err.message : 'unknown error');
+                }
+                if (goBtn) { goBtn.disabled = false; goBtn.textContent = 'Generate'; }
+            }
+        }
+
+        function dxaParseAutoDraftResponse(rawText) {
+            if (!rawText) return null;
+            try {
+                if (typeof window.safeJsonParse === 'function') {
+                    return window.safeJsonParse(rawText);
+                }
+                const cleaned = String(rawText).replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+                return JSON.parse(cleaned);
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function dxaBuildAutoDraftPrompt(diseaseName) {
+            // FORMAT CONTRACT leads (feedback_ai_prose_mode_recovery).
+            // LANGUAGE RULE explicit per-field (feedback_ai_prompt_language_neutral).
+            // Neutral <<<markers>>> avoid English few-shot bias.
+            // SELF-CHECK at end lets the model fix language drift.
+            return [
+                'ROLE: clinical medicine reference compiler. Produce a structured disease monograph for an internal medical-intern study tool (Thailand).',
+                '',
+                'FORMAT CONTRACT — RESPOND WITH PURE JSON ONLY.',
+                'NO MARKDOWN. NO PROSE OUTSIDE JSON. NO ```json``` FENCE.',
+                'Root object must contain EXACTLY these keys (string unless marked array):',
+                '{',
+                '  "diseaseName":     "<<<standard English disease name · same as input>>>",',
+                '  "thaiName":        "<<<Thai name of the disease · ภาษาไทย · empty string if no common Thai name>>>",',
+                '  "synonyms":        ["<<<array of alternate names / abbreviations e.g. T2DM, NIDDM>>>"],',
+                '  "icd10":           "<<<ICD-10 code e.g. E11 · empty string if unknown>>>",',
+                '  "category":        "<<<organ system / specialty · medical English e.g. Endocrine>>>",',
+                '  "epidemiology":    "<<<prevalence · incidence · risk groups · Thailand notes if relevant · medical English>>>",',
+                '  "etiology":        "<<<causes · risk factors · genetic/environmental contributors · medical English>>>",',
+                '  "pathophysiology": "<<<disease mechanism · sequence from insult to clinical state · medical English>>>",',
+                '  "symptoms":        "<<<patient-reported symptoms · medical English · short bullets with \\n- prefix>>>",',
+                '  "signs":           "<<<examination findings · vital signs · physical signs · medical English>>>",',
+                '  "diagnosis":       "<<<diagnostic criteria · clinical approach · scoring systems · medical English>>>",',
+                '  "investigations":  "<<<labs · imaging · special tests + expected findings · medical English>>>",',
+                '  "differential":    "<<<conditions to distinguish from · discriminating features · medical English>>>",',
+                '  "treatment":       "<<<pharmacologic treatment · first-line / second-line · medical English>>>",',
+                '  "nonPharm":        "<<<non-pharmacologic management · lifestyle · procedures · medical English>>>",',
+                '  "complications":   "<<<acute and chronic complications · medical English>>>",',
+                '  "prognosis":       "<<<natural history · outcomes · prognostic factors · medical English>>>",',
+                '  "patientCounseling":"<<<Thai counseling points · ภาษาไทยเท่านั้น · 2-5 bullet points>>>",',
+                '  "redFlags":        "<<<warning signs requiring urgent care · medical English>>>",',
+                '  "pearls":          "<<<high-yield clinical pearls · mix EN+TH ok>>>",',
+                '  "references":      ["<<<source hint 1>>>", "<<<source hint 2>>>", "<<<source hint 3>>>"]',
+                '}',
+                '',
+                'LANGUAGE RULE — STRICT:',
+                '- "thaiName" MUST be Thai (ภาษาไทย), or an empty string if there is no common Thai name.',
+                '- "patientCounseling" MUST be Thai (ภาษาไทย). This is counseling spoken to a Thai-speaking patient. Use everyday Thai, not transliterated English.',
+                '- "redFlags" and ALL other prose fields MUST be in English (international medical convention).',
+                '- "pearls" may mix Thai + English where pedagogically useful (e.g. Thai mnemonics with English medical terms).',
+                '- Medical loanwords like "MRI", "GFR", "QT prolongation" stay in English even inside Thai text — do not transliterate them.',
+                '',
+                'REFERENCES RULE — SOURCE HINTS ONLY (NOT URLs):',
+                '- Return 3-5 items in the "references" array.',
+                '- Each item names a verifiable source admin can search, e.g. "PubMed: dengue fever management guideline", "UpToDate: Clinical manifestations of dengue", "Thailand CPG: เบาหวาน 2566", "Harrison\'s Internal Medicine: <chapter>".',
+                '- Do NOT invent http(s) URLs. Do NOT cite specific PMIDs, DOIs, or paper URLs — those are hallucinated too often in medical references.',
+                '- Admin will verify each hint and substitute real links manually before publishing.',
+                '',
+                'CONTENT RULES:',
+                '- If you are uncertain about a field (e.g. ICD-10 code), return an empty string for that field rather than guessing.',
+                '- Reflect standard Thailand / international guidelines. Note local epidemiology where relevant.',
+                '- Keep each text field under 600 characters. Use \\n for line breaks. Use "- " prefix for bullet items.',
+                '- Do NOT include disclaimers like "consult a physician" in the JSON values — the platform handles that.',
+                '',
+                'SELF-CHECK before responding:',
+                '1. Is the response valid JSON (no markdown fence, no prose outside the braces)?',
+                '2. Are "thaiName" (if present) and "patientCounseling" written in Thai script?',
+                '3. Are "redFlags" and all other prose fields written in English?',
+                '4. Is "references" a 3-5 item array of source HINTS (no http URLs, no PMIDs, no DOIs)?',
+                '5. Are all 21 keys present?',
+                'If any check fails, regenerate before sending.',
+                '',
+                'DISEASE TO DRAFT: <<<' + diseaseName + '>>>'
+            ].join('\n');
         }
 
         function dxaUpdateCounts() {
