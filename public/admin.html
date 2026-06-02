@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.82</title>
+    <title>Nika V94.83</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1759,6 +1759,13 @@
         .dca-form-tab-btn[data-section="pk"].active       { color: #115e59; border-color: #99f6e4; }
         .dca-form-tab-btn[data-section="edu"].active      { color: #065f46; border-color: #a7f3d0; }
         .dca-form-tab-btn[data-section="refs"].active     { color: #475569; border-color: #cbd5e1; }
+        /* Disease Codex (Phase 2a) reuses the .dca-* structural CSS; only the 4
+           section keys unique to diseases (epi/etio/dx/mgmt) need their own active
+           tints. core/clinical/edu/refs share the Drug Codex rules above. */
+        .dca-form-tab-btn[data-section="epi"].active      { color: #b45309; border-color: #fde68a; }
+        .dca-form-tab-btn[data-section="etio"].active     { color: #6d28d9; border-color: #ddd6fe; }
+        .dca-form-tab-btn[data-section="dx"].active        { color: #0e7490; border-color: #a5f3fc; }
+        .dca-form-tab-btn[data-section="mgmt"].active     { color: #be123c; border-color: #fecdd3; }
         /* V94.41: Copy buttons — global (form header, full label) + per-section (icon-only, right-aligned). */
         .dca-form-copy-btn {
             padding: 4px 10px; border-radius: 6px;
@@ -10514,13 +10521,18 @@
                 <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:14px; margin-bottom:16px; border-bottom:1px solid var(--border-color); padding-bottom:14px; flex-wrap:wrap;">
                     <div>
                         <h2 style="margin:0; font-family:'Cormorant Garamond',serif; font-size:2.1em; color:var(--text-main); line-height:1;">PONEGLYPH</h2>
-                        <div style="font-size:0.85em; color:#64748b; margin-top:4px; letter-spacing:0.5px;">Learning Path · Daily Reflections · Drug Codex</div>
+                        <div style="font-size:0.85em; color:#64748b; margin-top:4px; letter-spacing:0.5px;">Learning Path · Daily Reflections · Drug Codex · Disease Codex</div>
                     </div>
                     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                         <!-- V93.97 Phase 2: Drug Codex admin entry point. Click opens the
                              A-Z drug reference CRUD modal (drug_codex + drug_codex_drafts). -->
                         <button type="button" class="dca-poneglyph-gear" onclick="openDrugCodexAdmin()" title="Drug Codex · จารึกข้อมูลยา">
                             💊 Drug Codex
+                        </button>
+                        <!-- Disease Codex Phase 2a: A-Z disease reference CRUD modal
+                             (disease_codex). Mirrors the Drug Codex entry point. -->
+                        <button type="button" class="dca-poneglyph-gear" onclick="openDiseaseCodexAdmin()" title="Disease Codex · จารึกข้อมูลโรค" style="background:linear-gradient(135deg,#0f766e,#0d9488); border-color:#0f766e; color:#fff;">
+                            🩺 Disease Codex
                         </button>
                         <div style="display:flex; background:#f1f5f9; border-radius:12px; padding:3px; gap:3px;">
                             <button id="lp-btn-my" onclick="lpSetView('my')" style="padding:7px 16px; border:none; border-radius:10px; font-size:0.85em; font-weight:700; background:#1d4ed8; color:#fff; cursor:pointer;">My Path</button>
@@ -13115,6 +13127,198 @@
                 <div style="display:flex; justify-content:space-between; gap:10px; margin-top:14px;">
                     <button type="button" onclick="dcaBackToList()" class="lpt-form-back-btn">← Back to list</button>
                     <button type="button" id="dca-form-save-btn" onclick="dcaSaveForm()" class="lpt-form-save-btn">💾 Save Drug</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Disease Codex Phase 2a: A-Z disease reference CRUD modal. Mirrors the
+         Drug Codex admin modal mechanics (search · A-Z rail · list · 8-section
+         tabbed form · save/edit/delete · audit-trail meta) but for diseases,
+         reusing the .dca-* structural CSS. IDs are dxa-/dx- prefixed so they
+         never collide with Drug Codex; all dxa* JS queries are scoped to this
+         modal. No drafts tab / AI / i18n in MVP (deferred per plan). -->
+    <div id="diseaseCodexAdminModal" class="modal" style="z-index:4402;">
+        <div class="modal-content" style="max-width:860px;">
+            <span class="close-modal" onclick="closeDiseaseCodexAdmin()">&times;</span>
+            <h3 style="margin:0 0 4px 0; color:#0f766e; display:flex; align-items:center; gap:8px;">
+                <span>🩺</span> Disease Codex · จารึกข้อมูลโรค
+            </h3>
+            <div style="font-size:0.83em; color:#64748b; margin-bottom:14px;">
+                A-Z clinical disease reference. Published entries are read by interns.
+            </div>
+
+            <!-- Published list view -->
+            <div id="dxa-view-published">
+                <div class="dca-toolbar">
+                    <input type="text" id="dxa-search" placeholder="Search by name, Thai name, ICD-10, or category…" oninput="dxaSearch()">
+                    <button type="button" class="dca-add-btn" onclick="dxaAddNew()">+ Add Disease</button>
+                </div>
+                <div class="dca-az-rail" id="dxa-az-rail"></div>
+                <div id="dxa-list" class="dca-list">
+                    <div class="dca-empty-state">Loading…</div>
+                </div>
+            </div>
+
+            <!-- Form view (Add / Edit) -->
+            <div id="dxa-view-form" style="display:none;">
+                <div id="dxa-form-error" class="dca-form-error" style="display:none;"></div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <div style="font-weight:800; color:#0f766e; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <span id="dxa-form-mode-label">Add Disease</span>
+                        <button type="button" id="dxa-form-copy-btn" class="dca-form-copy-btn"
+                                onclick="dxaCopyDiseaseAsMarkdown('all', this)" title="Copy this disease entry as Markdown to clipboard (current form state)">
+                            📋 Copy
+                        </button>
+                    </div>
+                    <div style="font-size:0.78em; color:#94a3b8;" id="dxa-form-doc-id"></div>
+                </div>
+
+                <div id="dxa-form-meta" class="dca-form-meta" style="display:none;"></div>
+
+                <!-- Tab navigation — 8 disease sections. Default tab = Core. -->
+                <div class="dca-form-tabs" id="dxa-form-tabs" role="tablist">
+                    <button type="button" class="dca-form-tab-btn active" data-section="core"     onclick="dxaSwitchSection('core')"     role="tab">📛 Core <span class="dca-form-tab-badge empty" data-section-badge="core">○</span></button>
+                    <button type="button" class="dca-form-tab-btn"        data-section="epi"      onclick="dxaSwitchSection('epi')"      role="tab">📈 Epi <span class="dca-form-tab-badge empty" data-section-badge="epi">○</span></button>
+                    <button type="button" class="dca-form-tab-btn"        data-section="etio"     onclick="dxaSwitchSection('etio')"     role="tab">🧬 Etio <span class="dca-form-tab-badge empty" data-section-badge="etio">○</span></button>
+                    <button type="button" class="dca-form-tab-btn"        data-section="clinical" onclick="dxaSwitchSection('clinical')" role="tab">🩺 Clinical <span class="dca-form-tab-badge empty" data-section-badge="clinical">○</span></button>
+                    <button type="button" class="dca-form-tab-btn"        data-section="dx"       onclick="dxaSwitchSection('dx')"       role="tab">🔬 Dx <span class="dca-form-tab-badge empty" data-section-badge="dx">○</span></button>
+                    <button type="button" class="dca-form-tab-btn"        data-section="mgmt"     onclick="dxaSwitchSection('mgmt')"     role="tab">💊 Mgmt <span class="dca-form-tab-badge empty" data-section-badge="mgmt">○</span></button>
+                    <button type="button" class="dca-form-tab-btn"        data-section="edu"      onclick="dxaSwitchSection('edu')"      role="tab">📖 Edu <span class="dca-form-tab-badge empty" data-section-badge="edu">○</span></button>
+                    <button type="button" class="dca-form-tab-btn"        data-section="refs"     onclick="dxaSwitchSection('refs')"     role="tab">🔗 Refs <span class="dca-form-tab-badge empty" data-section-badge="refs">○</span></button>
+                </div>
+
+                <!-- Section 1: Core identity -->
+                <div class="dca-form-section active-tab" data-tab="core">
+                    <div class="dca-form-section-header"><span>📛 Core Identity</span><button type="button" class="dca-form-copy-btn" onclick="dxaCopyDiseaseAsMarkdown('core', this)" title="Copy this section as Markdown">📋</button></div>
+                    <div class="dca-form-section-body">
+                        <div class="dca-form-grid">
+                            <label for="dxa-f-diseaseName" class="required">Disease Name (EN)</label>
+                            <input type="text" id="dxa-f-diseaseName" placeholder="e.g. Type 2 Diabetes Mellitus" maxlength="120">
+
+                            <label for="dxa-f-thaiName">Thai Name</label>
+                            <input type="text" id="dxa-f-thaiName" placeholder="e.g. เบาหวานชนิดที่ 2" maxlength="120">
+
+                            <label for="dxa-f-synonyms">Synonyms</label>
+                            <input type="text" id="dxa-f-synonyms" placeholder="Comma-separated · e.g. T2DM, NIDDM">
+
+                            <label for="dxa-f-icd10">ICD-10</label>
+                            <input type="text" id="dxa-f-icd10" placeholder="e.g. E11" maxlength="20">
+
+                            <label for="dxa-f-category">Category / System</label>
+                            <input type="text" id="dxa-f-category" placeholder="e.g. Endocrine" maxlength="80">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Epidemiology -->
+                <div class="dca-form-section" data-tab="epi">
+                    <div class="dca-form-section-header"><span>📈 Epidemiology</span><button type="button" class="dca-form-copy-btn" onclick="dxaCopyDiseaseAsMarkdown('epi', this)" title="Copy this section as Markdown">📋</button></div>
+                    <div class="dca-form-section-body">
+                        <div class="dca-form-grid">
+                            <label for="dxa-f-epidemiology">Epidemiology</label>
+                            <textarea id="dxa-f-epidemiology" rows="4" placeholder="Prevalence · incidence · risk groups · regional notes (Thailand if relevant)…"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Etiology & Pathophysiology -->
+                <div class="dca-form-section" data-tab="etio">
+                    <div class="dca-form-section-header"><span>🧬 Etiology &amp; Pathophysiology</span><button type="button" class="dca-form-copy-btn" onclick="dxaCopyDiseaseAsMarkdown('etio', this)" title="Copy this section as Markdown">📋</button></div>
+                    <div class="dca-form-section-body">
+                        <div class="dca-form-grid">
+                            <label for="dxa-f-etiology">Etiology</label>
+                            <textarea id="dxa-f-etiology" rows="4" placeholder="Causes · risk factors · genetic / environmental contributors…"></textarea>
+
+                            <label for="dxa-f-pathophysiology">Pathophysiology</label>
+                            <textarea id="dxa-f-pathophysiology" rows="5" placeholder="Disease mechanism · sequence of events from insult to clinical state…"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 4: Clinical Presentation -->
+                <div class="dca-form-section" data-tab="clinical">
+                    <div class="dca-form-section-header"><span>🩺 Clinical Presentation</span><button type="button" class="dca-form-copy-btn" onclick="dxaCopyDiseaseAsMarkdown('clinical', this)" title="Copy this section as Markdown">📋</button></div>
+                    <div class="dca-form-section-body">
+                        <div class="dca-form-grid">
+                            <label for="dxa-f-symptoms">Symptoms</label>
+                            <textarea id="dxa-f-symptoms" rows="4" placeholder="Patient-reported symptoms…"></textarea>
+
+                            <label for="dxa-f-signs">Signs</label>
+                            <textarea id="dxa-f-signs" rows="4" placeholder="Examination findings · vital signs · physical signs…"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 5: Diagnosis -->
+                <div class="dca-form-section" data-tab="dx">
+                    <div class="dca-form-section-header"><span>🔬 Diagnosis</span><button type="button" class="dca-form-copy-btn" onclick="dxaCopyDiseaseAsMarkdown('dx', this)" title="Copy this section as Markdown">📋</button></div>
+                    <div class="dca-form-section-body">
+                        <div class="dca-form-grid">
+                            <label for="dxa-f-diagnosis">Diagnostic Criteria</label>
+                            <textarea id="dxa-f-diagnosis" rows="4" placeholder="Diagnostic criteria · clinical approach · scoring systems…"></textarea>
+
+                            <label for="dxa-f-investigations">Investigations</label>
+                            <textarea id="dxa-f-investigations" rows="4" placeholder="Labs · imaging · special tests + expected findings…"></textarea>
+
+                            <label for="dxa-f-differential">Differential Diagnosis</label>
+                            <textarea id="dxa-f-differential" rows="3" placeholder="Conditions to distinguish from · discriminating features…"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 6: Management -->
+                <div class="dca-form-section" data-tab="mgmt">
+                    <div class="dca-form-section-header"><span>💊 Management</span><button type="button" class="dca-form-copy-btn" onclick="dxaCopyDiseaseAsMarkdown('mgmt', this)" title="Copy this section as Markdown">📋</button></div>
+                    <div class="dca-form-section-body">
+                        <div class="dca-form-grid">
+                            <label for="dxa-f-treatment">Treatment (Pharmacologic)</label>
+                            <textarea id="dxa-f-treatment" rows="4" placeholder="First-line · second-line · drug classes · dosing principles…"></textarea>
+
+                            <label for="dxa-f-nonPharm">Non-pharmacologic</label>
+                            <textarea id="dxa-f-nonPharm" rows="3" placeholder="Lifestyle · procedures · surgery · supportive care…"></textarea>
+
+                            <label for="dxa-f-complications">Complications</label>
+                            <textarea id="dxa-f-complications" rows="3" placeholder="Acute / chronic complications · what to monitor for…"></textarea>
+
+                            <label for="dxa-f-prognosis">Prognosis</label>
+                            <textarea id="dxa-f-prognosis" rows="3" placeholder="Natural history · outcomes · factors affecting prognosis…"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 7: Education -->
+                <div class="dca-form-section" data-tab="edu">
+                    <div class="dca-form-section-header"><span>📖 Education</span><button type="button" class="dca-form-copy-btn" onclick="dxaCopyDiseaseAsMarkdown('edu', this)" title="Copy this section as Markdown">📋</button></div>
+                    <div class="dca-form-section-body">
+                        <div class="dca-form-grid">
+                            <label for="dxa-f-patientCounseling">Patient Counseling (TH)</label>
+                            <textarea id="dxa-f-patientCounseling" rows="4" placeholder="คำแนะนำสำหรับผู้ป่วย (ภาษาไทย)…"></textarea>
+
+                            <label for="dxa-f-redFlags">Red Flags</label>
+                            <textarea id="dxa-f-redFlags" rows="3" placeholder="Warning signs requiring urgent escalation…"></textarea>
+
+                            <label for="dxa-f-pearls">Clinical Pearls</label>
+                            <textarea id="dxa-f-pearls" rows="3" placeholder="High-yield tips for intern review (EN + TH ok)…"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 8: References -->
+                <div class="dca-form-section" data-tab="refs">
+                    <div class="dca-form-section-header"><span>🔗 References</span><button type="button" class="dca-form-copy-btn" onclick="dxaCopyDiseaseAsMarkdown('refs', this)" title="Copy this section as Markdown">📋</button></div>
+                    <div class="dca-form-section-body">
+                        <div class="dca-form-grid">
+                            <label for="dxa-f-references">References</label>
+                            <textarea id="dxa-f-references" rows="3" placeholder="One per line · source hints (e.g. &quot;Harrison's 21e: <topic>&quot;, &quot;UpToDate: <topic>&quot;, &quot;PubMed: <terms>&quot;)"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; gap:10px; margin-top:14px;">
+                    <button type="button" onclick="dxaBackToList()" class="lpt-form-back-btn">← Back to list</button>
+                    <button type="button" id="dxa-form-save-btn" onclick="dxaSaveForm()" class="lpt-form-save-btn">💾 Save Disease</button>
                 </div>
             </div>
         </div>
@@ -31463,6 +31667,563 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             lines.push('If any check fails, regenerate before sending.');
 
             return lines.join('\n');
+        }
+
+        // ===================================================================
+        // Disease Codex Phase 2a — admin CRUD (dxa*).
+        // Mirrors the Drug Codex admin (dca*) mechanics for the disease_codex
+        // collection, reusing the .dca-* structural CSS. All DOM queries that
+        // could match the Drug Codex modal's tabs/sections are scoped to
+        // #diseaseCodexAdminModal so the two modals never interfere. No drafts
+        // UI / AI / i18n in MVP (deferred per the Disease Codex plan).
+        // ===================================================================
+        const DXA_FIELD_KEYS = [
+            'diseaseName', 'thaiName', 'synonyms', 'icd10', 'category',
+            'epidemiology',
+            'etiology', 'pathophysiology',
+            'symptoms', 'signs',
+            'diagnosis', 'investigations', 'differential',
+            'treatment', 'nonPharm', 'complications', 'prognosis',
+            'patientCounseling', 'redFlags', 'pearls',
+            'references'
+        ];
+        // synonyms entered comma-separated; references entered newline-separated.
+        const DXA_ARRAY_FIELDS = { synonyms: 'csv', references: 'lines' };
+
+        // section key → fields. `required` flags fields that gate the error badge.
+        const DXA_SECTION_DEFS = [
+            { key: 'core',     fields: ['diseaseName', 'thaiName', 'synonyms', 'icd10', 'category'], required: ['diseaseName'] },
+            { key: 'epi',      fields: ['epidemiology'] },
+            { key: 'etio',     fields: ['etiology', 'pathophysiology'] },
+            { key: 'clinical', fields: ['symptoms', 'signs'] },
+            { key: 'dx',       fields: ['diagnosis', 'investigations', 'differential'] },
+            { key: 'mgmt',     fields: ['treatment', 'nonPharm', 'complications', 'prognosis'] },
+            { key: 'edu',      fields: ['patientCounseling', 'redFlags', 'pearls'] },
+            { key: 'refs',     fields: ['references'] }
+        ];
+        const DXA_SECTION_TITLES = {
+            core: 'Core Identity', epi: 'Epidemiology', etio: 'Etiology & Pathophysiology',
+            clinical: 'Clinical Presentation', dx: 'Diagnosis', mgmt: 'Management',
+            edu: 'Education', refs: 'References'
+        };
+        const DXA_FIELD_LABELS = {
+            diseaseName: 'Disease Name (EN)', thaiName: 'Thai Name', synonyms: 'Synonyms',
+            icd10: 'ICD-10', category: 'Category / System', epidemiology: 'Epidemiology',
+            etiology: 'Etiology', pathophysiology: 'Pathophysiology', symptoms: 'Symptoms',
+            signs: 'Signs', diagnosis: 'Diagnostic Criteria', investigations: 'Investigations',
+            differential: 'Differential Diagnosis', treatment: 'Treatment (Pharmacologic)',
+            nonPharm: 'Non-pharmacologic', complications: 'Complications', prognosis: 'Prognosis',
+            patientCounseling: 'Patient Counseling (TH)', redFlags: 'Red Flags',
+            pearls: 'Clinical Pearls', references: 'References'
+        };
+
+        var dxaState = {
+            view: 'published',   // 'published' | 'form'
+            editingId: null,     // doc id being edited, null = add new
+            unsubCodex: null,    // onSnapshot unsubscribe for disease_codex
+            codex: [],           // sorted array of disease_codex docs
+            searchTerm: ''
+        };
+
+        function openDiseaseCodexAdmin() {
+            const modal = document.getElementById('diseaseCodexAdminModal');
+            if (!modal) return;
+            dxaState.view = 'published';
+            dxaState.editingId = null;
+            dxaState.searchTerm = '';
+            const searchEl = document.getElementById('dxa-search');
+            if (searchEl) searchEl.value = '';
+            dxaSwitchView('published');
+
+            dxaTeardownListeners();
+            try {
+                dxaState.unsubCodex = db.collection('disease_codex')
+                    .orderBy('diseaseName')
+                    .onSnapshot(snap => {
+                        // Firestore .orderBy is case-sensitive ASCII; resort
+                        // client-side with localeCompare base sensitivity so the
+                        // A-Z list matches the navigation rail (same fix as the
+                        // Drug Codex V94.66 snapshot handler).
+                        dxaState.codex = snap.docs
+                            .map(d => Object.assign({ _id: d.id }, d.data()))
+                            .sort((a, b) => (a.diseaseName || '').localeCompare(
+                                (b.diseaseName || ''), undefined, { sensitivity: 'base' }));
+                        dxaRenderPublishedList();
+                        dxaUpdateCounts();
+                    }, err => {
+                        console.error('[disease-codex] codex snapshot error:', err);
+                        const list = document.getElementById('dxa-list');
+                        if (list) list.innerHTML = `<div class="dca-empty-state" style="color:#b91c1c;">Failed to load disease_codex: ${err && err.message ? err.message : err}<br><small>If "Missing or insufficient permissions", deploy firestore.rules from the Disease Codex Phase 1 PR.</small></div>`;
+                    });
+            } catch (err) {
+                console.error('[disease-codex] listener setup failed:', err);
+            }
+
+            modal.style.display = 'block';
+            modal.classList.add('force-show');
+        }
+
+        function closeDiseaseCodexAdmin() {
+            dxaTeardownListeners();
+            forceHideModal('diseaseCodexAdminModal');
+        }
+
+        function dxaTeardownListeners() {
+            if (typeof dxaState.unsubCodex === 'function') {
+                try { dxaState.unsubCodex(); } catch (_) {}
+                dxaState.unsubCodex = null;
+            }
+        }
+
+        function dxaSwitchView(view) {
+            dxaState.view = view;
+            const published = document.getElementById('dxa-view-published');
+            const form = document.getElementById('dxa-view-form');
+            if (view === 'form') {
+                if (published) published.style.display = 'none';
+                if (form) form.style.display = 'block';
+            } else {
+                if (published) published.style.display = 'block';
+                if (form) form.style.display = 'none';
+            }
+        }
+
+        function dxaBackToList() {
+            dxaState.editingId = null;
+            dxaSwitchView('published');
+        }
+
+        function dxaUpdateCounts() {
+            // No view-tabs in MVP; nothing to update yet. Kept as a hook so the
+            // snapshot handler matches the Drug Codex shape (and a future drafts
+            // tab can populate a badge here).
+        }
+
+        function dxaSearch() {
+            const el = document.getElementById('dxa-search');
+            dxaState.searchTerm = el ? String(el.value || '').trim().toLowerCase() : '';
+            dxaRenderPublishedList();
+        }
+
+        function dxaMatchesSearch(disease, term) {
+            if (!term) return true;
+            const haystack = [
+                disease.diseaseName || '',
+                disease.thaiName || '',
+                (disease.synonyms || []).join(' '),
+                disease.icd10 || '',
+                disease.category || ''
+            ].join(' ').toLowerCase();
+            return haystack.includes(term);
+        }
+
+        function dxaEscapeHtml(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+
+        function dxaRenderAzRail() {
+            const rail = document.getElementById('dxa-az-rail');
+            if (!rail) return;
+            const counts = new Map();
+            dxaState.codex.forEach(d => {
+                const first = String((d.diseaseName || '').trim()).charAt(0).toUpperCase();
+                if (first) counts.set(first, (counts.get(first) || 0) + 1);
+            });
+            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+            rail.innerHTML = letters.map(L => {
+                const n = counts.get(L) || 0;
+                const has = n > 0;
+                const countBadge = has ? `<span class="dca-az-letter-count">${n}</span>` : '';
+                const title = has ? ` title="${n} disease${n === 1 ? '' : 's'} starting with ${L}"` : '';
+                return `<button type="button" class="dca-az-letter${has ? ' has-content' : ''}" ${has ? `onclick="dxaJumpToLetter('${L}')"` : 'disabled'}${title}>${L}${countBadge}</button>`;
+            }).join('');
+        }
+
+        function dxaJumpToLetter(letter) {
+            const list = document.getElementById('dxa-list');
+            if (!list) return;
+            const heading = list.querySelector(`[data-letter="${letter}"]`);
+            if (heading && heading.scrollIntoView) heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function dxaRenderPublishedList() {
+            dxaRenderAzRail();
+            const list = document.getElementById('dxa-list');
+            if (!list) return;
+            const filtered = dxaState.codex.filter(d => dxaMatchesSearch(d, dxaState.searchTerm));
+            if (filtered.length === 0) {
+                list.innerHTML = `<div class="dca-empty-state">${dxaState.searchTerm ? 'No diseases match the search.' : 'No diseases published yet. Click + Add Disease to begin building the codex.'}</div>`;
+                return;
+            }
+            const groups = {};
+            filtered.forEach(d => {
+                const first = String((d.diseaseName || '').trim()).charAt(0).toUpperCase();
+                const key = /[A-Z]/.test(first) ? first : '#';
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(d);
+            });
+            const orderedKeys = Object.keys(groups).sort((a, b) => {
+                if (a === '#') return 1;
+                if (b === '#') return -1;
+                return a.localeCompare(b);
+            });
+            list.innerHTML = orderedKeys.map(letter => {
+                const rows = groups[letter].map(disease => {
+                    const sub = [];
+                    if (disease.thaiName) sub.push(dxaEscapeHtml(disease.thaiName));
+                    if (Array.isArray(disease.synonyms) && disease.synonyms.length > 0) sub.push(dxaEscapeHtml(disease.synonyms.join(', ')));
+                    const subLine = sub.length ? `<div class="dca-row-brands">${sub.join(' · ')}</div>` : '';
+                    const chips = [];
+                    if (disease.icd10) chips.push(`<span class="dca-row-meta-chip">${dxaEscapeHtml(disease.icd10)}</span>`);
+                    if (disease.category) chips.push(`<span style="color:#475569;">${dxaEscapeHtml(disease.category)}</span>`);
+                    const updatedAbs = dxaFormatAbsolute(disease.updatedAt || disease.createdAt);
+                    return `
+                        <div class="dca-row">
+                            <div class="dca-row-main">
+                                <div class="dca-row-name">${dxaEscapeHtml(disease.diseaseName)}</div>
+                                <div class="dca-row-meta">${chips.join('')}</div>
+                                ${subLine}
+                                ${dxaListMetaTrailHtml(disease)}
+                            </div>
+                            <div class="dca-row-side">
+                                ${updatedAbs ? `<div class="dca-row-updated-abs" title="Last updated">🕒 ${dxaEscapeHtml(updatedAbs)}</div>` : ''}
+                                <div class="dca-row-actions">
+                                    <button type="button" class="dca-row-edit-btn" onclick="dxaEdit('${dxaEscapeHtml(disease._id)}')">Edit</button>
+                                    <button type="button" class="dca-row-del-btn" onclick="dxaDelete('${dxaEscapeHtml(disease._id)}', this)" title="Delete">🗑️</button>
+                                </div>
+                            </div>
+                        </div>`;
+                }).join('');
+                return `<div class="dca-letter-heading" data-letter="${letter}">${letter}</div>${rows}`;
+            }).join('');
+        }
+
+        function dxaArrayToInput(value, kind) {
+            if (!Array.isArray(value)) return '';
+            if (kind === 'lines') return value.join('\n');
+            return value.join(', ');
+        }
+
+        function dxaInputToArray(value, kind) {
+            const raw = String(value == null ? '' : value).trim();
+            if (!raw) return [];
+            const sep = kind === 'lines' ? /\r?\n/ : /,/;
+            return raw.split(sep).map(s => s.trim()).filter(Boolean);
+        }
+
+        function dxaSwitchSection(sectionKey) {
+            const modal = document.getElementById('diseaseCodexAdminModal');
+            if (!modal) return;
+            modal.querySelectorAll('.dca-form-tab-btn[data-section]').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.section === sectionKey);
+            });
+            modal.querySelectorAll('.dca-form-section[data-tab]').forEach(sec => {
+                sec.classList.toggle('active-tab', sec.dataset.tab === sectionKey);
+            });
+        }
+
+        // Recompute every section badge from current form values.
+        function dxaUpdateSectionBadges() {
+            const modal = document.getElementById('diseaseCodexAdminModal');
+            if (!modal) return;
+            DXA_SECTION_DEFS.forEach(def => {
+                const badge = modal.querySelector(`.dca-form-tab-badge[data-section-badge="${def.key}"]`);
+                if (!badge) return;
+                const reqMissing = (def.required || []).some(k => {
+                    const el = document.getElementById('dxa-f-' + k);
+                    return !el || !String(el.value || '').trim();
+                });
+                const anyFilled = def.fields.some(k => {
+                    const el = document.getElementById('dxa-f-' + k);
+                    if (!el) return false;
+                    return String(el.value || '').trim().length > 0;
+                });
+                let state, glyph;
+                if (reqMissing) { state = 'error'; glyph = '!'; }
+                else if (anyFilled) { state = 'full'; glyph = '✓'; }
+                else { state = 'empty'; glyph = '○'; }
+                badge.classList.remove('empty', 'full', 'error');
+                badge.classList.add(state);
+                badge.textContent = glyph;
+            });
+        }
+
+        // Copy disease entry (or one section) as Markdown from current form state.
+        async function dxaCopyDiseaseAsMarkdown(scopeKey, btnEl) {
+            const data = dxaCollectForm();
+            const sectionDefs = scopeKey === 'all'
+                ? DXA_SECTION_DEFS
+                : DXA_SECTION_DEFS.filter(d => d.key === scopeKey);
+            const lines = [];
+            if (scopeKey === 'all' && data.diseaseName) {
+                lines.push('# ' + data.diseaseName);
+                lines.push('');
+            }
+            let nonEmptyCount = 0;
+            sectionDefs.forEach(def => {
+                const populated = def.fields.filter(k => {
+                    const v = data[k];
+                    if (DXA_ARRAY_FIELDS[k]) return Array.isArray(v) && v.length > 0;
+                    return v && String(v).trim();
+                });
+                if (populated.length === 0) return;
+                lines.push('## ' + (DXA_SECTION_TITLES[def.key] || def.key));
+                lines.push('');
+                populated.forEach(k => {
+                    const label = DXA_FIELD_LABELS[k] || k;
+                    const v = data[k];
+                    if (DXA_ARRAY_FIELDS[k] === 'csv') {
+                        lines.push('**' + label + '**: ' + (v || []).join(', '));
+                    } else if (DXA_ARRAY_FIELDS[k] === 'lines') {
+                        lines.push('**' + label + '**:');
+                        (v || []).forEach(line => lines.push('- ' + line));
+                    } else {
+                        const text = String(v || '').trim();
+                        if (text.indexOf('\n') !== -1) {
+                            lines.push('**' + label + '**:');
+                            lines.push(text);
+                        } else {
+                            lines.push('**' + label + '**: ' + text);
+                        }
+                    }
+                    lines.push('');
+                    nonEmptyCount++;
+                });
+            });
+            const md = lines.join('\n').trim();
+            if (!md || nonEmptyCount === 0) {
+                if (typeof showToast === 'function') showToast('Nothing to copy — fields are empty');
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(md);
+                const scope = (scopeKey === 'all')
+                    ? (nonEmptyCount + ' field' + (nonEmptyCount === 1 ? '' : 's'))
+                    : (DXA_SECTION_TITLES[scopeKey] || scopeKey);
+                if (typeof showToast === 'function') showToast('📋 Copied ' + scope + ' as Markdown');
+                if (btnEl) {
+                    btnEl.classList.add('copied');
+                    setTimeout(() => btnEl.classList.remove('copied'), 1200);
+                }
+            } catch (err) {
+                console.error('[disease-codex] copy failed:', err);
+                alert('Copy failed: ' + (err && err.message ? err.message : 'clipboard API blocked — try a focused tab over HTTPS'));
+            }
+        }
+
+        function dxaFillForm(data) {
+            DXA_FIELD_KEYS.forEach(key => {
+                const el = document.getElementById('dxa-f-' + key);
+                if (!el) return;
+                const v = data ? data[key] : undefined;
+                if (DXA_ARRAY_FIELDS[key]) {
+                    el.value = dxaArrayToInput(v, DXA_ARRAY_FIELDS[key]);
+                } else {
+                    el.value = (v == null ? '' : String(v));
+                }
+            });
+            dxaRenderMeta(data);
+            const idEl = document.getElementById('dxa-form-doc-id');
+            if (idEl) idEl.textContent = (data && data._id) ? `doc: ${data._id}` : '';
+            const err = document.getElementById('dxa-form-error');
+            if (err) { err.style.display = 'none'; err.textContent = ''; }
+            dxaUpdateSectionBadges();
+        }
+
+        function dxaCollectForm() {
+            const payload = {};
+            DXA_FIELD_KEYS.forEach(key => {
+                const el = document.getElementById('dxa-f-' + key);
+                if (!el) return;
+                if (DXA_ARRAY_FIELDS[key]) {
+                    payload[key] = dxaInputToArray(el.value, DXA_ARRAY_FIELDS[key]);
+                } else {
+                    payload[key] = String(el.value || '').trim();
+                }
+            });
+            return payload;
+        }
+
+        function dxaAddNew() {
+            dxaState.editingId = null;
+            const modeLabel = document.getElementById('dxa-form-mode-label');
+            if (modeLabel) modeLabel.textContent = 'Add Disease';
+            dxaFillForm({});
+            dxaSwitchSection('core');
+            dxaSwitchView('form');
+        }
+
+        function dxaEdit(diseaseId) {
+            const disease = dxaState.codex.find(d => d._id === diseaseId);
+            if (!disease) { console.warn('[disease-codex] edit: not found', diseaseId); return; }
+            dxaState.editingId = diseaseId;
+            const modeLabel = document.getElementById('dxa-form-mode-label');
+            if (modeLabel) modeLabel.textContent = 'Edit · ' + (disease.diseaseName || diseaseId);
+            dxaFillForm(disease);
+            dxaSwitchSection('core');
+            dxaSwitchView('form');
+        }
+
+        async function dxaDelete(diseaseId, btn) {
+            const disease = dxaState.codex.find(d => d._id === diseaseId);
+            const name = (disease && disease.diseaseName) || diseaseId;
+            if (!confirm(`Delete "${name}" from the Disease Codex? This cannot be undone.`)) return;
+            if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+            try {
+                await db.collection('disease_codex').doc(diseaseId).delete();
+                if (typeof showToast === 'function') showToast(`🗑️ Deleted ${name}`);
+            } catch (err) {
+                console.error('[disease-codex] delete failed:', err);
+                alert('Delete failed: ' + (err && err.message ? err.message : 'unknown error'));
+                if (btn) { btn.disabled = false; btn.textContent = '🗑️'; }
+            }
+        }
+
+        async function dxaSaveForm() {
+            const payload = dxaCollectForm();
+            const errEl = document.getElementById('dxa-form-error');
+            if (!payload.diseaseName) {
+                if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Disease Name is required.'; }
+                dxaSwitchSection('core');
+                const nameEl = document.getElementById('dxa-f-diseaseName');
+                if (nameEl) nameEl.focus();
+                dxaUpdateSectionBadges();
+                return;
+            }
+            const nameLower = payload.diseaseName.toLowerCase();
+            const dup = dxaState.codex.find(d => (d.diseaseName || '').toLowerCase() === nameLower
+                && d._id !== dxaState.editingId);
+            if (dup) {
+                if (errEl) { errEl.style.display = 'block'; errEl.textContent = `A disease named "${payload.diseaseName}" already exists (id ${dup._id}). Edit the existing entry instead.`; }
+                return;
+            }
+
+            const saveBtn = document.getElementById('dxa-form-save-btn');
+            const originalText = saveBtn ? saveBtn.innerHTML : '';
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '⏳ Saving…'; }
+
+            const nowTs = firebase.firestore.FieldValue.serverTimestamp();
+            const reviewerEmail = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin-ui';
+            payload.lastReviewedAt = nowTs;
+            payload.reviewedBy = reviewerEmail;
+            payload.updatedAt = nowTs;
+
+            try {
+                if (dxaState.editingId) {
+                    payload.contributors = firebase.firestore.FieldValue.arrayUnion('admin:' + reviewerEmail);
+                    await db.collection('disease_codex').doc(dxaState.editingId).update(payload);
+                    if (typeof showToast === 'function') showToast(`✅ Updated "${payload.diseaseName}"`);
+                } else {
+                    payload.contributors = ['admin:' + reviewerEmail];
+                    payload.createdAt = nowTs;
+                    await db.collection('disease_codex').add(payload);
+                    if (typeof showToast === 'function') showToast(`✅ Added "${payload.diseaseName}"`);
+                }
+                dxaState.editingId = null;
+                dxaSwitchView('published');
+            } catch (err) {
+                console.error('[disease-codex] save failed:', err);
+                if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Save failed: ' + (err && err.message ? err.message : 'unknown error'); }
+            } finally {
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = originalText; }
+            }
+        }
+
+        // Absolute dd/mm/yyyy (พ.ศ.) + 24h for list rows (mirrors dcaFormatAbsolute
+        // V94.81 — ASCII slashes render everywhere; Thai-glyph month abbreviations
+        // dropped out of the list row).
+        function dxaFormatAbsolute(ts) {
+            if (!ts) return '';
+            let d;
+            try {
+                d = ts.toDate ? ts.toDate() : (ts instanceof Date ? ts : new Date(ts));
+            } catch (_) { return ''; }
+            if (!d || isNaN(d.getTime())) return '';
+            const pad = n => String(n).padStart(2, '0');
+            const dd = pad(d.getDate());
+            const mm = pad(d.getMonth() + 1);
+            const yyyy = d.getFullYear() + 543;
+            return `${dd}/${mm}/${yyyy} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+
+        // Relative time for the Edit-screen meta strip.
+        function dxaFormatRelative(ts) {
+            if (!ts) return '';
+            let d;
+            try {
+                d = ts.toDate ? ts.toDate() : (ts instanceof Date ? ts : new Date(ts));
+            } catch (_) { return ''; }
+            if (!d || isNaN(d.getTime())) return '';
+            const diffSec = (Date.now() - d.getTime()) / 1000;
+            if (diffSec < 60) return 'just now';
+            if (diffSec < 3600) return `${Math.floor(diffSec / 60)} min ago`;
+            if (diffSec < 86400) { const h = Math.floor(diffSec / 3600); return `${h} hr${h === 1 ? '' : 's'} ago`; }
+            if (diffSec < 2592000) { const days = Math.floor(diffSec / 86400); return `${days} day${days === 1 ? '' : 's'} ago`; }
+            return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+
+        function dxaContributorChipHtml(identifier) {
+            const s = String(identifier || '');
+            const colonIdx = s.indexOf(':');
+            const role = colonIdx > 0 ? s.slice(0, colonIdx) : '';
+            const id = colonIdx > 0 ? s.slice(colonIdx + 1) : s;
+            if (role === 'admin') {
+                return `<span class="dca-contributor-chip dca-contrib-admin" title="${dxaEscapeHtml(id)}">👤 admin</span>`;
+            }
+            if (role === 'intern') {
+                const short = id.length > 4 ? id.slice(-4) : id;
+                return `<span class="dca-contributor-chip dca-contrib-intern" title="intern UID: ${dxaEscapeHtml(id)}">📝 intern (${dxaEscapeHtml(short)})</span>`;
+            }
+            return `<span class="dca-contributor-chip dca-contrib-unknown">${dxaEscapeHtml(s)}</span>`;
+        }
+
+        function dxaListMetaTrailHtml(disease) {
+            if (!disease) return '';
+            const parts = [];
+            let contribList = Array.isArray(disease.contributors) ? disease.contributors.slice() : [];
+            if (contribList.length === 0 && disease.reviewedBy) contribList = ['admin:' + disease.reviewedBy];
+            if (contribList.length > 0) {
+                const seen = new Set();
+                contribList.forEach(item => {
+                    const key = String(item);
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    parts.push(dxaContributorChipHtml(item));
+                });
+            }
+            if (parts.length === 0) return '';
+            return `<div class="dca-row-meta-trail">${parts.join('')}</div>`;
+        }
+
+        function dxaRenderMeta(data) {
+            const el = document.getElementById('dxa-form-meta');
+            if (!el) return;
+            if (!data || (!data.updatedAt && !data.contributors && !data.reviewedBy)) {
+                el.style.display = 'none';
+                el.innerHTML = '';
+                return;
+            }
+            const parts = [];
+            const updatedRel = dxaFormatRelative(data.updatedAt || data.createdAt);
+            if (updatedRel) parts.push(`<span><strong>Updated:</strong> ${dxaEscapeHtml(updatedRel)}</span>`);
+            let contribList = Array.isArray(data.contributors) ? data.contributors.slice() : [];
+            if (contribList.length === 0 && data.reviewedBy) contribList = ['admin:' + data.reviewedBy];
+            if (contribList.length > 0) {
+                const seen = new Set();
+                const chips = [];
+                contribList.forEach(item => {
+                    const key = String(item);
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    chips.push(dxaContributorChipHtml(item));
+                });
+                parts.push(`<span><strong>Contributors:</strong></span>${chips.join('')}`);
+            }
+            if (parts.length === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
+            el.style.display = 'flex';
+            el.innerHTML = parts.join('<span class="dca-meta-sep">·</span>');
         }
 
         function closeCaseReviewScoreModal(shouldSubmit) {
