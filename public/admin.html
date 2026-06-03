@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.86</title>
+    <title>Nika V94.87</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13339,6 +13339,20 @@
 
                             <label for="dxa-f-prognosis">Prognosis</label>
                             <textarea id="dxa-f-prognosis" rows="3" placeholder="Natural history · outcomes · factors affecting prognosis…"></textarea>
+                        </div>
+
+                        <!-- V94.87 Phase 6: Drug Codex cross-link picker. Type to search
+                             published drugs → add chip. Stored as relatedDrugs:[{id,name}];
+                             interns tap a chip in the disease detail to open the drug. -->
+                        <div style="margin-top:14px;">
+                            <label style="display:block; font-weight:600; color:#0f766e; margin-bottom:6px;">🔗 Related Drugs (Drug Codex)</label>
+                            <div id="dxa-reldrug-chips" style="margin-bottom:6px;"></div>
+                            <div style="position:relative;">
+                                <input type="text" id="dxa-reldrug-input" placeholder="พิมพ์ชื่อยาเพื่อค้นหาแล้วเลือก…" autocomplete="off"
+                                       oninput="dxaRelatedDrugInput()" onblur="setTimeout(dxaHideRelatedDrugSuggest, 150)" style="width:100%;">
+                                <div id="dxa-reldrug-suggest" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1); max-height:240px; overflow-y:auto;"></div>
+                            </div>
+                            <div style="font-size:0.78em; color:#94a3b8; margin-top:4px;">ลิงก์ยาที่เกี่ยวข้องจาก Drug Codex · intern กดเปิดดูรายละเอียดยาได้</div>
                         </div>
                     </div>
                 </div>
@@ -31818,6 +31832,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             unsubDrafts: null,   // onSnapshot unsubscribe for disease_codex_drafts
             codex: [],           // sorted array of disease_codex docs
             drafts: [],          // pending disease_codex_drafts docs
+            relatedDrugs: [],    // V94.87 Phase 6: [{id,name}] linked drugs for the current form
+            drugList: [],        // V94.87 Phase 6: [{id,name}] published drug_codex for the picker (loaded on open)
             searchTerm: ''
         };
 
@@ -31869,6 +31885,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             } catch (err) {
                 console.error('[disease-codex] listener setup failed:', err);
             }
+
+            // V94.87 Phase 6: one-time load of published drug names for the
+            // Related Drugs cross-link picker (id + genericName only).
+            dxaLoadDrugList();
 
             modal.style.display = 'block';
             modal.classList.add('force-show');
@@ -32536,6 +32556,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     el.value = (v == null ? '' : String(v));
                 }
             });
+            // V94.87 Phase 6: seed the Related Drugs cross-link state from the doc.
+            dxaState.relatedDrugs = Array.isArray(data && data.relatedDrugs)
+                ? data.relatedDrugs.filter(r => r && r.id).map(r => ({ id: r.id, name: r.name || '' }))
+                : [];
+            const rdInput = document.getElementById('dxa-reldrug-input');
+            if (rdInput) rdInput.value = '';
+            dxaHideRelatedDrugSuggest();
+            dxaRenderRelatedDrugs();
             dxaRenderMeta(data);
             const idEl = document.getElementById('dxa-form-doc-id');
             if (idEl) idEl.textContent = (data && data._id) ? `doc: ${data._id}` : '';
@@ -32564,7 +32592,85 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             });
             // Full 5-lang bundle on the doc (deep-cloned to detach from state).
             payload.educationI18n = JSON.parse(JSON.stringify(dxaEduI18nState.data || {}));
+            // V94.87 Phase 6: Drug Codex cross-link — store [{id,name}]. name is a
+            // stable label for offline render; the canonical id drives navigation.
+            payload.relatedDrugs = (dxaState.relatedDrugs || [])
+                .filter(r => r && r.id)
+                .map(r => ({ id: r.id, name: r.name || '' }));
             return payload;
+        }
+
+        // ===================================================================
+        // V94.87 Phase 6: Drug Codex cross-link picker (admin side).
+        // Lets admin attach related drugs to a disease's Management section.
+        // Stored as relatedDrugs:[{id,name}] on the disease doc; interns tap a
+        // chip to open the Drug Codex detail (index.html dxOpenLinkedDrug).
+        // ===================================================================
+        function dxaLoadDrugList() {
+            if (!window.db) return;
+            db.collection('drug_codex').orderBy('genericName').get()
+                .then(snap => {
+                    dxaState.drugList = snap.docs
+                        .map(d => ({ id: d.id, name: (d.data().genericName || '') }))
+                        .filter(x => x.name);
+                })
+                .catch(err => console.warn('[disease-codex] drug list load failed (cross-link picker):', err));
+        }
+
+        function dxaRenderRelatedDrugs() {
+            const wrap = document.getElementById('dxa-reldrug-chips');
+            if (!wrap) return;
+            const list = dxaState.relatedDrugs || [];
+            if (list.length === 0) {
+                wrap.innerHTML = '<span style="color:#94a3b8; font-size:0.85em;">— ยังไม่มียาที่ลิงก์ —</span>';
+                return;
+            }
+            wrap.innerHTML = list.map(rd =>
+                `<span class="dca-row-meta-chip" style="display:inline-flex; align-items:center; gap:4px; margin:2px 4px 2px 0; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8;">💊 ${dxaEscapeHtml(rd.name || rd.id)}<button type="button" onclick="dxaRemoveRelatedDrug('${dxaEscapeHtml(rd.id)}')" title="Remove" style="border:none; background:none; cursor:pointer; color:#dc2626; font-weight:700; padding:0 2px; line-height:1;">×</button></span>`
+            ).join('');
+        }
+
+        function dxaRelatedDrugInput() {
+            const input = document.getElementById('dxa-reldrug-input');
+            const box = document.getElementById('dxa-reldrug-suggest');
+            if (!input || !box) return;
+            const term = String(input.value || '').trim().toLowerCase();
+            if (!term) { box.style.display = 'none'; box.innerHTML = ''; return; }
+            const already = new Set((dxaState.relatedDrugs || []).map(r => r.id));
+            const matches = (dxaState.drugList || [])
+                .filter(d => !already.has(d.id) && d.name.toLowerCase().includes(term))
+                .slice(0, 8);
+            if (matches.length === 0) {
+                box.innerHTML = '<div style="padding:6px 10px; color:#94a3b8; font-size:0.85em;">ไม่พบยา · ต้องเพิ่มใน Drug Codex ก่อน</div>';
+                box.style.display = 'block';
+                return;
+            }
+            box.innerHTML = matches.map(d =>
+                `<div onclick="dxaAddRelatedDrug('${dxaEscapeHtml(d.id)}')" style="padding:6px 10px; cursor:pointer; border-bottom:1px solid #f1f5f9; font-size:0.9em;">💊 ${dxaEscapeHtml(d.name)}</div>`
+            ).join('');
+            box.style.display = 'block';
+        }
+
+        function dxaAddRelatedDrug(drugId) {
+            const drug = (dxaState.drugList || []).find(d => d.id === drugId);
+            if (!drug) return;
+            if (!Array.isArray(dxaState.relatedDrugs)) dxaState.relatedDrugs = [];
+            if (dxaState.relatedDrugs.some(r => r.id === drugId)) return;
+            dxaState.relatedDrugs.push({ id: drug.id, name: drug.name });
+            const input = document.getElementById('dxa-reldrug-input');
+            if (input) input.value = '';
+            dxaHideRelatedDrugSuggest();
+            dxaRenderRelatedDrugs();
+        }
+
+        function dxaRemoveRelatedDrug(drugId) {
+            dxaState.relatedDrugs = (dxaState.relatedDrugs || []).filter(r => r.id !== drugId);
+            dxaRenderRelatedDrugs();
+        }
+
+        function dxaHideRelatedDrugSuggest() {
+            const box = document.getElementById('dxa-reldrug-suggest');
+            if (box) { box.style.display = 'none'; box.innerHTML = ''; }
         }
 
         function dxaAddNew() {
