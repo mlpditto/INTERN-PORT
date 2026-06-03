@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.85</title>
+    <title>Nika V94.86</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13145,7 +13145,19 @@
                 <span>🩺</span> Disease Codex · จารึกข้อมูลโรค
             </h3>
             <div style="font-size:0.83em; color:#64748b; margin-bottom:14px;">
-                A-Z clinical disease reference. Published entries are read by interns.
+                A-Z clinical disease reference. Published entries are read by interns;
+                draft submissions need admin approval before publishing.
+            </div>
+
+            <!-- View tabs (Published / Pending drafts) — V94.86 Phase 5b.
+                 Reuses the Drug Codex .dca-view-* CSS. -->
+            <div class="dca-view-tabs">
+                <button type="button" class="dca-view-tab" data-view="published" onclick="dxaSwitchView('published')">
+                    📚 Published <span id="dxa-published-count" style="color:#94a3b8; font-weight:600;">(0)</span>
+                </button>
+                <button type="button" class="dca-view-tab" data-view="drafts" onclick="dxaSwitchView('drafts')">
+                    📥 Pending Drafts <span id="dxa-drafts-badge" class="dca-view-tab-badge" style="display:none;">0</span>
+                </button>
             </div>
 
             <!-- Published list view -->
@@ -13188,6 +13200,16 @@
                 </div>
             </div>
 
+            <!-- Drafts list view — V94.86 Phase 5b -->
+            <div id="dxa-view-drafts" style="display:none;">
+                <div style="font-size:0.82em; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:8px 12px; margin-bottom:12px;">
+                    Intern-submitted drafts awaiting moderation. Approve to publish into Disease Codex; reject sends it back with admin notes.
+                </div>
+                <div id="dxa-drafts-list" class="dca-list">
+                    <div class="dca-empty-state">Loading…</div>
+                </div>
+            </div>
+
             <!-- Form view (Add / Edit) -->
             <div id="dxa-view-form" style="display:none;">
                 <div id="dxa-form-error" class="dca-form-error" style="display:none;"></div>
@@ -13204,6 +13226,11 @@
                 </div>
 
                 <div id="dxa-form-meta" class="dca-form-meta" style="display:none;"></div>
+
+                <!-- V94.86 Phase 5b: intern's free-text note to admin (drafts only).
+                     Shown only when reviewing a draft with a non-empty internNotes
+                     field; includes targetDiseaseId context when present. -->
+                <div id="dxa-form-intern-notes-banner" class="dca-form-intern-notes-banner" style="display:none;"></div>
 
                 <!-- Tab navigation — 8 disease sections. Default tab = Core. -->
                 <div class="dca-form-tabs" id="dxa-form-tabs" role="tablist">
@@ -31784,10 +31811,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         const dxaEduI18nState = { currentLang: 'en', data: {} };
 
         var dxaState = {
-            view: 'published',   // 'published' | 'form'
+            view: 'published',   // 'published' | 'drafts' | 'form'
             editingId: null,     // doc id being edited, null = add new
+            isDraftEdit: false,  // V94.86 Phase 5b: true when reviewing a draft (saveForm publishes to disease_codex)
             unsubCodex: null,    // onSnapshot unsubscribe for disease_codex
+            unsubDrafts: null,   // onSnapshot unsubscribe for disease_codex_drafts
             codex: [],           // sorted array of disease_codex docs
+            drafts: [],          // pending disease_codex_drafts docs
             searchTerm: ''
         };
 
@@ -31796,6 +31826,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!modal) return;
             dxaState.view = 'published';
             dxaState.editingId = null;
+            dxaState.isDraftEdit = false;
             dxaState.searchTerm = '';
             const searchEl = document.getElementById('dxa-search');
             if (searchEl) searchEl.value = '';
@@ -31821,6 +31852,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         const list = document.getElementById('dxa-list');
                         if (list) list.innerHTML = `<div class="dca-empty-state" style="color:#b91c1c;">Failed to load disease_codex: ${err && err.message ? err.message : err}<br><small>If "Missing or insufficient permissions", deploy firestore.rules from the Disease Codex Phase 1 PR.</small></div>`;
                     });
+                // V94.86 Phase 5b: pending-drafts queue (status+createdAt index live
+                // since Phase 1). Mirrors the Drug Codex drafts listener.
+                dxaState.unsubDrafts = db.collection('disease_codex_drafts')
+                    .where('status', '==', 'pending')
+                    .orderBy('createdAt')
+                    .onSnapshot(snap => {
+                        dxaState.drafts = snap.docs.map(d => Object.assign({ _id: d.id }, d.data()));
+                        dxaRenderDraftsList();
+                        dxaUpdateCounts();
+                    }, err => {
+                        // Drafts collection may be empty early on; index might still be
+                        // building. Don't blast the UI — just log.
+                        console.warn('[disease-codex] drafts snapshot error:', err);
+                    });
             } catch (err) {
                 console.error('[disease-codex] listener setup failed:', err);
             }
@@ -31839,24 +31884,44 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 try { dxaState.unsubCodex(); } catch (_) {}
                 dxaState.unsubCodex = null;
             }
+            if (typeof dxaState.unsubDrafts === 'function') {
+                try { dxaState.unsubDrafts(); } catch (_) {}
+                dxaState.unsubDrafts = null;
+            }
         }
 
         function dxaSwitchView(view) {
             dxaState.view = view;
+            // V94.86 Phase 5b: 3-way (published | drafts | form). The form view is
+            // only entered via Add/Edit/Review buttons — clicking a tab returns to
+            // a list view.
+            document.querySelectorAll('#diseaseCodexAdminModal .dca-view-tab').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-view') === view);
+            });
             const published = document.getElementById('dxa-view-published');
+            const drafts = document.getElementById('dxa-view-drafts');
             const form = document.getElementById('dxa-view-form');
-            if (view === 'form') {
+            if (view === 'drafts') {
                 if (published) published.style.display = 'none';
+                if (drafts) drafts.style.display = 'block';
+                if (form) form.style.display = 'none';
+            } else if (view === 'form') {
+                if (published) published.style.display = 'none';
+                if (drafts) drafts.style.display = 'none';
                 if (form) form.style.display = 'block';
             } else {
                 if (published) published.style.display = 'block';
+                if (drafts) drafts.style.display = 'none';
                 if (form) form.style.display = 'none';
             }
         }
 
         function dxaBackToList() {
+            // V94.86 Phase 5b: return to whichever list the form was opened from.
             dxaState.editingId = null;
-            dxaSwitchView('published');
+            const fallback = dxaState.isDraftEdit ? 'drafts' : 'published';
+            dxaState.isDraftEdit = false;
+            dxaSwitchView(fallback);
         }
 
         // ===================================================================
@@ -32085,9 +32150,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         function dxaUpdateCounts() {
-            // No view-tabs in MVP; nothing to update yet. Kept as a hook so the
-            // snapshot handler matches the Drug Codex shape (and a future drafts
-            // tab can populate a badge here).
+            // V94.86 Phase 5b: published count + pending-drafts badge.
+            const pubCount = document.getElementById('dxa-published-count');
+            if (pubCount) pubCount.textContent = `(${dxaState.codex.length})`;
+            const badge = document.getElementById('dxa-drafts-badge');
+            if (badge) {
+                if (dxaState.drafts.length > 0) {
+                    badge.style.display = 'inline-block';
+                    badge.textContent = String(dxaState.drafts.length);
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
         }
 
         function dxaSearch() {
@@ -32495,6 +32569,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         function dxaAddNew() {
             dxaState.editingId = null;
+            dxaState.isDraftEdit = false;        // leak-defense: clear any prior review state
+            dxaHideInternNotesBanner();
             const modeLabel = document.getElementById('dxa-form-mode-label');
             if (modeLabel) modeLabel.textContent = 'Add Disease';
             dxaFillForm({});
@@ -32506,6 +32582,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const disease = dxaState.codex.find(d => d._id === diseaseId);
             if (!disease) { console.warn('[disease-codex] edit: not found', diseaseId); return; }
             dxaState.editingId = diseaseId;
+            dxaState.isDraftEdit = false;        // leak-defense: editing a published doc, not a draft
+            dxaHideInternNotesBanner();
             const modeLabel = document.getElementById('dxa-form-mode-label');
             if (modeLabel) modeLabel.textContent = 'Edit · ' + (disease.diseaseName || diseaseId);
             dxaFillForm(disease);
@@ -32558,7 +32636,26 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             payload.updatedAt = nowTs;
 
             try {
-                if (dxaState.editingId) {
+                if (dxaState.isDraftEdit) {
+                    // V94.86 Phase 5b: approving via Review & Edit — publish payload to
+                    // disease_codex (new doc) + flip the draft to 'approved' in one
+                    // batch. Seed contributors[] with both the intern submitter and the
+                    // reviewing admin (set() needs a literal array — arrayUnion sentinel
+                    // is invalid without merge). The draft is kept (not deleted) so the
+                    // intern's "→ See in Codex" link resolves via publishedId.
+                    const draftDoc = (dxaState.drafts || []).find(d => d._id === dxaState.editingId);
+                    const draftContribs = [];
+                    if (draftDoc && draftDoc.submittedBy) draftContribs.push('intern:' + draftDoc.submittedBy);
+                    draftContribs.push('admin:' + reviewerEmail);
+                    payload.contributors = draftContribs;
+                    const batch = db.batch();
+                    const newRef = db.collection('disease_codex').doc();
+                    batch.set(newRef, Object.assign({ createdAt: nowTs }, payload));
+                    const draftRef = db.collection('disease_codex_drafts').doc(dxaState.editingId);
+                    batch.update(draftRef, { status: 'approved', approvedAt: nowTs, approvedBy: reviewerEmail, publishedId: newRef.id });
+                    await batch.commit();
+                    if (typeof showToast === 'function') showToast(`✅ Published "${payload.diseaseName}" from draft`);
+                } else if (dxaState.editingId) {
                     payload.contributors = firebase.firestore.FieldValue.arrayUnion('admin:' + reviewerEmail);
                     await db.collection('disease_codex').doc(dxaState.editingId).update(payload);
                     if (typeof showToast === 'function') showToast(`✅ Updated "${payload.diseaseName}"`);
@@ -32569,6 +32666,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     if (typeof showToast === 'function') showToast(`✅ Added "${payload.diseaseName}"`);
                 }
                 dxaState.editingId = null;
+                dxaState.isDraftEdit = false;
                 dxaSwitchView('published');
             } catch (err) {
                 console.error('[disease-codex] save failed:', err);
@@ -32576,6 +32674,167 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             } finally {
                 if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = originalText; }
             }
+        }
+
+        // ===================================================================
+        // V94.86 Phase 5b: Disease Codex draft moderation (admin).
+        // Mirrors the Drug Codex draft queue (dca*): render pending drafts,
+        // approve-as-is (batch publish + flip draft), reject with note, and
+        // Review & Edit (open the full form, publish on save via the
+        // dxaState.isDraftEdit branch in dxaSaveForm). Reuses .dca-draft-* CSS.
+        // ===================================================================
+        function dxaRenderDraftsList() {
+            const list = document.getElementById('dxa-drafts-list');
+            if (!list) return;
+            if (dxaState.drafts.length === 0) {
+                list.innerHTML = '<div class="dca-empty-state">No pending drafts. When interns submit disease entries, they appear here for moderation.</div>';
+                return;
+            }
+            list.innerHTML = dxaState.drafts.map(draft => {
+                const submitter = draft.submittedByName || draft.submittedBy || 'unknown';
+                const created = draft.createdAt && draft.createdAt.toDate ? draft.createdAt.toDate() : null;
+                const dateStr = created ? created.toLocaleDateString('th-TH') : '—';
+                // Resolve targetDiseaseId → published disease name so an edit
+                // request shows "edit · Dengue" instead of a 20-char doc id.
+                let target;
+                if (draft.targetDiseaseId) {
+                    const targetDisease = dxaState.codex.find(d => d._id === draft.targetDiseaseId);
+                    const targetLabel = targetDisease ? targetDisease.diseaseName : draft.targetDiseaseId;
+                    target = `<span class="dca-row-meta-chip" title="edit request targeting ${dxaEscapeHtml(draft.targetDiseaseId)}">✨ edit · ${dxaEscapeHtml(targetLabel)}</span>`;
+                } else {
+                    target = '<span class="dca-row-meta-chip">📥 new entry</span>';
+                }
+                const notesSnippet = draft.internNotes
+                    ? `<div class="dca-draft-notes-snippet">📝 ${dxaEscapeHtml(String(draft.internNotes).slice(0, 120))}${String(draft.internNotes).length > 120 ? '…' : ''}</div>`
+                    : '';
+                return `
+                    <div class="dca-draft-row">
+                        <div class="dca-draft-row-head">
+                            <div style="flex:1; min-width:0;">
+                                <div class="dca-row-name">${dxaEscapeHtml(draft.diseaseName || '(no name)')}</div>
+                                <div class="dca-draft-submitter">submitted by ${dxaEscapeHtml(submitter)} · ${dateStr}</div>
+                                ${notesSnippet}
+                            </div>
+                            <div class="dca-draft-actions">
+                                ${target}
+                                <button type="button" class="dca-draft-review-btn" onclick="dxaReviewDraft('${dxaEscapeHtml(draft._id)}')">Review & Edit</button>
+                                <button type="button" class="dca-draft-approve-btn" onclick="dxaApproveDraft('${dxaEscapeHtml(draft._id)}', this)">✓ Approve</button>
+                                <button type="button" class="dca-draft-reject-btn" onclick="dxaRejectDraft('${dxaEscapeHtml(draft._id)}', this)">✗ Reject</button>
+                            </div>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        async function dxaApproveDraft(draftId, btn) {
+            const draft = dxaState.drafts.find(d => d._id === draftId);
+            if (!draft) return;
+            if (!confirm(`Approve and publish "${draft.diseaseName || draftId}" to Disease Codex as-is? (Use "Review & Edit" if you want to edit fields before publishing.)`)) return;
+            if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+            const nowTs = firebase.firestore.FieldValue.serverTimestamp();
+            const reviewerEmail = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin-ui';
+
+            // Copy only schema fields from the draft (drop submittedBy/status/
+            // internNotes/targetDiseaseId — those are draft-only).
+            const payload = {};
+            DXA_FIELD_KEYS.forEach(key => {
+                const v = draft[key];
+                if (DXA_ARRAY_FIELDS[key]) {
+                    payload[key] = Array.isArray(v) ? v : [];
+                } else {
+                    payload[key] = v == null ? '' : v;
+                }
+            });
+            payload.createdAt = nowTs;
+            payload.updatedAt = nowTs;
+            payload.lastReviewedAt = nowTs;
+            payload.reviewedBy = reviewerEmail;
+            payload.aiDrafted = false;
+            // Seed contributors[] with both the intern submitter and the approving
+            // admin. Literal array (set() can't use the arrayUnion sentinel).
+            const approveContribs = [];
+            if (draft.submittedBy) approveContribs.push('intern:' + draft.submittedBy);
+            approveContribs.push('admin:' + reviewerEmail);
+            payload.contributors = approveContribs;
+
+            try {
+                const batch = db.batch();
+                const newRef = db.collection('disease_codex').doc();
+                batch.set(newRef, payload);
+                const draftRef = db.collection('disease_codex_drafts').doc(draftId);
+                batch.update(draftRef, { status: 'approved', approvedAt: nowTs, approvedBy: reviewerEmail, publishedId: newRef.id });
+                await batch.commit();
+                if (typeof showToast === 'function') showToast(`✅ Approved "${payload.diseaseName}"`);
+            } catch (err) {
+                console.error('[disease-codex] approve failed:', err);
+                alert('Approve failed: ' + (err && err.message ? err.message : 'unknown error'));
+                if (btn) { btn.disabled = false; btn.textContent = '✓ Approve'; }
+            }
+        }
+
+        async function dxaRejectDraft(draftId, btn) {
+            const draft = dxaState.drafts.find(d => d._id === draftId);
+            if (!draft) return;
+            const note = prompt(`Reject "${draft.diseaseName || draftId}" — optional message back to the intern:`, '');
+            if (note === null) return;
+            if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+            const nowTs = firebase.firestore.FieldValue.serverTimestamp();
+            const reviewerEmail = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin-ui';
+            try {
+                await db.collection('disease_codex_drafts').doc(draftId).update({
+                    status: 'rejected',
+                    rejectedAt: nowTs,
+                    rejectedBy: reviewerEmail,
+                    adminNotes: String(note || '').trim()
+                });
+                if (typeof showToast === 'function') showToast('✗ Rejected draft');
+            } catch (err) {
+                console.error('[disease-codex] reject failed:', err);
+                alert('Reject failed: ' + (err && err.message ? err.message : 'unknown error'));
+                if (btn) { btn.disabled = false; btn.textContent = '✗ Reject'; }
+            }
+        }
+
+        function dxaReviewDraft(draftId) {
+            const draft = dxaState.drafts.find(d => d._id === draftId);
+            if (!draft) { console.warn('[disease-codex] review: draft not found', draftId); return; }
+            // Open the form pre-filled with draft data; save target is
+            // disease_codex (publishing) and the draft flips to 'approved'
+            // (handled by the dxaState.isDraftEdit branch in dxaSaveForm).
+            dxaState.editingId = draftId;
+            dxaState.isDraftEdit = true;
+            const modeLabel = document.getElementById('dxa-form-mode-label');
+            if (modeLabel) modeLabel.textContent = 'Review Draft · ' + (draft.diseaseName || draftId);
+            dxaShowInternNotesBanner(draft);
+            dxaFillForm(draft);
+            dxaSwitchSection('core');
+            dxaSwitchView('form');
+        }
+
+        function dxaShowInternNotesBanner(draft) {
+            const banner = document.getElementById('dxa-form-intern-notes-banner');
+            if (!banner) return;
+            const hasNotes = draft && draft.internNotes && String(draft.internNotes).trim();
+            const hasTarget = draft && draft.targetDiseaseId;
+            if (!hasNotes && !hasTarget) { banner.style.display = 'none'; banner.innerHTML = ''; return; }
+            const parts = [];
+            if (hasTarget) {
+                const targetDisease = dxaState.codex.find(d => d._id === draft.targetDiseaseId);
+                const targetLabel = targetDisease ? targetDisease.diseaseName : draft.targetDiseaseId;
+                parts.push(`<div><strong>✨ Suggest edit for:</strong> ${dxaEscapeHtml(targetLabel)} <span style="color:#5eead4; font-size:0.85em;">(${dxaEscapeHtml(draft.targetDiseaseId)})</span></div>`);
+            }
+            if (hasNotes) {
+                parts.push(`
+                    <div class="dca-form-intern-notes-banner-label" style="margin-top:${hasTarget ? '8px' : '0'};">📝 intern's note</div>
+                    <div>${dxaEscapeHtml(String(draft.internNotes))}</div>`);
+            }
+            banner.innerHTML = parts.join('');
+            banner.style.display = 'block';
+        }
+
+        function dxaHideInternNotesBanner() {
+            const banner = document.getElementById('dxa-form-intern-notes-banner');
+            if (banner) { banner.style.display = 'none'; banner.innerHTML = ''; }
         }
 
         // Absolute dd/mm/yyyy (พ.ศ.) + 24h for list rows (mirrors dcaFormatAbsolute
