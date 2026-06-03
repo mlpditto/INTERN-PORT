@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.10)</title>
+    <title>Internship Portfolio (V95.11)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -10400,9 +10400,10 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
         // ===================================================================
         // Disease Codex Phase 2b — intern read-only view (dx*).
         // Mirrors the Drug Codex intern view (dc*) for the disease_codex
-        // collection, reusing the .dc-* CSS. Read-only: no submit, no i18n,
-        // no discussion (deferred per the Disease Codex plan). IDs are dx-
-        // prefixed and unique, so no query-scoping is needed.
+        // collection, reusing the .dc-* CSS. Read-only: no submit, no
+        // discussion (deferred per the Disease Codex plan). V95.11 Phase 4b
+        // adds the 5-lang i18n toggle (see the dx* i18n block below). IDs are
+        // dx- prefixed and unique, so no query-scoping is needed.
         // ===================================================================
         var dxState = {
             codex: [],
@@ -10569,30 +10570,179 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             dxState.currentDisease = null;
         }
 
+        // ===================================================================
+        // Disease Codex Phase 4b — intern i18n (dx*).
+        // Mirrors the Drug Codex intern i18n (dc*) for the disease_codex
+        // detail modal. Reuses the generic display tables DC_LANGS /
+        // DC_SOURCE_BADGES / DC_SOURCE_COLORS (pure flag/badge constants,
+        // read-only — no Drug Codex logic touched). Admin-authored
+        // educationI18n (Phase 4a: patientCounseling/redFlags/pearls × 5
+        // langs) wins per (field,lang); every other prose field flows
+        // through the runtime Tier A device → Tier B Typhoon path via the
+        // page-global qtTranslateText. Cache key `dxtr_{diseaseId}_{lang}`.
+        // ===================================================================
+        // Translatable prose fields — keep in sync with dxRenderDetail's
+        // section field list. diseaseName/thaiName/synonyms/icd10/category/
+        // references are identifiers/short labels — not translated.
+        const DX_TRANSLATABLE_FIELDS = [
+            'epidemiology', 'etiology', 'pathophysiology', 'symptoms', 'signs',
+            'diagnosis', 'investigations', 'differential', 'treatment',
+            'nonPharm', 'complications', 'prognosis',
+            'patientCounseling', 'redFlags', 'pearls'
+        ];
+        const dxLangState = {
+            selectedLang: (function () {
+                try { return localStorage.getItem('dxUiLang') || 'orig'; } catch (_) { return 'orig'; }
+            })(),
+            pending: new Set()
+        };
+
+        function dxGetSelectedLang() { return dxLangState.selectedLang; }
+        function dxSetSelectedLang(lang) {
+            dxLangState.selectedLang = lang;
+            try { localStorage.setItem('dxUiLang', lang); } catch (_) {}
+        }
+        function dxCacheKey(diseaseId, lang) { return `dxtr_${diseaseId}_${lang}`; }
+
+        function dxGetCached(diseaseId, lang) {
+            try { const raw = localStorage.getItem(dxCacheKey(diseaseId, lang)); return raw ? JSON.parse(raw) : null; }
+            catch (_) { return null; }
+        }
+        function dxSetCached(diseaseId, lang, data) {
+            try { localStorage.setItem(dxCacheKey(diseaseId, lang), JSON.stringify(data)); }
+            catch (e) {
+                // QuotaExceeded — drop oldest translation entries (dxtr + dctr + qt + qt2)
+                // and retry once. Same eviction pattern as dcSetCached.
+                const keys = Object.keys(localStorage).filter(k => k.startsWith('dxtr_') || k.startsWith('dctr_') || k.startsWith('qt_') || k.startsWith('qt2_'));
+                keys.slice(0, Math.min(50, keys.length)).forEach(k => localStorage.removeItem(k));
+                try { localStorage.setItem(dxCacheKey(diseaseId, lang), JSON.stringify(data)); } catch (_) {}
+            }
+        }
+
+        async function dxTranslateDisease(disease, lang) {
+            if (!disease || lang === 'orig') return null;
+            // Admin-provided educationI18n takes precedence over the runtime
+            // translation path (admin verified the text directly). Other prose
+            // fields still flow through Tier A device → Tier B Typhoon.
+            const i18n = (disease.educationI18n && typeof disease.educationI18n === 'object') ? disease.educationI18n : {};
+            const results = await Promise.all(
+                DX_TRANSLATABLE_FIELDS.map(key => {
+                    const adminText = i18n[key] && typeof i18n[key] === 'object' ? i18n[key][lang] : null;
+                    if (typeof adminText === 'string' && adminText.trim()) {
+                        return Promise.resolve({ text: adminText, source: 'manual' });
+                    }
+                    return qtTranslateText(disease[key] || '', lang)
+                        .catch(() => ({ text: disease[key] || '', source: 'failed' }));
+                })
+            );
+            const fields = {};
+            let bundleSource = 'noop';
+            DX_TRANSLATABLE_FIELDS.forEach((key, i) => {
+                fields[key] = results[i].text;
+                // Promote strongest source: typhoon > device > failed > manual > noop.
+                // 'manual' only wins when no field needed runtime translation.
+                const s = results[i].source;
+                if (s === 'typhoon') bundleSource = 'typhoon';
+                else if (s === 'device' && bundleSource !== 'typhoon') bundleSource = 'device';
+                else if (s === 'failed' && bundleSource !== 'typhoon' && bundleSource !== 'device') bundleSource = 'failed';
+                else if (s === 'manual' && bundleSource === 'noop') bundleSource = 'manual';
+            });
+            const bundle = { fields, source: bundleSource, ts: Date.now() };
+            dxSetCached(disease._id, lang, bundle);
+            return bundle;
+        }
+
+        function dxBackgroundTranslate(disease, lang) {
+            if (!disease || lang === 'orig') return;
+            const key = `${disease._id}_${lang}`;
+            if (dxLangState.pending.has(key)) return;
+            dxLangState.pending.add(key);
+            dxTranslateDisease(disease, lang)
+                .then(() => {
+                    // Re-render only if user is still on the same disease + lang.
+                    if (dxState.currentDisease && dxState.currentDisease._id === disease._id && dxGetSelectedLang() === lang) {
+                        dxRenderDetail(dxState.currentDisease);
+                    }
+                })
+                .catch(err => console.warn('[disease-codex translate]', disease._id, lang, err && err.message))
+                .finally(() => dxLangState.pending.delete(key));
+        }
+
+        // Returns a copy of `disease` with translatable fields overridden by
+        // cached translations for `lang`. On cache miss, kicks off background
+        // translate and returns the original tagged `_translationPending`.
+        function dxGetEffectiveDisease(disease, lang) {
+            if (!disease || lang === 'orig') return disease;
+            const cached = dxGetCached(disease._id, lang);
+            if (cached && cached.fields) {
+                return Object.assign({}, disease, cached.fields, { _translationSource: cached.source || 'cached' });
+            }
+            dxBackgroundTranslate(disease, lang);
+            return Object.assign({}, disease, { _translationPending: true });
+        }
+
+        function dxRenderLangBar(eff) {
+            const selected = dxGetSelectedLang();
+            let statusBadge = '';
+            if (eff && eff._translationPending) {
+                statusBadge = '<span style="font-size:0.75em; color:#475569; margin-left:8px; padding:2px 8px; border-radius:999px; background:#e2e8f0; font-weight:700;">⏳ แปลอยู่…</span>';
+            } else if (selected !== 'orig' && eff && eff._translationSource) {
+                const src = eff._translationSource;
+                const pal = DC_SOURCE_COLORS[src] || { c: '#475569', bg: '#f1f5f9' };
+                const label = DC_SOURCE_BADGES[src] || src;
+                statusBadge = `<span style="font-size:0.75em; color:${pal.c}; margin-left:8px; padding:2px 8px; border-radius:999px; background:${pal.bg}; font-weight:700;">${label}</span>`;
+            }
+            // Inline styles defeat the global `button { width:100% }` rule.
+            const chips = DC_LANGS.map(l => {
+                const isActive = l.code === selected;
+                const bg = isActive ? '#3b82f6' : '#f1f5f9';
+                const fg = isActive ? '#ffffff' : '#475569';
+                const bd = isActive ? '#3b82f6' : '#cbd5e1';
+                return `<button type="button" onclick="dxApplyLang('${l.code}')" title="${l.title}" style="display:inline-block; padding:6px 10px; margin:0 4px 0 0; border-radius:8px; font-size:0.9em; line-height:1; cursor:pointer; width:auto; min-width:auto; min-height:auto; flex:0 0 auto; background:${bg}; color:${fg}; border:1px solid ${bd};">${l.label}</button>`;
+            }).join('');
+            return `
+                <div class="dc-lang-bar lang-no-toggle" style="display:flex; align-items:center; flex-wrap:wrap; gap:0; padding:8px 12px; margin-bottom:10px; background:#f8fafc; border-radius:8px;">
+                    <span style="font-size:0.8em; color:#64748b; margin-right:6px;">🌐</span>
+                    ${chips}
+                    ${statusBadge}
+                </div>`;
+        }
+
+        function dxApplyLang(lang) {
+            dxSetSelectedLang(lang);
+            if (dxState.currentDisease) dxRenderDetail(dxState.currentDisease);
+        }
+
         function dxRenderDetail(disease) {
+            // V95.11 Phase 4b: i18n — pick effective disease for current
+            // language. Cache hit returns translated overrides; miss returns
+            // original + kicks off a background translate that re-renders when
+            // done. Mirrors dcRenderDetail.
+            const lang = dxGetSelectedLang();
+            const eff = dxGetEffectiveDisease(disease, lang);
             const nameEl = document.getElementById('dx-detail-name');
-            if (nameEl) nameEl.textContent = disease.diseaseName || '(unnamed)';
+            if (nameEl) nameEl.textContent = eff.diseaseName || '(unnamed)';
             const chipsEl = document.getElementById('dx-detail-chips');
             if (chipsEl) {
                 const chips = [];
-                if (disease.thaiName) chips.push(`<span class="dc-detail-chip" title="Thai name">🇹🇭 ${escapeHtml(disease.thaiName)}</span>`);
-                if (disease.icd10) chips.push(`<span class="dc-detail-chip" title="ICD-10">${escapeHtml(disease.icd10)}</span>`);
-                if (disease.category) chips.push(`<span class="dc-detail-chip">${escapeHtml(disease.category)}</span>`);
-                if (Array.isArray(disease.synonyms) && disease.synonyms.length > 0) {
-                    chips.push(`<span class="dc-detail-chip" title="Synonyms">= ${escapeHtml(disease.synonyms.slice(0, 3).join(', '))}${disease.synonyms.length > 3 ? ` +${disease.synonyms.length - 3}` : ''}</span>`);
+                if (eff.thaiName) chips.push(`<span class="dc-detail-chip" title="Thai name">🇹🇭 ${escapeHtml(eff.thaiName)}</span>`);
+                if (eff.icd10) chips.push(`<span class="dc-detail-chip" title="ICD-10">${escapeHtml(eff.icd10)}</span>`);
+                if (eff.category) chips.push(`<span class="dc-detail-chip">${escapeHtml(eff.category)}</span>`);
+                if (Array.isArray(eff.synonyms) && eff.synonyms.length > 0) {
+                    chips.push(`<span class="dc-detail-chip" title="Synonyms">= ${escapeHtml(eff.synonyms.slice(0, 3).join(', '))}${eff.synonyms.length > 3 ? ` +${eff.synonyms.length - 3}` : ''}</span>`);
                 }
                 chipsEl.innerHTML = chips.join('');
             }
             const body = document.getElementById('dx-detail-body');
             if (!body) return;
             const sections = [
-                { key: 'epi',  title: '📈 Epidemiology', open: false, fields: [['Epidemiology', disease.epidemiology]] },
-                { key: 'etio', title: '🧬 Etiology & Pathophysiology', open: false, fields: [['Etiology', disease.etiology], ['Pathophysiology', disease.pathophysiology]] },
-                { key: 'clinical', title: '🩺 Clinical Presentation', open: true, fields: [['Symptoms', disease.symptoms], ['Signs', disease.signs]] },
-                { key: 'dx', title: '🔬 Diagnosis', open: false, fields: [['Diagnostic Criteria', disease.diagnosis], ['Investigations', disease.investigations], ['Differential Diagnosis', disease.differential]] },
-                { key: 'mgmt', title: '💊 Management', open: true, fields: [['Treatment', disease.treatment], ['Non-pharmacologic', disease.nonPharm], ['Complications', disease.complications], ['Prognosis', disease.prognosis]] },
-                { key: 'edu', title: '📖 Education', open: true, fields: [['Patient Counseling · คำแนะนำผู้ป่วย', disease.patientCounseling], ['Red Flags', disease.redFlags], ['Clinical Pearls', disease.pearls]] },
-                { key: 'refs', title: '🔗 References', open: false, refs: Array.isArray(disease.references) ? disease.references.filter(Boolean) : [] }
+                { key: 'epi',  title: '📈 Epidemiology', open: false, fields: [['Epidemiology', eff.epidemiology]] },
+                { key: 'etio', title: '🧬 Etiology & Pathophysiology', open: false, fields: [['Etiology', eff.etiology], ['Pathophysiology', eff.pathophysiology]] },
+                { key: 'clinical', title: '🩺 Clinical Presentation', open: true, fields: [['Symptoms', eff.symptoms], ['Signs', eff.signs]] },
+                { key: 'dx', title: '🔬 Diagnosis', open: false, fields: [['Diagnostic Criteria', eff.diagnosis], ['Investigations', eff.investigations], ['Differential Diagnosis', eff.differential]] },
+                { key: 'mgmt', title: '💊 Management', open: true, fields: [['Treatment', eff.treatment], ['Non-pharmacologic', eff.nonPharm], ['Complications', eff.complications], ['Prognosis', eff.prognosis]] },
+                { key: 'edu', title: '📖 Education', open: true, fields: [['Patient Counseling · คำแนะนำผู้ป่วย', eff.patientCounseling], ['Red Flags', eff.redFlags], ['Clinical Pearls', eff.pearls]] },
+                { key: 'refs', title: '🔗 References', open: false, refs: Array.isArray(eff.references) ? eff.references.filter(Boolean) : [] }
             ];
             const html = sections.map(sec => {
                 if (sec.refs !== undefined) {
@@ -10623,7 +10773,8 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                         <div class="dc-detail-section-body">${fieldsHtml}</div>
                     </details>`;
             }).filter(Boolean).join('');
-            body.innerHTML = html || '<div class="dc-empty-state" style="padding:20px;">โรคนี้ยังไม่มีรายละเอียด · entry may still be in draft.</div>';
+            // V95.11: lang bar prefixed so the chip rail shows regardless of content.
+            body.innerHTML = dxRenderLangBar(eff) + (html || '<div class="dc-empty-state" style="padding:20px;">โรคนี้ยังไม่มีรายละเอียด · entry may still be in draft.</div>');
             body.scrollTop = 0;
         }
 
