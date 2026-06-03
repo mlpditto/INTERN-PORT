@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.12)</title>
+    <title>Internship Portfolio (V95.13)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -10843,10 +10843,24 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 { key: 'clinical', title: '🩺 Clinical Presentation', open: true, fields: [['Symptoms', eff.symptoms], ['Signs', eff.signs]] },
                 { key: 'dx', title: '🔬 Diagnosis', open: false, fields: [['Diagnostic Criteria', eff.diagnosis], ['Investigations', eff.investigations], ['Differential Diagnosis', eff.differential]] },
                 { key: 'mgmt', title: '💊 Management', open: true, fields: [['Treatment', eff.treatment], ['Non-pharmacologic', eff.nonPharm], ['Complications', eff.complications], ['Prognosis', eff.prognosis]] },
+                // V95.13 Phase 6: Drug Codex cross-link — chips tap into the drug detail.
+                { key: 'reldrug', title: '💊 Related Drugs · ยาที่เกี่ยวข้อง', open: true, relatedDrugs: Array.isArray(eff.relatedDrugs) ? eff.relatedDrugs.filter(rd => rd && rd.id) : [] },
                 { key: 'edu', title: '📖 Education', open: true, fields: [['Patient Counseling · คำแนะนำผู้ป่วย', eff.patientCounseling], ['Red Flags', eff.redFlags], ['Clinical Pearls', eff.pearls]] },
                 { key: 'refs', title: '🔗 References', open: false, refs: Array.isArray(eff.references) ? eff.references.filter(Boolean) : [] }
             ];
             const html = sections.map(sec => {
+                if (sec.relatedDrugs !== undefined) {
+                    // V95.13 Phase 6: tappable drug chips → open the Drug Codex detail.
+                    if (sec.relatedDrugs.length === 0) return '';
+                    const chips = sec.relatedDrugs.map(rd =>
+                        `<button type="button" class="dc-detail-chip" onclick="dxOpenLinkedDrug('${escapeHtml(rd.id)}')" title="เปิดดูใน Drug Codex" style="cursor:pointer; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8;">💊 ${escapeHtml(rd.name || rd.id)} ›</button>`
+                    ).join('');
+                    return `
+                        <details class="dc-detail-section" data-section-key="${sec.key}" ${sec.open ? 'open' : ''}>
+                            <summary>${sec.title}</summary>
+                            <div class="dc-detail-section-body"><div style="display:flex; flex-wrap:wrap; gap:8px;">${chips}</div></div>
+                        </details>`;
+                }
                 if (sec.refs !== undefined) {
                     if (sec.refs.length === 0) return '';
                     const refsHtml = sec.refs.map(url => {
@@ -10886,6 +10900,32 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 try { return window.renderMd(text); } catch (_) {}
             }
             return escapeHtml(text);
+        }
+
+        // V95.13 Phase 6: open a cross-linked drug from a disease's Related Drugs
+        // chip. Reuses the Drug Codex detail modal (dcOpenDetail) — which needs the
+        // drug in dcState.codex. If the intern hasn't opened the Drug Codex section
+        // yet, fetch the single doc on demand (Rule 28 allows signed-in reads).
+        async function dxOpenLinkedDrug(drugId) {
+            if (!drugId) return;
+            try {
+                if (typeof dcState === 'undefined' || typeof dcOpenDetail !== 'function') {
+                    console.warn('[disease-codex] Drug Codex view unavailable for cross-link');
+                    return;
+                }
+                if (!dcState.codex.find(d => d._id === drugId)) {
+                    if (!window.db) return;
+                    const snap = await db.collection('drug_codex').doc(drugId).get();
+                    if (!snap.exists) {
+                        if (typeof showToast === 'function') showToast('ยานี้อาจถูกย้าย/ลบไปแล้ว');
+                        return;
+                    }
+                    dcState.codex.push(Object.assign({ _id: snap.id }, snap.data()));
+                }
+                dcOpenDetail(drugId);
+            } catch (err) {
+                console.error('[disease-codex] open linked drug failed:', err);
+            }
         }
 
         // Close the Disease Codex detail + submit modals on backdrop click
