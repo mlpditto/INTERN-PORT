@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.11)</title>
+    <title>Internship Portfolio (V95.12)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3641,12 +3641,44 @@
                         <i id="dx-section-icon" class="fa-solid fa-chevron-down" style="color:#0f766e; transition:0.3s; font-size:0.9em;"></i>
                     </div>
                     <div id="dx-section-content" style="display:none; border-top:1px solid #f0f0f0; background:#fff;">
-                        <div class="dc-toolbar">
-                            <input type="text" id="dx-search-input" placeholder="ค้นหา · ชื่อโรค / Thai name / ICD-10 / category" oninput="dxRenderList()">
+                        <!-- V95.12 Phase 5: tab bar split — Browse (Phase 2b) vs My Drafts (Phase 5).
+                             Both panels share the same Submit footer. Mirrors Drug Codex Phase 5;
+                             reuses the .dc-view-* / .dc-footer / .dc-submit-btn CSS. -->
+                        <div class="dc-view-tabs">
+                            <button type="button" class="dc-view-tab active" data-view="browse" onclick="dxSwitchView('browse')">
+                                📚 Browse
+                            </button>
+                            <button type="button" class="dc-view-tab" data-view="mydrafts" onclick="dxSwitchView('mydrafts')">
+                                📝 My Drafts
+                                <span id="dx-mydrafts-badge" class="dc-view-tab-badge" style="display:none;">0</span>
+                            </button>
                         </div>
-                        <div class="dc-az-rail" id="dx-az-rail"></div>
-                        <div id="dx-list" class="dc-list">
-                            <div class="dc-empty-state">🩺 Disease Codex กำลังจัดเตรียม · รอสักครู่</div>
+
+                        <!-- Browse panel (Phase 2b content) -->
+                        <div id="dx-view-browse">
+                            <div class="dc-toolbar">
+                                <input type="text" id="dx-search-input" placeholder="ค้นหา · ชื่อโรค / Thai name / ICD-10 / category" oninput="dxRenderList()">
+                            </div>
+                            <div class="dc-az-rail" id="dx-az-rail"></div>
+                            <div id="dx-list" class="dc-list">
+                                <div class="dc-empty-state">🩺 Disease Codex กำลังจัดเตรียม · รอสักครู่</div>
+                            </div>
+                        </div>
+
+                        <!-- My Drafts panel (V95.12 Phase 5) -->
+                        <div id="dx-view-mydrafts" style="display:none;">
+                            <div style="font-size:0.82em; color:#0f766e; background:#f0fdfa; border:1px solid #ccfbf1; border-radius:10px; padding:8px 12px; margin:12px 16px 8px;">
+                                ส่งร่างโรคที่อยากให้เพิ่มในคลัง · admin ตรวจก่อน publish · pending drafts สามารถแก้ไข/ลบ ได้
+                            </div>
+                            <div id="dx-mydrafts-list" class="dc-list">
+                                <div class="dc-empty-state">กำลังโหลด…</div>
+                            </div>
+                        </div>
+
+                        <div class="dc-footer">
+                            <button type="button" class="dc-submit-btn" onclick="dxOpenSubmit('new')" title="Submit a new disease entry for admin moderation">
+                                📥 Submit New Disease
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -4227,10 +4259,9 @@
         </div>
     </div>
 
-    <!-- Disease Codex Phase 2b: intern read-only detail modal. Mirrors the Drug
-         Codex detail shell (reuses .dc-detail-* CSS) but read-only — no
-         suggest-edit, no language bar, no discussion (i18n/submission deferred).
-         8 sections injected by dxRenderDetail(). -->
+    <!-- Disease Codex detail modal. Mirrors the Drug Codex detail shell (reuses
+         .dc-detail-* CSS). V95.11 Phase 4b added the language bar; V95.12 Phase 5
+         added the ✨ Suggest edit button. 8 sections injected by dxRenderDetail(). -->
     <div id="diseaseCodexDetailModal" class="modal">
         <div class="modal-content dc-detail-shell">
             <div class="dc-detail-head">
@@ -4240,12 +4271,83 @@
                         <div id="dx-detail-chips" class="dc-detail-chips lang-no-toggle"></div>
                     </div>
                     <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                        <button type="button" class="dc-detail-suggest-btn" onclick="dxSuggestEdit()" title="ส่งคำขอแก้ไขรายการนี้ให้ admin">✨ Suggest edit</button>
                         <button type="button" class="dc-detail-close" onclick="dxCloseDetail()" aria-label="Close">×</button>
                     </div>
                 </div>
             </div>
             <div id="dx-detail-body" class="dc-detail-body lang-no-toggle">
                 <!-- Sections injected by dxRenderDetail() -->
+            </div>
+        </div>
+    </div>
+
+    <!-- V95.12 Phase 5: Disease Codex submit modal. Mirrors the Drug Codex submit
+         modal (reuses .dc-submit-* CSS). Opens in 3 modes via dxOpenSubmit(mode, ctx):
+           'new'           → blank form, write a fresh disease_codex_drafts doc
+           'edit-pending'  → load existing pending draft, allow update or delete
+           'suggest-edit'  → pre-fill from a published disease, set targetDiseaseId
+         8 fields (parallel to Drug Codex Mid scope): diseaseName(req) + thaiName +
+         icd10 + category + symptoms + diagnosis + treatment + internNotes (draft-only
+         note to admin, not part of the published 21-field schema). -->
+    <div id="diseaseCodexSubmitModal" class="modal">
+        <div class="modal-content dc-submit-shell">
+            <div class="dc-submit-head">
+                <div>
+                    <span class="dc-submit-title">📥 Submit Disease</span>
+                    <span id="dx-submit-mode-pill" class="dc-submit-mode-pill">New entry</span>
+                </div>
+                <button type="button" class="dc-detail-close" onclick="dxCloseSubmit()" aria-label="Close">×</button>
+            </div>
+            <div class="dc-submit-body">
+                <div id="dx-submit-target-banner" class="dc-submit-target-banner" style="display:none;">
+                    ✨ Suggest edit for: <strong id="dx-submit-target-name"></strong>
+                </div>
+                <div id="dx-submit-error" class="dc-submit-error" style="display:none;"></div>
+
+                <div class="dc-submit-field">
+                    <label for="dx-s-diseaseName" class="required">Disease Name · ชื่อโรค (EN)</label>
+                    <input type="text" id="dx-s-diseaseName" placeholder="e.g. Dengue Fever" maxlength="120">
+                </div>
+                <div class="dc-submit-field">
+                    <label for="dx-s-thaiName">Thai Name · ชื่อไทย</label>
+                    <input type="text" id="dx-s-thaiName" placeholder="e.g. ไข้เลือดออก" maxlength="120">
+                </div>
+                <div class="dc-submit-field">
+                    <label for="dx-s-icd10">ICD-10</label>
+                    <input type="text" id="dx-s-icd10" placeholder="e.g. A90" maxlength="20">
+                    <div class="dc-submit-field-hint">ถ้าไม่แน่ใจ เว้นว่างได้ — admin จะเติมตอน review</div>
+                </div>
+                <div class="dc-submit-field">
+                    <label for="dx-s-category">Category · กลุ่มโรค</label>
+                    <input type="text" id="dx-s-category" placeholder="e.g. Infectious disease" maxlength="80">
+                </div>
+                <div class="dc-submit-field">
+                    <label for="dx-s-symptoms">Symptoms · อาการ</label>
+                    <textarea id="dx-s-symptoms" rows="3" placeholder="Presenting symptoms…"></textarea>
+                </div>
+                <div class="dc-submit-field">
+                    <label for="dx-s-diagnosis">Diagnosis · การวินิจฉัย</label>
+                    <textarea id="dx-s-diagnosis" rows="3" placeholder="Diagnostic criteria / investigations…"></textarea>
+                </div>
+                <div class="dc-submit-field">
+                    <label for="dx-s-treatment">Treatment · การรักษา</label>
+                    <textarea id="dx-s-treatment" rows="3" placeholder="Management / treatment…"></textarea>
+                </div>
+                <div class="dc-submit-field">
+                    <label for="dx-s-internNotes">Notes to admin · บันทึกเพิ่มเติมถึง admin</label>
+                    <textarea id="dx-s-internNotes" rows="2" placeholder="อยากบอก admin อะไรเกี่ยวกับร่างนี้? (เช่น แหล่งอ้างอิง, ความไม่แน่ใจ…)"></textarea>
+                    <div class="dc-submit-field-hint">ฟิลด์นี้ไม่ปรากฏใน Disease Codex หลัง publish · admin เห็นเฉพาะตอน review</div>
+                </div>
+            </div>
+            <div class="dc-submit-footer">
+                <div>
+                    <button type="button" id="dx-submit-delete-btn" class="dc-submit-delete-btn" onclick="dxDeleteCurrentDraft()" style="display:none;">🗑️ Delete</button>
+                </div>
+                <div class="dc-submit-footer-right">
+                    <button type="button" class="dc-submit-cancel-btn" onclick="dxCloseSubmit()">Cancel</button>
+                    <button type="button" id="dx-submit-save-btn" class="dc-submit-save-btn" onclick="dxSubmitForm()">📥 Submit</button>
+                </div>
             </div>
         </div>
     </div>
@@ -10786,12 +10888,430 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             return escapeHtml(text);
         }
 
-        // Close the Disease Codex detail modal on backdrop click (matches the
-        // Drug Codex detail modal behavior).
+        // Close the Disease Codex detail + submit modals on backdrop click
+        // (matches the Drug Codex modal behavior).
         document.addEventListener('click', function(ev) {
             const modal = document.getElementById('diseaseCodexDetailModal');
             if (modal && ev.target === modal) dxCloseDetail();
+            const smodal = document.getElementById('diseaseCodexSubmitModal');
+            if (smodal && ev.target === smodal) dxCloseSubmit();
         });
+
+        // ===================================================================
+        // 🩺 DISEASE CODEX — [V95.12 Phase 5] Intern draft submission.
+        // Mirrors Drug Codex Phase 5 (dc*). Tab bar (Browse | My Drafts),
+        // 8-field submit form modal in 3 modes (new / edit-pending /
+        // suggest-edit), own-drafts listener. Writes disease_codex_drafts per
+        // firestore.rules rule 31 (owner-create-pending + owner-update-while-
+        // pending + owner-delete-while-pending). Reuses the .dc-* CSS.
+        // ===================================================================
+        var dxSubmitState = {
+            mode: 'new',             // 'new' | 'edit-pending' | 'suggest-edit'
+            editingId: null,         // doc id of draft being edited (edit-pending only)
+            targetDiseaseId: null,   // doc id of published disease being suggested-edit on
+            targetDiseaseName: ''    // human label for the target banner
+        };
+
+        var dxMyDraftsState = {
+            unsub: null,
+            loaded: false,           // first-open guard for the My Drafts tab
+            drafts: []               // own-only drafts (any status)
+        };
+
+        // 8 fields chosen for the intern form (parallel to Drug Codex Mid scope).
+        // diseaseName is required (also enforced server-side by rule 31).
+        // internNotes is a draft-only field that surfaces to admin in the
+        // moderation queue but never reaches the published 21-field schema.
+        const DX_FORM_KEYS = [
+            'diseaseName', 'thaiName', 'icd10', 'category',
+            'symptoms', 'diagnosis', 'treatment', 'internNotes'
+        ];
+        // None of the 8 intern fields are arrays (synonyms/references are
+        // admin-only), so this map is empty — kept for parity with dc* so the
+        // collect/fill helpers stay structurally identical.
+        const DX_FORM_ARRAY_FIELDS = {};
+
+        function dxArrayToInput(value, kind) {
+            if (!Array.isArray(value)) return '';
+            const sep = kind === 'lines' ? '\n' : ', ';
+            return value.filter(Boolean).map(s => String(s).trim()).join(sep);
+        }
+
+        function dxInputToArray(value, kind) {
+            const raw = String(value == null ? '' : value).trim();
+            if (!raw) return [];
+            const sep = kind === 'lines' ? /\r?\n/ : /,/;
+            return raw.split(sep).map(s => s.trim()).filter(Boolean);
+        }
+
+        function dxSwitchView(view) {
+            const browse = document.getElementById('dx-view-browse');
+            const mydrafts = document.getElementById('dx-view-mydrafts');
+            document.querySelectorAll('#dx-section-content .dc-view-tab').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-view') === view);
+            });
+            if (view === 'browse') {
+                if (browse) browse.style.display = 'block';
+                if (mydrafts) mydrafts.style.display = 'none';
+            } else if (view === 'mydrafts') {
+                if (browse) browse.style.display = 'none';
+                if (mydrafts) mydrafts.style.display = 'block';
+                if (!dxMyDraftsState.loaded) {
+                    dxMyDraftsState.loaded = true;
+                    dxLoadMyDrafts();
+                }
+            }
+        }
+
+        function dxLoadMyDrafts() {
+            if (!window.db) return;
+            const authUser = firebase.auth && firebase.auth().currentUser;
+            if (!authUser || !authUser.uid) {
+                console.warn('[disease-codex intern] My Drafts: not signed in yet');
+                const list = document.getElementById('dx-mydrafts-list');
+                if (list) list.innerHTML = '<div class="dc-empty-state">กำลังรอ sign-in…</div>';
+                return;
+            }
+            if (typeof dxMyDraftsState.unsub === 'function') {
+                try { dxMyDraftsState.unsub(); } catch (_) {}
+                dxMyDraftsState.unsub = null;
+            }
+            try {
+                // Uses composite index (submittedBy ASC + createdAt DESC) shipped
+                // in firestore.indexes.json (Disease Codex Phase 1).
+                dxMyDraftsState.unsub = db.collection('disease_codex_drafts')
+                    .where('submittedBy', '==', authUser.uid)
+                    .orderBy('createdAt', 'desc')
+                    .onSnapshot(snap => {
+                        dxMyDraftsState.drafts = snap.docs.map(d => Object.assign({ _id: d.id }, d.data()));
+                        dxRenderMyDrafts();
+                        dxUpdateMyDraftsBadge();
+                    }, err => {
+                        console.error('[disease-codex intern] My Drafts snapshot error:', err);
+                        const list = document.getElementById('dx-mydrafts-list');
+                        if (list) list.innerHTML = `<div class="dc-empty-state" style="color:#b91c1c;">โหลด My Drafts ไม่สำเร็จ · ${err && err.message ? err.message : 'unknown error'}</div>`;
+                    });
+            } catch (err) {
+                console.error('[disease-codex intern] My Drafts listener setup failed:', err);
+            }
+        }
+
+        function dxUpdateMyDraftsBadge() {
+            const badge = document.getElementById('dx-mydrafts-badge');
+            if (!badge) return;
+            const n = dxMyDraftsState.drafts.length;
+            if (n > 0) {
+                badge.style.display = 'inline-block';
+                badge.textContent = String(n);
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        function dxRenderMyDrafts() {
+            const list = document.getElementById('dx-mydrafts-list');
+            if (!list) return;
+            if (dxMyDraftsState.drafts.length === 0) {
+                list.innerHTML = '<div class="dc-empty-state">ยังไม่มี draft ที่ส่ง<br><small style="color:#64748b;">📚 <a href="#" onclick="event.preventDefault(); dxSwitchView(\'browse\');" style="color:#0f766e; font-weight:600; text-decoration:underline;">ดูรายการโรคที่ admin ลงไว้แล้วใน Browse tab</a><br>หรือกด 📥 Submit New Disease ด้านล่างเพื่อส่งร่างโรค</small></div>';
+                return;
+            }
+            list.innerHTML = dxMyDraftsState.drafts.map(draft => {
+                const status = String(draft.status || 'pending').toLowerCase();
+                const statusLabel = status === 'approved' ? 'Approved'
+                    : status === 'rejected' ? 'Rejected' : 'Pending';
+                const statusClass = 'dc-draft-status dc-draft-status-' + status;
+                const created = draft.createdAt && draft.createdAt.toDate ? draft.createdAt.toDate() : null;
+                const dateStr = created ? created.toLocaleDateString('th-TH', { year:'numeric', month:'short', day:'numeric' }) : '';
+                const targetLine = draft.targetDiseaseId
+                    ? `<div class="dc-draft-meta">✨ Suggest edit · target: <code>${escapeHtml(draft.targetDiseaseId)}</code></div>`
+                    : '<div class="dc-draft-meta">📥 New entry</div>';
+                const notesBlock = draft.internNotes
+                    ? `<div class="dc-draft-notes">📝 ${escapeHtml(String(draft.internNotes).slice(0, 240))}${String(draft.internNotes).length > 240 ? '…' : ''}</div>`
+                    : '';
+                const adminNote = (status === 'rejected' && draft.adminNotes)
+                    ? `<div class="dc-draft-admin-note"><div class="dc-draft-admin-note-label">admin's note</div>${escapeHtml(String(draft.adminNotes))}</div>`
+                    : '';
+                let actions = '';
+                if (status === 'pending') {
+                    actions = `
+                        <button type="button" class="dc-draft-btn dc-draft-btn-primary" onclick="dxEditMyDraft('${escapeHtml(draft._id)}')">✏️ Edit</button>
+                        <button type="button" class="dc-draft-btn dc-draft-btn-danger" onclick="dxDeleteMyDraft('${escapeHtml(draft._id)}', this)">🗑️ Delete</button>
+                    `;
+                } else if (status === 'approved') {
+                    if (draft.publishedId) {
+                        actions = `<button type="button" class="dc-draft-btn dc-draft-btn-primary" onclick="dxOpenDetail('${escapeHtml(draft.publishedId)}')">→ See in Codex</button>`;
+                    }
+                } else if (status === 'rejected') {
+                    actions = `<button type="button" class="dc-draft-btn dc-draft-btn-primary" onclick="dxResubmit('${escapeHtml(draft._id)}')">↻ Submit again</button>`;
+                }
+                return `
+                    <div class="dc-draft-row">
+                        <div class="dc-draft-row-head">
+                            <div class="dc-draft-name">
+                                ${escapeHtml(draft.diseaseName || '(no name)')}
+                                ${targetLine}
+                            </div>
+                            <span class="${statusClass}">${statusLabel}</span>
+                        </div>
+                        ${dateStr ? `<div class="dc-draft-meta">ส่งเมื่อ ${dateStr}</div>` : ''}
+                        ${notesBlock}
+                        ${adminNote}
+                        ${actions ? `<div class="dc-draft-actions">${actions}</div>` : ''}
+                    </div>`;
+            }).join('');
+        }
+
+        function dxFillSubmitForm(data) {
+            DX_FORM_KEYS.forEach(key => {
+                const el = document.getElementById('dx-s-' + key);
+                if (!el) return;
+                const v = data ? data[key] : undefined;
+                if (DX_FORM_ARRAY_FIELDS[key]) {
+                    el.value = dxArrayToInput(v, DX_FORM_ARRAY_FIELDS[key]);
+                } else {
+                    el.value = v == null ? '' : String(v);
+                }
+            });
+            const err = document.getElementById('dx-submit-error');
+            if (err) { err.style.display = 'none'; err.textContent = ''; }
+        }
+
+        function dxCollectSubmitForm() {
+            const payload = {};
+            DX_FORM_KEYS.forEach(key => {
+                const el = document.getElementById('dx-s-' + key);
+                if (!el) return;
+                if (DX_FORM_ARRAY_FIELDS[key]) {
+                    payload[key] = dxInputToArray(el.value, DX_FORM_ARRAY_FIELDS[key]);
+                } else {
+                    payload[key] = String(el.value || '').trim();
+                }
+            });
+            return payload;
+        }
+
+        function dxOpenSubmit(mode, ctx) {
+            // ctx is mode-dependent:
+            //   'new'           → undefined (blank form)
+            //   'edit-pending'  → { draftId } (pre-fills from dxMyDraftsState.drafts)
+            //   'suggest-edit'  → { disease } (pre-fills from a published disease doc)
+            dxSubmitState.mode = mode;
+            dxSubmitState.editingId = null;
+            dxSubmitState.targetDiseaseId = null;
+            dxSubmitState.targetDiseaseName = '';
+
+            const titleEl = document.getElementById('dx-submit-mode-pill');
+            const banner = document.getElementById('dx-submit-target-banner');
+            const targetNameEl = document.getElementById('dx-submit-target-name');
+            const deleteBtn = document.getElementById('dx-submit-delete-btn');
+            const saveBtn = document.getElementById('dx-submit-save-btn');
+            if (banner) banner.style.display = 'none';
+            if (deleteBtn) deleteBtn.style.display = 'none';
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '📥 Submit'; }
+
+            if (mode === 'new') {
+                if (titleEl) {
+                    titleEl.className = 'dc-submit-mode-pill';
+                    titleEl.textContent = 'New entry';
+                }
+                dxFillSubmitForm({});
+            } else if (mode === 'edit-pending') {
+                const draft = dxMyDraftsState.drafts.find(d => d._id === (ctx && ctx.draftId));
+                if (!draft) {
+                    console.warn('[disease-codex intern] dxOpenSubmit edit-pending: draft not found', ctx);
+                    return;
+                }
+                dxSubmitState.editingId = draft._id;
+                if (titleEl) {
+                    titleEl.className = 'dc-submit-mode-pill dc-submit-mode-pill-edit';
+                    titleEl.textContent = 'Edit pending';
+                }
+                if (deleteBtn) deleteBtn.style.display = 'inline-block';
+                if (saveBtn) saveBtn.textContent = '💾 Save';
+                if (draft.targetDiseaseId) {
+                    // Edit a "Suggest edit" draft → keep the target context visible.
+                    dxSubmitState.targetDiseaseId = draft.targetDiseaseId;
+                    dxSubmitState.targetDiseaseName = draft.diseaseName || draft.targetDiseaseId;
+                    if (banner) banner.style.display = 'block';
+                    if (targetNameEl) targetNameEl.textContent = dxSubmitState.targetDiseaseName;
+                }
+                dxFillSubmitForm(draft);
+            } else if (mode === 'suggest-edit') {
+                const disease = ctx && ctx.disease;
+                if (!disease) {
+                    console.warn('[disease-codex intern] dxOpenSubmit suggest-edit: no disease ctx');
+                    return;
+                }
+                dxSubmitState.targetDiseaseId = disease._id;
+                dxSubmitState.targetDiseaseName = disease.diseaseName || disease._id;
+                if (titleEl) {
+                    titleEl.className = 'dc-submit-mode-pill dc-submit-mode-pill-suggest';
+                    titleEl.textContent = 'Suggest edit';
+                }
+                if (banner) banner.style.display = 'block';
+                if (targetNameEl) targetNameEl.textContent = dxSubmitState.targetDiseaseName;
+                // Pre-fill from published disease (only the 8 fields we support;
+                // rest stay admin-only).
+                dxFillSubmitForm({
+                    diseaseName: disease.diseaseName,
+                    thaiName: disease.thaiName,
+                    icd10: disease.icd10,
+                    category: disease.category,
+                    symptoms: disease.symptoms,
+                    diagnosis: disease.diagnosis,
+                    treatment: disease.treatment,
+                    internNotes: ''
+                });
+            }
+            const modal = document.getElementById('diseaseCodexSubmitModal');
+            if (modal) modal.style.display = 'flex';
+            // If opened from Suggest-edit while detail modal is up, close detail
+            // so the submit modal isn't visually buried.
+            const detailModal = document.getElementById('diseaseCodexDetailModal');
+            if (mode === 'suggest-edit' && detailModal) detailModal.style.display = 'none';
+            setTimeout(() => {
+                const first = document.getElementById('dx-s-diseaseName');
+                if (first && !first.value) first.focus();
+            }, 60);
+        }
+
+        function dxCloseSubmit() {
+            const modal = document.getElementById('diseaseCodexSubmitModal');
+            if (modal) modal.style.display = 'none';
+            dxSubmitState.mode = 'new';
+            dxSubmitState.editingId = null;
+            dxSubmitState.targetDiseaseId = null;
+            dxSubmitState.targetDiseaseName = '';
+        }
+
+        async function dxSubmitForm() {
+            const payload = dxCollectSubmitForm();
+            const errEl = document.getElementById('dx-submit-error');
+            const saveBtn = document.getElementById('dx-submit-save-btn');
+            if (!payload.diseaseName) {
+                if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Disease Name ห้ามว่าง'; }
+                const first = document.getElementById('dx-s-diseaseName');
+                if (first) first.focus();
+                return;
+            }
+
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Saving…'; }
+            if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+
+            try {
+                const authUser = (typeof ensureFirebaseAuthReady === 'function')
+                    ? await ensureFirebaseAuthReady(10000)
+                    : (firebase.auth && firebase.auth().currentUser);
+                if (!authUser || !authUser.uid) throw new Error('ยังไม่ได้ sign-in');
+
+                const nowTs = firebase.firestore.FieldValue.serverTimestamp();
+
+                if (dxSubmitState.mode === 'edit-pending' && dxSubmitState.editingId) {
+                    // UPDATE existing pending draft. Rules require status stays
+                    // 'pending' + submittedBy unchanged, so we send neither field.
+                    const updateData = Object.assign({}, payload, {
+                        updatedAt: nowTs,
+                        status: 'pending'  // explicit so rule's `request.resource.data.status == 'pending'` check passes
+                    });
+                    // Preserve targetDiseaseId if it was set (suggest-edit draft).
+                    if (dxSubmitState.targetDiseaseId) updateData.targetDiseaseId = dxSubmitState.targetDiseaseId;
+                    await db.collection('disease_codex_drafts').doc(dxSubmitState.editingId).update(updateData);
+                    if (typeof showToast === 'function') showToast('💾 บันทึก draft แล้ว');
+                } else {
+                    // CREATE a new draft (new or suggest-edit). Required by rules:
+                    // submittedBy, status='pending', diseaseName non-empty.
+                    const draftData = Object.assign({}, payload, {
+                        submittedBy: authUser.uid,
+                        submittedByName: (window.userProfile && window.userProfile.displayName) || '',
+                        submittedByUserId: window.userId || '',
+                        submittedByPictureUrl: (window.userProfile && window.userProfile.pictureUrl) || '',
+                        status: 'pending',
+                        createdAt: nowTs,
+                        updatedAt: nowTs
+                    });
+                    if (dxSubmitState.targetDiseaseId) draftData.targetDiseaseId = dxSubmitState.targetDiseaseId;
+                    await db.collection('disease_codex_drafts').add(draftData);
+                    if (typeof showToast === 'function') {
+                        showToast(dxSubmitState.targetDiseaseId
+                            ? '✨ ส่งคำขอแก้ไขแล้ว · admin จะตรวจเร็วๆ นี้'
+                            : '📥 ส่ง draft แล้ว · admin จะตรวจเร็วๆ นี้');
+                    }
+                }
+                dxCloseSubmit();
+                // Switch user to My Drafts so they see their submission land.
+                dxSwitchView('mydrafts');
+            } catch (err) {
+                console.error('[disease-codex intern] submit failed:', err);
+                if (errEl) {
+                    errEl.style.display = 'block';
+                    errEl.textContent = 'ส่งไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error');
+                }
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = dxSubmitState.mode === 'edit-pending' ? '💾 Save' : '📥 Submit'; }
+            }
+        }
+
+        function dxEditMyDraft(draftId) {
+            dxOpenSubmit('edit-pending', { draftId });
+        }
+
+        async function dxDeleteMyDraft(draftId, btn) {
+            const draft = dxMyDraftsState.drafts.find(d => d._id === draftId);
+            const name = (draft && draft.diseaseName) || draftId;
+            if (!confirm(`ลบ draft "${name}" หรือไม่? · ลบแล้วเรียกคืนไม่ได้`)) return;
+            if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+            try {
+                await db.collection('disease_codex_drafts').doc(draftId).delete();
+                if (typeof showToast === 'function') showToast(`🗑️ ลบ draft "${name}" แล้ว`);
+            } catch (err) {
+                console.error('[disease-codex intern] delete failed:', err);
+                alert('ลบไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
+                if (btn) { btn.disabled = false; btn.textContent = '🗑️ Delete'; }
+            }
+        }
+
+        async function dxDeleteCurrentDraft() {
+            if (dxSubmitState.mode !== 'edit-pending' || !dxSubmitState.editingId) return;
+            const draft = dxMyDraftsState.drafts.find(d => d._id === dxSubmitState.editingId);
+            const name = (draft && draft.diseaseName) || dxSubmitState.editingId;
+            if (!confirm(`ลบ draft "${name}" หรือไม่? · ลบแล้วเรียกคืนไม่ได้`)) return;
+            const delBtn = document.getElementById('dx-submit-delete-btn');
+            if (delBtn) { delBtn.disabled = true; delBtn.textContent = '⏳'; }
+            try {
+                await db.collection('disease_codex_drafts').doc(dxSubmitState.editingId).delete();
+                if (typeof showToast === 'function') showToast(`🗑️ ลบ draft "${name}" แล้ว`);
+                dxCloseSubmit();
+            } catch (err) {
+                console.error('[disease-codex intern] delete (from form) failed:', err);
+                alert('ลบไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
+                if (delBtn) { delBtn.disabled = false; delBtn.textContent = '🗑️ Delete'; }
+            }
+        }
+
+        function dxSuggestEdit() {
+            if (!dxState.currentDisease) {
+                console.warn('[disease-codex intern] dxSuggestEdit: no current disease open');
+                return;
+            }
+            dxOpenSubmit('suggest-edit', { disease: dxState.currentDisease });
+        }
+
+        function dxResubmit(rejectedDraftId) {
+            const draft = dxMyDraftsState.drafts.find(d => d._id === rejectedDraftId);
+            if (!draft) return;
+            // Open a fresh "new" draft pre-filled from the rejected one. We
+            // don't reuse the rejected doc because rules lock it to admin once
+            // status != 'pending'. The rejected draft stays as a record.
+            dxOpenSubmit('new');
+            dxFillSubmitForm(draft);
+            const errEl = document.getElementById('dx-submit-error');
+            if (errEl) {
+                errEl.style.display = 'block';
+                errEl.style.background = '#fffbeb';
+                errEl.style.color = '#92400e';
+                errEl.style.borderColor = '#fde68a';
+                errEl.textContent = '↻ ฟิลด์ถูกเติมจาก draft ที่ถูก reject · แก้ตามความเห็น admin แล้วกด Submit ใหม่';
+            }
+        }
 
         function dcLoadCodex() {
             if (!window.db) return;
