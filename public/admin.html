@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.93</title>
+    <title>Nika V94.94</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -31392,6 +31392,23 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             hidden.value = target.dataset.value;
         }
 
+        // V94.94: optimistic "fake" progress for the AI Auto-Draft button. Generation
+        // is a single non-streaming request, so there's no real progress to read —
+        // animate an eased climb toward ~90% over the typical 10-30s. Caller clears it
+        // in finally (success hides the box, error resets the button). Shared Drug+Disease.
+        function startAiFakeProgress(btn, label) {
+            if (!btn) return { stop: function () {} };
+            const start = Date.now();
+            const render = function () {
+                const elapsed = (Date.now() - start) / 1000;
+                const pct = Math.min(92, Math.round(90 * (1 - Math.exp(-elapsed / 9))));
+                btn.textContent = '⏳ ' + label + ' ' + pct + '%';
+            };
+            render();
+            const id = setInterval(render, 300);
+            return { stop: function () { clearInterval(id); } };
+        }
+
         async function dcaAutoDraftGo() {
             const nameEl = document.getElementById('dca-ai-name');
             const errEl = document.getElementById('dca-ai-error');
@@ -31417,7 +31434,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
 
             if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-            if (goBtn) { goBtn.disabled = true; goBtn.textContent = '⏳ Generating…'; }
+            let progress = null;
+            if (goBtn) { goBtn.disabled = true; progress = startAiFakeProgress(goBtn, 'Generating…'); }
 
             const prompt = dcaBuildAutoDraftPrompt(drugName);
             try {
@@ -31485,6 +31503,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     errEl.textContent = 'Auto-draft failed: ' + (err && err.message ? err.message : 'unknown error');
                 }
                 if (goBtn) { goBtn.disabled = false; goBtn.textContent = 'Generate'; }
+            } finally {
+                if (progress) progress.stop();
             }
         }
 
@@ -32085,7 +32105,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
 
             if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-            if (goBtn) { goBtn.disabled = true; goBtn.textContent = '⏳ Generating…'; }
+            let progress = null;
+            if (goBtn) { goBtn.disabled = true; progress = startAiFakeProgress(goBtn, 'Generating…'); }
 
             const prompt = dxaBuildAutoDraftPrompt(diseaseName);
             try {
@@ -32145,6 +32166,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     errEl.textContent = 'Auto-draft failed: ' + (err && err.message ? err.message : 'unknown error');
                 }
                 if (goBtn) { goBtn.disabled = false; goBtn.textContent = 'Generate'; }
+            } finally {
+                if (progress) progress.stop();
             }
         }
 
