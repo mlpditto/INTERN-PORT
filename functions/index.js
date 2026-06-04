@@ -608,9 +608,19 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 tailoredPrompt += "\n\nIMPORTANT: Respond strictly in valid JSON format.";
             }
 
+            // Claude's hardcoded 4096 truncated long JSON responses (e.g. the Thai
+            // quiz analysis with multiple rewritten questions), producing invalid
+            // JSON the client then surfaced as "prose instead of JSON". Gemini
+            // already gets 8192 — match that as the floor and honor an explicit
+            // generationOptions.maxOutputTokens (capped for cost safety). Claude 4.x
+            // supports far more, so 8192 default / 16384 cap is well within limits.
+            const anthropicMaxTokens = Math.min(
+                Math.max(Number(generationOptions && generationOptions.maxOutputTokens) || 8192, 1024),
+                16384
+            );
             const response = await axios.post('https://api.anthropic.com/v1/messages', {
                 model: actualModel,
-                max_tokens: 4096,
+                max_tokens: anthropicMaxTokens,
                 messages: [{ role: "user", content: tailoredPrompt }],
                 temperature: 0.7
             }, {
