@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.15)</title>
+    <title>Internship Portfolio (V95.16)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4207,7 +4207,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.15 (Work history polish — softer ungraded score, muted empty patient name, hide empty 30-day trend)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.16 (Quiz attempts now appear in Work > History timeline)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -6399,6 +6399,8 @@
                 s.forEach(d => quizAttemptsCache[d.data().quizId] = d.data());
                 renderAssignments();
                 renderHistory();
+                // V95.16: quiz attempts now also feed the unified Work > History timeline
+                if (typeof renderUnifiedHistory === 'function') renderUnifiedHistory();
                 updateGrandLineDashboard();
             }, e => handleFirestoreListenerError('quiz attempts listener', e));
         }
@@ -14642,16 +14644,9 @@ async function archiveDoneCard(cardId) {
                         }));
                         console.log(`[Unified] Loaded ${unifiedSubmissionsCache.length} submissions`);
 
-                        // Toggle empty-state hero vs stats/search/filters based on whether user has any entries
-                        const isEmpty = unifiedSubmissionsCache.length === 0;
-                        const hero = document.getElementById('unified-empty-hero');
-                        const stats = document.getElementById('unified-stats-card');
-                        const searchWrap = document.getElementById('unified-search-wrap');
-                        const filtersWrap = document.getElementById('unified-filters-wrap');
-                        if (hero) hero.style.display = isEmpty ? 'flex' : 'none';
-                        if (stats) stats.style.display = isEmpty ? 'none' : '';
-                        if (searchWrap) searchWrap.style.display = isEmpty ? 'none' : '';
-                        if (filtersWrap) filtersWrap.style.display = isEmpty ? 'none' : '';
+                        // Toggle empty-state hero vs stats/search/filters. V95.16: now
+                        // based on submissions + quiz attempts (see syncUnifiedEmptyState).
+                        syncUnifiedEmptyState();
 
                         // Update unified history if container exists
                         renderUnifiedHistory();
@@ -14770,7 +14765,7 @@ async function archiveDoneCard(cardId) {
 
         // 🔥 [V91.65] Find oldest pending submission (for reminder banner)
         function getOldestPending() {
-            const pending = (unifiedSubmissionsCache || []).filter(s => s.status === 'pending' || s.status === 'รอตรวจ');
+            const pending = getUnifiedAllItems().filter(s => s.status === 'pending' || s.status === 'รอตรวจ');
             if (pending.length === 0) return null;
             let oldestTs = Infinity, oldest = null;
             pending.forEach(s => {
@@ -14790,7 +14785,7 @@ async function archiveDoneCard(cardId) {
                 const d = new Date(today); d.setDate(d.getDate() - i);
                 days.push({ ts: d.getTime(), points: 0 });
             }
-            (unifiedSubmissionsCache || []).forEach(s => {
+            getUnifiedAllItems().forEach(s => {
                 if (!s.timestamp || !s.timestamp.toDate) return;
                 const d = s.timestamp.toDate(); d.setHours(0,0,0,0);
                 const idx = days.findIndex(b => b.ts === d.getTime());
@@ -15076,10 +15071,66 @@ async function archiveDoneCard(cardId) {
             return buckets;
         }
 
+        // V95.16: Quiz attempts live in `quiz_attempts` (keyed by quizId), separate
+        // from the `submissions` collection the unified timeline loads. Map them into
+        // the same shape so quizzes (pending review + reviewed) show up in Work History
+        // alongside cases/works. Inclusion rule mirrors legacy renderHistory() (V94.39):
+        // pending / approved / exam-session attempts.
+        function mapQuizAttemptsToUnified() {
+            const cache = (typeof quizAttemptsCache !== 'undefined' && quizAttemptsCache) ? quizAttemptsCache : {};
+            const out = [];
+            Object.keys(cache).forEach(qid => {
+                const att = cache[qid];
+                if (!att) return;
+                if (!(att.status === 'pending' || att.status === 'approved' || att.isExamSession)) return;
+                const quiz = (typeof quizzesCache !== 'undefined' && quizzesCache) ? quizzesCache.find(q => q.id === qid) : null;
+                let score;
+                if (att.isExamSession && Number.isFinite(Number(att.groupScore))) score = Number(att.groupScore);
+                else { score = Number(att.score); if (!Number.isFinite(score)) score = 0; }
+                out.push({
+                    id: `${qid}_${userId}`,
+                    submissionType: 'quiz',
+                    title: quiz ? quiz.title : (att.quizTitle || 'แบบทดสอบ (Quiz)'),
+                    score: score,
+                    status: att.status === 'pending' ? 'pending' : (att.status || 'approved'),
+                    timestamp: att.timestamp,
+                    adminComment: att.adminComment || '',
+                    adminBonus: 0,
+                    metadata: {
+                        correctCount: att.correctCount,
+                        totalQuestions: att.totalQuestions,
+                        duration: att.duration,
+                        tags: att.tags
+                    }
+                });
+            });
+            return out;
+        }
+
+        // V95.16: Single source for the unified timeline — submissions + quiz attempts.
+        function getUnifiedAllItems() {
+            return (unifiedSubmissionsCache || []).concat(mapQuizAttemptsToUnified());
+        }
+
+        // V95.16: Toggle empty-state hero vs stats/search/filters based on whether the
+        // user has ANY entry (submissions or quiz attempts), so quiz-only users still
+        // see the timeline. Called from both the submissions listener and renderUnifiedHistory.
+        function syncUnifiedEmptyState() {
+            const isEmpty = getUnifiedAllItems().length === 0;
+            const hero = document.getElementById('unified-empty-hero');
+            const stats = document.getElementById('unified-stats-card');
+            const searchWrap = document.getElementById('unified-search-wrap');
+            const filtersWrap = document.getElementById('unified-filters-wrap');
+            if (hero) hero.style.display = isEmpty ? 'flex' : 'none';
+            if (stats) stats.style.display = isEmpty ? 'none' : '';
+            if (searchWrap) searchWrap.style.display = isEmpty ? 'none' : '';
+            if (filtersWrap) filtersWrap.style.display = isEmpty ? 'none' : '';
+        }
+
         // 🔥 [V91.62] Count submissions per type (for pill badges)
         function getUnifiedTypeCounts() {
             const counts = { all: 0, case: 0, work: 0, quiz: 0, quest: 0, reflective: 0 };
-            (unifiedSubmissionsCache || []).forEach(s => {
+            getUnifiedAllItems().forEach(s => {
                 counts.all++;
                 if (counts[s.submissionType] !== undefined) counts[s.submissionType]++;
             });
@@ -15089,7 +15140,7 @@ async function archiveDoneCard(cardId) {
         // 🔥 [V91.62] Apply type + status filter, return sorted submissions
         // 🔥 [V91.63] Also apply search query
         function getFilteredUnifiedItems() {
-            let items = (unifiedSubmissionsCache || []).slice();
+            let items = getUnifiedAllItems();
             if (unifiedCurrentFilter !== 'all') {
                 items = items.filter(s => s.submissionType === unifiedCurrentFilter);
             }
@@ -15166,6 +15217,7 @@ async function archiveDoneCard(cardId) {
             // 🔥 [V91.62] Always refresh pills (counts may change as new items arrive)
             // 🔥 [V91.63] Also refresh stats summary card
             // 🔥 [V91.65] Also refresh streak chip + pending banner; inject pulse CSS
+            syncUnifiedEmptyState();
             ensureUnifiedHistoryStyles();
             renderTypeFilterPills();
             renderStatusFilterPills();
