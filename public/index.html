@@ -14922,6 +14922,15 @@ async function archiveDoneCard(cardId) {
                     outline: 2px solid #4361ee; outline-offset: 2px;
                 }
 
+                /* V95.18: the generic button rule (width:100%, min-height:48px at
+                   index.html:341) makes these pills stretch full-width and stack on
+                   wide viewports (type pills overflow-scroll, status pills wrap). The
+                   inline styles never set width, so the generic rule wins. Class
+                   selectors beat the type selector — size pills to their content and
+                   drop the tall min-height on the small status chips. */
+                .unified-filter-btn, .unified-status-btn { width: auto; }
+                .unified-status-btn { min-height: 0; }
+
                 /* Empty-state hero card — shown when unified history has 0 entries */
                 .empty-hero-card {
                     display: flex;
@@ -15270,8 +15279,12 @@ async function archiveDoneCard(cardId) {
             // 🔥 [V91.66] Mark as no longer busy (skeleton state done)
             container.setAttribute('aria-busy', 'false');
 
-            // No submissions at all → original empty state with CTA
-            if (!unifiedSubmissionsCache || unifiedSubmissionsCache.length === 0) {
+            // No entries at all → original empty state with CTA.
+            // V95.19: check submissions + quiz attempts (getUnifiedAllItems), not just
+            // `unifiedSubmissionsCache` — a user with only quiz attempts and no other
+            // submissions was wrongly hitting this empty-hero early-return, so their
+            // quizzes never rendered (regression gap left by the V95.16 quiz merge).
+            if (getUnifiedAllItems().length === 0) {
                 container.innerHTML = `
                     <div style="text-align:center; color:#999; padding:40px 20px;">
                         <i class="fa-solid fa-inbox" style="font-size:3em; margin-bottom:15px; opacity:0.3;"></i>
