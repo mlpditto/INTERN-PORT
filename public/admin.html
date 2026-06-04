@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.87</title>
+    <title>Nika V94.88</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -20974,19 +20974,33 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 btn.innerHTML = oldContent;
             }
         };
-async function ensureAuthForQuizWrite(timeoutMs = 3000) {
-            if (auth && auth.currentUser) return auth.currentUser;
+async function ensureAuthForQuizWrite(timeoutMs = 6000) {
+            // V94.88: force-refresh a possibly-stale ID token before returning. A
+            // long-open admin tab can hold a currentUser whose token has expired;
+            // the Firestore write would then fail with permission-denied even though
+            // currentUser is non-null. getIdToken(true) recovers it silently. If the
+            // refresh token itself is gone, return null so the caller shows the clean
+            // "sign in again" path instead of a raw permission-denied.
+            const refresh = async (user) => {
+                if (!user) return null;
+                if (typeof user.getIdToken === 'function') {
+                    try { await user.getIdToken(true); }
+                    catch (_) { return null; }
+                }
+                return user;
+            };
+            if (auth && auth.currentUser) return refresh(auth.currentUser);
             if (!auth || typeof auth.onAuthStateChanged !== 'function') return null;
 
             return new Promise((resolve) => {
                 let done = false;
                 let unsub = null;
-                const finish = (user) => {
+                const finish = async (user) => {
                     if (done) return;
                     done = true;
                     if (typeof unsub === 'function') unsub();
                     clearTimeout(timer);
-                    resolve(user || null);
+                    resolve(await refresh(user));
                 };
                 const timer = setTimeout(() => finish(auth.currentUser || null), timeoutMs);
                 unsub = auth.onAuthStateChanged((user) => {
@@ -21320,7 +21334,7 @@ ${JSON.stringify(sourceObj)}`;
             };
 
             try {
-                const authUser = await ensureAuthForQuizWrite(3500);
+                const authUser = await ensureAuthForQuizWrite(6000);
                 if (!authUser) {
                     alert("❌ Firebase auth session not found.\n\nPlease sign in with the admin account again, then retry Save Quiz.");
                     const loginErrorEl = document.getElementById('login-error');
