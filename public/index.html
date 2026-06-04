@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.16)</title>
+    <title>Internship Portfolio (V95.17)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4207,7 +4207,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.16 (Quiz attempts now appear in Work > History timeline)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.17 (Deterministic Thai dates — fix garbled ". 2569" in LINE WebView)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -6386,6 +6386,26 @@
 
         // --- Quiz System ---
         // (Variables declared globally)
+
+        // V95.17: Thai short-month names are missing/garbled in limited-ICU WebViews
+        // (notably the LINE in-app browser), where toLocaleString('th-TH',{month:'short'})
+        // drops the day+month and renders e.g. ". 2569 14:41". Build the date string by
+        // hand from a static Thai month table + Buddhist year so it's deterministic
+        // everywhere. opts: { year:'numeric'|'2-digit', time:true } — omit for "D MMM".
+        const THAI_MONTHS_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+        function formatThaiDate(dateObj, opts) {
+            opts = opts || {};
+            const d = (dateObj instanceof Date) ? dateObj
+                    : (dateObj && typeof dateObj.toDate === 'function') ? dateObj.toDate()
+                    : null;
+            if (!d || isNaN(d.getTime())) return '-';
+            let s = `${d.getDate()} ${THAI_MONTHS_SHORT[d.getMonth()]}`;
+            const yearBE = d.getFullYear() + 543;
+            if (opts.year === 'numeric') s += ` ${yearBE}`;
+            else if (opts.year === '2-digit') s += ` ${String(yearBE % 100).padStart(2, '0')}`;
+            if (opts.time) s += ` ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+            return s;
+        }
 
         function loadQuizzes() {
             db.collection("quizzes").onSnapshot(s => {
@@ -9899,13 +9919,7 @@
                     const score = attempt.score || 0;
                     const totalScore = attempt.totalScore || quiz.totalScore || 100;
                     const percentage = Math.round((score / totalScore) * 100);
-                    const timestamp = attempt.timestamp ? attempt.timestamp.toDate().toLocaleString('th-TH', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    }) : '-';
+                    const timestamp = formatThaiDate(attempt.timestamp, { year: '2-digit', time: true });
 
                     const scoreColor = percentage >= 80 ? '#28a745' : percentage >= 60 ? '#ffc107' : '#dc3545';
                     const scoreIcon = percentage >= 80 ? 'fa-trophy' : percentage >= 60 ? 'fa-star' : 'fa-redo';
@@ -11081,7 +11095,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     : status === 'rejected' ? 'Rejected' : 'Pending';
                 const statusClass = 'dc-draft-status dc-draft-status-' + status;
                 const created = draft.createdAt && draft.createdAt.toDate ? draft.createdAt.toDate() : null;
-                const dateStr = created ? created.toLocaleDateString('th-TH', { year:'numeric', month:'short', day:'numeric' }) : '';
+                const dateStr = created ? formatThaiDate(created, { year:'numeric' }) : '';
                 const targetLine = draft.targetDiseaseId
                     ? `<div class="dc-draft-meta">✨ Suggest edit · target: <code>${escapeHtml(draft.targetDiseaseId)}</code></div>`
                     : '<div class="dc-draft-meta">📥 New entry</div>';
@@ -11872,7 +11886,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     : status === 'rejected' ? 'Rejected' : 'Pending';
                 const statusClass = 'dc-draft-status dc-draft-status-' + status;
                 const created = draft.createdAt && draft.createdAt.toDate ? draft.createdAt.toDate() : null;
-                const dateStr = created ? created.toLocaleDateString('th-TH', { year:'numeric', month:'short', day:'numeric' }) : '';
+                const dateStr = created ? formatThaiDate(created, { year:'numeric' }) : '';
                 const targetLine = draft.targetDrugId
                     ? `<div class="dc-draft-meta">✨ Suggest edit · target: <code>${escapeHtml(draft.targetDrugId)}</code></div>`
                     : '<div class="dc-draft-meta">📥 New entry</div>';
@@ -12804,7 +12818,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
 
                     item.innerHTML = `
                         <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                            <span style="font-weight:bold; color:#e67e22;">${log.mood || '😊'} ${d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</span>
+                            <span style="font-weight:bold; color:#e67e22;">${log.mood || '😊'} ${formatThaiDate(d)}</span>
                             <span style="color:#28a745; font-size:0.85em;">+0.1 pts</span>
                         </div>
                         <div style="color:#555; white-space:pre-wrap;">${log.content}</div>
@@ -14546,9 +14560,7 @@ async function archiveDoneCard(cardId) {
             }
 
             historyContainer.innerHTML = items.map(item => {
-                const date = item.timestamp ? item.timestamp.toDate().toLocaleString('th-TH', {
-                    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-                }) : '-';
+                const date = formatThaiDate(item.timestamp, { time: true });
                 const isPending = item.status === 'รอตรวจ' || item.status === 'pending';
                 const statusBadge = isPending
                     ? `<span class="badge" style="background:#fff3cd; color:#856404; font-size:0.7em;">⏳ รอตรวจ</span>`
@@ -15360,10 +15372,7 @@ async function archiveDoneCard(cardId) {
             // 🔥 [V91.62] Sort already done in getFilteredUnifiedItems
             // 🔥 [V91.63] Card render extracted as helper for date-bucket grouping
             const renderUnifiedCard = (item) => {
-                const date = item.timestamp ? item.timestamp.toDate().toLocaleString('th-TH', {
-                    day: 'numeric', month: 'short', year: 'numeric',
-                    hour: '2-digit', minute: '2-digit'
-                }) : '-';
+                const date = formatThaiDate(item.timestamp, { year: 'numeric', time: true });
 
                 const isPending = item.status === 'pending' || item.status === 'รอตรวจ';
                 const statusBadge = isPending
