@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.14)</title>
+    <title>Internship Portfolio (V95.15)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4207,7 +4207,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V94.33 (Read-only admin edit history viewer + ?entryId/showHistory deep link for LP entries)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.15 (Work history polish — softer ungraded score, muted empty patient name, hide empty 30-day trend)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -14702,7 +14702,11 @@ async function archiveDoneCard(cardId) {
             const pendingColor = s.pending > 0 ? '#d97706' : '#94a3b8';
             const sparklineValues = getPointsSparkline();
             const sparklineHasData = sparklineValues.some(v => v > 0);
-            const sparklineHtml = sparklineHasData ? renderSparkline(sparklineValues, 80, 28) : '<span style="font-size:0.7em; color:#cbd5e1; font-style:italic;">No activity yet</span>';
+            const trendRowHtml = sparklineHasData ? `
+                <div style="margin-top:10px; padding-top:10px; border-top:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                    <div style="font-size:0.66em; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">📈 30-day trend</div>
+                    <div style="display:flex; align-items:center; line-height:0;">${renderSparkline(sparklineValues, 80, 28)}</div>
+                </div>` : '';
             wrap.innerHTML = `
                 <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">
                     <div style="text-align:center;">
@@ -14718,10 +14722,7 @@ async function archiveDoneCard(cardId) {
                         <div style="font-size:0.62em; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; margin-top:3px;">⏳ Pending</div>
                     </div>
                 </div>
-                <div style="margin-top:10px; padding-top:10px; border-top:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center; gap:10px;">
-                    <div style="font-size:0.66em; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">📈 30-day trend</div>
-                    <div style="display:flex; align-items:center; line-height:0;">${sparklineHtml}</div>
-                </div>
+                ${trendRowHtml}
             `;
         }
 
@@ -15244,7 +15245,7 @@ async function archiveDoneCard(cardId) {
                             icon: 'fa-notes-medical',
                             color: '#ef233c',
                             link: null,
-                            detail: sub.metadata?.customer || 'No patient name'
+                            detail: sub.metadata?.customer || '<span style="color:#cbd5e1; font-style:italic;">No patient name</span>'
                         };
                     
                     case 'work':
@@ -15317,9 +15318,10 @@ async function archiveDoneCard(cardId) {
                     ? `<span class="badge" style="background:#fff3cd; color:#856404; font-size:0.75em;">⏳ รอตรวจ</span>`
                     : `<span class="badge" style="background:#d4edda; color:#155724; font-size:0.75em;">✅ ตรวจแล้ว</span>`;
 
-                const scoreDisplay = isNaN(item.score) || item.score === 0
-                    ? '-'
-                    : item.score.toFixed(2);
+                const hasScore = !(isNaN(item.score) || item.score === 0);
+                const scoreHtml = hasScore
+                    ? `<div style="font-weight:800; color:${item.color}; font-size:1.3em;">${item.score.toFixed(2)}</div>`
+                    : `<div style="font-weight:700; color:#cbd5e1; font-size:1em;" title="ยังไม่ให้คะแนน">–</div>`;
 
                 const linkHtml = item.link
                     ? `<a href="${item.link}" target="_blank" onclick="event.stopPropagation()" style="color:${item.color}; font-size:0.85em;">
@@ -15372,9 +15374,7 @@ async function archiveDoneCard(cardId) {
                                 </div>
                             </div>
                             <div style="text-align:right; flex-shrink:0;">
-                                <div style="font-weight:800; color:${item.color}; font-size:1.3em;">
-                                    ${scoreDisplay}
-                                </div>
+                                ${scoreHtml}
                                 ${linkHtml}
                             </div>
                             <i class="card-chevron fa-solid fa-chevron-down" style="color:#cbd5e1; font-size:0.85em; transition:transform 0.2s; flex-shrink:0; align-self:center; min-width:20px;" aria-label="Toggle details"></i>
