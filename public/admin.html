@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.89</title>
+    <title>Nika V94.90</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1376,6 +1376,14 @@
             background: #fff; color: #334155; cursor: pointer; font-weight: 700; font-size: 0.82em;
         }
         .dca-row-edit-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
+        /* V94.90: row-level "copy as Markdown" button — icon button sized like
+           the delete button but neutral (slate hover), green flash on success. */
+        .dca-row-copy-btn {
+            padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1;
+            background: #fff; cursor: pointer; font-size: 0.95em; line-height: 1;
+        }
+        .dca-row-copy-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
+        .dca-row-copy-btn.copied { background: #dcfce7; border-color: #86efac; }
         .dca-row-del-btn {
             padding: 6px 10px; border-radius: 8px; border: 1px solid #fecaca;
             background: #fff; cursor: pointer; font-size: 0.95em; line-height: 1;
@@ -29559,8 +29567,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             monitoring: 'Monitoring', patientCounseling: 'Patient Counseling', pearls: 'Clinical Pearls',
             references: 'References'
         };
-        async function dcaCopyDrugAsMarkdown(scopeKey, btnEl) {
-            const data = dcaCollectForm();
+        // V94.90: dataOverride lets the list-row 📋 button copy a drug straight
+        // from the cache object without loading it into the form first.
+        async function dcaCopyDrugAsMarkdown(scopeKey, btnEl, dataOverride) {
+            const data = dataOverride || dcaCollectForm();
             const name = (data.genericName || '').trim() || '(unnamed drug)';
             const sectionDefs = (scopeKey === 'all')
                 ? DCA_SECTION_DEFS
@@ -29623,6 +29633,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 console.error('[drug-codex] copy failed:', err);
                 alert('Copy failed: ' + (err && err.message ? err.message : 'clipboard API blocked — try a focused tab over HTTPS'));
             }
+        }
+
+        // V94.90: list-row copy — find the drug in the cache and copy it whole.
+        function dcaCopyRow(drugId, btnEl) {
+            const drug = (dcaState.codex || []).find(d => d._id === drugId);
+            if (!drug) { if (typeof showToast === 'function') showToast('Drug not found'); return; }
+            dcaCopyDrugAsMarkdown('all', btnEl, drug);
         }
 
         // Recompute badge state for every section based on the current form values.
@@ -29876,6 +29893,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 ${updatedAbs ? `<div class="dca-row-updated-abs" title="Last updated">🕒 ${dcaEscapeHtml(updatedAbs)}</div>` : ''}
                                 <div class="dca-row-actions">
                                     <button type="button" class="dca-row-edit-btn" onclick="dcaEdit('${dcaEscapeHtml(drug._id)}')">Edit</button>
+                                    <button type="button" class="dca-row-copy-btn" onclick="dcaCopyRow('${dcaEscapeHtml(drug._id)}', this)" title="Copy as Markdown">📋</button>
                                     <button type="button" class="dca-row-del-btn" onclick="dcaDelete('${dcaEscapeHtml(drug._id)}', this)" title="Delete">🗑️</button>
                                 </div>
                             </div>
@@ -32301,6 +32319,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 ${updatedAbs ? `<div class="dca-row-updated-abs" title="Last updated">🕒 ${dxaEscapeHtml(updatedAbs)}</div>` : ''}
                                 <div class="dca-row-actions">
                                     <button type="button" class="dca-row-edit-btn" onclick="dxaEdit('${dxaEscapeHtml(disease._id)}')">Edit</button>
+                                    <button type="button" class="dca-row-copy-btn" onclick="dxaCopyRow('${dxaEscapeHtml(disease._id)}', this)" title="Copy as Markdown">📋</button>
                                     <button type="button" class="dca-row-del-btn" onclick="dxaDelete('${dxaEscapeHtml(disease._id)}', this)" title="Delete">🗑️</button>
                                 </div>
                             </div>
@@ -32361,8 +32380,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         // Copy disease entry (or one section) as Markdown from current form state.
-        async function dxaCopyDiseaseAsMarkdown(scopeKey, btnEl) {
-            const data = dxaCollectForm();
+        // V94.90: dataOverride lets the list-row 📋 button copy a disease straight
+        // from the cache object without loading it into the form first.
+        async function dxaCopyDiseaseAsMarkdown(scopeKey, btnEl, dataOverride) {
+            const data = dataOverride || dxaCollectForm();
             const sectionDefs = scopeKey === 'all'
                 ? DXA_SECTION_DEFS
                 : DXA_SECTION_DEFS.filter(d => d.key === scopeKey);
@@ -32421,6 +32442,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 console.error('[disease-codex] copy failed:', err);
                 alert('Copy failed: ' + (err && err.message ? err.message : 'clipboard API blocked — try a focused tab over HTTPS'));
             }
+        }
+
+        // V94.90: list-row copy — find the disease in the cache and copy it whole.
+        function dxaCopyRow(diseaseId, btnEl) {
+            const disease = (dxaState.codex || []).find(d => d._id === diseaseId);
+            if (!disease) { if (typeof showToast === 'function') showToast('Disease not found'); return; }
+            dxaCopyDiseaseAsMarkdown('all', btnEl, disease);
         }
 
         // ===================================================================
