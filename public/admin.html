@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.90</title>
+    <title>Nika V94.91</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4240,7 +4240,13 @@
 
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
-        var db = firebase.firestore();
+        // V94.91: admin runs on the same mlpditto.github.io origin as the intern LIFF
+        // app, which signs in anonymously. With both on the DEFAULT Firebase app they
+        // shared one auth-persistence slot, so the intern's anonymous sign-in clobbered
+        // the admin's Google session → frequent forced re-login. Give admin its own named
+        // app ('admin') so its auth/Firestore/Storage persist in a separate slot.
+        var adminApp = firebase.initializeApp(firebaseConfig, 'admin');
+        var db = adminApp.firestore();
 
         // Google Drive Config ([Version: V87.67] Inlined for GitHub Pages)
         window.GDRIVE_CLIENT_ID = '367076866368-folligjcmmnrcu1u2tt3q9cvn9j5n2a6.apps.googleusercontent.com';
@@ -9076,7 +9082,7 @@
                         const hash = await window._sha256Hex(file);
                         const ext = _TTS_PRESET_AUDIO_MIME[file.type] || '.wav';
                         audioPath = 'voice-refs/' + hash + ext;
-                        const ref = firebase.storage().ref(audioPath);
+                        const ref = adminApp.storage().ref(audioPath);
                         try {
                             audioUrl = await ref.getDownloadURL();
                         } catch (probeErr) {
@@ -9130,7 +9136,7 @@
                     await db.collection('tts_voice_presets').doc(presetId).delete();
                     if (preset.audioPath && !storageStillUsed) {
                         try {
-                            await firebase.storage().ref(preset.audioPath).delete();
+                            await adminApp.storage().ref(preset.audioPath).delete();
                         } catch (e) {
                             console.warn('[V93.49] Voice preset Storage delete failed:', e && e.message);
                         }
@@ -9172,7 +9178,7 @@
                 window._voiceRefOrphans = [];
                 try {
                     const [storageList, presetSnap] = await Promise.all([
-                        firebase.storage().ref('voice-refs').listAll(),
+                        adminApp.storage().ref('voice-refs').listAll(),
                         db.collection('tts_voice_presets').get()
                     ]);
                     const storagePaths = storageList.items.map(i => i.fullPath);
@@ -9215,7 +9221,7 @@
                 let ok = 0, fail = 0;
                 for (const path of orphans) {
                     try {
-                        await firebase.storage().ref(path).delete();
+                        await adminApp.storage().ref(path).delete();
                         ok++;
                     } catch (e) {
                         fail++;
@@ -16550,7 +16556,7 @@ RULES:
                     const hash = await _sha256Hex(file);
                     const ext = _MIME_TO_EXT[file.type] || '.png';
                     const filename = 'editor-images/' + hash + ext;
-                    const ref = firebase.storage().ref(filename);
+                    const ref = adminApp.storage().ref(filename);
                     let url;
                     let reused = false;
                     try {
@@ -16614,7 +16620,7 @@ RULES:
             });
             for (const path of toDelete) {
                 try {
-                    await firebase.storage().ref(path).delete();
+                    await adminApp.storage().ref(path).delete();
                 } catch (e) {
                     console.warn('[V93.48] Quill image GC: failed to delete', path, e && e.message);
                 }
@@ -16663,7 +16669,7 @@ RULES:
             window._quillImageOrphans = [];
             try {
                 const [storageList, logsSnap] = await Promise.all([
-                    firebase.storage().ref('editor-images').listAll(),
+                    adminApp.storage().ref('editor-images').listAll(),
                     db.collection('reflective_logs').get()
                 ]);
                 const storagePaths = storageList.items.map(i => i.fullPath);
@@ -16718,7 +16724,7 @@ RULES:
             let ok = 0, fail = 0;
             for (const path of orphans) {
                 try {
-                    await firebase.storage().ref(path).delete();
+                    await adminApp.storage().ref(path).delete();
                     ok++;
                 } catch (e) {
                     fail++;
@@ -18270,7 +18276,9 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         const ADMIN_LIFF_ID = "2008959998-yjcNpaGt"; // 
         const MY_URL = window.location.origin + window.location.pathname;
 
-        var auth = firebase.auth();
+        var auth = adminApp.auth();
+        // Named app defaults to LOCAL persistence too; set it explicitly as belt & suspenders.
+        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => console.warn('[admin auth] setPersistence failed', e));
         const GOOGLE_POPUP_TIMEOUT_MS = 7000;
 
         var usersData = [], worksData = [], casesData = [], quizApprovedData = [], sideQuestsCache = {}, questsCache = [], questsSubCache = {}, questsSubList = [];
@@ -24326,7 +24334,7 @@ ${JSON.stringify(sourceObj)}`;
         function notifyQuizGraded(userId, quizTitle, message) {
             if (!userId || typeof userId !== 'string' || !userId.startsWith('U')) return;
             try {
-                firebase.functions().httpsCallable('notifyQuizReminder')({
+                adminApp.functions().httpsCallable('notifyQuizReminder')({
                     userId: userId,
                     quizTitle: quizTitle || '',
                     message: message
@@ -25900,7 +25908,7 @@ ${JSON.stringify(sourceObj)}`;
             document.getElementById('pod-upload-bar').style.display = 'block';
 
             try {
-                const storage = firebase.storage();
+                const storage = adminApp.storage();
                 const mime = String(podAudioBlob.type || 'audio/webm').toLowerCase();
                 let ext = 'webm';
                 if (mime.includes('wav')) ext = 'wav';
@@ -26024,7 +26032,7 @@ ${JSON.stringify(sourceObj)}`;
                     const fileSizeBytes = docSnap.exists ? (docSnap.data().fileSizeBytes || 0) : 0;
                     await db.collection('podcasts').doc(docId).delete();
                 if (filename) {
-                    try { await firebase.storage().ref(filename).delete(); } catch(e) { /* file may not exist */ }
+                    try { await adminApp.storage().ref(filename).delete(); } catch(e) { /* file may not exist */ }
                 }
                 if (gdriveBackupFileId) {
                     try { await deleteDriveBackupById(gdriveBackupFileId); } catch(e) { console.warn('Drive backup delete failed:', e); }
@@ -28974,7 +28982,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 await db.collection('taxonomy').doc('case').set({
                     systems: ctEditorState.systems,
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    updatedBy: (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin-ui',
+                    updatedBy: (auth.currentUser && auth.currentUser.email) || 'admin-ui',
                     schemaVersion: 1
                 });
                 window.CASE_TAXONOMY_SOURCE = 'firestore';
@@ -29297,7 +29305,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 await db.collection('taxonomy').doc('lp_' + axis).set({
                     systems: lptEditorState.systems[axis],
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    updatedBy: (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin-ui',
+                    updatedBy: (auth.currentUser && auth.currentUser.email) || 'admin-ui',
                     schemaVersion: 1
                 });
                 if (window.LP_TAXONOMY && window.LP_TAXONOMY[axis]) {
@@ -29384,7 +29392,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 await db.collection('taxonomy').doc('lp_' + axis).set({
                     systems: lptEditorState.systems[axis],
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    updatedBy: (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin-ui',
+                    updatedBy: (auth.currentUser && auth.currentUser.email) || 'admin-ui',
                     schemaVersion: 1
                 });
                 // Update in-memory global so admin LP review immediately reflects the change.
@@ -30565,7 +30573,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     .map(b => b.toString(16).padStart(2, '0'))
                     .join('');
                 const storagePath = 'pk-visuals/' + hash + ext;
-                const ref = firebase.storage().ref(storagePath);
+                const ref = adminApp.storage().ref(storagePath);
                 // 3. Probe-then-put dedup.
                 let downloadUrl;
                 let reused = false;
@@ -30585,7 +30593,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 //    V94.46 pattern used by dcaSaveForm.
                 if (saveBtn) saveBtn.innerHTML = '💾 Saving doc…';
                 const nowTs = firebase.firestore.FieldValue.serverTimestamp();
-                const reviewerEmail = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin-ui';
+                const reviewerEmail = (auth.currentUser && auth.currentUser.email) || 'admin-ui';
                 await db.collection('drug_codex').doc(dcaState.editingId).update({
                     pkVisual: {
                         storagePath: storagePath,
@@ -30874,7 +30882,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '⏳ Saving…'; }
 
             const nowTs = firebase.firestore.FieldValue.serverTimestamp();
-            const reviewerEmail = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin-ui';
+            const reviewerEmail = (auth.currentUser && auth.currentUser.email) || 'admin-ui';
 
             payload.lastReviewedAt = nowTs;
             payload.reviewedBy = reviewerEmail;
@@ -30936,7 +30944,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!confirm(`Approve and publish "${draft.genericName || draftId}" to Drug Codex as-is? (Use "Review & Edit" if you want to edit fields before publishing.)`)) return;
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
             const nowTs = firebase.firestore.FieldValue.serverTimestamp();
-            const reviewerEmail = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin-ui';
+            const reviewerEmail = (auth.currentUser && auth.currentUser.email) || 'admin-ui';
 
             // Copy only schema fields from draft (drop submittedBy/status/adminNotes).
             const payload = {};
@@ -30982,7 +30990,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (note === null) return;
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
             const nowTs = firebase.firestore.FieldValue.serverTimestamp();
-            const reviewerEmail = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin-ui';
+            const reviewerEmail = (auth.currentUser && auth.currentUser.email) || 'admin-ui';
             try {
                 await db.collection('drug_codex_drafts').doc(draftId).update({
                     status: 'rejected',
@@ -32789,7 +32797,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '⏳ Saving…'; }
 
             const nowTs = firebase.firestore.FieldValue.serverTimestamp();
-            const reviewerEmail = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin-ui';
+            const reviewerEmail = (auth.currentUser && auth.currentUser.email) || 'admin-ui';
             payload.lastReviewedAt = nowTs;
             payload.reviewedBy = reviewerEmail;
             payload.updatedAt = nowTs;
@@ -32891,7 +32899,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!confirm(`Approve and publish "${draft.diseaseName || draftId}" to Disease Codex as-is? (Use "Review & Edit" if you want to edit fields before publishing.)`)) return;
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
             const nowTs = firebase.firestore.FieldValue.serverTimestamp();
-            const reviewerEmail = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin-ui';
+            const reviewerEmail = (auth.currentUser && auth.currentUser.email) || 'admin-ui';
 
             // Copy only schema fields from the draft (drop submittedBy/status/
             // internNotes/targetDiseaseId — those are draft-only).
@@ -32938,7 +32946,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (note === null) return;
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
             const nowTs = firebase.firestore.FieldValue.serverTimestamp();
-            const reviewerEmail = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin-ui';
+            const reviewerEmail = (auth.currentUser && auth.currentUser.email) || 'admin-ui';
             try {
                 await db.collection('disease_codex_drafts').doc(draftId).update({
                     status: 'rejected',
@@ -36817,7 +36825,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             try {
                 if (sendBtn) { sendBtn.disabled = true; sendBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...'; }
                 if (statusEl) { statusEl.textContent = ''; statusEl.style.color = ''; }
-                const fn = firebase.functions().httpsCallable('notifyQuizReminder');
+                const fn = adminApp.functions().httpsCallable('notifyQuizReminder');
                 const res = await fn({ userId: ctx.userId, message, quizTitle: ctx.quizTitle || '' });
                 const data = res && res.data ? res.data : {};
                 if (data.ok && data.pushed) {
@@ -40234,7 +40242,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         // --- LIFF Preview ---
         async function openLiffPreview(userId = '') {
-            const generateToken = firebase.functions().httpsCallable('generatePreviewToken');
+            const generateToken = adminApp.functions().httpsCallable('generatePreviewToken');
             try {
                 const result = await generateToken();
                 const previewToken = result.data.token;
@@ -41461,7 +41469,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 alert('Message too long (max 4000 chars). Please shorten.');
                 return;
             }
-            const authUser = firebase.auth().currentUser;
+            const authUser = auth.currentUser;
             if (!authUser) {
                 alert('Not authenticated. Please refresh.');
                 return;
@@ -41480,7 +41488,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 // V91.77 PR γ.4b.2.1: invoke notify callable AFTER commit (replaces onDocumentCreated trigger).
                 // Fire-and-forget — UI must not block on LINE push result.
                 try {
-                    const notify = firebase.functions().httpsCallable('notifyOnReviewMessage');
+                    const notify = adminApp.functions().httpsCallable('notifyOnReviewMessage');
                     notify({ submissionId: note.id, messageId: msgRef.id }).catch(err => {
                         console.warn('[lnrSendMessage] notifyOnReviewMessage failed:', err && err.message);
                     });
@@ -43844,7 +43852,7 @@ Reply ONLY with raw JSON, no markdown:
                 examTitle: quiz.shortTitle || quiz.title || quizId,
                 hostUid: hostUid,
                 hostName: host.displayName || hostUid,
-                createdBy: (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'admin',
+                createdBy: (auth.currentUser && auth.currentUser.email) || 'admin',
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 state: 'lobby',
                 currentIdx: 0,
