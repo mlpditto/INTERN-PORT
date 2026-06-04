@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.88</title>
+    <title>Nika V94.89</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -21041,28 +21041,39 @@ async function ensureAuthForQuizWrite(timeoutMs = 6000) {
             if (caseContent) sourceObj.caseContent = caseContent;
 
             const caseClause = caseContent ? ', and the top-level "caseContent" field' : '';
-            const prompt = `Translate the following quiz from ${srcName} to ${langName}. Output ONLY strict valid JSON matching the input schema exactly — same number of questions, same number of options per question, same array order. Translate every "q" field, every string inside every "options" array, every "content" field${caseClause}. Preserve markdown formatting inside translated text. Do not translate proper nouns of drugs, conditions, or people. No markdown fences around the JSON, no commentary, no explanations.
+            const prompt = `Translate the following quiz from ${srcName} to ${langName}. Output ONLY strict valid JSON matching the input schema exactly — same number of questions, same number of options per question, same array order. Translate every "q" field, every string inside every "options" array, every "content" field${caseClause}. Preserve markdown formatting inside translated text. Do not translate proper nouns of drugs, conditions, or people. No markdown fences around the JSON, no commentary, no explanations. JSON SAFETY (critical): inside every translated string value, escape any double-quote as \\" and any line break as \\n — never emit a raw newline or an unescaped quote inside a JSON string, as that breaks the JSON.
 
 Source quiz:
 ${JSON.stringify(sourceObj)}`;
 
-            const response = await callUniversalAI('typhoon-v2.5-30b-a3b-instruct', prompt, true);
-            if (!response || !response.text) throw new Error('Empty response');
+            // V94.89: Typhoon occasionally emits invalid JSON — most commonly a raw
+            // newline or unescaped quote inside a translated markdown string, which
+            // raw JSON.parse rejected with "unterminated string" and failed the whole
+            // language. Use safeJsonParse (strips fences, extracts the {...} block) and
+            // retry once on a bad sample, mirroring the analyzeQuizAI pattern. Surface
+            // a raw snippet in the final error so the failure mode is diagnosable.
+            let lastErr = 'translation failed';
+            for (let attempt = 1; attempt <= 2; attempt++) {
+                const response = await callUniversalAI('typhoon-v2.5-30b-a3b-instruct', prompt, true);
+                if (!response || !response.text) { lastErr = 'Empty response'; continue; }
 
-            let parsed;
-            try {
-                parsed = JSON.parse(response.text);
-            } catch (e) {
-                throw new Error(`JSON parse failed: ${e.message}`);
+                const parsed = (typeof safeJsonParse === 'function')
+                    ? safeJsonParse(response.text)
+                    : (() => { try { return JSON.parse(response.text); } catch (_) { return null; } })();
+                if (!parsed) {
+                    lastErr = `JSON parse failed (attempt ${attempt}) · raw: ${String(response.text).slice(0, 140)}`;
+                    continue;
+                }
+                if (!Array.isArray(parsed.questions) || parsed.questions.length !== questions.length) {
+                    lastErr = `Question count mismatch: got ${parsed.questions ? parsed.questions.length : 'none'}, expected ${questions.length}`;
+                    continue;
+                }
+
+                const out = { questions: parsed.questions };
+                if (parsed.caseContent) out.caseContent = parsed.caseContent;
+                return out;
             }
-
-            if (!Array.isArray(parsed.questions) || parsed.questions.length !== questions.length) {
-                throw new Error(`Question count mismatch: got ${parsed.questions ? parsed.questions.length : 'none'}, expected ${questions.length}`);
-            }
-
-            const out = { questions: parsed.questions };
-            if (parsed.caseContent) out.caseContent = parsed.caseContent;
-            return out;
+            throw new Error(lastErr);
         }
 
         // V93.02 admin: added `silent` param + return summary, so Phase 3 backfill can
