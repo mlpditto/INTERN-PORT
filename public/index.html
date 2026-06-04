@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.19)</title>
+    <title>Internship Portfolio (V95.20)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4207,7 +4207,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.19 (Quiz-only users now see their quizzes in Work > History instead of the empty state)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.20 (Drug/Disease Codex wait for Firebase auth + auto-retry — no more permanent "Missing permissions")
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -10574,26 +10574,41 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 try { dxState.unsub(); } catch (_) {}
                 dxState.unsub = null;
             }
-            try {
-                dxState.unsub = db.collection('disease_codex')
-                    .orderBy('diseaseName')
-                    .onSnapshot(snap => {
-                        // Case/diacritic-insensitive A-Z to match the rail (same as
-                        // the Drug Codex intern V95.07 client-side resort).
-                        dxState.codex = snap.docs
-                            .map(d => Object.assign({ _id: d.id }, d.data()))
-                            .sort((a, b) => (a.diseaseName || '').localeCompare(
-                                (b.diseaseName || ''), undefined, { sensitivity: 'base' }));
-                        dxRenderList();
-                        dxUpdateCountBadge();
-                    }, err => {
-                        console.error('[disease-codex intern] snapshot error:', err);
-                        const list = document.getElementById('dx-list');
-                        if (list) list.innerHTML = `<div class="dc-empty-state" style="color:#b91c1c;">โหลด Disease Codex ไม่สำเร็จ · ${err && err.message ? err.message : 'unknown error'}</div>`;
-                    });
-            } catch (err) {
-                console.error('[disease-codex intern] listener setup failed:', err);
-            }
+            // V95.20: disease_codex read requires isSignedIn(); wait for Firebase auth
+            // before querying so opening the section during the auth boot gap (or an
+            // expired session) doesn't yield a permanent "Missing or insufficient
+            // permissions" with no recovery.
+            ensureFirebaseAuthReady().then(() => {
+                try {
+                    dxState.unsub = db.collection('disease_codex')
+                        .orderBy('diseaseName')
+                        .onSnapshot(snap => {
+                            dxState.authRetried = false;
+                            // Case/diacritic-insensitive A-Z to match the rail (same as
+                            // the Drug Codex intern V95.07 client-side resort).
+                            dxState.codex = snap.docs
+                                .map(d => Object.assign({ _id: d.id }, d.data()))
+                                .sort((a, b) => (a.diseaseName || '').localeCompare(
+                                    (b.diseaseName || ''), undefined, { sensitivity: 'base' }));
+                            dxRenderList();
+                            dxUpdateCountBadge();
+                        }, err => {
+                            console.error('[disease-codex intern] snapshot error:', err);
+                            const list = document.getElementById('dx-list');
+                            // A transient auth gap surfaces as permission-denied; wait for
+                            // auth to (re)establish and retry once instead of erroring out.
+                            if (err && err.code === 'permission-denied' && !dxState.authRetried) {
+                                dxState.authRetried = true;
+                                if (list) list.innerHTML = '<div class="dc-empty-state">กำลังรอ sign-in…</div>';
+                                ensureFirebaseAuthReady(8000).then(u => { if (u) dxLoadCodex(); });
+                                return;
+                            }
+                            if (list) list.innerHTML = `<div class="dc-empty-state" style="color:#b91c1c;">โหลด Disease Codex ไม่สำเร็จ · ${err && err.message ? err.message : 'unknown error'}</div>`;
+                        });
+                } catch (err) {
+                    console.error('[disease-codex intern] listener setup failed:', err);
+                }
+            });
         }
 
         function dxUpdateCountBadge() {
@@ -11395,29 +11410,44 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 try { dcState.unsub(); } catch (_) {}
                 dcState.unsub = null;
             }
-            try {
-                dcState.unsub = db.collection('drug_codex')
-                    .orderBy('genericName')
-                    .onSnapshot(snap => {
-                        // V95.07: Firestore .orderBy is case-sensitive ASCII (A < a),
-                        // so "Azilsartan" sorted before "alfuzosin" and "FIMASARTAN"
-                        // anchored the F group above lowercase entries. Resort
-                        // client-side with localeCompare sensitivity:'base' for a
-                        // case + diacritic-insensitive A-Z that matches the A-Z rail.
-                        dcState.codex = snap.docs
-                            .map(d => Object.assign({ _id: d.id }, d.data()))
-                            .sort((a, b) => (a.genericName || '').localeCompare(
-                                (b.genericName || ''), undefined, { sensitivity: 'base' }));
-                        dcRenderList();
-                        dcUpdateCountBadge();
-                    }, err => {
-                        console.error('[drug-codex intern] snapshot error:', err);
-                        const list = document.getElementById('dc-list');
-                        if (list) list.innerHTML = `<div class="dc-empty-state" style="color:#b91c1c;">โหลด Drug Codex ไม่สำเร็จ · ${err && err.message ? err.message : 'unknown error'}</div>`;
-                    });
-            } catch (err) {
-                console.error('[drug-codex intern] listener setup failed:', err);
-            }
+            // V95.20: drug_codex read requires isSignedIn(); wait for Firebase auth
+            // before querying so opening the section during the auth boot gap (or an
+            // expired session) doesn't yield a permanent "Missing or insufficient
+            // permissions" with no recovery.
+            ensureFirebaseAuthReady().then(() => {
+                try {
+                    dcState.unsub = db.collection('drug_codex')
+                        .orderBy('genericName')
+                        .onSnapshot(snap => {
+                            dcState.authRetried = false;
+                            // V95.07: Firestore .orderBy is case-sensitive ASCII (A < a),
+                            // so "Azilsartan" sorted before "alfuzosin" and "FIMASARTAN"
+                            // anchored the F group above lowercase entries. Resort
+                            // client-side with localeCompare sensitivity:'base' for a
+                            // case + diacritic-insensitive A-Z that matches the A-Z rail.
+                            dcState.codex = snap.docs
+                                .map(d => Object.assign({ _id: d.id }, d.data()))
+                                .sort((a, b) => (a.genericName || '').localeCompare(
+                                    (b.genericName || ''), undefined, { sensitivity: 'base' }));
+                            dcRenderList();
+                            dcUpdateCountBadge();
+                        }, err => {
+                            console.error('[drug-codex intern] snapshot error:', err);
+                            const list = document.getElementById('dc-list');
+                            // A transient auth gap surfaces as permission-denied; wait for
+                            // auth to (re)establish and retry once instead of erroring out.
+                            if (err && err.code === 'permission-denied' && !dcState.authRetried) {
+                                dcState.authRetried = true;
+                                if (list) list.innerHTML = '<div class="dc-empty-state">กำลังรอ sign-in…</div>';
+                                ensureFirebaseAuthReady(8000).then(u => { if (u) dcLoadCodex(); });
+                                return;
+                            }
+                            if (list) list.innerHTML = `<div class="dc-empty-state" style="color:#b91c1c;">โหลด Drug Codex ไม่สำเร็จ · ${err && err.message ? err.message : 'unknown error'}</div>`;
+                        });
+                } catch (err) {
+                    console.error('[drug-codex intern] listener setup failed:', err);
+                }
+            });
         }
 
         function dcUpdateCountBadge() {
