@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.07</title>
+    <title>Nika V95.08</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13547,6 +13547,14 @@
                 <button type="button" class="dca-pk-visual-chip active" data-value="infographic" onclick="dcaSelectPkVisualStyle(this)" title="Clean clinical infographic · vector icons · color-coded sections · pathway flow">📊 Infographic</button>
                 <button type="button" class="dca-pk-visual-chip" data-value="anatomical" onclick="dcaSelectPkVisualStyle(this)" title="Medical textbook cross-section · organs labeled (GI / liver / kidney)">🫀 Anatomical</button>
                 <button type="button" class="dca-pk-visual-chip" data-value="diagram" onclick="dcaSelectPkVisualStyle(this)" title="Flowchart · boxes + arrows · schematic only · no anatomy">🔀 Diagram</button>
+            </div>
+            <!-- V95.08: opt-in pharmacology context. By default the prompt uses only
+                 the 5 ADMET fields; tick these to also feed the diagram. -->
+            <div class="dca-pk-visual-section-label">Include in prompt (optional)</div>
+            <div class="dca-pk-visual-chip-rail" id="dcaPkVisualFieldsRail" style="gap:16px;">
+                <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:700; font-size:0.82em; color:#4338ca;"><input type="checkbox" id="dca-pv-inc-mechanism"> Mechanism</label>
+                <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:700; font-size:0.82em; color:#4338ca;"><input type="checkbox" id="dca-pv-inc-class"> Class</label>
+                <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:700; font-size:0.82em; color:#4338ca;"><input type="checkbox" id="dca-pv-inc-indication"> Indication</label>
             </div>
             <div class="dca-pk-visual-preview-wrap" id="dcaPkVisualPreviewWrap">
                 <div class="dca-pk-visual-preview-placeholder" id="dcaPkVisualPlaceholder">
@@ -30520,7 +30528,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // (omits empty fields so the AI doesn't have to fabricate). Common
         // visual constraints (English labels, 1024×1024, no photorealistic
         // humans) live at the end of each template.
-        function dcaBuildPkVisualPrompt(drug, style) {
+        function dcaBuildPkVisualPrompt(drug, style, opts) {
+            opts = opts || {};
             const fields = [
                 ['Absorption',   drug.absorption],
                 ['Distribution', drug.distribution],
@@ -30528,7 +30537,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 ['Excretion',    drug.excretion],
                 ['Toxicity',     drug.toxicity]
             ].filter(([, v]) => v && String(v).trim());
-            const admetBlock = fields.map(([k, v]) => `${k.toUpperCase()}: ${String(v).trim()}`).join('\n\n');
+            let admetBlock = fields.map(([k, v]) => `${k.toUpperCase()}: ${String(v).trim()}`).join('\n\n');
+            // V95.08: optional pharmacology context (admin opts in via checkboxes)
+            // so the diagram can reflect mechanism / class, not just ADMET.
+            const extraFields = [];
+            if (opts.includeMechanism && drug.mechanism)  extraFields.push(['Mechanism',  drug.mechanism]);
+            if (opts.includeClass     && drug.class)      extraFields.push(['Class',      drug.class]);
+            if (opts.includeIndication && drug.indication) extraFields.push(['Indication', drug.indication]);
+            if (extraFields.length) {
+                admetBlock += '\n\nADDITIONAL PHARMACOLOGY CONTEXT:\n'
+                    + extraFields.map(([k, v]) => `${k.toUpperCase()}: ${String(v).trim()}`).join('\n\n');
+            }
             const drugName = drug.genericName || 'this drug';
             const commonRules = [
                 '',
@@ -30582,7 +30601,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
                 return;
             }
-            const prompt = dcaBuildPkVisualPrompt(current, dcaPkVisualState.style);
+            // V95.08: opt-in pharmacology-context fields from the checkboxes.
+            const pvOpts = {
+                includeMechanism:  !!(document.getElementById('dca-pv-inc-mechanism')  || {}).checked,
+                includeClass:      !!(document.getElementById('dca-pv-inc-class')      || {}).checked,
+                includeIndication: !!(document.getElementById('dca-pv-inc-indication') || {}).checked
+            };
+            const prompt = dcaBuildPkVisualPrompt(current, dcaPkVisualState.style, pvOpts);
             const modelLabel = DCA_PK_VISUAL_MODEL_LABELS[dcaPkVisualState.model] || dcaPkVisualState.model;
 
             // V94.59: clear any persistent error from the previous Generate so
