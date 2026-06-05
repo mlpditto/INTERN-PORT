@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.24)</title>
+    <title>Internship Portfolio (V95.25)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4215,7 +4215,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.24 (Quiz catalog: fix lang-toggle blanking Thai — buttons/labels visible again)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.25 (update banner → single line on mobile: message ellipsis + non-shrinking buttons)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -17293,10 +17293,17 @@ async function archiveDoneCard(cardId) {
                 if (document.getElementById('upd-banner')) return;
                 const bar = document.createElement('div');
                 bar.id = 'upd-banner';
-                bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(135deg,#fde68a,#fbbf24);color:#7c2d12;padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:12px;font-weight:700;font-size:0.9em;box-shadow:0 2px 8px rgba(0,0,0,0.12);flex-wrap:wrap;';
-                bar.innerHTML = '<span>🔄 New version <strong>' + remoteVersion + '</strong> available · current ' + localVersion + '</span>' +
-                    '<button id="upd-banner-reload" style="background:#1d4ed8;color:#fff;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit;">Reload now</button>' +
-                    '<button id="upd-banner-dismiss" style="background:transparent;border:1px solid #92400e;color:#7c2d12;padding:6px 10px;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit;">Dismiss · 1h</button>';
+                // V95.25: single-line layout. flex-wrap:wrap previously dropped the
+                // two buttons onto their own full-width rows on narrow (mobile/LIFF)
+                // screens. Now nowrap — the message takes the remaining space and
+                // truncates with an ellipsis; the buttons never shrink or wrap.
+                bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(135deg,#fde68a,#fbbf24);color:#7c2d12;padding:8px 12px;display:flex;align-items:center;gap:8px;font-weight:700;font-size:0.85em;box-shadow:0 2px 8px rgba(0,0,0,0.12);flex-wrap:nowrap;';
+                // width:auto + flex-shrink:0 override the page's global `button`
+                // rule (display:flex; width:100%) that otherwise stretched each
+                // button to full width and forced them onto their own rows.
+                bar.innerHTML = '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🔄 New version <strong>' + remoteVersion + '</strong> available · current ' + localVersion + '</span>' +
+                    '<button id="upd-banner-reload" style="flex-shrink:0;width:auto;white-space:nowrap;background:#1d4ed8;color:#fff;border:none;padding:6px 13px;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit;">Reload now</button>' +
+                    '<button id="upd-banner-dismiss" style="flex-shrink:0;width:auto;white-space:nowrap;background:transparent;border:1px solid #92400e;color:#7c2d12;padding:6px 10px;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit;">Dismiss · 1h</button>';
                 document.body.appendChild(bar);
                 document.getElementById('upd-banner-reload').onclick = function() { location.reload(); };
                 document.getElementById('upd-banner-dismiss').onclick = function() { suppress(); bar.remove(); };
