@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.96</title>
+    <title>Nika V94.97</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13578,6 +13578,11 @@
                 <button type="button" class="dca-pk-visual-btn-cancel" onclick="dxaClosePathoVisualModal()">Close</button>
                 <div style="display:flex; gap:8px;">
                     <button type="button" id="dxaPathoVisualGenerateBtn" class="dca-pk-visual-btn-generate" onclick="dxaGeneratePathoVisual()">🎨 Generate</button>
+                    <!-- V94.97: download the generated image to the admin's device as
+                         a file. Unlike Save Visual (Firestore-gated to Edit-published
+                         mode), this works for ANY generated image — even a brand-new
+                         unsaved disease. Enabled whenever an image is in memory. -->
+                    <button type="button" id="dxaPathoVisualDownloadBtn" class="dca-pk-visual-btn-cancel" disabled onclick="dxaDownloadPathoVisual()" title="ดาวน์โหลดรูปลงเครื่อง (PNG) — ใช้ได้แม้ยังไม่ได้ Save ลง Firestore">⬇️ PNG</button>
                     <button type="button" id="dxaPathoVisualSaveBtn" class="dca-pk-visual-btn-save" disabled onclick="dxaSavePathoVisual()" title="Upload to Firebase Storage + persist disease_codex.pathoVisual. Enabled once an image is generated. Only available when editing a published disease.">💾 Save Visual</button>
                 </div>
             </div>
@@ -33074,6 +33079,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 saveBtn.disabled = !!dxaPathoVisualState.generating
                     || !dxaPathoVisualState.lastImageDataUrl;
             }
+            // V94.97: Download enabled on the same condition (image in memory) —
+            // NOT gated on editingId, since a local download needs no Firestore
+            // doc. The cancel-button base class has no :disabled style, so toggle
+            // opacity/cursor inline to make the disabled state visible.
+            const dlBtn = document.getElementById('dxaPathoVisualDownloadBtn');
+            if (dlBtn) {
+                const dlDisabled = !!dxaPathoVisualState.generating
+                    || !dxaPathoVisualState.lastImageDataUrl;
+                dlBtn.disabled = dlDisabled;
+                dlBtn.style.opacity = dlDisabled ? '0.5' : '1';
+                dlBtn.style.cursor = dlDisabled ? 'not-allowed' : 'pointer';
+            }
         }
 
         function dxaPathoVisualShowLoadError() {
@@ -33355,6 +33372,46 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = originalText || '💾 Save Visual'; }
                 if (genBtn) genBtn.disabled = false;
                 dxaPathoVisualRenderPreview();
+            }
+        }
+
+        // V94.97: download the previewed image to the admin's device. Works for
+        // ANY generated image (no Firestore doc / editingId needed) — fetch()
+        // resolves both data: URLs (Nano Banana common path) and https: URLs to
+        // a Blob, then a synthetic <a download> triggers the browser save.
+        async function dxaDownloadPathoVisual() {
+            const url = dxaPathoVisualState.lastImageDataUrl;
+            if (!url) {
+                if (typeof showToast === 'function') showToast('🎨 Generate a visual first.');
+                return;
+            }
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) {
+                    throw new Error(`fetch failed (${resp.status} ${resp.statusText}). A remote https image may be CORS-blocked.`);
+                }
+                const blob = await resp.blob();
+                const mime = blob.type || 'image/png';
+                const ext = mime === 'image/jpeg' || mime === 'image/jpg' ? 'jpg'
+                          : mime === 'image/webp' ? 'webp'
+                          : mime === 'image/gif'  ? 'gif'
+                          : 'png';
+                const nameEl = document.getElementById('dxa-f-diseaseName');
+                const slug = String((nameEl && nameEl.value) || 'disease')
+                    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'disease';
+                const fname = `patho-${slug}-${dxaPathoVisualState.style}.${ext}`;
+                const objUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = objUrl;
+                a.download = fname;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
+                if (typeof showToast === 'function') showToast('⬇️ ดาวน์โหลด ' + fname + ' แล้ว');
+            } catch (err) {
+                console.error('[disease-codex patho-visual download]', err);
+                if (typeof showToast === 'function') showToast('⬇️ ดาวน์โหลดไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
             }
         }
 
