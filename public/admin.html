@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.99</title>
+    <title>Nika V95.00</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -33257,7 +33257,23 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dxaPathoVisualState.lastErrorModelLabel = '';
             dxaPathoVisualState.generating = true;
             dxaPathoVisualRenderPreview();
-            if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
+            // V95.00: optimistic progress. Image gen has no real progress signal,
+            // so show a perceived-progress cue — reuse startAiFakeProgress for the
+            // % on the button (same as AI Auto-Draft V94.94) + a 1s timer on the
+            // spinner showing elapsed seconds.
+            let pvProgress = null;
+            let pvTimerId = null;
+            if (btn) { btn.disabled = true; pvProgress = startAiFakeProgress(btn, 'Generating'); }
+            const pvStart = Date.now();
+            const pvSpinnerSpan = document.querySelector('#dxaPathoVisualSpinner span');
+            if (pvSpinnerSpan) {
+                const pvPaint = function () {
+                    const s = Math.round((Date.now() - pvStart) / 1000);
+                    pvSpinnerSpan.textContent = 'Generating · ' + s + 's · this can take 10-30s…';
+                };
+                pvPaint();
+                pvTimerId = setInterval(pvPaint, 1000);
+            }
 
             try {
                 const resp = await window.callUniversalAI(
@@ -33313,6 +33329,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
             } finally {
                 dxaPathoVisualState.generating = false;
+                if (pvProgress) pvProgress.stop();
+                if (pvTimerId) clearInterval(pvTimerId);
                 dxaPathoVisualRenderPreview();
                 if (dxaPathoVisualState.lastError) {
                     dxaPathoVisualShowGenerateError(
