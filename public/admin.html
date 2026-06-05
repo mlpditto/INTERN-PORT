@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.02</title>
+    <title>Nika V95.03</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6788,6 +6788,31 @@
                                      <button class="btn-sm" style="background:var(--success); color:white; border-radius:20px; padding:10px 20px; border:none; font-weight:bold;" onclick="copyDesignToClipboard()">
                                         <i class="fa-solid fa-copy"></i> Copy Base64
                                     </button>
+                                </div>
+                            </div>
+
+                            <!-- V95.03: read-only gallery of saved Codex visuals (Disease
+                                 Codex pathoVisual + Drug Codex pkVisual). Lazy-loaded on demand
+                                 so the hub doesn't query on every open. Pure read — no new
+                                 collection, no deploy. mgw* fns live in the classic script. -->
+                            <div style="background:white; border-radius:28px; border:1px solid #e0e6ed; padding:22px 26px; box-shadow:0 10px 30px rgba(0,0,0,0.05);">
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                                    <div style="display:flex; align-items:center; gap:10px;">
+                                        <span style="font-size:1.2em;">🖼️</span>
+                                        <span style="font-weight:900; color:#334155;">ผลงานที่ผ่านมา · Codex Gallery</span>
+                                        <span id="mgw-gallery-count" style="font-size:0.78em; color:#64748b; background:#f1f5f9; padding:2px 10px; border-radius:999px;"></span>
+                                    </div>
+                                    <div style="display:flex; gap:8px; align-items:center;">
+                                        <select id="mgw-gallery-filter" onchange="mgwRenderCodexGallery()" style="padding:6px 10px; border-radius:10px; border:1.5px solid #e2e8f0; font-family:inherit; font-size:0.85em;">
+                                            <option value="all">ทั้งหมด</option>
+                                            <option value="disease">🩺 โรค (Pathophysiology)</option>
+                                            <option value="drug">💊 ยา (ADMET / PK)</option>
+                                        </select>
+                                        <button id="mgw-gallery-load-btn" onclick="mgwLoadCodexGallery()" style="padding:7px 16px; border-radius:12px; border:none; background:linear-gradient(45deg,#4361ee,#4895ef); color:white; font-weight:800; cursor:pointer; font-size:0.85em;">โหลดแกลเลอรี</button>
+                                    </div>
+                                </div>
+                                <div id="mgw-gallery-grid" style="margin-top:18px; display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:16px;">
+                                    <div id="mgw-gallery-empty" style="grid-column:1/-1; text-align:center; color:#94a3b8; padding:30px; font-size:0.9em;">กด <strong>โหลดแกลเลอรี</strong> เพื่อดูภาพ pathophysiology + PK ที่เคยสร้างและบันทึกไว้ในโคเด็กซ์</div>
                                 </div>
                             </div>
                         </div>
@@ -33522,6 +33547,110 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             } catch (err) {
                 console.error('[disease-codex patho-visual download]', err);
                 if (typeof showToast === 'function') showToast('⬇️ ดาวน์โหลดไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
+            }
+        }
+
+        // ===================================================================
+        // V95.03 Miss Goldenweek — read-only Codex Gallery. Surfaces the saved
+        // pathophysiology visuals (disease_codex.pathoVisual) + PK visuals
+        // (drug_codex.pkVisual) as a thumbnail grid in the design hub. Lazy
+        // loaded on demand. Classic-script (global) so the inline onclicks
+        // resolve. Pure read — no new collection / storage / deploy.
+        // ===================================================================
+        async function mgwLoadCodexGallery() {
+            const btn = document.getElementById('mgw-gallery-load-btn');
+            const grid = document.getElementById('mgw-gallery-grid');
+            if (!window.db) {
+                if (grid) grid.innerHTML = '<div style="grid-column:1/-1; color:#9f1239; padding:20px;">Firestore ยังไม่พร้อม — รีเฟรชหน้าแล้วลองใหม่</div>';
+                return;
+            }
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังโหลด…'; }
+            try {
+                const [dxSnap, dcSnap] = await Promise.all([
+                    db.collection('disease_codex').get(),
+                    db.collection('drug_codex').get()
+                ]);
+                const items = [];
+                dxSnap.forEach(function (doc) {
+                    const d = doc.data() || {};
+                    if (d.pathoVisual && d.pathoVisual.downloadUrl) {
+                        items.push({ type: 'disease', id: doc.id, name: d.diseaseName || d.thaiName || '(unnamed)',
+                            url: d.pathoVisual.downloadUrl, style: d.pathoVisual.style || '', model: d.pathoVisual.model || '' });
+                    }
+                });
+                dcSnap.forEach(function (doc) {
+                    const d = doc.data() || {};
+                    if (d.pkVisual && d.pkVisual.downloadUrl) {
+                        items.push({ type: 'drug', id: doc.id, name: d.genericName || '(unnamed)',
+                            url: d.pkVisual.downloadUrl, style: d.pkVisual.style || '', model: d.pkVisual.model || '' });
+                    }
+                });
+                items.sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+                window._mgwGallery = items;
+                mgwRenderCodexGallery();
+            } catch (err) {
+                console.error('[miss-goldenweek gallery] load failed:', err);
+                if (grid) grid.innerHTML = '<div style="grid-column:1/-1; color:#9f1239; padding:20px;">โหลดไม่สำเร็จ: ' + dxaEscapeHtml(err && err.message ? err.message : 'unknown error') + '</div>';
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = '🔄 รีเฟรช'; }
+            }
+        }
+
+        function mgwRenderCodexGallery() {
+            const grid = document.getElementById('mgw-gallery-grid');
+            const countEl = document.getElementById('mgw-gallery-count');
+            if (!grid) return;
+            const all = window._mgwGallery || [];
+            const filter = (document.getElementById('mgw-gallery-filter') || {}).value || 'all';
+            const items = all.filter(function (it) { return filter === 'all' || it.type === filter; });
+            window._mgwGalleryRendered = items;
+            if (countEl) countEl.textContent = items.length + ' รูป';
+            if (!items.length) {
+                grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:#94a3b8; padding:30px; font-size:0.9em;">ยังไม่มีภาพที่บันทึกไว้ในหมวดนี้</div>';
+                return;
+            }
+            grid.innerHTML = items.map(function (it, i) {
+                const badge = it.type === 'disease' ? '🩺 โรค' : '💊 ยา';
+                const badgeColor = it.type === 'disease' ? '#6d28d9' : '#0369a1';
+                const meta = [it.style, String(it.model || '').replace(/^(as|or)\//, '')].filter(Boolean).join(' · ');
+                return '<div style="border:1px solid #e2e8f0; border-radius:16px; overflow:hidden; background:#fff; box-shadow:0 2px 8px rgba(15,23,42,0.06);">'
+                    + '<a href="' + dxaEscapeHtml(it.url) + '" target="_blank" rel="noopener noreferrer" title="เปิดดูเต็มขนาดในแท็บใหม่" style="display:block;">'
+                    + '<img src="' + dxaEscapeHtml(it.url) + '" loading="lazy" alt="' + dxaEscapeHtml(it.name) + '" style="display:block; width:100%; height:150px; object-fit:cover; background:#f8fafc;">'
+                    + '</a>'
+                    + '<div style="padding:9px 11px;">'
+                    + '<div style="font-weight:800; color:#334155; font-size:0.85em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="' + dxaEscapeHtml(it.name) + '">' + dxaEscapeHtml(it.name) + '</div>'
+                    + '<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-top:5px;">'
+                    + '<span style="font-size:0.7em; font-weight:800; color:' + badgeColor + ';">' + badge + '</span>'
+                    + '<button onclick="mgwDownloadGalleryItem(' + i + ')" title="ดาวน์โหลด PNG" style="border:none; background:#f1f5f9; border-radius:8px; padding:3px 9px; cursor:pointer; font-size:0.78em;">⬇</button>'
+                    + '</div>'
+                    + (meta ? ('<div style="font-size:0.66em; color:#94a3b8; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + dxaEscapeHtml(meta) + '</div>') : '')
+                    + '</div></div>';
+            }).join('');
+        }
+
+        // Download a gallery item by its index in the currently-rendered list.
+        // fetch→blob→<a download>; falls back to opening the URL on CORS failure.
+        async function mgwDownloadGalleryItem(i) {
+            const it = (window._mgwGalleryRendered || [])[i];
+            if (!it || !it.url) return;
+            try {
+                const resp = await fetch(it.url);
+                if (!resp.ok) throw new Error('fetch ' + resp.status);
+                const blob = await resp.blob();
+                const ext = blob.type === 'image/jpeg' || blob.type === 'image/jpg' ? 'jpg'
+                          : blob.type === 'image/webp' ? 'webp'
+                          : blob.type === 'image/gif'  ? 'gif' : 'png';
+                const slug = String(it.name || it.type).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || it.type;
+                const fname = it.type + '-' + slug + '.' + ext;
+                const u = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = u; a.download = fname;
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(function () { URL.revokeObjectURL(u); }, 1000);
+                if (typeof showToast === 'function') showToast('⬇️ ' + fname);
+            } catch (err) {
+                console.warn('[miss-goldenweek gallery] download fell back to open:', err && err.message);
+                window.open(it.url, '_blank');
             }
         }
 
