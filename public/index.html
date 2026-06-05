@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.25)</title>
+    <title>Internship Portfolio (V95.26)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4215,7 +4215,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.25 (update banner → single line on mobile: message ellipsis + non-shrinking buttons)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.26 (quiz catalog: color-coded category left-border on each card)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -7470,10 +7470,24 @@
             list.innerHTML = matched.map(qbRowHtml).join('');
         }
 
+        // V95.26: deterministic category accent. Hash the first tag (fallback to
+        // targetGroup) into a stable hue so each category always gets the same
+        // subtle left-border color — no palette to maintain, and free-text tags
+        // still group visually. Uncategorized → neutral slate.
+        function qbCategoryColor(q) {
+            const raw = (q && q.tags ? String(q.tags).split(',')[0] : '') || (q && q.targetGroup) || '';
+            const cat = raw.trim().toLowerCase();
+            if (!cat) return '#cbd5e1';
+            let h = 0;
+            for (let i = 0; i < cat.length; i++) h = (h * 31 + cat.charCodeAt(i)) % 360;
+            return 'hsl(' + h + ', 58%, 58%)';
+        }
+
         function qbRowHtml(q) {
             const attempt = quizAttemptsCache[q.id];
             const status = attempt ? attempt.status : 'none';
             const avail = qbIsAvailableToMe(q);
+            const catColor = qbCategoryColor(q);
             const meta = [];
             if (q.totalPoints) meta.push(q.totalPoints + ' pts');
             if (Array.isArray(q.questions)) meta.push(q.questions.length + ' ข้อ');
@@ -7497,7 +7511,7 @@
                 right = '<button onclick="qbRequestQuiz(\'' + q.id + '\')" style="border:none; background:linear-gradient(135deg,#6366f1,#4f46e5); color:#fff; font-weight:800; font-size:0.86em; padding:9px 18px; border-radius:999px; cursor:pointer; white-space:nowrap; min-width:96px; text-align:center; box-shadow:0 2px 8px rgba(79,70,229,0.3);">📨 ขอทำ</button>';
             }
             const metaHtml = meta.length ? '<div style="font-size:0.74em; color:#94a3b8; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + escapeHtml(meta.join(' · ')) + '</div>' : '';
-            return '<div style="display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid #e2e8f0; border-radius:14px; padding:11px 14px; background:#fff;">'
+            return '<div style="display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid #e2e8f0; border-left:4px solid ' + catColor + '; border-radius:14px; padding:11px 14px; background:#fff;">'
                 + '<div style="min-width:0; flex:1;"><div style="font-weight:800; color:#1e293b; font-size:0.9em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="' + escapeHtml(q.title || '') + '">' + escapeHtml(q.title || '(ไม่มีชื่อ)') + '</div>' + metaHtml + '</div>'
                 + '<div style="flex-shrink:0;">' + right + '</div>'
                 + '</div>';
