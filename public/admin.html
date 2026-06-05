@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.04</title>
+    <title>Nika V95.05</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13126,6 +13126,17 @@
 
                             <label class="dc-cat-label dc-field-caution" for="dca-f-toxicity">Toxicity</label>
                             <textarea id="dca-f-toxicity" rows="3" placeholder="Overdose effects · organ toxicity · LD50 if known · antidote…"></textarea>
+                        </div>
+                        <!-- V95.05: persistent preview of the SAVED PK visual. Before
+                             this, Save Visual closed the modal with no admin-side trace,
+                             so admins thought the image was lost. Seeded from the doc in
+                             dcaFillForm + refreshed after dcaSavePkVisual. -->
+                        <div id="dca-pk-visual-current" style="display:none; margin-top:12px;">
+                            <div class="dca-pk-visual-section-label">🎨 Saved ADMET Visual</div>
+                            <a id="dca-pk-visual-current-link" href="#" target="_blank" rel="noopener noreferrer" style="display:inline-block; max-width:260px; border-radius:10px; overflow:hidden; border:1px solid #e2e8f0; box-shadow:0 1px 4px rgba(15,23,42,0.08);">
+                                <img id="dca-pk-visual-current-img" src="" alt="Saved ADMET visual" style="display:block; width:100%; height:auto; background:#f8fafc;">
+                            </a>
+                            <div id="dca-pk-visual-current-meta" class="dca-pk-visual-meta"></div>
                         </div>
                     </div>
                 </div>
@@ -29829,6 +29840,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             unsubDrafts: null,     // onSnapshot unsubscribe for drug_codex_drafts
             codex: [],             // sorted array of drug_codex docs
             drafts: [],            // pending drug_codex_drafts docs
+            pkVisual: null,        // V95.05: saved pkVisual on the current form's drug (for the in-form preview)
             searchTerm: ''
         };
 
@@ -30347,6 +30359,29 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (modal) modal.style.display = 'none';
         }
 
+        // V95.05: render (or hide) the in-form preview of the drug's saved pkVisual.
+        // Called from dcaFillForm (seed) + dcaSavePkVisual (refresh after a successful
+        // save, so the image doesn't vanish when the modal closes).
+        function dcaRenderCurrentPkVisual(pv) {
+            const wrap = document.getElementById('dca-pk-visual-current');
+            const img = document.getElementById('dca-pk-visual-current-img');
+            const link = document.getElementById('dca-pk-visual-current-link');
+            const meta = document.getElementById('dca-pk-visual-current-meta');
+            if (!wrap || !img || !link) return;
+            const url = pv && pv.downloadUrl ? String(pv.downloadUrl) : '';
+            if (!url) { wrap.style.display = 'none'; img.src = ''; return; }
+            img.src = url;
+            link.href = url;
+            if (meta) {
+                const bits = [
+                    pv.style ? String(pv.style) : '',
+                    pv.model ? String(pv.model).replace(/^(as|or)\//, '') : ''
+                ].filter(Boolean).join(' · ');
+                meta.textContent = bits ? ('Generated · ' + bits) : '';
+            }
+            wrap.style.display = 'block';
+        }
+
         function dcaSelectPkVisualModel(btn) {
             if (!btn || !btn.dataset || !btn.dataset.value) return;
             dcaPkVisualState.model = btn.dataset.value;
@@ -30755,10 +30790,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     updatedAt: nowTs,
                     contributors: firebase.firestore.FieldValue.arrayUnion('admin:' + reviewerEmail)
                 });
+                // V95.05: keep an admin-visible trace so the image doesn't appear
+                // to vanish when the modal closes — populate the in-form preview.
+                dcaState.pkVisual = {
+                    downloadUrl: downloadUrl,
+                    model: dcaPkVisualState.model,
+                    style: dcaPkVisualState.style
+                };
+                dcaRenderCurrentPkVisual(dcaState.pkVisual);
                 if (typeof showToast === 'function') {
                     showToast(reused
-                        ? '♻️ Reused existing image (dedup) · doc updated'
-                        : '✅ Visual saved to drug_codex');
+                        ? '♻️ Reused existing image (dedup) · แสดงในฟอร์มแล้ว'
+                        : '✅ บันทึกรูปแล้ว · แสดงในฟอร์ม (PK · ADMET) + ฝั่ง intern');
                 }
                 dcaClosePkVisualModal();
             } catch (err) {
@@ -30785,6 +30828,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const ndiRes = document.getElementById('dca-ndi-results');
             if (ndiRes) { ndiRes.style.display = 'none'; ndiRes.innerHTML = ''; ndiRes.classList.remove('panel'); }
             dcaNdiLast = null;
+            // V95.05: seed + render the saved PK visual preview so admins can see
+            // an attached image (and confirm a prior Save worked).
+            dcaState.pkVisual = (data && data.pkVisual && data.pkVisual.downloadUrl) ? data.pkVisual : null;
+            dcaRenderCurrentPkVisual(dcaState.pkVisual);
             // V94.75: sync the lookup button enabled-state to the (possibly empty)
             // Generic Name once the form is populated. Deferred so the field is set.
             setTimeout(dcaNdiSyncBtnState, 0);
