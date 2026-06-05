@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.04</title>
+    <title>Nika V95.09</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13127,6 +13127,17 @@
                             <label class="dc-cat-label dc-field-caution" for="dca-f-toxicity">Toxicity</label>
                             <textarea id="dca-f-toxicity" rows="3" placeholder="Overdose effects · organ toxicity · LD50 if known · antidote…"></textarea>
                         </div>
+                        <!-- V95.05: persistent preview of the SAVED PK visual. Before
+                             this, Save Visual closed the modal with no admin-side trace,
+                             so admins thought the image was lost. Seeded from the doc in
+                             dcaFillForm + refreshed after dcaSavePkVisual. -->
+                        <div id="dca-pk-visual-current" style="display:none; margin-top:12px;">
+                            <div class="dca-pk-visual-section-label">🎨 Saved ADMET Visual</div>
+                            <a id="dca-pk-visual-current-link" href="#" target="_blank" rel="noopener noreferrer" style="display:inline-block; max-width:260px; border-radius:10px; overflow:hidden; border:1px solid #e2e8f0; box-shadow:0 1px 4px rgba(15,23,42,0.08);">
+                                <img id="dca-pk-visual-current-img" src="" alt="Saved ADMET visual" style="display:block; width:100%; height:auto; background:#f8fafc;">
+                            </a>
+                            <div id="dca-pk-visual-current-meta" class="dca-pk-visual-meta"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -13524,18 +13535,12 @@
             </p>
             <div class="dca-pk-visual-section-label">Model</div>
             <div class="dca-pk-visual-chip-rail" id="dcaPkVisualModelRail">
-                <!-- V94.58: AI Studio Nano Banana is now the working default.
-                     callAIProxy's `gemini-aistudio` provider has proper image-gen
-                     routing (V92.70), so this returns real base64 image data.
-                     The 3 `or/` chips below currently hit callAIProxy's openrouter
-                     branch which uses /chat/completions endpoint — image models
-                     return text descriptions instead of images. Marked ⚠ until
-                     callAIProxy adds /api/v1/images/generations routing for
-                     OpenRouter image models (separate PR + Cloud Function deploy). -->
-                <button type="button" class="dca-pk-visual-chip active" data-value="as/gemini-3.1-flash-image-preview" onclick="dcaSelectPkVisualModel(this)" title="Google AI Studio · Gemini 3.1 Flash Image Preview (Nano Banana) — real image gen via callAIProxy gemini-aistudio provider (V92.70). V94.61: bumped from deprecated gemini-2.5-flash-image-preview.">🍌 Nano Banana · AI Studio</button>
-                <button type="button" class="dca-pk-visual-chip" data-value="or/openai/gpt-5.4-image-2" onclick="dcaSelectPkVisualModel(this)" title="⚠ OpenRouter — GPT-5.4 Image 2. callAIProxy currently misroutes OpenRouter image models through /chat/completions → returns text description instead of image. Awaiting proxy fix.">⚠ GPT-5.4 · OR</button>
-                <button type="button" class="dca-pk-visual-chip" data-value="or/google/gemini-3.1-flash-image-preview" onclick="dcaSelectPkVisualModel(this)" title="⚠ OpenRouter — Gemini 3.1 Flash Image Preview (Nano Banana 2). Same callAIProxy misroute as GPT-5.4 · OR — returns text. Awaiting proxy fix.">⚠ Nano Banana 2 · OR</button>
-                <button type="button" class="dca-pk-visual-chip" data-value="or/x-ai/grok-2-image" onclick="dcaSelectPkVisualModel(this)" title="⚠ OpenRouter — xAI Grok 2 Image. Same callAIProxy misroute — returns text. Awaiting proxy fix.">⚠ Grok · OR</button>
+                <!-- V95.06: decluttered to the one working image model. The 3 OpenRouter
+                     image chips (GPT-5.4 / Nano Banana 2 / Grok) were removed because
+                     callAIProxy misroutes OpenRouter image models through /chat/completions
+                     and returns text, not an image — they only confused admins. Re-add them
+                     here once callAIProxy gains /images routing for the or/ provider. -->
+                <button type="button" class="dca-pk-visual-chip active" data-value="as/gemini-3.1-flash-image-preview" onclick="dcaSelectPkVisualModel(this)" title="Google AI Studio · Gemini 3.1 Flash Image Preview (Nano Banana) — real image gen via callAIProxy gemini-aistudio provider (V92.70).">🍌 Nano Banana · AI Studio</button>
             </div>
             <div class="dca-pk-visual-section-label">Style</div>
             <div class="dca-pk-visual-chip-rail" id="dcaPkVisualStyleRail">
@@ -13543,6 +13548,17 @@
                 <button type="button" class="dca-pk-visual-chip" data-value="anatomical" onclick="dcaSelectPkVisualStyle(this)" title="Medical textbook cross-section · organs labeled (GI / liver / kidney)">🫀 Anatomical</button>
                 <button type="button" class="dca-pk-visual-chip" data-value="diagram" onclick="dcaSelectPkVisualStyle(this)" title="Flowchart · boxes + arrows · schematic only · no anatomy">🔀 Diagram</button>
             </div>
+            <!-- V95.08: opt-in pharmacology context. By default the prompt uses only
+                 the 5 ADMET fields; tick these to also feed the diagram. -->
+            <div class="dca-pk-visual-section-label">Include in prompt (optional)</div>
+            <div class="dca-pk-visual-chip-rail" id="dcaPkVisualFieldsRail" style="gap:16px;">
+                <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:700; font-size:0.82em; color:#4338ca;"><input type="checkbox" id="dca-pv-inc-mechanism"> Mechanism</label>
+                <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:700; font-size:0.82em; color:#4338ca;"><input type="checkbox" id="dca-pv-inc-class"> Class</label>
+                <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:700; font-size:0.82em; color:#4338ca;"><input type="checkbox" id="dca-pv-inc-indication"> Indication</label>
+            </div>
+            <!-- V95.09: free-text instructions appended to the prompt before Generate. -->
+            <div class="dca-pk-visual-section-label">Extra instructions (optional)</div>
+            <textarea id="dca-pv-extra" rows="2" placeholder="เพิ่มคำกำกับให้ AI เช่น 'ใส่ label ภาษาไทย' · 'เน้น CYP3A4' · 'โทนสีเย็น'…" style="width:100%; box-sizing:border-box; border:1.5px solid #c7d2fe; border-radius:10px; padding:8px 10px; font-family:inherit; font-size:0.86em; resize:vertical;"></textarea>
             <div class="dca-pk-visual-preview-wrap" id="dcaPkVisualPreviewWrap">
                 <div class="dca-pk-visual-preview-placeholder" id="dcaPkVisualPlaceholder">
                     Click <strong>Generate</strong> below to render an ADMET infographic.<br>
@@ -29829,6 +29845,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             unsubDrafts: null,     // onSnapshot unsubscribe for drug_codex_drafts
             codex: [],             // sorted array of drug_codex docs
             drafts: [],            // pending drug_codex_drafts docs
+            pkVisual: null,        // V95.05: saved pkVisual on the current form's drug (for the in-form preview)
             searchTerm: ''
         };
 
@@ -30337,6 +30354,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaPkVisualState.lastImageDataUrl = '';
             dcaPkVisualState.lastModelLabel = '';
             dcaPkVisualState.generating = false;
+            // V95.09: reset opt-in fields + extra instructions on every open so a
+            // prior drug's choices don't leak into a new one (static modal DOM —
+            // see feedback_static_modal_state_leak).
+            ['dca-pv-inc-mechanism', 'dca-pv-inc-class', 'dca-pv-inc-indication'].forEach(function (id) {
+                const cb = document.getElementById(id);
+                if (cb) cb.checked = false;
+            });
+            const extraEl = document.getElementById('dca-pv-extra');
+            if (extraEl) extraEl.value = '';
             dcaPkVisualRenderPreview();
             const modal = document.getElementById('dcaPkVisualModal');
             if (modal) modal.style.display = 'flex';
@@ -30345,6 +30371,29 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function dcaClosePkVisualModal() {
             const modal = document.getElementById('dcaPkVisualModal');
             if (modal) modal.style.display = 'none';
+        }
+
+        // V95.05: render (or hide) the in-form preview of the drug's saved pkVisual.
+        // Called from dcaFillForm (seed) + dcaSavePkVisual (refresh after a successful
+        // save, so the image doesn't vanish when the modal closes).
+        function dcaRenderCurrentPkVisual(pv) {
+            const wrap = document.getElementById('dca-pk-visual-current');
+            const img = document.getElementById('dca-pk-visual-current-img');
+            const link = document.getElementById('dca-pk-visual-current-link');
+            const meta = document.getElementById('dca-pk-visual-current-meta');
+            if (!wrap || !img || !link) return;
+            const url = pv && pv.downloadUrl ? String(pv.downloadUrl) : '';
+            if (!url) { wrap.style.display = 'none'; img.src = ''; return; }
+            img.src = url;
+            link.href = url;
+            if (meta) {
+                const bits = [
+                    pv.style ? String(pv.style) : '',
+                    pv.model ? String(pv.model).replace(/^(as|or)\//, '') : ''
+                ].filter(Boolean).join(' · ');
+                meta.textContent = bits ? ('Generated · ' + bits) : '';
+            }
+            wrap.style.display = 'block';
         }
 
         function dcaSelectPkVisualModel(btn) {
@@ -30491,7 +30540,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // (omits empty fields so the AI doesn't have to fabricate). Common
         // visual constraints (English labels, 1024×1024, no photorealistic
         // humans) live at the end of each template.
-        function dcaBuildPkVisualPrompt(drug, style) {
+        function dcaBuildPkVisualPrompt(drug, style, opts) {
+            opts = opts || {};
             const fields = [
                 ['Absorption',   drug.absorption],
                 ['Distribution', drug.distribution],
@@ -30499,9 +30549,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 ['Excretion',    drug.excretion],
                 ['Toxicity',     drug.toxicity]
             ].filter(([, v]) => v && String(v).trim());
-            const admetBlock = fields.map(([k, v]) => `${k.toUpperCase()}: ${String(v).trim()}`).join('\n\n');
+            let admetBlock = fields.map(([k, v]) => `${k.toUpperCase()}: ${String(v).trim()}`).join('\n\n');
+            // V95.08: optional pharmacology context (admin opts in via checkboxes)
+            // so the diagram can reflect mechanism / class, not just ADMET.
+            const extraFields = [];
+            if (opts.includeMechanism && drug.mechanism)  extraFields.push(['Mechanism',  drug.mechanism]);
+            if (opts.includeClass     && drug.class)      extraFields.push(['Class',      drug.class]);
+            if (opts.includeIndication && drug.indication) extraFields.push(['Indication', drug.indication]);
+            if (extraFields.length) {
+                admetBlock += '\n\nADDITIONAL PHARMACOLOGY CONTEXT:\n'
+                    + extraFields.map(([k, v]) => `${k.toUpperCase()}: ${String(v).trim()}`).join('\n\n');
+            }
             const drugName = drug.genericName || 'this drug';
-            const commonRules = [
+            let commonRules = [
                 '',
                 'STYLE CONSTRAINTS:',
                 '- English labels only (medical terms stay in English: CYP3A4, eGFR, t½, etc.).',
@@ -30510,6 +30570,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 '- Clean, professional medical aesthetic. White or light background.',
                 '- Make field names readable at a glance.'
             ].join('\n');
+            // V95.09: admin free-text instructions, appended last so they can
+            // override/refine the defaults (e.g. "use Thai labels", "cool tones").
+            if (opts.extra && String(opts.extra).trim()) {
+                commonRules += '\n\nADDITIONAL INSTRUCTIONS (admin, follow these): ' + String(opts.extra).trim();
+            }
 
             if (style === 'anatomical') {
                 return [
@@ -30553,7 +30618,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
                 return;
             }
-            const prompt = dcaBuildPkVisualPrompt(current, dcaPkVisualState.style);
+            // V95.08: opt-in pharmacology-context fields from the checkboxes.
+            // V95.09: + free-text extra instructions.
+            const pvExtraEl = document.getElementById('dca-pv-extra');
+            const pvOpts = {
+                includeMechanism:  !!(document.getElementById('dca-pv-inc-mechanism')  || {}).checked,
+                includeClass:      !!(document.getElementById('dca-pv-inc-class')      || {}).checked,
+                includeIndication: !!(document.getElementById('dca-pv-inc-indication') || {}).checked,
+                extra: pvExtraEl ? String(pvExtraEl.value || '').trim() : ''
+            };
+            const prompt = dcaBuildPkVisualPrompt(current, dcaPkVisualState.style, pvOpts);
             const modelLabel = DCA_PK_VISUAL_MODEL_LABELS[dcaPkVisualState.model] || dcaPkVisualState.model;
 
             // V94.59: clear any persistent error from the previous Generate so
@@ -30564,7 +30638,22 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaPkVisualState.lastErrorModelLabel = '';
             dcaPkVisualState.generating = true;
             dcaPkVisualRenderPreview();
-            if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
+            // V95.07: optimistic progress. Image gen has no real progress signal,
+            // so show a perceived-progress cue — reuse startAiFakeProgress for the
+            // % on the button + a 1s timer on the spinner showing elapsed seconds.
+            let pvProgress = null;
+            let pvTimerId = null;
+            if (btn) { btn.disabled = true; pvProgress = startAiFakeProgress(btn, 'Generating'); }
+            const pvStart = Date.now();
+            const pvSpinnerSpan = document.querySelector('#dcaPkVisualSpinner span');
+            if (pvSpinnerSpan) {
+                const pvPaint = function () {
+                    const s = Math.round((Date.now() - pvStart) / 1000);
+                    pvSpinnerSpan.textContent = 'Generating · ' + s + 's · this can take 10-30s…';
+                };
+                pvPaint();
+                pvTimerId = setInterval(pvPaint, 1000);
+            }
 
             try {
                 // Mirror the Alabasta Case Card call shape (V92.46/V92.70) —
@@ -30653,6 +30742,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
             } finally {
                 dcaPkVisualState.generating = false;
+                if (pvProgress) pvProgress.stop();
+                if (pvTimerId) clearInterval(pvTimerId);
                 dcaPkVisualRenderPreview();
                 // V94.59: re-show the persistent error AFTER renderPreview has
                 // run its top-of-function reset of the error box.
@@ -30755,10 +30846,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     updatedAt: nowTs,
                     contributors: firebase.firestore.FieldValue.arrayUnion('admin:' + reviewerEmail)
                 });
+                // V95.05: keep an admin-visible trace so the image doesn't appear
+                // to vanish when the modal closes — populate the in-form preview.
+                dcaState.pkVisual = {
+                    downloadUrl: downloadUrl,
+                    model: dcaPkVisualState.model,
+                    style: dcaPkVisualState.style
+                };
+                dcaRenderCurrentPkVisual(dcaState.pkVisual);
                 if (typeof showToast === 'function') {
                     showToast(reused
-                        ? '♻️ Reused existing image (dedup) · doc updated'
-                        : '✅ Visual saved to drug_codex');
+                        ? '♻️ Reused existing image (dedup) · แสดงในฟอร์มแล้ว'
+                        : '✅ บันทึกรูปแล้ว · แสดงในฟอร์ม (PK · ADMET) + ฝั่ง intern');
                 }
                 dcaClosePkVisualModal();
             } catch (err) {
@@ -30785,6 +30884,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const ndiRes = document.getElementById('dca-ndi-results');
             if (ndiRes) { ndiRes.style.display = 'none'; ndiRes.innerHTML = ''; ndiRes.classList.remove('panel'); }
             dcaNdiLast = null;
+            // V95.05: seed + render the saved PK visual preview so admins can see
+            // an attached image (and confirm a prior Save worked).
+            dcaState.pkVisual = (data && data.pkVisual && data.pkVisual.downloadUrl) ? data.pkVisual : null;
+            dcaRenderCurrentPkVisual(dcaState.pkVisual);
             // V94.75: sync the lookup button enabled-state to the (possibly empty)
             // Generic Name once the form is populated. Deferred so the field is set.
             setTimeout(dcaNdiSyncBtnState, 0);
