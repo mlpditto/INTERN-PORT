@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.98</title>
+    <title>Nika V95.02</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13557,14 +13557,12 @@
             </p>
             <div class="dca-pk-visual-section-label">Model</div>
             <div class="dca-pk-visual-chip-rail" id="dxaPathoVisualModelRail">
-                <!-- Same image-gen chips as Drug Codex PK Visual: AI Studio Nano Banana
-                     is the working default (real base64 via callAIProxy gemini-aistudio
-                     branch, V92.70); the 3 or/ chips hit the chat-route misroute and
-                     return text — kept + marked ⚠ until callAIProxy adds image routing. -->
+                <!-- V94.99: decluttered to the one working image model. The 3 OpenRouter
+                     image chips (GPT-5.4 / Nano Banana 2 / Grok) were removed because
+                     callAIProxy misroutes OpenRouter image models through /chat/completions
+                     and returns text, not an image — they only confused admins. Re-add them
+                     here once callAIProxy gains /images routing for the or/ provider. -->
                 <button type="button" class="dca-pk-visual-chip active" data-value="as/gemini-3.1-flash-image-preview" onclick="dxaSelectPathoVisualModel(this)" title="Google AI Studio · Gemini 3.1 Flash Image Preview (Nano Banana) — real image gen via callAIProxy gemini-aistudio provider.">🍌 Nano Banana · AI Studio</button>
-                <button type="button" class="dca-pk-visual-chip" data-value="or/openai/gpt-5.4-image-2" onclick="dxaSelectPathoVisualModel(this)" title="⚠ OpenRouter — GPT-5.4 Image 2. callAIProxy currently misroutes OpenRouter image models through /chat/completions → returns text. Awaiting proxy fix.">⚠ GPT-5.4 · OR</button>
-                <button type="button" class="dca-pk-visual-chip" data-value="or/google/gemini-3.1-flash-image-preview" onclick="dxaSelectPathoVisualModel(this)" title="⚠ OpenRouter — Gemini 3.1 Flash Image Preview (Nano Banana 2). Same misroute — returns text.">⚠ Nano Banana 2 · OR</button>
-                <button type="button" class="dca-pk-visual-chip" data-value="or/x-ai/grok-2-image" onclick="dxaSelectPathoVisualModel(this)" title="⚠ OpenRouter — xAI Grok 2 Image. Same misroute — returns text.">⚠ Grok · OR</button>
             </div>
             <div class="dca-pk-visual-section-label">Style</div>
             <div class="dca-pk-visual-chip-rail" id="dxaPathoVisualStyleRail">
@@ -13572,6 +13570,17 @@
                 <button type="button" class="dca-pk-visual-chip" data-value="anatomical" onclick="dxaSelectPathoVisualStyle(this)" title="Medical textbook illustration · affected organs / tissues labeled with the disease process">🫀 Anatomical</button>
                 <button type="button" class="dca-pk-visual-chip" data-value="pathway" onclick="dxaSelectPathoVisualStyle(this)" title="Flowchart of the pathogenesis cascade · boxes + arrows · schematic only">🔀 Pathway</button>
             </div>
+            <!-- V95.01: opt-in clinical context. By default the prompt uses only
+                 Etiology + Pathophysiology; tick these to also feed the diagram. -->
+            <div class="dca-pk-visual-section-label">Include in prompt (optional)</div>
+            <div class="dca-pk-visual-chip-rail" id="dxaPathoVisualFieldsRail" style="gap:16px;">
+                <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:700; font-size:0.82em; color:#4338ca;"><input type="checkbox" id="dxa-pv-inc-symptoms"> Symptoms</label>
+                <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:700; font-size:0.82em; color:#4338ca;"><input type="checkbox" id="dxa-pv-inc-signs"> Signs</label>
+                <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:700; font-size:0.82em; color:#4338ca;"><input type="checkbox" id="dxa-pv-inc-diagnosis"> Diagnosis</label>
+            </div>
+            <!-- V95.02: free-text instructions appended to the prompt before Generate. -->
+            <div class="dca-pk-visual-section-label">Extra instructions (optional)</div>
+            <textarea id="dxa-pv-extra" rows="2" placeholder="เพิ่มคำกำกับให้ AI เช่น 'ใส่ label ภาษาไทย' · 'เน้น pathway ของไต' · 'โทนสีเย็น'…" style="width:100%; box-sizing:border-box; border:1.5px solid #c7d2fe; border-radius:10px; padding:8px 10px; font-family:inherit; font-size:0.86em; resize:vertical;"></textarea>
             <div class="dca-pk-visual-preview-wrap" id="dxaPathoVisualPreviewWrap">
                 <div class="dca-pk-visual-preview-placeholder" id="dxaPathoVisualPlaceholder">
                     Click <strong>Generate</strong> below to render a pathophysiology visual.<br>
@@ -33050,6 +33059,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dxaPathoVisualState.lastImageDataUrl = '';
             dxaPathoVisualState.lastModelLabel = '';
             dxaPathoVisualState.generating = false;
+            // V95.02: reset opt-in fields + extra instructions on every open so a
+            // prior disease's choices don't leak into a new one (static modal DOM —
+            // see feedback_static_modal_state_leak).
+            ['dxa-pv-inc-symptoms', 'dxa-pv-inc-signs', 'dxa-pv-inc-diagnosis'].forEach(function (id) {
+                const cb = document.getElementById(id);
+                if (cb) cb.checked = false;
+            });
+            const extraEl = document.getElementById('dxa-pv-extra');
+            if (extraEl) extraEl.value = '';
             dxaPathoVisualRenderPreview();
             const modal = document.getElementById('dxaPathoVisualModal');
             if (modal) modal.style.display = 'flex';
@@ -33193,14 +33211,25 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         // Builds the prompt for the chosen style from etiology + pathophysiology
         // (omits empty fields). Common visual constraints live at the end.
-        function dxaBuildPathoVisualPrompt(disease, style) {
+        function dxaBuildPathoVisualPrompt(disease, style, opts) {
+            opts = opts || {};
             const fields = [
                 ['Etiology',        disease.etiology],
                 ['Pathophysiology', disease.pathophysiology]
             ].filter(([, v]) => v && String(v).trim());
-            const srcBlock = fields.map(([k, v]) => `${k.toUpperCase()}: ${String(v).trim()}`).join('\n\n');
+            let srcBlock = fields.map(([k, v]) => `${k.toUpperCase()}: ${String(v).trim()}`).join('\n\n');
+            // V95.01: optional clinical context (admin opts in via checkboxes) so
+            // the diagram can reflect the actual presentation, not just mechanism.
+            const extraFields = [];
+            if (opts.includeSymptoms  && disease.symptoms)  extraFields.push(['Symptoms',  disease.symptoms]);
+            if (opts.includeSigns     && disease.signs)     extraFields.push(['Signs',     disease.signs]);
+            if (opts.includeDiagnosis && disease.diagnosis) extraFields.push(['Diagnosis', disease.diagnosis]);
+            if (extraFields.length) {
+                srcBlock += '\n\nADDITIONAL CLINICAL CONTEXT:\n'
+                    + extraFields.map(([k, v]) => `${k.toUpperCase()}: ${String(v).trim()}`).join('\n\n');
+            }
             const diseaseName = disease.diseaseName || 'this disease';
-            const commonRules = [
+            let commonRules = [
                 '',
                 'STYLE CONSTRAINTS:',
                 '- English labels only (medical terms stay in English: cytokines, eGFR, ischemia, etc.).',
@@ -33209,6 +33238,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 '- Clean, professional medical aesthetic. White or light background.',
                 '- Make stage / mechanism labels readable at a glance.'
             ].join('\n');
+            // V95.02: admin free-text instructions, appended last so they can
+            // override/refine the defaults (e.g. "use Thai labels", "cool tones").
+            if (opts.extra && String(opts.extra).trim()) {
+                commonRules += '\n\nADDITIONAL INSTRUCTIONS (admin, follow these): ' + String(opts.extra).trim();
+            }
 
             if (style === 'anatomical') {
                 return [
@@ -33252,14 +33286,39 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
                 return;
             }
-            const prompt = dxaBuildPathoVisualPrompt(current, dxaPathoVisualState.style);
+            // V95.01: opt-in clinical-context fields from the checkboxes.
+            // V95.02: + free-text extra instructions.
+            const pvExtraEl = document.getElementById('dxa-pv-extra');
+            const pvOpts = {
+                includeSymptoms:  !!(document.getElementById('dxa-pv-inc-symptoms')  || {}).checked,
+                includeSigns:     !!(document.getElementById('dxa-pv-inc-signs')     || {}).checked,
+                includeDiagnosis: !!(document.getElementById('dxa-pv-inc-diagnosis') || {}).checked,
+                extra: pvExtraEl ? String(pvExtraEl.value || '').trim() : ''
+            };
+            const prompt = dxaBuildPathoVisualPrompt(current, dxaPathoVisualState.style, pvOpts);
             const modelLabel = DXA_PATHO_VISUAL_MODEL_LABELS[dxaPathoVisualState.model] || dxaPathoVisualState.model;
 
             dxaPathoVisualState.lastError = null;
             dxaPathoVisualState.lastErrorModelLabel = '';
             dxaPathoVisualState.generating = true;
             dxaPathoVisualRenderPreview();
-            if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
+            // V95.00: optimistic progress. Image gen has no real progress signal,
+            // so show a perceived-progress cue — reuse startAiFakeProgress for the
+            // % on the button (same as AI Auto-Draft V94.94) + a 1s timer on the
+            // spinner showing elapsed seconds.
+            let pvProgress = null;
+            let pvTimerId = null;
+            if (btn) { btn.disabled = true; pvProgress = startAiFakeProgress(btn, 'Generating'); }
+            const pvStart = Date.now();
+            const pvSpinnerSpan = document.querySelector('#dxaPathoVisualSpinner span');
+            if (pvSpinnerSpan) {
+                const pvPaint = function () {
+                    const s = Math.round((Date.now() - pvStart) / 1000);
+                    pvSpinnerSpan.textContent = 'Generating · ' + s + 's · this can take 10-30s…';
+                };
+                pvPaint();
+                pvTimerId = setInterval(pvPaint, 1000);
+            }
 
             try {
                 const resp = await window.callUniversalAI(
@@ -33315,6 +33374,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
             } finally {
                 dxaPathoVisualState.generating = false;
+                if (pvProgress) pvProgress.stop();
+                if (pvTimerId) clearInterval(pvTimerId);
                 dxaPathoVisualRenderPreview();
                 if (dxaPathoVisualState.lastError) {
                     dxaPathoVisualShowGenerateError(
