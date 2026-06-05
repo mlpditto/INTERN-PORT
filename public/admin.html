@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.00</title>
+    <title>Nika V95.01</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13569,6 +13569,14 @@
                 <button type="button" class="dca-pk-visual-chip active" data-value="infographic" onclick="dxaSelectPathoVisualStyle(this)" title="Clean clinical infographic · color-coded stages · cause → mechanism → clinical state flow">📊 Infographic</button>
                 <button type="button" class="dca-pk-visual-chip" data-value="anatomical" onclick="dxaSelectPathoVisualStyle(this)" title="Medical textbook illustration · affected organs / tissues labeled with the disease process">🫀 Anatomical</button>
                 <button type="button" class="dca-pk-visual-chip" data-value="pathway" onclick="dxaSelectPathoVisualStyle(this)" title="Flowchart of the pathogenesis cascade · boxes + arrows · schematic only">🔀 Pathway</button>
+            </div>
+            <!-- V95.01: opt-in clinical context. By default the prompt uses only
+                 Etiology + Pathophysiology; tick these to also feed the diagram. -->
+            <div class="dca-pk-visual-section-label">Include in prompt (optional)</div>
+            <div class="dca-pk-visual-chip-rail" id="dxaPathoVisualFieldsRail" style="gap:16px;">
+                <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:700; font-size:0.82em; color:#4338ca;"><input type="checkbox" id="dxa-pv-inc-symptoms"> Symptoms</label>
+                <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:700; font-size:0.82em; color:#4338ca;"><input type="checkbox" id="dxa-pv-inc-signs"> Signs</label>
+                <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:700; font-size:0.82em; color:#4338ca;"><input type="checkbox" id="dxa-pv-inc-diagnosis"> Diagnosis</label>
             </div>
             <div class="dca-pk-visual-preview-wrap" id="dxaPathoVisualPreviewWrap">
                 <div class="dca-pk-visual-preview-placeholder" id="dxaPathoVisualPlaceholder">
@@ -33191,12 +33199,23 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         // Builds the prompt for the chosen style from etiology + pathophysiology
         // (omits empty fields). Common visual constraints live at the end.
-        function dxaBuildPathoVisualPrompt(disease, style) {
+        function dxaBuildPathoVisualPrompt(disease, style, opts) {
+            opts = opts || {};
             const fields = [
                 ['Etiology',        disease.etiology],
                 ['Pathophysiology', disease.pathophysiology]
             ].filter(([, v]) => v && String(v).trim());
-            const srcBlock = fields.map(([k, v]) => `${k.toUpperCase()}: ${String(v).trim()}`).join('\n\n');
+            let srcBlock = fields.map(([k, v]) => `${k.toUpperCase()}: ${String(v).trim()}`).join('\n\n');
+            // V95.01: optional clinical context (admin opts in via checkboxes) so
+            // the diagram can reflect the actual presentation, not just mechanism.
+            const extraFields = [];
+            if (opts.includeSymptoms  && disease.symptoms)  extraFields.push(['Symptoms',  disease.symptoms]);
+            if (opts.includeSigns     && disease.signs)     extraFields.push(['Signs',     disease.signs]);
+            if (opts.includeDiagnosis && disease.diagnosis) extraFields.push(['Diagnosis', disease.diagnosis]);
+            if (extraFields.length) {
+                srcBlock += '\n\nADDITIONAL CLINICAL CONTEXT:\n'
+                    + extraFields.map(([k, v]) => `${k.toUpperCase()}: ${String(v).trim()}`).join('\n\n');
+            }
             const diseaseName = disease.diseaseName || 'this disease';
             const commonRules = [
                 '',
@@ -33250,7 +33269,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
                 return;
             }
-            const prompt = dxaBuildPathoVisualPrompt(current, dxaPathoVisualState.style);
+            // V95.01: opt-in clinical-context fields from the checkboxes.
+            const pvOpts = {
+                includeSymptoms:  !!(document.getElementById('dxa-pv-inc-symptoms')  || {}).checked,
+                includeSigns:     !!(document.getElementById('dxa-pv-inc-signs')     || {}).checked,
+                includeDiagnosis: !!(document.getElementById('dxa-pv-inc-diagnosis') || {}).checked
+            };
+            const prompt = dxaBuildPathoVisualPrompt(current, dxaPathoVisualState.style, pvOpts);
             const modelLabel = DXA_PATHO_VISUAL_MODEL_LABELS[dxaPathoVisualState.model] || dxaPathoVisualState.model;
 
             dxaPathoVisualState.lastError = null;
