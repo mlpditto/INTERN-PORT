@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.22)</title>
+    <title>Internship Portfolio (V95.23)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4215,7 +4215,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.22 (ค้นหา/ขอทำข้อสอบเอง — Quiz catalog + request-to-take)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.23 (fix grandTotalItems ReferenceError — dashboard update no longer throws)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -9622,6 +9622,12 @@
                 todayPoints += Number(morningQuizBonusCache.amount || MORNING_QUIZ_BONUS_AMOUNT) || 0;
             }
 
+            // V95.23 fix: grandTotalItems was referenced here (and at the Voyage
+            // Trends call below) but never declared — a ReferenceError that threw
+            // on every dashboard update ("Failed to load cases"). It's the total
+            // count of point-earning items across the three categories.
+            const grandTotalItems = quizzesWithPointsCount + reflectiveWithPointsCount + casesWithPointsCount;
+
             // Update Unified Metrics Bar (V91.38)
             updateUnifiedMetricsBar(todayPoints, reflectiveMetrics, quizzesWithPointsCount, reflectiveWithPointsCount, casesWithPointsCount, grandTotalItems, totalQuizScore, totalReflectiveScore, totalCaseScore, nextRank, score);
             
@@ -9633,7 +9639,14 @@
             updateMorningQuizBonusChip();
 
             // 🔥 Update Voyage Metrics Trends & Progress (V91.37)
-            updateVoyageMetricsTrends(quizzesWithPointsCount, reflectiveWithPointsCount, casesWithPointsCount, grandTotalItems);
+            // V95.23 fix: updateVoyageMetricsTrends is an orphaned call — the
+            // function was removed but the call left behind, so it threw
+            // "updateVoyageMetricsTrends is not defined" once grandTotalItems was
+            // fixed. Guard with a typeof check so it runs again only if the
+            // function is ever re-added (no behavior change otherwise).
+            if (typeof updateVoyageMetricsTrends === 'function') {
+                updateVoyageMetricsTrends(quizzesWithPointsCount, reflectiveWithPointsCount, casesWithPointsCount, grandTotalItems);
+            }
             // Quiz Trend
             const quizTrendEl = document.getElementById('kpi-quiz-trend');
             const quizBarEl = document.getElementById('kpi-quiz-bar');
