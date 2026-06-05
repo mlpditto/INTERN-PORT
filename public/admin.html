@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.09</title>
+    <title>Nika V95.10</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13580,6 +13580,10 @@
                 <button type="button" class="dca-pk-visual-btn-cancel" onclick="dcaClosePkVisualModal()">Close</button>
                 <div style="display:flex; gap:8px;">
                     <button type="button" id="dcaPkVisualGenerateBtn" class="dca-pk-visual-btn-generate" onclick="dcaGeneratePkVisual()">🎨 Generate</button>
+                    <!-- V95.10: download the generated image to the admin's device as a
+                         file. Unlike Save Visual (Firestore-gated to Edit-published mode),
+                         download works for ANY generated image. Mirrors Disease Codex V94.97. -->
+                    <button type="button" id="dcaPkVisualDownloadBtn" class="dca-pk-visual-btn-cancel" disabled onclick="dcaDownloadPkVisual()" title="ดาวน์โหลดรูปลงเครื่อง (PNG) — ใช้ได้แม้ยังไม่ได้ Save ลง Firestore">⬇️ PNG</button>
                     <button type="button" id="dcaPkVisualSaveBtn" class="dca-pk-visual-btn-save" disabled onclick="dcaSavePkVisual()" title="Upload to Firebase Storage + persist drug_codex.pkVisual. Enabled once an image is generated.">💾 Save Visual</button>
                 </div>
             </div>
@@ -30465,6 +30469,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 saveBtn.disabled = !!dcaPkVisualState.generating
                     || !dcaPkVisualState.lastImageDataUrl;
             }
+            // V95.10: Download enabled on the same condition (image in memory) —
+            // NOT gated on editingId, since a local download needs no Firestore
+            // doc. The cancel-button base class has no :disabled style, so toggle
+            // opacity/cursor inline to make the disabled state visible.
+            const dlBtn = document.getElementById('dcaPkVisualDownloadBtn');
+            if (dlBtn) {
+                const dlDisabled = !!dcaPkVisualState.generating
+                    || !dcaPkVisualState.lastImageDataUrl;
+                dlBtn.disabled = dlDisabled;
+                dlBtn.style.opacity = dlDisabled ? '0.5' : '1';
+                dlBtn.style.cursor = dlDisabled ? 'not-allowed' : 'pointer';
+            }
         }
 
         // V94.57: handlers for <img> load success/failure. On failure, the
@@ -30874,6 +30890,46 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // ensures the Save button reflects whether a fresh image is in
                 // memory if the modal is reopened without regenerating).
                 dcaPkVisualRenderPreview();
+            }
+        }
+
+        // V95.10: download the previewed image to the admin's device. Works for ANY
+        // generated image (no Firestore doc / editingId needed). Mirrors Disease
+        // Codex dxaDownloadPathoVisual (V94.97): fetch() resolves data:/https: URLs
+        // to a Blob, then a synthetic <a download> triggers the browser save.
+        async function dcaDownloadPkVisual() {
+            const url = dcaPkVisualState.lastImageDataUrl;
+            if (!url) {
+                if (typeof showToast === 'function') showToast('🎨 Generate a visual first.');
+                return;
+            }
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) {
+                    throw new Error(`fetch failed (${resp.status} ${resp.statusText}). A remote https image may be CORS-blocked.`);
+                }
+                const blob = await resp.blob();
+                const mime = blob.type || 'image/png';
+                const ext = mime === 'image/jpeg' || mime === 'image/jpg' ? 'jpg'
+                          : mime === 'image/webp' ? 'webp'
+                          : mime === 'image/gif'  ? 'gif'
+                          : 'png';
+                const nameEl = document.getElementById('dca-f-genericName');
+                const slug = String((nameEl && nameEl.value) || 'drug')
+                    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'drug';
+                const fname = `pk-${slug}-${dcaPkVisualState.style}.${ext}`;
+                const objUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = objUrl;
+                a.download = fname;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
+                if (typeof showToast === 'function') showToast('⬇️ ดาวน์โหลด ' + fname + ' แล้ว');
+            } catch (err) {
+                console.error('[drug-codex pk-visual download]', err);
+                if (typeof showToast === 'function') showToast('⬇️ ดาวน์โหลดไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
             }
         }
 
