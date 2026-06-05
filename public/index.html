@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.31)</title>
+    <title>Internship Portfolio (V95.32)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4215,7 +4215,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.31 (quiz materials: admin attaches 📎 download links · interns get them on the card)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.32 (quiz materials unlock only after completing the quiz — locked hint before)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -6946,7 +6946,6 @@
                         bodyHtml = `
                             ${deadlineHtml}
                             ${displayDesc ? `<div style="margin-top:10px; font-size:0.9em; color:#666;">${displayDesc}</div>` : ''}
-                            ${quizMaterialsHtml(q)}
                         `;
                         const isExpired = (dead && new Date() > dead);
                         if (isExpired) {
@@ -6969,6 +6968,9 @@
                     // the card stays expandable.
                     const hasViewedAnswers = !!attempt && !!localStorage.getItem('quizAnswersViewed_' + q.id);
                     const isCollapsed = (isExpired && (!attempt || attempt.status === 'abandoned')) || hasViewedAnswers;
+                    // V95.32: materials unlock only after the intern completes the quiz
+                    // (submitted/graded). Before that the card shows a locked hint.
+                    const quizMaterialsDone = !!attempt && (['completed', 'graded', 'approved', 'pending'].indexOf(attempt.status) >= 0 || (attempt.totalQuestions && attempt.totalQuestions > 0));
 
                     // V94.46/V94.48: card tint by state.
                     // V94.48: status-retake (orange) takes precedence — covers the surprise
@@ -6997,7 +6999,7 @@
                             </div>
                             ${isCollapsed ? '<i class="fa-solid fa-chevron-down" style="color:#ccc; font-size:0.9em; margin-left:10px;"></i>' : ''}
                         </div>
-                        <div class="assign-body" style="${isCollapsed ? 'display:none;' : ''}">${bodyHtml}</div>
+                        <div class="assign-body" style="${isCollapsed ? 'display:none;' : ''}">${bodyHtml}${quizMaterialsHtml(q, quizMaterialsDone)}</div>
                         <div class="assign-footer" style="${isCollapsed ? 'display:none;' : ''}">${actionHtml}</div>
                     `;
                 }
@@ -7569,10 +7571,15 @@
 
         // V95.12: render a quiz's downloadable materials as 📎 link chips
         // (admin pastes "Name | URL" lines → materials:[{name,url}]). '' when none.
-        // Used by the Mission assignment card + the catalog browse card.
-        function quizMaterialsHtml(q) {
+        // V95.32: materials unlock ONLY after the intern completes the quiz — before
+        // that, show a locked hint (don't expose the download). `done` is passed by
+        // the Mission card (true when the attempt is graded/submitted).
+        function quizMaterialsHtml(q, done) {
             const mats = (q && Array.isArray(q.materials)) ? q.materials.filter(function (m) { return m && m.url; }) : [];
             if (!mats.length) return '';
+            if (!done) {
+                return '<div style="margin-top:10px; display:inline-flex; align-items:center; gap:6px; background:#f8fafc; border:1px dashed #cbd5e1; color:#94a3b8; padding:6px 11px; border-radius:8px; font-size:0.78em; font-weight:600;">🔒 📎 เอกสารประกอบ (' + mats.length + ') — ปลดล็อกหลังทำข้อสอบเสร็จ</div>';
+            }
             const links = mats.map(function (m) {
                 const name = (m.name && String(m.name).trim()) || 'เอกสาร';
                 return '<a href="' + escapeHtml(String(m.url).trim()) + '" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:5px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; padding:5px 11px; border-radius:8px; font-size:0.82em; font-weight:700; text-decoration:none; margin:3px 6px 3px 0;">📎 ' + escapeHtml(name) + '</a>';
