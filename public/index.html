@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.21)</title>
+    <title>Internship Portfolio (V95.22)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3526,6 +3526,14 @@
                             
                             <!-- 🔥 V92.00: Tab 2 - Quiz List (moved from Quiz card) — V94.50: default active -->
                             <div id="pane-mission-quiz" class="mission-tab-pane active">
+                                <!-- V95.22: self-service quiz catalog. Lets interns find a quiz
+                                     and request to take it (writes quiz_attempts status='requesting',
+                                     which flows into the admin's existing approval queue → 'allowed'). -->
+                                <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+                                    <button onclick="qbOpenBrowse()" style="display:inline-flex; align-items:center; gap:7px; padding:9px 16px; border-radius:50px; border:1.5px solid #c7d2fe; background:linear-gradient(135deg,#eff6ff,#e0e7ff); color:#4338ca; font-weight:800; font-size:0.85em; cursor:pointer;">
+                                        <i class="fa-solid fa-magnifying-glass"></i> ค้นหา / ขอทำข้อสอบ
+                                    </button>
+                                </div>
                                 <div id="assignments-container"></div>
                                 <div id="assign-pagination" style="margin-top:15px; display:flex; justify-content:center; gap:10px;"></div>
                             </div>
@@ -4207,7 +4215,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.20 (Drug/Disease Codex wait for Firebase auth + auto-retry — no more permanent "Missing permissions")
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.22 (ค้นหา/ขอทำข้อสอบเอง — Quiz catalog + request-to-take)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -4440,6 +4448,19 @@
                     <button type="button" id="dc-submit-save-btn" class="dc-submit-save-btn" onclick="dcSubmitForm()">📥 Submit</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- V95.22: intern quiz catalog — search all active quizzes + request to take one. -->
+    <div id="quizBrowseModal" class="modal">
+        <div class="modal-content" style="max-width:560px; width:92%; max-height:85vh; display:flex; flex-direction:column; text-align:left;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:6px;">
+                <span style="font-weight:900; font-size:1.05em; color:#1e293b;">🔍 ค้นหา / ขอทำข้อสอบ</span>
+                <button onclick="qbCloseBrowse()" aria-label="Close" style="border:none; background:none; font-size:1.5em; line-height:1; cursor:pointer; color:#64748b;">×</button>
+            </div>
+            <div style="font-size:0.8em; color:#64748b; margin-bottom:10px;">เลือกข้อสอบที่อยากทำ แล้วกด “ขอทำ” — admin จะอนุมัติก่อนถึงเริ่มได้</div>
+            <input id="qb-search" oninput="qbRenderList()" placeholder="ค้นหาชื่อข้อสอบ / แท็ก / หมวด…" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1.5px solid #e2e8f0; border-radius:10px; font-size:0.95em; margin-bottom:12px;">
+            <div id="qb-list" style="overflow-y:auto; flex:1; min-height:120px; display:flex; flex-direction:column; gap:10px;"></div>
         </div>
     </div>
 
@@ -7386,6 +7407,124 @@
                 loadQuizzes();
             } catch (e) {
                 alert("Request Error: " + e.message);
+            }
+        }
+
+        // ===================================================================
+        // V95.22: intern quiz catalog — browse/search all active quizzes and
+        // request to take one. Reuses the quiz_attempts status='requesting'
+        // mechanism (same write as requestLateQuiz) → the admin's existing
+        // pending/requesting approval queue → status='allowed' → the quiz
+        // becomes takeable in the normal mission list. No new collection / rules
+        // / deploy.
+        // ===================================================================
+        function qbOpenBrowse() {
+            const m = document.getElementById('quizBrowseModal');
+            if (!m) return;
+            const s = document.getElementById('qb-search');
+            if (s) s.value = '';
+            qbRenderList();
+            m.style.display = 'flex';
+        }
+        function qbCloseBrowse() {
+            const m = document.getElementById('quizBrowseModal');
+            if (m) m.style.display = 'none';
+        }
+
+        // Mirrors the renderAssignments visibility filter: is this quiz already
+        // takeable by me right now (so no request is needed)?
+        function qbIsAvailableToMe(q) {
+            const now = new Date();
+            const start = q.startTime ? q.startTime.toDate() : null;
+            const dead = q.deadline ? q.deadline.toDate() : null;
+            const target = q.targetGroup || 'Public';
+            if (target !== 'Public' && target !== myGroup) return false;
+            if (q.isHomework && Array.isArray(q.assignedUsers) && q.assignedUsers.length > 0) {
+                if (!q.assignedUsers.includes(userId)) return false;
+            }
+            if (q.isActive !== true) return false;
+            if (start && now < start) return false;   // not started yet
+            if (dead && now > dead) return false;      // expired
+            return true;
+        }
+
+        function qbRenderList() {
+            const list = document.getElementById('qb-list');
+            if (!list) return;
+            const term = String((document.getElementById('qb-search') || {}).value || '').trim().toLowerCase();
+            const items = (quizzesCache || []).filter(function (q) { return q && q.isActive === true && !q.isPoll; });
+            const matched = items.filter(function (q) {
+                if (!term) return true;
+                const hay = [q.title, q.shortTitle, q.tags, q.targetGroup, q.description].filter(Boolean).join(' ').toLowerCase();
+                return hay.indexOf(term) !== -1;
+            });
+            matched.sort(function (a, b) { return String(a.title || '').localeCompare(String(b.title || '')); });
+            if (!matched.length) {
+                list.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:30px;">' + (term ? 'ไม่พบข้อสอบที่ตรงกับคำค้น' : 'ยังไม่มีข้อสอบในระบบ') + '</div>';
+                return;
+            }
+            list.innerHTML = matched.map(qbRowHtml).join('');
+        }
+
+        function qbRowHtml(q) {
+            const attempt = quizAttemptsCache[q.id];
+            const status = attempt ? attempt.status : 'none';
+            const avail = qbIsAvailableToMe(q);
+            const meta = [];
+            if (q.totalPoints) meta.push(q.totalPoints + ' pts');
+            if (Array.isArray(q.questions)) meta.push(q.questions.length + ' ข้อ');
+            if (q.targetGroup && q.targetGroup !== 'Public') meta.push('กลุ่ม ' + q.targetGroup);
+            if (q.tags) meta.push(String(q.tags).split(',').slice(0, 2).join(', '));
+            const badge = function (txt, c, bg) {
+                return '<span style="font-size:0.74em; font-weight:800; color:' + c + '; background:' + bg + '; padding:4px 10px; border-radius:999px; white-space:nowrap;">' + txt + '</span>';
+            };
+            let right;
+            if (status === 'requesting') {
+                right = badge('⏳ รออนุมัติ', '#92400e', '#fef3c7');
+            } else if (status === 'allowed') {
+                right = badge('✅ อนุมัติแล้ว · ทำได้ในรายการ', '#166534', '#dcfce7');
+            } else if (status === 'started') {
+                right = badge('▶ กำลังทำ', '#1d4ed8', '#dbeafe');
+            } else if (status !== 'none') {
+                right = badge('✓ ทำแล้ว', '#475569', '#f1f5f9');
+            } else if (avail) {
+                right = badge('พร้อมทำ · อยู่ใน Mission', '#0369a1', '#e0f2fe');
+            } else {
+                right = '<button onclick="qbRequestQuiz(\'' + q.id + '\')" style="border:none; background:linear-gradient(135deg,#6366f1,#4f46e5); color:#fff; font-weight:800; font-size:0.8em; padding:7px 14px; border-radius:999px; cursor:pointer; white-space:nowrap;">📨 ขอทำ</button>';
+            }
+            const metaHtml = meta.length ? '<div style="font-size:0.74em; color:#94a3b8; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + escapeHtml(meta.join(' · ')) + '</div>' : '';
+            return '<div style="display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid #e2e8f0; border-radius:14px; padding:11px 14px; background:#fff;">'
+                + '<div style="min-width:0; flex:1;"><div style="font-weight:800; color:#1e293b; font-size:0.9em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="' + escapeHtml(q.title || '') + '">' + escapeHtml(q.title || '(ไม่มีชื่อ)') + '</div>' + metaHtml + '</div>'
+                + '<div style="flex-shrink:0;">' + right + '</div>'
+                + '</div>';
+        }
+
+        async function qbRequestQuiz(quizId) {
+            const q = (quizzesCache || []).find(function (x) { return x.id === quizId; });
+            if (!q) return;
+            const existing = quizAttemptsCache[quizId];
+            if (existing && existing.status && existing.status !== 'none') {
+                alert('ข้อสอบนี้มีสถานะอยู่แล้ว (' + existing.status + ')');
+                qbRenderList();
+                return;
+            }
+            if (!confirm('ขอทำข้อสอบ "' + (q.title || '') + '"?\nadmin จะได้รับคำขอและต้องอนุมัติก่อนถึงจะเริ่มทำได้')) return;
+            try {
+                await db.collection("quiz_attempts").doc(`${quizId}_${userId}`).set({
+                    quizId: quizId,
+                    userId: userId,
+                    displayName: userProfile.displayName,
+                    pictureUrl: userProfile.pictureUrl || "",
+                    status: 'requesting',
+                    requestTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                // Optimistic local update so the row flips immediately (onSnapshot reconciles).
+                quizAttemptsCache[quizId] = Object.assign({}, quizAttemptsCache[quizId], { status: 'requesting', quizId: quizId, userId: userId });
+                alert('📨 ส่งคำขอแล้ว · รอ admin อนุมัติ');
+                qbRenderList();
+            } catch (e) {
+                alert('ขอไม่สำเร็จ: ' + (e && e.message ? e.message : 'unknown error'));
             }
         }
 
