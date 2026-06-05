@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.30)</title>
+    <title>Internship Portfolio (V95.31)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4215,7 +4215,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.30 (quiz feedback: helper line explaining why the quiz-set rating matters)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.31 (quiz materials: admin attaches 📎 download links · interns get them on the card)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -6946,6 +6946,7 @@
                         bodyHtml = `
                             ${deadlineHtml}
                             ${displayDesc ? `<div style="margin-top:10px; font-size:0.9em; color:#666;">${displayDesc}</div>` : ''}
+                            ${quizMaterialsHtml(q)}
                         `;
                         const isExpired = (dead && new Date() > dead);
                         if (isExpired) {
@@ -7566,6 +7567,19 @@
             list.innerHTML = matched.map(qbRowHtml).join('');
         }
 
+        // V95.12: render a quiz's downloadable materials as 📎 link chips
+        // (admin pastes "Name | URL" lines → materials:[{name,url}]). '' when none.
+        // Used by the Mission assignment card + the catalog browse card.
+        function quizMaterialsHtml(q) {
+            const mats = (q && Array.isArray(q.materials)) ? q.materials.filter(function (m) { return m && m.url; }) : [];
+            if (!mats.length) return '';
+            const links = mats.map(function (m) {
+                const name = (m.name && String(m.name).trim()) || 'เอกสาร';
+                return '<a href="' + escapeHtml(String(m.url).trim()) + '" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:5px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; padding:5px 11px; border-radius:8px; font-size:0.82em; font-weight:700; text-decoration:none; margin:3px 6px 3px 0;">📎 ' + escapeHtml(name) + '</a>';
+            }).join('');
+            return '<div style="margin-top:10px;"><div style="font-size:0.78em; color:#64748b; font-weight:700; margin-bottom:4px;">📎 เอกสารประกอบ</div><div style="display:flex; flex-wrap:wrap;">' + links + '</div></div>';
+        }
+
         // V95.26: deterministic category accent. Hash the first tag (fallback to
         // targetGroup) into a stable hue so each category always gets the same
         // subtle left-border color — no palette to maintain, and free-text tags
@@ -7587,6 +7601,7 @@
             const meta = [];
             if (q.totalPoints) meta.push(q.totalPoints + ' pts');
             if (Array.isArray(q.questions)) meta.push(q.questions.length + ' ข้อ');
+            if (Array.isArray(q.materials) && q.materials.filter(function (m) { return m && m.url; }).length) meta.push('📎 มีเอกสาร');
             if (q.targetGroup && q.targetGroup !== 'Public') meta.push('กลุ่ม ' + q.targetGroup);
             if (q.tags) meta.push(String(q.tags).split(',').slice(0, 2).join(', '));
             const badge = function (txt, c, bg) {
