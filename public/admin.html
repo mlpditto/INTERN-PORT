@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.94</title>
+    <title>Nika V94.95</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13298,7 +13298,18 @@
 
                 <!-- Section 2: Etiology & Epidemiology (V94.93: Epi folded in as a sub-section) -->
                 <div class="dca-form-section" data-tab="etio">
-                    <div class="dca-form-section-header"><span>🧬 Etiology &amp; Epidemiology</span><button type="button" class="dca-form-copy-btn" onclick="dxaCopyDiseaseAsMarkdown('etio', this)" title="Copy this section as Markdown">📋</button></div>
+                    <div class="dca-form-section-header">
+                        <span>🧬 Etiology &amp; Epidemiology</span>
+                        <span style="display:inline-flex; gap:6px; align-items:center;">
+                            <!-- V94.95 Phase 6: AI pathophysiology visual. Mirrors Drug Codex
+                                 PK Visual (dcaPkVisual*) — opens #dxaPathoVisualModal for image
+                                 gen from etiology + pathophysiology via callUniversalAI. Save
+                                 uploads to patho-visuals/{sha256} + persists disease_codex.pathoVisual.
+                                 Reuses the .dca-pk-visual-* CSS. -->
+                            <button type="button" class="dca-pk-visual-btn" onclick="dxaOpenPathoVisualModal()" title="Generate a pathophysiology infographic / anatomical / pathway diagram via AI image gen — Save publishes it on the intern Disease Codex detail">🎨 Visual</button>
+                            <button type="button" class="dca-form-copy-btn" onclick="dxaCopyDiseaseAsMarkdown('etio', this)" title="Copy this section as Markdown">📋</button>
+                        </span>
+                    </div>
                     <div class="dca-form-section-body">
                         <div class="dca-form-subhead">📈 Epidemiology</div>
                         <div class="dca-form-grid">
@@ -13496,6 +13507,63 @@
                 <div style="display:flex; gap:8px;">
                     <button type="button" id="dcaPkVisualGenerateBtn" class="dca-pk-visual-btn-generate" onclick="dcaGeneratePkVisual()">🎨 Generate</button>
                     <button type="button" id="dcaPkVisualSaveBtn" class="dca-pk-visual-btn-save" disabled onclick="dcaSavePkVisual()" title="Upload to Firebase Storage + persist drug_codex.pkVisual. Enabled once an image is generated.">💾 Save Visual</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- V94.95 Phase 6: Disease Codex AI Pathophysiology Visual. Faithful mirror
+         of the Drug Codex PK Visual modal (#dcaPkVisualModal). Admin clicks 🎨 in
+         the Etiology & Pathophysiology section header → modal opens. Two chip rails
+         (model + style), Generate calls image gen via callUniversalAI, preview pane
+         shows the dataURL. Save uploads to patho-visuals/{sha256}.{ext} via
+         storage.rules (admin-only) + persists disease_codex.pathoVisual. Reuses the
+         .dca-pk-visual-* CSS. z-index above diseaseCodexAdminModal. -->
+    <div id="dxaPathoVisualModal" class="modal" style="z-index:4502;">
+        <div class="modal-content" style="max-width:760px;">
+            <span class="close-modal" onclick="dxaClosePathoVisualModal()">&times;</span>
+            <h3 style="margin:0 0 4px 0; color:#5b21b6; display:flex; align-items:center; gap:8px;">
+                🎨 <span>Generate Pathophysiology Visual</span>
+                <span class="dca-ai-badge" style="background:linear-gradient(135deg,#ede9fe,#ddd6fe); color:#5b21b6;">🎨 persists to Firestore</span>
+            </h3>
+            <p style="margin:4px 0 14px 0; color:#64748b; font-size:0.86em;">
+                Generates a pathophysiology diagram from the Etiology + Pathophysiology fields. Pick a model + style, click Generate to preview, then Save to publish on the intern Disease Codex detail modal.
+            </p>
+            <div class="dca-pk-visual-section-label">Model</div>
+            <div class="dca-pk-visual-chip-rail" id="dxaPathoVisualModelRail">
+                <!-- Same image-gen chips as Drug Codex PK Visual: AI Studio Nano Banana
+                     is the working default (real base64 via callAIProxy gemini-aistudio
+                     branch, V92.70); the 3 or/ chips hit the chat-route misroute and
+                     return text — kept + marked ⚠ until callAIProxy adds image routing. -->
+                <button type="button" class="dca-pk-visual-chip active" data-value="as/gemini-3.1-flash-image-preview" onclick="dxaSelectPathoVisualModel(this)" title="Google AI Studio · Gemini 3.1 Flash Image Preview (Nano Banana) — real image gen via callAIProxy gemini-aistudio provider.">🍌 Nano Banana · AI Studio</button>
+                <button type="button" class="dca-pk-visual-chip" data-value="or/openai/gpt-5.4-image-2" onclick="dxaSelectPathoVisualModel(this)" title="⚠ OpenRouter — GPT-5.4 Image 2. callAIProxy currently misroutes OpenRouter image models through /chat/completions → returns text. Awaiting proxy fix.">⚠ GPT-5.4 · OR</button>
+                <button type="button" class="dca-pk-visual-chip" data-value="or/google/gemini-3.1-flash-image-preview" onclick="dxaSelectPathoVisualModel(this)" title="⚠ OpenRouter — Gemini 3.1 Flash Image Preview (Nano Banana 2). Same misroute — returns text.">⚠ Nano Banana 2 · OR</button>
+                <button type="button" class="dca-pk-visual-chip" data-value="or/x-ai/grok-2-image" onclick="dxaSelectPathoVisualModel(this)" title="⚠ OpenRouter — xAI Grok 2 Image. Same misroute — returns text.">⚠ Grok · OR</button>
+            </div>
+            <div class="dca-pk-visual-section-label">Style</div>
+            <div class="dca-pk-visual-chip-rail" id="dxaPathoVisualStyleRail">
+                <button type="button" class="dca-pk-visual-chip active" data-value="infographic" onclick="dxaSelectPathoVisualStyle(this)" title="Clean clinical infographic · color-coded stages · cause → mechanism → clinical state flow">📊 Infographic</button>
+                <button type="button" class="dca-pk-visual-chip" data-value="anatomical" onclick="dxaSelectPathoVisualStyle(this)" title="Medical textbook illustration · affected organs / tissues labeled with the disease process">🫀 Anatomical</button>
+                <button type="button" class="dca-pk-visual-chip" data-value="pathway" onclick="dxaSelectPathoVisualStyle(this)" title="Flowchart of the pathogenesis cascade · boxes + arrows · schematic only">🔀 Pathway</button>
+            </div>
+            <div class="dca-pk-visual-preview-wrap" id="dxaPathoVisualPreviewWrap">
+                <div class="dca-pk-visual-preview-placeholder" id="dxaPathoVisualPlaceholder">
+                    Click <strong>Generate</strong> below to render a pathophysiology visual.<br>
+                    Generation takes ~10-20 seconds depending on the model.
+                </div>
+                <div class="dca-pk-visual-spinner" id="dxaPathoVisualSpinner" style="display:none;">
+                    <i class="fa-solid fa-spinner fa-spin" style="font-size:1.4em;"></i>
+                    <span>Generating · this can take 10-30s…</span>
+                </div>
+                <img id="dxaPathoVisualPreviewImg" class="dca-pk-visual-preview-img" style="display:none;" alt="Generated pathophysiology visual">
+                <div id="dxaPathoVisualErrorBox" style="display:none; width:100%; padding:10px 12px; background:#fff5f5; border:1px solid #fecaca; border-radius:10px; color:#7f1d1d; font-size:0.84em; line-height:1.5; text-align:left;"></div>
+            </div>
+            <div class="dca-pk-visual-meta" id="dxaPathoVisualMeta"></div>
+            <div class="dca-pk-visual-actions">
+                <button type="button" class="dca-pk-visual-btn-cancel" onclick="dxaClosePathoVisualModal()">Close</button>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" id="dxaPathoVisualGenerateBtn" class="dca-pk-visual-btn-generate" onclick="dxaGeneratePathoVisual()">🎨 Generate</button>
+                    <button type="button" id="dxaPathoVisualSaveBtn" class="dca-pk-visual-btn-save" disabled onclick="dxaSavePathoVisual()" title="Upload to Firebase Storage + persist disease_codex.pathoVisual. Enabled once an image is generated. Only available when editing a published disease.">💾 Save Visual</button>
                 </div>
             </div>
         </div>
@@ -32870,6 +32938,404 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Save failed: ' + (err && err.message ? err.message : 'unknown error'); }
             } finally {
                 if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = originalText; }
+            }
+        }
+
+        // ===================================================================
+        // V94.95 Phase 6: Disease Codex AI Pathophysiology Visual (admin).
+        // Faithful mirror of the Drug Codex PK Visual block (dcaPkVisual*).
+        // Image gen from etiology + pathophysiology via callUniversalAI; Save
+        // uploads to patho-visuals/{sha256}.{ext} (content-addressed dedup) +
+        // persists disease_codex.pathoVisual. Self-contained — no Drug Codex
+        // logic touched; reuses adminApp.storage + the .dca-pk-visual-* CSS.
+        // ===================================================================
+        const dxaPathoVisualState = {
+            model: 'as/gemini-3.1-flash-image-preview',
+            style: 'infographic',
+            lastImageDataUrl: '',
+            lastModelLabel: '',
+            generating: false,
+            lastError: null,
+            lastErrorModelLabel: ''
+        };
+        const DXA_PATHO_VISUAL_MODEL_LABELS = {
+            'as/gemini-3.1-flash-image-preview':        'Nano Banana · AI Studio',
+            'or/openai/gpt-5.4-image-2':                'GPT-5.4 Image 2 (⚠ misrouted)',
+            'or/google/gemini-3.1-flash-image-preview': 'Nano Banana 2 (⚠ misrouted)',
+            'or/x-ai/grok-2-image':                     'Grok Imagine (⚠ misrouted)'
+        };
+
+        // Open modal. Snapshots the current form via dxaCollectForm so unsaved
+        // edits to the etiology/pathophysiology fields feed the prompt.
+        function dxaOpenPathoVisualModal() {
+            const current = dxaCollectForm();
+            const hasAnySource = ['etiology', 'pathophysiology']
+                .some(k => current[k] && String(current[k]).trim());
+            if (!hasAnySource) {
+                if (typeof showToast === 'function') {
+                    showToast('🎨 Fill Etiology or Pathophysiology before generating a visual.');
+                }
+                return;
+            }
+            if (!current.diseaseName) {
+                if (typeof showToast === 'function') {
+                    showToast('🎨 Disease Name is required before generating a visual.');
+                }
+                return;
+            }
+            dxaPathoVisualState.lastImageDataUrl = '';
+            dxaPathoVisualState.lastModelLabel = '';
+            dxaPathoVisualState.generating = false;
+            dxaPathoVisualRenderPreview();
+            const modal = document.getElementById('dxaPathoVisualModal');
+            if (modal) modal.style.display = 'flex';
+        }
+
+        function dxaClosePathoVisualModal() {
+            const modal = document.getElementById('dxaPathoVisualModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function dxaSelectPathoVisualModel(btn) {
+            if (!btn || !btn.dataset || !btn.dataset.value) return;
+            dxaPathoVisualState.model = btn.dataset.value;
+            const rail = document.getElementById('dxaPathoVisualModelRail');
+            if (rail) {
+                rail.querySelectorAll('.dca-pk-visual-chip').forEach(c => {
+                    c.classList.toggle('active', c.dataset.value === btn.dataset.value);
+                });
+            }
+        }
+
+        function dxaSelectPathoVisualStyle(btn) {
+            if (!btn || !btn.dataset || !btn.dataset.value) return;
+            dxaPathoVisualState.style = btn.dataset.value;
+            const rail = document.getElementById('dxaPathoVisualStyleRail');
+            if (rail) {
+                rail.querySelectorAll('.dca-pk-visual-chip').forEach(c => {
+                    c.classList.toggle('active', c.dataset.value === btn.dataset.value);
+                });
+            }
+        }
+
+        function dxaPathoVisualRenderPreview() {
+            const placeholder = document.getElementById('dxaPathoVisualPlaceholder');
+            const spinner = document.getElementById('dxaPathoVisualSpinner');
+            const img = document.getElementById('dxaPathoVisualPreviewImg');
+            const meta = document.getElementById('dxaPathoVisualMeta');
+            const errBox = document.getElementById('dxaPathoVisualErrorBox');
+            if (!placeholder || !spinner || !img) return;
+            if (errBox) errBox.style.display = 'none';
+            if (dxaPathoVisualState.generating) {
+                placeholder.style.display = 'none';
+                spinner.style.display = 'flex';
+                img.style.display = 'none';
+            } else if (dxaPathoVisualState.lastImageDataUrl) {
+                placeholder.style.display = 'none';
+                spinner.style.display = 'none';
+                img.style.display = 'block';
+                img.onerror = dxaPathoVisualShowLoadError;
+                img.onload = dxaPathoVisualHideLoadError;
+                img.src = dxaPathoVisualState.lastImageDataUrl;
+            } else {
+                placeholder.style.display = 'block';
+                spinner.style.display = 'none';
+                img.style.display = 'none';
+            }
+            if (meta) {
+                if (dxaPathoVisualState.lastModelLabel && !dxaPathoVisualState.generating) {
+                    meta.textContent = `Last generated with ${dxaPathoVisualState.lastModelLabel} · ${dxaPathoVisualState.style} style`;
+                } else {
+                    meta.textContent = '';
+                }
+            }
+            // Save enabled only when a fresh image is in memory.
+            const saveBtn = document.getElementById('dxaPathoVisualSaveBtn');
+            if (saveBtn) {
+                saveBtn.disabled = !!dxaPathoVisualState.generating
+                    || !dxaPathoVisualState.lastImageDataUrl;
+            }
+        }
+
+        function dxaPathoVisualShowLoadError() {
+            const errBox = document.getElementById('dxaPathoVisualErrorBox');
+            const img = document.getElementById('dxaPathoVisualPreviewImg');
+            if (!errBox) return;
+            const raw = String(window._dxaPathoVisualLastRaw || '');
+            const preview = raw.slice(0, 280);
+            const tail = raw.length > 280 ? '…' : '';
+            const shape = raw.startsWith('data:image/') ? 'dataURL'
+                : /^https?:\/\//i.test(raw) ? 'URL (http/https)'
+                : raw.length > 100 ? 'long string (assumed base64)'
+                : 'short string';
+            errBox.style.display = 'block';
+            errBox.innerHTML = '<strong style="color:#9f1239;">❌ Image failed to load.</strong><br>'
+                + '<span style="color:#64748b;">The model returned something, but the browser couldn\'t render it as an image.</span><br><br>'
+                + '<strong>Detected shape:</strong> ' + shape + ' · ' + raw.length + ' chars<br>'
+                + '<strong>Raw response preview:</strong><br>'
+                + '<pre style="white-space:pre-wrap; word-break:break-all; background:#fff; border:1px solid #fecaca; border-radius:6px; padding:6px 8px; margin:6px 0; font-size:0.8em; max-height:160px; overflow:auto;">' + dxaEscapeHtml(preview) + tail + '</pre>'
+                + '<button type="button" onclick="dxaPathoVisualCopyRaw()" style="padding:4px 10px; border-radius:6px; border:1px solid #cbd5e1; background:#fff; cursor:pointer; font-weight:700; font-size:0.82em;">📋 Copy full raw response</button>';
+            if (img) img.style.display = 'none';
+        }
+        function dxaPathoVisualHideLoadError() {
+            const errBox = document.getElementById('dxaPathoVisualErrorBox');
+            if (errBox) errBox.style.display = 'none';
+        }
+        function dxaPathoVisualShowGenerateError(err, modelLabel) {
+            const errBox = document.getElementById('dxaPathoVisualErrorBox');
+            const img = document.getElementById('dxaPathoVisualPreviewImg');
+            const placeholder = document.getElementById('dxaPathoVisualPlaceholder');
+            if (!errBox) return;
+            const msg = (err && err.message) ? String(err.message) : String(err || 'unknown error');
+            const stack = (err && err.stack) ? String(err.stack).split('\n').slice(0, 4).join('\n') : '';
+            const raw = String(window._dxaPathoVisualLastRaw || '');
+            const rawPreview = raw ? (raw.slice(0, 280) + (raw.length > 280 ? '…' : '')) : '';
+            errBox.style.display = 'block';
+            errBox.innerHTML = '<strong style="color:#9f1239;">❌ Generation failed.</strong><br>'
+                + '<span style="color:#64748b;">The Generate call threw an exception before the preview could render.</span><br><br>'
+                + '<strong>Model:</strong> ' + dxaEscapeHtml(modelLabel || '(unknown)') + '<br>'
+                + '<strong>Error:</strong>'
+                + '<pre style="white-space:pre-wrap; word-break:break-word; background:#fff; border:1px solid #fecaca; border-radius:6px; padding:6px 8px; margin:6px 0; font-size:0.8em; max-height:120px; overflow:auto; color:#7f1d1d;">' + dxaEscapeHtml(msg) + '</pre>'
+                + (stack ? ('<details style="margin-top:6px;"><summary style="cursor:pointer; color:#475569; font-size:0.78em;">Stack (first 4 lines)</summary><pre style="white-space:pre-wrap; word-break:break-word; background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:6px 8px; margin:6px 0; font-size:0.75em; max-height:120px; overflow:auto; color:#475569;">' + dxaEscapeHtml(stack) + '</pre></details>') : '')
+                + (rawPreview ? ('<details style="margin-top:6px;"><summary style="cursor:pointer; color:#475569; font-size:0.78em;">Raw response (if any)</summary><pre style="white-space:pre-wrap; word-break:break-all; background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:6px 8px; margin:6px 0; font-size:0.78em; max-height:140px; overflow:auto;">' + dxaEscapeHtml(rawPreview) + '</pre><button type="button" onclick="dxaPathoVisualCopyRaw()" style="padding:4px 10px; border-radius:6px; border:1px solid #cbd5e1; background:#fff; cursor:pointer; font-weight:700; font-size:0.82em;">📋 Copy full raw response</button></details>') : '');
+            if (img) img.style.display = 'none';
+            if (placeholder) placeholder.style.display = 'none';
+        }
+        function dxaPathoVisualCopyRaw() {
+            const raw = String(window._dxaPathoVisualLastRaw || '');
+            if (!raw) return;
+            navigator.clipboard.writeText(raw).then(() => {
+                if (typeof showToast === 'function') {
+                    showToast('📋 Raw response copied — paste it back to the dev/Claude for diagnosis.');
+                }
+            }, () => {
+                if (typeof showToast === 'function') {
+                    showToast('📋 Clipboard write failed — open DevTools console to see window._dxaPathoVisualLastRaw');
+                }
+            });
+        }
+
+        // Builds the prompt for the chosen style from etiology + pathophysiology
+        // (omits empty fields). Common visual constraints live at the end.
+        function dxaBuildPathoVisualPrompt(disease, style) {
+            const fields = [
+                ['Etiology',        disease.etiology],
+                ['Pathophysiology', disease.pathophysiology]
+            ].filter(([, v]) => v && String(v).trim());
+            const srcBlock = fields.map(([k, v]) => `${k.toUpperCase()}: ${String(v).trim()}`).join('\n\n');
+            const diseaseName = disease.diseaseName || 'this disease';
+            const commonRules = [
+                '',
+                'STYLE CONSTRAINTS:',
+                '- English labels only (medical terms stay in English: cytokines, eGFR, ischemia, etc.).',
+                '- 1024×1024 square format.',
+                '- No photorealistic humans or faces — illustration / diagram only.',
+                '- Clean, professional medical aesthetic. White or light background.',
+                '- Make stage / mechanism labels readable at a glance.'
+            ].join('\n');
+
+            if (style === 'anatomical') {
+                return [
+                    `Generate an anatomical pathophysiology illustration for the disease ${diseaseName}.`,
+                    '',
+                    'VISUAL DIRECTION: Medical-textbook anatomical illustration. Show the affected organ(s) or tissue(s) in cross-section, with the disease process visualized at the site (e.g. inflammation, occlusion, fibrosis, cellular damage). Use arrows and callouts to trace the sequence from the underlying cause through the tissue-level changes to the resulting dysfunction. Annotate each site with the relevant mechanism.',
+                    '',
+                    srcBlock,
+                    commonRules
+                ].join('\n');
+            }
+
+            if (style === 'pathway') {
+                return [
+                    `Generate a pathogenesis flowchart for the disease ${diseaseName}.`,
+                    '',
+                    'VISUAL DIRECTION: Clean flowchart with rectangular boxes connected by directional arrows showing the causal cascade: cause / trigger → molecular & cellular mechanism → tissue / organ change → clinical manifestation. Minimal color palette (medical blues with one accent color for the key pathological step). Schematic only — no anatomical illustration, no human figures.',
+                    '',
+                    srcBlock,
+                    commonRules
+                ].join('\n');
+            }
+
+            // default = infographic
+            return [
+                `Generate a clean medical infographic summarizing the pathophysiology of the disease ${diseaseName}.`,
+                '',
+                'VISUAL DIRECTION: Modern clinical reference card. Color-coded stages (cause → mechanism → tissue change → clinical state). Vector-style icons next to each stage. Clear typography hierarchy with the disease name as the title. Arrows or layout flow suggesting the progression from underlying cause to clinical presentation. Treat it as a single-page educational poster.',
+                '',
+                srcBlock,
+                commonRules
+            ].join('\n');
+        }
+
+        async function dxaGeneratePathoVisual() {
+            const btn = document.getElementById('dxaPathoVisualGenerateBtn');
+            const current = dxaCollectForm();
+            if (typeof window.callUniversalAI !== 'function') {
+                if (typeof showToast === 'function') {
+                    showToast('🎨 AI core not loaded — refresh and retry.');
+                }
+                return;
+            }
+            const prompt = dxaBuildPathoVisualPrompt(current, dxaPathoVisualState.style);
+            const modelLabel = DXA_PATHO_VISUAL_MODEL_LABELS[dxaPathoVisualState.model] || dxaPathoVisualState.model;
+
+            dxaPathoVisualState.lastError = null;
+            dxaPathoVisualState.lastErrorModelLabel = '';
+            dxaPathoVisualState.generating = true;
+            dxaPathoVisualRenderPreview();
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
+
+            try {
+                const resp = await window.callUniversalAI(
+                    dxaPathoVisualState.model,
+                    prompt,
+                    false,   // isJson
+                    null,    // visionData
+                    '',      // quickApiKey
+                    { size: '1792x1024' }
+                );
+                const raw = (resp && (resp.imageDataUrl
+                    || resp.dataUrl
+                    || (resp.raw && (resp.raw.imageDataUrl || resp.raw.dataUrl))
+                    || (resp.raw && resp.raw.data && resp.raw.data[0] && (resp.raw.data[0].url || resp.raw.data[0].b64_json))
+                    || resp.text
+                    || (resp.raw && resp.raw.text)
+                )) || '';
+                try {
+                    console.log('[disease-codex patho-visual] resp keys:', resp ? Object.keys(resp) : '(no resp)');
+                    console.log('[disease-codex patho-visual] resp.raw keys:', (resp && resp.raw) ? Object.keys(resp.raw) : '(no raw)');
+                    const rawPreview = String(raw).slice(0, 300);
+                    console.log('[disease-codex patho-visual] raw length:', String(raw).length, '· first 300 chars:', rawPreview);
+                    window._dxaPathoVisualLastResp = resp;
+                    window._dxaPathoVisualLastRaw = raw;
+                } catch (_) { /* logging is best-effort */ }
+                const rawStr = String(raw);
+                const mdMatch = rawStr.match(/!\[[^\]]*\]\((https?:\/\/[^)]+)\)/);
+                const extracted = mdMatch ? mdMatch[1] : rawStr;
+                let dataUrl;
+                if (extracted.startsWith('data:image/')) {
+                    dataUrl = extracted;
+                } else if (/^https?:\/\//i.test(extracted)) {
+                    dataUrl = extracted;
+                } else if (extracted.length > 100) {
+                    dataUrl = `data:image/png;base64,${extracted}`;
+                } else {
+                    dataUrl = '';
+                }
+                if (!dataUrl) {
+                    throw new Error('Empty or unrecognized image response. Try a different model.');
+                }
+                dxaPathoVisualState.lastImageDataUrl = dataUrl;
+                dxaPathoVisualState.lastModelLabel = modelLabel;
+                if (typeof showToast === 'function') {
+                    showToast(`🎨 Generated with ${modelLabel} · review before Save.`);
+                }
+            } catch (err) {
+                console.error('[disease-codex patho-visual]', err);
+                dxaPathoVisualState.lastError = err;
+                dxaPathoVisualState.lastErrorModelLabel = modelLabel;
+                if (typeof showToast === 'function') {
+                    showToast(`🎨 Generation failed: ${err && err.message ? err.message : 'unknown error'}`);
+                }
+            } finally {
+                dxaPathoVisualState.generating = false;
+                dxaPathoVisualRenderPreview();
+                if (dxaPathoVisualState.lastError) {
+                    dxaPathoVisualShowGenerateError(
+                        dxaPathoVisualState.lastError,
+                        dxaPathoVisualState.lastErrorModelLabel
+                    );
+                }
+                if (btn) { btn.disabled = false; btn.textContent = '🎨 Generate'; }
+            }
+        }
+
+        // Persist the previewed image. Upload to Storage at patho-visuals/{sha256}.{ext}
+        // (content-addressed dedup), then update disease_codex/{editingId}.pathoVisual.
+        // Only valid in Edit-published mode — Add / Approve-draft must save the disease
+        // first (no doc id yet; drafts live in disease_codex_drafts which interns don't read).
+        async function dxaSavePathoVisual() {
+            if (!dxaPathoVisualState.lastImageDataUrl) {
+                if (typeof showToast === 'function') showToast('🎨 Generate a visual first.');
+                return;
+            }
+            if (!dxaState.editingId) {
+                if (typeof showToast === 'function') showToast('💾 Save the disease first, then come back to attach a visual.');
+                return;
+            }
+            if (dxaState.isDraftEdit) {
+                if (typeof showToast === 'function') showToast('💾 Approve & publish the draft first, then attach a visual to the published doc.');
+                return;
+            }
+            const saveBtn = document.getElementById('dxaPathoVisualSaveBtn');
+            const genBtn = document.getElementById('dxaPathoVisualGenerateBtn');
+            const originalText = saveBtn ? saveBtn.innerHTML : '';
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '⏳ Hashing…'; }
+            if (genBtn) genBtn.disabled = true;
+            try {
+                const resp = await fetch(dxaPathoVisualState.lastImageDataUrl);
+                if (!resp.ok) {
+                    throw new Error(`Image fetch failed (${resp.status} ${resp.statusText}). If the source is a remote https URL it may be CORS-blocked.`);
+                }
+                const blob = await resp.blob();
+                const mime = blob.type || 'image/png';
+                const ext = mime === 'image/jpeg' || mime === 'image/jpg' ? '.jpg'
+                          : mime === 'image/webp' ? '.webp'
+                          : mime === 'image/gif'  ? '.gif'
+                          : '.png';
+                const buf = await blob.arrayBuffer();
+                const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+                const hash = Array.from(new Uint8Array(hashBuf))
+                    .map(b => b.toString(16).padStart(2, '0'))
+                    .join('');
+                const storagePath = 'patho-visuals/' + hash + ext;
+                const ref = adminApp.storage().ref(storagePath);
+                let downloadUrl;
+                let reused = false;
+                if (saveBtn) saveBtn.innerHTML = '🔎 Checking storage…';
+                try {
+                    downloadUrl = await ref.getDownloadURL();
+                    reused = true;
+                } catch (probeErr) {
+                    if (probeErr && probeErr.code !== 'storage/object-not-found') throw probeErr;
+                    if (saveBtn) saveBtn.innerHTML = '📤 Uploading…';
+                    const snap = await ref.put(blob, { contentType: mime });
+                    downloadUrl = await snap.ref.getDownloadURL();
+                }
+                if (saveBtn) saveBtn.innerHTML = '💾 Saving doc…';
+                const nowTs = firebase.firestore.FieldValue.serverTimestamp();
+                const reviewerEmail = (auth.currentUser && auth.currentUser.email) || 'admin-ui';
+                await db.collection('disease_codex').doc(dxaState.editingId).update({
+                    pathoVisual: {
+                        storagePath: storagePath,
+                        downloadUrl: downloadUrl,
+                        model: dxaPathoVisualState.model,
+                        style: dxaPathoVisualState.style,
+                        generatedAt: nowTs,
+                        generatedBy: reviewerEmail
+                    },
+                    lastReviewedAt: nowTs,
+                    reviewedBy: reviewerEmail,
+                    updatedAt: nowTs,
+                    contributors: firebase.firestore.FieldValue.arrayUnion('admin:' + reviewerEmail)
+                });
+                if (typeof showToast === 'function') {
+                    showToast(reused
+                        ? '♻️ Reused existing image (dedup) · doc updated'
+                        : '✅ Visual saved to disease_codex');
+                }
+                dxaClosePathoVisualModal();
+            } catch (err) {
+                console.error('[disease-codex patho-visual save]', err);
+                const msg = err && err.message ? err.message : 'unknown error';
+                const hint = /permission|denied|unauthorized/i.test(msg)
+                    ? '\n\nStorage rules likely block patho-visuals/**. After merge run: firebase deploy --only storage'
+                    : '';
+                alert('Save failed: ' + msg + hint);
+            } finally {
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = originalText || '💾 Save Visual'; }
+                if (genBtn) genBtn.disabled = false;
+                dxaPathoVisualRenderPreview();
             }
         }
 
