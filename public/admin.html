@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.95</title>
+    <title>Nika V94.97</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13288,7 +13288,22 @@
                             <input type="text" id="dxa-f-synonyms" placeholder="Comma-separated · e.g. T2DM, NIDDM">
 
                             <label for="dxa-f-icd10">ICD-10</label>
-                            <input type="text" id="dxa-f-icd10" placeholder="e.g. E11" maxlength="20">
+                            <!-- V94.96 Phase 6: AI ICD-10 suggest. Mirrors the NDI "ค้น อย."
+                                 button layout (reuses .dca-brand-field / .dca-ndi-* classes).
+                                 Asks callUniversalAI for candidate ICD-10 codes from the
+                                 disease name + context; admin taps a chip to fill the field.
+                                 AI-suggested → admin MUST verify before save (codes can be
+                                 hallucinated — no WHO API in this approach). -->
+                            <div class="dca-brand-field">
+                                <div class="dca-brand-input-wrap">
+                                    <input type="text" id="dxa-f-icd10" placeholder="e.g. E11" maxlength="20">
+                                    <button type="button" id="dxa-icd-btn" class="dca-ndi-btn" onclick="dxaIcdLookup()" title="ให้ AI แนะนำรหัส ICD-10 จากชื่อโรค — ตรวจสอบก่อน save">
+                                        <svg class="dca-ndi-btn-ico" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="7" cy="7" r="4.5"></circle><line x1="10.5" y1="10.5" x2="15" y2="15" stroke-linecap="round"></line></svg>
+                                        <span class="dca-ndi-btn-txt">🔍 AI ICD</span>
+                                    </button>
+                                </div>
+                                <div id="dxa-icd-results" class="dca-ndi-results" style="display:none;"></div>
+                            </div>
 
                             <label for="dxa-f-category">Category / System</label>
                             <input type="text" id="dxa-f-category" placeholder="e.g. Endocrine" maxlength="80">
@@ -13563,6 +13578,11 @@
                 <button type="button" class="dca-pk-visual-btn-cancel" onclick="dxaClosePathoVisualModal()">Close</button>
                 <div style="display:flex; gap:8px;">
                     <button type="button" id="dxaPathoVisualGenerateBtn" class="dca-pk-visual-btn-generate" onclick="dxaGeneratePathoVisual()">🎨 Generate</button>
+                    <!-- V94.97: download the generated image to the admin's device as
+                         a file. Unlike Save Visual (Firestore-gated to Edit-published
+                         mode), this works for ANY generated image — even a brand-new
+                         unsaved disease. Enabled whenever an image is in memory. -->
+                    <button type="button" id="dxaPathoVisualDownloadBtn" class="dca-pk-visual-btn-cancel" disabled onclick="dxaDownloadPathoVisual()" title="ดาวน์โหลดรูปลงเครื่อง (PNG) — ใช้ได้แม้ยังไม่ได้ Save ลง Firestore">⬇️ PNG</button>
                     <button type="button" id="dxaPathoVisualSaveBtn" class="dca-pk-visual-btn-save" disabled onclick="dxaSavePathoVisual()" title="Upload to Firebase Storage + persist disease_codex.pathoVisual. Enabled once an image is generated. Only available when editing a published disease.">💾 Save Visual</button>
                 </div>
             </div>
@@ -32680,6 +32700,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         function dxaFillForm(data) {
+            // V94.96: clear stale AI ICD-10 suggestions so chips from a previous
+            // disease don't linger on a fresh form (static DOM — see
+            // feedback_static_modal_state_leak).
+            dxaDismissIcdResults();
             // V94.85: rebuild Edu i18n state BEFORE the field loop so the 3 Edu
             // textareas read from state (per current chip lang). Legacy docs
             // without educationI18n get seeded from the root field into the
@@ -33055,6 +33079,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 saveBtn.disabled = !!dxaPathoVisualState.generating
                     || !dxaPathoVisualState.lastImageDataUrl;
             }
+            // V94.97: Download enabled on the same condition (image in memory) —
+            // NOT gated on editingId, since a local download needs no Firestore
+            // doc. The cancel-button base class has no :disabled style, so toggle
+            // opacity/cursor inline to make the disabled state visible.
+            const dlBtn = document.getElementById('dxaPathoVisualDownloadBtn');
+            if (dlBtn) {
+                const dlDisabled = !!dxaPathoVisualState.generating
+                    || !dxaPathoVisualState.lastImageDataUrl;
+                dlBtn.disabled = dlDisabled;
+                dlBtn.style.opacity = dlDisabled ? '0.5' : '1';
+                dlBtn.style.cursor = dlDisabled ? 'not-allowed' : 'pointer';
+            }
         }
 
         function dxaPathoVisualShowLoadError() {
@@ -33337,6 +33373,185 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (genBtn) genBtn.disabled = false;
                 dxaPathoVisualRenderPreview();
             }
+        }
+
+        // V94.97: download the previewed image to the admin's device. Works for
+        // ANY generated image (no Firestore doc / editingId needed) — fetch()
+        // resolves both data: URLs (Nano Banana common path) and https: URLs to
+        // a Blob, then a synthetic <a download> triggers the browser save.
+        async function dxaDownloadPathoVisual() {
+            const url = dxaPathoVisualState.lastImageDataUrl;
+            if (!url) {
+                if (typeof showToast === 'function') showToast('🎨 Generate a visual first.');
+                return;
+            }
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) {
+                    throw new Error(`fetch failed (${resp.status} ${resp.statusText}). A remote https image may be CORS-blocked.`);
+                }
+                const blob = await resp.blob();
+                const mime = blob.type || 'image/png';
+                const ext = mime === 'image/jpeg' || mime === 'image/jpg' ? 'jpg'
+                          : mime === 'image/webp' ? 'webp'
+                          : mime === 'image/gif'  ? 'gif'
+                          : 'png';
+                const nameEl = document.getElementById('dxa-f-diseaseName');
+                const slug = String((nameEl && nameEl.value) || 'disease')
+                    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'disease';
+                const fname = `patho-${slug}-${dxaPathoVisualState.style}.${ext}`;
+                const objUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = objUrl;
+                a.download = fname;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
+                if (typeof showToast === 'function') showToast('⬇️ ดาวน์โหลด ' + fname + ' แล้ว');
+            } catch (err) {
+                console.error('[disease-codex patho-visual download]', err);
+                if (typeof showToast === 'function') showToast('⬇️ ดาวน์โหลดไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'));
+            }
+        }
+
+        // ===================================================================
+        // V94.96 Phase 6: AI ICD-10 suggest (admin). User chose the AI-suggest
+        // approach over the WHO ICD API (no OAuth / Cloud Function / secret).
+        // Asks callUniversalAI for candidate ICD-10 codes from the disease name
+        // + context; admin taps a chip to fill #dxa-f-icd10. Reuses the NDI
+        // result-panel CSS (.dca-ndi-*) + the auto-draft JSON parser. ⚠️ codes
+        // are AI-generated — admin MUST verify before save (no authoritative
+        // source in this path).
+        // ===================================================================
+        function dxaBuildIcdPrompt(name, thaiName, category) {
+            // Language rule FIRST + neutral <<<markers>>> per
+            // feedback_ai_prompt_language_neutral. JSON-only FORMAT CONTRACT up
+            // top per feedback_ai_prose_mode_recovery.
+            return [
+                'TASK: Return the most relevant ICD-10 codes for the disease described below.',
+                '',
+                'OUTPUT FORMAT — MANDATORY. Reply with ONE JSON object and nothing else (no prose, no markdown fences):',
+                '{"codes":[{"code":"E11.9","title":"Type 2 diabetes mellitus without complications"}]}',
+                '- 1 to 5 entries, most specific & relevant first.',
+                '- "code" = a real ICD-10 code (WHO / ICD-10-CM style, e.g. E11.9, I21.0, J45.909).',
+                '- "title" = the official English title for that code.',
+                '- Do NOT invent codes that do not exist. If genuinely unsure, return your best real candidates.',
+                '',
+                'DISEASE:',
+                'Name: <<<' + name + '>>>',
+                thaiName ? ('Thai name: <<<' + thaiName + '>>>') : '',
+                category ? ('Category / System: <<<' + category + '>>>') : ''
+            ].filter(Boolean).join('\n');
+        }
+
+        // Accepts {codes:[{code,title}]}, a bare array, or array of strings.
+        function dxaNormalizeIcdList(parsed) {
+            if (!parsed) return [];
+            const arr = Array.isArray(parsed) ? parsed
+                      : (Array.isArray(parsed.codes) ? parsed.codes : []);
+            return arr.map(x => {
+                if (typeof x === 'string') return { code: x.trim(), title: '' };
+                return { code: String((x && x.code) || '').trim(), title: String((x && x.title) || '').trim() };
+            }).filter(x => x.code).slice(0, 5);
+        }
+
+        async function dxaIcdLookup() {
+            const nameEl = document.getElementById('dxa-f-diseaseName');
+            const btn = document.getElementById('dxa-icd-btn');
+            const diseaseName = nameEl ? String(nameEl.value || '').trim() : '';
+            if (!diseaseName) {
+                if (typeof showToast === 'function') showToast('🔍 กรอก Disease Name ก่อนค้น ICD-10');
+                if (nameEl) nameEl.focus();
+                return;
+            }
+            if (typeof window.callUniversalAI !== 'function') {
+                if (typeof showToast === 'function') showToast('🔍 AI core not loaded — refresh and retry.');
+                return;
+            }
+            const thaiName = (document.getElementById('dxa-f-thaiName') || {}).value || '';
+            const category = (document.getElementById('dxa-f-category') || {}).value || '';
+            let model = null;
+            try { model = localStorage.getItem(DXA_AI_LS_KEY); } catch (_) {}
+            model = model || DXA_AI_FALLBACK_MODEL;
+            const span = btn ? btn.querySelector('.dca-ndi-btn-txt') : null;
+            const origTxt = span ? span.textContent : '';
+            if (btn) btn.disabled = true;
+            if (span) span.textContent = '⏳ ค้น…';
+            const prompt = dxaBuildIcdPrompt(diseaseName, thaiName, category);
+            try {
+                const resp = await window.callUniversalAI(model, prompt, true);
+                const rawText = (resp && resp.text) ? resp.text : (typeof resp === 'string' ? resp : '');
+                let parsed = dxaParseAutoDraftResponse(rawText);
+                if (!parsed) {
+                    // Single silent retry — fresh sample usually returns clean JSON.
+                    const resp2 = await window.callUniversalAI(model, prompt, true);
+                    const rawText2 = (resp2 && resp2.text) ? resp2.text : (typeof resp2 === 'string' ? resp2 : '');
+                    parsed = dxaParseAutoDraftResponse(rawText2);
+                }
+                const list = dxaNormalizeIcdList(parsed);
+                if (!list.length) throw new Error('AI ไม่ได้คืนรหัส ICD-10 ที่ใช้ได้');
+                dxaRenderIcdResults(list);
+            } catch (err) {
+                console.error('[disease-codex icd lookup]', err);
+                dxaRenderIcdError(err);
+            } finally {
+                if (btn) btn.disabled = false;
+                if (span) span.textContent = origTxt || '🔍 AI ICD';
+            }
+        }
+
+        function dxaRenderIcdResults(list) {
+            const res = document.getElementById('dxa-icd-results');
+            if (!res) return;
+            window._dxaIcdLast = list;
+            const chips = list.map((it, i) =>
+                `<button type="button" class="dca-ndi-chip" onclick="dxaApplyIcdCode(${i})" title="${dxaEscapeHtml(it.title || it.code)} · คลิกเพื่อใส่ในช่อง ICD-10">${dxaEscapeHtml(it.code)}${it.title ? ' · ' + dxaEscapeHtml(it.title) : ''}</button>`
+            ).join('');
+            res.classList.add('panel');
+            res.style.display = 'block';
+            res.innerHTML =
+                '<div class="dca-ndi-results-head">'
+                + '<p class="dca-ndi-hint">🤖 AI แนะนำ · คลิกเลือก 1 รหัส (ตรวจสอบก่อน save)</p>'
+                + '<div class="dca-ndi-head-actions"><button type="button" class="dca-ndi-action-btn dca-ndi-dismiss" onclick="dxaDismissIcdResults()" title="ปิด">✕</button></div>'
+                + '</div>'
+                + '<div>' + chips + '</div>';
+        }
+
+        function dxaRenderIcdError(err) {
+            const res = document.getElementById('dxa-icd-results');
+            if (!res) return;
+            const msg = (err && err.message) ? err.message : 'unknown error';
+            res.classList.add('panel');
+            res.style.display = 'block';
+            res.innerHTML =
+                '<div class="dca-ndi-results-head">'
+                + '<p class="dca-ndi-hint" style="color:#9f1239;">❌ ค้นไม่สำเร็จ: ' + dxaEscapeHtml(msg) + '</p>'
+                + '<div class="dca-ndi-head-actions"><button type="button" class="dca-ndi-action-btn dca-ndi-dismiss" onclick="dxaDismissIcdResults()" title="ปิด">✕</button></div>'
+                + '</div>';
+        }
+
+        // Fill the ICD-10 field with the chosen code (replace — the field holds a
+        // single primary code). Marks the picked chip + reminds admin to verify.
+        function dxaApplyIcdCode(i) {
+            const list = window._dxaIcdLast || [];
+            const it = list[i];
+            if (!it) return;
+            const input = document.getElementById('dxa-f-icd10');
+            if (input) input.value = it.code;
+            const res = document.getElementById('dxa-icd-results');
+            if (res) {
+                res.querySelectorAll('.dca-ndi-chip').forEach((c, idx) => {
+                    c.classList.toggle('added', idx === i);
+                });
+            }
+            if (typeof showToast === 'function') showToast('🔍 ใส่ ' + it.code + ' ในช่อง ICD-10 แล้ว · ตรวจสอบความถูกต้องก่อน save');
+        }
+
+        function dxaDismissIcdResults() {
+            const res = document.getElementById('dxa-icd-results');
+            if (res) { res.style.display = 'none'; res.innerHTML = ''; res.classList.remove('panel'); }
+            window._dxaIcdLast = null;
         }
 
         // ===================================================================
