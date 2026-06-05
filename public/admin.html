@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.11</title>
+    <title>Nika V95.12</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -11523,6 +11523,14 @@
                                 <input type="hidden" id="quiz-tags" value="">
                             </div>
 
+                            <!-- V95.12: optional downloadable materials. One per line:
+                                 "Name | https://..." (or just the URL). Stored as
+                                 materials:[{name,url}] on the quiz; interns get 📎 links. -->
+                            <div style="margin-bottom:8px;">
+                                <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:2px;"><i class="fa-solid fa-paperclip"></i> Materials (optional) — บรรทัดละ 1 ไฟล์: ชื่อ | URL</label>
+                                <textarea id="quiz-materials" rows="2" placeholder="Lecture slides | https://drive.google.com/...&#10;https://example.com/handout.pdf" style="width:100%; padding:8px 12px; border:1px solid #334155; border-radius:8px; font-size:0.82em; background:#0f172a; color:#f1f5f9; resize:vertical; font-family:inherit;"></textarea>
+                            </div>
+
                              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
                                 <div>
                                     <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:2px;"><i class="fa-solid fa-users"></i> Target Group</label>
@@ -18974,6 +18982,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-total-points').value = q.totalPoints || 1.0;
             document.getElementById('quiz-description').value = q.description || "";
             document.getElementById('quiz-tags').value = q.tags || "";
+            if (document.getElementById('quiz-materials')) document.getElementById('quiz-materials').value = serializeQuizMaterials(q.materials);
             refreshTagChips();
             document.getElementById('quiz-is-poll').checked = q.isPoll || false;
             document.getElementById('quiz-one-time').checked = q.oneTimeMode || false;
@@ -19050,6 +19059,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-total-points').value = 1.0;
             document.getElementById('quiz-description').value = "";
             document.getElementById('quiz-tags').value = "";
+            if (document.getElementById('quiz-materials')) document.getElementById('quiz-materials').value = "";
             refreshTagChips();
             document.getElementById('quiz-is-poll').checked = false;
             document.getElementById('quiz-one-time').checked = false;
@@ -19271,6 +19281,29 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             showToast(`⏱️ Set all ${timers.length} questions to ${val}s`);
         }
 
+        // V95.12: quiz materials — parse the textarea (one per line, "Name | URL"
+        // or just a URL) into [{name,url}]; only http(s) URLs are kept. Name
+        // defaults to the URL's filename.
+        function parseQuizMaterials(text) {
+            return String(text || '').split('\n').map(function (line) {
+                line = line.trim();
+                if (!line) return null;
+                const pipe = line.indexOf('|');
+                let name = '', url = line;
+                if (pipe >= 0) { name = line.slice(0, pipe).trim(); url = line.slice(pipe + 1).trim(); }
+                if (!/^https?:\/\//i.test(url)) return null;
+                if (!name) {
+                    try { name = decodeURIComponent(url.split('/').pop().split('?')[0]) || 'เอกสาร'; }
+                    catch (_) { name = 'เอกสาร'; }
+                }
+                return { name: name.slice(0, 80), url: url };
+            }).filter(Boolean);
+        }
+        function serializeQuizMaterials(mats) {
+            return (Array.isArray(mats) ? mats : []).filter(function (m) { return m && m.url; })
+                .map(function (m) { return (m.name ? (m.name + ' | ') : '') + m.url; }).join('\n');
+        }
+
         function getQuizFormData() {
             const title = document.getElementById('quiz-title').value.trim();
             const shortTitle = document.getElementById('quiz-short-title').value.trim();
@@ -19288,6 +19321,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const feedbackLimit = parseInt(document.getElementById('quiz-feedback-limit').value) || 280;
             const caseContent = document.getElementById('quiz-case-content').value;
             const tags = document.getElementById('quiz-tags').value.trim();
+            const materials = parseQuizMaterials((document.getElementById('quiz-materials') || {}).value);
 
             // V93.87 Quiz Quality Q1: read blueprint, build only if any field set.
             // Keeps Firestore noise out of quizzes that never touched the panel.
@@ -19325,7 +19359,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             });
 
             return {
-                title, shortTitle, targetGroup, description, tags, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, quizType, feedbackLimit, caseContent, questions, blueprint,
+                title, shortTitle, targetGroup, description, tags, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, quizType, feedbackLimit, caseContent, questions, blueprint,
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
             };
@@ -21513,6 +21547,7 @@ ${JSON.stringify(sourceObj)}`;
                 targetGroup: formData.targetGroup, // Add targetGroup
                 description: formData.description,
                 tags: formData.tags || "",
+                materials: Array.isArray(formData.materials) ? formData.materials : [],
                 totalPoints: formData.totalPoints,
                 isPoll: formData.isPoll,
                 oneTimeMode: formData.oneTimeMode || false,
