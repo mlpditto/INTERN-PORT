@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V94.97</title>
+    <title>Nika V94.98</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13338,6 +13338,17 @@
 
                             <label for="dxa-f-pathophysiology">Pathophysiology</label>
                             <textarea id="dxa-f-pathophysiology" rows="5" placeholder="Disease mechanism · sequence of events from insult to clinical state…"></textarea>
+                        </div>
+                        <!-- V94.98: persistent preview of the SAVED pathophysiology visual.
+                             Before this, Save Visual closed the modal with no admin-side
+                             trace, so admins thought the image was lost. Seeded from the
+                             doc in dxaFillForm + refreshed after dxaSavePathoVisual. -->
+                        <div id="dxa-patho-visual-current" style="display:none; margin-top:12px;">
+                            <div class="dca-pk-visual-section-label">🎨 Saved Pathophysiology Visual</div>
+                            <a id="dxa-patho-visual-current-link" href="#" target="_blank" rel="noopener noreferrer" style="display:inline-block; max-width:260px; border-radius:10px; overflow:hidden; border:1px solid #e2e8f0; box-shadow:0 1px 4px rgba(15,23,42,0.08);">
+                                <img id="dxa-patho-visual-current-img" src="" alt="Saved pathophysiology visual" style="display:block; width:100%; height:auto; background:#f8fafc;">
+                            </a>
+                            <div id="dxa-patho-visual-current-meta" class="dca-pk-visual-meta"></div>
                         </div>
                     </div>
                 </div>
@@ -32000,6 +32011,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             drafts: [],          // pending disease_codex_drafts docs
             relatedDrugs: [],    // V94.87 Phase 6: [{id,name}] linked drugs for the current form
             drugList: [],        // V94.87 Phase 6: [{id,name}] published drug_codex for the picker (loaded on open)
+            pathoVisual: null,   // V94.98: the saved pathoVisual on the current form's disease (for the in-form preview)
             searchTerm: ''
         };
 
@@ -32747,12 +32759,40 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (rdInput) rdInput.value = '';
             dxaHideRelatedDrugSuggest();
             dxaRenderRelatedDrugs();
+            // V94.98: seed + render the saved pathophysiology visual preview so
+            // admins can see an attached image (and confirm a prior Save worked).
+            dxaState.pathoVisual = (data && data.pathoVisual && data.pathoVisual.downloadUrl)
+                ? data.pathoVisual : null;
+            dxaRenderCurrentPathoVisual(dxaState.pathoVisual);
             dxaRenderMeta(data);
             const idEl = document.getElementById('dxa-form-doc-id');
             if (idEl) idEl.textContent = (data && data._id) ? `doc: ${data._id}` : '';
             const err = document.getElementById('dxa-form-error');
             if (err) { err.style.display = 'none'; err.textContent = ''; }
             dxaUpdateSectionBadges();
+        }
+
+        // V94.98: render (or hide) the in-form preview of the disease's saved
+        // pathoVisual. Called from dxaFillForm (seed) + dxaSavePathoVisual (refresh
+        // after a successful save, so the image doesn't vanish when the modal closes).
+        function dxaRenderCurrentPathoVisual(pv) {
+            const wrap = document.getElementById('dxa-patho-visual-current');
+            const img = document.getElementById('dxa-patho-visual-current-img');
+            const link = document.getElementById('dxa-patho-visual-current-link');
+            const meta = document.getElementById('dxa-patho-visual-current-meta');
+            if (!wrap || !img || !link) return;
+            const url = pv && pv.downloadUrl ? String(pv.downloadUrl) : '';
+            if (!url) { wrap.style.display = 'none'; img.src = ''; return; }
+            img.src = url;
+            link.href = url;
+            if (meta) {
+                const bits = [
+                    pv.style ? String(pv.style) : '',
+                    pv.model ? String(pv.model).replace(/^(as|or)\//, '') : ''
+                ].filter(Boolean).join(' · ');
+                meta.textContent = bits ? ('Generated · ' + bits) : '';
+            }
+            wrap.style.display = 'block';
         }
 
         function dxaCollectForm() {
@@ -33355,10 +33395,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     updatedAt: nowTs,
                     contributors: firebase.firestore.FieldValue.arrayUnion('admin:' + reviewerEmail)
                 });
+                // V94.98: keep an admin-visible trace so the image doesn't appear
+                // to vanish when the modal closes — populate the in-form preview.
+                // downloadUrl/model/style are all in scope here.
+                dxaState.pathoVisual = {
+                    downloadUrl: downloadUrl,
+                    model: dxaPathoVisualState.model,
+                    style: dxaPathoVisualState.style
+                };
+                dxaRenderCurrentPathoVisual(dxaState.pathoVisual);
                 if (typeof showToast === 'function') {
                     showToast(reused
-                        ? '♻️ Reused existing image (dedup) · doc updated'
-                        : '✅ Visual saved to disease_codex');
+                        ? '♻️ Reused existing image (dedup) · แสดงในฟอร์มแล้ว'
+                        : '✅ บันทึกรูปแล้ว · แสดงในฟอร์ม (section Etiology) + ฝั่ง intern');
                 }
                 dxaClosePathoVisualModal();
             } catch (err) {
