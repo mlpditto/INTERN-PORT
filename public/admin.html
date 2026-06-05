@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.03</title>
+    <title>Nika V95.04</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1384,6 +1384,13 @@
         }
         .dca-row-copy-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
         .dca-row-copy-btn.copied { background: #dcfce7; border-color: #86efac; }
+        /* V95.04: row-level quick PK Visual shortcut — purple icon button. One
+           click opens the drug in edit mode + the PK Visual modal. */
+        .dca-row-visual-btn {
+            padding: 6px 10px; border-radius: 8px; border: 1px solid #ddd6fe;
+            background: #faf5ff; cursor: pointer; font-size: 0.95em; line-height: 1;
+        }
+        .dca-row-visual-btn:hover { background: #f3e8ff; border-color: #a78bfa; }
         .dca-row-del-btn {
             padding: 6px 10px; border-radius: 8px; border: 1px solid #fecaca;
             background: #fff; cursor: pointer; font-size: 0.95em; line-height: 1;
@@ -30040,6 +30047,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 ${updatedAbs ? `<div class="dca-row-updated-abs" title="Last updated">🕒 ${dcaEscapeHtml(updatedAbs)}</div>` : ''}
                                 <div class="dca-row-actions">
                                     <button type="button" class="dca-row-edit-btn" onclick="dcaEdit('${dcaEscapeHtml(drug._id)}')">Edit</button>
+                                    <button type="button" class="dca-row-visual-btn" onclick="dcaQuickVisual('${dcaEscapeHtml(drug._id)}')" title="🎨 สร้าง/แก้ PK Visual อย่างรวดเร็ว — เปิด edit + modal ให้เลย">🎨</button>
                                     <button type="button" class="dca-row-copy-btn" onclick="dcaCopyRow('${dcaEscapeHtml(drug._id)}', this)" title="Copy as Markdown">📋</button>
                                     <button type="button" class="dca-row-del-btn" onclick="dcaDelete('${dcaEscapeHtml(drug._id)}', this)" title="Delete">🗑️</button>
                                 </div>
@@ -30916,6 +30924,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaFillForm(drug);
             dcaSwitchSection('core');
             dcaSwitchView('form');
+        }
+
+        // V95.04: row-level quick PK Visual. Opens the drug in edit mode (so
+        // dcaState.editingId is set + ADMET fields are populated — both required
+        // by the PK Visual modal + Save) then opens the modal in one step, so
+        // admin skips Edit → PK tab → 🎨 Visual. Deferred a tick so dcaFillForm's
+        // field writes flush before dcaOpenPkVisualModal reads them via
+        // dcaCollectForm (its "fill an ADMET field first" guard). If ADMET is
+        // empty the modal won't open and the admin is left in the edit form with
+        // a toast — they can fill ADMET right there.
+        function dcaQuickVisual(drugId) {
+            dcaEdit(drugId);
+            setTimeout(dcaOpenPkVisualModal, 0);
         }
 
         function dcaReviewDraft(draftId) {
