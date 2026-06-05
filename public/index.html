@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.20)</title>
+    <title>Internship Portfolio (V95.21)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -10889,6 +10889,12 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             const sections = [
                 { key: 'epi',  title: '📈 Epidemiology', open: false, fields: [['Epidemiology', eff.epidemiology]] },
                 { key: 'etio', title: '🧬 Etiology & Pathophysiology', open: false, fields: [['Etiology', eff.etiology], ['Pathophysiology', eff.pathophysiology]] },
+                // V95.21 Phase 6: AI pathophysiology visual from admin's Generate
+                // Pathophysiology Visual modal. Renders only when pathoVisual.downloadUrl
+                // exists. open:true — the image is the most engaging surface.
+                (eff.pathoVisual && eff.pathoVisual.downloadUrl)
+                    ? { key: 'pathovisual', title: '🎨 Pathophysiology Visual', open: true, visual: eff.pathoVisual }
+                    : null,
                 { key: 'clinical', title: '🩺 Clinical Presentation', open: true, fields: [['Symptoms', eff.symptoms], ['Signs', eff.signs]] },
                 { key: 'dx', title: '🔬 Diagnosis', open: false, fields: [['Diagnostic Criteria', eff.diagnosis], ['Investigations', eff.investigations], ['Differential Diagnosis', eff.differential]] },
                 { key: 'mgmt', title: '💊 Management', open: true, fields: [['Treatment', eff.treatment], ['Non-pharmacologic', eff.nonPharm], ['Complications', eff.complications], ['Prognosis', eff.prognosis]] },
@@ -10897,7 +10903,29 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 { key: 'edu', title: '📖 Education', open: true, fields: [['Patient Counseling · คำแนะนำผู้ป่วย', eff.patientCounseling], ['Red Flags', eff.redFlags], ['Clinical Pearls', eff.pearls]] },
                 { key: 'refs', title: '🔗 References', open: false, refs: Array.isArray(eff.references) ? eff.references.filter(Boolean) : [] }
             ];
-            const html = sections.map(sec => {
+            const html = sections.filter(Boolean).map(sec => {
+                // V95.21 Phase 6: image-only pathophysiology visual section.
+                // Tokenized Storage download URL bypasses isAdmin() rules so
+                // interns render without read permission. lazy-load the <img>.
+                if (sec.visual) {
+                    const v = sec.visual;
+                    const url = String(v.downloadUrl || '');
+                    if (!url) return '';
+                    const meta = [
+                        v.style ? String(v.style) : '',
+                        v.model ? String(v.model).replace(/^(as|or)\//, '') : ''
+                    ].filter(Boolean).join(' · ');
+                    return `
+                        <details class="dc-detail-section" data-section-key="${sec.key || ''}" ${sec.open ? 'open' : ''}>
+                            <summary>${sec.title}</summary>
+                            <div class="dc-detail-section-body">
+                                <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="dc-pk-visual-link" title="Open full size in a new tab">
+                                    <img src="${escapeHtml(url)}" alt="Pathophysiology visual" loading="lazy" class="dc-pk-visual-img">
+                                </a>
+                                ${meta ? `<div class="dc-pk-visual-meta">Generated · ${escapeHtml(meta)}</div>` : ''}
+                            </div>
+                        </details>`;
+                }
                 if (sec.relatedDrugs !== undefined) {
                     // V95.13 Phase 6: tappable drug chips → open the Drug Codex detail.
                     if (sec.relatedDrugs.length === 0) return '';
