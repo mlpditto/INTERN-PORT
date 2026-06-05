@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.06</title>
+    <title>Nika V95.07</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -30593,7 +30593,22 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaPkVisualState.lastErrorModelLabel = '';
             dcaPkVisualState.generating = true;
             dcaPkVisualRenderPreview();
-            if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
+            // V95.07: optimistic progress. Image gen has no real progress signal,
+            // so show a perceived-progress cue — reuse startAiFakeProgress for the
+            // % on the button + a 1s timer on the spinner showing elapsed seconds.
+            let pvProgress = null;
+            let pvTimerId = null;
+            if (btn) { btn.disabled = true; pvProgress = startAiFakeProgress(btn, 'Generating'); }
+            const pvStart = Date.now();
+            const pvSpinnerSpan = document.querySelector('#dcaPkVisualSpinner span');
+            if (pvSpinnerSpan) {
+                const pvPaint = function () {
+                    const s = Math.round((Date.now() - pvStart) / 1000);
+                    pvSpinnerSpan.textContent = 'Generating · ' + s + 's · this can take 10-30s…';
+                };
+                pvPaint();
+                pvTimerId = setInterval(pvPaint, 1000);
+            }
 
             try {
                 // Mirror the Alabasta Case Card call shape (V92.46/V92.70) —
@@ -30682,6 +30697,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
             } finally {
                 dcaPkVisualState.generating = false;
+                if (pvProgress) pvProgress.stop();
+                if (pvTimerId) clearInterval(pvTimerId);
                 dcaPkVisualRenderPreview();
                 // V94.59: re-show the persistent error AFTER renderPreview has
                 // run its top-of-function reset of the error box.
