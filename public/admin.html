@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.08</title>
+    <title>Nika V95.09</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13556,6 +13556,9 @@
                 <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:700; font-size:0.82em; color:#4338ca;"><input type="checkbox" id="dca-pv-inc-class"> Class</label>
                 <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:700; font-size:0.82em; color:#4338ca;"><input type="checkbox" id="dca-pv-inc-indication"> Indication</label>
             </div>
+            <!-- V95.09: free-text instructions appended to the prompt before Generate. -->
+            <div class="dca-pk-visual-section-label">Extra instructions (optional)</div>
+            <textarea id="dca-pv-extra" rows="2" placeholder="เพิ่มคำกำกับให้ AI เช่น 'ใส่ label ภาษาไทย' · 'เน้น CYP3A4' · 'โทนสีเย็น'…" style="width:100%; box-sizing:border-box; border:1.5px solid #c7d2fe; border-radius:10px; padding:8px 10px; font-family:inherit; font-size:0.86em; resize:vertical;"></textarea>
             <div class="dca-pk-visual-preview-wrap" id="dcaPkVisualPreviewWrap">
                 <div class="dca-pk-visual-preview-placeholder" id="dcaPkVisualPlaceholder">
                     Click <strong>Generate</strong> below to render an ADMET infographic.<br>
@@ -30351,6 +30354,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaPkVisualState.lastImageDataUrl = '';
             dcaPkVisualState.lastModelLabel = '';
             dcaPkVisualState.generating = false;
+            // V95.09: reset opt-in fields + extra instructions on every open so a
+            // prior drug's choices don't leak into a new one (static modal DOM —
+            // see feedback_static_modal_state_leak).
+            ['dca-pv-inc-mechanism', 'dca-pv-inc-class', 'dca-pv-inc-indication'].forEach(function (id) {
+                const cb = document.getElementById(id);
+                if (cb) cb.checked = false;
+            });
+            const extraEl = document.getElementById('dca-pv-extra');
+            if (extraEl) extraEl.value = '';
             dcaPkVisualRenderPreview();
             const modal = document.getElementById('dcaPkVisualModal');
             if (modal) modal.style.display = 'flex';
@@ -30549,7 +30561,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     + extraFields.map(([k, v]) => `${k.toUpperCase()}: ${String(v).trim()}`).join('\n\n');
             }
             const drugName = drug.genericName || 'this drug';
-            const commonRules = [
+            let commonRules = [
                 '',
                 'STYLE CONSTRAINTS:',
                 '- English labels only (medical terms stay in English: CYP3A4, eGFR, t½, etc.).',
@@ -30558,6 +30570,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 '- Clean, professional medical aesthetic. White or light background.',
                 '- Make field names readable at a glance.'
             ].join('\n');
+            // V95.09: admin free-text instructions, appended last so they can
+            // override/refine the defaults (e.g. "use Thai labels", "cool tones").
+            if (opts.extra && String(opts.extra).trim()) {
+                commonRules += '\n\nADDITIONAL INSTRUCTIONS (admin, follow these): ' + String(opts.extra).trim();
+            }
 
             if (style === 'anatomical') {
                 return [
@@ -30602,10 +30619,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 return;
             }
             // V95.08: opt-in pharmacology-context fields from the checkboxes.
+            // V95.09: + free-text extra instructions.
+            const pvExtraEl = document.getElementById('dca-pv-extra');
             const pvOpts = {
                 includeMechanism:  !!(document.getElementById('dca-pv-inc-mechanism')  || {}).checked,
                 includeClass:      !!(document.getElementById('dca-pv-inc-class')      || {}).checked,
-                includeIndication: !!(document.getElementById('dca-pv-inc-indication') || {}).checked
+                includeIndication: !!(document.getElementById('dca-pv-inc-indication') || {}).checked,
+                extra: pvExtraEl ? String(pvExtraEl.value || '').trim() : ''
             };
             const prompt = dcaBuildPkVisualPrompt(current, dcaPkVisualState.style, pvOpts);
             const modelLabel = DCA_PK_VISUAL_MODEL_LABELS[dcaPkVisualState.model] || dcaPkVisualState.model;
