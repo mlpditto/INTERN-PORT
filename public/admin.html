@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.21</title>
+    <title>Nika V95.22</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6063,6 +6063,18 @@
                             <input type="text" id="board-search" placeholder="🔍 Search tasks..." onkeyup="filterBoard()" style="margin:0; width:180px; padding:5px 12px; font-size:0.85em; border-radius:30px;">
                         </div>
                     </div>
+
+                    <!-- V95.22: Quiz coverage by disease system (CASE_SYSTEMS). Display-only —
+                         counts quizzesData tags matched against the 12 systems + Uncategorized,
+                         and highlights coverage gaps (systems with 0 quizzes). lang-no-toggle so
+                         the Thai gap labels survive admin's EN-default lang toggle. -->
+                    <details id="quiz-coverage-panel" class="lang-no-toggle" open style="margin-top:10px; border:1px solid #e2e8f0; border-radius:12px; background:#fff;">
+                        <summary style="padding:10px 14px; cursor:pointer; font-weight:700; color:var(--primary); list-style:none; display:flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-notes-medical"></i> Quiz Coverage by System
+                            <span id="qcov-summary" style="font-size:0.78em; font-weight:600; color:#64748b; margin-left:auto;"></span>
+                        </summary>
+                        <div id="qcov-grid" style="padding:12px 14px; border-top:1px solid #eef2ff; display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px;"></div>
+                    </details>
 
                     <!-- 🔥 Relocated Review Sections inside Dashboard Kanban area -->
                     <div id="review-sections-container" style="margin-top:10px;">
@@ -26624,9 +26636,90 @@ ${JSON.stringify(sourceObj)}`;
                 renderKnowledgeBase();
             }, e => console.error("🔥 [Firestore Error] knowledge_base:", e));
 
-            db.collection("quizzes").onSnapshot(s => { 
-                quizzesData = s.docs.map(d => ({ id: d.id, ...d.data() })); 
-                renderQuizzes(); 
+            // V95.22: Dashboard "Quiz Coverage by System" widget. Maps each quiz's
+            // free-text tags (quiz-level + per-question) onto the 12 CASE_SYSTEMS
+            // disease groups and renders a count per system + an Uncategorized bucket,
+            // flagging coverage gaps (systems with 0 quizzes). Matching is fuzzy by
+            // necessity (tags are free-text): exact token match against
+            // {key, en/ko/th label, symptoms}, plus a substring match guarded to
+            // tokens >= 4 chars so short keys (gi/ent/msk) can't false-positive.
+            window.renderQuizCoverage = function () {
+                const grid = document.getElementById('qcov-grid');
+                if (!grid) return;
+                const systems = Array.isArray(window.CASE_SYSTEMS) ? window.CASE_SYSTEMS : [];
+                if (!systems.length) { grid.innerHTML = ''; return; }
+
+                const tokensFor = (sys) => {
+                    const raw = [sys.key, sys.label && sys.label.en, sys.label && sys.label.ko, sys.label && sys.label.th]
+                        .concat(Array.isArray(sys.symptoms) ? sys.symptoms : []);
+                    const toks = new Set();
+                    raw.filter(Boolean).forEach(t => {
+                        const s = String(t).toLowerCase().trim();
+                        if (s) toks.add(s);
+                        s.split(/[^a-z0-9฀-๿가-힯]+/i).forEach(w => { if (w && w.length >= 4) toks.add(w); });
+                    });
+                    return toks;
+                };
+                const matches = (tag, tokens) => {
+                    if (!tag) return false;
+                    if (tokens.has(tag)) return true;
+                    // Short tags (gi/ent/msk) match ONLY exactly — otherwise they
+                    // substring-hit long tokens ("ent" inside "recurrent"/"mental").
+                    if (tag.length < 4) return false;
+                    for (const tok of tokens) {
+                        if (tok.length >= 4 && (tag.indexOf(tok) !== -1 || tok.indexOf(tag) !== -1)) return true;
+                    }
+                    return false;
+                };
+
+                const sysTokens = systems.map(s => ({ sys: s, tokens: tokensFor(s) }));
+                const counts = {}; systems.forEach(s => counts[s.key] = 0);
+                let uncategorized = 0;
+                (Array.isArray(quizzesData) ? quizzesData : []).forEach(q => {
+                    const tagSet = new Set();
+                    const push = (str) => String(str || '').split(',').forEach(t => { const v = t.trim().toLowerCase(); if (v) tagSet.add(v); });
+                    push(q.tags);
+                    if (Array.isArray(q.questions)) q.questions.forEach(qq => push(qq && qq.tags));
+                    if (!tagSet.size) { uncategorized++; return; }
+                    let matchedAny = false;
+                    sysTokens.forEach(({ sys, tokens }) => {
+                        let hit = false;
+                        tagSet.forEach(tag => { if (!hit && matches(tag, tokens)) hit = true; });
+                        if (hit) { counts[sys.key]++; matchedAny = true; }
+                    });
+                    if (!matchedAny) uncategorized++;
+                });
+
+                const covered = systems.filter(s => counts[s.key] > 0).length;
+                const gaps = systems.length - covered;
+                let html = systems.map(s => {
+                    const n = counts[s.key];
+                    const isGap = n === 0;
+                    return `<div style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid ${isGap ? '#fecaca' : '#e2e8f0'}; border-radius:10px; background:${isGap ? '#fef2f2' : '#f8fafc'};">
+                        <span style="font-size:1.1em;">${s.emoji}</span>
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-size:0.8em; font-weight:700; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(s.label.en)}</div>
+                            ${isGap ? '<div style="font-size:0.62em; color:#b91c1c; font-weight:700;">⚠️ ยังไม่มี quiz</div>' : ''}
+                        </div>
+                        <span class="badge" style="background:${isGap ? '#fca5a5' : 'var(--primary)'}; color:white; min-width:22px; text-align:center;">${n}</span>
+                    </div>`;
+                }).join('');
+                if (uncategorized > 0) {
+                    html += `<div style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px dashed #cbd5e1; border-radius:10px; background:#f1f5f9;">
+                        <span style="font-size:1.1em;">🏷️</span>
+                        <div style="flex:1; min-width:0;"><div style="font-size:0.8em; font-weight:700; color:#64748b;">Uncategorized</div><div style="font-size:0.62em; color:#94a3b8;">tag ไม่เข้าระบบโรค</div></div>
+                        <span class="badge" style="background:#94a3b8; color:white; min-width:22px; text-align:center;">${uncategorized}</span>
+                    </div>`;
+                }
+                grid.innerHTML = html;
+                const sum = document.getElementById('qcov-summary');
+                if (sum) sum.textContent = `ครอบคลุม ${covered}/${systems.length} ระบบ` + (gaps ? ` · ขาด ${gaps}` : '') + (uncategorized ? ` · Uncat ${uncategorized}` : '');
+            };
+
+            db.collection("quizzes").onSnapshot(s => {
+                quizzesData = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderQuizzes();
+                if (window.renderQuizCoverage) window.renderQuizCoverage(); // V95.22 dashboard coverage widget
             }, e => console.error("🔥 [Firestore Error] quizzes:", e));
             // 🔥 Refined [Version: V77.6] Listen only for actionable items (Pending Review or New Request)
             db.collection("quiz_attempts").where("status", "in", ["pending", "requesting"]).onSnapshot(s => {
