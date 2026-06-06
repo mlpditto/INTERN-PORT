@@ -548,6 +548,14 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                         : tailoredPromptT
                 }],
                 response_format: isJson ? { type: "json_object" } : undefined,
+                // No explicit cap previously → api.opentyphoon.ai's low default truncated
+                // long JSON (e.g. a 29-question quiz translation), which the client then
+                // reported as "JSON parse failed". Honor generationOptions.maxOutputTokens
+                // (capped for cost), mirroring the anthropic/gemini branches.
+                max_tokens: Math.min(
+                    Math.max(Number(generationOptions && generationOptions.maxOutputTokens) || 8192, 1024),
+                    16384
+                ),
                 temperature: 0.2
             };
 

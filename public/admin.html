@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.19</title>
+    <title>Nika V95.20</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -21296,7 +21296,10 @@ ${JSON.stringify(sourceObj)}`;
             // a raw snippet in the final error so the failure mode is diagnosable.
             let lastErr = 'translation failed';
             for (let attempt = 1; attempt <= 2; attempt++) {
-                const response = await callUniversalAI('typhoon-v2.5-30b-a3b-instruct', prompt, true);
+                // V95.20: a big quiz (e.g. 29 questions × 4 options) translates to long
+                // JSON that overran Typhoon's default output cap and truncated mid-array,
+                // surfacing as "JSON parse failed". Request a larger budget (proxy caps it).
+                const response = await callUniversalAI('typhoon-v2.5-30b-a3b-instruct', prompt, true, null, '', { maxOutputTokens: 16384 });
                 if (!response || !response.text) { lastErr = 'Empty response'; continue; }
 
                 const parsed = (typeof safeJsonParse === 'function')
