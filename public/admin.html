@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.22</title>
+    <title>Nika V95.23</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12222,6 +12222,19 @@
                 <div style="text-align:right; margin-top:20px;">
                     <button class="btn-sm btn-dark"
                         onclick="document.getElementById('quizDiscussionModal').style.display='none'">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- V95.23: lists the quizzes behind a Dashboard coverage card. lang-no-toggle
+             so Thai quiz titles in the list survive admin's EN-default language toggle. -->
+        <div id="quizCoverageModal" class="modal lang-no-toggle" style="z-index:30000;">
+            <div class="modal-content" style="max-width:680px;">
+                <span class="close-modal" onclick="forceHideModal('quizCoverageModal')">&times;</span>
+                <h3 id="qcov-modal-title" style="color:var(--primary); margin:0 0 14px; font-weight:900;"></h3>
+                <div id="qcov-modal-list" style="max-height:60vh; overflow-y:auto;"></div>
+                <div style="margin-top:14px; text-align:right;">
+                    <button class="btn-sm btn-dark" onclick="forceHideModal('quizCoverageModal')">Close</button>
                 </div>
             </div>
         </div>
@@ -26673,29 +26686,34 @@ ${JSON.stringify(sourceObj)}`;
                 };
 
                 const sysTokens = systems.map(s => ({ sys: s, tokens: tokensFor(s) }));
-                const counts = {}; systems.forEach(s => counts[s.key] = 0);
-                let uncategorized = 0;
+                // Bucket quizzes per system (+ __uncat) so a card click can list them.
+                const buckets = { __uncat: [] };
+                systems.forEach(s => buckets[s.key] = []);
                 (Array.isArray(quizzesData) ? quizzesData : []).forEach(q => {
                     const tagSet = new Set();
                     const push = (str) => String(str || '').split(',').forEach(t => { const v = t.trim().toLowerCase(); if (v) tagSet.add(v); });
                     push(q.tags);
                     if (Array.isArray(q.questions)) q.questions.forEach(qq => push(qq && qq.tags));
-                    if (!tagSet.size) { uncategorized++; return; }
+                    if (!tagSet.size) { buckets.__uncat.push(q); return; }
                     let matchedAny = false;
                     sysTokens.forEach(({ sys, tokens }) => {
                         let hit = false;
                         tagSet.forEach(tag => { if (!hit && matches(tag, tokens)) hit = true; });
-                        if (hit) { counts[sys.key]++; matchedAny = true; }
+                        if (hit) { buckets[sys.key].push(q); matchedAny = true; }
                     });
-                    if (!matchedAny) uncategorized++;
+                    if (!matchedAny) buckets.__uncat.push(q);
                 });
+                window._qcovBuckets = buckets;
+                const counts = {}; systems.forEach(s => counts[s.key] = buckets[s.key].length);
+                const uncategorized = buckets.__uncat.length;
 
                 const covered = systems.filter(s => counts[s.key] > 0).length;
                 const gaps = systems.length - covered;
                 let html = systems.map(s => {
                     const n = counts[s.key];
                     const isGap = n === 0;
-                    return `<div style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid ${isGap ? '#fecaca' : '#e2e8f0'}; border-radius:10px; background:${isGap ? '#fef2f2' : '#f8fafc'};">
+                    const clickable = n > 0;
+                    return `<div ${clickable ? `onclick="window.openQuizCoverageList('${s.key}')"` : ''} style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid ${isGap ? '#fecaca' : '#e2e8f0'}; border-radius:10px; background:${isGap ? '#fef2f2' : '#f8fafc'}; ${clickable ? 'cursor:pointer;' : ''}" ${clickable ? `onmouseover="this.style.background='#eef2ff'" onmouseout="this.style.background='#f8fafc'"` : ''}>
                         <span style="font-size:1.1em;">${s.emoji}</span>
                         <div style="flex:1; min-width:0;">
                             <div style="font-size:0.8em; font-weight:700; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(s.label.en)}</div>
@@ -26705,7 +26723,7 @@ ${JSON.stringify(sourceObj)}`;
                     </div>`;
                 }).join('');
                 if (uncategorized > 0) {
-                    html += `<div style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px dashed #cbd5e1; border-radius:10px; background:#f1f5f9;">
+                    html += `<div onclick="window.openQuizCoverageList('__uncat')" style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px dashed #cbd5e1; border-radius:10px; background:#f1f5f9; cursor:pointer;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
                         <span style="font-size:1.1em;">🏷️</span>
                         <div style="flex:1; min-width:0;"><div style="font-size:0.8em; font-weight:700; color:#64748b;">Uncategorized</div><div style="font-size:0.62em; color:#94a3b8;">tag ไม่เข้าระบบโรค</div></div>
                         <span class="badge" style="background:#94a3b8; color:white; min-width:22px; text-align:center;">${uncategorized}</span>
@@ -26714,6 +26732,38 @@ ${JSON.stringify(sourceObj)}`;
                 grid.innerHTML = html;
                 const sum = document.getElementById('qcov-summary');
                 if (sum) sum.textContent = `ครอบคลุม ${covered}/${systems.length} ระบบ` + (gaps ? ` · ขาด ${gaps}` : '') + (uncategorized ? ` · Uncat ${uncategorized}` : '');
+            };
+
+            // V95.23: click a coverage card → list its quizzes; click a row → open the editor.
+            window.openQuizCoverageList = function (key) {
+                const buckets = window._qcovBuckets || {};
+                const list = Array.isArray(buckets[key]) ? buckets[key] : [];
+                const sys = (window.CASE_SYSTEMS || []).find(s => s.key === key);
+                const titleEl = document.getElementById('qcov-modal-title');
+                if (titleEl) titleEl.textContent = (sys ? `${sys.emoji} ${sys.label.en}` : '🏷️ Uncategorized') + ` · ${list.length} quiz`;
+                const cont = document.getElementById('qcov-modal-list');
+                if (cont) {
+                    if (!list.length) {
+                        cont.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:24px;">ไม่มี quiz ในหมวดนี้</div>';
+                    } else {
+                        const sorted = [...list].sort((a, b) => String(a.title || '').localeCompare(String(b.title || '')));
+                        cont.innerHTML = sorted.map(q => {
+                            const active = q.isActive === true;
+                            const statusBadge = `<span style="font-size:0.65em; font-weight:800; padding:2px 8px; border-radius:8px; white-space:nowrap; background:${active ? '#dcfce7' : '#f1f5f9'}; color:${active ? '#15803d' : '#64748b'};">${active ? 'Active' : 'Inactive'}</span>`;
+                            const tmpl = q.isTemplate ? '<span style="font-size:0.65em; font-weight:800; padding:2px 8px; border-radius:8px; background:#ffedd5; color:#9a3412;">TEMPLATE</span>' : '';
+                            const lock = (parseFloat(q.unlockScore) || 0) > 0 ? `<span style="font-size:0.65em; font-weight:800; padding:2px 8px; border-radius:8px; background:#ede9fe; color:#6d28d9;">🔒 ${parseFloat(q.unlockScore)}</span>` : '';
+                            return `<div onclick="forceHideModal('quizCoverageModal'); openQuizModal('${q.id}');" style="display:flex; align-items:center; gap:8px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:6px; cursor:pointer; background:#fff;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">
+                                <div style="flex:1; min-width:0;">
+                                    <div style="font-weight:700; color:#1e293b; font-size:0.9em;">${escapeHtml(q.title || '(untitled)')}</div>
+                                    ${q.tags ? `<div style="font-size:0.72em; color:#94a3b8; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(q.tags)}</div>` : ''}
+                                </div>
+                                ${lock} ${tmpl} ${statusBadge}
+                                <i class="fa-solid fa-pen-to-square" style="color:#cbd5e1;"></i>
+                            </div>`;
+                        }).join('');
+                    }
+                }
+                forceShowModal('quizCoverageModal');
             };
 
             db.collection("quizzes").onSnapshot(s => {
