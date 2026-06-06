@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.36)</title>
+    <title>Internship Portfolio (V95.37)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4215,7 +4215,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.36 (Case Stats v2 — system coverage, top symptoms, case points)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.37 (Case Stats v3 — time-window filter, logging streak, activity trend, CSV export)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -16711,83 +16711,199 @@ async function archiveDoneCard(cardId) {
             if (tabName === 'systems') renderCaseGrouped(window.myCasesCache || []);
         }
 
-        function renderCaseStats(cases) {
+        function renderCaseStats(allCases) {
             const container = document.getElementById('case-stats-pane-content');
             if (!container) return;
 
-            if (!cases.length) {
+            if (!allCases.length) {
                 container.innerHTML = `<p style="text-align:center; color:#94a3b8; padding:30px 0;">No cases recorded yet<br>등록된 케이스가 없습니다</p>`;
                 return;
             }
 
-            const groups = {};
-            cases.forEach(c => {
-                // submitCase writes `diseaseSystemKey`; older docs may carry `diseaseSystem`.
-                const key = c.diseaseSystemKey || c.diseaseSystem || 'other';
-                if (!groups[key]) groups[key] = 0;
-                groups[key]++;
-            });
+            const tsOf = c => (c.timestamp && typeof c.timestamp.toMillis === 'function') ? c.timestamp.toMillis() : 0;
 
-            const total = cases.length;
-            const sorted = Object.entries(groups).sort((a, b) => b[1] - a[1]);
+            // V95.37 Stats v3 — time-window filter. Windows the aggregate summary
+            // (breakdown / coverage / symptoms / points); the Streak + Activity
+            // panels below stay all-time / fixed 6-month range by design.
+            const win = window.caseStatsWindow || 'all';
+            const winDays = win === '7d' ? 7 : win === '30d' ? 30 : null;
+            const cutoff = winDays ? Date.now() - winDays * 86400000 : 0;
+            const cases = winDays ? allCases.filter(c => tsOf(c) >= cutoff) : allCases;
+            const pill = (val, label) => `<button type="button" onclick="setCaseStatsWindow('${val}')" style="border:none; cursor:pointer; font-size:0.76em; font-weight:700; padding:5px 13px; border-radius:99px; ${win === val ? 'background:#4361ee; color:#fff;' : 'background:#eef2ff; color:#4361ee;'}">${label}</button>`;
+            const pillsHtml = `<div style="display:flex; gap:7px; margin-bottom:16px;">${pill('7d', '7 days')}${pill('30d', '30 days')}${pill('all', 'All-time')}</div>`;
 
-            const rows = sorted.map(([key, count]) => {
-                const item = caseTaxonomyCatalog.find(x => x.key === key) || { label: key, key };
-                const emoji = CASE_SYSTEM_EMOJI[key] || '📋';
-                const pct = Math.round((count / total) * 100);
-                return `
+            // --- Windowed aggregate summary ---
+            let summaryHtml;
+            if (!cases.length) {
+                summaryHtml = `<p style="text-align:center; color:#94a3b8; padding:18px 0;">No cases in this window · 이 기간에 케이스 없음</p>`;
+            } else {
+                const groups = {};
+                cases.forEach(c => {
+                    // submitCase writes `diseaseSystemKey`; older docs may carry `diseaseSystem`.
+                    const key = c.diseaseSystemKey || c.diseaseSystem || 'other';
+                    groups[key] = (groups[key] || 0) + 1;
+                });
+                const total = cases.length;
+                const sorted = Object.entries(groups).sort((a, b) => b[1] - a[1]);
+                const rows = sorted.map(([key, count]) => {
+                    const item = caseTaxonomyCatalog.find(x => x.key === key) || { label: key, key };
+                    const emoji = CASE_SYSTEM_EMOJI[key] || '📋';
+                    const pct = Math.round((count / total) * 100);
+                    return `
                     <div style="margin-bottom:14px;">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
                             <span style="font-size:0.88em; font-weight:700; color:#334155;">${emoji} ${item.label}</span>
-                            <span style="font-size:0.82em; font-weight:800; color:#4361ee;">${count} case${count>1?'s':''}</span>
+                            <span style="font-size:0.82em; font-weight:800; color:#4361ee;">${count} case${count > 1 ? 's' : ''}</span>
                         </div>
                         <div style="background:#e8eeff; border-radius:99px; height:8px; overflow:hidden;">
                             <div style="width:${pct}%; background:linear-gradient(90deg,#4361ee,#7b93f8); height:100%; border-radius:99px; transition:width 0.4s ease;"></div>
                         </div>
                     </div>`;
-            }).join('');
+                }).join('');
 
-            // V95.36 Stats v2 — case points (sum of admin-awarded bonus).
-            const casePoints = cases.reduce((sum, c) => sum + (parseFloat(c.adminBonus) || 0), 0);
-            const pointsText = casePoints > 0 ? ` · ${casePoints % 1 === 0 ? casePoints : casePoints.toFixed(2)} pts` : '';
+                const casePoints = cases.reduce((sum, c) => sum + (parseFloat(c.adminBonus) || 0), 0);
+                const pointsText = casePoints > 0 ? ` · ${casePoints % 1 === 0 ? casePoints : casePoints.toFixed(2)} pts` : '';
 
-            // V95.36 Stats v2 — system coverage vs catalog (excludes the catch-all 'other').
-            const realSystems = (caseTaxonomyCatalog || []).filter(s => s.key !== 'other');
-            const missingList = realSystems.filter(s => !groups[s.key]);
-            const coverageHtml = realSystems.length ? `
-                <div style="margin-bottom:18px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                        <span style="font-size:0.88em; font-weight:700; color:#334155;">🗺️ System Coverage · 계통 커버리지</span>
-                        <span style="font-size:0.82em; font-weight:800; color:#4361ee;">${realSystems.length - missingList.length}/${realSystems.length}</span>
+                const realSystems = (caseTaxonomyCatalog || []).filter(s => s.key !== 'other');
+                const missingList = realSystems.filter(s => !groups[s.key]);
+                const coverageHtml = realSystems.length ? `
+                    <div style="margin-bottom:18px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <span style="font-size:0.88em; font-weight:700; color:#334155;">🗺️ System Coverage · 계통 커버리지</span>
+                            <span style="font-size:0.82em; font-weight:800; color:#4361ee;">${realSystems.length - missingList.length}/${realSystems.length}</span>
+                        </div>
+                        ${missingList.length
+                            ? `<div style="font-size:0.78em; color:#94a3b8; line-height:1.7;">Not yet logged: ${missingList.map(s => `${CASE_SYSTEM_EMOJI[s.key] || '📋'} ${s.label}`).join(' · ')}</div>`
+                            : `<div style="font-size:0.78em; color:#16a34a; font-weight:700;">✅ All systems covered · 모든 계통 완료</div>`}
+                    </div>` : '';
+
+                const symCounts = {};
+                cases.forEach(c => (Array.isArray(c.symptomTags) ? c.symptomTags : []).forEach(t => {
+                    const v = String(t || '').trim();
+                    if (v) symCounts[v] = (symCounts[v] || 0) + 1;
+                }));
+                const topSyms = Object.entries(symCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+                const symptomsHtml = topSyms.length ? `
+                    <div style="margin-top:22px;">
+                        <div style="font-size:0.88em; font-weight:700; color:#334155; margin-bottom:10px;">🔬 Top Symptoms · 자주 본 증상</div>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                            ${topSyms.map(([tag, n]) => `<span style="font-size:0.8em; background:#eef2ff; color:#4361ee; padding:5px 11px; border-radius:99px; font-weight:600;">${SYMPTOM_EMOJI[tag] || '🔹'} ${tag} <b style="margin-left:3px;">${n}</b></span>`).join('')}
+                        </div>
+                    </div>` : '';
+
+                summaryHtml = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+                        <span style="font-size:1em; font-weight:800; color:#334155;"><i class="fa-solid fa-chart-bar" style="color:#4361ee; margin-right:6px;"></i>My Case Summary · 내 케이스 요약</span>
+                        <span style="font-size:0.82em; font-weight:700; background:#e8eeff; color:#4361ee; padding:4px 10px; border-radius:99px;">${total} total${pointsText}</span>
                     </div>
-                    ${missingList.length
-                        ? `<div style="font-size:0.78em; color:#94a3b8; line-height:1.7;">Not yet logged: ${missingList.map(s => `${CASE_SYSTEM_EMOJI[s.key] || '📋'} ${s.label}`).join(' · ')}</div>`
-                        : `<div style="font-size:0.78em; color:#16a34a; font-weight:700;">✅ All systems covered · 모든 계통 완료</div>`}
-                </div>` : '';
+                    ${coverageHtml}
+                    ${rows}
+                    ${symptomsHtml}`;
+            }
 
-            // V95.36 Stats v2 — top symptom tags across all cases.
-            const symCounts = {};
-            cases.forEach(c => (Array.isArray(c.symptomTags) ? c.symptomTags : []).forEach(t => {
-                const v = String(t || '').trim();
-                if (v) symCounts[v] = (symCounts[v] || 0) + 1;
-            }));
-            const topSyms = Object.entries(symCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
-            const symptomsHtml = topSyms.length ? `
-                <div style="margin-top:22px;">
-                    <div style="font-size:0.88em; font-weight:700; color:#334155; margin-bottom:10px;">🔬 Top Symptoms · 자주 본 증상</div>
-                    <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                        ${topSyms.map(([tag, n]) => `<span style="font-size:0.8em; background:#eef2ff; color:#4361ee; padding:5px 11px; border-radius:99px; font-weight:600;">${SYMPTOM_EMOJI[tag] || '🔹'} ${tag} <b style="margin-left:3px;">${n}</b></span>`).join('')}
+            // --- V95.37 Streak (all-time, by ISO-week Monday) ---
+            const MS_DAY = 86400000;
+            const mondayEpochDay = (ts) => {
+                const dk = getBangkokDateTimeParts(new Date(ts)).dateKey;
+                const [y, m, d] = dk.split('-').map(Number);
+                const dt = new Date(Date.UTC(y, m - 1, d));
+                const back = dt.getUTCDay() === 0 ? 6 : dt.getUTCDay() - 1; // days since Monday
+                return Math.floor((dt.getTime() - back * MS_DAY) / MS_DAY);
+            };
+            const weekSet = new Set();
+            allCases.forEach(c => { const ts = tsOf(c); if (ts) weekSet.add(mondayEpochDay(ts)); });
+            const weeks = [...weekSet].sort((a, b) => a - b);
+            let longest = 0, run = 0, prev = null;
+            weeks.forEach(w => { run = (prev !== null && w === prev + 7) ? run + 1 : 1; if (run > longest) longest = run; prev = w; });
+            const thisMon = mondayEpochDay(Date.now());
+            let curStreak = 0;
+            const anchor = weekSet.has(thisMon) ? thisMon : (weekSet.has(thisMon - 7) ? thisMon - 7 : null);
+            if (anchor !== null) { let w = anchor; while (weekSet.has(w)) { curStreak++; w -= 7; } }
+            const streakHtml = `
+                <div style="display:flex; gap:10px; margin-top:24px;">
+                    <div style="flex:1; text-align:center; background:#fff7ed; border:1px solid #fed7aa; border-radius:12px; padding:12px 8px;">
+                        <div style="font-size:1.4em; font-weight:900; color:#ea580c;">🔥 ${curStreak}</div>
+                        <div style="font-size:0.72em; color:#9a3412; font-weight:700;">Current streak · 현재 (weeks)</div>
                     </div>
-                </div>` : '';
+                    <div style="flex:1; text-align:center; background:#eef2ff; border:1px solid #c7d2fe; border-radius:12px; padding:12px 8px;">
+                        <div style="font-size:1.4em; font-weight:900; color:#4361ee;">🏆 ${longest}</div>
+                        <div style="font-size:0.72em; color:#3730a3; font-weight:700;">Best streak · 최고 (weeks)</div>
+                    </div>
+                </div>`;
 
-            container.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
-                    <span style="font-size:1em; font-weight:800; color:#334155;"><i class="fa-solid fa-chart-bar" style="color:#4361ee; margin-right:6px;"></i>My Case Summary · 내 케이스 요약</span>
-                    <span style="font-size:0.82em; font-weight:700; background:#e8eeff; color:#4361ee; padding:4px 10px; border-radius:99px;">${total} total${pointsText}</span>
-                </div>
-                ${coverageHtml}
-                ${rows}
-                ${symptomsHtml}`;
+            // --- V95.37 Activity trend (last 6 months, all-time data) ---
+            const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const curDk = getBangkokDateTimeParts(new Date()).dateKey;
+            const cy = Number(curDk.slice(0, 4)), cmo = Number(curDk.slice(5, 7));
+            const months = [];
+            for (let i = 5; i >= 0; i--) {
+                let mm = cmo - i, yy = cy;
+                while (mm <= 0) { mm += 12; yy--; }
+                months.push({ key: `${yy}-${String(mm).padStart(2, '0')}`, label: MONTH_ABBR[mm - 1] });
+            }
+            const monthCount = {};
+            allCases.forEach(c => { const ts = tsOf(c); if (!ts) return; const ym = getBangkokDateTimeParts(new Date(ts)).dateKey.slice(0, 7); monthCount[ym] = (monthCount[ym] || 0) + 1; });
+            const maxM = Math.max(1, ...months.map(m => monthCount[m.key] || 0));
+            const trendHtml = `
+                <div style="margin-top:24px;">
+                    <div style="font-size:0.88em; font-weight:700; color:#334155; margin-bottom:12px;">📈 Activity (6 mo) · 활동 추이</div>
+                    <div style="display:flex; align-items:flex-end; gap:8px; height:90px; padding:0 4px;">
+                        ${months.map(m => {
+                            const n = monthCount[m.key] || 0;
+                            const h = Math.round((n / maxM) * 70) + (n > 0 ? 6 : 2);
+                            return `<div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:4px;">
+                                <span style="font-size:0.7em; font-weight:800; color:${n > 0 ? '#4361ee' : '#cbd5e1'};">${n}</span>
+                                <div style="width:100%; height:${h}px; border-radius:6px 6px 0 0; background:${n > 0 ? 'linear-gradient(180deg,#4361ee,#7b93f8)' : '#eef2ff'};"></div>
+                                <span style="font-size:0.66em; color:#94a3b8;">${m.label}</span>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>`;
+
+            const exportHtml = `
+                <div style="margin-top:24px; text-align:center;">
+                    <button type="button" onclick="exportCaseStatsCsv()" style="border:1px solid #c7d2fe; background:#fff; color:#4361ee; cursor:pointer; font-size:0.8em; font-weight:700; padding:8px 18px; border-radius:99px;"><i class="fa-solid fa-download" style="margin-right:6px;"></i>Export CSV · 내보내기</button>
+                </div>`;
+
+            container.innerHTML = pillsHtml + summaryHtml + streakHtml + trendHtml + exportHtml;
+        }
+
+        // V95.37 Stats v3 — time-window pill handler (persisted) + CSV export.
+        function setCaseStatsWindow(val) {
+            window.caseStatsWindow = val;
+            try { localStorage.setItem('case_stats_window', val); } catch (_) { }
+            renderCaseStats(window.myCasesCache || []);
+        }
+
+        function exportCaseStatsCsv() {
+            const all = window.myCasesCache || [];
+            if (!all.length) return;
+            const tsOf = c => (c.timestamp && typeof c.timestamp.toMillis === 'function') ? c.timestamp.toMillis() : 0;
+            const win = window.caseStatsWindow || 'all';
+            const winDays = win === '7d' ? 7 : win === '30d' ? 30 : null;
+            const cutoff = winDays ? Date.now() - winDays * 86400000 : 0;
+            const rows = (winDays ? all.filter(c => tsOf(c) >= cutoff) : all).slice().sort((a, b) => tsOf(b) - tsOf(a));
+            if (!rows.length) { if (typeof showToast === 'function') showToast('No cases in this window · 이 기간에 케이스 없음'); return; }
+            // PII (patient name / tel) intentionally excluded — portfolio-safe export.
+            const esc = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+            const lines = [['Date', 'Case No', 'System', 'Symptoms', 'Note', 'Points'].map(esc).join(',')];
+            rows.forEach(c => {
+                const ts = tsOf(c);
+                const date = ts ? getBangkokDateTimeParts(new Date(ts)).dateKey : '';
+                const system = c.diseaseSystemLabel || c.disease || (c.diseaseSystemKey || c.diseaseSystem || '');
+                const symptoms = Array.isArray(c.symptomTags) ? c.symptomTags.join('; ') : '';
+                lines.push([date, c.caseId || '', system, symptoms, c.note || '', (parseFloat(c.adminBonus) || 0)].map(esc).join(','));
+            });
+            const csv = '﻿' + lines.join('\r\n'); // BOM (U+FEFF) so Excel reads Thai/UTF-8
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `my-cases-${win}-${getBangkokDateTimeParts().dateKey}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
         }
 
         function initCaseComposer() {
