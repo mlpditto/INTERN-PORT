@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.24</title>
+    <title>Nika V95.25</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -26692,6 +26692,12 @@ ${JSON.stringify(sourceObj)}`;
                 const buckets = { __uncat: [] };
                 systems.forEach(s => buckets[s.key] = []);
                 (Array.isArray(quizzesData) ? quizzesData : []).forEach(q => {
+                    // V95.25: manual override wins over auto-match. '__none' = forced
+                    // Uncategorized; a valid system key = forced into that system;
+                    // anything else (unset / '__auto') falls through to auto-match.
+                    const ov = q.coverageSystem;
+                    if (ov === '__none') { buckets.__uncat.push(q); return; }
+                    if (ov && buckets[ov]) { buckets[ov].push(q); return; }
                     const tagSet = new Set();
                     const push = (str) => String(str || '').split(',').forEach(t => { const v = t.trim().toLowerCase(); if (v) tagSet.add(v); });
                     push(q.tags);
@@ -26738,9 +26744,11 @@ ${JSON.stringify(sourceObj)}`;
 
             // V95.23: click a coverage card → list its quizzes; click a row → open the editor.
             window.openQuizCoverageList = function (key) {
+                window._qcovOpenKey = key; // V95.25: remembered so a move can refresh this list
                 const buckets = window._qcovBuckets || {};
                 const list = Array.isArray(buckets[key]) ? buckets[key] : [];
-                const sys = (window.CASE_SYSTEMS || []).find(s => s.key === key);
+                const allSystems = window.CASE_SYSTEMS || [];
+                const sys = allSystems.find(s => s.key === key);
                 const titleEl = document.getElementById('qcov-modal-title');
                 if (titleEl) titleEl.textContent = (sys ? `${sys.emoji} ${sys.label.en}` : '🏷️ Uncategorized') + ` · ${list.length} quiz`;
                 const cont = document.getElementById('qcov-modal-list');
@@ -26754,18 +26762,39 @@ ${JSON.stringify(sourceObj)}`;
                             const statusBadge = `<span style="font-size:0.65em; font-weight:800; padding:2px 8px; border-radius:8px; white-space:nowrap; background:${active ? '#dcfce7' : '#f1f5f9'}; color:${active ? '#15803d' : '#64748b'};">${active ? 'Active' : 'Inactive'}</span>`;
                             const tmpl = q.isTemplate ? '<span style="font-size:0.65em; font-weight:800; padding:2px 8px; border-radius:8px; background:#ffedd5; color:#9a3412;">TEMPLATE</span>' : '';
                             const lock = (parseFloat(q.unlockScore) || 0) > 0 ? `<span style="font-size:0.65em; font-weight:800; padding:2px 8px; border-radius:8px; background:#ede9fe; color:#6d28d9;">🔒 ${parseFloat(q.unlockScore)}</span>` : '';
+                            const isManual = q.coverageSystem && q.coverageSystem !== '__auto';
+                            const manual = isManual ? '<span title="จัดหมวดเอง (manual)" style="font-size:0.8em;">📌</span>' : '';
+                            const ov = q.coverageSystem || '__auto';
+                            const picker = `<select onclick="event.stopPropagation()" onchange="event.stopPropagation(); window.setQuizCoverage('${q.id}', this.value)" title="ย้ายหมวด" style="font-size:0.7em; padding:3px 4px; border:1px solid #e2e8f0; border-radius:6px; max-width:138px; cursor:pointer; background:#fff;">`
+                                + `<option value="__auto"${ov === '__auto' ? ' selected' : ''}>↩︎ Auto</option>`
+                                + allSystems.map(s2 => `<option value="${s2.key}"${ov === s2.key ? ' selected' : ''}>${s2.emoji} ${escapeHtml(s2.label.en)}</option>`).join('')
+                                + `<option value="__none"${ov === '__none' ? ' selected' : ''}>🏷️ ไม่จัดหมวด</option>`
+                                + `</select>`;
                             return `<div onclick="forceHideModal('quizCoverageModal'); openQuizModal('${q.id}');" style="display:flex; align-items:center; gap:8px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:6px; cursor:pointer; background:#fff;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">
                                 <div style="flex:1; min-width:0;">
-                                    <div style="font-weight:700; color:#1e293b; font-size:0.9em;">${escapeHtml(q.title || '(untitled)')}</div>
+                                    <div style="font-weight:700; color:#1e293b; font-size:0.9em;">${manual}${escapeHtml(q.title || '(untitled)')}</div>
                                     ${q.tags ? `<div style="font-size:0.72em; color:#94a3b8; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(q.tags)}</div>` : ''}
                                 </div>
                                 ${lock} ${tmpl} ${statusBadge}
+                                ${picker}
                                 <i class="fa-solid fa-pen-to-square" style="color:#cbd5e1;"></i>
                             </div>`;
                         }).join('');
                     }
                 }
                 forceShowModal('quizCoverageModal');
+            };
+
+            // V95.25: persist a manual category override and refresh both the widget
+            // and the open list optimistically (the quizzes snapshot reconciles after).
+            window.setQuizCoverage = function (id, value) {
+                const q = (Array.isArray(quizzesData) ? quizzesData : []).find(x => x.id === id);
+                if (q) q.coverageSystem = value;
+                if (window.renderQuizCoverage) window.renderQuizCoverage();
+                if (window._qcovOpenKey) window.openQuizCoverageList(window._qcovOpenKey);
+                db.collection('quizzes').doc(id).update({ coverageSystem: value })
+                    .then(() => { if (typeof showToast === 'function') showToast('✅ ย้ายหมวดแล้ว'); })
+                    .catch(e => { if (typeof showToast === 'function') showToast('❌ ย้ายหมวดไม่สำเร็จ: ' + e.message); });
             };
 
             db.collection("quizzes").onSnapshot(s => {
