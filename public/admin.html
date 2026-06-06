@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.26</title>
+    <title>Nika V95.27</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -26660,9 +26660,22 @@ ${JSON.stringify(sourceObj)}`;
             window.renderQuizCoverage = function () {
                 const grid = document.getElementById('qcov-grid');
                 if (!grid) return;
-                const systems = Array.isArray(window.CASE_SYSTEMS) ? window.CASE_SYSTEMS : [];
-                if (!systems.length) { grid.innerHTML = ''; return; }
+                const base = Array.isArray(window.CASE_SYSTEMS) ? window.CASE_SYSTEMS : [];
+                if (!base.length) { grid.innerHTML = ''; return; }
+                // V95.27: coverage-only domains (not body systems → deliberately NOT added
+                // to the shared case-logging CASE_SYSTEMS). Appended just before "Other".
+                const EXTRA = [
+                    // key 'infection' (singular) so it matches both "infection" and "infections" tags.
+                    { key: 'infection', emoji: '🦠', label: { en: 'Infections', ko: '감염', th: 'การติดเชื้อ' } },
+                    { key: 'womens_health', emoji: '🚺', label: { en: "Women's Health", ko: '여성건강', th: 'สุขภาพสตรี' } }
+                ];
+                const systems = [...base.filter(s => s.key !== 'other'), ...EXTRA, ...base.filter(s => s.key === 'other')];
+                window._qcovSystems = systems; // shared with openQuizCoverageList's move dropdown
 
+                // V95.27: generic words that appear in multiple labels (e.g. "health" in
+                // both Mental Health + Women's Health) must NOT become match tokens, or a
+                // "Public Health" / "Mental Health" tag cross-matches the wrong system.
+                const TOKEN_STOPWORDS = new Set(['health', 'care', 'disease', 'system', 'general', 'medical']);
                 const tokensFor = (sys) => {
                     // V95.24: system NAME only — symptoms removed (a drug side-effect
                     // named in a tag was wrongly categorizing unrelated quizzes).
@@ -26671,7 +26684,7 @@ ${JSON.stringify(sourceObj)}`;
                     raw.filter(Boolean).forEach(t => {
                         const s = String(t).toLowerCase().trim();
                         if (s) toks.add(s);
-                        s.split(/[^a-z0-9฀-๿가-힯]+/i).forEach(w => { if (w && w.length >= 4) toks.add(w); });
+                        s.split(/[^a-z0-9฀-๿가-힯]+/i).forEach(w => { if (w && w.length >= 4 && !TOKEN_STOPWORDS.has(w)) toks.add(w); });
                     });
                     return toks;
                 };
@@ -26746,7 +26759,7 @@ ${JSON.stringify(sourceObj)}`;
                 window._qcovOpenKey = key; // V95.25: remembered so a move can refresh this list
                 const buckets = window._qcovBuckets || {};
                 const list = Array.isArray(buckets[key]) ? buckets[key] : [];
-                const allSystems = window.CASE_SYSTEMS || [];
+                const allSystems = window._qcovSystems || window.CASE_SYSTEMS || [];
                 const sys = allSystems.find(s => s.key === key);
                 const titleEl = document.getElementById('qcov-modal-title');
                 if (titleEl) titleEl.textContent = (sys ? `${sys.emoji} ${sys.label.en}` : '🏷️ Uncategorized') + ` · ${list.length} quiz`;
