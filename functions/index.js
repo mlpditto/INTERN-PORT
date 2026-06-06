@@ -487,8 +487,15 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                     temperature: 0.2,
                     // 2048 starved structured JSON outputs (e.g. grammar analysis) into
                     // mid-string truncation — gemini-2.5 thinking tokens count against
-                    // this budget. 8192 leaves ample room.
-                    maxOutputTokens: 8192,
+                    // this budget. 8192 is an ample default, but a large job (e.g. a
+                    // 25-question Quiz Analysis with full Thai rewrites) still overruns
+                    // it and truncates mid-JSON, which the client mislabels as "prose
+                    // instead of JSON". Honor an explicit generationOptions.maxOutputTokens
+                    // (capped for cost), mirroring the anthropic branch.
+                    maxOutputTokens: Math.min(
+                        Math.max(Number(generationOptions && generationOptions.maxOutputTokens) || 8192, 1024),
+                        32768
+                    ),
                     // Disable thinking for flash — these are structured extraction tasks,
                     // not reasoning-heavy, and thinking tokens otherwise eat the output
                     // budget. thinkingBudget:0 is flash-only; gemini-2.5-pro cannot
