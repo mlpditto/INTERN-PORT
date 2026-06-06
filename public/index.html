@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.32)</title>
+    <title>Internship Portfolio (V95.33)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5061,7 +5061,7 @@
         };
 
         let userId = "", userProfile = {}, userSubmissions = {};
-        let questsCache = [], mySubmissionsCache = {}, myWorksCache = [], sideQuestsCache = {}, myGroup = "Public";
+        let questsCache = [], mySubmissionsCache = {}, myWorksCache = [], sideQuestsCache = {}, myGroup = "Public", myScore = 0;
         let quizzesCache = [], quizAttemptsCache = {}, allUsersData = [], divisionConfig = {}, groupSettings = {}; // 🔥 Added Settings V69
         let usersWorksCache = []; // V90.63: declared global to avoid ReferenceError before loadMyWorks
         window.myCasesCache = window.myCasesCache || []; // V90.63: guard for renderCases
@@ -5630,6 +5630,7 @@
                     const da = d.data();
                     const score = parseFloat(da.score || 0);
                     myGroup = da.group || "Public"; // 🔥 Sync group V77.7
+                    myScore = score; // V95.33: live score drives quiz unlock gate (renderAssignments runs below)
                     document.getElementById('u-score').innerText = score.toFixed(2);
                     document.getElementById('u-group-badge').innerHTML = `<i class="fa-solid ${getGroupIcon(myGroup)}"></i> ${myGroup}`;
                     document.getElementById('u-group-badge').style.background = getGroupColor(myGroup);
@@ -6041,6 +6042,7 @@
 
                 // Reflect profile changes immediately on current screen (no hard refresh needed)
                 myGroup = userData.group || "Public";
+                myScore = parseFloat(userData.score || 0); // V95.33: keep unlock gate in sync
                 document.getElementById('u-group-badge').innerHTML = `<i class="fa-solid ${getGroupIcon(myGroup)}"></i> ${myGroup}`;
                 document.getElementById('u-group-badge').style.background = getGroupColor(myGroup);
                 document.getElementById('u-group-badge').style.display = myGroup !== 'Public' ? 'inline-block' : 'none';
@@ -6624,6 +6626,11 @@
 
                 const target = q.targetGroup || "Public";
                 if (target !== "Public" && target !== myGroup) return;
+
+                // V95.33: score gate — hide locked quizzes until the user's cumulative
+                // score reaches unlockScore. Skip the gate once they have an attempt so a
+                // later score dip can't yank a quiz they already engaged with. 0 = no gate.
+                if ((q.unlockScore || 0) > (myScore || 0) && !attempt) return;
 
                 if (q.isHomework && q.assignedUsers && q.assignedUsers.length > 0) {
                     if (!q.assignedUsers.includes(userId)) return;
@@ -7555,7 +7562,13 @@
             const list = document.getElementById('qb-list');
             if (!list) return;
             const term = String((document.getElementById('qb-search') || {}).value || '').trim().toLowerCase();
-            const items = (quizzesCache || []).filter(function (q) { return q && q.isActive === true && !q.isPoll; });
+            const items = (quizzesCache || []).filter(function (q) {
+                if (!(q && q.isActive === true && !q.isPoll)) return false;
+                // V95.33: keep score-locked quizzes out of Browse too (mirror the
+                // renderAssignments gate) so they stay undiscoverable until unlocked.
+                if ((q.unlockScore || 0) > (myScore || 0) && !quizAttemptsCache[q.id]) return false;
+                return true;
+            });
             const matched = items.filter(function (q) {
                 if (!term) return true;
                 const hay = [q.title, q.shortTitle, q.tags, q.targetGroup, q.description].filter(Boolean).join(' ').toLowerCase();
