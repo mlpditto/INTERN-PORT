@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.14</title>
+    <title>Nika V95.15</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -11535,6 +11535,13 @@
                                 <textarea id="quiz-materials" rows="2" placeholder="Lecture slides | https://drive.google.com/...&#10;https://example.com/handout.pdf" style="width:100%; padding:8px 12px; border:1px solid #334155; border-radius:8px; font-size:0.82em; background:#0f172a; color:#f1f5f9; resize:vertical; font-family:inherit;"></textarea>
                             </div>
 
+                            <!-- V95.15: gate a quiz behind cumulative score. Hidden from
+                                 interns until users.score >= unlockScore. 0 = no gate. -->
+                            <div style="margin-bottom:8px;">
+                                <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:2px;"><i class="fa-solid fa-lock"></i> Unlock at score <span class="lang-th">— ซ่อนจนกว่าคะแนนสะสมถึงเกณฑ์ (0 = ไม่ล็อก)</span></label>
+                                <input type="number" id="quiz-unlock-score" value="0" min="0" step="0.5" style="width:100%; padding:5px 8px; border:1px solid #334155; border-radius:6px; font-size:0.85em; background:#0f172a; color:#f1f5f9;">
+                            </div>
+
                              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
                                 <div>
                                     <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:2px;"><i class="fa-solid fa-users"></i> Target Group</label>
@@ -18983,6 +18990,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-title').value = q.title || "";
             document.getElementById('quiz-short-title').value = q.shortTitle || "";
             document.getElementById('quiz-target-group').value = q.targetGroup || "Public";
+            if (document.getElementById('quiz-unlock-score')) document.getElementById('quiz-unlock-score').value = q.unlockScore || 0;
             document.getElementById('quiz-total-points').value = q.totalPoints || 1.0;
             document.getElementById('quiz-description').value = q.description || "";
             document.getElementById('quiz-tags').value = q.tags || "";
@@ -19060,6 +19068,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-title').value = "";
             document.getElementById('quiz-short-title').value = "";
             document.getElementById('quiz-target-group').value = "Public";
+            if (document.getElementById('quiz-unlock-score')) document.getElementById('quiz-unlock-score').value = 0;
             document.getElementById('quiz-total-points').value = 1.0;
             document.getElementById('quiz-description').value = "";
             document.getElementById('quiz-tags').value = "";
@@ -19312,6 +19321,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const title = document.getElementById('quiz-title').value.trim();
             const shortTitle = document.getElementById('quiz-short-title').value.trim();
             const targetGroup = document.getElementById('quiz-target-group').value.trim() || "Public";
+            const unlockScore = Math.max(0, parseFloat(document.getElementById('quiz-unlock-score')?.value) || 0);
             const description = document.getElementById('quiz-description').value;
             const totalPoints = parseFloat(document.getElementById('quiz-total-points').value) || 1.0;
             const isPoll = document.getElementById('quiz-is-poll').checked;
@@ -19363,7 +19373,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             });
 
             return {
-                title, shortTitle, targetGroup, description, tags, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, quizType, feedbackLimit, caseContent, questions, blueprint,
+                title, shortTitle, targetGroup, unlockScore, description, tags, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, quizType, feedbackLimit, caseContent, questions, blueprint,
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
             };
@@ -21549,6 +21559,7 @@ ${JSON.stringify(sourceObj)}`;
                 title: formData.title,
                 shortTitle: formData.shortTitle,
                 targetGroup: formData.targetGroup, // Add targetGroup
+                unlockScore: formData.unlockScore || 0, // V95.15: score gate (0 = no gate)
                 description: formData.description,
                 tags: formData.tags || "",
                 materials: Array.isArray(formData.materials) ? formData.materials : [],
