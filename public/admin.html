@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.23</title>
+    <title>Nika V95.24</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -26654,7 +26654,8 @@ ${JSON.stringify(sourceObj)}`;
             // disease groups and renders a count per system + an Uncategorized bucket,
             // flagging coverage gaps (systems with 0 quizzes). Matching is fuzzy by
             // necessity (tags are free-text): exact token match against
-            // {key, en/ko/th label, symptoms}, plus a substring match guarded to
+            // {key, en/ko/th label} (symptoms removed in V95.24 — see tokensFor),
+            // plus a substring match guarded to
             // tokens >= 4 chars so short keys (gi/ent/msk) can't false-positive.
             window.renderQuizCoverage = function () {
                 const grid = document.getElementById('qcov-grid');
@@ -26663,8 +26664,9 @@ ${JSON.stringify(sourceObj)}`;
                 if (!systems.length) { grid.innerHTML = ''; return; }
 
                 const tokensFor = (sys) => {
-                    const raw = [sys.key, sys.label && sys.label.en, sys.label && sys.label.ko, sys.label && sys.label.th]
-                        .concat(Array.isArray(sys.symptoms) ? sys.symptoms : []);
+                    // V95.24: system NAME only — symptoms removed (a drug side-effect
+                    // named in a tag was wrongly categorizing unrelated quizzes).
+                    const raw = [sys.key, sys.label && sys.label.en, sys.label && sys.label.ko, sys.label && sys.label.th];
                     const toks = new Set();
                     raw.filter(Boolean).forEach(t => {
                         const s = String(t).toLowerCase().trim();
