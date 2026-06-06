@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.35)</title>
+    <title>Internship Portfolio (V95.36)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4215,7 +4215,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.32 (quiz materials unlock only after completing the quiz — locked hint before)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.36 (Case Stats v2 — system coverage, top symptoms, case points)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -16747,12 +16747,47 @@ async function archiveDoneCard(cardId) {
                     </div>`;
             }).join('');
 
+            // V95.36 Stats v2 — case points (sum of admin-awarded bonus).
+            const casePoints = cases.reduce((sum, c) => sum + (parseFloat(c.adminBonus) || 0), 0);
+            const pointsText = casePoints > 0 ? ` · ${casePoints % 1 === 0 ? casePoints : casePoints.toFixed(2)} pts` : '';
+
+            // V95.36 Stats v2 — system coverage vs catalog (excludes the catch-all 'other').
+            const realSystems = (caseTaxonomyCatalog || []).filter(s => s.key !== 'other');
+            const missingList = realSystems.filter(s => !groups[s.key]);
+            const coverageHtml = realSystems.length ? `
+                <div style="margin-bottom:18px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <span style="font-size:0.88em; font-weight:700; color:#334155;">🗺️ System Coverage · 계통 커버리지</span>
+                        <span style="font-size:0.82em; font-weight:800; color:#4361ee;">${realSystems.length - missingList.length}/${realSystems.length}</span>
+                    </div>
+                    ${missingList.length
+                        ? `<div style="font-size:0.78em; color:#94a3b8; line-height:1.7;">Not yet logged: ${missingList.map(s => `${CASE_SYSTEM_EMOJI[s.key] || '📋'} ${s.label}`).join(' · ')}</div>`
+                        : `<div style="font-size:0.78em; color:#16a34a; font-weight:700;">✅ All systems covered · 모든 계통 완료</div>`}
+                </div>` : '';
+
+            // V95.36 Stats v2 — top symptom tags across all cases.
+            const symCounts = {};
+            cases.forEach(c => (Array.isArray(c.symptomTags) ? c.symptomTags : []).forEach(t => {
+                const v = String(t || '').trim();
+                if (v) symCounts[v] = (symCounts[v] || 0) + 1;
+            }));
+            const topSyms = Object.entries(symCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+            const symptomsHtml = topSyms.length ? `
+                <div style="margin-top:22px;">
+                    <div style="font-size:0.88em; font-weight:700; color:#334155; margin-bottom:10px;">🔬 Top Symptoms · 자주 본 증상</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                        ${topSyms.map(([tag, n]) => `<span style="font-size:0.8em; background:#eef2ff; color:#4361ee; padding:5px 11px; border-radius:99px; font-weight:600;">${SYMPTOM_EMOJI[tag] || '🔹'} ${tag} <b style="margin-left:3px;">${n}</b></span>`).join('')}
+                    </div>
+                </div>` : '';
+
             container.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
                     <span style="font-size:1em; font-weight:800; color:#334155;"><i class="fa-solid fa-chart-bar" style="color:#4361ee; margin-right:6px;"></i>My Case Summary · 내 케이스 요약</span>
-                    <span style="font-size:0.82em; font-weight:700; background:#e8eeff; color:#4361ee; padding:4px 10px; border-radius:99px;">${total} total</span>
+                    <span style="font-size:0.82em; font-weight:700; background:#e8eeff; color:#4361ee; padding:4px 10px; border-radius:99px;">${total} total${pointsText}</span>
                 </div>
-                ${rows}`;
+                ${coverageHtml}
+                ${rows}
+                ${symptomsHtml}`;
         }
 
         function initCaseComposer() {
