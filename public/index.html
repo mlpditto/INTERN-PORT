@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.40)</title>
+    <title>Internship Portfolio (V95.41)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4215,7 +4215,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.40 (Work History — fix blank Thai date + status badge hidden by lang-toggle)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.41 (View Answers — show all options with correct/your-pick marks)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -8870,6 +8870,36 @@
                     ? `<div style="margin-top:10px; padding:10px 12px; background:rgba(34,197,94,0.10); border-left:3px solid #16a34a; border-radius:6px; font-size:0.92em; color:#14532d; line-height:1.55;"><b style="display:block; margin-bottom:4px; color:#15803d; font-size:0.78em; text-transform:uppercase; letter-spacing:0.04em;"><i class="fa-solid fa-lightbulb"></i> Explanation<span class="lang-th"> เฉลย</span></b><div class="md-render lang-no-toggle">${window.renderMd(question.explanation)}</div></div>`
                     : '';
 
+                // V95.41: for choice/flashcard, render the FULL option list with the
+                // user's pick + correct answer marked inline (clearer than a bare
+                // Answer/Correct pair). Score-0 (revealKey=false) still withholds the
+                // key — only the user's pick is marked. Other types keep text render.
+                let answerBlock;
+                if (isChoice || isFlash) {
+                    const pickedSet = new Set(Array.isArray(userAns) ? userAns : (userAns != null ? [userAns] : []));
+                    const correctSet = new Set(Array.isArray(question.correct) ? question.correct : (question.correct != null ? [question.correct] : []));
+                    const optsHtml = (question.options || []).map((opt, idx) => {
+                        const picked = pickedSet.has(idx);
+                        const right = revealKey && correctSet.has(idx);
+                        let bg2 = '#ffffff', bd = '#e2e8f0', mk = '';
+                        if (right) { bg2 = '#d4edda'; bd = '#86c79b'; mk = '<span style="color:#155724; font-weight:800;">✓</span>'; }
+                        if (picked && !right) {
+                            if (revealKey) { bg2 = '#f8d7da'; bd = '#f1aeb5'; mk = '<span style="color:#721c24; font-weight:800;">✗</span>'; }
+                            else { bg2 = '#fff3cd'; bd = '#ffe69c'; }
+                        }
+                        const youTag = picked ? '<span style="margin-left:auto; font-size:0.72em; font-weight:700; color:#475569; background:rgba(255,255,255,0.7); padding:1px 7px; border-radius:99px; white-space:nowrap;">You<span class="lang-th"> คุณเลือก</span></span>' : '';
+                        return `<div style="display:flex; align-items:center; gap:8px; background:${bg2}; border:1px solid ${bd}; border-radius:8px; padding:7px 10px; margin-bottom:6px; font-size:0.92em;"><span class="lang-no-toggle" style="flex:1; min-width:0;">${opt}</span>${mk}${youTag}</div>`;
+                    }).join('');
+                    const noAns = pickedSet.size === 0
+                        ? `<div style="font-size:0.85em; color:#999; margin-bottom:6px;"><b>Answer<span class="lang-th"> ตอบ</span>:</b> – (no answer ไม่ได้ตอบ)</div>`
+                        : '';
+                    answerBlock = `<div style="margin-top:4px;">${noAns}${optsHtml}</div>`;
+                } else {
+                    answerBlock = `<div style="background:rgba(255,255,255,0.5); padding:8px; border-radius:6px; font-size:0.95em;">
+                            <b>Answer<span class="lang-th"> ตอบ</span>:</b> <span class="lang-no-toggle">${userAnsText}</span>
+                        </div>${correctAnsText}`;
+                }
+
                 html += `
                     <div style="background:${bg}; border:1px solid ${border}; padding:15px; border-radius:10px; margin-bottom:15px;">
                         <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
@@ -8877,10 +8907,7 @@
                             ${icon}
                         </div>
                         <div class="md-render" style="font-size:1em; margin-bottom:5px;">${window.renderMd(question.q)}</div>
-                        <div style="background:rgba(255,255,255,0.5); padding:8px; border-radius:6px; font-size:0.95em;">
-                            <b>Answer<span class="lang-th"> ตอบ</span>:</b> <span class="lang-no-toggle">${userAnsText}</span>
-                        </div>
-                        ${correctAnsText}
+                        ${answerBlock}
                         ${explanationText}
                     </div>
                 `;
