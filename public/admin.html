@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.29</title>
+    <title>Nika V95.30</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -18533,6 +18533,245 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 window.restoreQuizMagicState(item, 1400);
             }
         };
+
+        // ── V95.30: per-question targeted improvement menu (Fact-check / Polish / Distractors / Explanation) ──
+        // Granular sibling to the "Magic" full-overhaul button. Reuses callUniversalAI + safeJsonParse + the
+        // quiz-editor model chip. Read-only Fact-check; preview-before-apply for the three mutating actions.
+        window.toggleQImproveMenu = function(btn) {
+            const menu = btn.parentElement.querySelector('.q-improve-menu');
+            if (!menu) return;
+            const willShow = (menu.style.display === 'none' || !menu.style.display);
+            document.querySelectorAll('.q-improve-menu').forEach(m => { if (m !== menu) m.style.display = 'none'; });
+            menu.style.display = willShow ? 'block' : 'none';
+        };
+        // close any open menu when clicking outside its wrapper
+        document.addEventListener('click', function(e) {
+            if (e.target.closest && e.target.closest('.q-improve-wrap')) return;
+            document.querySelectorAll('.q-improve-menu').forEach(m => { m.style.display = 'none'; });
+        });
+
+        window._qImproveModel = function(item) {
+            const toolbar = document.getElementById('toolbar-ai-translate-model');
+            if (toolbar && toolbar.value) return toolbar.value;
+            const itemModel = item.querySelector('.ai-model-quiz');
+            return (itemModel && itemModel.value) || 'gemini-3.5-flash';
+        };
+
+        window._qImproveCtx = function(item) {
+            const qTa = item.querySelector('.q-text');
+            const optTas = Array.from(item.querySelectorAll('.q-opt'));
+            const checks = Array.from(item.querySelectorAll('.q-correct-check'));
+            const keyInput = item.querySelector('.quick-api-key');
+            return {
+                qTa, optTas,
+                question: (qTa && qTa.value || '').trim(),
+                options: optTas.map(t => (t.value || '').trim()),
+                correctIndices: checks.map((c, i) => c.checked ? i : null).filter(i => i !== null),
+                quickApiKey: keyInput ? keyInput.value.trim() : '',
+                expTa: item.querySelector('.q-explanation')
+            };
+        };
+
+        window._qImproveChipBusy = function(chip, busy) {
+            if (busy) {
+                chip.dataset._html = chip.innerHTML;
+                chip.disabled = true;
+                chip.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังทำงาน...';
+            } else {
+                chip.disabled = false;
+                if (chip.dataset._html) chip.innerHTML = chip.dataset._html;
+            }
+        };
+
+        window._qImproveRemovePanel = function(item) {
+            const old = item.querySelector('.q-improve-panel');
+            if (old) old.remove();
+        };
+
+        window._qImproveShowPanel = function(item, html, accent, applyFn) {
+            window._qImproveRemovePanel(item);
+            const panel = document.createElement('div');
+            panel.className = 'q-improve-panel lang-no-toggle';
+            const c = accent || '#cbd5e1';
+            panel.style.cssText = 'margin:10px 0; padding:12px 14px; background:#f8fafc; border:1px solid ' + c + '; border-left:4px solid ' + c + '; border-radius:12px; font-size:0.85em; color:#1e293b; line-height:1.55; overflow-x:auto;';
+            panel.innerHTML = html;
+            const cancel = panel.querySelector('.q-improve-cancel');
+            if (cancel) cancel.onclick = () => panel.remove();
+            const apply = panel.querySelector('.q-improve-apply');
+            if (apply && applyFn) apply.onclick = () => { applyFn(); panel.remove(); };
+            const anchor = item.querySelector('.options-actions');
+            if (anchor && anchor.parentElement) anchor.parentElement.insertBefore(panel, anchor);
+            else item.appendChild(panel);
+            return panel;
+        };
+
+        window._qImproveActionBar = function(applyLabel) {
+            return '<div style="margin-top:10px; display:flex; gap:8px;">' +
+                '<button type="button" class="q-improve-apply" style="padding:6px 16px; background:#22c55e; color:#fff; border:none; border-radius:10px; font-weight:800; font-size:0.95em; cursor:pointer;">' + applyLabel + '</button>' +
+                '<button type="button" class="q-improve-cancel" style="padding:6px 16px; background:#e2e8f0; color:#475569; border:none; border-radius:10px; font-weight:700; font-size:0.95em; cursor:pointer;">ยกเลิก</button></div>';
+        };
+
+        window._qImproveSetOpt = function(ta, val) {
+            ta.value = val;
+            if (window.renderQOptPreview) window.renderQOptPreview(ta);
+            if (window.showQOptPreview) window.showQOptPreview(ta);
+        };
+
+        window.qImproveAction = async function(chip, action) {
+            const item = chip.closest('.quiz-q-item');
+            const menu = chip.closest('.q-improve-menu');
+            if (menu) menu.style.display = 'none';
+            const ctx = window._qImproveCtx(item);
+            if (!ctx.question) return alert('กรุณากรอกโจทย์ก่อนครับ');
+            const model = window._qImproveModel(item);
+            try {
+                window._qImproveChipBusy(chip, true);
+                window._qImproveShowPanel(item, '<i class="fa-solid fa-spinner fa-spin"></i> AI กำลังประมวลผล...', '#94a3b8');
+                if (action === 'factcheck') await window._qImproveFactCheck(item, ctx, model);
+                else if (action === 'polish') await window._qImprovePolish(item, ctx, model);
+                else if (action === 'distractors') await window._qImproveDistractors(item, ctx, model);
+                else if (action === 'explanation') await window._qImproveExplanation(item, ctx, model);
+            } catch (err) {
+                console.error('[qImprove] ' + action, err);
+                window._qImproveShowPanel(item, '<strong>⚠️ ผิดพลาด</strong><br>' + escapeHtml(String((err && err.message) || err)), '#ef4444');
+            } finally {
+                window._qImproveChipBusy(chip, false);
+            }
+        };
+
+        window._qImproveFactCheck = async function(item, ctx, model) {
+            const correctList = ctx.correctIndices.map(i => (i + 1) + '. ' + ctx.options[i]).join(' | ') || '(ยังไม่ได้ติ๊กคำตอบถูก)';
+            const prompt = [
+                'ภาษา: ตอบทุก field ที่เป็นข้อความเป็นภาษาไทย (คงศัพท์เทคนิค/ชื่อยาเป็นภาษาอังกฤษได้)',
+                'คุณคือผู้เชี่ยวชาญด้านเภสัชกรรม/การแพทย์ ทำหน้าที่ตรวจสอบความถูกต้องเชิงข้อเท็จจริงของข้อสอบปรนัย',
+                'ตรวจสอบ: (1) คำตอบที่ทำเครื่องหมายว่าถูก ถูกต้องจริงหรือไม่ (2) มีข้อผิดพลาดเชิงข้อเท็จจริงหรือไม่ (3) โจทย์/ตัวเลือกกำกวม มีคำตอบถูกมากกว่าหนึ่ง หรือไม่มีคำตอบถูกหรือไม่',
+                'อย่าแก้ไขถ้อยคำ — รายงานผลการตรวจเท่านั้น',
+                '',
+                'โจทย์: ' + JSON.stringify(ctx.question),
+                'ตัวเลือก (0-indexed): ' + JSON.stringify(ctx.options),
+                'คำตอบที่ทำเครื่องหมายว่าถูก: ' + correctList,
+                '',
+                'OUTPUT ต้องเป็น RAW JSON เท่านั้น ห้ามมี code fence ห้ามมีคำอธิบายนอก JSON:',
+                '{"verdict":"ok|warning|error","summary":"สรุปสั้นๆ","issues":["ปัญหาที่พบ"],"suggestedCorrectIndices":[เลข index ที่ควรถูก หรือ [] ถ้าไม่ต้องเปลี่ยน]}'
+            ].join('\n');
+            const res = await window.callUniversalAI(model, prompt, true, null, ctx.quickApiKey);
+            const data = safeJsonParse(res.text);
+            if (!data) throw new Error('AI ส่งค่าที่ไม่ใช่ JSON: ' + String(res.text || '').slice(0, 160));
+            const verdict = String(data.verdict || 'warning').toLowerCase();
+            const accent = verdict === 'ok' ? '#16a34a' : (verdict === 'error' ? '#ef4444' : '#f59e0b');
+            const icon = verdict === 'ok' ? '✅' : (verdict === 'error' ? '❌' : '⚠️');
+            const issues = Array.isArray(data.issues) ? data.issues.filter(x => x && String(x).trim()) : [];
+            let html = '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px;"><strong>' + icon + ' Fact-check</strong><button type="button" class="q-improve-cancel" style="background:none; border:none; color:#94a3b8; cursor:pointer; font-size:1.05em; line-height:1;">✕</button></div>';
+            if (data.summary) html += '<div style="margin-bottom:6px;">' + escapeHtml(String(data.summary)) + '</div>';
+            if (issues.length) html += '<ul style="margin:6px 0 0; padding-left:18px;">' + issues.map(x => '<li>' + escapeHtml(String(x)) + '</li>').join('') + '</ul>';
+            if (Array.isArray(data.suggestedCorrectIndices) && data.suggestedCorrectIndices.length) {
+                const sug = data.suggestedCorrectIndices.map(i => Number(i) + 1).join(', ');
+                html += '<div style="margin-top:8px; color:#0f766e;">💡 AI เสนอว่าคำตอบที่ถูกควรเป็นข้อ: ' + escapeHtml(sug) + ' (โปรดตรวจสอบเองก่อนแก้)</div>';
+            }
+            html += '<div style="margin-top:8px; font-size:0.78em; color:#94a3b8;">model: ' + escapeHtml(String(res.model || model)) + '</div>';
+            window._qImproveShowPanel(item, html, accent);
+        };
+
+        window._qImprovePolish = async function(item, ctx, model) {
+            const prompt = [
+                'ภาษา: คงภาษาเดิมของแต่ละข้อความ (ข้อความไทยคงเป็นไทย, ศัพท์/ชื่อยาภาษาอังกฤษคงเป็นอังกฤษ) ห้ามแปลข้ามภาษา',
+                'งานของคุณ: เกลาไวยากรณ์และสำนวนของข้อสอบปรนัยให้อ่านลื่นและเป็นทางการขึ้น',
+                'ข้อห้ามเด็ดขาด: ห้ามเปลี่ยนความหมาย ห้ามเปลี่ยนระดับความยาก ห้ามเพิ่ม/ลดจำนวนตัวเลือก ห้ามสลับว่าตัวเลือกใดเป็นคำตอบถูก (คงลำดับ index เดิมทุกตัว)',
+                'อาจใส่ markdown เบาๆ (**ตัวหนา**/*เอียง*) เฉพาะในโจทย์; ถ้าใส่ใน option ต้องใส่สม่ำเสมอทุกตัวเลือกหรือไม่ใส่เลย',
+                '',
+                'โจทย์เดิม: ' + JSON.stringify(ctx.question),
+                'ตัวเลือกเดิม (เรียงตาม index): ' + JSON.stringify(ctx.options),
+                '',
+                'OUTPUT ต้องเป็น RAW JSON เท่านั้น ห้าม code fence: {"question":"...","options":["...",...]} โดย options ต้องมีจำนวนและลำดับเท่าเดิม'
+            ].join('\n');
+            const res = await window.callUniversalAI(model, prompt, true, null, ctx.quickApiKey);
+            const data = safeJsonParse(res.text);
+            if (!data || typeof data.question !== 'string' || !Array.isArray(data.options)) throw new Error('AI ส่งรูปแบบไม่ถูกต้อง');
+            if (data.options.length !== ctx.options.length) throw new Error('จำนวนตัวเลือกไม่ตรงกับเดิม (AI ส่ง ' + data.options.length + ' จากเดิม ' + ctx.options.length + ') — ลองใหม่อีกครั้ง');
+            const newOpts = data.options.map(o => String(o));
+            const rows = ctx.options.map((o, i) =>
+                '<tr><td style="padding:3px 8px; color:#94a3b8; vertical-align:top;">' + (i + 1) + '</td>' +
+                '<td style="padding:3px 8px; color:#b91c1c; text-decoration:line-through; vertical-align:top;">' + escapeHtml(o) + '</td>' +
+                '<td style="padding:3px 8px; color:#15803d; font-weight:600; vertical-align:top;">' + escapeHtml(newOpts[i]) + '</td></tr>'
+            ).join('');
+            const applyFn = () => {
+                ctx.qTa.value = data.question;
+                if (window.renderQTextPreview) window.renderQTextPreview(ctx.qTa);
+                ctx.optTas.forEach((ta, i) => { if (typeof newOpts[i] === 'string') window._qImproveSetOpt(ta, newOpts[i]); });
+                showToast('✅ เกลาภาษาเรียบร้อย');
+            };
+            let html = '<div style="margin-bottom:6px;"><strong>✏️ เกลาภาษา — ตรวจก่อนนำไปใช้</strong></div>';
+            html += '<div style="margin-bottom:4px; color:#64748b;">โจทย์ใหม่:</div><div style="padding:6px 8px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:8px;">' + escapeHtml(data.question) + '</div>';
+            html += '<table style="width:100%; border-collapse:collapse;"><tr><th style="text-align:left; padding:3px 8px; color:#94a3b8;">#</th><th style="text-align:left; padding:3px 8px; color:#94a3b8;">เดิม</th><th style="text-align:left; padding:3px 8px; color:#94a3b8;">ใหม่</th></tr>' + rows + '</table>';
+            html += window._qImproveActionBar('✅ ใช้เวอร์ชันนี้');
+            window._qImproveShowPanel(item, html, '#0891b2', applyFn);
+        };
+
+        window._qImproveDistractors = async function(item, ctx, model) {
+            if (!ctx.correctIndices.length) throw new Error('กรุณาติ๊กคำตอบที่ถูกอย่างน้อย 1 ข้อก่อน');
+            const correctSet = ctx.correctIndices;
+            const prompt = [
+                'ภาษา: คงภาษาเดิมของข้อความ (ไทยคงไทย, ศัพท์อังกฤษคงอังกฤษ) ห้ามแปลข้ามภาษา',
+                'งานของคุณ: ปรับปรุง "ตัวลวง" (ตัวเลือกที่ผิด) ของข้อสอบปรนัยให้น่าเชื่อถือและอิงความเข้าใจผิดที่พบบ่อย ไม่ใช่ผิดแบบเห็นชัด',
+                'ข้อห้าม: ห้ามแก้โจทย์ ห้ามแก้ข้อความของตัวเลือกที่เป็นคำตอบถูก ห้ามเปลี่ยนจำนวนตัวเลือก ตัวลวงต้องไม่กลายเป็นคำตอบถูกอีกข้อ',
+                '',
+                'โจทย์: ' + JSON.stringify(ctx.question),
+                'ตัวเลือกทั้งหมด (0-indexed): ' + JSON.stringify(ctx.options),
+                'index ที่เป็นคำตอบถูก (ห้ามแก้): ' + JSON.stringify(correctSet),
+                '',
+                'OUTPUT RAW JSON เท่านั้น ห้าม code fence: {"options":["...",...]} จำนวนและลำดับเท่าเดิม โดย index ที่เป็นคำตอบถูกต้องเหมือนเดิมเป๊ะ'
+            ].join('\n');
+            const res = await window.callUniversalAI(model, prompt, true, null, ctx.quickApiKey);
+            const data = safeJsonParse(res.text);
+            if (!data || !Array.isArray(data.options) || data.options.length !== ctx.options.length) throw new Error('AI ส่งจำนวนตัวเลือกไม่ตรง — ลองใหม่อีกครั้ง');
+            const newOpts = data.options.map(o => String(o));
+            const rows = ctx.options.map((o, i) => {
+                if (correctSet.includes(i)) return '<tr><td style="padding:3px 8px; color:#94a3b8;">' + (i + 1) + '</td><td colspan="2" style="padding:3px 8px; color:#15803d;">✓ ' + escapeHtml(o) + ' <span style="color:#94a3b8;">(คำตอบถูก — คงเดิม)</span></td></tr>';
+                return '<tr><td style="padding:3px 8px; color:#94a3b8; vertical-align:top;">' + (i + 1) + '</td><td style="padding:3px 8px; color:#b91c1c; text-decoration:line-through; vertical-align:top;">' + escapeHtml(o) + '</td><td style="padding:3px 8px; color:#15803d; font-weight:600; vertical-align:top;">' + escapeHtml(newOpts[i]) + '</td></tr>';
+            }).join('');
+            const applyFn = () => {
+                ctx.optTas.forEach((ta, i) => { if (!correctSet.includes(i) && typeof newOpts[i] === 'string') window._qImproveSetOpt(ta, newOpts[i]); });
+                showToast('✅ ปรับตัวลวงเรียบร้อย');
+            };
+            let html = '<div style="margin-bottom:6px;"><strong>🎯 ปรับตัวลวง — ตรวจก่อนนำไปใช้</strong></div>';
+            html += '<table style="width:100%; border-collapse:collapse;"><tr><th style="text-align:left; padding:3px 8px; color:#94a3b8;">#</th><th style="text-align:left; padding:3px 8px; color:#94a3b8;">เดิม</th><th style="text-align:left; padding:3px 8px; color:#94a3b8;">ใหม่</th></tr>' + rows + '</table>';
+            html += window._qImproveActionBar('✅ ใช้ตัวลวงใหม่');
+            window._qImproveShowPanel(item, html, '#0891b2', applyFn);
+        };
+
+        window._qImproveExplanation = async function(item, ctx, model) {
+            if (!ctx.expTa) throw new Error('ไม่พบช่อง Explanation ของข้อนี้');
+            const correctList = ctx.correctIndices.map(i => (i + 1) + '. ' + ctx.options[i]).join(' | ') || '(ยังไม่ได้ติ๊กคำตอบถูก)';
+            const prompt = [
+                'ภาษา: เขียนคำอธิบายเป็นภาษาเดียวกับโจทย์ (โจทย์ไทย→อธิบายไทย) คงศัพท์เทคนิค/ชื่อยาเป็นอังกฤษได้',
+                'งานของคุณ: เขียนคำอธิบายเฉลยสำหรับผู้เรียน อธิบายว่าทำไมคำตอบที่ถูกจึงถูก และทำไมตัวลวงจึงผิด',
+                'ความยาวกระชับ ไม่เกิน ~150 คำ ใช้ markdown เบาๆ ได้',
+                '',
+                'โจทย์: ' + JSON.stringify(ctx.question),
+                'ตัวเลือก: ' + JSON.stringify(ctx.options),
+                'คำตอบที่ถูก: ' + correctList,
+                '',
+                'OUTPUT RAW JSON เท่านั้น ห้าม code fence: {"explanation":"..."}'
+            ].join('\n');
+            const res = await window.callUniversalAI(model, prompt, true, null, ctx.quickApiKey);
+            const data = safeJsonParse(res.text);
+            if (!data || typeof data.explanation !== 'string' || !data.explanation.trim()) throw new Error('AI ไม่ได้ส่งคำอธิบายกลับมา');
+            const expl = data.explanation.trim();
+            const existing = (ctx.expTa.value || '').trim();
+            if (!existing) {
+                ctx.expTa.value = expl;
+                showToast('✅ สร้างคำอธิบายแล้ว');
+                let html = '<div style="margin-bottom:6px;"><strong>💡 สร้างคำอธิบาย — ใส่ให้แล้ว</strong> <button type="button" class="q-improve-cancel" style="float:right; background:none; border:none; color:#94a3b8; cursor:pointer; font-size:1.05em; line-height:1;">✕</button></div>';
+                html += '<div style="padding:6px 8px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; white-space:pre-wrap;">' + escapeHtml(expl) + '</div>';
+                window._qImproveShowPanel(item, html, '#16a34a');
+                return;
+            }
+            const applyFn = () => { ctx.expTa.value = expl; showToast('✅ แทนที่คำอธิบายแล้ว'); };
+            let html = '<div style="margin-bottom:6px;"><strong>💡 มีคำอธิบายเดิมอยู่แล้ว — แทนที่ไหม?</strong></div>';
+            html += '<div style="color:#64748b; margin-bottom:4px;">ของใหม่:</div><div style="padding:6px 8px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; white-space:pre-wrap; margin-bottom:8px;">' + escapeHtml(expl) + '</div>';
+            html += window._qImproveActionBar('✅ แทนที่');
+            window._qImproveShowPanel(item, html, '#16a34a', applyFn);
+        };
     </script>
     <script>
         const ALLOWED_EMAIL = "medlifeplus@gmail.com";
@@ -19703,6 +19942,15 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                             ${qType === 'choice' ? `
                                 <button type="button" class="btn-sm" onclick="addOption(this)" style="padding:6px 20px; background:#fff; color:var(--primary); border:1.5px solid var(--primary); border-radius:12px; font-weight:900; font-size:0.8em; transition:all 0.2s; box-shadow:0 4px 10px rgba(99,102,241,0.05);" onmouseover="this.style.background='var(--primary)'; this.style.color='white';"><i class="fa-solid fa-plus"></i> Add Option</button>
                                 <button type="button" class="btn-sm" onclick="aiEnhanceQuestion(this)" title="AI Magic - enhance this question" style="padding:4px 12px; background:linear-gradient(135deg, #8b5cf6, #7c3aed); color:white; border:none; border-radius:12px; font-weight:900; font-size:0.75em; transition:all 0.2s;"><i class="fa-solid fa-wand-magic-sparkles"></i> Magic</button>
+                                <span class="q-improve-wrap" style="position:relative; display:inline-block;">
+                                    <button type="button" class="btn-sm" onclick="toggleQImproveMenu(this)" title="ปรับปรุงข้อนี้แบบเจาะจง" style="padding:4px 12px; background:#fff; color:#0891b2; border:1.5px solid #0891b2; border-radius:12px; font-weight:900; font-size:0.75em; transition:all 0.2s;"><i class="fa-solid fa-screwdriver-wrench"></i> ปรับปรุง <i class="fa-solid fa-caret-down" style="font-size:0.85em;"></i></button>
+                                    <div class="q-improve-menu lang-no-toggle" style="display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:60; background:#fff; border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 8px 24px rgba(15,23,42,0.18); padding:6px; min-width:210px;">
+                                        <button type="button" onclick="qImproveAction(this,'factcheck')" style="display:block; width:100%; text-align:left; padding:7px 10px; background:none; border:none; border-radius:8px; font-size:0.85em; font-weight:700; color:#0f172a; cursor:pointer;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">🩺 Fact-check คำตอบ</button>
+                                        <button type="button" onclick="qImproveAction(this,'polish')" style="display:block; width:100%; text-align:left; padding:7px 10px; background:none; border:none; border-radius:8px; font-size:0.85em; font-weight:700; color:#0f172a; cursor:pointer;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">✏️ เกลาภาษา/ไวยากรณ์</button>
+                                        <button type="button" onclick="qImproveAction(this,'distractors')" style="display:block; width:100%; text-align:left; padding:7px 10px; background:none; border:none; border-radius:8px; font-size:0.85em; font-weight:700; color:#0f172a; cursor:pointer;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">🎯 ปรับเฉพาะตัวลวง</button>
+                                        <button type="button" onclick="qImproveAction(this,'explanation')" style="display:block; width:100%; text-align:left; padding:7px 10px; background:none; border:none; border-radius:8px; font-size:0.85em; font-weight:700; color:#0f172a; cursor:pointer;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">💡 สร้างคำอธิบาย</button>
+                                    </div>
+                                </span>
                             ` : ''}
                             <button type="button" class="btn-sm btn-q-tags-toggle" onclick="toggleQTags(this)" title="Per-question tags" style="padding:4px 12px; background:${initialTagCount > 0 ? '#eef2ff' : '#f1f5f9'}; color:${initialTagCount > 0 ? '#4338ca' : '#475569'}; border:1px solid ${initialTagCount > 0 ? '#c7d2fe' : '#e2e8f0'}; border-radius:12px; font-weight:800; font-size:0.75em; transition:all 0.2s; display:flex; align-items:center; gap:5px;"><i class="fa-solid fa-tags"></i> Tags<span class="q-tags-count" style="padding:1px 6px; background:#6366f1; color:white; border-radius:6px; font-size:0.7em; font-weight:900; ${initialTagCount > 0 ? '' : 'display:none;'}">${initialTagCount > 0 ? initialTagCount : ''}</span></button>
                         </div>
