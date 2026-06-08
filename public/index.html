@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.42)</title>
+    <title>Internship Portfolio (V95.43)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2019,6 +2019,9 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- V95.43: Daily Check-in card — กดรับคะแนนรายวัน + streak ต่อเนื่อง -->
+                <div id="daily-checkin-card" class="lang-no-toggle"></div>
 
                 <!-- Certificate Request Section -->
                 <div id="certificate-request-section"
@@ -4215,7 +4218,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.42 (View Answers — left-align review for readability of long vignettes)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.43 (Daily Check-in — กดเช็คอินรับคะแนนรายวัน + streak ต่อเนื่อง โบนัสครบ 7 วัน)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -5083,6 +5086,12 @@
         let morningQuizBonusTimer = null;
         const MORNING_QUIZ_BONUS_AMOUNT = 0.1;
 
+        // V95.43: Daily Check-in — กดรับคะแนนรายวัน + streak ต่อเนื่อง
+        const CHECKIN_DAILY_AMOUNT = 0.01;        // คะแนนพื้นฐานต่อการเช็คอิน 1 วัน
+        const CHECKIN_STREAK_BONUS_EVERY = 7;     // ครบทุก N วันต่อเนื่อง ได้โบนัสก้อน
+        const CHECKIN_STREAK_BONUS_AMOUNT = 0.05; // โบนัสเมื่อครบรอบ streak
+        let myCheckin = { currentStreak: 0, bestStreak: 0, lastDate: '' };
+
         const reflectiveBadgeCatalog = [
             { id: 'first_log', icon: '📝', title: 'First Reflection', desc: 'Submit first Reflective Log ส่ง Reflective Log ครั้งแรก', cond: m => m.totalLogs >= 1 },
             { id: 'writer_7', icon: '📚', title: 'Weekly Writer', desc: 'Submit 7 logs ส่งครบ 7 ครั้ง', cond: m => m.totalLogs >= 7 },
@@ -5632,6 +5641,13 @@
                     myGroup = da.group || "Public"; // 🔥 Sync group V77.7
                     myScore = score; // V95.33: live score drives quiz unlock gate (renderAssignments runs below)
                     document.getElementById('u-score').innerText = score.toFixed(2);
+                    // V95.43: keep daily check-in card in sync with live user doc
+                    myCheckin = {
+                        currentStreak: da.checkinCurrentStreak || 0,
+                        bestStreak: da.checkinBestStreak || 0,
+                        lastDate: da.checkinLastDate || ''
+                    };
+                    renderDailyCheckinCard();
                     document.getElementById('u-group-badge').innerHTML = `<i class="fa-solid ${getGroupIcon(myGroup)}"></i> ${myGroup}`;
                     document.getElementById('u-group-badge').style.background = getGroupColor(myGroup);
                     document.getElementById('u-group-badge').style.display = myGroup !== 'Public' ? 'inline-block' : 'none';
@@ -12910,6 +12926,123 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 console.warn('Morning quiz bonus transaction failed:', err);
                 return { status: 'error', error: err };
             }
+        }
+
+        // --- 📅 V95.43: Daily Check-in (กดรับคะแนนรายวัน + streak ต่อเนื่อง) ---
+        function renderDailyCheckinCard() {
+            const el = document.getElementById('daily-checkin-card');
+            if (!el) return;
+
+            const todayKey = getBangkokDateTimeParts().dateKey;
+            const yesterdayKey = getBangkokDateTimeParts(new Date(Date.now() - 86400000)).dateKey;
+            const c = myCheckin || {};
+
+            // streak ยังนับต่อได้ก็ต่อเมื่อเช็คอินล่าสุดคือวันนี้หรือเมื่อวาน มิฉะนั้นถือว่าขาดช่วง
+            const alive = (c.lastDate === todayKey || c.lastDate === yesterdayKey);
+            const streak = alive ? (c.currentStreak || 0) : 0;
+            const best = c.bestStreak || 0;
+            const doneToday = c.lastDate === todayKey;
+
+            // คำนวณข้อความโบนัส streak
+            let hint;
+            if (doneToday) {
+                const rem = streak % CHECKIN_STREAK_BONUS_EVERY;
+                hint = (rem === 0 && streak > 0)
+                    ? `🎁 ครบ ${streak} วัน รับโบนัส +${CHECKIN_STREAK_BONUS_AMOUNT.toFixed(2)} แล้ว!`
+                    : `อีก ${CHECKIN_STREAK_BONUS_EVERY - rem} วัน รับโบนัส +${CHECKIN_STREAK_BONUS_AMOUNT.toFixed(2)}`;
+            } else {
+                const projected = streak + 1;
+                hint = (projected % CHECKIN_STREAK_BONUS_EVERY === 0)
+                    ? `🎁 เช็คอินวันนี้ครบ ${projected} วัน รับโบนัส +${CHECKIN_STREAK_BONUS_AMOUNT.toFixed(2)}!`
+                    : `เช็คอินรับ +${CHECKIN_DAILY_AMOUNT.toFixed(2)} คะแนน`;
+            }
+
+            const bestLine = best > 0 ? `<div style="font-size:0.62em; color:#94a3b8; font-weight:700; margin-top:2px;">สถิติต่อเนื่องสูงสุด ${best} วัน</div>` : '';
+
+            const btnHtml = doneToday
+                ? `<button id="daily-checkin-btn" disabled style="width:100%; padding:11px; border:none; border-radius:12px; background:#e2e8f0; color:#64748b; font-weight:800; font-size:0.9em; cursor:default;">เช็คอินแล้ววันนี้ ✓</button>`
+                : `<button id="daily-checkin-btn" onclick="tryDailyCheckin()" style="width:100%; padding:11px; border:none; border-radius:12px; background:linear-gradient(135deg,#f97316,#ea580c); color:#fff; font-weight:800; font-size:0.9em; cursor:pointer; box-shadow:0 4px 12px rgba(234,88,12,0.3);">เช็คอินรับคะแนนวันนี้</button>`;
+
+            el.innerHTML = `
+                <div style="margin-top:8px; padding:14px 16px; border-radius:16px; background:linear-gradient(135deg,#fff7ed,#ffedd5); border:1px solid #fed7aa;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;">
+                        <div>
+                            <div style="font-weight:800; color:#9a3412; font-size:0.95em;">📅 เช็คอินรายวัน</div>
+                            <div style="font-size:0.72em; color:#c2410c; font-weight:700; margin-top:2px;">${hint}</div>
+                            ${bestLine}
+                        </div>
+                        <div style="text-align:center; flex-shrink:0;">
+                            <div style="font-size:1.5em; line-height:1;">🔥</div>
+                            <div style="font-weight:900; color:#ea580c; font-size:1.05em; line-height:1.1;">${streak}</div>
+                            <div style="font-size:0.55em; color:#9a3412; font-weight:800; letter-spacing:0.5px;">วันต่อเนื่อง</div>
+                        </div>
+                    </div>
+                    ${btnHtml}
+                </div>`;
+        }
+
+        async function tryDailyCheckin() {
+            if (!userId) return;
+            const btn = document.getElementById('daily-checkin-btn');
+            if (btn) { btn.disabled = true; btn.textContent = 'กำลังเช็คอิน...'; }
+
+            const authUser = await ensureFirebaseAuthReady(10000);
+            if (!authUser) {
+                if (btn) { btn.disabled = false; btn.textContent = 'เช็คอินรับคะแนนวันนี้'; }
+                renderDailyCheckinCard();
+                return;
+            }
+
+            const todayKey = getBangkokDateTimeParts().dateKey;
+            const yesterdayKey = getBangkokDateTimeParts(new Date(Date.now() - 86400000)).dateKey;
+            const userRef = db.collection('users').doc(userId);
+            const logRef = db.collection('checkin_logs').doc(`daily_checkin_${userId}_${todayKey}`);
+
+            try {
+                const result = await db.runTransaction(async tx => {
+                    const logSnap = await tx.get(logRef);
+                    if (logSnap.exists) return { status: 'already' };
+
+                    const userSnap = await tx.get(userRef);
+                    const ud = userSnap.exists ? (userSnap.data() || {}) : {};
+                    const prevDate = ud.checkinLastDate || '';
+                    const prevStreak = ud.checkinCurrentStreak || 0;
+                    const prevBest = ud.checkinBestStreak || 0;
+
+                    const newStreak = (prevDate === yesterdayKey) ? (prevStreak + 1) : 1;
+                    const bonus = (newStreak % CHECKIN_STREAK_BONUS_EVERY === 0) ? CHECKIN_STREAK_BONUS_AMOUNT : 0;
+                    const amount = CHECKIN_DAILY_AMOUNT + bonus;
+                    const newBest = Math.max(prevBest, newStreak);
+
+                    tx.set(logRef, {
+                        userId,
+                        displayName: userProfile.displayName || '',
+                        type: 'daily_checkin',
+                        dateKey: todayKey,
+                        streak: newStreak,
+                        amount,
+                        bonus,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    tx.set(userRef, {
+                        score: firebase.firestore.FieldValue.increment(amount),
+                        checkinCurrentStreak: newStreak,
+                        checkinBestStreak: newBest,
+                        checkinLastDate: todayKey
+                    }, { merge: true });
+
+                    return { status: 'checked', amount, bonus, streak: newStreak, best: newBest };
+                });
+
+                if (result && result.status === 'checked') {
+                    // อัปเดต state ทันที (listener จะรีเฟรชซ้ำให้อีกที)
+                    myCheckin = { currentStreak: result.streak, bestStreak: result.best, lastDate: todayKey };
+                }
+            } catch (err) {
+                console.warn('Daily check-in transaction failed:', err);
+            }
+
+            renderDailyCheckinCard();
         }
 
         function collectReflectiveMetrics(logs) {
