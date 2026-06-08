@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.43)</title>
+    <title>Internship Portfolio (V95.44)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4218,7 +4218,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.43 (Daily Check-in — กดเช็คอินรับคะแนนรายวัน + streak ต่อเนื่อง โบนัสครบ 7 วัน)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.44 (Daily Check-in — compact English card + slimmer layout)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -12928,7 +12928,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             }
         }
 
-        // --- 📅 V95.43: Daily Check-in (กดรับคะแนนรายวัน + streak ต่อเนื่อง) ---
+        // --- 📅 V95.44: Daily Check-in (tap to earn daily points + streak) ---
         function renderDailyCheckinCard() {
             const el = document.getElementById('daily-checkin-card');
             if (!el) return;
@@ -12937,45 +12937,41 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             const yesterdayKey = getBangkokDateTimeParts(new Date(Date.now() - 86400000)).dateKey;
             const c = myCheckin || {};
 
-            // streak ยังนับต่อได้ก็ต่อเมื่อเช็คอินล่าสุดคือวันนี้หรือเมื่อวาน มิฉะนั้นถือว่าขาดช่วง
+            // streak survives only if the last check-in was today or yesterday; else it lapsed
             const alive = (c.lastDate === todayKey || c.lastDate === yesterdayKey);
             const streak = alive ? (c.currentStreak || 0) : 0;
             const best = c.bestStreak || 0;
             const doneToday = c.lastDate === todayKey;
+            const bonus = `+${CHECKIN_STREAK_BONUS_AMOUNT.toFixed(2)}`;
 
-            // คำนวณข้อความโบนัส streak
             let hint;
             if (doneToday) {
                 const rem = streak % CHECKIN_STREAK_BONUS_EVERY;
+                const left = CHECKIN_STREAK_BONUS_EVERY - rem;
                 hint = (rem === 0 && streak > 0)
-                    ? `🎁 ครบ ${streak} วัน รับโบนัส +${CHECKIN_STREAK_BONUS_AMOUNT.toFixed(2)} แล้ว!`
-                    : `อีก ${CHECKIN_STREAK_BONUS_EVERY - rem} วัน รับโบนัส +${CHECKIN_STREAK_BONUS_AMOUNT.toFixed(2)}`;
+                    ? `🎁 ${streak}-day bonus ${bonus} earned!`
+                    : `${left} day${left === 1 ? '' : 's'} to your ${bonus} bonus`;
             } else {
                 const projected = streak + 1;
                 hint = (projected % CHECKIN_STREAK_BONUS_EVERY === 0)
-                    ? `🎁 เช็คอินวันนี้ครบ ${projected} วัน รับโบนัส +${CHECKIN_STREAK_BONUS_AMOUNT.toFixed(2)}!`
-                    : `เช็คอินรับ +${CHECKIN_DAILY_AMOUNT.toFixed(2)} คะแนน`;
+                    ? `🎁 Check in for a ${projected}-day bonus ${bonus}!`
+                    : `Earn +${CHECKIN_DAILY_AMOUNT.toFixed(2)} pt today`;
             }
-
-            const bestLine = best > 0 ? `<div style="font-size:0.62em; color:#94a3b8; font-weight:700; margin-top:2px;">สถิติต่อเนื่องสูงสุด ${best} วัน</div>` : '';
+            if (best > 0) hint += ` · best ${best}`;
 
             const btnHtml = doneToday
-                ? `<button id="daily-checkin-btn" disabled style="width:100%; padding:11px; border:none; border-radius:12px; background:#e2e8f0; color:#64748b; font-weight:800; font-size:0.9em; cursor:default;">เช็คอินแล้ววันนี้ ✓</button>`
-                : `<button id="daily-checkin-btn" onclick="tryDailyCheckin()" style="width:100%; padding:11px; border:none; border-radius:12px; background:linear-gradient(135deg,#f97316,#ea580c); color:#fff; font-weight:800; font-size:0.9em; cursor:pointer; box-shadow:0 4px 12px rgba(234,88,12,0.3);">เช็คอินรับคะแนนวันนี้</button>`;
+                ? `<span style="flex-shrink:0; padding:8px 13px; border-radius:10px; background:#e2e8f0; color:#64748b; font-weight:800; font-size:0.78em; white-space:nowrap;">✓ Checked in</span>`
+                : `<button id="daily-checkin-btn" onclick="tryDailyCheckin()" style="flex-shrink:0; width:auto; padding:9px 16px; border:none; border-radius:10px; background:linear-gradient(135deg,#f97316,#ea580c); color:#fff; font-weight:800; font-size:0.82em; cursor:pointer; white-space:nowrap; box-shadow:0 3px 10px rgba(234,88,12,0.3);">Check in</button>`;
 
             el.innerHTML = `
-                <div style="margin-top:8px; padding:14px 16px; border-radius:16px; background:linear-gradient(135deg,#fff7ed,#ffedd5); border:1px solid #fed7aa;">
-                    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;">
-                        <div>
-                            <div style="font-weight:800; color:#9a3412; font-size:0.95em;">📅 เช็คอินรายวัน</div>
-                            <div style="font-size:0.72em; color:#c2410c; font-weight:700; margin-top:2px;">${hint}</div>
-                            ${bestLine}
-                        </div>
-                        <div style="text-align:center; flex-shrink:0;">
-                            <div style="font-size:1.5em; line-height:1;">🔥</div>
-                            <div style="font-weight:900; color:#ea580c; font-size:1.05em; line-height:1.1;">${streak}</div>
-                            <div style="font-size:0.55em; color:#9a3412; font-weight:800; letter-spacing:0.5px;">วันต่อเนื่อง</div>
-                        </div>
+                <div style="margin-top:8px; padding:10px 12px; border-radius:14px; background:linear-gradient(135deg,#fff7ed,#ffedd5); border:1px solid #fed7aa; display:flex; align-items:center; gap:10px;">
+                    <div style="flex-shrink:0; text-align:center; min-width:30px;">
+                        <div style="font-size:1.25em; line-height:1;">🔥</div>
+                        <div style="font-weight:900; color:#ea580c; font-size:0.9em; line-height:1.1;">${streak}</div>
+                    </div>
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-weight:800; color:#9a3412; font-size:0.85em;">Daily Check-in</div>
+                        <div style="font-size:0.68em; color:#c2410c; font-weight:700; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${hint}</div>
                     </div>
                     ${btnHtml}
                 </div>`;
@@ -12984,11 +12980,11 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
         async function tryDailyCheckin() {
             if (!userId) return;
             const btn = document.getElementById('daily-checkin-btn');
-            if (btn) { btn.disabled = true; btn.textContent = 'กำลังเช็คอิน...'; }
+            if (btn) { btn.disabled = true; btn.textContent = 'Checking in…'; }
 
             const authUser = await ensureFirebaseAuthReady(10000);
             if (!authUser) {
-                if (btn) { btn.disabled = false; btn.textContent = 'เช็คอินรับคะแนนวันนี้'; }
+                if (btn) { btn.disabled = false; btn.textContent = 'Check in'; }
                 renderDailyCheckinCard();
                 return;
             }
