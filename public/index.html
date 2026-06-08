@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.48)</title>
+    <title>Internship Portfolio (V95.49)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4224,7 +4224,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.48 (Rank chip clarity — prefix "→" on the next-rank chip so it no longer reads as contradicting the current LV badge)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.49 (Daily Streak — Log/Case chips now show when you last submitted, e.g. "3d ago")
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -12980,6 +12980,29 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 && getBangkokDateTimeParts(x.timestamp.toDate()).dateKey === todayKey);
         }
 
+        // V95.49: most recent submission date (Bangkok dateKey) across a cache, or null.
+        function _lastActivityDateKey(cache) {
+            let latest = null;
+            (cache || []).forEach(x => {
+                if (x && x.timestamp && x.timestamp.toDate) {
+                    const k = getBangkokDateTimeParts(x.timestamp.toDate()).dateKey;
+                    if (!latest || k > latest) latest = k;
+                }
+            });
+            return latest;
+        }
+
+        // V95.49: compact "last submitted" caption for the Log / Case chips.
+        function _lastActivityCaption(cache) {
+            const key = _lastActivityDateKey(cache);
+            if (!key) return 'never';
+            const todayKey = getBangkokDateTimeParts().dateKey;
+            if (key === todayKey) return 'today';
+            const days = Math.round(
+                (new Date(todayKey + 'T12:00:00Z') - new Date(key + 'T12:00:00Z')) / 86400000);
+            return days <= 1 ? '1d ago' : `${days}d ago`;
+        }
+
         // Union of every day the user did ANY of: daily check-in, reflective log, case submit.
         function collectActivityDates() {
             const set = new Set();
@@ -13088,6 +13111,12 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             const chipLog = logDone ? doneChip('📝', 'Log') : actChip('📝', 'Log', 'gotoLog()', false);
             const chipCase = caseDone ? doneChip('🩺', 'Case') : actChip('🩺', 'Case', 'gotoCaseSubmit()', false);
 
+            // V95.49: stack each Log / Case chip over a tiny "last submitted" caption.
+            const withCaption = (chipHtml, caption) =>
+                `<div style="display:flex; flex-direction:column; align-items:center; gap:2px;">${chipHtml}<span title="Last submitted" style="font-size:0.6em; color:#9a3412; font-weight:700; white-space:nowrap;">${caption}</span></div>`;
+            const chipLogWrap = withCaption(chipLog, _lastActivityCaption(window.myReflectiveLogsCache));
+            const chipCaseWrap = withCaption(chipCase, _lastActivityCaption(window.myCasesCache));
+
             el.innerHTML = `
                 <div style="margin-top:8px; padding:10px 12px; border-radius:14px; background:linear-gradient(135deg,#fff7ed,#ffedd5); border:1px solid #fed7aa; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                     <div style="flex-shrink:0; text-align:center; min-width:30px;">
@@ -13098,7 +13127,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                         <div style="font-weight:800; color:#9a3412; font-size:0.85em;">Daily Streak</div>
                         <div style="font-size:0.68em; color:#c2410c; font-weight:700; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${hint}</div>
                     </div>
-                    <div style="display:flex; gap:6px; flex-wrap:wrap; flex-shrink:0;">${chipCheck}${chipLog}${chipCase}</div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; flex-shrink:0; align-items:flex-start;">${chipCheck}${chipLogWrap}${chipCaseWrap}</div>
                 </div>`;
         }
 
