@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.30</title>
+    <title>Nika V95.31</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6282,6 +6282,7 @@
                             <button type="button" class="quiz-filter-pill" data-filter="template" onclick="setQuizFilter('template')">TEMPLATE</button>
                             <button type="button" class="quiz-filter-pill" data-filter="onetime" onclick="setQuizFilter('onetime')">ONE-TIME</button>
                             <button type="button" class="quiz-filter-pill" data-filter="locked" onclick="setQuizFilter('locked')">🔒 LOCKED</button>
+                            <button type="button" class="quiz-filter-pill" data-filter="materials" onclick="setQuizFilter('materials')">📎 MATERIALS</button>
                         </div>
                         <span style="height:18px; border-left:1px solid #e2e8f0; margin:0 4px;"></span>
                         <span style="font-size:0.65em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap;">Tags:</span>
@@ -25374,6 +25375,10 @@ ${JSON.stringify(sourceObj)}`;
                 // from interns until users.score reaches the threshold (0/absent = no gate).
                 const unlockVal = parseFloat(q.unlockScore) || 0;
                 const unlockLabel = unlockVal > 0 ? `<span class="badge" style="background:#7c3aed; color:white; margin-left:5px;" title="Hidden from interns until their cumulative score ≥ ${unlockVal}"><i class="fa-solid fa-lock"></i> ${unlockVal} pts</span>` : '';
+                // V95.31: surface attached downloadable materials so admin can see (and filter)
+                // which quizzes hand interns files after completion. Hover lists the names.
+                const _mats = Array.isArray(q.materials) ? q.materials.filter(m => m && m.url) : [];
+                const materialsLabel = _mats.length > 0 ? `<span class="badge" style="background:#1d4ed8; color:white; margin-left:5px;" title="${escapeHtml(_mats.map(m => (m.name && String(m.name).trim()) || 'เอกสาร').join(', '))}">📎 ${_mats.length}</span>` : '';
 
 
                 const timerOptions = [1, 2, 4, 8, 12, 24, 48, 72, 120, 168];
@@ -25419,7 +25424,7 @@ ${JSON.stringify(sourceObj)}`;
                             </div>
                             <div style="display:flex; flex-wrap:wrap; gap:3px; align-items:center;">
                                 ${modeLabel} ${oneTimeLabel} ${homeworkLabel} 
-                                ${pollLabel} ${subjLabel} ${orderingLabel} ${flashcardLabel} ${templateLabel} ${targetGroupLabel} ${unlockLabel}
+                                ${pollLabel} ${subjLabel} ${orderingLabel} ${flashcardLabel} ${templateLabel} ${targetGroupLabel} ${unlockLabel} ${materialsLabel}
                             </div>
                             <div style="margin-top:4px;"><small style="color:#999;">(${q.shortTitle || '-'})</small></div>
                         </td>
@@ -25634,6 +25639,7 @@ ${JSON.stringify(sourceObj)}`;
             if (f === 'template') return !!q.isTemplate;
             if (f === 'onetime') return !!q.oneTimeMode;
             if (f === 'locked') return (parseFloat(q.unlockScore) || 0) > 0; // V95.19: score-gated quizzes
+            if (f === 'materials') return Array.isArray(q.materials) && q.materials.some(m => m && m.url); // V95.31: has downloadable materials
             return true;
         }
 
