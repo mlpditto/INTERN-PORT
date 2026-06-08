@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.31</title>
+    <title>Nika V95.32</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -25378,7 +25378,7 @@ ${JSON.stringify(sourceObj)}`;
                 // V95.31: surface attached downloadable materials so admin can see (and filter)
                 // which quizzes hand interns files after completion. Hover lists the names.
                 const _mats = Array.isArray(q.materials) ? q.materials.filter(m => m && m.url) : [];
-                const materialsLabel = _mats.length > 0 ? `<span class="badge" style="background:#1d4ed8; color:white; margin-left:5px;" title="${escapeHtml(_mats.map(m => (m.name && String(m.name).trim()) || 'เอกสาร').join(', '))}">📎 ${_mats.length}</span>` : '';
+                const materialsLabel = _mats.length > 0 ? `<span class="badge" style="background:#1d4ed8; color:white; margin-left:5px; cursor:pointer;" title="คลิกเพื่อทดสอบโหลดเอกสาร: ${escapeHtml(_mats.map(m => (m.name && String(m.name).trim()) || 'เอกสาร').join(', '))}" onclick="event.stopPropagation(); adminOpenQuizMaterials('${q.id}')">📎 ${_mats.length}</span>` : '';
 
 
                 const timerOptions = [1, 2, 4, 8, 12, 24, 48, 72, 120, 168];
@@ -25641,6 +25641,35 @@ ${JSON.stringify(sourceObj)}`;
             if (f === 'locked') return (parseFloat(q.unlockScore) || 0) > 0; // V95.19: score-gated quizzes
             if (f === 'materials') return Array.isArray(q.materials) && q.materials.some(m => m && m.url); // V95.31: has downloadable materials
             return true;
+        }
+
+        // V95.32: admin clicks the 📎 badge to test-load a quiz's downloadable materials.
+        // 1 file → open it directly; multiple → a tiny self-contained chooser modal
+        // (opening several tabs at once trips popup blockers). External links open in a
+        // new tab with noopener.
+        function adminOpenQuizMaterials(quizId) {
+            const q = (typeof quizzesData !== 'undefined' ? quizzesData : []).find(x => x.id === quizId);
+            const mats = (q && Array.isArray(q.materials)) ? q.materials.filter(m => m && m.url) : [];
+            if (!mats.length) return;
+            if (mats.length === 1) { window.open(String(mats[0].url).trim(), '_blank', 'noopener'); return; }
+            const existing = document.getElementById('adminQuizMaterialsModal');
+            if (existing) existing.remove();
+            const links = mats.map(m => {
+                const name = (m.name && String(m.name).trim()) || 'เอกสาร';
+                return `<a href="${escapeHtml(String(m.url).trim())}" target="_blank" rel="noopener noreferrer" style="display:flex; align-items:center; gap:8px; padding:10px 14px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; border-radius:10px; font-weight:700; text-decoration:none; font-size:0.9em;">📎 ${escapeHtml(name)}</a>`;
+            }).join('');
+            const overlay = document.createElement('div');
+            overlay.id = 'adminQuizMaterialsModal';
+            overlay.style.cssText = 'position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:99999; display:flex; align-items:center; justify-content:center; padding:20px;';
+            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+            overlay.innerHTML = `<div style="background:white; border-radius:16px; padding:22px; max-width:420px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+                    <div style="font-weight:900; color:#0f172a; font-size:1.05em;">📎 เอกสารประกอบ (${mats.length})</div>
+                    <button type="button" onclick="document.getElementById('adminQuizMaterialsModal').remove()" style="background:none; border:none; font-size:1.2em; cursor:pointer; color:#64748b;">✕</button>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:8px;">${links}</div>
+            </div>`;
+            document.body.appendChild(overlay);
         }
 
         function sortQuizzes(arr) {
