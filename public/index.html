@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.50)</title>
+    <title>Internship Portfolio (V95.51)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4224,7 +4224,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.50 (Rank chip — show only points needed to rank up, e.g. "→ 4.62 pts", instead of the next-rank name)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.51 (LIFF boot resilience — retry flaky liff.init up to 3× with backoff before failing)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -5367,6 +5367,31 @@
             }
         }
 
+        // V95.51: liff.init can transiently fail ("Failed to fetch") on flaky mobile
+        // networks, especially some Android builds. Retry a few times with backoff
+        // before giving up — mirrors signInAnonymouslyWithRetry. Each attempt keeps
+        // the existing 10s timeout so a hung init can't stall the boot.
+        async function initLiffWithRetry(maxAttempts = 3) {
+            let lastErr;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    const initPromise = liff.init({ liffId: USER_LIFF_ID });
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error("LIFF Init Timeout")), 10000));
+                    await Promise.race([initPromise, timeoutPromise]);
+                    return;
+                } catch (err) {
+                    lastErr = err;
+                    console.warn(`LIFF init attempt ${attempt}/${maxAttempts} failed:`, err && err.message);
+                    if (attempt < maxAttempts) {
+                        updateStatus(`Network hiccup — retrying LIFF (${attempt}/${maxAttempts})...`);
+                        await new Promise(r => setTimeout(r, 1200 * attempt)); // linear backoff
+                    }
+                }
+            }
+            throw lastErr;
+        }
+
         async function main() {
             try {
                 const urlParams = new URLSearchParams(window.location.search);
@@ -5499,13 +5524,7 @@
                 if (!window.liff) throw new Error("LIFF SDK not found on window");
 
                 updateStatus("Initializing LIFF...");
-                // Timeout for LIFF Init (10 seconds)
-                const initPromise = liff.init({ liffId: USER_LIFF_ID });
-                const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error("LIFF Init Timeout")), 10000)
-                );
-
-                await Promise.race([initPromise, timeoutPromise]);
+                await initLiffWithRetry(3); // V95.51: retry flaky liff.init (10s timeout each) before failing
 
                 updateStatus("Checking Login Status...");
                 if (!liff.isLoggedIn()) {
