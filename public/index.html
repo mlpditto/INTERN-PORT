@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.44)</title>
+    <title>Internship Portfolio (V95.45)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -1936,7 +1936,8 @@
                                     <span class="metric-badge badge-today" id="badge-today">
                                         <i class="fa-solid fa-coins"></i> +0.00
                                     </span>
-                                    <span class="metric-badge badge-streak" id="badge-streak">
+                                    <!-- V95.45: 🔥 streak consolidated into the Daily Streak card below -->
+                                    <span class="metric-badge badge-streak" id="badge-streak" style="display:none;">
                                         <i class="fa-solid fa-fire"></i> 0
                                     </span>
                                     <span class="metric-badge badge-logs" id="badge-logs">
@@ -4218,7 +4219,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.44 (Daily Check-in — compact English card + slimmer layout)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.45 (Daily Streak — one streak across Check-in / Log / Case)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -12928,20 +12929,102 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             }
         }
 
-        // --- 📅 V95.44: Daily Check-in (tap to earn daily points + streak) ---
+        // --- 📅 V95.45: Daily Streak hub — one streak across check-in / log / case ---
+        function _shiftDateKey(key, deltaDays) {
+            // calendar arithmetic on a Bangkok YYYY-MM-DD key (noon UTC dodges DST/tz drift)
+            const d = new Date(key + 'T12:00:00Z');
+            d.setUTCDate(d.getUTCDate() + deltaDays);
+            return d.toISOString().slice(0, 10);
+        }
+
+        function _activityDoneToday(cache) {
+            const todayKey = getBangkokDateTimeParts().dateKey;
+            return (cache || []).some(x => x && x.timestamp && x.timestamp.toDate
+                && getBangkokDateTimeParts(x.timestamp.toDate()).dateKey === todayKey);
+        }
+
+        // Union of every day the user did ANY of: daily check-in, reflective log, case submit.
+        function collectActivityDates() {
+            const set = new Set();
+            const add = ts => { if (ts && ts.toDate) set.add(getBangkokDateTimeParts(ts.toDate()).dateKey); };
+            (window.myReflectiveLogsCache || []).forEach(l => add(l.timestamp));
+            (window.myCasesCache || []).forEach(c => add(c.timestamp));
+            // reconstruct the stored check-in run (only lastDate + currentStreak are kept client-side)
+            const c = myCheckin || {};
+            if (c.lastDate) {
+                const n = Math.max(1, c.currentStreak || 1);
+                for (let i = 0; i < n; i++) set.add(_shiftDateKey(c.lastDate, -i));
+            }
+            return set;
+        }
+
+        // Consecutive days (Bangkok) ending today, or yesterday if nothing yet today.
+        function computeEngagementStreak(forceTodayKey) {
+            const set = collectActivityDates();
+            if (forceTodayKey) set.add(forceTodayKey);
+            const todayKey = getBangkokDateTimeParts().dateKey;
+            const yesterdayKey = _shiftDateKey(todayKey, -1);
+            const doneToday = set.has(todayKey);
+            let cursor = doneToday ? todayKey : (set.has(yesterdayKey) ? yesterdayKey : null);
+            let streak = 0;
+            while (cursor && set.has(cursor)) { streak++; cursor = _shiftDateKey(cursor, -1); }
+            return { streak, doneToday };
+        }
+
+        // Award the +0.05 milestone once per day when the engagement streak hits a 7-day multiple.
+        async function awardEngagementBonusIfDue() {
+            if (!userId) return;
+            const todayKey = getBangkokDateTimeParts().dateKey;
+            const { streak } = computeEngagementStreak(todayKey); // an activity just happened → count today
+            if (streak <= 0 || streak % CHECKIN_STREAK_BONUS_EVERY !== 0) return;
+            const authUser = await ensureFirebaseAuthReady(10000);
+            if (!authUser) return;
+            const userRef = db.collection('users').doc(userId);
+            const logRef = db.collection('checkin_logs').doc(`streak_bonus_${userId}_${todayKey}`);
+            try {
+                await db.runTransaction(async tx => {
+                    const snap = await tx.get(userRef);
+                    const ud = snap.exists ? (snap.data() || {}) : {};
+                    if (ud.activityBonusLastDate === todayKey) return; // already paid today
+                    tx.set(userRef, {
+                        score: firebase.firestore.FieldValue.increment(CHECKIN_STREAK_BONUS_AMOUNT),
+                        activityBonusLastDate: todayKey
+                    }, { merge: true });
+                    tx.set(logRef, {
+                        userId,
+                        displayName: userProfile.displayName || '',
+                        type: 'streak_bonus',
+                        amount: CHECKIN_STREAK_BONUS_AMOUNT,
+                        streak,
+                        dateKey: todayKey,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                });
+            } catch (err) { console.warn('Engagement streak bonus failed:', err); }
+        }
+
+        // Navigation shortcuts for the Log / Case chips.
+        function gotoLog() {
+            const content = document.getElementById('kanban-content');
+            if (content && content.style.display === 'none' && typeof toggleKanban === 'function') toggleKanban();
+            if (typeof switchMissionTab === 'function') switchMissionTab('reflection');
+            const sec = document.getElementById('section-missions') || content;
+            if (sec && sec.scrollIntoView) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        function gotoCaseSubmit() {
+            const content = document.getElementById('case-section-content');
+            if (content && content.style.display === 'none' && typeof toggleCaseSection === 'function') toggleCaseSection();
+            if (typeof switchCaseTab === 'function') switchCaseTab('submit');
+            const sec = document.getElementById('section-cases') || content;
+            if (sec && sec.scrollIntoView) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
         function renderDailyCheckinCard() {
             const el = document.getElementById('daily-checkin-card');
             if (!el) return;
 
             const todayKey = getBangkokDateTimeParts().dateKey;
-            const yesterdayKey = getBangkokDateTimeParts(new Date(Date.now() - 86400000)).dateKey;
-            const c = myCheckin || {};
-
-            // streak survives only if the last check-in was today or yesterday; else it lapsed
-            const alive = (c.lastDate === todayKey || c.lastDate === yesterdayKey);
-            const streak = alive ? (c.currentStreak || 0) : 0;
-            const best = c.bestStreak || 0;
-            const doneToday = c.lastDate === todayKey;
+            const { streak, doneToday } = computeEngagementStreak();
             const bonus = `+${CHECKIN_STREAK_BONUS_AMOUNT.toFixed(2)}`;
 
             let hint;
@@ -12953,27 +13036,32 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     : `${left} day${left === 1 ? '' : 's'} to your ${bonus} bonus`;
             } else {
                 const projected = streak + 1;
-                hint = (projected % CHECKIN_STREAK_BONUS_EVERY === 0)
-                    ? `🎁 Check in for a ${projected}-day bonus ${bonus}!`
-                    : `Earn +${CHECKIN_DAILY_AMOUNT.toFixed(2)} pt today`;
+                if (projected % CHECKIN_STREAK_BONUS_EVERY === 0) hint = `🎁 Act today for a ${projected}-day bonus ${bonus}!`;
+                else hint = streak > 0 ? 'Do any activity to keep your streak' : 'Check in or log to start your streak';
             }
-            if (best > 0) hint += ` · best ${best}`;
 
-            const btnHtml = doneToday
-                ? `<span style="flex-shrink:0; padding:8px 13px; border-radius:10px; background:#e2e8f0; color:#64748b; font-weight:800; font-size:0.78em; white-space:nowrap;">✓ Checked in</span>`
-                : `<button id="daily-checkin-btn" onclick="tryDailyCheckin()" style="flex-shrink:0; width:auto; padding:9px 16px; border:none; border-radius:10px; background:linear-gradient(135deg,#f97316,#ea580c); color:#fff; font-weight:800; font-size:0.82em; cursor:pointer; white-space:nowrap; box-shadow:0 3px 10px rgba(234,88,12,0.3);">Check in</button>`;
+            const checkDone = (myCheckin || {}).lastDate === todayKey;
+            const logDone = _activityDoneToday(window.myReflectiveLogsCache);
+            const caseDone = _activityDoneToday(window.myCasesCache);
+
+            const doneChip = (icon, label) => `<span title="${label} done today" style="display:inline-flex; align-items:center; gap:4px; padding:6px 9px; border-radius:9px; background:#dcfce7; color:#15803d; font-weight:800; font-size:0.72em; white-space:nowrap;">${icon} ✓</span>`;
+            const actChip = (icon, label, fn, primary, id) => `<button ${id ? `id="${id}" ` : ''}onclick="${fn}" title="${label}" style="display:inline-flex; align-items:center; gap:4px; width:auto; padding:6px 10px; border-radius:9px; background:${primary ? 'linear-gradient(135deg,#f97316,#ea580c)' : '#fff7ed'}; color:${primary ? '#fff' : '#c2410c'}; border:${primary ? 'none' : '1px solid #fed7aa'}; font-weight:800; font-size:0.72em; cursor:pointer; white-space:nowrap;">${icon} ${label}</button>`;
+
+            const chipCheck = checkDone ? doneChip('✅', 'Check in') : actChip('✅', 'Check in', 'tryDailyCheckin()', true, 'daily-checkin-btn');
+            const chipLog = logDone ? doneChip('📝', 'Log') : actChip('📝', 'Log', 'gotoLog()', false);
+            const chipCase = caseDone ? doneChip('🩺', 'Case') : actChip('🩺', 'Case', 'gotoCaseSubmit()', false);
 
             el.innerHTML = `
-                <div style="margin-top:8px; padding:10px 12px; border-radius:14px; background:linear-gradient(135deg,#fff7ed,#ffedd5); border:1px solid #fed7aa; display:flex; align-items:center; gap:10px;">
+                <div style="margin-top:8px; padding:10px 12px; border-radius:14px; background:linear-gradient(135deg,#fff7ed,#ffedd5); border:1px solid #fed7aa; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                     <div style="flex-shrink:0; text-align:center; min-width:30px;">
                         <div style="font-size:1.25em; line-height:1;">🔥</div>
                         <div style="font-weight:900; color:#ea580c; font-size:0.9em; line-height:1.1;">${streak}</div>
                     </div>
-                    <div style="flex:1; min-width:0;">
-                        <div style="font-weight:800; color:#9a3412; font-size:0.85em;">Daily Check-in</div>
+                    <div style="flex:1; min-width:120px;">
+                        <div style="font-weight:800; color:#9a3412; font-size:0.85em;">Daily Streak</div>
                         <div style="font-size:0.68em; color:#c2410c; font-weight:700; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${hint}</div>
                     </div>
-                    ${btnHtml}
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; flex-shrink:0;">${chipCheck}${chipLog}${chipCase}</div>
                 </div>`;
         }
 
@@ -13006,8 +13094,9 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     const prevBest = ud.checkinBestStreak || 0;
 
                     const newStreak = (prevDate === yesterdayKey) ? (prevStreak + 1) : 1;
-                    const bonus = (newStreak % CHECKIN_STREAK_BONUS_EVERY === 0) ? CHECKIN_STREAK_BONUS_AMOUNT : 0;
-                    const amount = CHECKIN_DAILY_AMOUNT + bonus;
+                    // V95.45: the +0.05 milestone now rides the unified engagement streak
+                    // (awardEngagementBonusIfDue), so check-in itself only grants its base.
+                    const amount = CHECKIN_DAILY_AMOUNT;
                     const newBest = Math.max(prevBest, newStreak);
 
                     tx.set(logRef, {
@@ -13017,7 +13106,6 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                         dateKey: todayKey,
                         streak: newStreak,
                         amount,
-                        bonus,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
                     tx.set(userRef, {
@@ -13027,12 +13115,14 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                         checkinLastDate: todayKey
                     }, { merge: true });
 
-                    return { status: 'checked', amount, bonus, streak: newStreak, best: newBest };
+                    return { status: 'checked', amount, streak: newStreak, best: newBest };
                 });
 
                 if (result && result.status === 'checked') {
-                    // อัปเดต state ทันที (listener จะรีเฟรชซ้ำให้อีกที)
+                    // update local state immediately (listener will refresh again)
                     myCheckin = { currentStreak: result.streak, bestStreak: result.best, lastDate: todayKey };
+                    renderDailyCheckinCard();
+                    await awardEngagementBonusIfDue(); // pay the +0.05 if this push hit a 7-day multiple
                 }
             } catch (err) {
                 console.warn('Daily check-in transaction failed:', err);
@@ -13490,6 +13580,10 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     scoreGranted = false;
                     console.warn("Reflective log saved but score update failed:", scoreErr);
                 }
+
+                // V95.45: a log counts toward the unified daily streak
+                renderDailyCheckinCard();
+                awardEngagementBonusIfDue();
 
                 document.getElementById('rl-content').value = "";
                 updateCharCount();
@@ -14916,6 +15010,7 @@ async function archiveDoneCard(cardId) {
                     // V94.31: refresh writing profile + DR status when reflective_logs change
                     if (typeof renderMyWritingProfile === 'function') renderMyWritingProfile();
                     if (typeof renderDRStatus === 'function') renderDRStatus();
+                    renderDailyCheckinCard(); // V95.45: log dates feed the unified streak
                 }, e => {
                     console.error("Error loading my reflective logs:", e);
                     if (e && e.code === 'permission-denied') notifyMissingFirebaseAuth('my reflective logs');
@@ -17335,6 +17430,7 @@ async function archiveDoneCard(cardId) {
                 }
 
                 await awardCaseSubmitBonus();
+                awardEngagementBonusIfDue(); // V95.45: a case counts toward the unified daily streak
 
                 // Notify LINE
                 if (liff.isInClient()) {
@@ -17462,6 +17558,7 @@ async function archiveDoneCard(cardId) {
                 renderCaseGrouped(cases);
                 renderCaseSystemCards(); // V94.79: refresh the per-system counters on the Log Case cards
                 updateGrandLineDashboard();
+                renderDailyCheckinCard(); // V95.45: case dates feed the unified streak
             }).catch(err => {
                 console.error("Failed to load cases:", err);
                 window.myCasesCache = [];
