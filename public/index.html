@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.45)</title>
+    <title>Internship Portfolio (V95.46)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -1976,6 +1976,11 @@
                                     <div class="voyage-metric-item">
                                         <i class="fa-solid fa-chart-line" style="color:#10b981;"></i>
                                         <span id="unified-total" class="voyage-value">0</span>
+                                    </div>
+                                    <!-- V95.46: total check-ins (completes the per-activity counters; streak lives in the card) -->
+                                    <div class="voyage-metric-item" title="Total check-ins">
+                                        <i class="fa-solid fa-calendar-check" style="color:#ea580c;"></i>
+                                        <span id="unified-checkin" class="voyage-value">0</span>
                                     </div>
                                     <span class="voyage-trend" id="unified-trend">
                                         <i class="fa-solid fa-arrow-up"></i> +0
@@ -4219,7 +4224,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V95.45 (Daily Streak — one streak across Check-in / Log / Case)
+                <span id="intern-version-current">V94.04</span> — Last feature: V95.46 (Total check-ins counter in the metrics strip)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -5649,6 +5654,9 @@
                         lastDate: da.checkinLastDate || ''
                     };
                     renderDailyCheckinCard();
+                    // V95.46: total check-in counter in the metrics strip
+                    const checkinCountEl = document.getElementById('unified-checkin');
+                    if (checkinCountEl) checkinCountEl.textContent = da.checkinTotalCount || 0;
                     document.getElementById('u-group-badge').innerHTML = `<i class="fa-solid ${getGroupIcon(myGroup)}"></i> ${myGroup}`;
                     document.getElementById('u-group-badge').style.background = getGroupColor(myGroup);
                     document.getElementById('u-group-badge').style.display = myGroup !== 'Public' ? 'inline-block' : 'none';
@@ -13112,7 +13120,8 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                         score: firebase.firestore.FieldValue.increment(amount),
                         checkinCurrentStreak: newStreak,
                         checkinBestStreak: newBest,
-                        checkinLastDate: todayKey
+                        checkinLastDate: todayKey,
+                        checkinTotalCount: firebase.firestore.FieldValue.increment(1) // V95.46: lifetime check-in tally
                     }, { merge: true });
 
                     return { status: 'checked', amount, streak: newStreak, best: newBest };
