@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.43</title>
+    <title>Nika V95.44</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -25405,6 +25405,18 @@ ${JSON.stringify(sourceObj)}`;
                 });
             }
 
+            // V95.44: per-row system chips — reuse the Dashboard's Quiz Coverage
+            // classifier (computeQuizCoverageBuckets) so each row shows its หมวด
+            // without switching tabs. Computed once per render; a quiz can match
+            // multiple systems. Missing entry = uncategorized.
+            const covByQuiz = {};
+            const covBuckets = (typeof window.computeQuizCoverageBuckets === 'function') ? window.computeQuizCoverageBuckets() : null;
+            if (covBuckets) {
+                (window._qcovSystems || []).forEach(s => {
+                    (covBuckets[s.key] || []).forEach(qq => { (covByQuiz[qq.id] = covByQuiz[qq.id] || []).push(s); });
+                });
+            }
+
             // Helper to render row
             const generateRow = (q, isActiveSection) => {
                 let statusInfo = "";
@@ -25457,6 +25469,13 @@ ${JSON.stringify(sourceObj)}`;
                 // which quizzes hand interns files after completion. Hover lists the names.
                 const _mats = Array.isArray(q.materials) ? q.materials.filter(m => m && m.url) : [];
                 const materialsLabel = _mats.length > 0 ? `<span class="badge" style="background:#1d4ed8; color:white; margin-left:5px; cursor:pointer;" title="คลิกเพื่อทดสอบโหลดเอกสาร: ${escapeHtml(_mats.map(m => (m.name && String(m.name).trim()) || 'เอกสาร').join(', '))}" onclick="event.stopPropagation(); adminOpenQuizMaterials('${q.id}')">📎 ${_mats.length}</span>` : '';
+                // V95.44: หมวด chips mirroring the Dashboard Quiz Coverage widget. Click
+                // opens the same per-system list modal (works from any tab — the modal is
+                // static and covByQuiz guarantees _qcovBuckets is fresh this render).
+                const _covList = covByQuiz[q.id] || [];
+                const systemLabel = _covList.length
+                    ? _covList.map(s => `<span class="badge" title="หมวดตาม Quiz Coverage — คลิกดู quiz ในหมวดนี้" style="background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe; margin-left:5px; cursor:pointer;" onclick="event.stopPropagation(); window.openQuizCoverageList('${s.key}')">${s.emoji} ${escapeHtml(s.label.en)}</span>`).join('')
+                    : (covBuckets ? `<span class="badge" title="ยังไม่จัดหมวด — คลิกเพื่อดู/จัดหมวดจากรายการ Uncategorized" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a; margin-left:5px; cursor:pointer;" onclick="event.stopPropagation(); window.openQuizCoverageList('__uncat')">📥 ยังไม่จัดหมวด</span>` : '');
 
 
                 const timerOptions = [1, 2, 4, 8, 12, 24, 48, 72, 120, 168];
@@ -25501,8 +25520,8 @@ ${JSON.stringify(sourceObj)}`;
                                 ${_easyBadge}${_hardBadge}${_cheatBadge}
                             </div>
                             <div style="display:flex; flex-wrap:wrap; gap:3px; align-items:center;">
-                                ${modeLabel} ${oneTimeLabel} ${homeworkLabel} 
-                                ${pollLabel} ${subjLabel} ${orderingLabel} ${flashcardLabel} ${templateLabel} ${targetGroupLabel} ${unlockLabel} ${materialsLabel}
+                                ${modeLabel} ${oneTimeLabel} ${homeworkLabel}
+                                ${pollLabel} ${subjLabel} ${orderingLabel} ${flashcardLabel} ${templateLabel} ${targetGroupLabel} ${unlockLabel} ${materialsLabel} ${systemLabel}
                             </div>
                             <div style="margin-top:4px;"><small style="color:#999;">(${q.shortTitle || '-'})</small></div>
                         </td>
@@ -27018,11 +27037,14 @@ ${JSON.stringify(sourceObj)}`;
             // {key, en/ko/th label} (symptoms removed in V95.24 — see tokensFor),
             // plus a substring match guarded to
             // tokens >= 4 chars so short keys (gi/ent/msk) can't false-positive.
-            window.renderQuizCoverage = function () {
-                const grid = document.getElementById('qcov-grid');
-                if (!grid) return;
+            // V95.44: classification split out of renderQuizCoverage so the Quiz Engine
+            // list can reuse it — renderQuizCoverage early-returns when #qcov-grid isn't
+            // on screen, but the bucket math has no DOM dependency. Returns the buckets
+            // (and caches them on window._qcovBuckets/_qcovSystems) or null if
+            // CASE_SYSTEMS hasn't loaded yet.
+            window.computeQuizCoverageBuckets = function () {
                 const base = Array.isArray(window.CASE_SYSTEMS) ? window.CASE_SYSTEMS : [];
-                if (!base.length) { grid.innerHTML = ''; return; }
+                if (!base.length) return null;
                 // V95.27: coverage-only domains (not body systems → deliberately NOT added
                 // to the shared case-logging CASE_SYSTEMS). Appended just before "Other".
                 const EXTRA = [
@@ -27086,6 +27108,15 @@ ${JSON.stringify(sourceObj)}`;
                     if (!matchedAny) buckets.__uncat.push(q);
                 });
                 window._qcovBuckets = buckets;
+                return buckets;
+            };
+
+            window.renderQuizCoverage = function () {
+                const grid = document.getElementById('qcov-grid');
+                if (!grid) return;
+                const buckets = window.computeQuizCoverageBuckets();
+                if (!buckets) { grid.innerHTML = ''; return; }
+                const systems = window._qcovSystems || [];
                 const counts = {}; systems.forEach(s => counts[s.key] = buckets[s.key].length);
                 const uncategorized = buckets.__uncat.length;
 
