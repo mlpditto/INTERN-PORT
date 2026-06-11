@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.58)</title>
+    <title>Internship Portfolio (V95.59)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2971,6 +2971,27 @@
                     background: #fffbeb; border: 1px solid #fde68a;
                     border-radius: 8px; padding: 8px 12px;
                 }
+                /* V95.45: intern submitter credit footer for user-contributed
+                   Codex entries (Drug + Disease). Soft slate card with avatar. */
+                .dc-detail-credit {
+                    display: flex; align-items: center; gap: 10px;
+                    margin: 16px 20px 4px; padding: 10px 14px;
+                    background: #f8fafc; border: 1px solid #e2e8f0;
+                    border-radius: 10px;
+                }
+                .dc-detail-credit-avatar {
+                    width: 32px; height: 32px; border-radius: 50%;
+                    object-fit: cover; flex-shrink: 0;
+                    border: 1px solid #e2e8f0; background: #fff;
+                }
+                .dc-detail-credit-avatar-fallback {
+                    display: inline-flex; align-items: center; justify-content: center;
+                    font-size: 16px; background: #eef2ff;
+                }
+                .dc-detail-credit-text {
+                    font-size: 0.82em; color: #64748b; line-height: 1.4;
+                }
+                .dc-detail-credit-text strong { color: #334155; }
                 @media (max-width: 640px) {
                     .dc-detail-shell { max-width: 100%; }
                     .dc-detail-head { padding: 12px 16px; }
@@ -11431,7 +11452,10 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     </details>`;
             }).filter(Boolean).join('');
             // V95.11: lang bar prefixed so the chip rail shows regardless of content.
-            body.innerHTML = dxRenderLangBar(eff) + (html || '<div class="dc-empty-state" style="padding:20px;">โรคนี้ยังไม่มีรายละเอียด · entry may still be in draft.</div>');
+            // V95.45: credit the intern who submitted this entry (when present).
+            // Read from the original doc, not eff — credit fields aren't translated.
+            const creditHtml = codexContributorCreditHtml(disease.submittedByName, disease.submittedByPictureUrl);
+            body.innerHTML = dxRenderLangBar(eff) + (html || '<div class="dc-empty-state" style="padding:20px;">โรคนี้ยังไม่มีรายละเอียด · entry may still be in draft.</div>') + creditHtml;
             body.scrollTop = 0;
         }
 
@@ -11441,6 +11465,28 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 try { return window.renderMd(text); } catch (_) {}
             }
             return escapeHtml(text);
+        }
+
+        // V95.45: intern-facing credit for user-submitted Codex entries. Renders a
+        // small "เพิ่มข้อมูลโดย <name>" footer with the submitter's LINE avatar when
+        // the published doc carries submittedByName (set at admin approval). Shared
+        // by Drug + Disease detail views. Returns '' for admin/AI-authored entries
+        // (no submitter name) so they show nothing.
+        function codexContributorCreditHtml(name, pictureUrl) {
+            const safeName = String(name == null ? '' : name).trim();
+            if (!safeName) return '';
+            const pic = String(pictureUrl == null ? '' : pictureUrl).trim();
+            const avatar = /^https?:\/\//i.test(pic)
+                ? `<img src="${escapeHtml(pic)}" alt="" class="dc-detail-credit-avatar" loading="lazy">`
+                : `<span class="dc-detail-credit-avatar dc-detail-credit-avatar-fallback">👤</span>`;
+            // lang-no-toggle: exempt from lang-toggle.js auto-wrap. Without it the
+            // Thai label AND a Thai intern display name (e.g. "สมชาย ใจดี") get
+            // hidden under the EN-default body — see CLAUDE memory lang-toggle-thai-blank.
+            return `
+                <div class="dc-detail-credit lang-no-toggle">
+                    ${avatar}
+                    <span class="dc-detail-credit-text">เพิ่มข้อมูลโดย · Contributed by <strong>${escapeHtml(safeName)}</strong></span>
+                </div>`;
         }
 
         // V95.13 Phase 6: open a cross-linked drug from a disease's Related Drugs
@@ -12244,7 +12290,10 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 </details>`;
             // V94.99: lang bar prefixed to body so the chip rail is always
             // visible regardless of whether the drug has any text content.
-            body.innerHTML = dcRenderLangBar(eff) + (html || '<div class="dc-empty-state" style="padding:20px;">ยานี้ยังไม่มีรายละเอียด · entry may still be in draft.</div>') + discussionHtml;
+            // V95.45: credit the intern submitter (when present), placed above the
+            // discussion thread. Read from the original doc — not translated.
+            const creditHtml = codexContributorCreditHtml(drug.submittedByName, drug.submittedByPictureUrl);
+            body.innerHTML = dcRenderLangBar(eff) + (html || '<div class="dc-empty-state" style="padding:20px;">ยานี้ยังไม่มีรายละเอียด · entry may still be in draft.</div>') + creditHtml + discussionHtml;
             // Wire discussion onSnapshot on first toggle-open (lazy — interns
             // who never expand the section pay zero read cost).
             const detailsEl = document.getElementById('dc-discussion-details');
