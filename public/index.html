@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.59)</title>
+    <title>Internship Portfolio (V95.60)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5416,6 +5416,29 @@
             throw lastErr;
         }
 
+        // V95.60: replace the dead-end alert() on init failure with an actionable
+        // Retry screen on the loading overlay (salvaged from PR #536 — the retry
+        // half of that PR shipped as V95.51, this screen half never landed).
+        function showInitError(message) {
+            const overlay = document.getElementById('loading-overlay');
+            const safe = String(message || 'Unknown error').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const isNetwork = /failed to fetch|network|timeout|fetch/i.test(message || '');
+            const body = `
+                <div class="lang-no-toggle" style="background:#fff; border-radius:16px; padding:24px 20px; max-width:320px; width:86%; text-align:center; box-shadow:0 12px 40px rgba(0,0,0,.35);">
+                    <div style="font-size:2.4em; margin-bottom:8px;">${isNetwork ? '📶' : '⚠️'}</div>
+                    <div style="font-weight:800; color:#1e293b; font-size:1.1em; margin-bottom:6px;">เปิดแอปไม่สำเร็จ</div>
+                    <div style="color:#475569; font-size:0.85em; line-height:1.55; margin-bottom:6px;">${isNetwork ? 'เชื่อมต่อเครือข่ายไม่สำเร็จ<br>เช็คสัญญาณเน็ตแล้วลองใหม่อีกครั้ง' : 'เกิดข้อผิดพลาดระหว่างเปิดแอป'}</div>
+                    <div style="color:#94a3b8; font-size:0.7em; margin-bottom:18px; word-break:break-word;">(${safe})</div>
+                    <button onclick="location.reload()" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; width:auto; padding:12px 30px; border:none; border-radius:11px; background:linear-gradient(135deg,#3b82f6,#2563eb); color:#fff; font-weight:800; font-size:0.98em; cursor:pointer; box-shadow:0 4px 14px rgba(37,99,235,.4);">🔄 ลองใหม่ · Retry</button>
+                </div>`;
+            if (overlay) {
+                overlay.classList.remove('hidden');
+                overlay.innerHTML = body;
+            } else {
+                alert("Init Error: " + message);
+            }
+        }
+
         async function main() {
             try {
                 const urlParams = new URLSearchParams(window.location.search);
@@ -5631,7 +5654,8 @@
                 // Start Timer Loop
                 setInterval(checkExpiry, 1000);
             } catch (e) {
-                alert("Init Error: " + e.message);
+                console.error("Init failed:", e);
+                showInitError(e && e.message ? e.message : String(e));
             }
         }
         // Removed direct main() call to prevent double execution or execution before SDK load
