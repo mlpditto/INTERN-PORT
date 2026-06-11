@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.38</title>
+    <title>Nika V95.39</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -11504,10 +11504,14 @@
                     </div>
 
                     <!-- Details: Audience & Categorization ([Version: V89.27] Refactored) -->
-                    <details style="margin-bottom:8px; border:1px solid #334155; border-radius:12px; background:rgba(30,41,59,0.5); backdrop-filter:blur(10px); transition: all 0.3s ease;" open>
+                    <!-- V95.39 lean Phase 3: collapsed by default; the summary chip mirrors the
+                         current values (kept live by updateAudienceSummaryPreview) so the admin
+                         can read the config without expanding. -->
+                    <details style="margin-bottom:8px; border:1px solid #334155; border-radius:12px; background:rgba(30,41,59,0.5); backdrop-filter:blur(10px); transition: all 0.3s ease;">
                         <summary style="padding:10px 15px; cursor:pointer; font-size:0.8em; font-weight:700; color:#818cf8; text-transform:uppercase; letter-spacing:0.8px; user-select:none; list-style:none; display:flex; align-items:center; gap:6px;">
                             <i class="fa-solid fa-chevron-right" style="font-size:0.7em; transition:transform 0.2s;"></i>
                             <i class="fa-solid fa-sliders"></i> Audience & Categorization
+                            <span id="audience-summary-preview" class="lang-no-toggle" style="margin-left:auto; font-weight:600; color:#94a3b8; text-transform:none; letter-spacing:0; font-size:0.92em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;"></span>
                         </summary>
                         <div style="padding:10px 12px; border-top:1px solid #334155;">
                             
@@ -19161,6 +19165,30 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         var quizzesData = [];
         let autoSaveTimer;
 
+        // V95.39 lean Phase 3: mirror the collapsed Audience & Categorization values
+        // into its <summary> so the admin can read the config without expanding.
+        // window-assigned because refreshTagChips (its other caller) is too.
+        window.updateAudienceSummaryPreview = function() {
+            const el = document.getElementById('audience-summary-preview');
+            if (!el) return;
+            const tgSel = document.getElementById('quiz-target-group');
+            const target = (tgSel && tgSel.selectedIndex >= 0) ? tgSel.options[tgSel.selectedIndex].text : 'Public';
+            const unlock = Number(document.getElementById('quiz-unlock-score')?.value || 0);
+            const tagCount = (document.getElementById('quiz-tags')?.value || '').split(',').filter(t => t.trim()).length;
+            const matCount = (document.getElementById('quiz-materials')?.value || '').split('\n').filter(l => l.trim()).length;
+            const modes = [];
+            if (document.getElementById('quiz-is-poll')?.checked) modes.push('Poll');
+            if (document.getElementById('quiz-one-time')?.checked) modes.push('1×');
+            if (document.getElementById('quiz-is-homework')?.checked) modes.push('HW');
+            if (document.getElementById('quiz-shuffle-choices')?.checked) modes.push('Shuffle');
+            const parts = [target];
+            if (unlock > 0) parts.push(`🔒≥${unlock}`);
+            parts.push(`🏷️${tagCount}`);
+            if (matCount > 0) parts.push(`📎${matCount}`);
+            if (modes.length) parts.push(modes.join('+'));
+            el.textContent = parts.join(' · ');
+        };
+
         async function openQuizModal(id = null) {
             forceShowModal('quizManageModal');
             const container = document.getElementById('quiz-questions-container');
@@ -19218,6 +19246,16 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     if (e.target && e.target.matches('input, textarea')) triggerAutoSave();
                 });
                 qmModal.dataset.autosaveDelegated = '1';
+            }
+
+            // V95.39 lean Phase 3: keep the collapsed Audience summary live while the
+            // admin edits (checkboxes/selects fire 'change', text fields fire 'input';
+            // programmatic tag writes are covered by the refreshTagChips hook instead).
+            if (qmModal && !qmModal.dataset.audienceSummaryDelegated) {
+                const syncAudienceSummary = () => window.updateAudienceSummaryPreview && window.updateAudienceSummaryPreview();
+                qmModal.addEventListener('input', syncAudienceSummary);
+                qmModal.addEventListener('change', syncAudienceSummary);
+                qmModal.dataset.audienceSummaryDelegated = '1';
             }
 
             if (id) {
@@ -19338,6 +19376,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             }
             quizQPageIndex = 0;
             updateQuizPagination();
+            window.updateAudienceSummaryPreview && window.updateAudienceSummaryPreview();
         }
 
         function resetQuizForm() {
@@ -19382,6 +19421,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-deadline').value = "";
             document.getElementById('quiz-questions-container').innerHTML = "";
             quizQPageIndex = 0;
+            window.updateAudienceSummaryPreview && window.updateAudienceSummaryPreview();
         }
 
         // 🔥 [Version: V78.2] Homework User Picker
@@ -44443,6 +44483,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     <i class="fa-solid fa-circle-xmark" style="cursor:pointer; opacity:0.75; color:#94a3b8; font-size:1.1em; transition:0.2s; margin-left:4px;" onmouseover="this.style.opacity='1'; this.style.color='#ef4444'; this.style.transform='scale(1.2)';" onmouseout="this.style.opacity='0.75'; this.style.color='#94a3b8'; this.style.transform='scale(1)';" onclick="removeTagChip(${idx})" title="Remove tag"></i>
                 </span>`;
             }).join('');
+            // V95.39: tag writes are programmatic (no input/change event) — sync the
+            // collapsed Audience summary chip here, the single funnel for all tag edits.
+            if (window.updateAudienceSummaryPreview) window.updateAudienceSummaryPreview();
         };
 
         window.editTagChip = function(index) {
