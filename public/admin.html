@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.32</title>
+    <title>Nika V95.33</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -23174,6 +23174,13 @@ ${JSON.stringify(sourceObj)}`;
                 const examBadgeHtml = att.isExamSession
                     ? `<span style="display:inline-flex;align-items:center;gap:6px;background:#e0e7ff;color:#3730a3;border:1px solid #a5b4fc;padding:6px 12px;border-radius:999px;font-size:0.78em;font-weight:800;">🎓 Group Exam Session</span>`
                     : '';
+                // V95.33: surface the quiz's downloadable materials right in the review
+                // header so the admin can pull up the source material while grading.
+                // Reuses adminOpenQuizMaterials (1 file → open; many → chooser modal).
+                const _reviewMats = Array.isArray(quiz.materials) ? quiz.materials.filter(m => m && m.url) : [];
+                const materialsBtnHtml = _reviewMats.length > 0
+                    ? `<button onclick="adminOpenQuizMaterials('${escapeHtml(quiz.id)}')" style="background:#1d4ed8;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;" title="โหลดเอกสารประกอบของ Quiz นี้"><i class="fa-solid fa-paperclip"></i> Materials (${_reviewMats.length})</button>`
+                    : '';
 
                 // Create overlay directly on document.body
                 const overlay = document.createElement('div');
@@ -23193,6 +23200,7 @@ ${JSON.stringify(sourceObj)}`;
                                 </div>
                             </div>
                             <div style="display:flex; gap:8px;">
+                                ${materialsBtnHtml}
                                 <button onclick="openTimingRiskConfigModal()" style="background:#0ea5e9;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:1.1em;" title="Timing Config">⚙</button>
                                 <button ${isAlreadyApproved ? 'disabled' : `onclick="approveQuizAttempt('${attemptId}')"`} style="${approveBtnStyle || 'background:#2ecc71;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;'}" title="${isAlreadyApproved ? 'Already approved — cannot re-approve' : 'Approve at 100%'}">🍎 Manten Manten no Mi (100%)</button>
                                 <button ${isAlreadyApproved ? 'disabled' : `onclick="approveQuizAttemptActual('${attemptId}')"`} style="${approveBtnStyle || 'background:#3498db;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;'}" title="${isAlreadyApproved ? 'Already approved — cannot re-approve' : 'Approve at actual score'}">🍇 Shōjiki Shōjiki no Mi (${actualApproveLabel})</button>
