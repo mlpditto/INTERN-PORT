@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.41</title>
+    <title>Nika V95.42</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -23242,6 +23242,9 @@ ${JSON.stringify(sourceObj)}`;
                             </div>
                             <div style="display:flex; gap:8px;">
                                 ${materialsBtnHtml}
+                                <!-- V95.42 option C: peek at this learner's feedback mid-review. The panel's
+                                     static z-index (2501) sits under this overlay (99999), so bump it on open. -->
+                                <button onclick="document.getElementById('quizFeedbackPanelModal').style.zIndex=100000; showQuizFeedbackPanel(window._reviewCurrentQuizId, window._reviewCurrentUserId)" style="background:#f59e0b;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;" title="ดู feedback ของ user นี้สำหรับ quiz นี้">⭐ Feedback</button>
                                 <button onclick="openTimingRiskConfigModal()" style="background:#0ea5e9;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:1.1em;" title="Timing Config">⚙</button>
                                 <button ${isAlreadyApproved ? 'disabled' : `onclick="approveQuizAttempt('${attemptId}')"`} style="${approveBtnStyle || 'background:#2ecc71;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;'}" title="${isAlreadyApproved ? 'Already approved — cannot re-approve' : 'Approve at 100%'}">🍎 Manten Manten no Mi (100%)</button>
                                 <button ${isAlreadyApproved ? 'disabled' : `onclick="approveQuizAttemptActual('${attemptId}')"`} style="${approveBtnStyle || 'background:#3498db;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;'}" title="${isAlreadyApproved ? 'Already approved — cannot re-approve' : 'Approve at actual score'}">🍇 Shōjiki Shōjiki no Mi (${actualApproveLabel})</button>
@@ -24942,6 +24945,27 @@ ${JSON.stringify(sourceObj)}`;
             }
         }
 
+        // V95.42: after approving an attempt, flow straight into that learner's
+        // feedback for the quiz (option A). Checks existence first so approvals of
+        // attempts with no feedback don't open an empty panel — equality-only query,
+        // no composite index needed. Failure is non-fatal: approval already landed.
+        async function openFeedbackAfterApprove(quizId, userId) {
+            if (!quizId || !userId) return;
+            try {
+                const snap = await db.collection('quiz_feedback')
+                    .where('quizId', '==', quizId)
+                    .where('userId', '==', userId)
+                    .limit(1).get();
+                if (!snap.empty && typeof showQuizFeedbackPanel === 'function') {
+                    showQuizFeedbackPanel(quizId, userId);
+                } else {
+                    showToast('⭐ ยังไม่มี feedback จาก user นี้สำหรับ quiz นี้');
+                }
+            } catch (e) {
+                console.warn('openFeedbackAfterApprove failed:', e);
+            }
+        }
+
         async function approveQuizAttempt(attemptId) {
             if (!confirm("Approve this attempt? This will mark all questions as manually CORRECT and update the score to 100%.")) return;
             try {
@@ -24995,9 +25019,10 @@ ${JSON.stringify(sourceObj)}`;
                 notifyQuizGraded(att.userId, quiz.shortTitle || quiz.title, '📋 อาจารย์ตรวจแบบทดสอบของคุณแล้ว ได้คะแนนเต็ม 🎉 เปิดแอปเพื่อดูเฉลยและทบทวนได้เลยครับ\nYour quiz has been graded — full marks! Open the app to review.');
                 showToast("✅ Attempt Approved & Points Added!");
                 closeReviewOverlay();
-                
+
                 if (typeof renderPendingQuizzes !== 'undefined') renderPendingQuizzes();
                 if (typeof drawKanban !== 'undefined') drawKanban();
+                openFeedbackAfterApprove(att.quizId, att.userId);
             } catch (e) {
                 console.error("Approve error:", e);
                 alert("Failed to approve: " + e.message);
@@ -25069,9 +25094,10 @@ ${JSON.stringify(sourceObj)}`;
                 notifyQuizGraded(att.userId, quiz.shortTitle || quiz.title, `📋 อาจารย์ตรวจแบบทดสอบของคุณแล้ว ✅ ได้ ${curCorrect}/${totalQ} ข้อ เปิดแอปเพื่อดูข้อที่ตอบผิดและคำอธิบายได้เลยครับ\nYour quiz has been graded — open the app to review your answers.`);
                 showToast(`✅ Approved with score: ${curCorrect}/${totalQ} (${pointsToAdd} pts)`);
                 closeReviewOverlay();
-                
+
                 if (typeof renderPendingQuizzes !== 'undefined') renderPendingQuizzes();
                 if (typeof drawKanban !== 'undefined') drawKanban();
+                openFeedbackAfterApprove(att.quizId, att.userId);
             } catch (e) {
                 console.error("Approve Actual error:", e);
                 alert("Failed to approve: " + e.message);
