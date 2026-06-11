@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.39</title>
+    <title>Nika V95.40</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -11626,14 +11626,10 @@
                                     </div>
                                 </div>
                             </div>
-                            <!-- Feedback Limit Area (for read_only mode) -->
-                            <div id="feedback-limit-area" style="display:none; margin-bottom:8px;">
-                                <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:2px;"><i class="fa-solid fa-comment"></i> Feedback Character Limit</label>
-                                <input type="number" id="quiz-feedback-limit-ro" value="280" min="0" max="1000" style="width:100%; padding:5px 8px; border:1px solid #334155; border-radius:6px; font-size:0.85em; background:#0f172a; color:#f1f5f9;">
-                                <div id="read-only-hint" style="display:none; margin-top:4px; padding:4px 8px; background:rgba(30,58,138,0.3); border-radius:4px; font-size:0.72em; color:#93c5fd; border:1px solid rgba(59,130,246,0.2);">
-                                    <i class="fa-solid fa-info-circle"></i> Read-only mode: users view content and provide feedback.
-                                </div>
-                            </div>
+                            <!-- V95.40 lean Phase 4: read_only-mode Feedback Limit block removed.
+                                 #quiz-feedback-limit-ro was dead UI (getQuizFormData only ever read
+                                 #quiz-feedback-limit in the grid above), and its hidden static
+                                 #read-only-hint shadowed toggleCaseUI's dynamic Learning-Mode hint. -->
                         </div>
                     </details>
 
@@ -19306,6 +19302,9 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-short-title').value = q.shortTitle || "";
             document.getElementById('quiz-target-group').value = q.targetGroup || "Public";
             if (document.getElementById('quiz-unlock-score')) document.getElementById('quiz-unlock-score').value = q.unlockScore || 0;
+            // V95.40: restore the stored limit — this was never loaded, so editing
+            // quiz B after quiz A silently saved A's leftover input value into B.
+            if (document.getElementById('quiz-feedback-limit')) document.getElementById('quiz-feedback-limit').value = q.feedbackLimit || 280;
             document.getElementById('quiz-total-points').value = q.totalPoints || 1.0;
             document.getElementById('quiz-description').value = q.description || "";
             document.getElementById('quiz-tags').value = q.tags || "";
@@ -19385,6 +19384,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-short-title').value = "";
             document.getElementById('quiz-target-group').value = "Public";
             if (document.getElementById('quiz-unlock-score')) document.getElementById('quiz-unlock-score').value = 0;
+            if (document.getElementById('quiz-feedback-limit')) document.getElementById('quiz-feedback-limit').value = 280;
             document.getElementById('quiz-total-points').value = 1.0;
             document.getElementById('quiz-description').value = "";
             document.getElementById('quiz-tags').value = "";
@@ -19532,10 +19532,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         function toggleCaseUI() {
             const type = document.getElementById('quiz-type').value;
             const area = document.getElementById('case-content-area');
-            const limitArea = document.getElementById('feedback-limit-area');
 
             area.style.display = (type === 'case_study') ? 'block' : 'none';
-            limitArea.style.display = (type === 'read_only') ? 'block' : 'none';
 
             const hintId = 'read-only-hint';
             let hint = document.getElementById(hintId);
