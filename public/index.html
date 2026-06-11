@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.55)</title>
+    <title>Internship Portfolio (V95.56)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4482,8 +4482,9 @@
     </div>
 
     <!-- V95.29: styled start-quiz confirmation (replaces a native confirm() with a
-         trilingual wall of text). Shows the user's current toggle language first +
-         the others in an expander. lang-no-toggle so we control the languages here. -->
+         trilingual wall of text). V95.56: Thai-first + tappable language chips
+         (was: body-toggle language + a details expander); chip choice persists
+         per device. lang-no-toggle so we control the languages here. -->
     <div id="quizStartConfirmModal" class="modal lang-no-toggle">
         <div class="modal-content" style="max-width:440px; width:92%; text-align:left;">
             <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
@@ -4493,10 +4494,8 @@
             <div id="qsc-quizname" style="font-weight:800; color:#4338ca; background:#eef2ff; border-radius:8px; padding:6px 12px; margin-bottom:12px; font-size:0.92em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
             <div id="qsc-key" style="display:flex; gap:8px; align-items:flex-start; background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:10px 12px; color:#991b1b; font-weight:700; font-size:0.9em; margin-bottom:10px;"></div>
             <ul id="qsc-rules" style="margin:0 0 12px 0; padding-left:18px; color:#334155; font-size:0.86em; line-height:1.6;"></ul>
-            <details id="qsc-others" style="margin-bottom:14px;">
-                <summary style="cursor:pointer; color:#4f46e5; font-weight:700; font-size:0.84em;">🌐 ภาษาอื่น / Other languages</summary>
-                <div id="qsc-others-body" style="margin-top:8px; font-size:0.84em; color:#475569; line-height:1.55;"></div>
-            </details>
+            <!-- V95.56: tap a chip to repaint the whole confirmation in that language -->
+            <div id="qsc-lang-chips" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;"></div>
             <div style="display:flex; gap:10px; justify-content:flex-end;">
                 <button id="qsc-cancel" type="button" style="width:auto; flex-shrink:0; padding:9px 18px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; color:#475569; font-weight:700; cursor:pointer;"></button>
                 <button id="qsc-confirm" type="button" style="width:auto; flex-shrink:0; padding:9px 22px; border-radius:10px; border:none; background:linear-gradient(135deg,#4361ee,#4895ef); color:#fff; font-weight:800; cursor:pointer; box-shadow:0 2px 8px rgba(67,97,238,0.3);"></button>
@@ -7262,31 +7261,41 @@
                   rules: ['시작 후 제출할 때까지 화면을 나가지 마십시오', '나가거나 새로고침하면 즉시 종료됩니다'],
                   confirm: '시작', cancel: '취소' }
         };
-        function quizStartPrimaryLang() {
-            const c = document.body.classList;
-            if (c.contains('lang-th-on')) return 'th';
-            if (c.contains('lang-kr-on')) return 'kr';
-            return 'en';
-        }
+        // V95.56: Thai-first + tappable language chips (was: body-toggle language +
+        // a details expander). Tapping a chip repaints the whole confirmation in
+        // that language; the choice persists per device via localStorage.
         function quizStartConfirm(quizTitle) {
             return new Promise(function (resolve) {
                 const m = document.getElementById('quizStartConfirmModal');
                 if (!m) { resolve(window.confirm('Start quiz "' + (quizTitle || '') + '"?')); return; }
-                const prim = quizStartPrimaryLang();
-                const p = QUIZ_START_I18N[prim];
-                const others = ['th', 'en', 'kr'].filter(function (l) { return l !== prim; });
-                document.getElementById('qsc-title').textContent = p.title;
-                document.getElementById('qsc-quizname').textContent = '📋 ' + (quizTitle || '');
-                document.getElementById('qsc-key').innerHTML = '<span>🚫</span><span>' + escapeHtml(p.key) + '</span>';
-                document.getElementById('qsc-rules').innerHTML = p.rules.map(function (r) { return '<li>' + escapeHtml(r) + '</li>'; }).join('');
-                document.getElementById('qsc-others-body').innerHTML = others.map(function (l) {
-                    const o = QUIZ_START_I18N[l];
-                    return '<div style="margin-bottom:8px;"><div style="font-weight:700;">' + o.flag + ' ' + escapeHtml(o.name) + '</div><div>' + escapeHtml(o.key) + '</div></div>';
-                }).join('');
-                const det = document.getElementById('qsc-others'); if (det) det.open = false;
+                const stored = localStorage.getItem('quiz_start_lang');
+                let lang = QUIZ_START_I18N[stored] ? stored : 'th';
                 const cBtn = document.getElementById('qsc-confirm'), xBtn = document.getElementById('qsc-cancel');
-                cBtn.textContent = '▶ ' + p.confirm;
-                xBtn.textContent = p.cancel;
+                function paint() {
+                    const p = QUIZ_START_I18N[lang];
+                    document.getElementById('qsc-title').textContent = p.title;
+                    document.getElementById('qsc-quizname').textContent = '📋 ' + (quizTitle || '');
+                    document.getElementById('qsc-key').innerHTML = '<span>🚫</span><span>' + escapeHtml(p.key) + '</span>';
+                    document.getElementById('qsc-rules').innerHTML = p.rules.map(function (r) { return '<li>' + escapeHtml(r) + '</li>'; }).join('');
+                    const chips = document.getElementById('qsc-lang-chips');
+                    if (chips) {
+                        chips.innerHTML = ['th', 'en', 'kr'].map(function (l) {
+                            const o = QUIZ_START_I18N[l];
+                            const active = l === lang;
+                            return '<button type="button" data-lang="' + l + '" style="width:auto; min-height:auto; flex-shrink:0; padding:5px 12px; border-radius:999px; font-size:0.8em; font-weight:800; cursor:pointer; border:1.5px solid ' + (active ? '#4f46e5' : '#c7d2fe') + '; background:' + (active ? '#4f46e5' : '#fff') + '; color:' + (active ? '#fff' : '#4f46e5') + ';">' + o.flag + ' ' + escapeHtml(o.name) + '</button>';
+                        }).join('');
+                        chips.querySelectorAll('button[data-lang]').forEach(function (b) {
+                            b.onclick = function () {
+                                lang = this.dataset.lang;
+                                localStorage.setItem('quiz_start_lang', lang);
+                                paint();
+                            };
+                        });
+                    }
+                    cBtn.textContent = '▶ ' + p.confirm;
+                    xBtn.textContent = p.cancel;
+                }
+                paint();
                 function done(val) { m.style.display = 'none'; cBtn.onclick = null; xBtn.onclick = null; resolve(val); }
                 cBtn.onclick = function () { done(true); };
                 xBtn.onclick = function () { done(false); };
