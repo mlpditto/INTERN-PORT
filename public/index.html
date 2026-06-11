@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.56)</title>
+    <title>Internship Portfolio (V95.57)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -15366,7 +15366,8 @@ async function archiveDoneCard(cardId) {
                                 <i class="fa-solid ${item.icon}"></i>
                             </div>
                             <div style="flex:1; min-width:0;">
-                                <div style="font-weight:700; font-size:1em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#2d3436; margin-bottom:2px;">${item.title}</div>
+                                <!-- V95.57: lang-no-toggle — Thai-only titles hidden by lang-toggle walker -->
+                                <div class="lang-no-toggle" style="font-weight:700; font-size:1em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#2d3436; margin-bottom:2px;">${item.title}</div>
                                 <div style="font-size:0.75em; color:#b2bec3; display:flex; align-items:center; gap:8px;">
                                     <span>${date}</span>
                                     <span style="width:3px; height:3px; background:#dfe6e9; border-radius:50%;"></span>
@@ -15759,10 +15760,21 @@ async function archiveDoneCard(cardId) {
                 const label = (Number(sub.score) > 0) ? '👁️ View Answers ดูเฉลย' : '🔍 Review Mistakes ดูข้อที่ตอบผิด';
                 viewBtn = `<button onclick="viewQuizAnswers('${sub.quizId}')" style="margin-top:12px; width:100%; border:none; cursor:pointer; background:#eef2ff; color:#4361ee; font-size:0.8em; font-weight:700; padding:9px 14px; border-radius:8px;">${label}</button>`;
             }
+            // V95.57: downloadable materials — every attempt here is already submitted,
+            // which is exactly the V95.32 unlock condition. Pending quizzes left the
+            // Mission card in V95.52, so while awaiting grading this is the intern's
+            // only access point. lang-no-toggle wrap: the chip labels are Thai.
+            let matsHtml = '';
+            if (sub && sub.quizId && typeof quizzesCache !== 'undefined' && quizzesCache && typeof quizMaterialsHtml === 'function') {
+                const matQuiz = quizzesCache.find(q => q.id === sub.quizId);
+                const inner = matQuiz ? quizMaterialsHtml(matQuiz, true) : '';
+                if (inner) matsHtml = `<div class="lang-no-toggle">${inner}</div>`;
+            }
             return `<div style="font-size:0.7em; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:8px;">🧠 Quiz Detail</div>
                 ${bar}
                 ${tagsHtml}
                 ${m.duration ? `<div style="font-size:0.78em; color:#64748b; margin-top:6px;">⏱ Duration: ${escapeUnifiedHtml(String(m.duration))}s</div>` : ''}
+                ${matsHtml}
                 ${viewBtn}`;
         }
 
@@ -16204,10 +16216,12 @@ async function archiveDoneCard(cardId) {
                                 <i class="fa-solid ${item.icon}"></i>
                             </div>
                             <div style="flex:1; min-width:0;">
-                                <div style="font-weight:700; font-size:1em; color:#2d3436; margin-bottom:4px;">
+                                <!-- V95.57: lang-no-toggle — Thai-only quiz titles were auto-wrapped
+                                     and hidden (same bug class as the V95.40 meta-line fix below) -->
+                                <div class="lang-no-toggle" style="font-weight:700; font-size:1em; color:#2d3436; margin-bottom:4px;">
                                     ${item.title}${newChip}
                                 </div>
-                                <div style="font-size:0.8em; color:#64748b; margin-bottom:4px;">
+                                <div class="lang-no-toggle" style="font-size:0.8em; color:#64748b; margin-bottom:4px;">
                                     ${item.detail}
                                 </div>
                                 <div class="lang-no-toggle" style="font-size:0.75em; color:#b2bec3; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
