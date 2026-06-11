@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.34</title>
+    <title>Nika V95.35</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -36269,7 +36269,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const sub = (questsSubList || []).find(s => s.questId === q.id && s.userId === userId);
                     return { quest: q, sub, status: getQuestLifecycleStatus(q, sub) };
                 })
-                .filter(item => item.status !== 'draft');
+                .filter(item => item.status !== 'draft')
+                // V95.35: hide quests whose deadline passed before this user registered
+                // (Public quests match everyone retroactively → phantom EXPIRED for new users).
+                // Keep anything the user actually submitted, and keep all quests for legacy
+                // users with no createdAt.
+                .filter(item => {
+                    if (item.sub) return true;
+                    const joined = toHubDate(user.createdAt);
+                    const deadline = toHubDate(item.quest.deadline);
+                    return !(joined && deadline && deadline < joined);
+                });
 
             allVisible.forEach(item => { if (counts[item.status] !== undefined) counts[item.status]++; });
 
