@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.54)</title>
+    <title>Internship Portfolio (V95.55)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -6205,7 +6205,10 @@
             const container = document.getElementById('cert-request-btn-container');
             if (!container) return;
 
-            const hasCert = userData.startDate && userData.endDate && (userData.score || 0) > 0;
+            // V95.55: certificate requires 30 pts (matches the progress bar + status gate
+            // in updateGrandLineDashboard). Was `> 0`, which let sub-30 users (e.g. score
+            // 2.12) submit a request — fixed to `>= 30`.
+            const hasCert = userData.startDate && userData.endDate && (userData.score || 0) >= 30;
             const certRequested = userData.certRequested || false;
             const certApproved = userData.certApproved || false;
             const score = userData.score || 0;
@@ -6239,6 +6242,15 @@
 
         async function requestCertificateFromLIFF() {
             try {
+                // V95.55: re-check eligibility against fresh data before writing — guards
+                // against a stale active button or a direct call submitting below the 30-pt gate.
+                const _certDoc = await db.collection("users").doc(userId).get();
+                if (((_certDoc.data() || {}).score || 0) < 30) {
+                    showToast("⚠️ ต้องมีคะแนนถึง 30 ก่อนจึงจะขอใบรับรองได้");
+                    checkUser();
+                    return;
+                }
+
                 // Mark user as requested certificate
                 await db.collection("users").doc(userId).update({
                     certRequested: true,
