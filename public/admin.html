@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.50</title>
+    <title>Nika V95.51</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1390,6 +1390,18 @@
         .dca-row-updated-abs {
             font-size: 0.72em; color: #64748b; font-weight: 600;
             white-space: nowrap;
+        }
+        /* V95.51: contributor chips moved onto the timestamp line (right column) so
+           the drug list no longer spends a dedicated bottom row on them. Chips sit
+           before the time; the inner wrapper restores the 0.74em context the chips
+           used to inherit from .dca-row-meta-trail without shrinking the timestamp. */
+        .dca-row-side-top {
+            display: flex; align-items: center; justify-content: flex-end;
+            gap: 6px; flex-wrap: wrap;
+        }
+        .dca-row-side-contrib {
+            display: inline-flex; align-items: center; justify-content: flex-end;
+            gap: 6px; flex-wrap: wrap; font-size: 0.74em;
         }
         .dca-row-actions { display: flex; gap: 6px; }
         .dca-row-edit-btn {
@@ -30833,10 +30845,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 <div class="dca-row-name">${dcaEscapeHtml(drug.genericName)}</div>
                                 <div class="dca-row-meta">${chips.join('')}</div>
                                 ${brands}
-                                ${dcaListMetaTrailHtml(drug)}
                             </div>
                             <div class="dca-row-side">
-                                ${updatedAbs ? `<div class="dca-row-updated-abs" title="Last updated">🕒 ${dcaEscapeHtml(updatedAbs)}</div>` : ''}
+                                <div class="dca-row-side-top">
+                                    ${dcaListContribChipsHtml(drug)}
+                                    ${updatedAbs ? `<div class="dca-row-updated-abs" title="Last updated">🕒 ${dcaEscapeHtml(updatedAbs)}</div>` : ''}
+                                </div>
                                 <div class="dca-row-actions">
                                     <button type="button" class="dca-row-edit-btn" onclick="dcaEdit('${dcaEscapeHtml(drug._id)}')">Edit</button>
                                     <button type="button" class="dca-row-visual-btn" onclick="dcaQuickVisual('${dcaEscapeHtml(drug._id)}')" title="🎨 สร้าง/แก้ PK Visual อย่างรวดเร็ว — เปิด edit + modal ให้เลย">🎨</button>
@@ -32211,11 +32225,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // without opening each entry. More compact than the Edit-screen strip
         // (no "Updated:" / "Contributors:" labels), but reuses the same
         // contributor chip classes + relative-time + legacy-reviewedBy fallback.
-        function dcaListMetaTrailHtml(drug) {
+        // V95.51: contributor pills for a list row. Renamed from dcaListMetaTrailHtml
+        // and now wrapped in the inline .dca-row-side-contrib span so the chips sit on
+        // the timestamp line in the right column instead of a dedicated bottom row.
+        function dcaListContribChipsHtml(drug) {
             if (!drug) return '';
-            // V94.74: updated-at moved out to the row's right column (above the
-            // action buttons) as an absolute timestamp — this trail is now
-            // contributor pills only.
             const parts = [];
             let contribList = Array.isArray(drug.contributors) ? drug.contributors.slice() : [];
             if (contribList.length === 0 && drug.reviewedBy) {
@@ -32231,7 +32245,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 });
             }
             if (parts.length === 0) return '';
-            return `<div class="dca-row-meta-trail">${parts.join('')}</div>`;
+            return `<span class="dca-row-side-contrib">${parts.join('')}</span>`;
         }
 
         // V94.46: paint the meta strip from a drug record (data may be a published
