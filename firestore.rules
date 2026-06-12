@@ -68,7 +68,17 @@ service cloud.firestore {
       allow read, create: if true;
       allow update, delete: if isAdmin();
     }
-    
+
+    // 5b. Material download click log (V95.63) — one doc per click written by the
+    // intern when they open a quiz's 📎 attachment; admin aggregates distinct users +
+    // per-file counts. Write-only for signed-in interns; admin-only read so the
+    // analytics aren't world-readable.
+    match /material_clicks/{clickId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
     // 6. Side Quests
     match /side_quests/{taskId} {
       allow read: if true;

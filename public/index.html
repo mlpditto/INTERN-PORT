@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.62)</title>
+    <title>Internship Portfolio (V95.63)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -7768,11 +7768,41 @@
             if (!done) {
                 return '<div style="margin-top:10px; display:inline-flex; align-items:center; gap:6px; background:#f8fafc; border:1px dashed #cbd5e1; color:#94a3b8; padding:6px 11px; border-radius:8px; font-size:0.78em; font-weight:600;">🔒 📎 เอกสารประกอบ (' + mats.length + ') — ปลดล็อกหลังทำข้อสอบเสร็จ</div>';
             }
+            const qid = escapeHtml(String((q && q.id) || ''));
             const links = mats.map(function (m) {
                 const name = (m.name && String(m.name).trim()) || 'เอกสาร';
-                return '<a href="' + escapeHtml(String(m.url).trim()) + '" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:5px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; padding:5px 11px; border-radius:8px; font-size:0.82em; font-weight:700; text-decoration:none; margin:3px 6px 3px 0;">📎 ' + escapeHtml(name) + '</a>';
+                const safeUrl = escapeHtml(String(m.url).trim());
+                // V95.63: data-* attrs + onclick feed qzLogMaterialClick (fire-and-forget
+                // download analytics). The href still opens the file regardless of logging.
+                return '<a href="' + safeUrl + '" target="_blank" rel="noopener noreferrer"'
+                    + ' data-quiz-id="' + qid + '" data-mat-url="' + safeUrl + '" data-mat-name="' + escapeHtml(name) + '"'
+                    + ' onclick="qzLogMaterialClick(this)"'
+                    + ' style="display:inline-flex; align-items:center; gap:5px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; padding:5px 11px; border-radius:8px; font-size:0.82em; font-weight:700; text-decoration:none; margin:3px 6px 3px 0;">📎 ' + escapeHtml(name) + '</a>';
             }).join('');
             return '<div style="margin-top:10px;"><div style="font-size:0.78em; color:#64748b; font-weight:700; margin-bottom:4px;">📎 เอกสารประกอบ</div><div style="display:flex; flex-wrap:wrap;">' + links + '</div></div>';
+        }
+
+        // V95.63: log a material-download click (fire-and-forget) so admin can see how
+        // many interns opened each quiz's attachments. One doc per click in
+        // `material_clicks`; admin aggregates distinct users + per-file counts (Level B).
+        // Never blocks the download — the <a href> opens regardless of whether this write
+        // succeeds (e.g. before the firestore rule is deployed, or offline).
+        function qzLogMaterialClick(el) {
+            try {
+                if (typeof db === 'undefined' || !db || !el || typeof userId === 'undefined' || !userId) return;
+                const quizId = el.getAttribute('data-quiz-id') || '';
+                const url = el.getAttribute('data-mat-url') || '';
+                const name = el.getAttribute('data-mat-name') || '';
+                if (!quizId || !url) return;
+                db.collection('material_clicks').add({
+                    quizId: quizId,
+                    userId: userId,
+                    displayName: (typeof userProfile !== 'undefined' && userProfile && userProfile.displayName) || '',
+                    materialUrl: url,
+                    materialName: name,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                }).catch(function () { /* best-effort analytics — ignore failures */ });
+            } catch (e) { /* never block the download */ }
         }
 
         // V95.26: deterministic category accent. Hash the first tag (fallback to
