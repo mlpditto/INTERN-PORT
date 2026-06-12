@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.51</title>
+    <title>Nika V95.52</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12683,6 +12683,10 @@
                     <!-- V94.30: cycle EN → KO → Both for this modal's static labels. -->
                     <button type="button" id="ecn-lang-toggle-btn" onclick="ecnCycleLang()" title="Toggle language" style="background:#fff; color:#1f2937; border:1px solid #cbd5e1; border-radius:999px; padding:6px 12px; font-size:0.78em; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
                         <i class="fa-solid fa-language"></i> <span id="ecn-lang-toggle-label">Both</span>
+                    </button>
+                    <!-- V95.52: one-click copy of the loaded case data (context fields + note) as plain text. -->
+                    <button type="button" id="edit-case-copy-data-btn" onclick="copyEditCaseNoteData()" title="Copy case data" style="background:#fff; color:#1f2937; border:1px solid #cbd5e1; border-radius:999px; padding:6px 12px; font-size:0.78em; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-copy"></i> Copy
                     </button>
                     <!-- V92.67 Phase 3-E: copy a deep-link to this case so admins can share the URL. -->
                     <button type="button" id="edit-case-share-btn" onclick="copyEditCaseShareLink()" title="Copy share link" style="background:#fff; color:#1f2937; border:1px solid #cbd5e1; border-radius:999px; padding:6px 12px; font-size:0.78em; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
@@ -28379,6 +28383,33 @@ ${JSON.stringify(sourceObj)}`;
             } catch (e) {
                 // Fallback: show a prompt for manual copy.
                 try { prompt('Copy this link:', url); } catch (_) { alert(url); }
+            }
+        }
+
+        // V95.52: one-click copy of the loaded case data. Reads live modal values so
+        // unsaved textarea edits are included (copy-what-you-see).
+        async function copyEditCaseNoteData() {
+            const id = document.getElementById('edit-case-note-id')?.value || '';
+            if (!id) { alert('No case loaded'); return; }
+            const grab = elId => document.getElementById(elId)?.textContent.trim() || '-';
+            const tags = (window.editCaseTaxonomyState?.selectedTags || []).join(', ');
+            const text = [
+                `User: ${grab('edit-case-note-user')}`,
+                `HN/Ref: ${grab('edit-case-note-ref')}`,
+                `Disease: ${grab('edit-case-note-disease')}`,
+                `Customer: ${grab('edit-case-note-customer')}`,
+                `Score: ${grab('edit-case-note-score')}`,
+                `Tags: ${tags || '-'}`,
+                '',
+                'Case Note:',
+                String(document.getElementById('edit-case-note-text')?.value || '-')
+            ].join('\n');
+            try {
+                await navigator.clipboard.writeText(text);
+                if (typeof showToast === 'function') showToast('Case data copied · 데이터 복사됨', 'success');
+            } catch (e) {
+                // Fallback: show a prompt for manual copy.
+                try { prompt('Copy this text:', text); } catch (_) { alert(text); }
             }
         }
 
