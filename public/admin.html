@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.54</title>
+    <title>Nika V95.55</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -27160,7 +27160,12 @@ ${JSON.stringify(sourceObj)}`;
                     { key: 'infection', emoji: '🦠', label: { en: 'Infections', ko: '감염', th: 'การติดเชื้อ' } },
                     { key: 'womens_health', emoji: '🚺', label: { en: "Women's Health", ko: '여성건강', th: 'สุขภาพสตรี' } }
                 ];
-                const systems = [...base.filter(s => s.key !== 'other'), ...EXTRA, ...base.filter(s => s.key === 'other')];
+                // V95.55: CASE_SYSTEMS now ships 'infection' itself (added 2026-06-12),
+                // so a coverage-only EXTRA with the same key must yield — duplicate keys
+                // rendered two identical cards AND pushed each matching quiz into the
+                // shared bucket twice (inflated counts, doubled rows in the list modal).
+                const extras = EXTRA.filter(e => !base.some(b => b.key === e.key));
+                const systems = [...base.filter(s => s.key !== 'other'), ...extras, ...base.filter(s => s.key === 'other')];
                 window._qcovSystems = systems; // shared with openQuizCoverageList's move dropdown
 
                 // V95.27: generic words that appear in multiple labels (e.g. "health" in
