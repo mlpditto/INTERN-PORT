@@ -48,6 +48,11 @@
         { key: 'mental', emoji: '🧘',
           label: { en: 'Mental Health', ko: '정신건강', th: 'สุขภาพจิต' },
           symptoms: ['Stress', 'Anxiety', 'Low Mood', 'Poor Sleep', 'Panic'] },
+        // 2026-06-12: Infection added here AND in the taxonomy/case Firestore
+        // overlay (the overlay wins at runtime — this keeps the fallback in sync).
+        { key: 'infection', emoji: '🦠',
+          label: { en: 'Infection', ko: '감염', th: 'โรคติดเชื้อ' },
+          symptoms: ['Fever', 'Chills', 'Myalgia', 'Rash', 'Diarrhea', 'Wound Infection'] },
         { key: 'other', emoji: '📋',
           label: { en: 'Other', ko: '기타', th: 'อื่นๆ' },
           symptoms: ['Follow-up', 'Medication Q', 'Unclear Symptom'] }
