@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.49</title>
+    <title>Nika V95.50</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15410,11 +15410,21 @@
             const tagStr = Array.isArray(formData.tags) ? formData.tags.join(', ') : (formData.tags || '');
             const btn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
             const oldText = btn ? btn.innerHTML : "Analyze";
+            // V95.50: simulated progress %. analyzeQuizAI is a single opaque AI await with no
+            // real progress signal, so ease an estimate toward 95% while waiting (fast early,
+            // slowing near the cap so it never reaches 100% before the call returns). Cleared
+            // in the finally block.
+            let analyzeProgressTimer = null;
 
             try {
                 if (btn) {
-                    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analyzing...`;
+                    let pct = 0;
+                    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analyzing 0%`;
                     btn.disabled = true;
+                    analyzeProgressTimer = setInterval(() => {
+                        pct = Math.min(95, pct + Math.max(1, Math.round((95 - pct) * 0.08)));
+                        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analyzing ${pct}%`;
+                    }, 350);
                 }
                 
                 const prompt = `FORMAT CONTRACT — READ FIRST, OBEY ABSOLUTELY:
@@ -15668,6 +15678,7 @@
                 alert("Analysis error: " + e.message);
                 console.error(e);
             } finally {
+                if (analyzeProgressTimer) clearInterval(analyzeProgressTimer); // V95.50: stop the progress ticker
                 if (btn) {
                     btn.innerHTML = oldText;
                     btn.disabled = false;
