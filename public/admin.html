@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.52</title>
+    <title>Nika V95.53</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12739,6 +12739,14 @@
                         // V91.82: PRIMARY_SYSTEMS now provided by public/case-taxonomy.js
                         // (compat shim from CASE_SYSTEMS — 12 systems unified with LIFF.
                         // Fixes the prior `endo` vs `endocrine` key mismatch.)
+                        // V95.53: emit the KR half inside a data-ecn span so the modal's
+                        // EN/KO toggle (V94.30 CSS) also applies to these dynamic labels.
+                        // Falls back to the combined bilingual string if the per-language
+                        // parts aren't available.
+                        function primarySystemLabelHtml(sys) {
+                            const meta = (window.CASE_SYSTEM_BY_KEY || {})[sys.value];
+                            return meta ? `${meta.emoji} ${meta.label.en} <span data-ecn="ko">${meta.label.ko}</span>` : null;
+                        }
                         function renderPrimarySystemBtnGroup() {
                             const group = document.getElementById('primary-system-btn-group');
                             const hidden = document.getElementById('edit-case-taxonomy-system');
@@ -12747,7 +12755,9 @@
                                 const btn = document.createElement('button');
                                 btn.type = 'button';
                                 btn.className = 'primary-btn' + (hidden.value === sys.value ? ' active' : '');
-                                btn.textContent = sys.label;
+                                const labelHtml = primarySystemLabelHtml(sys);
+                                if (labelHtml) btn.innerHTML = labelHtml;
+                                else btn.textContent = sys.label;
                                 btn.style.marginBottom = '4px';
                                 btn.onclick = function() {
                                     // Remove active from all
@@ -12757,7 +12767,10 @@
                                     // Update Disease field automatically (V91.83: sys.label is now
                                     // bilingual "emoji EN KR", so the trailing `(code)` is redundant.)
                                     const diseaseEl = document.getElementById('edit-case-note-disease');
-                                    if (diseaseEl) diseaseEl.textContent = sys.label;
+                                    if (diseaseEl) {
+                                        if (labelHtml) diseaseEl.innerHTML = labelHtml;
+                                        else diseaseEl.textContent = sys.label;
+                                    }
                                     if (typeof renderEditCaseTaxonomyCard === 'function') renderEditCaseTaxonomyCard();
                                 };
                                 group.appendChild(btn);
@@ -28180,11 +28193,13 @@ ${JSON.stringify(sourceObj)}`;
                 ? selectedTags.map(tag => `<button type="button" class="edit-case-taxonomy-chip active" onclick='toggleEditCaseTaxonomyTag(${JSON.stringify(tag)})'>${tag}</button>`).join('')
                 : `<span class="edit-case-taxonomy-chip muted">No tags selected yet</span>`;
 
+            // V95.53: KR halves wrapped in data-ecn spans so the modal's EN/KO
+            // toggle hides them (saved taxonomySummary stays bilingual — display only).
             const summary = entry
-                ? `${entry.label} ${entry.koLabel}${selectedTags.length ? ` - ${selectedTags.join(', ')}` : ''}`
-                : 'Choose a primary system to generate a canonical taxonomy summary. · 주요 계통을 선택하면 정규 분류 요약이 생성됩니다.';
+                ? `${entry.label}<span data-ecn="ko"> ${entry.koLabel}</span>${selectedTags.length ? ` - ${selectedTags.join(', ')}` : ''}`
+                : '<span data-ecn="en">Choose a primary system to generate a canonical taxonomy summary.</span><span data-ecn="sep"> · </span><span data-ecn="ko">주요 계통을 선택하면 정규 분류 요약이 생성됩니다.</span>';
             previewEl.innerHTML = entry
-                ? `<strong>Canonical Summary · 정규 요약:</strong> ${summary}`
+                ? `<strong><span data-ecn="en">Canonical Summary</span><span data-ecn="sep"> · </span><span data-ecn="ko">정규 요약</span>:</strong> ${summary}`
                 : summary;
         }
 
@@ -28248,7 +28263,9 @@ ${JSON.stringify(sourceObj)}`;
             resetEditCaseTaxonomyState();
             if (saveBtn) {
                 saveBtn.disabled = false;
-                saveBtn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes · 변경 저장';
+                // V95.53: restore the data-ecn span structure (was a plain bilingual
+                // string, which broke the EN/KO toggle on every reopen after a save).
+                saveBtn.innerHTML = '<i class="fa-solid fa-save"></i> <span data-ecn="en">Save Changes</span><span data-ecn="sep"> · </span><span data-ecn="ko">변경 저장</span>';
             }
         }
 
