@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.63)</title>
+    <title>Internship Portfolio (V95.64)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -15745,11 +15745,13 @@ async function archiveDoneCard(cardId) {
         // 🔥 [V91.65] Inject pulse CSS for recently-graded cards (idempotent)
         // 🔥 [V91.66] Also inject skeleton loader CSS
         function ensureUnifiedHistoryStyles() {
-            if (document.getElementById('unified-history-styles-v91-66')) return;
-            const old65 = document.getElementById('unified-history-styles-v91-65');
-            if (old65) old65.remove();
+            if (document.getElementById('unified-history-styles-v95-64')) return;
+            ['unified-history-styles-v91-65', 'unified-history-styles-v91-66'].forEach(function (id) {
+                const old = document.getElementById(id);
+                if (old) old.remove();
+            });
             const s = document.createElement('style');
-            s.id = 'unified-history-styles-v91-66';
+            s.id = 'unified-history-styles-v95-64';
             s.textContent = `
                 @keyframes recentlyGradedPulse {
                     0%, 100% { box-shadow: 0 4px 15px rgba(22,163,74,0.06); }
@@ -15826,6 +15828,20 @@ async function archiveDoneCard(cardId) {
                     margin: 8px 0 0 0;
                     max-width: 320px;
                     line-height: 1.5;
+                }
+
+                /* V95.64: PC density — collapsed cards in each date bucket flow into a
+                   responsive grid (≈2-3 columns by width); mobile / LIFF stays a single
+                   column (only ≥760px changes, so the in-app phone view is untouched).
+                   align-items:start lets each card keep its natural height instead of
+                   stretching to its neighbour. An EXPANDED card spans the full row so its
+                   Quiz Detail / View Answers / score bar stay readable instead of being
+                   squeezed into one narrow column. */
+                .uh-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+                .uh-grid > .unified-history-card { margin-bottom: 0 !important; }
+                @media (min-width: 760px) {
+                    .uh-grid { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); align-items: start; }
+                    .uh-grid > .unified-history-card[aria-expanded="true"] { grid-column: 1 / -1; }
                 }
             `;
             document.head.appendChild(s);
@@ -16388,7 +16404,9 @@ async function archiveDoneCard(cardId) {
                     <div style="font-size:0.72em; color:#94a3b8; font-weight:700;">(${b.items.length})</div>
                     <div style="flex:1; height:1px; background:#f1f5f9;"></div>
                 </div>`;
-                groupedHtml += b.items.map(renderUnifiedCard).join('');
+                // V95.64: wrap each bucket's cards in a responsive grid (PC ≈2-3 cols,
+                // mobile 1 col). Header above stays full-width.
+                groupedHtml += `<div class="uh-grid">${b.items.map(renderUnifiedCard).join('')}</div>`;
             });
 
             // 🔥 [V91.62] Append "Load more" button if more items remain
