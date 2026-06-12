@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.47</title>
+    <title>Nika V95.48</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6082,6 +6082,9 @@
                         <div style="display:flex; gap:10px; align-items:center;">
                             <h4 style="margin:0; color:var(--primary);"><i class="fa-solid fa-layer-group"></i> Kanban Board</h4>
                             <input type="text" id="board-search" placeholder="🔍 Search tasks..." onkeyup="filterBoard()" style="margin:0; width:180px; padding:5px 12px; font-size:0.85em; border-radius:30px;">
+                            <!-- γ.4d: opens the Escalated Learning Notes review queue. Hidden by
+                                 refreshEscalatedNotesCount() until at least one note is escalated. -->
+                            <button type="button" id="escalated-notes-btn" onclick="openEscalatedNotesView()" title="Learning notes you flagged with 🚀 Escalate — focused review queue" style="display:none; margin:0; padding:5px 14px; font-size:0.85em; border-radius:30px; border:1.5px solid #fecaca; background:#fff5f5; color:#b91c1c; font-weight:800; cursor:pointer; white-space:nowrap;">🚀 Escalated <span id="escalated-notes-count">0</span></button>
                         </div>
                     </div>
 
@@ -13887,6 +13890,21 @@
                 <button type="button" class="btn-sm" onclick="approveLearningNoteNoScore()" title="Mark reviewed without awarding points" style="width:auto; min-width:130px; background:#fff; color:#475569; border:1.5px solid #cbd5e1; border-radius:12px; padding:10px 14px; font-weight:800; min-height:auto;">Approve no pts</button>
                 <button type="button" class="btn-sm" onclick="saveLearningNoteReview()" style="width:auto; min-width:140px; background:linear-gradient(135deg,#6c5ce7,#a29bfe); color:#fff; border:none; border-radius:12px; padding:10px 18px; font-weight:900; min-height:auto;">Save &amp; Award</button>
             </div>
+        </div>
+    </div>
+
+    <!-- γ.4d: Escalated Learning Notes review queue. Read-only list over
+         learningNotesCache (reviewState==='escalated'); each row jumps back into
+         reviewLearningNote. Deliberately NOT a patient-case creator — escalated
+         notes stay in submissions, never pollute the Alabasta cases collection. -->
+    <div id="escalatedNotesModal" class="modal" style="z-index:4302;">
+        <div class="modal-content" style="max-width:680px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px;">
+                <h2 style="margin:0; color:#b91c1c; font-size:1.15em; font-weight:900;">🚀 Escalated Learning Notes</h2>
+                <button type="button" onclick="closeEscalatedNotesView()" style="border:none; background:transparent; color:#475569; font-size:1.45em; line-height:1; cursor:pointer; padding:4px 10px;">&times;</button>
+            </div>
+            <div style="font-size:0.82em; color:#94a3b8; margin-bottom:14px;">Notes you flagged with 🚀 Escalate — your queue of standout reflections to turn into teaching material or follow up on.</div>
+            <div id="escalated-notes-list" style="max-height:60vh; overflow-y:auto;"></div>
         </div>
     </div>
 
@@ -42393,6 +42411,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     learningNotesCache = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                     learningNotesCache.sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
                     drawKanban();
+                    refreshEscalatedNotesCount(); // γ.4d: keep the Escalated queue button + count fresh
                 }, e => console.error("🔥 [Firestore Error] learning_note submissions:", e));
         }
 
@@ -43093,6 +43112,75 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             return `${y}-${m}-${day}`;
         }
 
+        // γ.4d: escalated-notes review queue. "🚀 Escalate" on a learning note already
+        // sets reviewState='escalated' + LINE-notifies the student + shows a kanban badge;
+        // this gathers every escalated note into one focused list so the admin can act on
+        // the ones they flagged (turn into teaching material, follow up) instead of hunting
+        // them out of the shared Done column. Read-only over learningNotesCache — NO new
+        // collection and NO patient-case doc (the original "create a cases doc" plan was
+        // rejected because it would pollute the real patient-case table). escalatedAt is
+        // stamped in _lnrCommitReview.
+        function escGetEscalatedNotes() {
+            const ms = (n) => (n.escalatedAt && n.escalatedAt.toMillis) ? n.escalatedAt.toMillis()
+                : (n.timestamp && n.timestamp.toMillis ? n.timestamp.toMillis() : 0);
+            return (learningNotesCache || [])
+                .filter(n => n && !n.isArchived && n.reviewState === 'escalated')
+                .sort((a, b) => ms(b) - ms(a));
+        }
+
+        // Keep the kanban-header button + count in sync; hide it entirely when nothing
+        // is escalated. Called from the learning-note snapshot listener after drawKanban.
+        function refreshEscalatedNotesCount() {
+            const countEl = document.getElementById('escalated-notes-count');
+            const btn = document.getElementById('escalated-notes-btn');
+            if (!countEl || !btn) return;
+            const n = escGetEscalatedNotes().length;
+            countEl.textContent = n;
+            btn.style.display = n > 0 ? '' : 'none';
+        }
+
+        function openEscalatedNotesView() {
+            const listEl = document.getElementById('escalated-notes-list');
+            if (!listEl) return;
+            const esc = (val) => String(val || '')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const notes = escGetEscalatedNotes();
+            if (!notes.length) {
+                listEl.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:30px; font-style:italic;">No escalated notes yet — toggle 🚀 Escalate when reviewing a standout note.</div>';
+            } else {
+                listEl.innerHTML = notes.map(n => {
+                    const when = (n.escalatedAt && n.escalatedAt.toDate) ? n.escalatedAt.toDate().toLocaleDateString('th-TH')
+                        : (n.timestamp && n.timestamp.toDate ? n.timestamp.toDate().toLocaleDateString('th-TH') : '—');
+                    const tags = (n.metadata && Array.isArray(n.metadata.tags)) ? n.metadata.tags : [];
+                    const tagChips = tags.slice(0, 5).map(t => `<span style="background:#fee2e2; color:#b91c1c; padding:2px 8px; border-radius:8px; font-size:0.7em; font-weight:700;">${esc(t)}</span>`).join(' ');
+                    return `<div style="display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid #fecaca; border-left:4px solid #ef4444; border-radius:12px; padding:11px 14px; background:#fff; margin-bottom:10px;">
+                        <div style="min-width:0; flex:1;">
+                            <div style="font-weight:800; color:#7f1d1d; font-size:0.92em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(n.title || 'Untitled')}</div>
+                            <div style="font-size:0.76em; color:#94a3b8; margin-top:3px;">${esc(n.displayName || 'Unknown')} · 🚀 ${esc(when)}</div>
+                            ${tagChips ? `<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:4px;">${tagChips}</div>` : ''}
+                        </div>
+                        <button type="button" onclick="escReviewFromList('${n.id}')" style="flex-shrink:0; width:auto; padding:8px 16px; background:linear-gradient(135deg,#6c5ce7,#a29bfe); color:#fff; border:none; border-radius:10px; font-weight:800; font-size:0.82em; cursor:pointer; min-height:auto; white-space:nowrap;">Review</button>
+                    </div>`;
+                }).join('');
+            }
+            // Open with the same manual pattern as reviewLearningNote (its sibling) — it
+            // skips forceShowModal's 100ms zero-size self-check, which false-positives when
+            // a modal is shown and re-hidden in quick succession (e.g. the Review jump).
+            const modal = document.getElementById('escalatedNotesModal');
+            if (modal) { modal.style.display = 'block'; modal.classList.add('force-show'); }
+        }
+
+        function closeEscalatedNotesView() {
+            forceHideModal('escalatedNotesModal');
+        }
+
+        // Jump from the queue back into the full review modal for one note.
+        function escReviewFromList(id) {
+            closeEscalatedNotesView();
+            reviewLearningNote(id);
+        }
+
         // V91.72 PR γ.1: Learning Note review handler (Section 9)
         // V91.73 PR γ.2: + tag editor + auto-suggest + star rating + templates
         // Save logic preserves all V91.71 writes; γ.2 additionally writes adminQualityStars
@@ -43514,6 +43602,12 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     submissionUpdate.followUpAt = firebase.firestore.Timestamp.fromDate(localMidnight);
                 } else {
                     submissionUpdate.followUpAt = firebase.firestore.FieldValue.delete();
+                }
+                // γ.4d: stamp escalatedAt the first time a note enters the escalated
+                // state so the Escalated review queue can sort by when it was flagged.
+                // Don't overwrite on re-review — keeps the original flag time stable.
+                if (reviewState === 'escalated' && !note.escalatedAt) {
+                    submissionUpdate.escalatedAt = firebase.firestore.FieldValue.serverTimestamp();
                 }
                 if (awardPoints && bonus > 0) {
                     submissionUpdate.pointsAmount = firebase.firestore.FieldValue.increment(bonus);
