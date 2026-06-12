@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.65)</title>
+    <title>Internship Portfolio (V95.66)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5138,6 +5138,37 @@
             console.log(msg);
         }
 
+        // V95.66: ?lgid=1 turns boot into a one-shot "show me this chat's LINE
+        // group id" screen (admin setup for group push notifications). The param
+        // arrives either directly or wrapped in liff.state depending on how the
+        // liff.line.me link was resolved.
+        function isLineGroupIdMode() {
+            try {
+                const search = window.location.search || '';
+                if (/[?&]lgid=1(?:&|$)/.test(search)) return true;
+                const m = search.match(/[?&]liff\.state=([^&]+)/);
+                return !!(m && /lgid=1/.test(decodeURIComponent(m[1])));
+            } catch (_) { return false; }
+        }
+
+        function showLineGroupIdScreen() {
+            let ctx = null;
+            try { ctx = liff.getContext(); } catch (_) { }
+            const gid = (ctx && (ctx.groupId || ctx.roomId)) || '';
+            const type = (ctx && ctx.type) || 'unknown';
+            const overlay = document.getElementById('loading-overlay');
+            if (!overlay) { alert(gid ? `LINE ${type} ID:\n${gid}` : `No group id — opened from "${type}" context.`); return; }
+            const body = gid
+                ? `<div style="font-size:0.85em; color:#94a3b8; margin-bottom:8px;">LINE ${type} ID (แตะค้างเพื่อเลือก/คัดลอก):</div>
+                   <code id="lgid-value" style="display:block; user-select:all; -webkit-user-select:all; word-break:break-all; background:#0f172a; color:#6ee7b7; border:1px solid #334155; border-radius:10px; padding:12px; font-size:0.95em;">${gid}</code>
+                   <button onclick="(navigator.clipboard&&navigator.clipboard.writeText('${gid}')||Promise.reject()).then(()=>{this.innerText='✅ Copied';},()=>{this.innerText='เลือกข้อความด้านบนแล้วคัดลอกเอง';})" style="margin-top:12px; width:100%; background:#10b981; color:white; border:none; border-radius:10px; padding:12px; font-weight:800;">📋 Copy</button>
+                   <div style="font-size:0.78em; color:#64748b; margin-top:10px;">ส่งค่านี้ให้ผู้ดูแลระบบเพื่อตั้งค่าแจ้งเตือนเข้ากลุ่ม</div>`
+                : `<div style="color:#fca5a5; font-weight:700;">ไม่พบ Group ID</div>
+                   <div style="font-size:0.85em; color:#94a3b8; margin-top:8px; line-height:1.6;">ตอนนี้เปิดจาก context: <b>${type}</b><br>ต้องเปิดลิงก์ liff.line.me นี้จาก <b>ภายในแชทกลุ่ม</b> เท่านั้น (แปะลิงก์ในกลุ่มแล้วแตะจากตรงนั้น)</div>`;
+            overlay.innerHTML = `<div class="lang-no-toggle" style="max-width:420px; margin:120px auto 0; background:#1e293b; border:1px solid #334155; border-radius:16px; padding:20px; text-align:left;">
+                <div style="font-weight:900; color:#e2e8f0; margin-bottom:12px;">🔎 LINE Group ID</div>${body}</div>`;
+        }
+
         const groupColorMap = {
             'Public': '#4361ee',
             'IT': '#20c997',
@@ -5578,6 +5609,16 @@
                     updateStatus("Not Logged In. Redirecting...");
                     document.getElementById('btn-manual-login').style.display = 'inline-block';
                     liff.login();
+                    return;
+                }
+
+                // V95.66: LINE group-id discovery mode (?lgid=1) — admin opens the
+                // liff.line.me link from inside the target group once to read its
+                // groupId (needed for the notifyAdminOnNewCase group-push secret).
+                // Stops boot here, BEFORE the admin auto-redirect below would
+                // bounce the admin to admin.html and hide the overlay.
+                if (isLineGroupIdMode()) {
+                    showLineGroupIdScreen();
                     return;
                 }
 
