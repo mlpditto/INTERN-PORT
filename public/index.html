@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.61)</title>
+    <title>Internship Portfolio (V95.62)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5803,6 +5803,12 @@
 
                     // Ensure quiz/assignment lists refresh after group/profile is resolved
                     renderAssignments();
+                    // V95.62 Phase 4 hardening: if the Browse modal is open, live-refresh
+                    // it too so a score change locks/unlocks its rows in place. The Mission
+                    // feed already updates via renderAssignments above; Browse otherwise
+                    // only repainted on next open.
+                    const _qbBrowse = document.getElementById('quizBrowseModal');
+                    if (_qbBrowse && _qbBrowse.style.display === 'flex') qbRenderList();
                     renderHistory();
                 } else {
                     // First time user — show enrollment modal
@@ -7418,6 +7424,23 @@
         async function runQuiz(quizId) {
             currentQuiz = quizzesCache.find(x => x.id === quizId);
             if (!currentQuiz) return;
+
+            // V95.62 Phase 4 hardening: hard-block score-locked quizzes at the open
+            // step. The Mission feed (renderAssignments) + Browse (qbRenderList)
+            // already hide these, but a stale card, deep-link, or direct runQuiz()
+            // call could still slip past discovery — enforce it at the single
+            // chokepoint every take-path funnels through. Mirror the discovery gate:
+            // skip once an attempt exists so a later score dip can't lock out a quiz
+            // they already engaged with. 0 = no gate.
+            {
+                const _lockAttempt = quizAttemptsCache[quizId];
+                if ((currentQuiz.unlockScore || 0) > (myScore || 0) && !_lockAttempt) {
+                    alert(`🔒 ข้อสอบนี้ยังล็อกอยู่\nต้องมีคะแนนสะสม ${currentQuiz.unlockScore} แต้มก่อนจึงจะทำได้\n(ตอนนี้คุณมี ${(myScore || 0).toFixed(2)} แต้ม)`);
+                    currentQuiz = null;
+                    return;
+                }
+            }
+
             quizTotalStartTime = new Date(); // 🔥 V84.1: Track start time
 
             if (currentQuiz.deadline && new Date() > currentQuiz.deadline.toDate()) {
