@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.53</title>
+    <title>Nika V95.54</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -45101,6 +45101,11 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     <div style="font-size:0.75em;font-weight:700;color:#6b21a8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">🎯 Next Topics Requested</div>
                     <div style="display:flex;flex-wrap:wrap;gap:5px;">${topicEntries.slice(0, 8).map((e, i) => `<span class="lang-no-toggle" onclick="qfpClearTopicChip(${i})" style="background:white;border:1px solid #d8b4fe;border-radius:8px;padding:3px 9px;font-size:0.8em;color:#7c3aed;font-weight:600;cursor:pointer;transition:0.2s;min-width:18px;display:inline-block;text-align:center;" onmouseover="this.style.background='#fee2e2';this.style.borderColor='#fca5a5';this.style.color='#dc2626';" onmouseout="this.style.background='white';this.style.borderColor='#d8b4fe';this.style.color='#7c3aed';" title="Click to clear this entry's nextTopic (V92.96 — keeps rating + comment, removes only this nextTopic field)">${qfpEscapeHtml(e.topic)}</span>`).join('')}${blankTopicCount > 0 ? `<span onclick="qfpClearBlankTopics()" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:3px 9px;font-size:0.8em;color:#64748b;font-weight:600;cursor:pointer;transition:0.2s;" onmouseover="this.style.background='#fee2e2';this.style.borderColor='#fca5a5';this.style.color='#dc2626';" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1';this.style.color='#64748b';" title="Click to clear ${blankTopicCount} blank nextTopic field${blankTopicCount === 1 ? '' : 's'} (V92.90 — keeps rating + comment, removes empty nextTopic only)">🗑 +${blankTopicCount} blank</span>` : ''}</div>
                 </div>` : ''}
+                ${(() => { const n = _qfpFeedbacks.filter(qfpIsEmptyFeedback).length; return n > 0 ? `<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:12px;padding:12px 18px;flex:1;min-width:150px;">
+                    <div style="font-size:0.75em;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:0.5px;">Empty Feedback</div>
+                    <div style="font-size:2em;font-weight:900;color:#dc2626;">${n}</div>
+                    <button class="btn-sm" onclick="qfpCleanEmptyFeedback()" title="Delete every entry with no rating, no comment, and no next topic (one confirm, reverts feedback rewards + writes audit rows)" style="background:#dc2626;color:white;border:none;border-radius:8px;padding:4px 10px;font-size:0.78em;font-weight:700;cursor:pointer;">🧹 Clean empty</button>
+                </div>` : ''; })()}
             `;
 
             // Update badge in quiz table
@@ -45364,6 +45369,86 @@ Reply ONLY with raw JSON, no markdown:
                 }
             } catch (e) {
                 alert('Failed to delete: ' + e.message);
+            }
+        }
+
+        // V95.54: an entry is "empty" when the intern gave no stars, no comment
+        // (invisible-char payloads count as empty via qfpNormalizeTopic), and no
+        // next topic — nothing reviewable, the cleanup target admins delete by hand.
+        function qfpIsEmptyFeedback(f) {
+            return !(typeof f.rating === 'number' && f.rating > 0)
+                && !qfpNormalizeTopic(f.comment)
+                && !qfpNormalizeTopic(f.nextTopic);
+        }
+
+        // V95.54: bulk-delete every empty entry for the open quiz in one confirmed
+        // batch. Same delete + revert-pointsEarned + checkin_logs audit shape as
+        // deleteQuizFeedbackItem, but reverts are aggregated per user so each user
+        // doc gets a single update (a batch must not write one doc twice). Panel
+        // loads max 100 docs → worst case 100 deletes + 200 user ops, under the
+        // 500-op batch limit.
+        async function qfpCleanEmptyFeedback() {
+            const empties = (_qfpFeedbacks || []).filter(qfpIsEmptyFeedback);
+            if (!empties.length) { showToast('No empty feedback to clean'); return; }
+
+            const quiz = (quizzesData || []).find(q => q.id === _qfpCurrentId);
+            const quizTitle = quiz?.title || quiz?.name || _qfpCurrentId || 'Quiz';
+
+            const revertByUser = {};
+            empties.forEach(f => {
+                const pts = (typeof f.pointsEarned === 'number' && f.pointsEarned > 0) ? f.pointsEarned : 0;
+                const userExists = f.userId && f.userId !== 'anon' && (usersData || []).some(u => u.id === f.userId);
+                if (pts > 0 && userExists) {
+                    if (!revertByUser[f.userId]) revertByUser[f.userId] = { pts: 0, count: 0, name: f.displayName || 'Unknown user' };
+                    revertByUser[f.userId].pts += pts;
+                    revertByUser[f.userId].count += 1;
+                }
+            });
+            const revertUsers = Object.keys(revertByUser);
+            const totalRevert = revertUsers.reduce((a, uid) => a + revertByUser[uid].pts, 0);
+
+            const revertLines = revertUsers.slice(0, 8).map(uid => `• ${revertByUser[uid].name}: −${revertByUser[uid].pts.toFixed(1)} PTS`);
+            if (revertUsers.length > 8) revertLines.push(`• … +${revertUsers.length - 8} more users`);
+            const confirmMsg = `Delete ${empties.length} empty feedback entr${empties.length === 1 ? 'y' : 'ies'} for '${quizTitle}'?\n(No rating + no comment + no next topic)\n\n` +
+                (totalRevert > 0
+                    ? `Feedback rewards to revert — −${totalRevert.toFixed(1)} PTS total:\n${revertLines.join('\n')}\n\n`
+                    : 'No feedback rewards to revert.\n\n') +
+                'This cannot be undone.';
+            if (!confirm(confirmMsg)) return;
+
+            try {
+                const b = db.batch();
+                empties.forEach(f => b.delete(db.collection('quiz_feedback').doc(f.id)));
+                revertUsers.forEach(uid => {
+                    const r = revertByUser[uid];
+                    b.update(db.collection('users').doc(uid), {
+                        score: firebase.firestore.FieldValue.increment(-r.pts)
+                    });
+                    b.set(db.collection('checkin_logs').doc(), {
+                        userId: uid,
+                        type: 'manual_adjust',
+                        amount: -r.pts,
+                        note: `Revert: ${r.count} empty Quiz Feedback bulk-cleaned — '${quizTitle}'`,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                });
+                await b.commit();
+
+                const deletedIds = new Set(empties.map(f => f.id));
+                _qfpFeedbacks = _qfpFeedbacks.filter(x => !deletedIds.has(x.id));
+                if (Array.isArray(window._quizFeedbackCache)) {
+                    window._quizFeedbackCache = window._quizFeedbackCache.filter(x => !deletedIds.has(x.id));
+                }
+
+                showToast(totalRevert > 0
+                    ? `Deleted ${deletedIds.size} empty feedback & reverted −${totalRevert.toFixed(1)} PTS`
+                    : `Deleted ${deletedIds.size} empty feedback`);
+                if (typeof renderQuizFeedbackCards === 'function') renderQuizFeedbackCards();
+                if (_qfpCurrentId) {
+                    await showQuizFeedbackPanel(_qfpCurrentId);
+                }
+            } catch (e) {
+                alert('Failed to clean: ' + e.message);
             }
         }
 
