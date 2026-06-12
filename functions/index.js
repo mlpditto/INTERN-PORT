@@ -1329,9 +1329,13 @@ exports.notifyOnAdminEdit = onCall(
 //     notifyOnReviewMessage and notifyOnAdminEdit)
 //   - ADMIN_LINE_USER_ID  (NEW — single LINE userId starting with
 //     'U'; the recipient of every new-case Flex Message)
+//   - ADMIN_LINE_GROUP_ID  (V95.66 track — LINE groupId 'C…' or
+//     roomId 'R…'; the OA must be a member of that group. Same Flex
+//     is pushed there IN ADDITION to the 1:1 admin push. Discover the
+//     id via the intern LIFF's ?lgid=1 screen.)
 // ============================================================
 exports.notifyAdminOnNewCase = onCall(
-    { secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID'] },
+    { secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID'] },
     async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'Login required');
@@ -1359,13 +1363,25 @@ exports.notifyAdminOnNewCase = onCall(
 
     const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     const adminLineId = process.env.ADMIN_LINE_USER_ID;
+    const adminGroupId = process.env.ADMIN_LINE_GROUP_ID;
 
     if (!accessToken) {
         console.warn(`[notifyAdminOnNewCase] LINE_CHANNEL_ACCESS_TOKEN secret missing — skipping push for case=${caseDocId}`);
         return { skipped: true, reason: 'token-missing' };
     }
-    if (!adminLineId || typeof adminLineId !== 'string' || !adminLineId.startsWith('U')) {
-        console.warn(`[notifyAdminOnNewCase] ADMIN_LINE_USER_ID missing or invalid — skipping push for case=${caseDocId}`);
+    // V95.66 track: push to the admin 1:1 AND the team group when configured.
+    // Either target alone is enough to proceed; both missing = skip.
+    const targets = [];
+    if (adminLineId && typeof adminLineId === 'string' && adminLineId.startsWith('U')) {
+        targets.push({ to: adminLineId, label: 'admin-1on1' });
+    } else {
+        console.warn(`[notifyAdminOnNewCase] ADMIN_LINE_USER_ID missing or invalid — no 1:1 push for case=${caseDocId}`);
+    }
+    if (adminGroupId && typeof adminGroupId === 'string' && /^[CR]/.test(adminGroupId)) {
+        targets.push({ to: adminGroupId, label: 'group' });
+    }
+    if (!targets.length) {
+        console.warn(`[notifyAdminOnNewCase] no valid push target — skipping push for case=${caseDocId}`);
         return { skipped: true, reason: 'admin-id-missing' };
     }
 
@@ -1432,35 +1448,43 @@ exports.notifyAdminOnNewCase = onCall(
         }
     };
 
-    try {
-        await axios.post('https://api.line.me/v2/bot/message/push', {
-            to: adminLineId,
-            messages: [flex]
-        }, {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            },
-            timeout: 8000
-        });
+    // Push each target independently — a group failure (e.g. OA kicked from
+    // the group) must not block the 1:1 admin push, and vice versa.
+    const results = [];
+    for (const target of targets) {
+        try {
+            await axios.post('https://api.line.me/v2/bot/message/push', {
+                to: target.to,
+                messages: [flex]
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 8000
+            });
 
-        console.log(`[notifyAdminOnNewCase] PUSHED  case=${caseDocId}  user=${displayName}  hn=${caseRef || '(none)'}`);
-        return { ok: true, pushed: true, caseDocId };
-    } catch (err) {
-        const status = err && err.response ? err.response.status : null;
-        const lineMessage = (err && err.response && err.response.data && err.response.data.message) || (err && err.message) || 'unknown';
-        let code;
-        if (status === 400) code = 'invalid';
-        else if (status === 401) code = 'token';
-        else if (status === 403) code = 'no-friend';
-        else if (status === 404) code = 'invalid-user';
-        else if (status === 429) code = 'rate-limit';
-        else if (status >= 500 && status < 600) code = 'transient';
-        else code = 'network';
+            console.log(`[notifyAdminOnNewCase] PUSHED  target=${target.label}  case=${caseDocId}  user=${displayName}  hn=${caseRef || '(none)'}`);
+            results.push({ target: target.label, ok: true });
+        } catch (err) {
+            const status = err && err.response ? err.response.status : null;
+            const lineMessage = (err && err.response && err.response.data && err.response.data.message) || (err && err.message) || 'unknown';
+            let code;
+            if (status === 400) code = 'invalid';
+            else if (status === 401) code = 'token';
+            else if (status === 403) code = 'no-friend';
+            else if (status === 404) code = 'invalid-user';
+            else if (status === 429) code = 'rate-limit';
+            else if (status >= 500 && status < 600) code = 'transient';
+            else code = 'network';
 
-        console.error(`[notifyAdminOnNewCase] PUSH_FAILED  code=${code}  status=${status || 'no-response'}  case=${caseDocId}  message=${JSON.stringify(lineMessage)}`);
-        return { ok: false, code, status: status || null, caseDocId };
+            console.error(`[notifyAdminOnNewCase] PUSH_FAILED  target=${target.label}  code=${code}  status=${status || 'no-response'}  case=${caseDocId}  message=${JSON.stringify(lineMessage)}`);
+            results.push({ target: target.label, ok: false, code, status: status || null });
+        }
     }
+
+    const pushedCount = results.filter(r => r.ok).length;
+    return { ok: pushedCount > 0, pushed: pushedCount > 0, pushedCount, results, caseDocId };
 });
 
 // ============================================================
