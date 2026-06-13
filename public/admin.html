@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.56</title>
+    <title>Nika V95.57</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -45031,7 +45031,8 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         async function showQuizFeedbackPanel(quizId, highlightUserId) {
             _qfpCurrentId = quizId;
             _qfpFeedbacks = [];
-            document.getElementById('qfp-ai-result').innerText = '';
+            // V95.57: muted placeholder instead of a blank yellow box before Generate
+            document.getElementById('qfp-ai-result').innerHTML = '<span style="color:#b08968;font-style:italic;">เลือกโมเดล แล้วกด ✨ Generate เพื่อให้ AI สรุปภาพรวม feedback ของชุดข้อสอบนี้</span>';
             document.getElementById('qfp-summary').innerHTML = '';
             document.getElementById('qfp-comments').innerHTML = `<p style="text-align:center;color:#94a3b8;padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</p>`;
 
@@ -45663,6 +45664,31 @@ Reply ONLY with raw JSON, no markdown:
             btn.style.color = 'white';
         };
 
+        // V95.57: light markdown renderer for the AI Insight result. The model
+        // returns Thai prose with **bold** and numbered/bulleted lines; pre-wrap
+        // text showed the literal ** and offered no list spacing. Escapes first
+        // (AI output — see escape guidance) then applies a safe minimal subset.
+        function qfpRenderInsightMarkdown(raw) {
+            const esc = qfpEscapeHtml(String(raw || ''));
+            const bolded = esc.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            const lines = bolded.split('\n');
+            let html = '', inList = false;
+            for (const ln of lines) {
+                const t = ln.trim();
+                const bullet = t.match(/^[-•]\s+(.*)$/);
+                if (bullet) {
+                    if (!inList) { html += '<ul style="margin:4px 0;padding-left:20px;">'; inList = true; }
+                    html += `<li style="margin:2px 0;">${bullet[1]}</li>`;
+                    continue;
+                }
+                if (inList) { html += '</ul>'; inList = false; }
+                if (!t) { html += '<div style="height:6px;"></div>'; continue; }
+                html += `<div style="margin:2px 0;">${ln}</div>`;
+            }
+            if (inList) html += '</ul>';
+            return html;
+        }
+
         async function generateAIFeedbackInsight() {
             if (!_qfpFeedbacks.length) return;
             const btn = document.getElementById('qfp-ai-btn');
@@ -45670,7 +45696,7 @@ Reply ONLY with raw JSON, no markdown:
             const oldText = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-            resultEl.innerText = 'Analyzing...';
+            resultEl.innerHTML = '<span style="color:#b08968;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังวิเคราะห์ feedback...</span>';
 
             const quiz = quizzesData.find(x => x.id === _qfpCurrentId);
             const ratings = _qfpFeedbacks.map(f => f.rating).filter(r => typeof r === 'number');
@@ -45694,7 +45720,7 @@ Reply ONLY with raw JSON, no markdown:
             try {
                 const model = document.getElementById('ai-model-selector') ? document.getElementById('ai-model-selector').value : 'gpt-4o-mini';
                 const { text } = await window.callUniversalAI(model, prompt);
-                resultEl.innerText = text || '(No response)';
+                resultEl.innerHTML = text ? qfpRenderInsightMarkdown(text) : '(No response)';
             } catch (e) {
                 resultEl.innerText = 'Error: ' + e.message;
             } finally {
