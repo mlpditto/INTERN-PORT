@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.61</title>
+    <title>Nika V95.62</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -22182,6 +22182,7 @@ ${JSON.stringify(sourceObj)}`;
             const data = {
                 ...formData,
                 isActive: true, // Force Active
+                lastLiveAt: firebase.firestore.FieldValue.serverTimestamp(), // V95.62: drives the 🆕 "เพิ่ง Live" tag
                 startTime: convertDate(document.getElementById('quiz-start-time').value),
                 deadline: convertDate(document.getElementById('quiz-deadline').value),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -25620,6 +25621,11 @@ ${JSON.stringify(sourceObj)}`;
                     ? `<span title="${_cheatStats.riskyCount} attempt(s) flagged by cheat-detector: ${_cheatStats.High} High, ${_cheatStats.Moderate} Moderate (of ${_cheatStats.withData} monitored). Click to review." style="font-size:0.7em; background:#fef2f2; color:#991b1b; border:1px solid #fecaca; padding:2px 6px; border-radius:8px; font-weight:800; cursor:help; white-space:nowrap;" onclick="event.stopPropagation(); showQuizParticipants('${q.id}')">⚠️ ${_cheatStats.riskyCount}</span>`
                     : '';
 
+                // V95.62: 🆕 "เพิ่ง Live" tag — quiz is live now or was within 30 days
+                const _liveTag = quizRecentlyLive(q)
+                    ? `<span class="lang-no-toggle" title="เคย live ภายใน 30 วันล่าสุด" style="font-size:0.7em; background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:2px 7px; border-radius:8px; font-weight:800; white-space:nowrap;">🆕 เพิ่ง Live</span>`
+                    : '';
+
                 return `
                     <tr class="lang-no-toggle">
                         <td>
@@ -25630,7 +25636,7 @@ ${JSON.stringify(sourceObj)}`;
                                 ${_easyBadge}${_hardBadge}${_cheatBadge}
                             </div>
                             <div style="display:flex; flex-wrap:wrap; gap:3px; align-items:center;">
-                                ${modeLabel} ${oneTimeLabel} ${homeworkLabel}
+                                ${_liveTag} ${modeLabel} ${oneTimeLabel} ${homeworkLabel}
                                 ${pollLabel} ${subjLabel} ${orderingLabel} ${flashcardLabel} ${templateLabel} ${targetGroupLabel} ${unlockLabel} ${materialsLabel} ${systemLabel}
                             </div>
                             <div style="margin-top:4px;"><small style="color:#999;">(${q.shortTitle || '-'})</small></div>
@@ -25905,6 +25911,7 @@ ${JSON.stringify(sourceObj)}`;
                 startTime: null,
                 deadline: null,
                 isActive: true,
+                lastLiveAt: firebase.firestore.FieldValue.serverTimestamp(), // V95.62: 🆕 "เพิ่ง Live" tag
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             showToast("Reposted!");
@@ -25926,6 +25933,7 @@ ${JSON.stringify(sourceObj)}`;
                 await db.collection("quizzes").doc(id).update({
                     deadline: firebase.firestore.Timestamp.fromDate(deadline),
                     isActive: true, // Ensure it's active
+                    lastLiveAt: firebase.firestore.FieldValue.serverTimestamp(), // V95.62: 🆕 "เพิ่ง Live" tag
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 showToast(wasInactive ? `Quiz is now live with ${hours}h timer!` : `Timer set for ${hours} hours!`);
@@ -25967,9 +25975,22 @@ ${JSON.stringify(sourceObj)}`;
             } catch (e) { alert("Duplicate Error: " + e.message); }
         }
 
+        // V95.62: a quiz is "recently live" if it's active now, or last went live
+        // within 30 days (lastLiveAt, stamped at every go-live path). Drives the 🆕
+        // "เพิ่ง Live" row tag. Forward-only — older quizzes light up once they next
+        // go live (no lastLiveAt backfilled on existing docs).
+        const QUIZ_RECENT_LIVE_MS = 30 * 24 * 60 * 60 * 1000;
+        function quizRecentlyLive(q) {
+            if (q && q.isActive) return true;
+            const t = (q && q.lastLiveAt && typeof q.lastLiveAt.toDate === 'function') ? q.lastLiveAt.toDate() : null;
+            return t ? (Date.now() - t.getTime()) <= QUIZ_RECENT_LIVE_MS : false;
+        }
+
         async function toggleQuizStatus(id, current) {
             const updates = { isActive: !current };
-            
+            // V95.62: stamp last-went-live time when activating (drives 🆕 "เพิ่ง Live" tag)
+            if (!current) updates.lastLiveAt = firebase.firestore.FieldValue.serverTimestamp();
+
             if (!current) {
                 const q = quizzesData.find(x => x.id === id);
                 if (q && q.deadline) {
@@ -26022,7 +26043,7 @@ ${JSON.stringify(sourceObj)}`;
                 const batch = db.batch();
                 ids.forEach(id => {
                     // mirror toggleQuizStatus: deactivating also marks the quiz as a template
-                    const upd = active ? { isActive: true } : { isActive: false, isTemplate: true };
+                    const upd = active ? { isActive: true, lastLiveAt: firebase.firestore.FieldValue.serverTimestamp() } : { isActive: false, isTemplate: true }; // V95.62: stamp live time on bulk activate
                     batch.update(db.collection("quizzes").doc(id), upd);
                 });
                 await batch.commit();
