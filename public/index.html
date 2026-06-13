@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.71)</title>
+    <title>Internship Portfolio (V95.72)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3693,7 +3693,7 @@
                             </div>
                         </div>
 
-                        <div class="dc-footer">
+                        <div class="dc-footer" id="dc-submit-footer">
                             <button type="button" class="dc-submit-btn" onclick="dcOpenSubmit('new')" title="Submit a new drug entry for admin moderation">
                                 📥 Submit New Drug
                             </button>
@@ -3753,7 +3753,7 @@
                             </div>
                         </div>
 
-                        <div class="dc-footer">
+                        <div class="dc-footer" id="dx-submit-footer">
                             <button type="button" class="dc-submit-btn" onclick="dxOpenSubmit('new')" title="Submit a new disease entry for admin moderation">
                                 📥 Submit New Disease
                             </button>
@@ -11753,6 +11753,9 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             if (view === 'browse') {
                 if (browse) browse.style.display = 'block';
                 if (mydrafts) mydrafts.style.display = 'none';
+                // V95.72: restore the footer Submit (empty My Drafts hides it)
+                const footer = document.getElementById('dx-submit-footer');
+                if (footer) footer.style.display = '';
             } else if (view === 'mydrafts') {
                 if (browse) browse.style.display = 'none';
                 if (mydrafts) mydrafts.style.display = 'block';
@@ -11811,15 +11814,24 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
         function dxRenderMyDrafts() {
             const list = document.getElementById('dx-mydrafts-list');
             if (!list) return;
+            // V95.72: empty My Drafts hosts both actions in one row (Open Browse +
+            // Submit, split left-right); hide the persistent footer Submit to avoid
+            // a duplicate, show it again once there are drafts.
+            const footer = document.getElementById('dx-submit-footer');
             if (dxMyDraftsState.drafts.length === 0) {
+                if (footer) footer.style.display = 'none';
                 list.innerHTML = '<div class="dc-empty-state lang-no-toggle" style="padding:24px 16px; max-width:440px; margin:0 auto;">'
                     + '<div style="font-size:1.8em; margin-bottom:6px;">📝</div>'
                     + '<div style="font-weight:700; color:#475569; margin-bottom:4px;">No drafts yet</div>'
-                    + '<div style="font-size:0.82em; color:#94a3b8; margin-bottom:12px;">Browse the codex, or hit Submit below to add one</div>'
-                    + '<button type="button" onclick="dxSwitchView(\'browse\')" style="width:auto; min-height:0; background:#f0fdfa; color:#0f766e; border:1px solid #99f6e4; border-radius:8px; padding:6px 14px; font-weight:700; font-size:0.85em; cursor:pointer;">📚 Open Browse</button>'
+                    + '<div style="font-size:0.82em; color:#94a3b8; margin-bottom:14px;">Browse the codex, or submit a new draft</div>'
+                    + '<div style="display:flex; gap:10px;">'
+                    + '<button type="button" onclick="dxSwitchView(\'browse\')" style="flex:1; width:auto; min-height:0; background:#f0fdfa; color:#0f766e; border:1px solid #99f6e4; border-radius:8px; padding:7px 12px; font-weight:700; font-size:0.85em; cursor:pointer;">📚 Open Browse</button>'
+                    + '<button type="button" onclick="dxOpenSubmit(\'new\')" style="flex:1; width:auto; min-height:0; background:#0f766e; color:#fff; border:1px solid #0f766e; border-radius:8px; padding:7px 12px; font-weight:700; font-size:0.85em; cursor:pointer;">📥 Submit</button>'
+                    + '</div>'
                     + '</div>';
                 return;
             }
+            if (footer) footer.style.display = '';
             list.innerHTML = dxMyDraftsState.drafts.map(draft => {
                 const status = String(draft.status || 'pending').toLowerCase();
                 const statusLabel = status === 'approved' ? 'Approved'
@@ -12581,6 +12593,9 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             if (view === 'browse') {
                 if (browse) browse.style.display = 'block';
                 if (mydrafts) mydrafts.style.display = 'none';
+                // V95.72: restore the footer Submit (empty My Drafts hides it)
+                const footer = document.getElementById('dc-submit-footer');
+                if (footer) footer.style.display = '';
             } else if (view === 'mydrafts') {
                 if (browse) browse.style.display = 'none';
                 if (mydrafts) mydrafts.style.display = 'block';
@@ -12639,19 +12654,24 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
         function dcRenderMyDrafts() {
             const list = document.getElementById('dc-mydrafts-list');
             if (!list) return;
+            // V95.72: empty My Drafts hosts both actions in one row (Open Browse +
+            // Submit, split left-right), so hide the persistent footer Submit here to
+            // avoid a duplicate; show it again once there are drafts.
+            const footer = document.getElementById('dc-submit-footer');
             if (dcMyDraftsState.drafts.length === 0) {
-                // V94.95: empty state nudges intern toward Browse tab — otherwise
-                // an intern who lands here (e.g. via auto-switch after submit, or
-                // by manual tab click out of curiosity) sees nothing and may
-                // assume the whole Drug Codex is empty.
+                if (footer) footer.style.display = 'none';
                 list.innerHTML = '<div class="dc-empty-state lang-no-toggle" style="padding:24px 16px; max-width:440px; margin:0 auto;">'
                     + '<div style="font-size:1.8em; margin-bottom:6px;">📝</div>'
                     + '<div style="font-weight:700; color:#475569; margin-bottom:4px;">No drafts yet</div>'
-                    + '<div style="font-size:0.82em; color:#94a3b8; margin-bottom:12px;">Browse the codex, or hit Submit below to add one</div>'
-                    + '<button type="button" onclick="dcSwitchView(\'browse\')" style="width:auto; min-height:0; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; border-radius:8px; padding:6px 14px; font-weight:700; font-size:0.85em; cursor:pointer;">📚 Open Browse</button>'
+                    + '<div style="font-size:0.82em; color:#94a3b8; margin-bottom:14px;">Browse the codex, or submit a new draft</div>'
+                    + '<div style="display:flex; gap:10px;">'
+                    + '<button type="button" onclick="dcSwitchView(\'browse\')" style="flex:1; width:auto; min-height:0; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; border-radius:8px; padding:7px 12px; font-weight:700; font-size:0.85em; cursor:pointer;">📚 Open Browse</button>'
+                    + '<button type="button" onclick="dcOpenSubmit(\'new\')" style="flex:1; width:auto; min-height:0; background:#2563eb; color:#fff; border:1px solid #2563eb; border-radius:8px; padding:7px 12px; font-weight:700; font-size:0.85em; cursor:pointer;">📥 Submit</button>'
+                    + '</div>'
                     + '</div>';
                 return;
             }
+            if (footer) footer.style.display = '';
             list.innerHTML = dcMyDraftsState.drafts.map(draft => {
                 const status = String(draft.status || 'pending').toLowerCase();
                 const statusLabel = status === 'approved' ? 'Approved'
