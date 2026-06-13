@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.55</title>
+    <title>Nika V95.56</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -45131,7 +45131,12 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 const safeComment = qfpEscapeHtml(rawComment);
                 const commentLength = rawComment.length;
                 const meetsMin = commentLength >= 100;
-                const aiScoreText = typeof f.aiFeedbackScore === 'number' ? `${f.aiFeedbackScore.toFixed(1)}/10` : 'Not scored';
+                // V95.56: hide the AI review box until a score exists — the empty
+                // "Not scored" purple box added ~40px of noise to every card. The
+                // element stays in the DOM (display:none) because runAIFeedbackScoring
+                // writes the spinner + result into it; it unhides there.
+                const hasAiReview = typeof f.aiFeedbackScore === 'number';
+                const aiScoreText = hasAiReview ? `${f.aiFeedbackScore.toFixed(1)}/10` : 'Not scored';
                 const aiIssue = qfpEscapeHtml(f.aiFeedbackIssue || '');
                 const aiSuggestion = qfpEscapeHtml(f.aiFeedbackSuggestion || '');
                 const adminScoreValue = typeof f.adminExtraScore === 'number' ? f.adminExtraScore : '';
@@ -45179,6 +45184,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                                 Feedback Length: ${commentLength} chars · ${meetsMin ? 'Meets minimum' : 'Below 100'}
                             </span>
                             <div style="display:flex; gap:6px; align-items:center;">
+                                <button id="qfp-bonus-btn-${f.id}" class="btn-sm" onclick="qfpToggleBonus('${f.id}')" title="Show/hide Bonus Score by Admin (retroactive)" style="background:#f0fdfa; color:#0f766e; border:1px solid #99f6e4; border-radius:8px; padding:5px 10px;">
+                                    🎁 Bonus${adminScoreValue !== '' ? ' ' + adminScoreValue : ''}
+                                </button>
                                 <button id="qfp-ai-btn-${f.id}" class="btn-sm" onclick="runAIFeedbackScoring('${f.id}')" ${!rawComment ? 'disabled title="No feedback text to score"' : ''} style="background:${rawComment ? '#1d4ed8' : '#94a3b8'}; color:white; border:none; border-radius:8px; padding:5px 10px; ${!rawComment ? 'cursor:not-allowed; opacity:0.6;' : ''}">
                                     🗡️ Score
                                 </button>
@@ -45187,12 +45195,12 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                                 </button>
                             </div>
                         </div>
-                        <div id="qfp-ai-review-${f.id}" style="margin-top:8px; font-size:0.8em; color:#334155; background:#eef2ff; border:1px solid #c7d2fe; border-radius:8px; padding:8px 10px; line-height:1.5;">
-                            <div><b>🗡️</b> ${aiScoreText}</div>
+                        <div id="qfp-ai-review-${f.id}" style="margin-top:8px; font-size:0.8em; color:#334155; background:#eef2ff; border:1px solid #c7d2fe; border-radius:8px; padding:8px 10px; line-height:1.5;${hasAiReview ? '' : ' display:none;'}">
+                            ${hasAiReview ? `<div><b>🗡️</b> ${aiScoreText}</div>
                             ${aiIssue ? `<div><b>Issue:</b> ${aiIssue}</div>` : ''}
-                            ${aiSuggestion ? `<div><b>Suggestion:</b> ${aiSuggestion}</div>` : ''}
+                            ${aiSuggestion ? `<div><b>Suggestion:</b> ${aiSuggestion}</div>` : ''}` : ''}
                         </div>
-                        <div style="margin-top:10px; padding:10px; border:1px dashed #cbd5e1; border-radius:8px; background:#f8fafc;">
+                        <div id="qfp-admin-bonus-${f.id}" style="margin-top:10px; padding:10px; border:1px dashed #cbd5e1; border-radius:8px; background:#f8fafc; display:none;">
                             <div style="font-size:0.78em; font-weight:800; color:#334155; margin-bottom:8px;">Bonus Score by Admin (retroactive)</div>
                             <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                                 <input id="qfp-admin-score-${f.id}" type="number" min="0" max="10" step="0.5" value="${adminScoreValue}" placeholder="0-10" style="width:90px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">
@@ -45234,7 +45242,10 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             }
-            if (reviewEl) reviewEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Scoring...';
+            if (reviewEl) {
+                reviewEl.style.display = ''; // V95.56: box is hidden until first score
+                reviewEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Scoring...';
+            }
 
             const model = document.getElementById('ai-model-selector') ? document.getElementById('ai-model-selector').value : 'gpt-4o-mini';
             const prompt = `You are an admin assistant evaluating the quality of a learner's quiz feedback.
@@ -45288,6 +45299,13 @@ Reply ONLY with raw JSON, no markdown:
             }
         }
 
+        // V95.56: the bonus form is collapsed by default (rarely used but was
+        // ~90px on every card) — the 🎁 Bonus button in the action row toggles it.
+        function qfpToggleBonus(feedbackId) {
+            const el = document.getElementById(`qfp-admin-bonus-${feedbackId}`);
+            if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+        }
+
         async function saveAdminFeedbackScore(feedbackId) {
             const scoreEl = document.getElementById(`qfp-admin-score-${feedbackId}`);
             const noteEl = document.getElementById(`qfp-admin-note-${feedbackId}`);
@@ -45311,6 +45329,9 @@ Reply ONLY with raw JSON, no markdown:
                     item.adminExtraScore = score;
                     item.adminScoreNote = note;
                 }
+                // V95.56: reflect the saved value on the collapsed-state toggle button
+                const bonusBtn = document.getElementById(`qfp-bonus-btn-${feedbackId}`);
+                if (bonusBtn) bonusBtn.innerText = `🎁 Bonus ${score}`;
                 showToast('Bonus score saved');
             } catch (e) {
                 alert('Failed to save score: ' + e.message);
