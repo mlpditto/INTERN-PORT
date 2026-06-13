@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.59</title>
+    <title>Nika V95.61</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12217,6 +12217,8 @@
                 <div style="font-weight:800; font-size:0.88em; color:#475569; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
                     <i class="fa-solid fa-comments"></i> Individual Feedback
                 </div>
+                <!-- V95.60: filter/sort rail — populated by qfpRenderFilterRail() only when there are >3 responses -->
+                <div id="qfp-comments-controls" style="margin-bottom:10px;"></div>
                 <div id="qfp-comments" style="display:flex; flex-direction:column; gap:10px;">
                     <p style="text-align:center; color:#94a3b8; padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</p>
                 </div>
@@ -44995,6 +44997,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         // --- [Version: V90.36] Quiz Feedback Panel ---
         let _qfpCurrentId = null;
         let _qfpFeedbacks = [];
+        // V95.60: in-panel filter/sort state for the Individual Feedback list
+        let _qfpFilter = 'all';   // all | unscored | short | low
+        let _qfpSort = 'recent';  // recent | rating
 
         function qfpEscapeHtml(text) {
             return String(text || '')
@@ -45044,8 +45049,17 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         }
 
         async function showQuizFeedbackPanel(quizId, highlightUserId) {
+            // V95.60: preserve filter/sort + scroll across in-place re-renders
+            // (delete/score/clear-topic reopen the panel for the SAME quiz). A fresh
+            // open of a different quiz — or any highlight jump — resets the filter and
+            // starts at the top so the targeted card can't be filtered out of view.
+            const _qfpScrollEl = document.querySelector('#quizFeedbackPanelModal .modal-content');
+            const _qfpIsReopen = (_qfpCurrentId === quizId);
+            const _qfpSavedScroll = (_qfpIsReopen && _qfpScrollEl) ? _qfpScrollEl.scrollTop : 0;
+            if (!_qfpIsReopen || highlightUserId) { _qfpFilter = 'all'; _qfpSort = 'recent'; }
             _qfpCurrentId = quizId;
             _qfpFeedbacks = [];
+            document.getElementById('qfp-comments-controls').innerHTML = '';
             // V95.57: muted placeholder instead of a blank yellow box before Generate
             document.getElementById('qfp-ai-result').innerHTML = '<span style="color:#b08968;font-style:italic;">เลือกโมเดล แล้วกด ✨ Generate เพื่อให้ AI สรุปภาพรวม feedback ของชุดข้อสอบนี้</span>';
             document.getElementById('qfp-summary').innerHTML = '';
@@ -45136,8 +45150,33 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             const badge = document.getElementById(`fb-badge-${quizId}`);
             if (badge && avgRating !== null) badge.innerText = `⭐ ${avgRating.toFixed(1)} (${_qfpFeedbacks.length})`;
 
-            // Render comment cards
-            document.getElementById('qfp-comments').innerHTML = _qfpFeedbacks.map(f => {
+            // V95.60: render the filter/sort rail + comment cards via extracted
+            // helpers so rail chips can re-render the list in place (no Firestore
+            // refetch, no scroll jump).
+            qfpRenderFilterRail();
+            qfpRenderComments();
+
+            // V93.97: when opened from the Review Quiz Attempt modal, scroll to and
+            // briefly highlight the reviewed learner's own feedback card.
+            if (highlightUserId) {
+                const card = document.querySelector(`#qfp-comments [data-fb-user="${CSS.escape(highlightUserId)}"]`);
+                if (card) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    card.style.boxShadow = '0 0 0 3px #f59e0b';
+                    setTimeout(() => { card.style.boxShadow = ''; }, 3000);
+                } else if (typeof showToast === 'function') {
+                    showToast('This learner has no feedback for this quiz');
+                }
+            } else if (_qfpIsReopen && _qfpScrollEl) {
+                // V95.60: keep the scroll position across in-place re-renders
+                _qfpScrollEl.scrollTop = _qfpSavedScroll;
+            }
+        }
+
+        // V95.60: one feedback card's HTML — lifted out of showQuizFeedbackPanel so
+        // the filter/sort rail can re-render the list in place. References only
+        // module-level state (_qfpAttempts) and global qfp* helpers.
+        function qfpCardHtml(f) {
                 const dateStr = qfpFormatAbsolute(f.timestamp);
                 const stars = typeof f.rating === 'number' ? ('★'.repeat(Math.round(f.rating / 10 * 5)) + '☆'.repeat(5 - Math.round(f.rating / 10 * 5))) : '';
                 const mins = Math.floor((f.timeUsedSeconds || 0) / 60);
@@ -45227,23 +45266,112 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                             </div>
                         </div>
                     </div>`;
-            }).join('');
+        }
 
-            // V93.97: when opened from the Review Quiz Attempt modal, scroll to and
-            // briefly highlight the reviewed learner's own feedback card.
-            if (highlightUserId) {
-                const card = document.querySelector(`#qfp-comments [data-fb-user="${CSS.escape(highlightUserId)}"]`);
-                if (card) {
-                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    card.style.boxShadow = '0 0 0 3px #f59e0b';
-                    setTimeout(() => { card.style.boxShadow = ''; }, 3000);
-                } else if (typeof showToast === 'function') {
-                    showToast('This learner has no feedback for this quiz');
-                }
+        // V95.60: filter predicate for the Individual Feedback list.
+        function qfpMatchesFilter(f) {
+            const rc = qfpNormalizeTopic(f.comment);
+            switch (_qfpFilter) {
+                case 'unscored': return rc.length > 0 && typeof f.aiFeedbackScore !== 'number';
+                case 'short':    return rc.length > 0 && rc.length < 100;
+                case 'low':      return typeof f.rating === 'number' && f.rating <= 5;
+                default:         return true;
             }
         }
 
-        async function runAIFeedbackScoring(feedbackId) {
+        // V95.60: render the comment cards for the current filter + sort into
+        // #qfp-comments. Called on panel open and by the rail chips (in place).
+        function qfpRenderComments() {
+            const container = document.getElementById('qfp-comments');
+            if (!container) return;
+            let list = _qfpFeedbacks.filter(qfpMatchesFilter);
+            if (_qfpSort === 'rating') {
+                const rk = f => (typeof f.rating === 'number' ? f.rating : Infinity);
+                list = list.slice().sort((a, b) => rk(a) - rk(b));
+            }
+            if (!list.length) {
+                container.innerHTML = `<p style="text-align:center;color:#94a3b8;padding:20px;">ไม่มีรายการที่ตรงกับตัวกรองนี้</p>`;
+                return;
+            }
+            container.innerHTML = list.map(qfpCardHtml).join('');
+        }
+
+        // V95.60: filter + sort chip rail above the comment feed. Hidden for small
+        // lists (<=3) where scanning by eye is fine; shows per-filter counts so the
+        // admin knows how many need attention before clicking.
+        function qfpRenderFilterRail() {
+            const rail = document.getElementById('qfp-comments-controls');
+            if (!rail) return;
+            if (_qfpFeedbacks.length <= 3) { rail.innerHTML = ''; return; }
+            const norm = f => qfpNormalizeTopic(f.comment);
+            const counts = {
+                all: _qfpFeedbacks.length,
+                unscored: _qfpFeedbacks.filter(f => norm(f).length > 0 && typeof f.aiFeedbackScore !== 'number').length,
+                short: _qfpFeedbacks.filter(f => { const n = norm(f).length; return n > 0 && n < 100; }).length,
+                low: _qfpFeedbacks.filter(f => typeof f.rating === 'number' && f.rating <= 5).length,
+            };
+            const chip = (key, label, count) => {
+                const active = _qfpFilter === key;
+                return `<button onclick="qfpSetFilter('${key}')" style="padding:3px 10px;border-radius:20px;font-size:0.72em;font-weight:800;cursor:pointer;transition:0.2s;border:1.5px solid ${active ? '#f59e0b' : '#e2e8f0'};background:${active ? '#f59e0b' : 'transparent'};color:${active ? 'white' : '#64748b'};">${label} ${count}</button>`;
+            };
+            const sortChip = (key, label) => {
+                const active = _qfpSort === key;
+                return `<button onclick="qfpSetSort('${key}')" style="padding:3px 10px;border-radius:20px;font-size:0.72em;font-weight:800;cursor:pointer;transition:0.2s;border:1.5px solid ${active ? '#1d4ed8' : '#e2e8f0'};background:${active ? '#eff6ff' : 'transparent'};color:${active ? '#1d4ed8' : '#64748b'};">${label}</button>`;
+            };
+            rail.innerHTML = `
+                <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">
+                    ${chip('all', 'ทั้งหมด', counts.all)}
+                    ${chip('unscored', 'ยังไม่ตรวจ', counts.unscored)}
+                    ${chip('short', 'สั้น<100', counts.short)}
+                    ${chip('low', 'คะแนนต่ำ', counts.low)}
+                    <span style="width:1px;height:18px;background:#e2e8f0;margin:0 3px;"></span>
+                    <span style="font-size:0.7em;color:#94a3b8;font-weight:700;">เรียง:</span>
+                    ${sortChip('recent', 'ใหม่สุด')}
+                    ${sortChip('rating', 'คะแนนน้อย→มาก')}
+                    ${counts.unscored > 0 ? `<button id="qfp-bulk-score-btn" onclick="qfpScoreAllUnscored()" title="ตรวจ feedback ที่ยังไม่ตรวจทั้งหมดด้วย AI (โมเดลที่เลือกด้านบน) ทีละรายการ" style="margin-left:auto;padding:3px 12px;border-radius:20px;font-size:0.72em;font-weight:800;cursor:pointer;transition:0.2s;border:1.5px solid #1d4ed8;background:#1d4ed8;color:white;">🗡️ ตรวจที่ยังไม่ตรวจ (${counts.unscored})</button>` : ''}
+                </div>`;
+        }
+
+        window.qfpSetFilter = function(v) { _qfpFilter = v; qfpRenderFilterRail(); qfpRenderComments(); };
+        window.qfpSetSort = function(v) { _qfpSort = v; qfpRenderFilterRail(); qfpRenderComments(); };
+
+        // V95.61: bulk-run AI scoring on every unscored feedback that has a comment.
+        // Sequential (one await per item — gentle on the AI proxy) with live N/total
+        // progress on the rail button. Reuses runAIFeedbackScoring in silent mode so
+        // each item still updates its own card's review box but doesn't spam a toast.
+        let _qfpBulkRunning = false;
+        async function qfpScoreAllUnscored() {
+            if (_qfpBulkRunning) return;
+            const targets = _qfpFeedbacks.filter(f => qfpNormalizeTopic(f.comment).length > 0 && typeof f.aiFeedbackScore !== 'number');
+            if (!targets.length) { if (typeof showToast === 'function') showToast('ไม่มี feedback ที่ยังไม่ตรวจ'); return; }
+            const model = document.getElementById('ai-model-selector') ? document.getElementById('ai-model-selector').value : 'the selected model';
+            if (!confirm(`ตรวจ feedback ที่ยังไม่ตรวจ ${targets.length} รายการด้วย AI?\nโมเดล: ${model}\n\nระบบจะตรวจทีละรายการ — อย่าปิดหน้าต่างจนกว่าจะเสร็จ`)) return;
+
+            _qfpBulkRunning = true;
+            const btn = document.getElementById('qfp-bulk-score-btn');
+            const oldHtml = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.style.cursor = 'wait'; btn.style.opacity = '0.85'; }
+            let failed = 0;
+            for (let i = 0; i < targets.length; i++) {
+                const f = targets[i];
+                if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${i + 1}/${targets.length}`;
+                await runAIFeedbackScoring(f.id, { silent: true });
+                // runAIFeedbackScoring sets aiFeedbackScore on this same object on success
+                if (typeof f.aiFeedbackScore !== 'number') failed++;
+            }
+            _qfpBulkRunning = false;
+            if (btn) { btn.disabled = false; btn.style.cursor = 'pointer'; btn.style.opacity = '1'; btn.innerHTML = oldHtml; }
+
+            const ok = targets.length - failed;
+            if (typeof showToast === 'function') showToast(`ตรวจเสร็จ ${ok}/${targets.length}${failed ? ` (ล้มเหลว ${failed})` : ''}`);
+            // Scores are now in _qfpFeedbacks — refresh the visible cards + rail counts.
+            qfpRenderComments();
+            qfpRenderFilterRail();
+        }
+        window.qfpScoreAllUnscored = qfpScoreAllUnscored;
+
+        async function runAIFeedbackScoring(feedbackId, opts = {}) {
+            const silent = !!opts.silent; // V95.61: suppress per-item toast during bulk scoring
             const item = _qfpFeedbacks.find(x => x.id === feedbackId);
             if (!item) return;
 
@@ -45306,7 +45434,7 @@ Reply ONLY with raw JSON, no markdown:
                 if (reviewEl) {
                     reviewEl.innerHTML = `<div><b>AI Score:</b> ${score.toFixed(1)}/10</div>${issue ? `<div><b>Issue:</b> ${qfpEscapeHtml(issue)}</div>` : ''}${suggestion ? `<div><b>Suggestion:</b> ${qfpEscapeHtml(suggestion)}</div>` : ''}`;
                 }
-                showToast('AI scoring complete');
+                if (!silent && typeof showToast === 'function') showToast('AI scoring complete');
             } catch (e) {
                 if (reviewEl) reviewEl.innerText = 'AI scoring failed: ' + e.message;
             } finally {
