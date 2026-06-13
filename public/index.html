@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.66)</title>
+    <title>Internship Portfolio (V95.67)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2750,6 +2750,12 @@
                 .dc-az-letter.has-content:hover {
                     background: #dbeafe;
                 }
+                /* V95.67: selected letter "page" — solid fill so the active filter is obvious */
+                .dc-az-letter.active,
+                .dc-az-letter.active:hover {
+                    background: #1d4ed8; color: #fff; border-color: #1d4ed8;
+                }
+                .dc-az-letter.active .dc-az-letter-count { opacity: 0.9; }
                 /* V95.08: per-letter count badge — small superscript inside
                    the rail button. Inherits color from the active letter
                    (blue when has-content, hidden when empty). */
@@ -10919,6 +10925,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             unsub: null,        // onSnapshot unsubscribe
             loaded: false,      // first-open guard so we only wire the listener once
             searchTerm: '',
+            activeLetter: 'all', // V95.67: letter-as-page filter ('all' = whole list)
             currentDrug: null   // drug currently open in detail modal
         };
 
@@ -12154,11 +12161,19 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 list.innerHTML = '<div class="dc-empty-state">📚 Drug Codex กำลังจัดเตรียม · รอสักครู่<br><small style="color:#cbd5e1;">Admin is curating entries · check back soon</small></div>';
                 return;
             }
-            const filtered = dcState.codex.filter(d => dcMatchesSearch(d, dcState.searchTerm));
-            if (filtered.length === 0) {
+            const searched = dcState.codex.filter(d => dcMatchesSearch(d, dcState.searchTerm));
+            if (searched.length === 0) {
                 list.innerHTML = `<div class="dc-empty-state">ไม่พบยาที่ตรงกับ "${escapeHtml(dcState.searchTerm)}"</div>`;
                 return;
             }
+            // V95.67: letter-as-page filter — show only the selected letter's drugs.
+            // Suspended while searching (a search spans letters), so 'all' applies.
+            const effLetter = dcState.searchTerm ? 'all' : (dcState.activeLetter || 'all');
+            const dcFirstKey = d => {
+                const first = String((d.genericName || '').trim()).charAt(0).toUpperCase();
+                return /[A-Z]/.test(first) ? first : '#';
+            };
+            const filtered = effLetter === 'all' ? searched : searched.filter(d => dcFirstKey(d) === effLetter);
             // Group by first letter (A-Z) with non-A-Z bucketed under '#'.
             const groups = {};
             filtered.forEach(d => {
@@ -12207,23 +12222,33 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 const first = String((d.genericName || '').trim()).charAt(0).toUpperCase();
                 if (first) counts.set(first, (counts.get(first) || 0) + 1);
             });
+            // V95.67: letter chips act as a page filter. While searching, the
+            // filter is suspended so the 'All' chip shows as active.
+            let total = 0;
+            counts.forEach(v => { total += v; });
+            const railActive = term ? 'all' : (dcState.activeLetter || 'all');
             const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-            rail.innerHTML = letters.map(L => {
+            const allChip = `<button type="button" class="dc-az-letter has-content lang-no-toggle${railActive === 'all' ? ' active' : ''}" onclick="dcSelectLetter('all')" title="แสดงยาทั้งหมด">ทั้งหมด<span class="dc-az-letter-count">${total}</span></button>`;
+            rail.innerHTML = allChip + letters.map(L => {
                 const n = counts.get(L) || 0;
                 const has = n > 0;
+                const active = has && railActive === L;
                 const countBadge = has ? `<span class="dc-az-letter-count">${n}</span>` : '';
                 const title = has ? ` title="${n} drug${n === 1 ? '' : 's'} starting with ${L}"` : '';
-                return `<button type="button" class="dc-az-letter${has ? ' has-content' : ''}" ${has ? `onclick="dcJumpToLetter('${L}')"` : 'disabled'}${title}>${L}${countBadge}</button>`;
+                return `<button type="button" class="dc-az-letter${has ? ' has-content' : ''}${active ? ' active' : ''}" ${has ? `onclick="dcSelectLetter('${L}')"` : 'disabled'}${title}>${L}${countBadge}</button>`;
             }).join('');
         }
 
-        function dcJumpToLetter(letter) {
+        // V95.67: select a letter "page" (or 'all'). Browsing by letter overrides
+        // any active search, then re-renders and scrolls the list back to the top.
+        function dcSelectLetter(letter) {
+            dcState.activeLetter = letter;
+            const s = document.getElementById('dc-search-input');
+            if (s && s.value) s.value = '';
+            dcState.searchTerm = '';
+            dcRenderList();
             const list = document.getElementById('dc-list');
-            if (!list) return;
-            const heading = list.querySelector(`[data-letter="${letter}"]`);
-            if (heading && heading.scrollIntoView) {
-                heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+            if (list) list.scrollTop = 0;
         }
 
         function dcOpenDetail(drugId) {
