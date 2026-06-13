@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.57</title>
+    <title>Nika V95.58</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -45020,6 +45020,21 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             return /[\p{L}\p{N}\p{S}\p{P}]/u.test(cleaned) ? cleaned : '';
         }
 
+        // V95.58: absolute dd/mm/yyyy (พ.ศ.) + 24h, ASCII-only — mirrors
+        // dcaFormatAbsolute/dxaFormatAbsolute (V94.81). Replaces the panel's
+        // toLocaleString('th-TH', dateStyle:'short') form whose 2-digit Buddhist
+        // year ("12/6/69 22:11") was ambiguous.
+        function qfpFormatAbsolute(ts) {
+            if (!ts) return '—';
+            let d;
+            try {
+                d = ts.toDate ? ts.toDate() : (ts instanceof Date ? ts : new Date(ts.seconds ? ts.seconds * 1000 : ts));
+            } catch (_) { return '—'; }
+            if (!d || isNaN(d.getTime())) return '—';
+            const pad = n => String(n).padStart(2, '0');
+            return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear() + 543} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+
         async function qfpCallAI(model, prompt) {
             const resp = await window.callUniversalAI(model, prompt);
             if (resp && typeof resp === 'object') {
@@ -45084,6 +45099,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             const blankTopicCount = allEntries.length - topicEntries.length;
             window._qfpVisibleTopicEntries = topicEntries;
             const avgTime = _qfpFeedbacks.reduce((a, f) => a + (f.timeUsedSeconds || 0), 0) / _qfpFeedbacks.length;
+            // V95.58: single mm:ss value instead of "6 min" + "373s avg" (same value twice)
+            const avgTimeR = Math.round(avgTime);
+            const avgTimeMMSS = `${Math.floor(avgTimeR / 60)}:${String(avgTimeR % 60).padStart(2, '0')}`;
 
             const starFill = avgRating !== null ? Math.round(avgRating / 10 * 5) : null;
             const starsHtml = starFill !== null ? '★'.repeat(starFill) + '☆'.repeat(5 - starFill) : '—';
@@ -45100,8 +45118,8 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 </div>
                 <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 18px;flex:1;min-width:140px;">
                     <div style="font-size:0.75em;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:0.5px;">Avg Time</div>
-                    <div style="font-size:2em;font-weight:900;color:#1d4ed8;">${Math.round(avgTime / 60)}<span style="font-size:0.5em;color:#3b82f6;"> min</span></div>
-                    <div style="font-size:0.75em;color:#60a5fa;">${Math.round(avgTime)}s avg</div>
+                    <div style="font-size:2em;font-weight:900;color:#1d4ed8;">${avgTimeMMSS}<span style="font-size:0.5em;color:#3b82f6;"> min</span></div>
+                    <div style="font-size:0.75em;color:#60a5fa;">เฉลี่ยต่อคน</div>
                 </div>
                 ${(topics.length || blankTopicCount > 0) ? `<div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:12px;padding:12px 18px;flex:2;min-width:200px;">
                     <div style="font-size:0.75em;font-weight:700;color:#6b21a8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">🎯 Next Topics Requested</div>
@@ -45120,8 +45138,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
             // Render comment cards
             document.getElementById('qfp-comments').innerHTML = _qfpFeedbacks.map(f => {
-                const ts = f.timestamp ? (typeof f.timestamp.toDate === 'function' ? f.timestamp.toDate() : new Date(f.timestamp.seconds * 1000)) : null;
-                const dateStr = ts ? ts.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+                const dateStr = qfpFormatAbsolute(f.timestamp);
                 const stars = typeof f.rating === 'number' ? ('★'.repeat(Math.round(f.rating / 10 * 5)) + '☆'.repeat(5 - Math.round(f.rating / 10 * 5))) : '';
                 const mins = Math.floor((f.timeUsedSeconds || 0) / 60);
                 const secs = (f.timeUsedSeconds || 0) % 60;
