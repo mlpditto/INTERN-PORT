@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.60</title>
+    <title>Nika V95.61</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -45328,13 +45328,50 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     <span style="font-size:0.7em;color:#94a3b8;font-weight:700;">เรียง:</span>
                     ${sortChip('recent', 'ใหม่สุด')}
                     ${sortChip('rating', 'คะแนนน้อย→มาก')}
+                    ${counts.unscored > 0 ? `<button id="qfp-bulk-score-btn" onclick="qfpScoreAllUnscored()" title="ตรวจ feedback ที่ยังไม่ตรวจทั้งหมดด้วย AI (โมเดลที่เลือกด้านบน) ทีละรายการ" style="margin-left:auto;padding:3px 12px;border-radius:20px;font-size:0.72em;font-weight:800;cursor:pointer;transition:0.2s;border:1.5px solid #1d4ed8;background:#1d4ed8;color:white;">🗡️ ตรวจที่ยังไม่ตรวจ (${counts.unscored})</button>` : ''}
                 </div>`;
         }
 
         window.qfpSetFilter = function(v) { _qfpFilter = v; qfpRenderFilterRail(); qfpRenderComments(); };
         window.qfpSetSort = function(v) { _qfpSort = v; qfpRenderFilterRail(); qfpRenderComments(); };
 
-        async function runAIFeedbackScoring(feedbackId) {
+        // V95.61: bulk-run AI scoring on every unscored feedback that has a comment.
+        // Sequential (one await per item — gentle on the AI proxy) with live N/total
+        // progress on the rail button. Reuses runAIFeedbackScoring in silent mode so
+        // each item still updates its own card's review box but doesn't spam a toast.
+        let _qfpBulkRunning = false;
+        async function qfpScoreAllUnscored() {
+            if (_qfpBulkRunning) return;
+            const targets = _qfpFeedbacks.filter(f => qfpNormalizeTopic(f.comment).length > 0 && typeof f.aiFeedbackScore !== 'number');
+            if (!targets.length) { if (typeof showToast === 'function') showToast('ไม่มี feedback ที่ยังไม่ตรวจ'); return; }
+            const model = document.getElementById('ai-model-selector') ? document.getElementById('ai-model-selector').value : 'the selected model';
+            if (!confirm(`ตรวจ feedback ที่ยังไม่ตรวจ ${targets.length} รายการด้วย AI?\nโมเดล: ${model}\n\nระบบจะตรวจทีละรายการ — อย่าปิดหน้าต่างจนกว่าจะเสร็จ`)) return;
+
+            _qfpBulkRunning = true;
+            const btn = document.getElementById('qfp-bulk-score-btn');
+            const oldHtml = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.style.cursor = 'wait'; btn.style.opacity = '0.85'; }
+            let failed = 0;
+            for (let i = 0; i < targets.length; i++) {
+                const f = targets[i];
+                if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${i + 1}/${targets.length}`;
+                await runAIFeedbackScoring(f.id, { silent: true });
+                // runAIFeedbackScoring sets aiFeedbackScore on this same object on success
+                if (typeof f.aiFeedbackScore !== 'number') failed++;
+            }
+            _qfpBulkRunning = false;
+            if (btn) { btn.disabled = false; btn.style.cursor = 'pointer'; btn.style.opacity = '1'; btn.innerHTML = oldHtml; }
+
+            const ok = targets.length - failed;
+            if (typeof showToast === 'function') showToast(`ตรวจเสร็จ ${ok}/${targets.length}${failed ? ` (ล้มเหลว ${failed})` : ''}`);
+            // Scores are now in _qfpFeedbacks — refresh the visible cards + rail counts.
+            qfpRenderComments();
+            qfpRenderFilterRail();
+        }
+        window.qfpScoreAllUnscored = qfpScoreAllUnscored;
+
+        async function runAIFeedbackScoring(feedbackId, opts = {}) {
+            const silent = !!opts.silent; // V95.61: suppress per-item toast during bulk scoring
             const item = _qfpFeedbacks.find(x => x.id === feedbackId);
             if (!item) return;
 
@@ -45397,7 +45434,7 @@ Reply ONLY with raw JSON, no markdown:
                 if (reviewEl) {
                     reviewEl.innerHTML = `<div><b>AI Score:</b> ${score.toFixed(1)}/10</div>${issue ? `<div><b>Issue:</b> ${qfpEscapeHtml(issue)}</div>` : ''}${suggestion ? `<div><b>Suggestion:</b> ${qfpEscapeHtml(suggestion)}</div>` : ''}`;
                 }
-                showToast('AI scoring complete');
+                if (!silent && typeof showToast === 'function') showToast('AI scoring complete');
             } catch (e) {
                 if (reviewEl) reviewEl.innerText = 'AI scoring failed: ' + e.message;
             } finally {
