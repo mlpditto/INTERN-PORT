@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.68)</title>
+    <title>Internship Portfolio (V95.69)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4391,29 +4391,31 @@
                     <label for="dx-s-thaiName">Thai Name · ชื่อไทย</label>
                     <input type="text" id="dx-s-thaiName" placeholder="e.g. ไข้เลือดออก" maxlength="120">
                 </div>
-                <div class="dc-submit-field">
-                    <label for="dx-s-icd10">ICD-10</label>
-                    <input type="text" id="dx-s-icd10" placeholder="e.g. A90" maxlength="20">
-                    <div class="dc-submit-field-hint">ถ้าไม่แน่ใจ เว้นว่างได้ — admin จะเติมตอน review</div>
-                </div>
-                <div class="dc-submit-field">
-                    <label for="dx-s-category">Category · กลุ่มโรค</label>
-                    <input type="text" id="dx-s-category" placeholder="e.g. Infectious disease" maxlength="80">
+                <div class="dc-submit-row">
+                    <div class="dc-submit-field">
+                        <label for="dx-s-icd10">ICD-10</label>
+                        <input type="text" id="dx-s-icd10" placeholder="e.g. A90" maxlength="20">
+                        <div class="dc-submit-field-hint">ถ้าไม่แน่ใจ เว้นว่างได้ — admin จะเติมตอน review</div>
+                    </div>
+                    <div class="dc-submit-field">
+                        <label for="dx-s-category">Category · กลุ่มโรค</label>
+                        <input type="text" id="dx-s-category" placeholder="e.g. Infectious disease" maxlength="80">
+                    </div>
                 </div>
                 <div class="dc-submit-field">
                     <label for="dx-s-symptoms">Symptoms · อาการ</label>
-                    <textarea id="dx-s-symptoms" rows="3" placeholder="Presenting symptoms…"></textarea>
+                    <textarea id="dx-s-symptoms" rows="2" placeholder="Presenting symptoms…"></textarea>
                 </div>
                 <div class="dc-submit-field">
                     <label for="dx-s-diagnosis">Diagnosis · การวินิจฉัย</label>
-                    <textarea id="dx-s-diagnosis" rows="3" placeholder="Diagnostic criteria / investigations…"></textarea>
+                    <textarea id="dx-s-diagnosis" rows="2" placeholder="Diagnostic criteria / investigations…"></textarea>
                 </div>
                 <div class="dc-submit-field">
                     <label for="dx-s-treatment">Treatment · การรักษา</label>
-                    <textarea id="dx-s-treatment" rows="3" placeholder="Management / treatment…"></textarea>
+                    <textarea id="dx-s-treatment" rows="2" placeholder="Management / treatment…"></textarea>
                 </div>
                 <div class="dc-submit-field">
-                    <label for="dx-s-internNotes">Notes to admin · บันทึกเพิ่มเติมถึง admin</label>
+                    <label for="dx-s-internNotes">Notes to admin · บันทึกเพิ่มเติมถึงผู้ดูแล</label>
                     <textarea id="dx-s-internNotes" rows="2" placeholder="อยากบอก admin อะไรเกี่ยวกับร่างนี้? (เช่น แหล่งอ้างอิง, ความไม่แน่ใจ…)"></textarea>
                     <div class="dc-submit-field-hint">ฟิลด์นี้ไม่ปรากฏใน Disease Codex หลัง publish · admin เห็นเฉพาะตอน review</div>
                 </div>
@@ -11181,6 +11183,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             unsub: null,
             loaded: false,
             searchTerm: '',
+            activeLetter: 'all', // V95.69: letter-as-page filter ('all' = whole list)
             currentDisease: null
         };
 
@@ -11276,11 +11279,19 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 list.innerHTML = '<div class="dc-empty-state">🩺 Disease Codex กำลังจัดเตรียม · รอสักครู่<br><small style="color:#cbd5e1;">Admin is curating entries · check back soon</small></div>';
                 return;
             }
-            const filtered = dxState.codex.filter(d => dxMatchesSearch(d, dxState.searchTerm));
-            if (filtered.length === 0) {
+            const searched = dxState.codex.filter(d => dxMatchesSearch(d, dxState.searchTerm));
+            if (searched.length === 0) {
                 list.innerHTML = `<div class="dc-empty-state">ไม่พบโรคที่ตรงกับ "${escapeHtml(dxState.searchTerm)}"</div>`;
                 return;
             }
+            // V95.69: letter-as-page filter — show only the selected letter's diseases.
+            // Suspended while searching (a search spans letters), so 'all' applies.
+            const effLetter = dxState.searchTerm ? 'all' : (dxState.activeLetter || 'all');
+            const dxFirstKey = d => {
+                const first = String((d.diseaseName || '').trim()).charAt(0).toUpperCase();
+                return /[A-Z]/.test(first) ? first : '#';
+            };
+            const filtered = effLetter === 'all' ? searched : searched.filter(d => dxFirstKey(d) === effLetter);
             const groups = {};
             filtered.forEach(d => {
                 const first = String((d.diseaseName || '').trim()).charAt(0).toUpperCase();
@@ -11324,21 +11335,33 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 const first = String((d.diseaseName || '').trim()).charAt(0).toUpperCase();
                 if (first) counts.set(first, (counts.get(first) || 0) + 1);
             });
+            // V95.69: letter chips act as a page filter. While searching, the
+            // filter is suspended so the 'All' chip shows as active.
+            let total = 0;
+            counts.forEach(v => { total += v; });
+            const railActive = term ? 'all' : (dxState.activeLetter || 'all');
             const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-            rail.innerHTML = letters.map(L => {
+            const allChip = `<button type="button" class="dc-az-letter has-content lang-no-toggle${railActive === 'all' ? ' active' : ''}" onclick="dxSelectLetter('all')" title="แสดงโรคทั้งหมด">ทั้งหมด<span class="dc-az-letter-count">${total}</span></button>`;
+            rail.innerHTML = allChip + letters.map(L => {
                 const n = counts.get(L) || 0;
                 const has = n > 0;
+                const active = has && railActive === L;
                 const countBadge = has ? `<span class="dc-az-letter-count">${n}</span>` : '';
                 const title = has ? ` title="${n} disease${n === 1 ? '' : 's'} starting with ${L}"` : '';
-                return `<button type="button" class="dc-az-letter${has ? ' has-content' : ''}" ${has ? `onclick="dxJumpToLetter('${L}')"` : 'disabled'}${title}>${L}${countBadge}</button>`;
+                return `<button type="button" class="dc-az-letter${has ? ' has-content' : ''}${active ? ' active' : ''}" ${has ? `onclick="dxSelectLetter('${L}')"` : 'disabled'}${title}>${L}${countBadge}</button>`;
             }).join('');
         }
 
-        function dxJumpToLetter(letter) {
+        // V95.69: select a letter "page" (or 'all'). Browsing by letter overrides
+        // any active search, then re-renders and scrolls the list back to the top.
+        function dxSelectLetter(letter) {
+            dxState.activeLetter = letter;
+            const s = document.getElementById('dx-search-input');
+            if (s && s.value) s.value = '';
+            dxState.searchTerm = '';
+            dxRenderList();
             const list = document.getElementById('dx-list');
-            if (!list) return;
-            const heading = list.querySelector(`[data-letter="${letter}"]`);
-            if (heading && heading.scrollIntoView) heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (list) list.scrollTop = 0;
         }
 
         function dxOpenDetail(diseaseId) {
