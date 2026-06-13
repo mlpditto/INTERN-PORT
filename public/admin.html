@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.63</title>
+    <title>Nika V95.64</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -36080,7 +36080,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         </div>
                         <div style="flex:2.5; display:flex; flex-direction:column; margin: 0 15px; min-width:0;">
                             <div class="lb-mid" id="chart-${u.id}" style="margin:0; width:100%; height:45px; min-height:45px; flex:none;"></div>
-                            <div class="lb-stat-row" id="stats-${u.id}" style="display:flex; justify-content:space-between; align-items:center; font-size:0.7em; color:var(--text-sub); margin-top:6px; padding:0 4px;">
+                            <div class="lb-stat-row" id="stats-${u.id}" style="display:flex; flex-wrap:wrap; gap:3px 10px; justify-content:space-between; align-items:center; font-size:0.7em; color:var(--text-sub); margin-top:6px; padding:0 4px;">
                                 <span style="opacity:0.6;">Calculating metrics...</span>
                             </div>
                         </div>
@@ -36181,11 +36181,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
                 try {
                     // Fetch data just for this user
-                    const [worksSnap, questsSnap, logsSnap] = await Promise.all([
+                    const [worksSnap, questsSnap, logsSnap, reflectSnap, casesSnap] = await Promise.all([
                         db.collection("works").where("userId", "==", u.id).get(),
                         db.collection("quest_submissions").where("userId", "==", u.id).get(),
-                        db.collection("checkin_logs").where("userId", "==", u.id).get()
+                        db.collection("checkin_logs").where("userId", "==", u.id).get(),
+                        db.collection("reflective_logs").where("userId", "==", u.id).get(),
+                        db.collection("cases").where("userId", "==", u.id).get()
                     ]);
+                    // V95.64: submission counts surfaced in the leaderboard stats row
+                    const logCount = reflectSnap.size;
+                    const caseCount = casesSnap.size;
 
                     const pointsMap = {};
                     const detailsMap = {}; // {dateStr: [{type, note, amount}]}
@@ -36327,6 +36332,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             <div style="display:flex; align-items:center; gap:3px;" title="${maxDate}"><i class="fa-solid fa-arrow-up" style="color:#28a745;"></i> Max: <b>${maxS.toFixed(2)}</b> <span style="font-size:0.8em;color:#999;">${maxDateTh}</span></div>
                             <div style="display:flex; align-items:center; gap:3px; color:#333;"><i class="fa-solid fa-fire" style="color:#ff9f1c;"></i> <b style="color:#ff6b6b">${longestStreak}d</b> <span style="font-size:0.8em;color:#999;">${streakRange}</span></div>
                             <div style="display:flex; align-items:center; gap:3px;"><i class="fa-solid fa-calendar-check" style="color:#4361ee;"></i> <b>${activeDays}/${elapsedDays}</b> <span style="font-size:0.8em;color:#999;">(${activePct}%)</span></div>
+                            <div style="display:flex; align-items:center; gap:3px;" title="Reflective logs submitted"><i class="fa-solid fa-pen-fancy" style="color:#e67e22;"></i> <b>${logCount}</b> <span style="font-size:0.8em;color:#999;">logs</span></div>
+                            <div style="display:flex; align-items:center; gap:3px;" title="Cases submitted"><i class="fa-solid fa-notes-medical" style="color:#0ea5e9;"></i> <b>${caseCount}</b> <span style="font-size:0.8em;color:#999;">cases</span></div>
                         `;
                     }
                 } catch (e) { console.error("Chart Error:", e); }
