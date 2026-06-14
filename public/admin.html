@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.69</title>
+    <title>Nika V95.70</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -32591,7 +32591,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // identifier is the 'admin:<email>' or 'intern:<uid>' string. Short form
         // = local-part of email (up to 8 chars) for admins, last 4 chars of uid
         // for interns. Unknown role → neutral slate pill with raw value.
-        function dcaContributorChipHtml(identifier) {
+        function dcaContributorChipHtml(identifier, doc) {
             const s = String(identifier || '');
             const colonIdx = s.indexOf(':');
             const role = colonIdx > 0 ? s.slice(0, colonIdx) : '';
@@ -32605,14 +32605,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 return `<span class="dca-contributor-chip dca-contrib-admin" title="${dcaEscapeHtml(id)}">👤 admin</span>`;
             }
             if (role === 'intern') {
-                // V95.69: resolve intern uid → profile picture + displayName from the
-                // global usersData cache instead of showing the cryptic last-4 of uid.
-                // Falls back to the old short-uid label when the user isn't in cache.
+                // V95.70: prefer the intern submitter's name + picture stored ON THE DOC
+                // (submittedByName / submittedByPictureUrl, seeded V95.45) — reliable
+                // regardless of whether usersData is loaded or the contributor uid matches
+                // a users doc id. Fall back to the usersData cache, then the short-uid label.
                 const u = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === id);
                 const short = id.length > 4 ? id.slice(-4) : id;
-                const name = u && u.displayName ? u.displayName : 'intern (' + short + ')';
-                const avatar = u && u.pictureUrl
-                    ? `<img class="dca-contrib-avatar" src="${dcaEscapeHtml(u.pictureUrl)}" alt="" onerror="this.outerHTML='📝'">`
+                const pic = (doc && doc.submittedByPictureUrl) || (u && u.pictureUrl) || '';
+                const name = (doc && doc.submittedByName) || (u && u.displayName) || ('intern (' + short + ')');
+                const avatar = pic
+                    ? `<img class="dca-contrib-avatar" src="${dcaEscapeHtml(pic)}" alt="" onerror="this.outerHTML='📝'">`
                     : '📝';
                 return `<span class="dca-contributor-chip dca-contrib-intern" title="intern: ${dcaEscapeHtml(name)} (${dcaEscapeHtml(id)})">${avatar} ${dcaEscapeHtml(name)}</span>`;
             }
@@ -32640,7 +32642,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const key = String(item);
                     if (seen.has(key)) return;
                     seen.add(key);
-                    parts.push(dcaContributorChipHtml(item));
+                    parts.push(dcaContributorChipHtml(item, drug));
                 });
             }
             if (parts.length === 0) return '';
@@ -32677,7 +32679,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const key = String(item);
                     if (seen.has(key)) return;
                     seen.add(key);
-                    chips.push(dcaContributorChipHtml(item));
+                    chips.push(dcaContributorChipHtml(item, data));
                 });
                 parts.push(`<span><strong>Contributors:</strong></span>${chips.join('')}`);
             }
@@ -35746,7 +35748,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
         }
 
-        function dxaContributorChipHtml(identifier) {
+        function dxaContributorChipHtml(identifier, doc) {
             const s = String(identifier || '');
             const colonIdx = s.indexOf(':');
             const role = colonIdx > 0 ? s.slice(0, colonIdx) : '';
@@ -35755,13 +35757,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 return `<span class="dca-contributor-chip dca-contrib-admin" title="${dxaEscapeHtml(id)}">👤 admin</span>`;
             }
             if (role === 'intern') {
-                // V95.69: resolve intern uid → profile picture + displayName from the
-                // global usersData cache instead of showing the cryptic last-4 of uid.
+                // V95.70: prefer the intern submitter's name + picture stored ON THE DOC
+                // (submittedByName / submittedByPictureUrl, seeded V95.45). Fall back to
+                // the usersData cache, then the short-uid label.
                 const u = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === id);
                 const short = id.length > 4 ? id.slice(-4) : id;
-                const name = u && u.displayName ? u.displayName : 'intern (' + short + ')';
-                const avatar = u && u.pictureUrl
-                    ? `<img class="dca-contrib-avatar" src="${dxaEscapeHtml(u.pictureUrl)}" alt="" onerror="this.outerHTML='📝'">`
+                const pic = (doc && doc.submittedByPictureUrl) || (u && u.pictureUrl) || '';
+                const name = (doc && doc.submittedByName) || (u && u.displayName) || ('intern (' + short + ')');
+                const avatar = pic
+                    ? `<img class="dca-contrib-avatar" src="${dxaEscapeHtml(pic)}" alt="" onerror="this.outerHTML='📝'">`
                     : '📝';
                 return `<span class="dca-contributor-chip dca-contrib-intern" title="intern: ${dxaEscapeHtml(name)} (${dxaEscapeHtml(id)})">${avatar} ${dxaEscapeHtml(name)}</span>`;
             }
@@ -35779,7 +35783,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const key = String(item);
                     if (seen.has(key)) return;
                     seen.add(key);
-                    parts.push(dxaContributorChipHtml(item));
+                    parts.push(dxaContributorChipHtml(item, disease));
                 });
             }
             if (parts.length === 0) return '';
@@ -35806,7 +35810,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const key = String(item);
                     if (seen.has(key)) return;
                     seen.add(key);
-                    chips.push(dxaContributorChipHtml(item));
+                    chips.push(dxaContributorChipHtml(item, data));
                 });
                 parts.push(`<span><strong>Contributors:</strong></span>${chips.join('')}`);
             }
