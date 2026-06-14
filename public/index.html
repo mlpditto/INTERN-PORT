@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.79)</title>
+    <title>Internship Portfolio (V95.81)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -13432,6 +13432,15 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             return days <= 1 ? '1d ago' : `${days}d ago`;
         }
 
+        // V95.81: Daily Streak chip caption — total count + compact recency,
+        // e.g. "3 · 1d" (3 submissions, last 1 day ago). "0" when none yet.
+        function _activityChipCaption(cache) {
+            const n = (cache || []).length;
+            if (n === 0) return '0';
+            const time = _lastActivityCaption(cache).replace(' ago', '');
+            return n + ' · ' + time;
+        }
+
         // Union of every day the user did ANY of: daily check-in, reflective log, case submit.
         function collectActivityDates() {
             const set = new Set();
@@ -13539,8 +13548,8 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             const doneChip = (icon, label, sub) => `<span title="${label} done today${sub ? ` · last ${sub}` : ''}" style="display:inline-flex; align-items:center; gap:4px; padding:5px 9px; border-radius:9px; background:#dcfce7; color:#15803d; font-weight:800; font-size:0.72em; white-space:nowrap;">${icon} ✓${sub ? `<span style="opacity:.65; margin-left:1px;">${sub}</span>` : ''}</span>`;
             const actChip = (icon, label, fn, primary, id, sub) => `<button ${id ? `id="${id}" ` : ''}onclick="${fn}" title="${label}${sub ? ` · last ${sub}` : ''}" style="display:inline-flex; align-items:center; gap:4px; width:auto; padding:5px 10px; border-radius:9px; background:${primary ? 'linear-gradient(135deg,#f97316,#ea580c)' : '#fff7ed'}; color:${primary ? '#fff' : '#c2410c'}; border:${primary ? 'none' : '1px solid #fed7aa'}; font-weight:800; font-size:0.72em; cursor:pointer; white-space:nowrap;">${icon} ${label}${sub ? `<span style="opacity:.7; font-weight:700; margin-left:1px;">· ${sub}</span>` : ''}</button>`;
 
-            const logCap = _lastActivityCaption(window.myReflectiveLogsCache);
-            const caseCap = _lastActivityCaption(window.myCasesCache);
+            const logCap = _activityChipCaption(window.myReflectiveLogsCache);
+            const caseCap = _activityChipCaption(window.myCasesCache);
             const chipCheck = checkDone ? doneChip('✅', 'Check in') : actChip('✅', 'Check in', 'tryDailyCheckin()', true, 'daily-checkin-btn');
             const chipLog = logDone ? doneChip('📝', 'Log', logCap) : actChip('📝', 'Log', 'gotoLog()', false, null, logCap);
             const chipCase = caseDone ? doneChip('🩺', 'Case', caseCap) : actChip('🩺', 'Case', 'gotoCaseSubmit()', false, null, caseCap);
