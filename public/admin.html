@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.71</title>
+    <title>Nika V95.73</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -11749,6 +11749,9 @@
                                     <label class="logic-chip" style="background:rgba(167,139,250,0.1); border:1px solid rgba(167,139,250,0.3); color:#a78bfa;">
                                         <input type="checkbox" id="quiz-shuffle-choices" checked> <span>Shuffle Choices</span>
                                     </label>
+                                    <label class="logic-chip" style="background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); color:#fbbf24;" title="Multi-answer questions award partial points: (correct − wrong) / total correct, min 0. Single-answer unaffected.">
+                                        <input type="checkbox" id="quiz-partial-credit"> <span>Partial Credit (multi-answer)</span>
+                                    </label>
                                 </div>
                                 <style>
                                     .logic-chip { display:flex; align-items:center; gap:6px; cursor:pointer; padding:6px 12px; border-radius:10px; font-size:0.75em; font-weight:700; transition:all 0.2s; user-select:none; }
@@ -19486,6 +19489,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             if (document.getElementById('quiz-one-time')?.checked) modes.push('1×');
             if (document.getElementById('quiz-is-homework')?.checked) modes.push('HW');
             if (document.getElementById('quiz-shuffle-choices')?.checked) modes.push('Shuffle');
+            if (document.getElementById('quiz-partial-credit')?.checked) modes.push('Partial');
             const parts = [target];
             if (unlock > 0) parts.push(`🔒≥${unlock}`);
             parts.push(`🏷️${tagCount}`);
@@ -19659,6 +19663,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-timer-mode').value = q.timerMode || 'per_question';
             document.getElementById('quiz-total-timer').value = q.totalTimer || 300;
             document.getElementById('quiz-shuffle-choices').checked = q.shuffleChoices !== undefined ? q.shuffleChoices : true;
+            { const pc = document.getElementById('quiz-partial-credit'); if (pc) pc.checked = !!q.partialCredit; }
             toggleTimerModeUI();
             toggleHomeworkUI();
             // Load assigned users
@@ -19740,6 +19745,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-timer-mode').value = 'per_question';
             document.getElementById('quiz-total-timer').value = 300;
             document.getElementById('quiz-shuffle-choices').checked = true;
+            { const pc = document.getElementById('quiz-partial-credit'); if (pc) pc.checked = false; }
             toggleTimerModeUI();
             toggleHomeworkUI();
             document.getElementById('quiz-type').value = "standard";
@@ -19989,6 +19995,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const timerMode = document.getElementById('quiz-timer-mode').value;
             const totalTimer = parseInt(document.getElementById('quiz-total-timer').value) || 300;
             const shuffleChoices = document.getElementById('quiz-shuffle-choices').checked;
+            const partialCredit = document.getElementById('quiz-partial-credit')?.checked || false;
             const quizType = document.getElementById('quiz-type').value;
             const feedbackLimit = parseInt(document.getElementById('quiz-feedback-limit').value) || 280;
             const caseContent = document.getElementById('quiz-case-content').value;
@@ -20031,7 +20038,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             });
 
             return {
-                title, shortTitle, targetGroup, unlockScore, description, tags, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, quizType, feedbackLimit, caseContent, questions, blueprint,
+                title, shortTitle, targetGroup, unlockScore, description, tags, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, partialCredit, quizType, feedbackLimit, caseContent, questions, blueprint,
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
             };
@@ -22244,6 +22251,7 @@ ${JSON.stringify(sourceObj)}`;
                 timerMode: formData.timerMode || 'per_question',
                 totalTimer: formData.totalTimer || 300,
                 shuffleChoices: formData.shuffleChoices !== undefined ? formData.shuffleChoices : true,
+                partialCredit: formData.partialCredit || false,
                 quizType: formData.quizType || 'standard',
                 feedbackLimit: formData.feedbackLimit || 280,
                 questions: validQuestions,
@@ -23381,11 +23389,15 @@ ${JSON.stringify(sourceObj)}`;
                         const isChoice = (q.type || 'choice') === 'choice';
                         const isManuallyCorrect = !!(att.manualCorrect && att.manualCorrect[i] === true);
                         let isCorrect = false;
+                        let partialFrac = null; // V95.73: non-null only for partial-credit multi-answer
                         if (isChoice) {
                             const target = q.correct;
                             const sAns = Array.isArray(studentAns) ? studentAns : (studentAns !== undefined && studentAns !== null ? [studentAns] : []);
                             const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
-                            if (tAns.length === 0) isCorrect = false;
+                            if (quiz.partialCredit && tAns.length > 1) {
+                                partialFrac = scorePartialMultiChoice(tAns.map(Number), parseStoredChoiceAnswer(studentAns));
+                                isCorrect = partialFrac >= 1;
+                            } else if (tAns.length === 0) isCorrect = false;
                             else if (tAns.length === 1 && sAns.length === 1) isCorrect = (String(sAns[0]).trim() === String(tAns[0]).trim());
                             else isCorrect = (sAns.length === tAns.length && tAns.every(v => sAns.map(String).includes(String(v))));
                             isCorrect = isCorrect || isManuallyCorrect;
@@ -23405,10 +23417,21 @@ ${JSON.stringify(sourceObj)}`;
                         let studentAnsText = "";
                         let correctAnsText = "";
                         if (isChoice) {
-                            const sIdx = parseInt(studentAns);
-                            const cIdx = parseInt(q.correct);
-                            studentAnsText = `<b>${window.renderMdInline(q.options[sIdx] || '-')}</b> (Choice ${isNaN(sIdx) ? '-' : sIdx + 1})`;
-                            correctAnsText = `<span style="color:green;">${window.renderMdInline(q.options[cIdx])}</span> (Choice ${isNaN(cIdx) ? '-' : cIdx + 1})`;
+                            // V95.73: render ALL picked options (multi-answer was previously
+                            // collapsed to the first via parseInt on the joined string).
+                            const picked = parseStoredChoiceAnswer(studentAns);
+                            const correctIdxs = (Array.isArray(q.correct) ? q.correct : [q.correct]).map(Number).filter(n => Number.isFinite(n));
+                            studentAnsText = picked.length
+                                ? picked.map(idx => {
+                                    const ok = correctIdxs.includes(idx);
+                                    return `<span style="color:${ok ? '#0f5132' : '#b91c1c'};">${ok ? '&#10004;' : '&#10006;'} ${window.renderMdInline(q.options[idx] || '-')}</span> (Choice ${idx + 1})`;
+                                  }).join('<br>')
+                                : '<span style="color:#999;">(no answer)</span>';
+                            correctAnsText = correctIdxs.map(idx => `<span style="color:green;">${window.renderMdInline(q.options[idx])}</span> (Choice ${idx + 1})`).join('<br>');
+                            if (partialFrac !== null) {
+                                const hit = picked.filter(p => correctIdxs.includes(p)).length;
+                                correctAnsText += `<div style="margin-top:6px; font-size:0.85em; color:#92400e; font-weight:700;">Partial: ${hit}/${correctIdxs.length} correct &rarr; ${Math.round(partialFrac * 100)}% of this question's points</div>`;
+                            }
                         } else {
                             let ansArray = [];
                             if (Array.isArray(studentAns)) ansArray = studentAns;
@@ -23430,9 +23453,14 @@ ${JSON.stringify(sourceObj)}`;
                             correctAnsText = `<span style="color:#666;">(Subjective Answer)</span>`;
                         }
 
-                        const cardBg = isCorrect ? '#d4edda' : '#f8d7da';
-                        const cardBorder = isCorrect ? '#28a745' : '#dc3545';
-                        const cardIcon = isCorrect ? '&#10004;' : '&#10006;';
+                        // V95.73: amber "partial" state when 0 < fraction < 1 (and not full / manual).
+                        const isPartial = partialFrac !== null && partialFrac > 0 && partialFrac < 1 && !isCorrect;
+                        const cardBg = isCorrect ? '#d4edda' : (isPartial ? '#fff3cd' : '#f8d7da');
+                        const cardBorder = isCorrect ? '#28a745' : (isPartial ? '#f59e0b' : '#dc3545');
+                        const cardIcon = isCorrect ? '&#10004;' : (isPartial ? '&#9680;' : '&#10006;');
+                        const partialBadgeHtml = isPartial
+                            ? `<span class="badge" style="background:#f59e0b; font-size:0.7em; padding:2px 8px; margin-left:6px; flex-shrink:0;">Partial ${Math.round(partialFrac * 100)}%</span>`
+                            : '';
                         const studentDuration = (att.durations || [])[i];
                         const studentActiveDuration = (att.durationsActive || [])[i];
                         const answerChanges = (att.answerChangeCounts || [])[i];
@@ -23446,7 +23474,7 @@ ${JSON.stringify(sourceObj)}`;
                             <div class="lang-no-toggle" style="border:2px solid ${cardBorder}; padding:15px; margin-bottom:15px; border-radius:12px; background:${cardBg}; border-left:8px solid ${cardBorder}; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
                                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; flex-wrap: wrap; gap:8px;">
                                     <b style="font-size:1.1em; flex:1; min-width:200px; word-wrap: break-word; overflow-wrap: break-word; white-space: normal;">${cardIcon} Q${i + 1}: ${window.renderMdInline(q.q)} ${durationHtml}${activeDurationHtml}${answerChangesHtml}${firstLatencyHtml}</b>
-                                    <span class="badge" style="background:#6c757d; font-size:0.7em; padding:2px 8px; margin-left:8px; flex-shrink:0;">${isChoice ? 'Choice' : 'Short Answer'}</span>
+                                    <span class="badge" style="background:#6c757d; font-size:0.7em; padding:2px 8px; margin-left:8px; flex-shrink:0;">${isChoice ? 'Choice' : 'Short Answer'}</span>${partialBadgeHtml}
                                 </div>
                                 <div style="display:flex; flex-direction:column; gap:8px;">
                                     <div style="padding:10px; border-radius:8px; background:rgba(255,255,255,0.6); border:1px solid rgba(0,0,0,0.05); font-size:0.95em;">
@@ -25054,6 +25082,25 @@ ${JSON.stringify(sourceObj)}`;
             showToast("📥 Infographic Downloaded (SVG)!");
         };
 
+        // V95.73: partial credit for multi-answer choice questions (opt-in per quiz via
+        // quiz.partialCredit). Formula B = (correct − wrong) / totalCorrect, floored at 0.
+        // KEEP IN SYNC with the identical helper in index.html (submitQuiz scoring).
+        function scorePartialMultiChoice(correctArr, selectedArr) {
+            const total = (correctArr || []).length;
+            if (total === 0) return 0;
+            let hit = 0, wrong = 0;
+            (selectedArr || []).forEach(v => (correctArr.includes(v) ? hit++ : wrong++));
+            return Math.max(0, (hit - wrong) / total);
+        }
+
+        // V95.73: a stored multi-select answer is the joined string "0\n---\n2" (index.html
+        // submitQuiz joins arrays). Parse it (or an array / scalar) back to numeric indices.
+        function parseStoredChoiceAnswer(stored) {
+            if (Array.isArray(stored)) return stored.map(Number).filter(n => Number.isFinite(n));
+            if (stored === null || stored === undefined || stored === '') return [];
+            return String(stored).split('\n---\n').map(s => parseInt(s, 10)).filter(n => Number.isFinite(n));
+        }
+
         function calculateAttemptScoring(att, quiz) {
             const qList = quiz.questions || [];
             const qCount = Math.max(1, qList.length);
@@ -25068,30 +25115,37 @@ ${JSON.stringify(sourceObj)}`;
                 const userAns = (att.answers || [])[i];
                 const isChoice = (q.type || 'choice') === 'choice';
                 const manuallyCorrect = manualCorrect[i] === true;
-                let autoCorrect = false;
+                // autoFraction is 0..1; binary 0/1 for everything except partial-credit
+                // multi-answer questions, which yield a fraction (mirrors index.html).
+                let autoFraction = 0;
 
                 if (isChoice) {
                     const target = q.correct;
-                    const sAns = Array.isArray(userAns) ? userAns : (userAns !== undefined && userAns !== null ? [userAns] : []);
                     const tAns = Array.isArray(target) ? target : (target !== undefined && target !== null ? [target] : []);
-                    autoCorrect = sAns.length > 0 && sAns.length === tAns.length && sAns.every(v => tAns.includes(v));
+                    if (quiz.partialCredit && tAns.length > 1) {
+                        autoFraction = scorePartialMultiChoice(tAns.map(Number), parseStoredChoiceAnswer(userAns));
+                    } else {
+                        const sAns = Array.isArray(userAns) ? userAns : (userAns !== undefined && userAns !== null ? [userAns] : []);
+                        autoFraction = (sAns.length > 0 && sAns.length === tAns.length && sAns.every(v => tAns.includes(v))) ? 1 : 0;
+                    }
                 } else {
-                    autoCorrect = !!(att.gradedAnswers && att.gradedAnswers[i]);
+                    autoFraction = (att.gradedAnswers && att.gradedAnswers[i]) ? 1 : 0;
                 }
 
-                const effectiveCorrect = manuallyCorrect || autoCorrect;
-                if (effectiveCorrect) correctCount++;
+                // Manual "mark as correct" override always grants full credit.
+                const effectiveFraction = manuallyCorrect ? 1 : autoFraction;
+                correctCount += effectiveFraction;
 
                 const manualScoreNum = Number(manualScores[i]);
                 if (Number.isFinite(manualScoreNum)) {
                     totalScore += Math.max(0, Math.min(pointsPerQuestion, manualScoreNum));
-                } else if (effectiveCorrect) {
-                    totalScore += pointsPerQuestion;
+                } else {
+                    totalScore += effectiveFraction * pointsPerQuestion;
                 }
             });
 
             return {
-                correctCount,
+                correctCount: parseFloat(correctCount.toFixed(2)),
                 score: parseFloat(totalScore.toFixed(2))
             };
         }
