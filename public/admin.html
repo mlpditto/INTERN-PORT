@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.74</title>
+    <title>Nika V95.80</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13548,6 +13548,16 @@
                                 onclick="dxaCopyDiseaseAsMarkdown('all', this)" title="Copy this disease entry as Markdown to clipboard (current form state)">
                             📋 Copy
                         </button>
+                        <!-- V95.80: AI fill empty + AI Review (mirror of Drug Codex). Shown on
+                             Edit / Review-draft via dxaShowAiButtons(); hidden on Add New. -->
+                        <button type="button" id="dxa-form-ai-fill-btn" class="dca-ai-draft-btn" style="display:none;"
+                                onclick="dxaAiFillEmptyFields()" title="Use AI to fill the fields that are still empty, using current form data as seed">
+                            🤖 AI fill empty fields
+                        </button>
+                        <button type="button" id="dxa-form-ai-review-btn" class="dca-ai-review-btn" style="display:none;"
+                                onclick="dxaAiReviewDraft()" title="ให้ AI ตรวจข้อมูลโรคที่กรอกแล้ว — หาจุด factual / safety / consistency (เสนอเท่านั้น admin ตัดสินเอง · อ้างความรู้โมเดล ไม่ได้เปิดแหล่งจริง)">
+                            🔍 AI Review
+                        </button>
                     </div>
                     <div style="font-size:0.78em; color:#94a3b8;" id="dxa-form-doc-id"></div>
                 </div>
@@ -13575,6 +13585,11 @@
                     <span class="dca-verify-strip-text">🤖 แท็บนี้ AI ร่างมา — ตรวจแล้วกดยืนยัน</span>
                     <button type="button" id="dxa-verify-toggle" class="dca-verify-toggle" onclick="dxaToggleVerifyCurrent()">ทำเครื่องหมายว่าตรวจแล้ว</button>
                 </div>
+
+                <!-- V95.80: AI Review findings panel — rendered by dxaRenderReviewResults.
+                     Advisory list grouped by section + a completeness block for empty
+                     fields. Reuses the .dca-review-* CSS. Cleared on form open. -->
+                <div id="dxa-review-results" class="dca-review-results" style="display:none;"></div>
 
                 <!-- Section 1: Core identity -->
                 <div class="dca-form-section active-tab" data-tab="core">
@@ -33747,6 +33762,38 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         const DXA_EDU_I18N_PRIMARY = { patientCounseling: 'th', redFlags: 'en', pearls: 'en' };
         const dxaEduI18nState = { currentLang: 'en', data: {} };
 
+        // V95.80: AI fill + AI Review for Disease — mirror of the Drug Codex
+        // (dca*) feature. diseaseName is the required prompt anchor (never filled).
+        const DXA_AI_FILL_SKIP = new Set(['diseaseName']);
+        const DXA_REVIEW_SEVERITIES = ['safety', 'factual', 'consistency', 'suggestion'];
+        const DXA_REVIEW_SEV_LABEL = {
+            safety: '🚨 Safety', factual: '⚠️ Factual',
+            consistency: '🔧 Consistency', suggestion: '💡 Suggestion'
+        };
+        // Per-field content hints for AI fill (only the blank keys are passed).
+        const DXA_AI_FIELD_GUIDE = {
+            'thaiName':         'Thai name of the disease · ภาษาไทย · empty string if none',
+            'synonyms':         'array of alternative names / abbreviations · empty array if none',
+            'icd10':            'WHO ICD-10 code e.g. E11 · empty string if unknown',
+            'category':         'organ system / category · medical English',
+            'epidemiology':     'prevalence · incidence · risk groups · age/sex distribution · medical English',
+            'etiology':         'causes · risk factors · genetic/environmental contributors · medical English',
+            'pathophysiology':  'disease mechanism · medical English · concise',
+            'symptoms':         'patient-reported symptoms · medical English · short bullets with \\n- prefix',
+            'signs':            'examination findings · medical English · short bullets with \\n- prefix',
+            'diagnosis':        'diagnostic criteria / gold standard · medical English',
+            'investigations':   'labs · imaging · other tests · medical English · short bullets',
+            'differential':     'differential diagnoses · medical English · short bullets',
+            'treatment':        'pharmacologic management · first-line and alternatives · medical English',
+            'nonPharm':         'non-pharmacologic management · lifestyle · procedures · medical English',
+            'complications':    'disease complications · medical English · short bullets',
+            'prognosis':        'natural history and outcome · medical English',
+            'patientCounseling':'Thai counseling points · ภาษาไทยเท่านั้น · 2-5 bullet points',
+            'redFlags':         'warning signs needing urgent care · medical English · short bullets',
+            'pearls':           'high-yield clinical pearls · mix EN+TH ok',
+            'references':       'array of source HINTS (NOT URLs) · 3-5 items · each names a verifiable source admin can search, e.g. "PubMed: <search terms>", "UpToDate: <topic>", "Amboss: <disease>" · NO http(s) URLs · NO PMIDs · NO DOIs'
+        };
+
         var dxaState = {
             view: 'published',   // 'published' | 'drafts' | 'form'
             editingId: null,     // doc id being edited, null = add new
@@ -33760,6 +33807,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             pathoVisual: null,   // V94.98: the saved pathoVisual on the current form's disease (for the in-form preview)
             formAiDrafted: false, // V95.65: current form opened as an AI draft (drives the per-tab verify tracker)
             verified: {},         // V95.65: section keys the admin confirmed this session; reset per form open
+            reviewFindings: {},   // V95.80: { sectionKey: [findings] } from dxaAiReviewDraft
             searchTerm: ''
         };
 
@@ -34525,6 +34573,408 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         }
 
+        // ── V95.80: Disease AI fill + AI Review (mirror of Drug dca*) ──────────
+        // Toggle the two AI buttons in the disease form header. Shown on Edit +
+        // Review-draft; hidden on Add New (auto-draft already covers blank forms).
+        function dxaShowAiButtons() {
+            const b = document.getElementById('dxa-form-ai-fill-btn');
+            if (b) { b.style.display = 'inline-flex'; b.disabled = false; b.textContent = '🤖 AI fill empty fields'; }
+            const r = document.getElementById('dxa-form-ai-review-btn');
+            if (r) { r.style.display = 'inline-flex'; r.disabled = false; r.textContent = '🔍 AI Review'; }
+        }
+        function dxaHideAiButtons() {
+            const b = document.getElementById('dxa-form-ai-fill-btn');
+            if (b) { b.style.display = 'none'; b.disabled = false; b.textContent = '🤖 AI fill empty fields'; }
+            const r = document.getElementById('dxa-form-ai-review-btn');
+            if (r) { r.style.display = 'none'; r.disabled = false; r.textContent = '🔍 AI Review'; }
+        }
+
+        // field key → section key, from DXA_SECTION_DEFS (single source of truth).
+        function dxaSectionOfField(field) {
+            const def = DXA_SECTION_DEFS.find(d => d.fields.includes(field));
+            return def ? def.key : null;
+        }
+
+        // { sectionKey: [emptyFieldKeys] } — deterministic, for the completeness block.
+        function dxaEmptyFieldsBySection() {
+            const cur = dxaCollectForm();
+            const out = {};
+            DXA_SECTION_DEFS.forEach(def => {
+                def.fields.forEach(key => {
+                    if (DXA_AI_FILL_SKIP.has(key)) return;
+                    const v = cur[key];
+                    const empty = DXA_ARRAY_FIELDS[key]
+                        ? (!Array.isArray(v) || v.length === 0)
+                        : (!v || !String(v).trim());
+                    if (empty) (out[def.key] = out[def.key] || []).push(key);
+                });
+            });
+            return out;
+        }
+
+        function dxaBuildAiFillPrompt(seedData, emptyFieldKeys) {
+            const seedJson = {};
+            DXA_FIELD_KEYS.forEach(key => {
+                if (emptyFieldKeys.includes(key)) return;
+                const v = seedData[key];
+                if (DXA_ARRAY_FIELDS[key]) { if (Array.isArray(v) && v.length > 0) seedJson[key] = v; }
+                else { const s = v == null ? '' : String(v).trim(); if (s) seedJson[key] = s; }
+            });
+            let internNotes = '';
+            let targetContext = '';
+            if (dxaState.isDraftEdit && dxaState.editingId) {
+                const draft = (dxaState.drafts || []).find(d => d._id === dxaState.editingId);
+                if (draft) {
+                    if (draft.internNotes) internNotes = String(draft.internNotes).trim();
+                    if (draft.targetDiseaseId) {
+                        const t = (dxaState.codex || []).find(d => d._id === draft.targetDiseaseId);
+                        targetContext = t ? t.diseaseName : draft.targetDiseaseId;
+                    }
+                }
+            }
+            const requestedKeys = emptyFieldKeys.map(k => '  "' + k + '"').join(',\n');
+            const lines = [
+                'ROLE: clinical reference compiler. A partial DISEASE monograph has some fields blank; you augment it by filling ONLY the blank fields. Output is for an internal medical-intern study tool (Thailand).',
+                '',
+                'FORMAT CONTRACT — RESPOND WITH PURE JSON ONLY.',
+                'NO MARKDOWN. NO PROSE OUTSIDE JSON. NO ```json``` FENCE.',
+                'Root object must contain EXACTLY these keys (and ONLY these keys):',
+                '{',
+                requestedKeys,
+                '}',
+                '',
+                'SUPPLIED SEED (already verified — DO NOT echo these keys back, DO NOT contradict them):',
+                '```',
+                JSON.stringify(seedJson, null, 2),
+                '```'
+            ];
+            if (internNotes) {
+                lines.push('');
+                lines.push("INTERN'S FREE-TEXT NOTE (context about why they submitted — may inform your fill):");
+                lines.push('<<<' + internNotes + '>>>');
+            }
+            if (targetContext) {
+                lines.push('');
+                lines.push('SUGGEST-EDIT CONTEXT: this draft proposes edits to an existing codex entry "' + targetContext + '".');
+            }
+            lines.push('');
+            lines.push('PER-FIELD CONTENT GUIDE (only for the keys you must fill — produce no other keys):');
+            emptyFieldKeys.forEach(key => { if (DXA_AI_FIELD_GUIDE[key]) lines.push('- "' + key + '": ' + DXA_AI_FIELD_GUIDE[key]); });
+            lines.push('');
+            lines.push('LANGUAGE RULE — STRICT:');
+            lines.push('- "patientCounseling" MUST be Thai (ภาษาไทย). This is counseling spoken to a Thai-speaking patient. Use everyday Thai, not transliterated English.');
+            lines.push('- "thaiName" MUST be Thai.');
+            lines.push('- ALL other prose fields MUST be in English (international medical convention).');
+            lines.push('- "pearls" may mix Thai + English where pedagogically useful.');
+            lines.push('- Medical loanwords like "MRI", "ECG", "GFR" stay in English even inside Thai text — do not transliterate them.');
+            lines.push('');
+            lines.push('CONTENT RULES:');
+            lines.push('- If uncertain about a specific field (e.g. ICD-10 code), return an empty string for that field rather than guessing.');
+            lines.push('- Keep each text field under 600 characters. Use \\n for line breaks. Use "- " prefix for bullet items.');
+            lines.push('- Do NOT contradict the supplied seed. Your fills must be internally consistent with it.');
+            lines.push('- Do NOT include disclaimers like "consult a physician" in JSON values — the platform handles that.');
+            lines.push('- Do NOT include any seed key in your response.');
+            lines.push('');
+            lines.push('SELF-CHECK before responding:');
+            lines.push('1. Is the response valid JSON (no fence, no prose outside braces)?');
+            lines.push('2. Does the response contain ONLY these keys: ' + emptyFieldKeys.map(k => '"' + k + '"').join(', ') + '?');
+            lines.push('3. Is "patientCounseling" / "thaiName" written in Thai script (if requested)?');
+            lines.push('4. Are all other prose fields in English?');
+            lines.push('5. Are your fills consistent with the supplied seed?');
+            lines.push('If any check fails, regenerate before sending.');
+            return lines.join('\n');
+        }
+
+        async function dxaAiFillEmptyFields() {
+            const btn = document.getElementById('dxa-form-ai-fill-btn');
+            const errEl = document.getElementById('dxa-form-error');
+            if (typeof window.callUniversalAI !== 'function') {
+                if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'AI core not loaded yet — try again in a moment.'; }
+                return;
+            }
+            const current = dxaCollectForm();
+            if (!current.diseaseName) {
+                if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Disease Name is required before AI fill.'; }
+                return;
+            }
+            const emptyKeys = DXA_FIELD_KEYS.filter(key => {
+                if (DXA_AI_FILL_SKIP.has(key)) return false;
+                const v = current[key];
+                if (DXA_ARRAY_FIELDS[key]) return !Array.isArray(v) || v.length === 0;
+                return !v || !String(v).trim();
+            });
+            if (emptyKeys.length === 0) {
+                if (typeof showToast === 'function') showToast('All fields already filled — nothing for AI to add.');
+                else if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'All fields already filled — nothing for AI to add.'; }
+                return;
+            }
+            let selectedModel = DXA_AI_FALLBACK_MODEL;
+            try { const saved = localStorage.getItem(DXA_AI_LS_KEY); if (saved) selectedModel = saved; } catch (_) { /* ignore */ }
+            if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ Filling ' + emptyKeys.length + ' field' + (emptyKeys.length === 1 ? '' : 's') + '…'; }
+            const prompt = dxaBuildAiFillPrompt(current, emptyKeys);
+            try {
+                const resp = await window.callUniversalAI(selectedModel, prompt, true);
+                const rawText = (resp && resp.text) ? resp.text : (typeof resp === 'string' ? resp : '');
+                if (!rawText) throw new Error('Empty response from AI');
+                let parsed = dxaParseAutoDraftResponse(rawText);
+                if (!parsed) {
+                    const resp2 = await window.callUniversalAI(selectedModel, prompt, true);
+                    const rawText2 = (resp2 && resp2.text) ? resp2.text : (typeof resp2 === 'string' ? resp2 : '');
+                    parsed = dxaParseAutoDraftResponse(rawText2);
+                    if (!parsed) {
+                        const preview = String(rawText2 || rawText || '').slice(0, 300);
+                        throw new Error('AI returned invalid JSON after retry.\nFirst 300 chars: ' + preview);
+                    }
+                }
+                const merged = Object.assign({}, current);
+                merged._id = dxaState.editingId;
+                merged.aiDrafted = true;
+                merged.aiDraftedModel = (resp && resp.model) ? resp.model : selectedModel;
+                let filledCount = 0;
+                const eduFieldsFilled = [];
+                emptyKeys.forEach(key => {
+                    const v = parsed[key];
+                    if (DXA_ARRAY_FIELDS[key]) {
+                        if (Array.isArray(v) && v.length > 0) { merged[key] = v.filter(Boolean); filledCount++; }
+                    } else {
+                        const s = v == null ? '' : String(v).trim();
+                        if (s) { merged[key] = s; filledCount++; if (DXA_EDU_I18N_FIELDS.includes(key)) eduFieldsFilled.push(key); }
+                    }
+                });
+                dxaFillForm(merged);
+                if (typeof showToast === 'function') {
+                    const modelLabel = (resp && resp.model) ? resp.model : selectedModel;
+                    const skipped = emptyKeys.length - filledCount;
+                    const skipNote = skipped > 0 ? ` · ${skipped} left empty by model (uncertain)` : '';
+                    showToast(`🤖 Filled ${filledCount}/${emptyKeys.length} field${emptyKeys.length === 1 ? '' : 's'} with ${modelLabel}${skipNote}. Verify before save.`);
+                }
+                if (eduFieldsFilled.length > 0 && typeof dxaTranslateEducationI18n === 'function') {
+                    dxaTranslateEducationI18n({ fields: eduFieldsFilled, silent: false }).catch(err => {
+                        console.warn('[disease-codex] AI-fill Edu i18n translate failed:', err && err.message);
+                    });
+                }
+            } catch (err) {
+                console.error('[disease-codex] AI fill failed:', err);
+                if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'AI fill failed: ' + (err && err.message ? err.message : 'unknown error'); }
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = '🤖 AI fill empty fields'; }
+            }
+        }
+
+        function dxaBuildReviewPrompt(data, filledLines, internContext) {
+            return [
+                'ROLE: senior physician / clinical educator auditing a DRAFT disease monograph for an internal medical-intern study tool (Thailand). The draft was written by a junior intern (or an AI) and needs your review before publishing.',
+                '',
+                'TASK: review ONLY the fields provided below (they are the ones that have content). Find concrete problems. Do NOT rewrite the content. Do NOT comment on fields that are absent.',
+                '',
+                'FORMAT CONTRACT — RESPOND WITH PURE JSON ONLY.',
+                'NO MARKDOWN. NO PROSE OUTSIDE JSON. NO ```json``` FENCE.',
+                'Shape:',
+                '{',
+                '  "findings": [',
+                '    {',
+                '      "field":      "<<<the exact field key from the list, e.g. diagnosis>>>",',
+                '      "severity":   "<<<one of: safety | factual | consistency | suggestion>>>",',
+                '      "issue":      "<<<what is wrong or risky · one sentence · medical English>>>",',
+                '      "suggestion": "<<<what to check or correct · one sentence · medical English · empty string if none>>>"',
+                '    }',
+                '  ],',
+                '  "overallNote": "<<<one-line overall impression · empty string if nothing notable>>>"',
+                '}',
+                '',
+                'SEVERITY MEANING:',
+                '- "safety": a missing or wrong red flag, a dangerous omission, or guidance that could delay urgent care or harm a patient.',
+                '- "factual": a value likely incorrect (wrong ICD-10 code, wrong diagnostic criterion, wrong first-line treatment, wrong epidemiology).',
+                '- "consistency": fields that contradict each other (e.g. symptoms vs diagnosis, treatment vs etiology, category vs ICD-10).',
+                '- "suggestion": a non-critical improvement or an important point that is missing.',
+                '',
+                'CONFIDENCE RULE — STRICT (avoid false alarms):',
+                '- Flag a finding ONLY if you are reasonably confident it is a real problem. If unsure, DO NOT flag it.',
+                '- You are reasoning from your own medical knowledge only — you cannot open the cited references. Do NOT claim a reference is wrong; at most suggest verifying it.',
+                '- If the draft looks clinically sound, return an EMPTY findings array. An empty array is a valid, good answer.',
+                '- Keep each "issue" / "suggestion" under 220 characters. Plain medical English.',
+                '',
+                'SELF-CHECK before responding:',
+                '1. Is the response valid JSON (no fence, no prose outside braces)?',
+                '2. Does every finding.field match one of the provided field keys exactly?',
+                '3. Is every finding.severity one of the four allowed values?',
+                '4. Did you avoid flagging anything you are not confident about?',
+                'If any check fails, fix it before sending.',
+                '',
+                'DISEASE: <<<' + (data.diseaseName || '') + '>>>' + (data.category ? ' · category as drafted: ' + data.category : ''),
+                internContext ? ('INTERN CONTEXT / CITATION (for your awareness, do not audit it directly): <<<' + internContext + '>>>') : '',
+                '',
+                'FIELDS TO REVIEW:',
+                filledLines.join('\n')
+            ].filter(Boolean).join('\n');
+        }
+
+        async function dxaAiReviewDraft() {
+            const btn = document.getElementById('dxa-form-ai-review-btn');
+            const errEl = document.getElementById('dxa-form-error');
+            if (typeof window.callUniversalAI !== 'function') {
+                if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'AI core not loaded yet — try again in a moment.'; }
+                return;
+            }
+            const current = dxaCollectForm();
+            if (!current.diseaseName) {
+                if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Disease Name is required before AI Review.'; }
+                return;
+            }
+            const filledLines = [];
+            DXA_SECTION_DEFS.forEach(def => {
+                def.fields.forEach(key => {
+                    if (key === 'diseaseName') return;
+                    const v = current[key];
+                    let text = '';
+                    if (DXA_ARRAY_FIELDS[key]) text = Array.isArray(v) ? v.filter(Boolean).join(', ') : '';
+                    else text = (v == null ? '' : String(v).trim());
+                    if (!text) return;
+                    const label = (DXA_FIELD_LABELS[key] || key);
+                    const sec = (DXA_SECTION_TITLES[def.key] || def.key);
+                    filledLines.push(`- [${sec}] ${label} (key=${key}): ${text}`);
+                });
+            });
+            if (filledLines.length === 0) {
+                if (typeof showToast === 'function') showToast('No filled fields to review yet.');
+                else if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'No filled fields to review yet.'; }
+                return;
+            }
+            let internContext = '';
+            const banner = document.getElementById('dxa-form-intern-notes-banner');
+            if (banner && banner.style.display !== 'none') {
+                internContext = String(banner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 500);
+            }
+            let selectedModel = DXA_AI_FALLBACK_MODEL;
+            try { const saved = localStorage.getItem(DXA_AI_LS_KEY); if (saved) selectedModel = saved; } catch (_) { /* ignore */ }
+            if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ Reviewing…'; }
+            const prompt = dxaBuildReviewPrompt(current, filledLines, internContext);
+            try {
+                const resp = await window.callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768 });
+                const rawText = (resp && resp.text) ? resp.text : (typeof resp === 'string' ? resp : '');
+                if (!rawText) throw new Error('Empty response from AI');
+                let parsed = dxaParseAutoDraftResponse(rawText);
+                if (!parsed) {
+                    const resp2 = await window.callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768 });
+                    const rawText2 = (resp2 && resp2.text) ? resp2.text : (typeof resp2 === 'string' ? resp2 : '');
+                    parsed = dxaParseAutoDraftResponse(rawText2);
+                    if (!parsed) {
+                        const preview = String(rawText2 || rawText || '').slice(0, 300);
+                        throw new Error('AI returned invalid JSON after retry.\nFirst 300 chars: ' + preview);
+                    }
+                }
+                const raw = Array.isArray(parsed.findings) ? parsed.findings : [];
+                const findings = raw.map(f => {
+                    if (!f || typeof f !== 'object') return null;
+                    const field = String(f.field || '').trim();
+                    const issue = String(f.issue || '').trim();
+                    if (!field || !issue) return null;
+                    const section = dxaSectionOfField(field);
+                    if (!section) return null;
+                    let severity = String(f.severity || '').trim().toLowerCase();
+                    if (!DXA_REVIEW_SEVERITIES.includes(severity)) severity = 'suggestion';
+                    return { field, section, severity, issue, suggestion: String(f.suggestion || '').trim() };
+                }).filter(Boolean);
+                const overallNote = String(parsed.overallNote || '').trim();
+                dxaState.reviewFindings = {};
+                findings.forEach(f => { (dxaState.reviewFindings[f.section] = dxaState.reviewFindings[f.section] || []).push(f); });
+                dxaState.formAiDrafted = true;
+                dxaUpdateSectionBadges();
+                dxaRefreshVerifyStrip();
+                dxaRenderReviewResults(findings, overallNote);
+                if (typeof showToast === 'function') {
+                    const ml = (typeof dxaFormatModelLabel === 'function') ? dxaFormatModelLabel((resp && resp.model) || selectedModel) : ((resp && resp.model) || selectedModel);
+                    showToast(findings.length
+                        ? `🔍 AI Review: ${findings.length} point${findings.length === 1 ? '' : 's'} to check (${ml})`
+                        : `🔍 AI Review: no clear issues found (${ml}) — still verify each tab`);
+                }
+            } catch (err) {
+                console.error('[disease-codex] AI review failed:', err);
+                if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'AI Review failed: ' + (err && err.message ? err.message : 'unknown error'); }
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = '🔍 AI Review'; }
+            }
+        }
+
+        function dxaRenderReviewResults(findings, overallNote) {
+            const panel = document.getElementById('dxa-review-results');
+            if (!panel) return;
+            const esc = (typeof dxaEscapeHtml === 'function') ? dxaEscapeHtml : (s => String(s));
+            const parts = [];
+            parts.push(
+                '<div class="dca-review-results-head">' +
+                    '<span>🔍 AI Review · ' + findings.length + ' finding' + (findings.length === 1 ? '' : 's') + '</span>' +
+                    '<span class="dca-review-disclaimer">advisory · model knowledge, not live sources</span>' +
+                    '<button type="button" class="dca-review-dismiss" onclick="dxaDismissReviewResults()" title="Dismiss">✕</button>' +
+                '</div>'
+            );
+            if (overallNote) parts.push('<div class="dca-review-overall">' + esc(overallNote) + '</div>');
+            if (findings.length === 0) {
+                parts.push('<div class="dca-review-empty">✅ AI ไม่พบปัญหาในเนื้อหาที่กรอก — ยังต้องตรวจยืนยันแต่ละแท็บเอง</div>');
+            } else {
+                DXA_SECTION_DEFS.forEach(def => {
+                    const group = findings.filter(f => f.section === def.key);
+                    if (!group.length) return;
+                    const title = (DXA_SECTION_TITLES[def.key] || def.key);
+                    const rows = group.map(f => {
+                        const sevLabel = DXA_REVIEW_SEV_LABEL[f.severity] || f.severity;
+                        const fieldLabel = (DXA_FIELD_LABELS[f.field] || f.field);
+                        return '<div class="dca-review-finding">' +
+                            '<span class="dca-review-sev ' + f.severity + '">' + esc(sevLabel) + '</span>' +
+                            '<div class="dca-review-finding-body">' +
+                                '<span class="dca-review-finding-field">' + esc(fieldLabel) + '</span> — ' + esc(f.issue) +
+                                (f.suggestion ? '<div class="dca-review-finding-fix">→ ' + esc(f.suggestion) + '</div>' : '') +
+                            '</div>' +
+                        '</div>';
+                    }).join('');
+                    parts.push(
+                        '<div class="dca-review-group">' +
+                            '<span class="dca-review-group-title" onclick="dxaSwitchSection(\'' + def.key + '\')">' +
+                                esc(title) + ' (' + group.length + ') ↗' +
+                            '</span>' + rows +
+                        '</div>'
+                    );
+                });
+            }
+            const emptyBySection = dxaEmptyFieldsBySection();
+            const emptyCount = Object.keys(emptyBySection).reduce((a, k) => a + emptyBySection[k].length, 0);
+            if (emptyCount > 0) {
+                const secList = DXA_SECTION_DEFS
+                    .filter(d => emptyBySection[d.key] && emptyBySection[d.key].length)
+                    .map(d => (DXA_SECTION_TITLES[d.key] || d.key) + ' (' + emptyBySection[d.key].length + ')')
+                    .join(' · ');
+                parts.push(
+                    '<div class="dca-review-completeness">' +
+                        '<div class="dca-review-completeness-text">' +
+                            '<span class="dca-review-completeness-head">📋 ยังไม่ได้กรอก ' + emptyCount + ' ช่อง</span>' +
+                            '<span class="dca-review-completeness-sub">' + esc(secList) + '</span>' +
+                        '</div>' +
+                        '<button type="button" class="dca-review-fill-btn" onclick="dxaAiFillEmptyFields()">🤖 เติมช่องว่างด้วย AI</button>' +
+                    '</div>'
+                );
+            }
+            panel.innerHTML = parts.join('');
+            panel.style.display = 'block';
+            DXA_SECTION_DEFS.forEach(def => {
+                const badge = document.querySelector(`#diseaseCodexAdminModal .dca-form-tab-badge[data-section-badge="${def.key}"]`);
+                if (!badge) return;
+                const n = (dxaState.reviewFindings[def.key] || []).length;
+                badge.title = n ? ('🔍 AI: ' + n + ' point' + (n === 1 ? '' : 's') + ' to check') : '';
+            });
+        }
+
+        function dxaDismissReviewResults() {
+            const panel = document.getElementById('dxa-review-results');
+            if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
+            dxaState.reviewFindings = {};
+            DXA_SECTION_DEFS.forEach(def => {
+                const badge = document.querySelector(`#diseaseCodexAdminModal .dca-form-tab-badge[data-section-badge="${def.key}"]`);
+                if (badge) badge.title = '';
+            });
+        }
+
         function dxaFillForm(data) {
             // V95.65: bind once — editing any field in a verified AI-drafted section
             // flips it back to unverified so the green ✓ never lies.
@@ -34549,6 +34999,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // disease don't linger on a fresh form (static DOM — see
             // feedback_static_modal_state_leak).
             dxaDismissIcdResults();
+            // V95.80: clear stale AI Review findings from a previous disease (static DOM).
+            if (typeof dxaDismissReviewResults === 'function') dxaDismissReviewResults();
             // V94.85: rebuild Edu i18n state BEFORE the field loop so the 3 Edu
             // textareas read from state (per current chip lang). Legacy docs
             // without educationI18n get seeded from the root field into the
@@ -34739,6 +35191,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dxaHideInternNotesBanner();
             const modeLabel = document.getElementById('dxa-form-mode-label');
             if (modeLabel) modeLabel.textContent = 'Add Disease';
+            dxaHideAiButtons();
             dxaFillForm({});
             dxaSwitchSection('core');
             dxaSwitchView('form');
@@ -34752,6 +35205,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dxaHideInternNotesBanner();
             const modeLabel = document.getElementById('dxa-form-mode-label');
             if (modeLabel) modeLabel.textContent = 'Edit · ' + (disease.diseaseName || diseaseId);
+            dxaShowAiButtons();
             dxaFillForm(disease);
             dxaSwitchSection('core');
             dxaSwitchView('form');
@@ -35750,6 +36204,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const modeLabel = document.getElementById('dxa-form-mode-label');
             if (modeLabel) modeLabel.textContent = 'Review Draft · ' + (draft.diseaseName || draftId);
             dxaShowInternNotesBanner(draft);
+            dxaShowAiButtons();
             dxaFillForm(draft);
             dxaSwitchSection('core');
             dxaSwitchView('form');
