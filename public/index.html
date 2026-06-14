@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.78)</title>
+    <title>Internship Portfolio (V95.79)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2884,10 +2884,30 @@
                 }
                 .dc-detail-section {
                     margin: 0;
+                    /* V95.79: leave room under the sticky section rail when a chip
+                       scrolls a section to the top. */
+                    scroll-margin-top: 46px;
                 }
                 .dc-detail-section + .dc-detail-section {
                     border-top: 1px solid #f1f5f9;
                 }
+                /* V95.79: sticky in-modal jump rail — tap a chip to expand + scroll
+                   to that section. Reduces scrolling through long collapsed sections. */
+                .dc-sec-rail {
+                    position: sticky; top: 0; z-index: 6;
+                    display: flex; flex-wrap: wrap; gap: 6px;
+                    padding: 8px 16px; background: #fff;
+                    border-bottom: 1px solid #eef2f7;
+                }
+                .dc-sec-chip {
+                    /* defeat global button { width:100%; min-height:48px } (index.html:341) */
+                    width: auto; min-height: 0;
+                    padding: 4px 10px; border-radius: 999px;
+                    border: 1px solid #e2e8f0; background: #f8fafc;
+                    color: #475569; font-size: 0.7em; font-weight: 800;
+                    cursor: pointer; white-space: nowrap; line-height: 1.2;
+                }
+                .dc-sec-chip:hover { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
                 /* V95.02 Phase 2: section accent borders — left-stripe per
                    section category. Palette echoes admin section colors
                    (public/admin.html) so the two surfaces stay consistent. */
@@ -11589,14 +11609,14 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 // Pathophysiology Visual modal. Renders only when pathoVisual.downloadUrl
                 // exists. open:true — the image is the most engaging surface.
                 (eff.pathoVisual && eff.pathoVisual.downloadUrl)
-                    ? { key: 'pathovisual', title: '🎨 Pathophysiology Visual', open: true, visual: eff.pathoVisual }
+                    ? { key: 'pathovisual', title: '🎨 Pathophysiology Visual', open: false, visual: eff.pathoVisual }
                     : null,
-                { key: 'clinical', title: '🩺 Clinical Presentation', open: true, fields: [['Symptoms', eff.symptoms], ['Signs', eff.signs]] },
+                { key: 'clinical', title: '🩺 Clinical Presentation', open: false, fields: [['Symptoms', eff.symptoms], ['Signs', eff.signs]] },
                 { key: 'dx', title: '🔬 Diagnosis', open: false, fields: [['Diagnostic Criteria', eff.diagnosis], ['Investigations', eff.investigations], ['Differential Diagnosis', eff.differential]] },
-                { key: 'mgmt', title: '💊 Management', open: true, fields: [['Treatment', eff.treatment], ['Non-pharmacologic', eff.nonPharm], ['Complications', eff.complications], ['Prognosis', eff.prognosis]] },
+                { key: 'mgmt', title: '💊 Management', open: false, fields: [['Treatment', eff.treatment], ['Non-pharmacologic', eff.nonPharm], ['Complications', eff.complications], ['Prognosis', eff.prognosis]] },
                 // V95.13 Phase 6: Drug Codex cross-link — chips tap into the drug detail.
-                { key: 'reldrug', title: '💊 Related Drugs · ยาที่เกี่ยวข้อง', open: true, relatedDrugs: Array.isArray(eff.relatedDrugs) ? eff.relatedDrugs.filter(rd => rd && rd.id) : [] },
-                { key: 'edu', title: '📖 Education', open: true, fields: [['Patient Counseling · คำแนะนำผู้ป่วย', eff.patientCounseling], ['Red Flags', eff.redFlags], ['Clinical Pearls', eff.pearls]] },
+                { key: 'reldrug', title: '💊 Related Drugs · ยาที่เกี่ยวข้อง', open: false, relatedDrugs: Array.isArray(eff.relatedDrugs) ? eff.relatedDrugs.filter(rd => rd && rd.id) : [] },
+                { key: 'edu', title: '📖 Education', open: false, fields: [['Patient Counseling · คำแนะนำผู้ป่วย', eff.patientCounseling], ['Red Flags', eff.redFlags], ['Clinical Pearls', eff.pearls]] },
                 { key: 'refs', title: '🔗 References', open: false, refs: Array.isArray(eff.references) ? eff.references.filter(Boolean) : [] }
             ];
             const html = sections.filter(Boolean).map(sec => {
@@ -11667,6 +11687,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             // Read from the original doc, not eff — credit fields aren't translated.
             const creditHtml = codexContributorCreditHtml(disease.submittedByName, disease.submittedByPictureUrl);
             body.innerHTML = dxRenderLangBar(eff) + (html || '<div class="dc-empty-state" style="padding:20px;">โรคนี้ยังไม่มีรายละเอียด · entry may still be in draft.</div>') + creditHtml;
+            codexBuildSectionRail(body); // V95.79: sticky jump-rail + auto-open first
             body.scrollTop = 0;
         }
 
@@ -12417,13 +12438,13 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             // exists. open:true because the image is the most engaging
             // surface in the modal — interns see it immediately on expand.
             const pkVisualSection = (eff.pkVisual && eff.pkVisual.downloadUrl)
-                ? { key: 'pkvisual', title: '🎨 ADMET Visual', open: true, visual: eff.pkVisual }
+                ? { key: 'pkvisual', title: '🎨 ADMET Visual', open: false, visual: eff.pkVisual }
                 : null;
             const sections = [
                 {
                     key: 'clinical',
                     title: '🩺 Clinical Use',
-                    open: true,
+                    open: false, // V95.79: rail auto-opens the first section
                     fields: [
                         ['Indication', eff.indication, 'safe'],
                         ['Dosing', eff.dosing, 'reference'],
@@ -12445,7 +12466,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 {
                     key: 'edu',
                     title: '📖 Education',
-                    open: true,
+                    open: false,
                     fields: [
                         ['Monitoring', eff.monitoring, 'safe'],
                         ['Patient Counseling · คำแนะนำผู้ป่วย', eff.patientCounseling, 'empathy'],
@@ -12548,6 +12569,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             // discussion thread. Read from the original doc — not translated.
             const creditHtml = codexContributorCreditHtml(drug.submittedByName, drug.submittedByPictureUrl);
             body.innerHTML = dcRenderLangBar(eff) + (html || '<div class="dc-empty-state" style="padding:20px;">ยานี้ยังไม่มีรายละเอียด · entry may still be in draft.</div>') + creditHtml + discussionHtml;
+            codexBuildSectionRail(body); // V95.79: sticky jump-rail + auto-open first
             // Wire discussion onSnapshot on first toggle-open (lazy — interns
             // who never expand the section pay zero read cost).
             const detailsEl = document.getElementById('dc-discussion-details');
@@ -12561,6 +12583,37 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             // Scroll body to top so new drug opens at the start, not where the
             // last drug was scrolled to.
             body.scrollTop = 0;
+        }
+
+        // V95.79: build the sticky section jump-rail for a Codex detail body.
+        // Reads the rendered <details> sections, makes a chip per section that
+        // expands + scrolls to it, and auto-opens the first so the modal isn't blank.
+        // Shared by Drug (dcRenderDetail) and Disease (dxRenderDetail).
+        function codexBuildSectionRail(bodyEl) {
+            if (!bodyEl) return;
+            const secs = [...bodyEl.querySelectorAll('.dc-detail-section')];
+            if (secs.length < 2) { if (secs[0]) secs[0].open = true; return; }
+            const chips = secs.map((s, i) => {
+                const key = s.getAttribute('data-section-key') || ('s' + i);
+                const sum = s.querySelector('summary');
+                const label = ((sum ? sum.textContent : '') || '').replace(/\s+/g, ' ').trim() || ('Section ' + (i + 1));
+                return `<button type="button" class="dc-sec-chip" data-target="${escapeHtml(key)}">${escapeHtml(label)}</button>`;
+            }).join('');
+            const rail = document.createElement('div');
+            rail.className = 'dc-sec-rail lang-no-toggle';
+            rail.innerHTML = chips;
+            bodyEl.insertBefore(rail, secs[0]);
+            rail.addEventListener('click', e => {
+                const btn = e.target.closest('.dc-sec-chip');
+                if (!btn) return;
+                const key = btn.getAttribute('data-target');
+                const target = [...bodyEl.querySelectorAll('.dc-detail-section')]
+                    .find(s => (s.getAttribute('data-section-key') || '') === key);
+                if (!target) return;
+                target.open = true;
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+            secs[0].open = true; // content-first; the rest stay collapsed
         }
 
         function dcRenderFieldValue(raw) {
