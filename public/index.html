@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.72)</title>
+    <title>Internship Portfolio (V95.73)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -9007,6 +9007,18 @@
             return (correctCount / totalQuestions) * (totalPoints || 1.0);
         }
 
+        // V95.73: partial credit for multi-answer choice questions (opt-in per quiz
+        // via quiz.partialCredit). Formula B = (correct − wrong) / totalCorrect, floored
+        // at 0. Returns a fraction in [0,1] added to correctCount like the ordering path.
+        // KEEP IN SYNC with the identical helper in admin.html (calculateAttemptScoring).
+        function scorePartialMultiChoice(correctArr, selectedArr) {
+            const total = (correctArr || []).length;
+            if (total === 0) return 0;
+            let hit = 0, wrong = 0;
+            (selectedArr || []).forEach(v => (correctArr.includes(v) ? hit++ : wrong++));
+            return Math.max(0, (hit - wrong) / total);
+        }
+
         // V94.73 PR 4b: ordering questions yield fractional partial credit, so a
         // quiz's correctCount / practiceScore can be non-integer. Render integers
         // cleanly and round fractions to 2dp wherever the raw count is shown.
@@ -9353,7 +9365,14 @@
                         if (hasCorrect) {
                             const target = Array.isArray(q.correct) ? q.correct : [q.correct];
                             const mineArray = Array.isArray(mine) ? (Array.isArray(mine) ? mine : [mine]) : (mine !== null && mine !== undefined ? [mine] : []);
-                            if (target.length > 0 && target.length === mineArray.length && target.every(val => mineArray.includes(val))) {
+                            if (currentQuiz.partialCredit && target.length > 1) {
+                                // V95.73: per-quiz opt-in partial credit for MULTI-answer
+                                // questions only. (correct − wrong) / totalCorrect, floored
+                                // at 0 — picking every option nets 0, not full marks.
+                                // Single-answer keeps the exact-match path below (radio = 1
+                                // pick), so this never changes single-answer behavior.
+                                correctCount += scorePartialMultiChoice(target, mineArray);
+                            } else if (target.length > 0 && target.length === mineArray.length && target.every(val => mineArray.includes(val))) {
                                 correctCount++;
                             }
                         } else if (mine !== null && mine !== undefined) {
