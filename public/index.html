@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.83)</title>
+    <title>Internship Portfolio (V95.84)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -17583,21 +17583,14 @@ async function archiveDoneCard(cardId) {
                 });
                 const total = cases.length;
                 const sorted = Object.entries(groups).sort((a, b) => b[1] - a[1]);
-                const rows = sorted.map(([key, count]) => {
+                // V95.84: per-system breakdown as compact inline count chips instead
+                // of full-width progress bars (the bars carried little signal when most
+                // systems have 1 case). 3+ rows → one wrapping line.
+                const rows = `<div style="display:flex; flex-wrap:wrap; gap:8px;">` + sorted.map(([key, count]) => {
                     const item = caseTaxonomyCatalog.find(x => x.key === key) || { label: key, key };
                     const emoji = CASE_SYSTEM_EMOJI[key] || '📋';
-                    const pct = Math.round((count / total) * 100);
-                    return `
-                    <div style="margin-bottom:10px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                            <span style="font-size:0.88em; font-weight:700; color:#334155;">${emoji} ${item.label}</span>
-                            <span style="font-size:0.82em; font-weight:800; color:#4361ee;">${count} case${count > 1 ? 's' : ''}</span>
-                        </div>
-                        <div style="background:#e8eeff; border-radius:99px; height:6px; overflow:hidden;">
-                            <div style="width:${pct}%; background:linear-gradient(90deg,#4361ee,#7b93f8); height:100%; border-radius:99px; transition:width 0.4s ease;"></div>
-                        </div>
-                    </div>`;
-                }).join('');
+                    return `<span style="font-size:0.82em; background:#eef2ff; color:#334155; padding:5px 11px; border-radius:99px; font-weight:600; white-space:nowrap;">${emoji} ${item.label} <b style="color:#4361ee; margin-left:3px;">${count}</b></span>`;
+                }).join('') + `</div>`;
 
                 const casePoints = cases.reduce((sum, c) => sum + (parseFloat(c.adminBonus) || 0), 0);
                 const pointsText = casePoints > 0 ? ` · ${casePoints % 1 === 0 ? casePoints : casePoints.toFixed(2)} pts` : '';
@@ -17657,16 +17650,13 @@ async function archiveDoneCard(cardId) {
             let curStreak = 0;
             const anchor = weekSet.has(thisMon) ? thisMon : (weekSet.has(thisMon - 7) ? thisMon - 7 : null);
             if (anchor !== null) { let w = anchor; while (weekSet.has(w)) { curStreak++; w -= 7; } }
+            // V95.84: streak as one compact row instead of two tall cards.
             const streakHtml = `
-                <div style="display:flex; gap:10px; margin-top:16px;">
-                    <div style="flex:1; text-align:center; background:#fff7ed; border:1px solid #fed7aa; border-radius:12px; padding:8px;">
-                        <div style="font-size:1.2em; font-weight:900; color:#ea580c;">🔥 ${curStreak}</div>
-                        <div style="font-size:0.7em; color:#9a3412; font-weight:700;">Current streak · 현재 (weeks)</div>
-                    </div>
-                    <div style="flex:1; text-align:center; background:#eef2ff; border:1px solid #c7d2fe; border-radius:12px; padding:8px;">
-                        <div style="font-size:1.2em; font-weight:900; color:#4361ee;">🏆 ${longest}</div>
-                        <div style="font-size:0.7em; color:#3730a3; font-weight:700;">Best streak · 최고 (weeks)</div>
-                    </div>
+                <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:16px; padding:9px 14px; background:#fafbff; border:1px solid #eef2ff; border-radius:12px; font-size:0.82em; font-weight:700;">
+                    <span style="color:#9a3412;">🔥 <b style="color:#ea580c; font-size:1.2em;">${curStreak}</b> Current streak · 현재</span>
+                    <span style="color:#cbd5e1;">|</span>
+                    <span style="color:#3730a3;">🏆 <b style="color:#4361ee; font-size:1.2em;">${longest}</b> Best streak · 최고</span>
+                    <span style="color:#94a3b8; font-weight:600;">(weeks)</span>
                 </div>`;
 
             // --- V95.37 Activity trend (last 6 months, all-time data) ---
