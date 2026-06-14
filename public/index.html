@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.77)</title>
+    <title>Internship Portfolio (V95.78)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -2817,6 +2817,12 @@
                 }
                 .dc-row-chev {
                     color: #94a3b8; font-size: 0.85em; flex-shrink: 0;
+                }
+                /* V95.78: tiny contributor avatar on intern-contributed Browse rows. */
+                .dc-row-credit-avatar {
+                    width: 26px; height: 26px; border-radius: 50%;
+                    object-fit: cover; flex-shrink: 0;
+                    border: 1.5px solid #e0e7ff;
                 }
                 .dc-empty-state {
                     text-align: center; color: #94a3b8;
@@ -11336,6 +11342,12 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     const chips = [];
                     if (disease.icd10) chips.push(`<span class="dc-row-meta-chip">${escapeHtml(disease.icd10)}</span>`);
                     if (disease.category) chips.push(`<span style="color:#475569;">${escapeHtml(disease.category)}</span>`);
+                    // V95.78: credit avatar for intern-contributed entries only (mirror of Drug).
+                    const credPic = String(disease.submittedByPictureUrl || '').trim();
+                    const credName = String(disease.submittedByName || '').trim();
+                    const credAvatar = (/^https?:\/\//i.test(credPic) && credName)
+                        ? `<img src="${escapeHtml(credPic)}" alt="" class="dc-row-credit-avatar" loading="lazy" title="เพิ่มข้อมูลโดย ${escapeHtml(credName)}" onerror="this.remove()">`
+                        : '';
                     return `
                         <div class="dc-row" onclick="dxOpenDetail('${escapeHtml(disease._id)}')">
                             <div class="dc-row-main">
@@ -11343,6 +11355,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                                 ${thai}
                                 ${chips.length ? `<div class="dc-row-meta">${chips.join('')}</div>` : ''}
                             </div>
+                            ${credAvatar}
                             <i class="fa-solid fa-chevron-right dc-row-chev"></i>
                         </div>`;
                 }).join('');
@@ -12273,6 +12286,14 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     const chips = [];
                     if (drug.atcCode) chips.push(`<span class="dc-row-meta-chip">${escapeHtml(drug.atcCode)}</span>`);
                     if (drug.class) chips.push(`<span style="color:#475569;">${escapeHtml(drug.class)}</span>`);
+                    // V95.78: credit avatar for intern-contributed entries only (admin
+                    // entries have no per-user photo). Picture + name come from the doc
+                    // (submittedBy* seeded at approval, V95.45); onerror drops a dead img.
+                    const credPic = String(drug.submittedByPictureUrl || '').trim();
+                    const credName = String(drug.submittedByName || '').trim();
+                    const credAvatar = (/^https?:\/\//i.test(credPic) && credName)
+                        ? `<img src="${escapeHtml(credPic)}" alt="" class="dc-row-credit-avatar" loading="lazy" title="เพิ่มข้อมูลโดย ${escapeHtml(credName)}" onerror="this.remove()">`
+                        : '';
                     return `
                         <div class="dc-row" onclick="dcOpenDetail('${escapeHtml(drug._id)}')">
                             <div class="dc-row-main">
@@ -12280,6 +12301,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                                 ${brands}
                                 ${chips.length ? `<div class="dc-row-meta">${chips.join('')}</div>` : ''}
                             </div>
+                            ${credAvatar}
                             <i class="fa-solid fa-chevron-right dc-row-chev"></i>
                         </div>`;
                 }).join('');
