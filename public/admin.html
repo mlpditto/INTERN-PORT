@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.66</title>
+    <title>Nika V95.68</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1355,6 +1355,22 @@
         .dca-review-empty {
             font-size: 0.82em; color: #047857; font-weight: 700;
         }
+        /* V95.68: completeness block inside the AI Review panel — lists empty fields
+           and offers a one-click fill (reuses dcaAiFillEmptyFields). */
+        .dca-review-completeness {
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+            margin-top: 8px; padding: 8px 12px;
+            background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px;
+        }
+        .dca-review-completeness-text { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 2px; }
+        .dca-review-completeness-head { font-size: 0.82em; font-weight: 800; color: #3730a3; }
+        .dca-review-completeness-sub { font-size: 0.74em; color: #6366f1; font-weight: 600; }
+        .dca-review-fill-btn {
+            padding: 5px 12px; border-radius: 8px; border: none;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #fff; font-weight: 800; cursor: pointer; font-size: 0.8em; white-space: nowrap;
+        }
+        .dca-review-fill-btn:hover { background: linear-gradient(135deg, #d97706, #b45309); }
         .dca-ai-error {
             margin-top: 10px; padding: 8px 12px; border-radius: 8px;
             background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
@@ -33299,6 +33315,25 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         // Render the advisory findings panel, grouped by section. Each group title and
         // each finding row jumps to its tab. Also stamps a count on the tab badge title.
+        // V95.68: empty (AI-fillable) fields grouped by section — mirrors the
+        // emptyKeys logic in dcaAiFillEmptyFields so the review's completeness block
+        // and the actual fill agree on what counts as empty.
+        function dcaEmptyFieldsBySection() {
+            const cur = dcaCollectForm();
+            const out = {};
+            DCA_SECTION_DEFS.forEach(def => {
+                def.fields.forEach(key => {
+                    if (DCA_AI_FILL_SKIP.has(key)) return;
+                    const v = cur[key];
+                    const empty = DCA_ARRAY_FIELDS[key]
+                        ? (!Array.isArray(v) || v.length === 0)
+                        : (!v || !String(v).trim());
+                    if (empty) (out[def.key] = out[def.key] || []).push(key);
+                });
+            });
+            return out;
+        }
+
         function dcaRenderReviewResults(findings, overallNote) {
             const panel = document.getElementById('dca-review-results');
             if (!panel) return;
@@ -33314,7 +33349,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (overallNote) parts.push('<div class="dca-review-overall">' + esc(overallNote) + '</div>');
 
             if (findings.length === 0) {
-                parts.push('<div class="dca-review-empty">✅ AI ไม่พบปัญหาที่ชัดเจน — ยังต้องตรวจยืนยันแต่ละแท็บเอง</div>');
+                parts.push('<div class="dca-review-empty">✅ AI ไม่พบปัญหาในเนื้อหาที่กรอก — ยังต้องตรวจยืนยันแต่ละแท็บเอง</div>');
             } else {
                 // Group in section order.
                 DCA_SECTION_DEFS.forEach(def => {
@@ -33341,6 +33376,28 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     );
                 });
             }
+
+            // V95.68: completeness — surface the empty fields and offer a one-click
+            // fill. Computed locally (deterministic), so it's reliable regardless of
+            // what the model returned; the button reuses the existing AI fill flow.
+            const emptyBySection = dcaEmptyFieldsBySection();
+            const emptyCount = Object.keys(emptyBySection).reduce((a, k) => a + emptyBySection[k].length, 0);
+            if (emptyCount > 0) {
+                const secList = DCA_SECTION_DEFS
+                    .filter(d => emptyBySection[d.key] && emptyBySection[d.key].length)
+                    .map(d => (DCA_SECTION_TITLES[d.key] || d.key) + ' (' + emptyBySection[d.key].length + ')')
+                    .join(' · ');
+                parts.push(
+                    '<div class="dca-review-completeness">' +
+                        '<div class="dca-review-completeness-text">' +
+                            '<span class="dca-review-completeness-head">📋 ยังไม่ได้กรอก ' + emptyCount + ' ช่อง</span>' +
+                            '<span class="dca-review-completeness-sub">' + esc(secList) + '</span>' +
+                        '</div>' +
+                        '<button type="button" class="dca-review-fill-btn" onclick="dcaAiFillEmptyFields()">🤖 เติมช่องว่างด้วย AI</button>' +
+                    '</div>'
+                );
+            }
+
             panel.innerHTML = parts.join('');
             panel.style.display = 'block';
 
