@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.70</title>
+    <title>Nika V95.71</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -32406,6 +32406,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // doc for the intern Codex credit line (mirror of dcaApproveDraft).
                     if (draftDoc && draftDoc.submittedByName) payload.submittedByName = draftDoc.submittedByName;
                     if (draftDoc && draftDoc.submittedByPictureUrl) payload.submittedByPictureUrl = draftDoc.submittedByPictureUrl;
+                    // V95.71: carry the LINE user id so the contributor chip can resolve
+                    // the LIVE profile from usersData (contributors[] holds the Auth uid).
+                    if (draftDoc && draftDoc.submittedByUserId) payload.submittedByUserId = draftDoc.submittedByUserId;
                     const batch = db.batch();
                     const newRef = db.collection('drug_codex').doc();
                     batch.set(newRef, Object.assign({ createdAt: nowTs }, payload));
@@ -32470,6 +32473,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // the intern Drug Codex can credit "เพิ่มข้อมูลโดย <name>".
             if (draft.submittedByName) payload.submittedByName = draft.submittedByName;
             if (draft.submittedByPictureUrl) payload.submittedByPictureUrl = draft.submittedByPictureUrl;
+            // V95.71: carry the LINE user id for live usersData resolution in the chip.
+            if (draft.submittedByUserId) payload.submittedByUserId = draft.submittedByUserId;
 
             try {
                 const batch = db.batch();
@@ -32605,14 +32610,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 return `<span class="dca-contributor-chip dca-contrib-admin" title="${dcaEscapeHtml(id)}">👤 admin</span>`;
             }
             if (role === 'intern') {
-                // V95.70: prefer the intern submitter's name + picture stored ON THE DOC
-                // (submittedByName / submittedByPictureUrl, seeded V95.45) — reliable
-                // regardless of whether usersData is loaded or the contributor uid matches
-                // a users doc id. Fall back to the usersData cache, then the short-uid label.
-                const u = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === id);
+                // V95.71: the contributor id is the intern's Firebase AUTH uid, which
+                // never matches usersData (keyed by LINE user id). Resolve usersData via
+                // doc.submittedByUserId (the LINE id carried onto the doc at approval) so
+                // the LIVE profile picture/name shows — freshest if the intern changed it.
+                // Fall back to the name/picture snapshot stored at submit time
+                // (submittedByName / submittedByPictureUrl, V95.45), then the short label.
                 const short = id.length > 4 ? id.slice(-4) : id;
-                const pic = (doc && doc.submittedByPictureUrl) || (u && u.pictureUrl) || '';
-                const name = (doc && doc.submittedByName) || (u && u.displayName) || ('intern (' + short + ')');
+                const lineId = (doc && doc.submittedByUserId) || id;
+                const u = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === lineId);
+                const pic = (u && u.pictureUrl) || (doc && doc.submittedByPictureUrl) || '';
+                const name = (u && u.displayName) || (doc && doc.submittedByName) || ('intern (' + short + ')');
                 const avatar = pic
                     ? `<img class="dca-contrib-avatar" src="${dcaEscapeHtml(pic)}" alt="" onerror="this.outerHTML='📝'">`
                     : '📝';
@@ -34767,6 +34775,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // doc for the intern Codex credit line (mirror of dxaApproveDraft).
                     if (draftDoc && draftDoc.submittedByName) payload.submittedByName = draftDoc.submittedByName;
                     if (draftDoc && draftDoc.submittedByPictureUrl) payload.submittedByPictureUrl = draftDoc.submittedByPictureUrl;
+                    // V95.71: carry the LINE user id for live usersData resolution in the chip.
+                    if (draftDoc && draftDoc.submittedByUserId) payload.submittedByUserId = draftDoc.submittedByUserId;
                     const batch = db.batch();
                     const newRef = db.collection('disease_codex').doc();
                     batch.set(newRef, Object.assign({ createdAt: nowTs }, payload));
@@ -35634,6 +35644,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // contributors[] only holds the UID; these fields hold the friendly name.
             if (draft.submittedByName) payload.submittedByName = draft.submittedByName;
             if (draft.submittedByPictureUrl) payload.submittedByPictureUrl = draft.submittedByPictureUrl;
+            // V95.71: carry the LINE user id for live usersData resolution in the chip.
+            if (draft.submittedByUserId) payload.submittedByUserId = draft.submittedByUserId;
 
             try {
                 const batch = db.batch();
@@ -35757,13 +35769,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 return `<span class="dca-contributor-chip dca-contrib-admin" title="${dxaEscapeHtml(id)}">👤 admin</span>`;
             }
             if (role === 'intern') {
-                // V95.70: prefer the intern submitter's name + picture stored ON THE DOC
-                // (submittedByName / submittedByPictureUrl, seeded V95.45). Fall back to
-                // the usersData cache, then the short-uid label.
-                const u = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === id);
+                // V95.71: contributor id = intern Firebase AUTH uid (never matches
+                // usersData, keyed by LINE user id). Resolve usersData via the LINE id
+                // carried on the doc (submittedByUserId) for the LIVE profile; fall back
+                // to the submit-time name/picture snapshot, then the short-uid label.
                 const short = id.length > 4 ? id.slice(-4) : id;
-                const pic = (doc && doc.submittedByPictureUrl) || (u && u.pictureUrl) || '';
-                const name = (doc && doc.submittedByName) || (u && u.displayName) || ('intern (' + short + ')');
+                const lineId = (doc && doc.submittedByUserId) || id;
+                const u = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === lineId);
+                const pic = (u && u.pictureUrl) || (doc && doc.submittedByPictureUrl) || '';
+                const name = (u && u.displayName) || (doc && doc.submittedByName) || ('intern (' + short + ')');
                 const avatar = pic
                     ? `<img class="dca-contrib-avatar" src="${dxaEscapeHtml(pic)}" alt="" onerror="this.outerHTML='📝'">`
                     : '📝';
