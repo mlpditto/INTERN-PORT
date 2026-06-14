@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.64</title>
+    <title>Nika V95.65</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1805,6 +1805,33 @@
         .dca-form-tab-badge.full  { display: none; }
         .dca-form-tab-badge.empty { background: #cbd5e1; }
         .dca-form-tab-badge.error { background: #ef4444; }
+        /* V95.65: per-tab verify tracker — for AI-drafted forms only. A filled
+           section starts 'unverified' (amber ?) and flips 'verified' (green ✓)
+           when the admin confirms it via the verify strip. Both override the
+           hidden 'full' so AI content can't masquerade as already-checked. */
+        .dca-form-tab-badge.unverified { display: inline-flex; background: #f59e0b; }
+        .dca-form-tab-badge.verified   { display: inline-flex; background: #22c55e; }
+        /* V95.65: verify strip under the tab rail — reflects the ACTIVE tab's
+           verify state and toggles it. Shown only when the form is AI-drafted. */
+        .dca-verify-strip {
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+            margin: 8px 0 10px; padding: 7px 12px;
+            background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
+            font-size: 0.82em; color: #92400e; font-weight: 700;
+        }
+        .dca-verify-strip.done { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+        .dca-verify-strip-text { flex: 1; min-width: 160px; }
+        .dca-verify-toggle {
+            padding: 4px 12px; border-radius: 7px; cursor: pointer;
+            border: 1px solid #f59e0b; background: #f59e0b; color: #fff;
+            font-weight: 800; font-size: 0.95em;
+            transition: background 0.12s, color 0.12s, border-color 0.12s;
+        }
+        .dca-verify-toggle:hover { background: #d97706; border-color: #d97706; }
+        .dca-verify-strip.done .dca-verify-toggle {
+            background: #fff; color: #065f46; border-color: #6ee7b7;
+        }
+        .dca-verify-strip.done .dca-verify-toggle:hover { background: #ecfdf5; }
         .dca-form-section[data-tab] { display: none; }
         .dca-form-section[data-tab].active-tab { display: block; }
         /* V94.43 Phase 2: section accent borders + active-tab pill colors.
@@ -13136,6 +13163,17 @@
                     <button type="button" class="dca-form-tab-btn"        data-section="refs"     onclick="dcaSwitchSection('refs')"     role="tab">🔗 Refs <span class="dca-form-tab-badge empty" data-section-badge="refs">○</span></button>
                 </div>
 
+                <!-- V95.65: per-tab verify strip — only shown for AI-drafted forms.
+                     Reflects the ACTIVE section's verify state; the toggle marks the
+                     current tab reviewed (dcaState.verified). Tab badges show ? (amber,
+                     unverified) → ✓ (green, verified) so "AI filled" no longer looks
+                     identical to "admin checked". Save warns if any filled tab is
+                     still unverified. -->
+                <div id="dca-verify-strip" class="dca-verify-strip" style="display:none;">
+                    <span class="dca-verify-strip-text">🤖 แท็บนี้ AI ร่างมา — ตรวจแล้วกดยืนยัน</span>
+                    <button type="button" id="dca-verify-toggle" class="dca-verify-toggle" onclick="dcaToggleVerifyCurrent()">ทำเครื่องหมายว่าตรวจแล้ว</button>
+                </div>
+
                 <!-- Section 1: Core identity -->
                 <div class="dca-form-section active-tab" data-tab="core">
                     <div class="dca-form-section-header"><span>📛 Core Identity</span><button type="button" class="dca-form-copy-btn" onclick="dcaCopyDrugAsMarkdown('core', this)" title="Copy this section as Markdown">📋</button></div>
@@ -13420,6 +13458,13 @@
                     <button type="button" class="dca-form-tab-btn"        data-section="dx"       onclick="dxaSwitchSection('dx')"       role="tab">🔬 Dx <span class="dca-form-tab-badge empty" data-section-badge="dx">○</span></button>
                     <button type="button" class="dca-form-tab-btn"        data-section="mgmt"     onclick="dxaSwitchSection('mgmt')"     role="tab">💊 Mgmt &amp; Edu <span class="dca-form-tab-badge empty" data-section-badge="mgmt">○</span></button>
                     <button type="button" class="dca-form-tab-btn"        data-section="refs"     onclick="dxaSwitchSection('refs')"     role="tab">🔗 Refs <span class="dca-form-tab-badge empty" data-section-badge="refs">○</span></button>
+                </div>
+
+                <!-- V95.65: per-tab verify strip — mirrors Drug Codex. Only shown for
+                     AI-drafted forms; reflects the ACTIVE section's verify state. -->
+                <div id="dxa-verify-strip" class="dca-verify-strip" style="display:none;">
+                    <span class="dca-verify-strip-text">🤖 แท็บนี้ AI ร่างมา — ตรวจแล้วกดยืนยัน</span>
+                    <button type="button" id="dxa-verify-toggle" class="dca-verify-toggle" onclick="dxaToggleVerifyCurrent()">ทำเครื่องหมายว่าตรวจแล้ว</button>
                 </div>
 
                 <!-- Section 1: Core identity -->
@@ -30578,6 +30623,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.querySelectorAll('.dca-form-section[data-tab]').forEach(sec => {
                 sec.classList.toggle('active-tab', sec.dataset.tab === sectionKey);
             });
+            // V95.65: keep the verify strip in sync with the now-active tab.
+            if (typeof dcaRefreshVerifyStrip === 'function') dcaRefreshVerifyStrip();
         }
 
         // V94.41: Copy drug entry (or one section) as Markdown to clipboard.
@@ -30677,8 +30724,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         // Recompute badge state for every section based on the current form values.
-        // Badge states: 'error' (required field empty), 'full' (any field filled), 'empty' (all empty).
+        // Base states: 'error' (required field empty), 'full' (any field filled,
+        // hidden by CSS), 'empty' (all empty).
+        // V95.65: when the form is AI-drafted (dcaState.formAiDrafted), a filled
+        // section is 'unverified' (amber ?) until the admin confirms it, then
+        // 'verified' (green ✓). Non-AI manual edits keep the old hidden-✓ behavior.
         function dcaUpdateSectionBadges() {
+            const aiMode = !!dcaState.formAiDrafted;
             DCA_SECTION_DEFS.forEach(def => {
                 const badge = document.querySelector(`.dca-form-tab-badge[data-section-badge="${def.key}"]`);
                 if (!badge) return;
@@ -30693,12 +30745,71 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 });
                 let state, glyph;
                 if (reqMissing) { state = 'error'; glyph = '!'; }
-                else if (anyFilled) { state = 'full'; glyph = '✓'; }
-                else { state = 'empty'; glyph = '○'; }
-                badge.classList.remove('empty', 'full', 'error');
+                else if (!anyFilled) { state = 'empty'; glyph = '○'; }
+                else if (aiMode && !dcaState.verified[def.key]) { state = 'unverified'; glyph = '?'; }
+                else if (aiMode) { state = 'verified'; glyph = '✓'; }
+                else { state = 'full'; glyph = '✓'; }
+                badge.classList.remove('empty', 'full', 'error', 'unverified', 'verified');
                 badge.classList.add(state);
                 badge.textContent = glyph;
             });
+        }
+
+        // V95.65: which section keys are filled but not yet admin-verified.
+        // Empty list when the form isn't AI-drafted (no verify gate then).
+        function dcaUnverifiedFilledSections() {
+            if (!dcaState.formAiDrafted) return [];
+            return DCA_SECTION_DEFS.filter(def => {
+                const anyFilled = def.fields.some(k => {
+                    const el = document.getElementById('dca-f-' + k);
+                    return el && String(el.value || '').trim().length > 0;
+                });
+                return anyFilled && !dcaState.verified[def.key];
+            }).map(def => def.key);
+        }
+
+        // V95.65: sync the verify strip to the currently active tab. Hidden unless
+        // the form is AI-drafted. An empty tab has nothing to verify.
+        function dcaRefreshVerifyStrip() {
+            const strip = document.getElementById('dca-verify-strip');
+            const toggle = document.getElementById('dca-verify-toggle');
+            if (!strip || !toggle) return;
+            const txt = strip.querySelector('.dca-verify-strip-text');
+            if (!dcaState.formAiDrafted) { strip.style.display = 'none'; return; }
+            const activeBtn = document.querySelector('#dca-form-tabs .dca-form-tab-btn.active');
+            const key = activeBtn ? activeBtn.dataset.section : 'core';
+            const def = DCA_SECTION_DEFS.find(d => d.key === key);
+            const anyFilled = def && def.fields.some(k => {
+                const el = document.getElementById('dca-f-' + k);
+                return el && String(el.value || '').trim().length > 0;
+            });
+            strip.style.display = 'flex';
+            if (!anyFilled) {
+                strip.classList.remove('done');
+                if (txt) txt.textContent = 'ℹ️ แท็บนี้ยังว่าง — ไม่มีอะไรต้องตรวจ';
+                toggle.style.display = 'none';
+                return;
+            }
+            toggle.style.display = '';
+            const done = !!dcaState.verified[key];
+            strip.classList.toggle('done', done);
+            if (done) {
+                if (txt) txt.textContent = '✅ ตรวจแท็บนี้แล้ว';
+                toggle.textContent = 'ยกเลิกการตรวจ';
+            } else {
+                if (txt) txt.textContent = '🤖 แท็บนี้ AI ร่างมา — ตรวจแล้วกดยืนยัน';
+                toggle.textContent = 'ทำเครื่องหมายว่าตรวจแล้ว';
+            }
+        }
+
+        // V95.65: toggle the active tab's verified flag, then repaint badge + strip.
+        function dcaToggleVerifyCurrent() {
+            const activeBtn = document.querySelector('#dca-form-tabs .dca-form-tab-btn.active');
+            const key = activeBtn ? activeBtn.dataset.section : null;
+            if (!key) return;
+            dcaState.verified[key] = !dcaState.verified[key];
+            dcaUpdateSectionBadges();
+            dcaRefreshVerifyStrip();
         }
 
         var dcaState = {
@@ -30710,6 +30821,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             codex: [],             // sorted array of drug_codex docs
             drafts: [],            // pending drug_codex_drafts docs
             pkVisual: null,        // V95.05: saved pkVisual on the current form's drug (for the in-form preview)
+            formAiDrafted: false,  // V95.65: current form opened as an AI draft (drives the per-tab verify tracker)
+            verified: {},          // V95.65: section keys the admin confirmed this session ({core:true, ...}); reset per form open
             searchTerm: ''
         };
 
@@ -31796,6 +31909,25 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         function dcaFillForm(data) {
+            // V95.65: bind once — editing any field inside a verified AI-drafted
+            // section flips it back to unverified so the green ✓ never lies.
+            if (!dcaState._verifyInputBound) {
+                const formView = document.getElementById('dca-view-form');
+                if (formView) {
+                    formView.addEventListener('input', (e) => {
+                        if (!dcaState.formAiDrafted) return;
+                        const sec = e.target.closest && e.target.closest('.dca-form-section[data-tab]');
+                        if (!sec) return;
+                        const key = sec.dataset.tab;
+                        if (dcaState.verified[key]) {
+                            dcaState.verified[key] = false;
+                            dcaUpdateSectionBadges();
+                            dcaRefreshVerifyStrip();
+                        }
+                    });
+                    dcaState._verifyInputBound = true;
+                }
+            }
             // V94.70: clear stale NDI brand-lookup results so chips from a
             // previous drug don't linger when a new form opens (static DOM —
             // see feedback_static_modal_state_leak).
@@ -31882,8 +32014,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // Clear error
             const err = document.getElementById('dca-form-error');
             if (err) { err.style.display = 'none'; err.textContent = ''; }
+            // V95.65: reset the per-tab verify tracker for this fresh form fill.
+            // formAiDrafted gates the whole tracker; verified starts empty so the
+            // admin must re-confirm each AI-filled tab every time the form opens.
+            dcaState.formAiDrafted = showAiBadge;
+            dcaState.verified = {};
             // V94.38: refresh tab badges after form re-fill (Add/Edit/Review/AI auto-draft/AI fill empty all flow through here)
             dcaUpdateSectionBadges();
+            // V95.65: paint the verify strip for the active tab.
+            dcaRefreshVerifyStrip();
         }
 
         function dcaCollectForm() {
@@ -32056,6 +32195,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (dup) {
                 if (errEl) { errEl.style.display = 'block'; errEl.textContent = `A drug with name "${payload.genericName}" already exists (id ${dup._id}). Edit the existing entry instead.`; }
                 return;
+            }
+
+            // V95.65: verify gate — for AI-drafted forms, warn before saving if any
+            // filled tab is still unverified. Admin can override; cancelling jumps to
+            // the first unchecked tab so they can review it.
+            if (dcaState.formAiDrafted) {
+                const unchecked = dcaUnverifiedFilledSections();
+                if (unchecked.length) {
+                    const names = unchecked.map(k => DCA_SECTION_TITLES[k] || k).join('\n• ');
+                    const ok = confirm(`ยังมี ${unchecked.length} แท็บที่ยังไม่ได้ตรวจ:\n• ${names}\n\nบันทึกเลยหรือไม่?`);
+                    if (!ok) { dcaSwitchSection(unchecked[0]); return; }
+                }
             }
 
             const saveBtn = document.getElementById('dca-form-save-btn');
@@ -33096,6 +33247,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             relatedDrugs: [],    // V94.87 Phase 6: [{id,name}] linked drugs for the current form
             drugList: [],        // V94.87 Phase 6: [{id,name}] published drug_codex for the picker (loaded on open)
             pathoVisual: null,   // V94.98: the saved pathoVisual on the current form's disease (for the in-form preview)
+            formAiDrafted: false, // V95.65: current form opened as an AI draft (drives the per-tab verify tracker)
+            verified: {},         // V95.65: section keys the admin confirmed this session; reset per form open
             searchTerm: ''
         };
 
@@ -33324,6 +33477,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         draftData[key] = v == null ? '' : String(v);
                     }
                 });
+                // V95.65: mark in-memory draft as AI-drafted so the per-tab verify
+                // tracker engages (stripped on save — payload.aiDrafted=false).
+                draftData.aiDrafted = true;
+                draftData.aiDraftedModel = (resp && resp.model) ? resp.model : selectedModel;
 
                 // Hide input row + open form view in Add mode with AI marker.
                 dxaAutoDraftCancel();
@@ -33573,12 +33730,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             modal.querySelectorAll('.dca-form-section[data-tab]').forEach(sec => {
                 sec.classList.toggle('active-tab', sec.dataset.tab === sectionKey);
             });
+            // V95.65: keep the verify strip in sync with the now-active tab.
+            if (typeof dxaRefreshVerifyStrip === 'function') dxaRefreshVerifyStrip();
         }
 
         // Recompute every section badge from current form values.
+        // V95.65: AI-drafted forms get the verify tracker (unverified ? → verified ✓);
+        // manual edits keep the old hidden-✓ behavior. Mirrors dcaUpdateSectionBadges.
         function dxaUpdateSectionBadges() {
             const modal = document.getElementById('diseaseCodexAdminModal');
             if (!modal) return;
+            const aiMode = !!dxaState.formAiDrafted;
             DXA_SECTION_DEFS.forEach(def => {
                 const badge = modal.querySelector(`.dca-form-tab-badge[data-section-badge="${def.key}"]`);
                 if (!badge) return;
@@ -33593,12 +33755,69 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 });
                 let state, glyph;
                 if (reqMissing) { state = 'error'; glyph = '!'; }
-                else if (anyFilled) { state = 'full'; glyph = '✓'; }
-                else { state = 'empty'; glyph = '○'; }
-                badge.classList.remove('empty', 'full', 'error');
+                else if (!anyFilled) { state = 'empty'; glyph = '○'; }
+                else if (aiMode && !dxaState.verified[def.key]) { state = 'unverified'; glyph = '?'; }
+                else if (aiMode) { state = 'verified'; glyph = '✓'; }
+                else { state = 'full'; glyph = '✓'; }
+                badge.classList.remove('empty', 'full', 'error', 'unverified', 'verified');
                 badge.classList.add(state);
                 badge.textContent = glyph;
             });
+        }
+
+        // V95.65: which section keys are filled but not yet admin-verified.
+        function dxaUnverifiedFilledSections() {
+            if (!dxaState.formAiDrafted) return [];
+            return DXA_SECTION_DEFS.filter(def => {
+                const anyFilled = def.fields.some(k => {
+                    const el = document.getElementById('dxa-f-' + k);
+                    return el && String(el.value || '').trim().length > 0;
+                });
+                return anyFilled && !dxaState.verified[def.key];
+            }).map(def => def.key);
+        }
+
+        // V95.65: sync the verify strip to the active tab (hidden unless AI-drafted).
+        function dxaRefreshVerifyStrip() {
+            const strip = document.getElementById('dxa-verify-strip');
+            const toggle = document.getElementById('dxa-verify-toggle');
+            if (!strip || !toggle) return;
+            const txt = strip.querySelector('.dca-verify-strip-text');
+            if (!dxaState.formAiDrafted) { strip.style.display = 'none'; return; }
+            const activeBtn = document.querySelector('#dxa-form-tabs .dca-form-tab-btn.active');
+            const key = activeBtn ? activeBtn.dataset.section : 'core';
+            const def = DXA_SECTION_DEFS.find(d => d.key === key);
+            const anyFilled = def && def.fields.some(k => {
+                const el = document.getElementById('dxa-f-' + k);
+                return el && String(el.value || '').trim().length > 0;
+            });
+            strip.style.display = 'flex';
+            if (!anyFilled) {
+                strip.classList.remove('done');
+                if (txt) txt.textContent = 'ℹ️ แท็บนี้ยังว่าง — ไม่มีอะไรต้องตรวจ';
+                toggle.style.display = 'none';
+                return;
+            }
+            toggle.style.display = '';
+            const done = !!dxaState.verified[key];
+            strip.classList.toggle('done', done);
+            if (done) {
+                if (txt) txt.textContent = '✅ ตรวจแท็บนี้แล้ว';
+                toggle.textContent = 'ยกเลิกการตรวจ';
+            } else {
+                if (txt) txt.textContent = '🤖 แท็บนี้ AI ร่างมา — ตรวจแล้วกดยืนยัน';
+                toggle.textContent = 'ทำเครื่องหมายว่าตรวจแล้ว';
+            }
+        }
+
+        // V95.65: toggle the active tab's verified flag, then repaint badge + strip.
+        function dxaToggleVerifyCurrent() {
+            const activeBtn = document.querySelector('#dxa-form-tabs .dca-form-tab-btn.active');
+            const key = activeBtn ? activeBtn.dataset.section : null;
+            if (!key) return;
+            dxaState.verified[key] = !dxaState.verified[key];
+            dxaUpdateSectionBadges();
+            dxaRefreshVerifyStrip();
         }
 
         // Copy disease entry (or one section) as Markdown from current form state.
@@ -33796,6 +34015,25 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         function dxaFillForm(data) {
+            // V95.65: bind once — editing any field in a verified AI-drafted section
+            // flips it back to unverified so the green ✓ never lies.
+            if (!dxaState._verifyInputBound) {
+                const formView = document.getElementById('dxa-view-form');
+                if (formView) {
+                    formView.addEventListener('input', (e) => {
+                        if (!dxaState.formAiDrafted) return;
+                        const sec = e.target.closest && e.target.closest('.dca-form-section[data-tab]');
+                        if (!sec) return;
+                        const key = sec.dataset.tab;
+                        if (dxaState.verified[key]) {
+                            dxaState.verified[key] = false;
+                            dxaUpdateSectionBadges();
+                            dxaRefreshVerifyStrip();
+                        }
+                    });
+                    dxaState._verifyInputBound = true;
+                }
+            }
             // V94.96: clear stale AI ICD-10 suggestions so chips from a previous
             // disease don't linger on a fresh form (static DOM — see
             // feedback_static_modal_state_leak).
@@ -33853,7 +34091,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (idEl) idEl.textContent = (data && data._id) ? `doc: ${data._id}` : '';
             const err = document.getElementById('dxa-form-error');
             if (err) { err.style.display = 'none'; err.textContent = ''; }
+            // V95.65: reset the per-tab verify tracker for this fresh form fill.
+            dxaState.formAiDrafted = !!(data && data.aiDrafted);
+            dxaState.verified = {};
             dxaUpdateSectionBadges();
+            dxaRefreshVerifyStrip();
         }
 
         // V94.98: render (or hide) the in-form preview of the disease's saved
@@ -34036,6 +34278,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (dup) {
                 if (errEl) { errEl.style.display = 'block'; errEl.textContent = `A disease named "${payload.diseaseName}" already exists (id ${dup._id}). Edit the existing entry instead.`; }
                 return;
+            }
+
+            // V95.65: verify gate — for AI-drafted forms, warn before saving if any
+            // filled tab is still unverified. Cancel jumps to the first unchecked tab.
+            if (dxaState.formAiDrafted) {
+                const unchecked = dxaUnverifiedFilledSections();
+                if (unchecked.length) {
+                    const names = unchecked.map(k => DXA_SECTION_TITLES[k] || k).join('\n• ');
+                    const ok = confirm(`ยังมี ${unchecked.length} แท็บที่ยังไม่ได้ตรวจ:\n• ${names}\n\nบันทึกเลยหรือไม่?`);
+                    if (!ok) { dxaSwitchSection(unchecked[0]); return; }
+                }
             }
 
             const saveBtn = document.getElementById('dxa-form-save-btn');
