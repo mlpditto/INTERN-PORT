@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.85)</title>
+    <title>Internship Portfolio (V95.86)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -16536,7 +16536,7 @@ async function archiveDoneCard(cardId) {
                             icon: 'fa-brain',
                             color: '#8e44ad',
                             link: null,
-                            detail: `Score: ${sub.score}`
+                            detail: '' // V95.86: score already shown as the big right-side number — don't repeat it here
                         };
                     
                     case 'quest':
@@ -16584,7 +16584,10 @@ async function archiveDoneCard(cardId) {
                     ? `<span class="badge" style="background:#fff3cd; color:#856404; font-size:0.75em;">⏳ รอตรวจ</span>`
                     : `<span class="badge" style="background:#d4edda; color:#155724; font-size:0.75em;">✅ ตรวจแล้ว</span>`;
 
-                const hasScore = !(isNaN(item.score) || item.score === 0);
+                // V95.86: quizzes are auto-scored, so 0 is a real score (show 0.00),
+                // not a "not yet graded" dash. Case/Work keep the dash for an unscored 0.
+                const isQuizItem = !!(item._raw && item._raw.submissionType === 'quiz');
+                const hasScore = isQuizItem ? !isNaN(item.score) : !(isNaN(item.score) || item.score === 0);
                 const scoreHtml = hasScore
                     ? `<div style="font-weight:800; color:${item.color}; font-size:1.15em;">${item.score.toFixed(2)}</div>`
                     : `<div style="font-weight:700; color:#cbd5e1; font-size:1em;" title="ยังไม่ให้คะแนน">–</div>`;
@@ -16630,9 +16633,9 @@ async function archiveDoneCard(cardId) {
                                 <div class="lang-no-toggle" style="font-weight:700; font-size:1em; color:#2d3436; margin-bottom:4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;" title="${escapeUnifiedHtml(String(item.title).replace(/<[^>]*>/g,''))}">
                                     ${item.title}${newChip}
                                 </div>
-                                <div class="lang-no-toggle" style="font-size:0.8em; color:#64748b; margin-bottom:4px;">
+                                ${item.detail ? `<div class="lang-no-toggle" style="font-size:0.8em; color:#64748b; margin-bottom:4px;">
                                     ${item.detail}
-                                </div>
+                                </div>` : ''}
                                 <div class="lang-no-toggle" style="font-size:0.75em; color:#b2bec3; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                                     <span>${date}</span>
                                     <span style="width:3px; height:3px; background:#dfe6e9; border-radius:50%;"></span>
