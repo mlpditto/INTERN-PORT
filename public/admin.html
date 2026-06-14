@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.65</title>
+    <title>Nika V95.66</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1296,6 +1296,65 @@
         }
         .dca-ai-fill-btn:hover { background: linear-gradient(135deg, #d97706, #b45309); }
         .dca-ai-fill-btn:disabled { background: #cbd5e1; cursor: wait; }
+        /* V95.66: AI Review button — blue to read as "inspect", distinct from the
+           amber "fill" button it sits beside. */
+        .dca-ai-review-btn {
+            padding: 4px 10px; border-radius: 8px; border: none;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: #fff; font-weight: 700; cursor: pointer; font-size: 0.76em;
+            white-space: nowrap;
+        }
+        .dca-ai-review-btn:hover { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+        .dca-ai-review-btn:disabled { background: #cbd5e1; cursor: wait; }
+        /* V95.66: AI Review findings panel. Advisory list grouped by section,
+           each finding tagged with a severity chip. Rendered by
+           dcaRenderReviewResults; the same markup is reused by the disease
+           mirror via the shared .dca-* classes. */
+        .dca-review-results {
+            margin: 8px 0 10px; padding: 10px 12px;
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+        }
+        .dca-review-results-head {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            font-weight: 800; font-size: 0.84em; color: #1e293b; margin-bottom: 8px;
+        }
+        .dca-review-results-head .dca-review-dismiss {
+            margin-left: auto; cursor: pointer; border: 1px solid #e2e8f0;
+            background: #fff; border-radius: 6px; padding: 2px 8px;
+            font-size: 0.9em; color: #64748b;
+        }
+        .dca-review-disclaimer { font-size: 0.74em; color: #94a3b8; font-weight: 600; }
+        .dca-review-overall {
+            font-size: 0.8em; color: #475569; margin-bottom: 8px;
+            padding: 6px 10px; background: #fff; border-radius: 8px; border: 1px solid #eef2f7;
+            white-space: pre-wrap;
+        }
+        .dca-review-group { margin-bottom: 8px; }
+        .dca-review-group-title {
+            font-size: 0.78em; font-weight: 800; color: #1e40af;
+            cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+        }
+        .dca-review-group-title:hover { text-decoration: underline; }
+        .dca-review-finding {
+            display: flex; gap: 8px; align-items: flex-start;
+            padding: 6px 8px; margin-top: 4px;
+            background: #fff; border: 1px solid #eef2f7; border-radius: 8px;
+            font-size: 0.8em; color: #334155;
+        }
+        .dca-review-sev {
+            flex: none; font-size: 0.72em; font-weight: 800; border-radius: 999px;
+            padding: 1px 8px; white-space: nowrap; align-self: center;
+        }
+        .dca-review-sev.safety      { background: #fee2e2; color: #b91c1c; }
+        .dca-review-sev.factual     { background: #ffedd5; color: #c2410c; }
+        .dca-review-sev.consistency { background: #fef9c3; color: #a16207; }
+        .dca-review-sev.suggestion  { background: #dbeafe; color: #1d4ed8; }
+        .dca-review-finding-body { flex: 1; }
+        .dca-review-finding-field { font-weight: 700; color: #0f172a; }
+        .dca-review-finding-fix { color: #475569; margin-top: 2px; }
+        .dca-review-empty {
+            font-size: 0.82em; color: #047857; font-weight: 700;
+        }
         .dca-ai-error {
             margin-top: 10px; padding: 8px 12px; border-radius: 8px;
             background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
@@ -13122,6 +13181,13 @@
                                 onclick="dcaAiFillEmptyFields()" title="Use AI to fill the fields intern left empty, using their data as seed">
                             🤖 AI fill empty fields
                         </button>
+                        <!-- V95.66: AI Review — the complement to AI fill. Checks the fields
+                             that ARE filled (intern/AI) for factual / safety / consistency
+                             issues. Advisory only: never edits fields, never auto-verifies. -->
+                        <button type="button" id="dca-form-ai-review-btn" class="dca-ai-review-btn" style="display:none;"
+                                onclick="dcaAiReviewDraft()" title="ให้ AI ตรวจข้อมูลที่กรอกแล้ว — หาจุด factual / safety / consistency (เสนอเท่านั้น admin ตัดสินเอง · อ้างความรู้โมเดล ไม่ได้เปิดแหล่งจริง)">
+                            🔍 AI Review
+                        </button>
                         <!-- V94.41: Copy whole drug entry as Markdown to clipboard. Uses current form
                              values (dcaCollectForm) so admin can copy WIP state before saving. -->
                         <button type="button" id="dca-form-copy-btn" class="dca-form-copy-btn"
@@ -13173,6 +13239,11 @@
                     <span class="dca-verify-strip-text">🤖 แท็บนี้ AI ร่างมา — ตรวจแล้วกดยืนยัน</span>
                     <button type="button" id="dca-verify-toggle" class="dca-verify-toggle" onclick="dcaToggleVerifyCurrent()">ทำเครื่องหมายว่าตรวจแล้ว</button>
                 </div>
+
+                <!-- V95.66: AI Review findings panel — rendered by dcaRenderReviewResults.
+                     Advisory list grouped by section; each row jumps to its tab. Cleared
+                     on form open (dcaFillForm). -->
+                <div id="dca-review-results" class="dca-review-results" style="display:none;"></div>
 
                 <!-- Section 1: Core identity -->
                 <div class="dca-form-section active-tab" data-tab="core">
@@ -30823,6 +30894,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             pkVisual: null,        // V95.05: saved pkVisual on the current form's drug (for the in-form preview)
             formAiDrafted: false,  // V95.65: current form opened as an AI draft (drives the per-tab verify tracker)
             verified: {},          // V95.65: section keys the admin confirmed this session ({core:true, ...}); reset per form open
+            reviewFindings: {},    // V95.66: AI Review results keyed by section ({clinical:[...]}); reset per form open
             searchTerm: ''
         };
 
@@ -31934,6 +32006,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const ndiRes = document.getElementById('dca-ndi-results');
             if (ndiRes) { ndiRes.style.display = 'none'; ndiRes.innerHTML = ''; ndiRes.classList.remove('panel'); }
             dcaNdiLast = null;
+            // V95.66: clear stale AI Review findings from a previous drug (static DOM).
+            if (typeof dcaDismissReviewResults === 'function') dcaDismissReviewResults();
             // V95.05: seed + render the saved PK visual preview so admins can see
             // an attached image (and confirm a prior Save worked).
             dcaState.pkVisual = (data && data.pkVisual && data.pkVisual.downloadUrl) ? data.pkVisual : null;
@@ -32154,10 +32228,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function dcaShowAiFillButton() {
             const btn = document.getElementById('dca-form-ai-fill-btn');
             if (btn) { btn.style.display = 'inline-flex'; btn.disabled = false; btn.textContent = '🤖 AI fill empty fields'; }
+            // V95.66: AI Review rides alongside AI fill (Edit + Review-draft) so the
+            // two stay in sync without touching each call site.
+            const rbtn = document.getElementById('dca-form-ai-review-btn');
+            if (rbtn) { rbtn.style.display = 'inline-flex'; rbtn.disabled = false; rbtn.textContent = '🔍 AI Review'; }
         }
         function dcaHideAiFillButton() {
             const btn = document.getElementById('dca-form-ai-fill-btn');
             if (btn) { btn.style.display = 'none'; btn.disabled = false; btn.textContent = '🤖 AI fill empty fields'; }
+            const rbtn = document.getElementById('dca-form-ai-review-btn');
+            if (rbtn) { rbtn.style.display = 'none'; rbtn.disabled = false; rbtn.textContent = '🔍 AI Review'; }
         }
 
         async function dcaDelete(drugId, btn) {
@@ -33046,6 +33126,241 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             } finally {
                 if (btn) { btn.disabled = false; btn.textContent = '🤖 AI fill empty fields'; }
             }
+        }
+
+        // ── V95.66: AI Review ──────────────────────────────────────────────────
+        // The complement to AI fill: checks the fields that ARE filled (by an intern
+        // or AI) for issues, instead of filling empty ones. ADVISORY ONLY — it never
+        // edits a field and never marks a tab verified. Findings are model-knowledge
+        // opinions (no live source fetch), so the UI says so and the prompt is told
+        // to flag only what it's confident about (keeps false-positives down).
+        const DCA_REVIEW_SEVERITIES = ['safety', 'factual', 'consistency', 'suggestion'];
+        const DCA_REVIEW_SEV_LABEL = {
+            safety: '🚨 Safety', factual: '⚠️ Factual',
+            consistency: '🔧 Consistency', suggestion: '💡 Suggestion'
+        };
+
+        // field key → section key, from the single source of truth (DCA_SECTION_DEFS).
+        function dcaSectionOfField(field) {
+            const def = DCA_SECTION_DEFS.find(d => d.fields.includes(field));
+            return def ? def.key : null;
+        }
+
+        function dcaBuildReviewPrompt(data, filledLines, internContext) {
+            return [
+                'ROLE: senior clinical pharmacist auditing a DRAFT drug monograph for an internal medical-intern study tool (Thailand). The draft was written by a junior intern (or an AI) and needs your review before publishing.',
+                '',
+                'TASK: review ONLY the fields provided below (they are the ones that have content). Find concrete problems. Do NOT rewrite the content. Do NOT comment on fields that are absent.',
+                '',
+                'FORMAT CONTRACT — RESPOND WITH PURE JSON ONLY.',
+                'NO MARKDOWN. NO PROSE OUTSIDE JSON. NO ```json``` FENCE.',
+                'Shape:',
+                '{',
+                '  "findings": [',
+                '    {',
+                '      "field":      "<<<the exact field key from the list, e.g. dosing>>>",',
+                '      "severity":   "<<<one of: safety | factual | consistency | suggestion>>>",',
+                '      "issue":      "<<<what is wrong or risky · one sentence · medical English>>>",',
+                '      "suggestion": "<<<what to check or correct · one sentence · medical English · empty string if none>>>"',
+                '    }',
+                '  ],',
+                '  "overallNote": "<<<one-line overall impression · empty string if nothing notable>>>"',
+                '}',
+                '',
+                'SEVERITY MEANING:',
+                '- "safety": missing/wrong contraindication, missing black-box warning, dangerous dose, omitted major interaction — anything that could harm a patient.',
+                '- "factual": a value that is likely incorrect (wrong ATC code, wrong half-life, wrong class, wrong mechanism).',
+                '- "consistency": fields that contradict each other (e.g. Class vs ATC code, renal excretion stated but no renal dose adjustment, mechanism vs side-effect profile).',
+                '- "suggestion": a non-critical improvement or an important point that is missing.',
+                '',
+                'CONFIDENCE RULE — STRICT (avoid false alarms):',
+                '- Flag a finding ONLY if you are reasonably confident it is a real problem. If you are unsure whether a value is correct, DO NOT flag it.',
+                '- You are reasoning from your own medical knowledge only — you cannot open the cited references. Do NOT claim a reference is wrong; at most suggest verifying it.',
+                '- If the draft looks clinically sound, return an EMPTY findings array. An empty array is a valid, good answer.',
+                '- Keep each "issue" / "suggestion" under 220 characters. Plain medical English.',
+                '',
+                'SELF-CHECK before responding:',
+                '1. Is the response valid JSON (no fence, no prose outside braces)?',
+                '2. Does every finding.field match one of the provided field keys exactly?',
+                '3. Is every finding.severity one of the four allowed values?',
+                '4. Did you avoid flagging anything you are not confident about?',
+                'If any check fails, fix it before sending.',
+                '',
+                'DRUG: <<<' + (data.genericName || '') + '>>>' + (data.class ? ' · class as drafted: ' + data.class : ''),
+                internContext ? ('INTERN CONTEXT / CITATION (for your awareness, do not audit it directly): <<<' + internContext + '>>>') : '',
+                '',
+                'FIELDS TO REVIEW:',
+                filledLines.join('\n')
+            ].filter(Boolean).join('\n');
+        }
+
+        async function dcaAiReviewDraft() {
+            const btn = document.getElementById('dca-form-ai-review-btn');
+            const errEl = document.getElementById('dca-form-error');
+            if (typeof window.callUniversalAI !== 'function') {
+                if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'AI core not loaded yet — try again in a moment.'; }
+                return;
+            }
+            const current = dcaCollectForm();
+            if (!current.genericName) {
+                if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Generic Name is required before AI Review.'; }
+                return;
+            }
+
+            // Build the list of FILLED fields (skip the name anchor — it's not audited).
+            const filledLines = [];
+            DCA_SECTION_DEFS.forEach(def => {
+                def.fields.forEach(key => {
+                    if (key === 'genericName') return;
+                    const v = current[key];
+                    let text = '';
+                    if (DCA_ARRAY_FIELDS[key]) text = Array.isArray(v) ? v.filter(Boolean).join(', ') : '';
+                    else text = (v == null ? '' : String(v).trim());
+                    if (!text) return;
+                    const label = (DCA_FIELD_LABELS[key] || key);
+                    const sec = (DCA_SECTION_TITLES[def.key] || def.key);
+                    filledLines.push(`- [${sec}] ${label} (key=${key}): ${text}`);
+                });
+            });
+            if (filledLines.length === 0) {
+                if (typeof showToast === 'function') showToast('No filled fields to review yet.');
+                else if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'No filled fields to review yet.'; }
+                return;
+            }
+
+            // Intern citation/context (if the banner is showing) — awareness only.
+            let internContext = '';
+            const banner = document.getElementById('dca-form-intern-notes-banner');
+            if (banner && banner.style.display !== 'none') {
+                internContext = String(banner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 500);
+            }
+
+            let selectedModel = DCA_AI_FALLBACK_MODEL;
+            try { const saved = localStorage.getItem(DCA_AI_LS_KEY); if (saved) selectedModel = saved; } catch (_) { /* ignore */ }
+
+            if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ Reviewing…'; }
+
+            const prompt = dcaBuildReviewPrompt(current, filledLines, internContext);
+            try {
+                const resp = await window.callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768 });
+                const rawText = (resp && resp.text) ? resp.text : (typeof resp === 'string' ? resp : '');
+                if (!rawText) throw new Error('Empty response from AI');
+                let parsed = dcaParseAutoDraftResponse(rawText);
+                if (!parsed) {
+                    const resp2 = await window.callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768 });
+                    const rawText2 = (resp2 && resp2.text) ? resp2.text : (typeof resp2 === 'string' ? resp2 : '');
+                    parsed = dcaParseAutoDraftResponse(rawText2);
+                    if (!parsed) {
+                        const preview = String(rawText2 || rawText || '').slice(0, 300);
+                        throw new Error('AI returned invalid JSON after retry.\nFirst 300 chars: ' + preview);
+                    }
+                }
+
+                // Normalize findings: keep only those naming a real field with an issue.
+                const raw = Array.isArray(parsed.findings) ? parsed.findings : [];
+                const findings = raw.map(f => {
+                    if (!f || typeof f !== 'object') return null;
+                    const field = String(f.field || '').trim();
+                    const issue = String(f.issue || '').trim();
+                    if (!field || !issue) return null;
+                    const section = dcaSectionOfField(field);
+                    if (!section) return null; // hallucinated field name → drop
+                    let severity = String(f.severity || '').trim().toLowerCase();
+                    if (!DCA_REVIEW_SEVERITIES.includes(severity)) severity = 'suggestion';
+                    return { field, section, severity, issue, suggestion: String(f.suggestion || '').trim() };
+                }).filter(Boolean);
+                const overallNote = String(parsed.overallNote || '').trim();
+
+                // Map section → findings for per-tab hinting.
+                dcaState.reviewFindings = {};
+                findings.forEach(f => { (dcaState.reviewFindings[f.section] = dcaState.reviewFindings[f.section] || []).push(f); });
+
+                // Running a review puts the form into verify mode so the admin can
+                // confirm each tab before publishing — the gap noted for intern drafts.
+                dcaState.formAiDrafted = true;
+                dcaUpdateSectionBadges();
+                dcaRefreshVerifyStrip();
+                dcaRenderReviewResults(findings, overallNote);
+
+                if (typeof showToast === 'function') {
+                    const ml = (typeof dcaFormatModelLabel === 'function') ? dcaFormatModelLabel((resp && resp.model) || selectedModel) : ((resp && resp.model) || selectedModel);
+                    showToast(findings.length
+                        ? `🔍 AI Review: ${findings.length} point${findings.length === 1 ? '' : 's'} to check (${ml})`
+                        : `🔍 AI Review: no clear issues found (${ml}) — still verify each tab`);
+                }
+            } catch (err) {
+                console.error('[drug-codex] AI review failed:', err);
+                if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'AI Review failed: ' + (err && err.message ? err.message : 'unknown error'); }
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = '🔍 AI Review'; }
+            }
+        }
+
+        // Render the advisory findings panel, grouped by section. Each group title and
+        // each finding row jumps to its tab. Also stamps a count on the tab badge title.
+        function dcaRenderReviewResults(findings, overallNote) {
+            const panel = document.getElementById('dca-review-results');
+            if (!panel) return;
+            const esc = (typeof dcaEscapeHtml === 'function') ? dcaEscapeHtml : (s => String(s));
+            const parts = [];
+            parts.push(
+                '<div class="dca-review-results-head">' +
+                    '<span>🔍 AI Review · ' + findings.length + ' finding' + (findings.length === 1 ? '' : 's') + '</span>' +
+                    '<span class="dca-review-disclaimer">advisory · model knowledge, not live sources</span>' +
+                    '<button type="button" class="dca-review-dismiss" onclick="dcaDismissReviewResults()" title="Dismiss">✕</button>' +
+                '</div>'
+            );
+            if (overallNote) parts.push('<div class="dca-review-overall">' + esc(overallNote) + '</div>');
+
+            if (findings.length === 0) {
+                parts.push('<div class="dca-review-empty">✅ AI ไม่พบปัญหาที่ชัดเจน — ยังต้องตรวจยืนยันแต่ละแท็บเอง</div>');
+            } else {
+                // Group in section order.
+                DCA_SECTION_DEFS.forEach(def => {
+                    const group = findings.filter(f => f.section === def.key);
+                    if (!group.length) return;
+                    const title = (DCA_SECTION_TITLES[def.key] || def.key);
+                    const rows = group.map(f => {
+                        const sevLabel = DCA_REVIEW_SEV_LABEL[f.severity] || f.severity;
+                        const fieldLabel = (DCA_FIELD_LABELS[f.field] || f.field);
+                        return '<div class="dca-review-finding">' +
+                            '<span class="dca-review-sev ' + f.severity + '">' + esc(sevLabel) + '</span>' +
+                            '<div class="dca-review-finding-body">' +
+                                '<span class="dca-review-finding-field">' + esc(fieldLabel) + '</span> — ' + esc(f.issue) +
+                                (f.suggestion ? '<div class="dca-review-finding-fix">→ ' + esc(f.suggestion) + '</div>' : '') +
+                            '</div>' +
+                        '</div>';
+                    }).join('');
+                    parts.push(
+                        '<div class="dca-review-group">' +
+                            '<span class="dca-review-group-title" onclick="dcaSwitchSection(\'' + def.key + '\')">' +
+                                esc(title) + ' (' + group.length + ') ↗' +
+                            '</span>' + rows +
+                        '</div>'
+                    );
+                });
+            }
+            panel.innerHTML = parts.join('');
+            panel.style.display = 'block';
+
+            // Stamp finding count on each section's tab badge title (cleared on open/dismiss).
+            DCA_SECTION_DEFS.forEach(def => {
+                const badge = document.querySelector(`.dca-form-tab-badge[data-section-badge="${def.key}"]`);
+                if (!badge) return;
+                const n = (dcaState.reviewFindings[def.key] || []).length;
+                badge.title = n ? ('🔍 AI: ' + n + ' point' + (n === 1 ? '' : 's') + ' to check') : '';
+            });
+        }
+
+        function dcaDismissReviewResults() {
+            const panel = document.getElementById('dca-review-results');
+            if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
+            dcaState.reviewFindings = {};
+            DCA_SECTION_DEFS.forEach(def => {
+                const badge = document.querySelector(`.dca-form-tab-badge[data-section-badge="${def.key}"]`);
+                if (badge) badge.title = '';
+            });
         }
 
         // Per-field content guide. Only used for keys AI is asked to fill (not the seed keys).
