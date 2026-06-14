@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.68</title>
+    <title>Nika V95.69</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6158,6 +6158,16 @@
                 <div id="chip-work" class="stat-badge" style="display:none; background:rgba(16, 185, 129, 0.08); color:#10b981; border:1px solid rgba(16, 185, 129, 0.15); padding:6px 14px; border-radius:14px; font-weight:800; font-size:0.85em; display:flex; align-items:center; gap:8px; cursor:pointer; transition:0.2s;" onmouseover="this.style.background='rgba(16, 185, 129, 0.15)'" onmouseout="this.style.background='rgba(16, 185, 129, 0.08)'" onclick="openQuickReview('work')">
                     <span style="font-size:1.2em;">💼</span> Work <span id="stat-work-count" style="margin-left:4px; opacity:0.8;">0</span>
                 </div>
+                <!-- V95.67: Codex draft chips. Intern-submitted Drug/Disease drafts live
+                     under the Poneglyph tab, so the default Dashboard never surfaced them.
+                     These chips appear only when pending drafts exist; click jumps into the
+                     codex's Pending Drafts view. Counts driven by startCodexDraftBadges(). -->
+                <div id="chip-drugdraft" class="stat-badge" style="display:none; background:rgba(79, 70, 229, 0.08); color:#4f46e5; border:1px solid rgba(79, 70, 229, 0.15); padding:6px 14px; border-radius:14px; font-weight:800; font-size:0.85em; display:flex; align-items:center; gap:8px; cursor:pointer; transition:0.2s;" onmouseover="this.style.background='rgba(79, 70, 229, 0.15)'" onmouseout="this.style.background='rgba(79, 70, 229, 0.08)'" onclick="openDrugCodexDrafts()" title="Intern-submitted Drug Codex drafts awaiting moderation">
+                    <span style="font-size:1.2em;">💊</span> Drug Drafts <span id="stat-drugdraft-count" style="margin-left:4px; opacity:0.8;">0</span>
+                </div>
+                <div id="chip-diseasedraft" class="stat-badge" style="display:none; background:rgba(13, 148, 136, 0.08); color:#0d9488; border:1px solid rgba(13, 148, 136, 0.15); padding:6px 14px; border-radius:14px; font-weight:800; font-size:0.85em; display:flex; align-items:center; gap:8px; cursor:pointer; transition:0.2s;" onmouseover="this.style.background='rgba(13, 148, 136, 0.15)'" onmouseout="this.style.background='rgba(13, 148, 136, 0.08)'" onclick="openDiseaseCodexDrafts()" title="Intern-submitted Disease Codex drafts awaiting moderation">
+                    <span style="font-size:1.2em;">🩺</span> Disease Drafts <span id="stat-diseasedraft-count" style="margin-left:4px; opacity:0.8;">0</span>
+                </div>
             </div>
 
 
@@ -10751,11 +10761,15 @@
                              A-Z drug reference CRUD modal (drug_codex + drug_codex_drafts). -->
                         <button type="button" class="dca-poneglyph-gear" onclick="openDrugCodexAdmin()" title="Drug Codex · จารึกข้อมูลยา">
                             💊 Drug Codex
+                            <!-- V95.67: pending intern-draft count, driven by startCodexDraftBadges() -->
+                            <span id="gear-drug-draft-badge" style="display:none; background:#ef4444; color:#fff; font-size:0.7em; font-weight:900; padding:1px 7px; border-radius:10px; margin-left:4px;">0</span>
                         </button>
                         <!-- Disease Codex Phase 2a: A-Z disease reference CRUD modal
                              (disease_codex). Mirrors the Drug Codex entry point. -->
                         <button type="button" class="dca-poneglyph-gear" onclick="openDiseaseCodexAdmin()" title="Disease Codex · จารึกข้อมูลโรค" style="background:linear-gradient(135deg,#0f766e,#0d9488); border-color:#0f766e; color:#fff;">
                             🩺 Disease Codex
+                            <!-- V95.67: pending intern-draft count, driven by startCodexDraftBadges() -->
+                            <span id="gear-disease-draft-badge" style="display:none; background:#fff; color:#0f766e; font-size:0.7em; font-weight:900; padding:1px 7px; border-radius:10px; margin-left:4px;">0</span>
                         </button>
                         <div style="display:flex; background:#f1f5f9; border-radius:12px; padding:3px; gap:3px;">
                             <button id="lp-btn-my" onclick="lpSetView('my')" style="padding:7px 16px; border:none; border-radius:10px; font-size:0.85em; font-weight:700; background:#1d4ed8; color:#fff; cursor:pointer;">My Path</button>
@@ -19389,6 +19403,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             // 🔥 [Version: V68] Load Data First (Firefox Protection)
             loadData();
             initKanban();
+            startCodexDraftBadges(); // V95.67: surface pending Drug/Disease drafts on the Dashboard
             setInterval(updateRealtimeTimers, 1000);
             setInterval(updateQuizCountdown, 1000); // Quiz Countdown
             document.addEventListener('keydown', (e) => { if (e.key === "Escape") document.querySelectorAll('.modal').forEach(m => { m.setAttribute('style','display:none;'); }); });
@@ -19398,6 +19413,53 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             if (ADMIN_LIFF_ID && window.liff) {
                 try { await liff.init({ liffId: ADMIN_LIFF_ID }); } catch (e) { console.warn("LIFF Init Failed (Non-critical):", e); }
             }
+        }
+
+        // ── V95.67: Dashboard codex-draft badges ───────────────────────────────
+        // Intern-submitted Drug/Disease Codex drafts live under the Poneglyph tab,
+        // so the admin never saw them from the default Dashboard. These always-on
+        // count listeners surface pending drafts as Dashboard stat chips and as a
+        // badge on the Poneglyph gear buttons. Count-only (no orderBy → no composite
+        // index); the codex modals keep their own richer list listeners.
+        var codexDraftBadgeUnsub = { drug: null, disease: null };
+
+        function startCodexDraftBadges() {
+            if (typeof db === 'undefined' || !db) return;
+            function watch(collName, chipId, countId, gearBadgeId) {
+                try {
+                    return db.collection(collName).where('status', '==', 'pending')
+                        .onSnapshot(
+                            snap => updateCodexDraftBadge(snap.size, chipId, countId, gearBadgeId),
+                            err => console.warn('[codex-draft-badge] ' + collName + ' watch error:', err && err.message)
+                        );
+                } catch (err) {
+                    console.warn('[codex-draft-badge] ' + collName + ' setup failed:', err);
+                    return null;
+                }
+            }
+            if (!codexDraftBadgeUnsub.drug)
+                codexDraftBadgeUnsub.drug = watch('drug_codex_drafts', 'chip-drugdraft', 'stat-drugdraft-count', 'gear-drug-draft-badge');
+            if (!codexDraftBadgeUnsub.disease)
+                codexDraftBadgeUnsub.disease = watch('disease_codex_drafts', 'chip-diseasedraft', 'stat-diseasedraft-count', 'gear-disease-draft-badge');
+        }
+
+        function updateCodexDraftBadge(n, chipId, countId, gearBadgeId) {
+            const countEl = document.getElementById(countId);
+            if (countEl) countEl.innerText = n;
+            const chip = document.getElementById(chipId);
+            if (chip) chip.style.display = n > 0 ? 'flex' : 'none';
+            const gear = document.getElementById(gearBadgeId);
+            if (gear) { gear.innerText = n; gear.style.display = n > 0 ? 'inline-flex' : 'none'; }
+        }
+
+        // Dashboard chip click → open the codex straight to its Pending Drafts view.
+        function openDrugCodexDrafts() {
+            if (typeof openDrugCodexAdmin === 'function') openDrugCodexAdmin();
+            if (typeof dcaSwitchView === 'function') dcaSwitchView('drafts');
+        }
+        function openDiseaseCodexDrafts() {
+            if (typeof openDiseaseCodexAdmin === 'function') openDiseaseCodexAdmin();
+            if (typeof dxaSwitchView === 'function') dxaSwitchView('drafts');
         }
 
         var quizzesData = [];
