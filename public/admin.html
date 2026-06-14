@@ -1663,6 +1663,11 @@
         }
         .dca-contrib-admin { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; }
         .dca-contrib-intern { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+        .dca-contrib-avatar {
+            width: 16px; height: 16px; border-radius: 50%;
+            object-fit: cover; vertical-align: middle;
+            border: 1px solid #a7f3d0;
+        }
         .dca-contrib-unknown { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
         /* V94.50: Edu section i18n — 5-lang chip rail above the 3 textareas
            plus inline 🌐 regen buttons next to each field label.
@@ -32600,8 +32605,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 return `<span class="dca-contributor-chip dca-contrib-admin" title="${dcaEscapeHtml(id)}">👤 admin</span>`;
             }
             if (role === 'intern') {
+                // V95.69: resolve intern uid → profile picture + displayName from the
+                // global usersData cache instead of showing the cryptic last-4 of uid.
+                // Falls back to the old short-uid label when the user isn't in cache.
+                const u = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === id);
                 const short = id.length > 4 ? id.slice(-4) : id;
-                return `<span class="dca-contributor-chip dca-contrib-intern" title="intern UID: ${dcaEscapeHtml(id)}">📝 intern (${dcaEscapeHtml(short)})</span>`;
+                const name = u && u.displayName ? u.displayName : 'intern (' + short + ')';
+                const avatar = u && u.pictureUrl
+                    ? `<img class="dca-contrib-avatar" src="${dcaEscapeHtml(u.pictureUrl)}" alt="" onerror="this.outerHTML='📝'">`
+                    : '📝';
+                return `<span class="dca-contributor-chip dca-contrib-intern" title="intern: ${dcaEscapeHtml(name)} (${dcaEscapeHtml(id)})">${avatar} ${dcaEscapeHtml(name)}</span>`;
             }
             return `<span class="dca-contributor-chip dca-contrib-unknown">${dcaEscapeHtml(s)}</span>`;
         }
@@ -35742,8 +35755,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 return `<span class="dca-contributor-chip dca-contrib-admin" title="${dxaEscapeHtml(id)}">👤 admin</span>`;
             }
             if (role === 'intern') {
+                // V95.69: resolve intern uid → profile picture + displayName from the
+                // global usersData cache instead of showing the cryptic last-4 of uid.
+                const u = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === id);
                 const short = id.length > 4 ? id.slice(-4) : id;
-                return `<span class="dca-contributor-chip dca-contrib-intern" title="intern UID: ${dxaEscapeHtml(id)}">📝 intern (${dxaEscapeHtml(short)})</span>`;
+                const name = u && u.displayName ? u.displayName : 'intern (' + short + ')';
+                const avatar = u && u.pictureUrl
+                    ? `<img class="dca-contrib-avatar" src="${dxaEscapeHtml(u.pictureUrl)}" alt="" onerror="this.outerHTML='📝'">`
+                    : '📝';
+                return `<span class="dca-contributor-chip dca-contrib-intern" title="intern: ${dxaEscapeHtml(name)} (${dxaEscapeHtml(id)})">${avatar} ${dxaEscapeHtml(name)}</span>`;
             }
             return `<span class="dca-contributor-chip dca-contrib-unknown">${dxaEscapeHtml(s)}</span>`;
         }
