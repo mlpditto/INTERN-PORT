@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.87</title>
+    <title>Nika V95.88</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1673,13 +1673,13 @@
            intern's submitted draft (intern wrote it); blue = admin added/changed it. */
         .dca-prov-intern { border-left: 4px solid #10b981 !important; }
         .dca-prov-admin  { border-left: 4px solid #3b82f6 !important; }
-        #dca-prov-legend {
+        #dca-prov-legend, #dxa-prov-legend {
             display: none; align-items: center; gap: 14px; flex-wrap: wrap;
             font-size: 0.74em; font-weight: 700; margin: 0 0 10px;
             padding: 6px 12px; background: #f8fafc; border: 1px solid #eef2f7; border-radius: 8px;
         }
-        #dca-prov-legend .dca-prov-key { display: inline-flex; align-items: center; gap: 5px; }
-        #dca-prov-legend .dca-prov-swatch { width: 11px; height: 11px; border-radius: 3px; }
+        #dca-prov-legend .dca-prov-key, #dxa-prov-legend .dca-prov-key { display: inline-flex; align-items: center; gap: 5px; }
+        #dca-prov-legend .dca-prov-swatch, #dxa-prov-legend .dca-prov-swatch { width: 11px; height: 11px; border-radius: 3px; }
         /* V94.50: Edu section i18n — 5-lang chip rail above the 3 textareas
            plus inline 🌐 regen buttons next to each field label.
            Chip rail mirrors the intern detail-modal lang chips (5 langs in
@@ -13581,6 +13581,13 @@
                 </div>
 
                 <div id="dxa-form-meta" class="dca-form-meta" style="display:none;"></div>
+                <!-- V95.88: per-field authorship legend (mirror of Drug Codex) — shown only
+                     for intern-contributed entries; field borders tinted green/blue. -->
+                <div id="dxa-prov-legend" class="lang-no-toggle">
+                    <span style="color:#64748b;">ผู้เขียนแต่ละช่อง ·</span>
+                    <span class="dca-prov-key" style="color:#047857;"><span class="dca-prov-swatch" style="background:#10b981;"></span>intern เขียน</span>
+                    <span class="dca-prov-key" style="color:#1d4ed8;"><span class="dca-prov-swatch" style="background:#3b82f6;"></span>admin เขียน/แก้</span>
+                </div>
 
                 <!-- V94.86 Phase 5b: intern's free-text note to admin (drafts only).
                      Shown only when reviewing a draft with a non-empty internNotes
@@ -34669,6 +34676,48 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (r) { r.style.display = 'none'; r.disabled = false; r.textContent = '🔍 AI Review'; }
         }
 
+        // ── V95.88: per-field authorship tint (mirror of Drug dca*) — diff vs draft ──
+        function dxaNormProvVal(key, v) {
+            if (DXA_ARRAY_FIELDS[key]) return (Array.isArray(v) ? v : []).map(x => String(x).trim()).filter(Boolean).join('|');
+            return String(v == null ? '' : v).trim();
+        }
+        function dxaClearProvenanceTint() {
+            DXA_FIELD_KEYS.forEach(key => {
+                const el = document.getElementById('dxa-f-' + key);
+                if (el) el.classList.remove('dca-prov-intern', 'dca-prov-admin');
+            });
+            const legend = document.getElementById('dxa-prov-legend');
+            if (legend) legend.style.display = 'none';
+        }
+        function dxaApplyProvenanceTint() {
+            const draft = dxaState.internDraftValues;
+            if (!draft) { dxaClearProvenanceTint(); return; }
+            const cur = dxaCollectForm();
+            DXA_FIELD_KEYS.forEach(key => {
+                const el = document.getElementById('dxa-f-' + key);
+                if (!el) return;
+                el.classList.remove('dca-prov-intern', 'dca-prov-admin');
+                const curV = dxaNormProvVal(key, cur[key]);
+                if (!curV) return;
+                const internV = dxaNormProvVal(key, draft[key]);
+                el.classList.add(internV && internV === curV ? 'dca-prov-intern' : 'dca-prov-admin');
+            });
+            const legend = document.getElementById('dxa-prov-legend');
+            if (legend) legend.style.display = 'flex';
+        }
+        async function dxaLoadProvenanceForEdit(disease) {
+            dxaState.internDraftValues = null;
+            dxaClearProvenanceTint();
+            const hasIntern = Array.isArray(disease && disease.contributors) && disease.contributors.some(c => String(c).indexOf('intern:') === 0);
+            if (!hasIntern || !dxaState.editingId || !window.db) return;
+            const eid = dxaState.editingId;
+            try {
+                const snap = await db.collection('disease_codex_drafts').where('publishedId', '==', eid).limit(1).get();
+                if (dxaState.editingId !== eid) return;
+                if (!snap.empty) { dxaState.internDraftValues = snap.docs[0].data(); dxaApplyProvenanceTint(); }
+            } catch (e) { console.warn('[disease-codex] provenance draft fetch failed:', e && e.message); }
+        }
+
         // field key → section key, from DXA_SECTION_DEFS (single source of truth).
         function dxaSectionOfField(field) {
             const def = DXA_SECTION_DEFS.find(d => d.fields.includes(field));
@@ -35062,6 +35111,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const formView = document.getElementById('dxa-view-form');
                 if (formView) {
                     formView.addEventListener('input', (e) => {
+                        // V95.88: live provenance re-tint of the edited field (mirror of Drug).
+                        if (dxaState.internDraftValues && e.target && typeof e.target.id === 'string' && e.target.id.indexOf('dxa-f-') === 0) {
+                            dxaApplyProvenanceTint();
+                        }
                         if (!dxaState.formAiDrafted) return;
                         const sec = e.target.closest && e.target.closest('.dca-form-section[data-tab]');
                         if (!sec) return;
@@ -35081,6 +35134,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dxaDismissIcdResults();
             // V95.80: clear stale AI Review findings from a previous disease (static DOM).
             if (typeof dxaDismissReviewResults === 'function') dxaDismissReviewResults();
+            // V95.88: clear stale per-field authorship tint; the caller re-applies.
+            dxaState.internDraftValues = null;
+            if (typeof dxaClearProvenanceTint === 'function') dxaClearProvenanceTint();
             // V94.85: rebuild Edu i18n state BEFORE the field loop so the 3 Edu
             // textareas read from state (per current chip lang). Legacy docs
             // without educationI18n get seeded from the root field into the
@@ -35287,6 +35343,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (modeLabel) modeLabel.textContent = 'Edit · ' + (disease.diseaseName || diseaseId);
             dxaShowAiButtons();
             dxaFillForm(disease);
+            dxaLoadProvenanceForEdit(disease); // V95.88: tint fields by intern/admin authorship
             dxaSwitchSection('core');
             dxaSwitchView('form');
         }
@@ -36286,6 +36343,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dxaShowInternNotesBanner(draft);
             dxaShowAiButtons();
             dxaFillForm(draft);
+            // V95.88: the draft IS the intern's submission — tint its filled fields green.
+            dxaState.internDraftValues = draft;
+            dxaApplyProvenanceTint();
             dxaSwitchSection('core');
             dxaSwitchView('form');
         }
