@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.93</title>
+    <title>Nika V95.94</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -18565,6 +18565,19 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     ta.value = before + replacement + after;
                     break;
                 }
+                case 'redbold': {
+                    // V95.94: bold red inline HTML — markdown has no colour syntax and
+                    // the intern side injects option text raw (no markdown parse), so HTML
+                    // is the only thing that renders red+bold on both admin preview and learner view.
+                    const open = '<b style="color:#e11d48">';
+                    const close = '</b>';
+                    const placeholder = selected || 'ข้อความ';
+                    replacement = open + placeholder + close;
+                    cursorStart = start + open.length;
+                    cursorEnd = cursorStart + placeholder.length;
+                    ta.value = before + replacement + after;
+                    break;
+                }
                 case 'h2':
                 case 'h3': {
                     const prefix = type === 'h2' ? '## ' : '### ';
@@ -18628,6 +18641,29 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const ta = item.querySelector(textareaSelector);
             if (!ta) return;
             window.mdToolbarInsert(ta, type);
+        };
+
+        // V95.94: red-bold button for a single option row. Resolves the .q-opt
+        // textarea relative to the clicked button. The button uses onmousedown
+        // preventDefault so the textarea never blurs (its onblur swaps to the
+        // rendered preview + hides the textarea) — that keeps focus + the current
+        // selection intact so mdToolbarInsert wraps the selected text, not nothing.
+        window.mdToolbarInsertInOpt = function(buttonEl) {
+            const row = buttonEl && buttonEl.closest && buttonEl.closest('.q-opt-row');
+            if (!row) return;
+            const ta = row.querySelector('textarea.q-opt');
+            if (!ta) return;
+            // If the preview is showing (textarea hidden), restore the editor first.
+            // There's no live selection in that state, so select the whole option —
+            // clicking red-B on a settled option means "make this option red".
+            if (ta.style.display === 'none') {
+                const preview = row.querySelector('.q-opt-preview');
+                if (preview) preview.style.display = 'none';
+                ta.style.display = '';
+                ta.focus();
+                ta.setSelectionRange(0, ta.value.length);
+            }
+            window.mdToolbarInsert(ta, 'redbold');
         };
 
         // Markdown preview for q-text (Phase 1, V91.35)
@@ -18835,6 +18871,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                             <textarea class="q-opt" placeholder="Option ${i + 1}" oninput="renderQOptPreview(this)" onblur="showQOptPreview(this)" style="flex:1; margin:0; font-size:0.95em; padding:8px 12px; border-radius:10px; border:none; background:transparent; min-height:40px; outline:none;">${optText}</textarea>
                             <div class="q-opt-preview" tabindex="0" onclick="editQOptFromPreview(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editQOptFromPreview(this);}" style="display:none; flex:1;"></div>
                         </div>
+                        <button type="button" onmousedown="event.preventDefault()" onclick="mdToolbarInsertInOpt(this)" title="ตัวหนาสีแดง — ครอบข้อความที่เลือก" style="width:28px; height:28px; flex-shrink:0; padding:0; background:none; border:none; cursor:pointer; line-height:1; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'"><b style="color:#e11d48;">B</b></button>
                         <button type="button" onclick="removeOption(this)" style="width:28px; height:28px; padding:0; background:none; color:#cbd5e1; border:none; cursor:pointer; font-size:0.8em; transition:color 0.2s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#cbd5e1'" title="Delete Option">✕</button>
                     `;
                     optContainer.appendChild(row);
@@ -20325,6 +20362,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                                 <textarea class="q-opt" placeholder="Option ${i + 1}" oninput="renderQOptPreview(this)" onblur="showQOptPreview(this)" style="flex:1; margin:0; font-size:1.05em; padding:8px; border-radius:10px; border:none; background:transparent; min-height:45px; outline:none; font-weight:700; color:${isSelected ? '#4ade80' : '#f8fafc'}; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${opt}</textarea>
                                 <div class="q-opt-preview" tabindex="0" onclick="editQOptFromPreview(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editQOptFromPreview(this);}" style="display:none; flex:1;"></div>
                             </div>
+                            <button type="button" onmousedown="event.preventDefault()" onclick="mdToolbarInsertInOpt(this)" title="ตัวหนาสีแดง — ครอบข้อความที่เลือก" style="width:28px; height:28px; flex-shrink:0; padding:0; background:none; border:none; cursor:pointer; line-height:1; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'"><b style="color:#e11d48;">B</b></button>
                             ${options.length > 2 ? `<button type="button" onclick="removeOption(this)" style="width:32px; height:32px; padding:0; background:none; color:#94a3b8; border:none; cursor:pointer; font-size:0.9em; transition:all 0.2s;" onmouseover="this.style.color='#ef4444'; this.style.transform='scale(1.2)'" onmouseout="this.style.color='#94a3b8'; this.style.transform='scale(1)'">✕</button>` : ''}
                         </div>
                         `;
@@ -21111,6 +21149,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                                     <textarea class="q-opt" oninput="renderQOptPreview(this)" onblur="showQOptPreview(this)" style="flex:1; margin:0; padding:8px; border:none; background:transparent; font-size:1.05em; font-weight:700; color:${isCorrect ? '#4ade80' : '#f8fafc'}; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${opt}</textarea>
                                     <div class="q-opt-preview" tabindex="0" onclick="editQOptFromPreview(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editQOptFromPreview(this);}" style="display:none; flex:1;"></div>
                                 </div>
+                                <button type="button" onmousedown="event.preventDefault()" onclick="mdToolbarInsertInOpt(this)" title="ตัวหนาสีแดง — ครอบข้อความที่เลือก" style="background:none; border:none; cursor:pointer; line-height:1; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'"><b style="color:#e11d48;">B</b></button>
                                 <button type="button" onclick="removeOption(this)" style="background:none; border:none; color:#94a3b8;">✕</button>
                             </div>`;
                             optContainer.insertAdjacentHTML('beforeend', optHtml);
@@ -21306,6 +21345,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                         <textarea class="q-opt" placeholder="Option ${count + 1}" oninput="renderQOptPreview(this)" onblur="showQOptPreview(this)" style="flex:1; margin:0; font-size:1.05em; padding:8px; border-radius:10px; border:none; background:transparent; min-height:45px; outline:none; font-weight:700; color:#f8fafc; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${val}</textarea>
                         <div class="q-opt-preview" tabindex="0" onclick="editQOptFromPreview(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editQOptFromPreview(this);}" style="display:none; flex:1;"></div>
                     </div>
+                    <button type="button" onmousedown="event.preventDefault()" onclick="mdToolbarInsertInOpt(this)" title="ตัวหนาสีแดง — ครอบข้อความที่เลือก" style="width:28px; height:28px; flex-shrink:0; padding:0; background:none; border:none; cursor:pointer; line-height:1; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'"><b style="color:#e11d48;">B</b></button>
                     <button type="button" onclick="removeOption(this)" style="width:28px; height:28px; padding:0; background:none; color:#94a3b8; border:none; cursor:pointer; font-size:0.8em; transition:all 0.2s;" onmouseover="this.style.color='#ef4444'; this.style.transform='scale(1.1)'" onmouseout="this.style.color='#94a3b8'; this.style.transform='scale(1)'" title="Delete Option">✕</button>
                 `;
             container.appendChild(row);
