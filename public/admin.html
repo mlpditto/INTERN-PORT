@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.80</title>
+    <title>Nika V95.87</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1669,6 +1669,17 @@
             border: 1px solid #a7f3d0;
         }
         .dca-contrib-unknown { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+        /* V95.87: per-field authorship tint — green left border = value matches the
+           intern's submitted draft (intern wrote it); blue = admin added/changed it. */
+        .dca-prov-intern { border-left: 4px solid #10b981 !important; }
+        .dca-prov-admin  { border-left: 4px solid #3b82f6 !important; }
+        #dca-prov-legend {
+            display: none; align-items: center; gap: 14px; flex-wrap: wrap;
+            font-size: 0.74em; font-weight: 700; margin: 0 0 10px;
+            padding: 6px 12px; background: #f8fafc; border: 1px solid #eef2f7; border-radius: 8px;
+        }
+        #dca-prov-legend .dca-prov-key { display: inline-flex; align-items: center; gap: 5px; }
+        #dca-prov-legend .dca-prov-swatch { width: 11px; height: 11px; border-radius: 3px; }
         /* V94.50: Edu section i18n — 5-lang chip rail above the 3 textareas
            plus inline 🌐 regen buttons next to each field label.
            Chip rail mirrors the intern detail-modal lang chips (5 langs in
@@ -13247,6 +13258,13 @@
                      from data.updatedAt + data.contributors[]; legacy docs synthesize
                      a single 'admin:<reviewedBy>' chip as fallback. -->
                 <div id="dca-form-meta" class="dca-form-meta" style="display:none;"></div>
+                <!-- V95.87: per-field authorship legend — shown only for intern-contributed
+                     entries; field borders are tinted green (intern) / blue (admin). -->
+                <div id="dca-prov-legend" class="lang-no-toggle">
+                    <span style="color:#64748b;">ผู้เขียนแต่ละช่อง ·</span>
+                    <span class="dca-prov-key" style="color:#047857;"><span class="dca-prov-swatch" style="background:#10b981;"></span>intern เขียน</span>
+                    <span class="dca-prov-key" style="color:#1d4ed8;"><span class="dca-prov-swatch" style="background:#3b82f6;"></span>admin เขียน/แก้</span>
+                </div>
 
                 <!-- V94.35 Phase 5: intern's free-text note to admin (drafts only).
                      Shown only when reviewing a draft that has a non-empty
@@ -32139,6 +32157,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const formView = document.getElementById('dca-view-form');
                 if (formView) {
                     formView.addEventListener('input', (e) => {
+                        // V95.87: live provenance re-tint when admin edits a field (a field
+                        // that matched the intern draft turns blue once changed). Runs only
+                        // for intern-contributed entries (internDraftValues set).
+                        if (dcaState.internDraftValues && e.target && typeof e.target.id === 'string' && e.target.id.indexOf('dca-f-') === 0) {
+                            dcaApplyProvenanceTint();
+                        }
                         if (!dcaState.formAiDrafted) return;
                         const sec = e.target.closest && e.target.closest('.dca-form-section[data-tab]');
                         if (!sec) return;
@@ -32160,6 +32184,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaNdiLast = null;
             // V95.66: clear stale AI Review findings from a previous drug (static DOM).
             if (typeof dcaDismissReviewResults === 'function') dcaDismissReviewResults();
+            // V95.87: clear stale per-field authorship tint; the caller (Edit/Review) re-applies.
+            dcaState.internDraftValues = null;
+            if (typeof dcaClearProvenanceTint === 'function') dcaClearProvenanceTint();
             // V95.05: seed + render the saved PK visual preview so admins can see
             // an attached image (and confirm a prior Save worked).
             dcaState.pkVisual = (data && data.pkVisual && data.pkVisual.downloadUrl) ? data.pkVisual : null;
@@ -32308,6 +32335,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // fill handler itself toasts "nothing to add" if no fields are blank.
             dcaShowAiFillButton();
             dcaFillForm(drug);
+            dcaLoadProvenanceForEdit(drug); // V95.87: tint fields by intern/admin authorship
             dcaSwitchSection('core');
             dcaSwitchView('form');
         }
@@ -32341,6 +32369,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // partial submission with the missing technical fields.
             dcaShowAiFillButton();
             dcaFillForm(draft);
+            // V95.87: the draft IS the intern's submission — tint its filled fields green;
+            // empties admin fills during review turn blue live.
+            dcaState.internDraftValues = draft;
+            dcaApplyProvenanceTint();
             dcaSwitchSection('core');
             dcaSwitchView('form');
         }
@@ -32390,6 +32422,54 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (btn) { btn.style.display = 'none'; btn.disabled = false; btn.textContent = '🤖 AI fill empty fields'; }
             const rbtn = document.getElementById('dca-form-ai-review-btn');
             if (rbtn) { rbtn.style.display = 'none'; rbtn.disabled = false; rbtn.textContent = '🔍 AI Review'; }
+        }
+
+        // ── V95.87: per-field authorship tint (diff vs the intern's submitted draft) ──
+        // No per-field author is stored, so we infer it: a field whose current value
+        // equals the intern's original draft value = intern wrote it (green border);
+        // a field admin added or changed = admin (blue). dcaState.internDraftValues holds
+        // the intern draft (in-memory for Review-draft, fetched by publishedId for Edit).
+        function dcaNormProvVal(key, v) {
+            if (DCA_ARRAY_FIELDS[key]) return (Array.isArray(v) ? v : []).map(x => String(x).trim()).filter(Boolean).join('|');
+            return String(v == null ? '' : v).trim();
+        }
+        function dcaClearProvenanceTint() {
+            DCA_FIELD_KEYS.forEach(key => {
+                const el = document.getElementById('dca-f-' + key);
+                if (el) el.classList.remove('dca-prov-intern', 'dca-prov-admin');
+            });
+            const legend = document.getElementById('dca-prov-legend');
+            if (legend) legend.style.display = 'none';
+        }
+        function dcaApplyProvenanceTint() {
+            const draft = dcaState.internDraftValues;
+            if (!draft) { dcaClearProvenanceTint(); return; }
+            const cur = dcaCollectForm();
+            DCA_FIELD_KEYS.forEach(key => {
+                const el = document.getElementById('dca-f-' + key);
+                if (!el) return;
+                el.classList.remove('dca-prov-intern', 'dca-prov-admin');
+                const curV = dcaNormProvVal(key, cur[key]);
+                if (!curV) return; // empty field — no tint
+                const internV = dcaNormProvVal(key, draft[key]);
+                el.classList.add(internV && internV === curV ? 'dca-prov-intern' : 'dca-prov-admin');
+            });
+            const legend = document.getElementById('dca-prov-legend');
+            if (legend) legend.style.display = 'flex';
+        }
+        // Edit (published doc): the intern's original is the kept draft whose
+        // publishedId == this doc. Only intern-contributed entries have one.
+        async function dcaLoadProvenanceForEdit(drug) {
+            dcaState.internDraftValues = null;
+            dcaClearProvenanceTint();
+            const hasIntern = Array.isArray(drug && drug.contributors) && drug.contributors.some(c => String(c).indexOf('intern:') === 0);
+            if (!hasIntern || !dcaState.editingId || !window.db) return;
+            const eid = dcaState.editingId;
+            try {
+                const snap = await db.collection('drug_codex_drafts').where('publishedId', '==', eid).limit(1).get();
+                if (dcaState.editingId !== eid) return; // admin switched entries mid-fetch
+                if (!snap.empty) { dcaState.internDraftValues = snap.docs[0].data(); dcaApplyProvenanceTint(); }
+            } catch (e) { console.warn('[drug-codex] provenance draft fetch failed:', e && e.message); }
         }
 
         async function dcaDelete(drugId, btn) {
