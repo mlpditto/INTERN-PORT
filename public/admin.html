@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.92</title>
+    <title>Nika V95.93</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1665,6 +1665,9 @@
         }
         .dca-contrib-admin { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; }
         .dca-contrib-intern { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+        /* V95.93: admin-curated contributor credit (🤝) — teal, distinct from
+           the intern-draft-origin green so the two provenance sources read apart. */
+        .dca-contrib-helper { background: #f0fdfa; color: #0f766e; border-color: #99f6e4; }
         .dca-contrib-avatar {
             width: 16px; height: 16px; border-radius: 50%;
             object-fit: cover; vertical-align: middle;
@@ -13466,6 +13469,19 @@
                         <div class="dca-form-grid">
                             <label for="dca-f-references">References</label>
                             <textarea id="dca-f-references" rows="3" placeholder="One per line · URLs or source hints (e.g. &quot;PubMed: <search terms>&quot;, &quot;MIMS Thailand&quot;, &quot;UpToDate: <topic>&quot;)"></textarea>
+                        </div>
+                        <!-- V95.93: admin-curated contributor credit. Type to search users →
+                             add chip. Stored as helper:<lineId> in contributors[]; renders as a
+                             🤝 pill on the card (separate from intern draft-origin credit). -->
+                        <div style="margin-top:14px;">
+                            <label style="display:block; font-weight:600; color:#0f766e; margin-bottom:6px;">🤝 ผู้ช่วยลงข้อมูล (Contributors)</label>
+                            <div id="dca-helper-chips" style="margin-bottom:6px;"></div>
+                            <div style="position:relative;">
+                                <input type="text" id="dca-helper-input" placeholder="พิมพ์ชื่อ user เพื่อค้นหาแล้วเลือก…" autocomplete="off"
+                                       oninput="dcaHelperInput()" onblur="setTimeout(dcaHideHelperSuggest, 150)" style="width:100%;">
+                                <div id="dca-helper-suggest" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1); max-height:240px; overflow-y:auto;"></div>
+                            </div>
+                            <div style="font-size:0.78em; color:#94a3b8; margin-top:4px;">เครดิต user ที่ช่วยลงข้อมูลยานี้ · แสดงเป็น 🤝 บนการ์ด (แยกจาก intern ที่ส่ง draft)</div>
                         </div>
                     </div>
                 </div>
@@ -31076,6 +31092,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             formAiDrafted: false,  // V95.65: current form opened as an AI draft (drives the per-tab verify tracker)
             verified: {},          // V95.65: section keys the admin confirmed this session ({core:true, ...}); reset per form open
             reviewFindings: {},    // V95.66: AI Review results keyed by section ({clinical:[...]}); reset per form open
+            helpers: [],           // V95.93: admin-curated contributor picker state [{userId(lineId),name,pictureUrl}]; persisted as helper:<lineId> in contributors[]
             searchTerm: ''
         };
 
@@ -32272,6 +32289,21 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // Hides itself on Add Drug; renders from contributors[] with legacy
             // reviewedBy fallback for pre-V94.46 docs.
             dcaRenderMeta(data);
+            // V95.93: hydrate the admin-curated contributor picker from any
+            // helper:<lineId> entries already on contributors[]. Live profile
+            // (name/picture) resolves from usersData by LINE id; falls back to a
+            // short label if the user is no longer in usersData.
+            dcaState.helpers = (Array.isArray(data && data.contributors) ? data.contributors : [])
+                .filter(c => String(c).indexOf('helper:') === 0)
+                .map(c => {
+                    const lineId = String(c).slice('helper:'.length);
+                    const u = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === lineId);
+                    return { userId: lineId, name: (u && u.displayName) || '', pictureUrl: (u && u.pictureUrl) || '' };
+                });
+            const helperInput = document.getElementById('dca-helper-input');
+            if (helperInput) helperInput.value = '';
+            dcaHideHelperSuggest();
+            dcaRenderHelperChips();
             // Doc id strip
             const idEl = document.getElementById('dca-form-doc-id');
             if (idEl) idEl.textContent = (data && data._id) ? `doc: ${data._id}` : '';
@@ -32561,6 +32593,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const draftContribs = [];
                     if (draftDoc && draftDoc.submittedBy) draftContribs.push('intern:' + draftDoc.submittedBy);
                     draftContribs.push('admin:' + reviewerEmail);
+                    // V95.93: append admin-curated contributor credits.
+                    (dcaState.helpers || []).forEach(h => {
+                        const c = 'helper:' + h.userId;
+                        if (!draftContribs.includes(c)) draftContribs.push(c);
+                    });
                     payload.contributors = draftContribs;
                     // V95.45: carry intern submitter name + picture onto the published
                     // doc for the intern Codex credit line (mirror of dcaApproveDraft).
@@ -32577,14 +32614,26 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     await batch.commit();
                     if (typeof showToast === 'function') showToast(`✅ Published "${payload.genericName}" from draft`);
                 } else if (dcaState.editingId) {
-                    // V94.46: arrayUnion is idempotent — re-saving by the same admin
-                    // is a no-op for contributors. Works on update() (sentinel valid).
-                    payload.contributors = firebase.firestore.FieldValue.arrayUnion('admin:' + reviewerEmail);
+                    // V95.93: rebuild contributors[] from a literal (no longer arrayUnion)
+                    // so the helper picker is authoritative — adding AND removing a 🤝
+                    // credit both take effect. Preserve every existing non-helper entry
+                    // (admin/intern audit trail), re-add this admin, then the picker's
+                    // current helper set. De-dup by Set-insertion order.
+                    const existing = ((dcaState.codex.find(d => d._id === dcaState.editingId) || {}).contributors) || [];
+                    const next = [];
+                    const seen = new Set();
+                    const pushUniq = c => { if (!seen.has(c)) { seen.add(c); next.push(c); } };
+                    existing.filter(c => String(c).indexOf('helper:') !== 0).forEach(pushUniq);
+                    pushUniq('admin:' + reviewerEmail);
+                    (dcaState.helpers || []).forEach(h => pushUniq('helper:' + h.userId));
+                    payload.contributors = next;
                     await db.collection('drug_codex').doc(dcaState.editingId).update(payload);
                     if (typeof showToast === 'function') showToast(`✅ Updated "${payload.genericName}"`);
                 } else {
-                    // V94.46: brand-new drug — only the creating admin is on the trail.
-                    payload.contributors = ['admin:' + reviewerEmail];
+                    // V94.46: brand-new drug — the creating admin plus any
+                    // V95.93 admin-curated contributor credits.
+                    payload.contributors = ['admin:' + reviewerEmail]
+                        .concat((dcaState.helpers || []).map(h => 'helper:' + h.userId));
                     payload.createdAt = nowTs;
                     await db.collection('drug_codex').add(payload);
                     if (typeof showToast === 'function') showToast(`✅ Added "${payload.genericName}"`);
@@ -32786,7 +32835,89 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     : '📝';
                 return `<span class="dca-contributor-chip dca-contrib-intern" title="intern: ${dcaEscapeHtml(name)} (${dcaEscapeHtml(id)})">${avatar} ${dcaEscapeHtml(name)}</span>`;
             }
+            if (role === 'helper') {
+                // V95.93: admin-curated credit. id IS the LINE user id (admin picks
+                // from usersData), so the live profile resolves directly — no auth-uid
+                // indirection like intern. Falls back to a short label if the user left.
+                const short = id.length > 4 ? id.slice(-4) : id;
+                const u = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === id);
+                const pic = u && u.pictureUrl ? u.pictureUrl : '';
+                const name = (u && u.displayName) || ('user (' + short + ')');
+                const avatar = pic
+                    ? `<img class="dca-contrib-avatar" src="${dcaEscapeHtml(pic)}" alt="" onerror="this.outerHTML='🤝'">`
+                    : '🤝';
+                return `<span class="dca-contributor-chip dca-contrib-helper" title="ผู้ช่วยลงข้อมูล: ${dcaEscapeHtml(name)}">🤝 ${avatar} ${dcaEscapeHtml(name)}</span>`;
+            }
             return `<span class="dca-contributor-chip dca-contrib-unknown">${dcaEscapeHtml(s)}</span>`;
+        }
+
+        // ── V95.93: admin-curated contributor ("ผู้ช่วยลงข้อมูล") picker ──────
+        // Type to search usersData (LINE users) → add a 🤝 chip. State lives in
+        // dcaState.helpers [{userId(lineId),name,pictureUrl}]; persisted into
+        // contributors[] as helper:<lineId> on save. Mirrors the Disease Codex
+        // Related-Drugs picker mechanics (input + suggest box + chip row).
+        function dcaRenderHelperChips() {
+            const wrap = document.getElementById('dca-helper-chips');
+            if (!wrap) return;
+            const list = dcaState.helpers || [];
+            if (list.length === 0) {
+                wrap.innerHTML = '<span style="color:#94a3b8; font-size:0.85em;">— ยังไม่มีผู้ช่วยลงข้อมูล —</span>';
+                return;
+            }
+            wrap.innerHTML = list.map(h => {
+                const label = h.name || ('user (' + (h.userId.length > 4 ? h.userId.slice(-4) : h.userId) + ')');
+                const avatar = h.pictureUrl
+                    ? `<img src="${dcaEscapeHtml(h.pictureUrl)}" alt="" style="width:16px;height:16px;border-radius:50%;object-fit:cover;" onerror="this.outerHTML='🤝'">`
+                    : '🤝';
+                return `<span class="dca-row-meta-chip" style="display:inline-flex; align-items:center; gap:4px; margin:2px 4px 2px 0; background:#f0fdfa; border:1px solid #99f6e4; color:#0f766e;">${avatar} ${dcaEscapeHtml(label)}<button type="button" onclick="dcaRemoveHelper('${dcaEscapeHtml(h.userId)}')" title="Remove" style="border:none; background:none; cursor:pointer; color:#dc2626; font-weight:700; padding:0 2px; line-height:1;">×</button></span>`;
+            }).join('');
+        }
+
+        function dcaHelperInput() {
+            const input = document.getElementById('dca-helper-input');
+            const box = document.getElementById('dca-helper-suggest');
+            if (!input || !box) return;
+            const term = String(input.value || '').trim().toLowerCase();
+            if (!term) { box.style.display = 'none'; box.innerHTML = ''; return; }
+            const already = new Set((dcaState.helpers || []).map(h => h.userId));
+            const pool = (typeof usersData !== 'undefined' ? usersData : []);
+            const matches = pool
+                .filter(u => u && u.id && !already.has(u.id) && String(u.displayName || '').toLowerCase().includes(term))
+                .slice(0, 8);
+            if (matches.length === 0) {
+                box.innerHTML = '<div style="padding:6px 10px; color:#94a3b8; font-size:0.85em;">ไม่พบ user</div>';
+                box.style.display = 'block';
+                return;
+            }
+            box.innerHTML = matches.map(u => {
+                const pic = u.pictureUrl
+                    ? `<img src="${dcaEscapeHtml(u.pictureUrl)}" alt="" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;">`
+                    : '🤝 ';
+                return `<div onclick="dcaAddHelper('${dcaEscapeHtml(u.id)}')" style="padding:6px 10px; cursor:pointer; border-bottom:1px solid #f1f5f9; font-size:0.9em;">${pic}${dcaEscapeHtml(u.displayName || u.id)}</div>`;
+            }).join('');
+            box.style.display = 'block';
+        }
+
+        function dcaAddHelper(lineId) {
+            const u = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === lineId);
+            if (!u) return;
+            if (!Array.isArray(dcaState.helpers)) dcaState.helpers = [];
+            if (dcaState.helpers.some(h => h.userId === lineId)) return;
+            dcaState.helpers.push({ userId: lineId, name: u.displayName || '', pictureUrl: u.pictureUrl || '' });
+            const input = document.getElementById('dca-helper-input');
+            if (input) input.value = '';
+            dcaHideHelperSuggest();
+            dcaRenderHelperChips();
+        }
+
+        function dcaRemoveHelper(lineId) {
+            dcaState.helpers = (dcaState.helpers || []).filter(h => h.userId !== lineId);
+            dcaRenderHelperChips();
+        }
+
+        function dcaHideHelperSuggest() {
+            const box = document.getElementById('dca-helper-suggest');
+            if (box) { box.style.display = 'none'; box.innerHTML = ''; }
         }
 
         // V94.48: HTML-returning variant of the meta strip for use in the
