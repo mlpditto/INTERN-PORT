@@ -660,7 +660,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             const apiKey = process.env.GEMINI_API_KEY;
             if (!apiKey) return res.status(500).json({ error: "GEMINI_API_KEY is not configured on server." });
 
-            const asModel = model || "gemini-2.5-flash-image-preview";
+            const asModel = model || "gemini-2.5-flash-image";
             const isImageRequest = /image/i.test(asModel);
             const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${asModel}:generateContent?key=${apiKey}`;
 
