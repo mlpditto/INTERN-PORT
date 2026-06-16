@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.00</title>
+    <title>Nika V96.03</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1354,6 +1354,14 @@
         .dca-review-finding-body { flex: 1; }
         .dca-review-finding-field { font-weight: 700; color: #0f172a; }
         .dca-review-finding-fix { color: #475569; margin-top: 2px; }
+        /* V96.02: AI Review before→after diff + Apply button. */
+        .dca-review-diff { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; font-size: 0.84em; }
+        .dca-review-diff-old { background: #fef2f2; color: #b91c1c; text-decoration: line-through; padding: 1px 6px; border-radius: 6px; border: 1px solid #fecaca; }
+        .dca-review-diff-arrow { color: #94a3b8; font-weight: 700; }
+        .dca-review-diff-new { background: #f0fdf4; color: #15803d; padding: 1px 6px; border-radius: 6px; border: 1px solid #bbf7d0; }
+        .dca-review-apply-btn { margin-left: 4px; border: none; background: #1d4ed8; color: #fff; font-weight: 700; font-size: 0.92em; padding: 2px 10px; border-radius: 7px; cursor: pointer; }
+        .dca-review-apply-btn:hover { background: #1e40af; }
+        .dca-review-applied { margin-left: 4px; color: #15803d; font-weight: 700; font-size: 0.9em; }
         .dca-review-empty {
             font-size: 0.82em; color: #047857; font-weight: 700;
         }
@@ -13887,6 +13895,14 @@
             <!-- V95.09: free-text instructions appended to the prompt before Generate. -->
             <div class="dca-pk-visual-section-label">Extra instructions (optional)</div>
             <textarea id="dca-pv-extra" rows="2" placeholder="เพิ่มคำกำกับให้ AI เช่น 'ใส่ label ภาษาไทย' · 'เน้น CYP3A4' · 'โทนสีเย็น'…" style="width:100%; box-sizing:border-box; border:1.5px solid #c7d2fe; border-radius:10px; padding:8px 10px; font-family:inherit; font-size:0.86em; resize:vertical;"></textarea>
+            <!-- V96.01: image-to-image refine. When ON (and a base image exists — saved
+                 pkVisual or one generated this session), Generate EDITS that image using
+                 the Extra instructions above (keeps the existing layout) instead of
+                 creating a fresh image. Row is hidden until a base image is available. -->
+            <label id="dca-pv-refine-row" style="display:none; align-items:center; gap:8px; margin-top:8px; cursor:pointer; font-weight:700; font-size:0.84em; color:#5b21b6;">
+                <input type="checkbox" id="dca-pv-refine">
+                ✏️ Refine existing image — แก้ภาพเดิมตาม “Extra instructions” (เก็บ layout เดิม) แทนสร้างใหม่
+            </label>
             <div class="dca-pk-visual-preview-wrap" id="dcaPkVisualPreviewWrap">
                 <div class="dca-pk-visual-preview-placeholder" id="dcaPkVisualPlaceholder">
                     Click <strong>Generate</strong> below to render an ADMET infographic.<br>
@@ -31800,6 +31816,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             });
             const extraEl = document.getElementById('dca-pv-extra');
             if (extraEl) extraEl.value = '';
+            // V96.01: reset Refine toggle, then show it only if a saved base image
+            // exists for this drug (lastImageDataUrl was just cleared above).
+            const refineEl = document.getElementById('dca-pv-refine');
+            if (refineEl) refineEl.checked = false;
+            dcaPkVisualUpdateRefineVisibility();
             dcaPkVisualRenderPreview();
             const modal = document.getElementById('dcaPkVisualModal');
             if (modal) modal.style.display = 'flex';
@@ -31831,6 +31852,45 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 meta.textContent = bits ? ('Generated · ' + bits) : '';
             }
             wrap.style.display = 'block';
+        }
+
+        // V96.01: image-to-image "Refine" helpers. The base image to edit is the
+        // one generated this session (lastImageDataUrl, a data: URL) if present,
+        // else the drug's already-saved pkVisual.downloadUrl (a Storage https URL).
+        function dcaPkVisualGetBaseImageUrl() {
+            if (dcaPkVisualState.lastImageDataUrl) return dcaPkVisualState.lastImageDataUrl;
+            const drug = (dcaState.codex || []).find(d => d._id === dcaState.editingId);
+            const url = drug && drug.pkVisual && drug.pkVisual.downloadUrl;
+            return url ? String(url) : '';
+        }
+        // Show the Refine toggle only when a base image exists; uncheck + hide otherwise.
+        function dcaPkVisualUpdateRefineVisibility() {
+            const row = document.getElementById('dca-pv-refine-row');
+            if (!row) return;
+            const has = !!dcaPkVisualGetBaseImageUrl();
+            row.style.display = has ? 'inline-flex' : 'none';
+            if (!has) { const cb = document.getElementById('dca-pv-refine'); if (cb) cb.checked = false; }
+        }
+        // Fetch the base image → bare base64 + mime, for the proxy's visionData.
+        // Works for data: URLs (session image) and https Storage URLs (saved image,
+        // CORS-permitting). Throws a clear message the caller surfaces on failure.
+        async function dcaPkVisualLoadBaseImageB64() {
+            const url = dcaPkVisualGetBaseImageUrl();
+            if (!url) throw new Error('ไม่พบภาพต้นฉบับสำหรับ refine — กด Generate ก่อนหนึ่งครั้ง');
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error('โหลดภาพต้นฉบับไม่สำเร็จ (HTTP ' + resp.status + ')');
+            const blob = await resp.blob();
+            const dataUrl = await new Promise((res, rej) => {
+                const fr = new FileReader();
+                fr.onload = () => res(String(fr.result));
+                fr.onerror = () => rej(new Error('อ่านไฟล์ภาพไม่สำเร็จ'));
+                fr.readAsDataURL(blob);
+            });
+            const comma = dataUrl.indexOf(',');
+            return {
+                image_base64: comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl,
+                image_mimetype: blob.type || 'image/png'
+            };
         }
 
         function dcaSelectPkVisualModel(btn) {
@@ -32010,6 +32070,26 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     + extraFields.map(([k, v]) => `${k.toUpperCase()}: ${String(v).trim()}`).join('\n\n');
             }
             const drugName = drug.genericName || 'this drug';
+            // V96.01: image-to-image refine. The caller attaches the existing image as
+            // visionData; this prompt tells the model to EDIT it (preserve layout) and
+            // apply only the admin's Extra instructions. Early-return so it doesn't pick
+            // up the full from-scratch VISUAL DIRECTION of the style branches below.
+            if (opts.refine) {
+                const editInstr = (opts.extra && String(opts.extra).trim())
+                    ? String(opts.extra).trim()
+                    : 'Improve overall clarity and readability without changing any facts.';
+                return [
+                    `You are given an existing ADMET pharmacokinetics visual for the drug ${drugName}.`,
+                    'EDIT this image. Preserve its existing layout, composition, colors, icons, and all correct content.',
+                    'Apply ONLY the following change(s); leave everything else exactly as-is:',
+                    editInstr,
+                    '',
+                    'Keep all medical facts accurate and consistent with the ADMET data below.',
+                    'English labels (CYP3A4, eGFR, t½, etc.); clean professional medical look; text readable at a glance.',
+                    '',
+                    admetBlock
+                ].join('\n');
+            }
             let commonRules = [
                 '',
                 'STYLE CONSTRAINTS:',
@@ -32076,6 +32156,24 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 includeIndication: !!(document.getElementById('dca-pv-inc-indication') || {}).checked,
                 extra: pvExtraEl ? String(pvExtraEl.value || '').trim() : ''
             };
+            // V96.01: image-to-image refine. When the toggle is on, require an edit
+            // instruction, load the base image as visionData, and flag the prompt so
+            // it becomes an EDIT instruction instead of a from-scratch generation.
+            const refineOn = !!(document.getElementById('dca-pv-refine') || {}).checked;
+            let pvVision = null;
+            if (refineOn) {
+                if (!pvOpts.extra) {
+                    if (typeof showToast === 'function') showToast('✏️ พิมพ์สิ่งที่อยากแก้ในช่อง Extra instructions ก่อน');
+                    return;
+                }
+                pvOpts.refine = true;
+                try {
+                    pvVision = await dcaPkVisualLoadBaseImageB64();
+                } catch (e) {
+                    if (typeof showToast === 'function') showToast('✏️ Refine ไม่สำเร็จ: ' + (e && e.message ? e.message : 'โหลดภาพต้นฉบับไม่ได้'));
+                    return;
+                }
+            }
             const prompt = dcaBuildPkVisualPrompt(current, dcaPkVisualState.style, pvOpts);
             const modelLabel = DCA_PK_VISUAL_MODEL_LABELS[dcaPkVisualState.model] || dcaPkVisualState.model;
 
@@ -32114,9 +32212,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const resp = await window.callUniversalAI(
                     dcaPkVisualState.model,
                     prompt,
-                    false,   // isJson
-                    null,    // visionData
-                    '',      // quickApiKey
+                    false,     // isJson
+                    pvVision,  // V96.01: base image for refine (null = fresh generation)
+                    '',        // quickApiKey
                     { size: '1792x1024' }
                 );
                 // V94.62: prefer imageDataUrl/dataUrl over text. The proxy's
@@ -32175,7 +32273,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 dcaPkVisualState.lastImageDataUrl = dataUrl;
                 dcaPkVisualState.lastModelLabel = modelLabel;
                 if (typeof showToast === 'function') {
-                    showToast(`🎨 Generated with ${modelLabel} · review before Save (Phase 2).`);
+                    showToast((refineOn ? '✏️ Refined' : '🎨 Generated') + ` with ${modelLabel} · review before Save (Phase 2).`);
                 }
             } catch (err) {
                 console.error('[drug-codex pk-visual]', err);
@@ -32194,6 +32292,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (pvProgress) pvProgress.stop();
                 if (pvTimerId) clearInterval(pvTimerId);
                 dcaPkVisualRenderPreview();
+                // V96.01: a successful generate sets lastImageDataUrl → the Refine
+                // toggle can now appear so the admin can iteratively edit this result.
+                dcaPkVisualUpdateRefineVisibility();
                 // V94.59: re-show the persistent error AFTER renderPreview has
                 // run its top-of-function reset of the error box.
                 if (dcaPkVisualState.lastError) {
@@ -33792,7 +33893,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return [
                 'ROLE: senior clinical pharmacist auditing a DRAFT drug monograph for an internal medical-intern study tool (Thailand). The draft was written by a junior intern (or an AI) and needs your review before publishing.',
                 '',
-                'TASK: review ONLY the fields provided below (they are the ones that have content). Find concrete problems. Do NOT rewrite the content. Do NOT comment on fields that are absent.',
+                'TASK: review ONLY the fields provided below (they are the ones that have content). Find concrete problems. For each problem, when you are confident, propose the EXACT corrected text (current → proposed) so the admin can apply it; if you cannot be confident in a specific replacement, leave current/proposed empty and only describe the issue. Do NOT comment on fields that are absent.',
                 '',
                 'FORMAT CONTRACT — RESPOND WITH PURE JSON ONLY.',
                 'NO MARKDOWN. NO PROSE OUTSIDE JSON. NO ```json``` FENCE.',
@@ -33803,6 +33904,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 '      "field":      "<<<the exact field key from the list, e.g. dosing>>>",',
                 '      "severity":   "<<<one of: safety | factual | consistency | suggestion>>>",',
                 '      "issue":      "<<<what is wrong or risky · one sentence · medical English>>>",',
+                '      "current":    "<<<the EXACT problematic text copied VERBATIM from this field (so it can be found and replaced) · empty string if the issue is not one specific text snippet>>>",',
+                '      "proposed":   "<<<the corrected replacement for current · same language + units · empty string if you cannot confidently propose a concrete fix>>>",',
                 '      "suggestion": "<<<what to check or correct · one sentence · medical English · empty string if none>>>"',
                 '    }',
                 '  ],',
@@ -33826,6 +33929,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 '2. Does every finding.field match one of the provided field keys exactly?',
                 '3. Is every finding.severity one of the four allowed values?',
                 '4. Did you avoid flagging anything you are not confident about?',
+                '5. When you filled "current", is it copied VERBATIM from the field text above (character-for-character, so it can be found and replaced)?',
                 'If any check fails, fix it before sending.',
                 '',
                 'DRUG: <<<' + (data.genericName || '') + '>>>' + (data.class ? ' · class as drafted: ' + data.class : ''),
@@ -33910,9 +34014,24 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     if (!section) return null; // hallucinated field name → drop
                     let severity = String(f.severity || '').trim().toLowerCase();
                     if (!DCA_REVIEW_SEVERITIES.includes(severity)) severity = 'suggestion';
-                    return { field, section, severity, issue, suggestion: String(f.suggestion || '').trim() };
+                    // V96.02: carry the optional before→after pair so the panel can
+                    // render a diff + Apply button (current/proposed both present).
+                    return {
+                        field, section, severity, issue,
+                        current: String(f.current || '').trim(),
+                        proposed: String(f.proposed || '').trim(),
+                        suggestion: String(f.suggestion || '').trim()
+                    };
                 }).filter(Boolean);
                 const overallNote = String(parsed.overallNote || '').trim();
+
+                // V96.02: stash a flat indexed list + overall so dcaApplyReviewFix can
+                // look a finding up by index (onclick passes only an int → sidesteps
+                // quoting Thai / multi-line proposed text into an attribute) and so a
+                // re-render after Apply keeps the same data.
+                findings.forEach((f, i) => { f._idx = i; });
+                dcaState.reviewFindingsFlat = findings;
+                dcaState._reviewOverall = overallNote;
 
                 // Map section → findings for per-tab hinting.
                 dcaState.reviewFindings = {};
@@ -33985,10 +34104,25 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const rows = group.map(f => {
                         const sevLabel = DCA_REVIEW_SEV_LABEL[f.severity] || f.severity;
                         const fieldLabel = (DCA_FIELD_LABELS[f.field] || f.field);
+                        // V96.02: before→after diff + Apply when the model proposed a
+                        // concrete corrected value. Applied findings show a confirmed
+                        // state instead of the button.
+                        let diffHtml = '';
+                        if (f.current && f.proposed) {
+                            diffHtml = '<div class="dca-review-diff">' +
+                                '<span class="dca-review-diff-old">' + esc(f.current) + '</span>' +
+                                '<span class="dca-review-diff-arrow">→</span>' +
+                                '<span class="dca-review-diff-new">' + esc(f.proposed) + '</span>' +
+                                (f._applied
+                                    ? '<span class="dca-review-applied">✓ applied — ตรวจก่อน Save</span>'
+                                    : '<button type="button" class="dca-review-apply-btn" onclick="dcaApplyReviewFix(' + f._idx + ')" title="เขียนค่าที่เสนอลงช่อง (ยืนยันก่อน)">✏️ Apply</button>') +
+                            '</div>';
+                        }
                         return '<div class="dca-review-finding">' +
                             '<span class="dca-review-sev ' + f.severity + '">' + esc(sevLabel) + '</span>' +
                             '<div class="dca-review-finding-body">' +
                                 '<span class="dca-review-finding-field">' + esc(fieldLabel) + '</span> — ' + esc(f.issue) +
+                                diffHtml +
                                 (f.suggestion ? '<div class="dca-review-finding-fix">→ ' + esc(f.suggestion) + '</div>' : '') +
                             '</div>' +
                         '</div>';
@@ -34034,6 +34168,38 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const n = (dcaState.reviewFindings[def.key] || []).length;
                 badge.title = n ? ('🔍 AI: ' + n + ' point' + (n === 1 ? '' : 's') + ' to check') : '';
             });
+        }
+
+        // V96.02: apply one AI Review finding's proposed value to its field. Looked
+        // up by index from dcaState.reviewFindingsFlat. Confirm-gated (medical tool —
+        // AI proposals must be verified, never auto-trusted). Substring-replaces the
+        // verbatim `current` with `proposed`; if `current` is empty it replaces the
+        // whole field; if `current` no longer matches the live field, it bails.
+        function dcaApplyReviewFix(idx) {
+            const list = dcaState.reviewFindingsFlat || [];
+            const f = list[idx];
+            if (!f || !f.proposed) return;
+            const label = (DCA_FIELD_LABELS[f.field] || f.field);
+            const el = document.getElementById('dca-f-' + f.field);
+            if (!el) { if (typeof showToast === 'function') showToast('ไม่พบช่อง ' + label); return; }
+            const cur = String(el.value || '');
+            let next, beforeShown;
+            if (f.current && cur.indexOf(f.current) !== -1) {
+                next = cur.replace(f.current, f.proposed); // first occurrence only
+                beforeShown = f.current;
+            } else if (!f.current) {
+                next = f.proposed; // whole-field proposal
+                beforeShown = cur || '(ว่าง)';
+            } else {
+                if (typeof showToast === 'function') showToast('ข้อความเดิมในช่องเปลี่ยนไปแล้ว — แก้เอง');
+                return;
+            }
+            if (!confirm('Apply AI fix · ' + label + '\n\nก่อน:\n' + beforeShown + '\n\nหลัง:\n' + f.proposed + '\n\n⚠️ ตรวจความถูกต้องทางการแพทย์เองก่อนเสมอ')) return;
+            el.value = next;
+            try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) { /* best-effort */ }
+            f._applied = true;
+            if (typeof showToast === 'function') showToast('✏️ Applied to ' + label + ' — verify ก่อน Save');
+            dcaRenderReviewResults(dcaState.reviewFindingsFlat, dcaState._reviewOverall || '');
         }
 
         function dcaDismissReviewResults() {
