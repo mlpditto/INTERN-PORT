@@ -248,7 +248,27 @@ const axios = require("axios");
 // Configuration
 const PROJECT_ID = "intern-port-edfa7";
 const REGION = "us-central1"; // Primary for Imagen
-const AUTH_SECRET = "mlp-secret-8888"; // Basic shared secret between admin.html and proxy
+// V95.95: AI proxy + NDI lookup authenticate via Firebase ID token instead of a
+// shared secret that shipped inside the client bundle (anyone could read it from
+// DevTools and run up provider bills). Verify `Authorization: Bearer <idToken>`;
+// callers then gate on isAdminToken — admin = full access, non-admin = Typhoon only.
+async function verifyIdTokenFromHeader(req, res) {
+    const authz = req.headers.authorization || req.headers.Authorization || "";
+    const m = /^Bearer\s+(.+)$/i.exec(String(authz).trim());
+    if (!m) {
+        res.status(401).json({ error: "Missing Authorization bearer token" });
+        return null;
+    }
+    try {
+        return await admin.auth().verifyIdToken(m[1]);
+    } catch (e) {
+        res.status(401).json({ error: "Invalid or expired ID token" });
+        return null;
+    }
+}
+function isAdminToken(decoded) {
+    return !!decoded && (decoded.admin === true || decoded.email === "medlifeplus@gmail.com");
+}
 
 function getAudioMimeType(audioEncoding) {
     const normalized = String(audioEncoding || "").toUpperCase();
@@ -297,8 +317,10 @@ function getSafeProviderError(err) {
 // ============================================================
 exports.ndiBrandLookup = onRequest({ cors: true, timeoutSeconds: 60, memory: "256MiB" }, async (req, res) => {
     try {
-        if (req.headers["x-mlp-secret"] !== AUTH_SECRET) {
-            return res.status(401).json({ error: "Unauthorized" });
+        const decoded = await verifyIdTokenFromHeader(req, res);
+        if (!decoded) return; // 401 already sent
+        if (!isAdminToken(decoded)) {
+            return res.status(403).json({ error: "Admin only." });
         }
         const generic = String((req.body && req.body.name) || req.query.name || "").trim();
         if (!generic) {
@@ -345,15 +367,21 @@ exports.ndiBrandLookup = onRequest({ cors: true, timeoutSeconds: 60, memory: "25
  */
 exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY", "TYPHOON_API_KEY", "THAILLM_API_KEY"], timeoutSeconds: 300, memory: "512MiB" }, async (req, res) => {
     try {
-        // 1. Basic Auth Check (Custom Header)
-        const authHeader = req.headers["x-mlp-secret"];
-        if (authHeader !== AUTH_SECRET) {
-            return res.status(401).json({ error: "Unauthorized access to AI Proxy" });
-        }
+        // 1. Auth: Firebase ID token (replaces the public x-mlp-secret gate).
+        const decoded = await verifyIdTokenFromHeader(req, res);
+        if (!decoded) return; // 401 already sent
+        const callerIsAdmin = isAdminToken(decoded);
 
         const { provider, model, prompt, isJson, visionData, generationOptions = {} } = req.body;
         if (!provider || (provider !== "cloud_tts" && !prompt)) {
             return res.status(400).json({ error: "Missing provider or prompt" });
+        }
+
+        // 2. Role gate: non-admin (intern / anonymous LIFF) may only use Typhoon
+        // translation — the single intern AI path (qtTranslateText). Blocks a
+        // signed-in non-admin from running up GPT / Gemini / image-gen / TTS bills.
+        if (!callerIsAdmin && provider !== "typhoon") {
+            return res.status(403).json({ error: "This AI provider is restricted to admins." });
         }
 
         // --- Google Cloud Text-to-Speech (Gemini TTS) ---

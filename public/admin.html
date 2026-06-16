@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.94</title>
+    <title>Nika V95.95</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -14893,8 +14893,17 @@
             if (typeof initAIUsageDisplay === 'function') initAIUsageDisplay();
         };
 
+        // V95.95: AI proxy + NDI lookup now require a Firebase ID token (admin
+        // named-app session) instead of the retired x-mlp-secret. One helper builds
+        // the auth headers for every proxy/NDI fetch. Empty token → server 401 →
+        // callUniversalAI falls through to its existing local-SDK fallback.
+        window._aiAuthHeaders = async function() {
+            let t = '';
+            try { const u = adminApp.auth().currentUser; if (u) t = await u.getIdToken(); } catch (e) {}
+            return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + t };
+        };
+
         window.callUniversalAI = async function(modelName, prompt, isJson = false, visionData = null, quickApiKey = '', generationOptions = null) {
-            const PROXY_SECRET = "mlp-secret-8888";
             const DIRECT_PROXY = 'https://us-central1-intern-port-edfa7.cloudfunctions.net/callAIProxy';
             let PROXY_URL = (window.location.hostname === 'mlp-int.work')
                 ? '/api/ai'
@@ -14945,7 +14954,7 @@
                 if (proxyProvider !== "") {
                     const proxyResponse = await fetch(PROXY_URL, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'x-mlp-secret': PROXY_SECRET },
+                        headers: await window._aiAuthHeaders(),
                         body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData, generationOptions: generationOptions || undefined })
                     });
                     if (proxyResponse.ok) {
@@ -14958,7 +14967,7 @@
                         console.warn(`[AI Proxy] Primary endpoint returned status ${proxyResponse.status}. Trying backup...`);
                         const backupResponse = await fetch(BACKUP_PROXY, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'x-mlp-secret': PROXY_SECRET },
+                            headers: await window._aiAuthHeaders(),
                             body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData, generationOptions: generationOptions || undefined })
                         }).catch(() => null);
                         if (backupResponse && backupResponse.ok) {
@@ -14978,7 +14987,7 @@
                 try {
                     const backupResponse = await fetch(BACKUP_PROXY, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'x-mlp-secret': PROXY_SECRET },
+                        headers: await window._aiAuthHeaders(),
                         body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData, generationOptions: generationOptions || undefined })
                     });
                     if (backupResponse.ok) {
@@ -15146,14 +15155,13 @@
         };
 
         window.callTtsProxy = async function(payload) {
-            const PROXY_SECRET = "mlp-secret-8888";
             const PROXY_URL = (window.location.hostname === 'mlp-int.work') ? '/api/ai' : 'https://mlp-int.work/api/ai';
             const BACKUP_PROXY = 'https://intern-port-edfa7.web.app/api/ai';
 
             const callEndpoint = async (url) => {
                 const response = await fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-mlp-secret': PROXY_SECRET },
+                    headers: await window._aiAuthHeaders(),
                     body: JSON.stringify(payload)
                 });
                 const data = await response.json().catch(() => ({}));
@@ -30874,7 +30882,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const PROXY_URL = 'https://us-central1-intern-port-edfa7.cloudfunctions.net/callAIProxy';
             const resp = await fetch(PROXY_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-mlp-secret': 'mlp-secret-8888' },
+                headers: await window._aiAuthHeaders(),
                 body: JSON.stringify({ provider: 'typhoon', model: 'typhoon-v2.5-30b-a3b-instruct', prompt, isJson: false })
             });
             if (!resp.ok) throw new Error(`Typhoon HTTP ${resp.status}`);
@@ -33152,7 +33160,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             try {
                 const resp = await fetch('https://us-central1-intern-port-edfa7.cloudfunctions.net/ndiBrandLookup', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-mlp-secret': 'mlp-secret-8888' },
+                    headers: await window._aiAuthHeaders(),
                     body: JSON.stringify({ name: generic })
                 });
                 const data = await resp.json().catch(() => ({}));
