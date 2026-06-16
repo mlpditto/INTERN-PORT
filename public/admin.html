@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.96</title>
+    <title>Nika V95.97</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -10689,6 +10689,8 @@
                             <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
                         </button>
                         <input type="checkbox" id="alabasta-case-show-archived" onchange="renderAlabastaCases()" hidden>
+                        <!-- V95.97: one-shot backfill — sync reviewed cases whose intern submissions mirror is stuck on 'pending' -->
+                        <button type="button" id="alabasta-reconcile-btn" onclick="reconcileCaseSubmissionMirrors()" title="Sync reviewed cases to intern view · 검토된 케이스를 인턴 화면과 동기화" aria-label="Sync intern view" style="margin:0; padding:4px 11px; font-size:0.72em; font-weight:800; color:#92400e; background:#fff; border:1px solid #fcd34d; border-radius:999px; cursor:pointer;">🔧 Sync intern</button>
                         <span style="font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:3px 10px;">Total · 전체 <b id="alabasta-case-total">0</b></span>
                         <span style="font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:3px 10px;">Pending · 대기 <b id="alabasta-case-pending">0</b></span>
                         <span style="font-size:0.72em; color:#166534; font-weight:700; background:#fff; border:1px solid #86efac; border-radius:999px; padding:3px 10px;">Reviewed · 검토 완료 <b id="alabasta-case-reviewed">0</b></span>
@@ -30072,13 +30074,82 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         }
 
+        // V95.97: case review historically wrote only the `cases` doc (+ users/score +
+        // checkin_logs) and NEVER synced the dual-written `submissions` mirror
+        // (metadata.sourceId = caseDocId, written by the intern on submit). So after a
+        // review the case left the Alabasta inbox (cases.status='reviewed' + isArchived)
+        // but the intern's unified "pending" banner — which reads `submissions` where
+        // status==='pending' — never cleared. This helper stages the mirror update(s)
+        // onto the caller's batch. Async (queries first) → call before batch.commit().
+        // `metadata.sourceId` is a single-field equality → auto-indexed, no composite.
+        async function stageCaseSubmissionMirror(batch, caseDocId, fields) {
+            if (!caseDocId) return 0;
+            try {
+                const snap = await db.collection('submissions').where('metadata.sourceId', '==', caseDocId).get();
+                snap.forEach(doc => batch.update(doc.ref, { ...fields, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }));
+                return snap.size;
+            } catch (e) {
+                console.warn('[case mirror] sync failed for', caseDocId, e && e.message);
+                return 0;
+            }
+        }
+
+        // V95.97: build the mirror field-set for a reviewed case from its awarded bonus.
+        // Intern treats any status other than 'pending'/'รอตรวจ' as reviewed (index.html
+        // isReviewed check), so 'reviewed' clears the banner + shows the ตรวจแล้ว badge.
+        function caseMirrorReviewedFields(bonus) {
+            return {
+                status: 'reviewed',
+                score: bonus,
+                adminBonus: bonus,
+                pointsAwarded: bonus > 0,
+                pointsAmount: bonus,
+                reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+        }
+
+        // V95.97: one-shot backfill for cases reviewed BEFORE the sync fix shipped — their
+        // `submissions` mirror is still 'pending' so the intern banner is stuck. Scans
+        // pending submissions (filtering type='case' client-side to dodge a composite
+        // index), and for any whose linked `cases` doc is already reviewed/archived, syncs
+        // the mirror from the case's recorded adminBonus. Admin-initiated, rare, idempotent.
+        async function reconcileCaseSubmissionMirrors() {
+            const btn = document.getElementById('alabasta-reconcile-btn');
+            const orig = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
+            try {
+                const snap = await db.collection('submissions').where('status', '==', 'pending').get();
+                const caseSubs = snap.docs.filter(d => (d.data().submissionType === 'case'));
+                let fixed = 0;
+                let batch = db.batch(), ops = 0;
+                for (const doc of caseSubs) {
+                    const caseId = doc.data().metadata && doc.data().metadata.sourceId;
+                    if (!caseId) continue;
+                    let c = (casesData || []).find(x => x.id === caseId);
+                    if (!c) { const cs = await db.collection('cases').doc(caseId).get(); c = cs.exists ? { id: caseId, ...cs.data() } : null; }
+                    if (!c || !(c.status === 'reviewed' || c.isArchived)) continue; // case not actually reviewed → leave pending
+                    const bonus = parseFloat(c.adminBonus) || 0;
+                    batch.update(doc.ref, { ...caseMirrorReviewedFields(bonus), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                    fixed++; ops++;
+                    if (ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0; } // stay under the 500-op batch limit
+                }
+                if (ops > 0) await batch.commit();
+                if (typeof showToast === 'function') showToast(`🔧 Synced ${fixed} reviewed case(s) to intern view`, fixed ? 'success' : 'info');
+                else alert(`Synced ${fixed} reviewed case submission(s).`);
+            } catch (e) {
+                console.error('reconcileCaseSubmissionMirrors failed:', e);
+                alert('Sync failed: ' + e.message);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+            }
+        }
+
         // V91.91: Bulk-review handler — reuses the score modal but applies one bonus value
         // to every selected case. Single Firestore batch covers all updates + per-user score
-        // increments + per-user case_review_bonus log writes. Firestore batch limit is 500
-        // operations; with ~3 ops per case (case update + user inc + log set + reviewLogId
-        // update = up to 4), this comfortably handles ~120 cases per batch. Beyond that the
-        // commit would error and the user would see the failure — admins can split batches
-        // by hand for now (no chunking yet).
+        // increments + per-user case_review_bonus log writes + the V95.97 submissions-mirror
+        // sync. Firestore batch limit is 500 ops; with ~5 ops per case now (case update +
+        // user inc + log set + reviewLogId update + mirror update), this handles ~100 cases
+        // per batch. Beyond that the commit would error — admins can split batches by hand.
         async function bulkAlabastaReview() {
             const ids = Array.from(window.alabastaSelectedIds || []);
             if (!ids.length) return;
@@ -30135,6 +30206,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     }
                     succeeded++;
                 });
+
+                // V95.97: sync each reviewed case's submissions mirror in the same batch.
+                await Promise.all(ids.map(id => stageCaseSubmissionMirror(batch, id, caseMirrorReviewedFields(bonus))));
 
                 await batch.commit();
                 clearAlabastaSelection();
@@ -36795,6 +36869,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         });
                     }
 
+                    // V95.97: sync the submissions mirror so the intern's pending banner clears.
+                    await stageCaseSubmissionMirror(batch, caseDocId, caseMirrorReviewedFields(bonus));
+
                     await batch.commit();
                     if (typeof showToast === 'function') showToast(`Archived +${bonus.toFixed(2)} pts · 보관 +${bonus.toFixed(2)}점`, 'success');
                     return;
@@ -36848,6 +36925,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 }
+
+                // V95.97: revert the submissions mirror back to pending so the intern's
+                // banner re-surfaces a reopened case (and the awarded score is cleared).
+                await stageCaseSubmissionMirror(reopenBatch, caseDocId, {
+                    status: 'pending', score: 0, adminBonus: 0, pointsAwarded: false, pointsAmount: 0
+                });
 
                 await reopenBatch.commit();
 
