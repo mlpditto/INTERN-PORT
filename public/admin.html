@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.01</title>
+    <title>Nika V96.02</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1354,6 +1354,14 @@
         .dca-review-finding-body { flex: 1; }
         .dca-review-finding-field { font-weight: 700; color: #0f172a; }
         .dca-review-finding-fix { color: #475569; margin-top: 2px; }
+        /* V96.02: AI Review before→after diff + Apply button. */
+        .dca-review-diff { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; font-size: 0.84em; }
+        .dca-review-diff-old { background: #fef2f2; color: #b91c1c; text-decoration: line-through; padding: 1px 6px; border-radius: 6px; border: 1px solid #fecaca; }
+        .dca-review-diff-arrow { color: #94a3b8; font-weight: 700; }
+        .dca-review-diff-new { background: #f0fdf4; color: #15803d; padding: 1px 6px; border-radius: 6px; border: 1px solid #bbf7d0; }
+        .dca-review-apply-btn { margin-left: 4px; border: none; background: #1d4ed8; color: #fff; font-weight: 700; font-size: 0.92em; padding: 2px 10px; border-radius: 7px; cursor: pointer; }
+        .dca-review-apply-btn:hover { background: #1e40af; }
+        .dca-review-applied { margin-left: 4px; color: #15803d; font-weight: 700; font-size: 0.9em; }
         .dca-review-empty {
             font-size: 0.82em; color: #047857; font-weight: 700;
         }
@@ -33869,7 +33877,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return [
                 'ROLE: senior clinical pharmacist auditing a DRAFT drug monograph for an internal medical-intern study tool (Thailand). The draft was written by a junior intern (or an AI) and needs your review before publishing.',
                 '',
-                'TASK: review ONLY the fields provided below (they are the ones that have content). Find concrete problems. Do NOT rewrite the content. Do NOT comment on fields that are absent.',
+                'TASK: review ONLY the fields provided below (they are the ones that have content). Find concrete problems. For each problem, when you are confident, propose the EXACT corrected text (current → proposed) so the admin can apply it; if you cannot be confident in a specific replacement, leave current/proposed empty and only describe the issue. Do NOT comment on fields that are absent.',
                 '',
                 'FORMAT CONTRACT — RESPOND WITH PURE JSON ONLY.',
                 'NO MARKDOWN. NO PROSE OUTSIDE JSON. NO ```json``` FENCE.',
@@ -33880,6 +33888,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 '      "field":      "<<<the exact field key from the list, e.g. dosing>>>",',
                 '      "severity":   "<<<one of: safety | factual | consistency | suggestion>>>",',
                 '      "issue":      "<<<what is wrong or risky · one sentence · medical English>>>",',
+                '      "current":    "<<<the EXACT problematic text copied VERBATIM from this field (so it can be found and replaced) · empty string if the issue is not one specific text snippet>>>",',
+                '      "proposed":   "<<<the corrected replacement for current · same language + units · empty string if you cannot confidently propose a concrete fix>>>",',
                 '      "suggestion": "<<<what to check or correct · one sentence · medical English · empty string if none>>>"',
                 '    }',
                 '  ],',
@@ -33903,6 +33913,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 '2. Does every finding.field match one of the provided field keys exactly?',
                 '3. Is every finding.severity one of the four allowed values?',
                 '4. Did you avoid flagging anything you are not confident about?',
+                '5. When you filled "current", is it copied VERBATIM from the field text above (character-for-character, so it can be found and replaced)?',
                 'If any check fails, fix it before sending.',
                 '',
                 'DRUG: <<<' + (data.genericName || '') + '>>>' + (data.class ? ' · class as drafted: ' + data.class : ''),
@@ -33987,9 +33998,24 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     if (!section) return null; // hallucinated field name → drop
                     let severity = String(f.severity || '').trim().toLowerCase();
                     if (!DCA_REVIEW_SEVERITIES.includes(severity)) severity = 'suggestion';
-                    return { field, section, severity, issue, suggestion: String(f.suggestion || '').trim() };
+                    // V96.02: carry the optional before→after pair so the panel can
+                    // render a diff + Apply button (current/proposed both present).
+                    return {
+                        field, section, severity, issue,
+                        current: String(f.current || '').trim(),
+                        proposed: String(f.proposed || '').trim(),
+                        suggestion: String(f.suggestion || '').trim()
+                    };
                 }).filter(Boolean);
                 const overallNote = String(parsed.overallNote || '').trim();
+
+                // V96.02: stash a flat indexed list + overall so dcaApplyReviewFix can
+                // look a finding up by index (onclick passes only an int → sidesteps
+                // quoting Thai / multi-line proposed text into an attribute) and so a
+                // re-render after Apply keeps the same data.
+                findings.forEach((f, i) => { f._idx = i; });
+                dcaState.reviewFindingsFlat = findings;
+                dcaState._reviewOverall = overallNote;
 
                 // Map section → findings for per-tab hinting.
                 dcaState.reviewFindings = {};
@@ -34062,10 +34088,25 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const rows = group.map(f => {
                         const sevLabel = DCA_REVIEW_SEV_LABEL[f.severity] || f.severity;
                         const fieldLabel = (DCA_FIELD_LABELS[f.field] || f.field);
+                        // V96.02: before→after diff + Apply when the model proposed a
+                        // concrete corrected value. Applied findings show a confirmed
+                        // state instead of the button.
+                        let diffHtml = '';
+                        if (f.current && f.proposed) {
+                            diffHtml = '<div class="dca-review-diff">' +
+                                '<span class="dca-review-diff-old">' + esc(f.current) + '</span>' +
+                                '<span class="dca-review-diff-arrow">→</span>' +
+                                '<span class="dca-review-diff-new">' + esc(f.proposed) + '</span>' +
+                                (f._applied
+                                    ? '<span class="dca-review-applied">✓ applied — ตรวจก่อน Save</span>'
+                                    : '<button type="button" class="dca-review-apply-btn" onclick="dcaApplyReviewFix(' + f._idx + ')" title="เขียนค่าที่เสนอลงช่อง (ยืนยันก่อน)">✏️ Apply</button>') +
+                            '</div>';
+                        }
                         return '<div class="dca-review-finding">' +
                             '<span class="dca-review-sev ' + f.severity + '">' + esc(sevLabel) + '</span>' +
                             '<div class="dca-review-finding-body">' +
                                 '<span class="dca-review-finding-field">' + esc(fieldLabel) + '</span> — ' + esc(f.issue) +
+                                diffHtml +
                                 (f.suggestion ? '<div class="dca-review-finding-fix">→ ' + esc(f.suggestion) + '</div>' : '') +
                             '</div>' +
                         '</div>';
@@ -34111,6 +34152,38 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const n = (dcaState.reviewFindings[def.key] || []).length;
                 badge.title = n ? ('🔍 AI: ' + n + ' point' + (n === 1 ? '' : 's') + ' to check') : '';
             });
+        }
+
+        // V96.02: apply one AI Review finding's proposed value to its field. Looked
+        // up by index from dcaState.reviewFindingsFlat. Confirm-gated (medical tool —
+        // AI proposals must be verified, never auto-trusted). Substring-replaces the
+        // verbatim `current` with `proposed`; if `current` is empty it replaces the
+        // whole field; if `current` no longer matches the live field, it bails.
+        function dcaApplyReviewFix(idx) {
+            const list = dcaState.reviewFindingsFlat || [];
+            const f = list[idx];
+            if (!f || !f.proposed) return;
+            const label = (DCA_FIELD_LABELS[f.field] || f.field);
+            const el = document.getElementById('dca-f-' + f.field);
+            if (!el) { if (typeof showToast === 'function') showToast('ไม่พบช่อง ' + label); return; }
+            const cur = String(el.value || '');
+            let next, beforeShown;
+            if (f.current && cur.indexOf(f.current) !== -1) {
+                next = cur.replace(f.current, f.proposed); // first occurrence only
+                beforeShown = f.current;
+            } else if (!f.current) {
+                next = f.proposed; // whole-field proposal
+                beforeShown = cur || '(ว่าง)';
+            } else {
+                if (typeof showToast === 'function') showToast('ข้อความเดิมในช่องเปลี่ยนไปแล้ว — แก้เอง');
+                return;
+            }
+            if (!confirm('Apply AI fix · ' + label + '\n\nก่อน:\n' + beforeShown + '\n\nหลัง:\n' + f.proposed + '\n\n⚠️ ตรวจความถูกต้องทางการแพทย์เองก่อนเสมอ')) return;
+            el.value = next;
+            try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) { /* best-effort */ }
+            f._applied = true;
+            if (typeof showToast === 'function') showToast('✏️ Applied to ' + label + ' — verify ก่อน Save');
+            dcaRenderReviewResults(dcaState.reviewFindingsFlat, dcaState._reviewOverall || '');
         }
 
         function dcaDismissReviewResults() {
