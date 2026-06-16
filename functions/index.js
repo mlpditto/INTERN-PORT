@@ -270,6 +270,30 @@ function isAdminToken(decoded) {
     return !!decoded && (decoded.admin === true || decoded.email === "medlifeplus@gmail.com");
 }
 
+// V95.96: observability — per-day AI token aggregation. One doc per Bangkok day in
+// ai_usage/{YYYY-MM-DD}; atomic FieldValue.increment makes each call a cheap merge
+// (no read), split by provider and caller role (admin / intern). Best-effort:
+// a usage-write failure must never affect the AI response. Tokens only (no $ cost).
+async function recordAiUsage(provider, model, tokens, isAdmin) {
+    try {
+        const day = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" }); // YYYY-MM-DD
+        const inc = (n) => admin.firestore.FieldValue.increment(n);
+        const t = Number(tokens) || 0;
+        const role = isAdmin ? "admin" : "intern";
+        const prov = provider || "unknown";
+        await admin.firestore().collection("ai_usage").doc(day).set({
+            date: day,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            totalTokens: inc(t),
+            totalCount: inc(1),
+            providers: { [prov]: { tokens: inc(t), count: inc(1) } },
+            roles: { [role]: { tokens: inc(t), count: inc(1) } }
+        }, { merge: true });
+    } catch (e) {
+        console.warn("recordAiUsage failed:", e && e.message);
+    }
+}
+
 function getAudioMimeType(audioEncoding) {
     const normalized = String(audioEncoding || "").toUpperCase();
     if (normalized === "MP3") return "audio/mpeg";
@@ -383,6 +407,17 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
         if (!callerIsAdmin && provider !== "typhoon") {
             return res.status(403).json({ error: "This AI provider is restricted to admins." });
         }
+
+        // V95.96: observability — record token usage on every SUCCESSFUL response via a
+        // single interception of res.json (so we don't touch each provider branch).
+        // Skips error payloads. Best-effort fire-and-forget — never blocks/breaks the reply.
+        const _sendJson = res.json.bind(res);
+        res.json = (payload) => {
+            if (payload && !payload.error) {
+                recordAiUsage(provider, payload.model || model, payload.tokens, callerIsAdmin);
+            }
+            return _sendJson(payload);
+        };
 
         // --- Google Cloud Text-to-Speech (Gemini TTS) ---
         if (provider === "cloud_tts") {

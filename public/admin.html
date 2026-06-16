@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.95</title>
+    <title>Nika V95.96</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -125,6 +125,8 @@
             const isOpen = body.style.display !== 'none';
             body.style.display = isOpen ? 'none' : 'block';
             if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
+            // V95.96: lazy-load the server-backed 7-day usage when the panel opens
+            if (!isOpen && id === 'acc-usage' && typeof loadAiUsage7d === 'function') loadAiUsage7d();
         };
 
         window.syncModelDefault = function(targetId, value) {
@@ -14743,6 +14745,13 @@
                         </div>
                         <div id="usage-list">Loading usage...</div>
                         <div style="border-top:1px solid #ddd; margin-top:10px; padding-top:10px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                                <div style="font-weight:bold; color:#7c3aed;"><i class="fa-solid fa-server"></i> Last 7 days (all devices)</div>
+                                <button type="button" onclick="loadAiUsage7d()" title="Refresh server usage" style="background:none; border:1px solid #d8b4fe; color:#7c3aed; font-size:0.85em; padding:3px 9px; border-radius:7px; cursor:pointer;"><i class="fa-solid fa-rotate"></i></button>
+                            </div>
+                            <div id="ai-usage-7d" style="font-size:0.9em; color:#555;">Open to load…</div>
+                        </div>
+                        <div style="border-top:1px solid #ddd; margin-top:10px; padding-top:10px;">
                             <div style="font-weight:bold; margin-bottom:5px; color:#667eea;"><i class="fa-solid fa-gauge-high"></i> Quota Status</div>
                             <div id="quota-list" style="font-size:0.9em;"><div style="color:#999; font-style:italic;">Click Check Quota to fetch limits...</div></div>
                             <button onclick="checkAllQuota()" style="width:100%; margin-top:8px; background:linear-gradient(135deg,#667eea,#764ba2); color:white; border:none; font-size:0.9em; padding:6px; border-radius:6px; cursor:pointer;"><i class="fa-solid fa-rotate"></i> Check Quota</button>
@@ -15354,6 +15363,44 @@
                 if (badgeBreakdown) badgeBreakdown.innerHTML = badgeStr;
             }
             return count;
+        };
+
+        // V95.96: server-backed 7-day token usage (all devices + intern, unlike the
+        // localStorage "today" badge above). Reads ai_usage/{date} docs written by
+        // callAIProxy. Range filter + orderBy on the same `date` field → no index.
+        window.loadAiUsage7d = async function() {
+            const el = document.getElementById('ai-usage-7d');
+            if (!el) return;
+            el.innerHTML = '<span style="color:#999;">Loading…</span>';
+            try {
+                const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+                const since = new Date(Date.now() - 6 * 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+                const snap = await db.collection('ai_usage').where('date', '>=', since).orderBy('date', 'desc').get();
+                if (snap.empty) { el.innerHTML = '<span style="color:#999; font-style:italic;">No server usage recorded yet.</span>'; return; }
+                let grand = 0, html = '';
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    grand += d.totalTokens || 0;
+                    const provs = Object.entries(d.providers || {})
+                        .sort((a, b) => ((b[1] || {}).tokens || 0) - ((a[1] || {}).tokens || 0))
+                        .map(([p, v]) => `${p} ${((v || {}).tokens || 0).toLocaleString()}`).join(' · ');
+                    const roles = d.roles || {};
+                    const roleStr = `admin ${((roles.admin || {}).tokens || 0).toLocaleString()} / intern ${((roles.intern || {}).tokens || 0).toLocaleString()}`;
+                    html += `<div style="border-bottom:1px solid #f1e9fb; padding:5px 0;">
+                        <div style="display:flex; justify-content:space-between; font-weight:800; color:#6d28d9;">
+                            <span>${d.date}${d.date === today ? ' · today' : ''}</span>
+                            <span>${(d.totalTokens || 0).toLocaleString()} tok · ${(d.totalCount || 0)} calls</span>
+                        </div>
+                        <div style="color:#7a6207; font-size:0.85em; margin-top:1px;">${provs || '—'}</div>
+                        <div style="color:#999; font-size:0.8em;">${roleStr}</div>
+                    </div>`;
+                });
+                html += `<div style="text-align:right; font-weight:900; color:#6d28d9; margin-top:6px;">7-day total: ${grand.toLocaleString()} tokens</div>`;
+                el.innerHTML = html;
+            } catch (e) {
+                el.innerHTML = `<span style="color:#c0392b;">Load failed: ${e.message}</span>`;
+                console.warn('loadAiUsage7d failed:', e);
+            }
         };
 
         window.openAIKeysModal = function() {
