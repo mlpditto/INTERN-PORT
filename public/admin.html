@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.04</title>
+    <title>Nika V96.05</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -127,6 +127,8 @@
             if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
             // V95.96: lazy-load the server-backed 7-day usage when the panel opens
             if (!isOpen && id === 'acc-usage' && typeof loadAiUsage7d === 'function') loadAiUsage7d();
+            // V96.05: lazy-load the 7-day AI quality panel alongside usage.
+            if (!isOpen && id === 'acc-usage' && typeof loadAiEvals7d === 'function') loadAiEvals7d();
         };
 
         window.syncModelDefault = function(targetId, value) {
@@ -14779,6 +14781,14 @@
                             </div>
                             <div id="ai-usage-7d" style="font-size:0.9em; color:#555;">Open to load…</div>
                         </div>
+                        <!-- V96.05 Evaluation pillar — AI quality (accept/keep rates), mirror of the usage panel. -->
+                        <div style="border-top:1px solid #ddd; margin-top:10px; padding-top:10px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                                <div style="font-weight:bold; color:#7c3aed;"><i class="fa-solid fa-clipboard-check"></i> AI quality · 7 days</div>
+                                <button type="button" onclick="loadAiEvals7d()" title="Refresh AI quality" style="background:none; border:1px solid #d8b4fe; color:#7c3aed; font-size:0.85em; padding:3px 9px; border-radius:7px; cursor:pointer;"><i class="fa-solid fa-rotate"></i></button>
+                            </div>
+                            <div id="ai-evals-7d" style="font-size:0.9em; color:#555;">Open to load…</div>
+                        </div>
                         <div style="border-top:1px solid #ddd; margin-top:10px; padding-top:10px;">
                             <div style="font-weight:bold; margin-bottom:5px; color:#667eea;"><i class="fa-solid fa-gauge-high"></i> Quota Status</div>
                             <div id="quota-list" style="font-size:0.9em;"><div style="color:#999; font-style:italic;">Click Check Quota to fetch limits...</div></div>
@@ -15428,6 +15438,78 @@
             } catch (e) {
                 el.innerHTML = `<span style="color:#c0392b;">Load failed: ${e.message}</span>`;
                 console.warn('loadAiUsage7d failed:', e);
+            }
+        };
+
+        // V96.05 Evaluation pillar — record an AI quality signal. outcome is a free
+        // string ('suggested' | 'applied' | 'dismissed' | 'generated' | 'kept' …).
+        // Aggregated per Bangkok day into ai_evals/{date} with merge+increment, so a
+        // call is a cheap fire-and-forget write (never blocks/breaks the AI flow).
+        // Complements ai_usage (volume/cost) with "is the output actually used?".
+        window.recordAiEval = function(feature, model, outcome, n) {
+            try {
+                if (!feature || !outcome) return;
+                if (typeof db === 'undefined' || !db) return;
+                const inc = firebase.firestore.FieldValue.increment(n && n > 0 ? n : 1);
+                const day = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+                const clean = s => String(s == null ? '' : s).replace(/[~*/\[\].]/g, '_').slice(0, 80) || 'unknown';
+                const feat = clean(feature), out = clean(outcome), mdl = clean(model);
+                db.collection('ai_evals').doc(day).set({
+                    date: day,
+                    total: inc,
+                    features: { [feat]: { [out]: inc } },
+                    models:   { [mdl]:  { [out]: inc } },
+                }, { merge: true }).catch(e => console.warn('recordAiEval write failed:', e && e.message));
+            } catch (e) { console.warn('recordAiEval failed:', e && e.message); }
+        };
+
+        // V96.05 — 7-day AI quality panel (mirror of loadAiUsage7d). For features
+        // with a clear positive/total outcome pair, shows an accept/keep rate.
+        const AI_EVAL_RATE = {
+            ai_review: { pos: 'applied',   total: 'suggested', label: 'applied' },
+            pk_visual: { pos: 'kept',      total: 'generated', label: 'kept' },
+        };
+        const AI_EVAL_FEATURE_LABEL = { ai_review: '🔍 AI Review', pk_visual: '🎨 PK Visual' };
+        window.loadAiEvals7d = async function() {
+            const el = document.getElementById('ai-evals-7d');
+            if (!el) return;
+            el.innerHTML = '<span style="color:#999;">Loading…</span>';
+            try {
+                const since = new Date(Date.now() - 6 * 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+                const snap = await db.collection('ai_evals').where('date', '>=', since).orderBy('date', 'desc').get();
+                if (snap.empty) { el.innerHTML = '<span style="color:#999; font-style:italic;">No quality signals recorded yet.</span>'; return; }
+                // aggregate features across the 7 days
+                const feats = {};
+                snap.forEach(doc => {
+                    const fs = doc.data().features || {};
+                    Object.entries(fs).forEach(([f, outs]) => {
+                        feats[f] = feats[f] || {};
+                        Object.entries(outs || {}).forEach(([o, c]) => { feats[f][o] = (feats[f][o] || 0) + (c || 0); });
+                    });
+                });
+                let html = '';
+                Object.entries(feats).sort().forEach(([f, outs]) => {
+                    const name = AI_EVAL_FEATURE_LABEL[f] || f;
+                    const breakdown = Object.entries(outs).sort((a, b) => b[1] - a[1])
+                        .map(([o, c]) => `${o} ${c}`).join(' · ');
+                    const r = AI_EVAL_RATE[f];
+                    let rate = '';
+                    if (r && outs[r.total] > 0) {
+                        const pct = Math.round((outs[r.pos] || 0) / outs[r.total] * 100);
+                        const col = pct >= 60 ? '#15803d' : (pct >= 30 ? '#a16207' : '#b91c1c');
+                        rate = `<span style="font-weight:900; color:${col};">${pct}% ${r.label}</span>`;
+                    }
+                    html += `<div style="border-bottom:1px solid #f1e9fb; padding:5px 0;">
+                        <div style="display:flex; justify-content:space-between; font-weight:800; color:#6d28d9;">
+                            <span>${name}</span>${rate}
+                        </div>
+                        <div style="color:#7a6207; font-size:0.85em; margin-top:1px;">${breakdown || '—'}</div>
+                    </div>`;
+                });
+                el.innerHTML = html || '<span style="color:#999; font-style:italic;">No quality signals yet.</span>';
+            } catch (e) {
+                el.innerHTML = `<span style="color:#c0392b;">Load failed: ${e.message}</span>`;
+                console.warn('loadAiEvals7d failed:', e);
             }
         };
 
@@ -32275,6 +32357,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
                 dcaPkVisualState.lastImageDataUrl = dataUrl;
                 dcaPkVisualState.lastModelLabel = modelLabel;
+                // V96.05 Evaluation pillar: a visual was generated (denominator for keep-rate).
+                if (typeof recordAiEval === 'function') recordAiEval('pk_visual', dcaPkVisualState.model, 'generated');
                 if (typeof showToast === 'function') {
                     showToast((refineOn ? '✏️ Refined' : '🎨 Generated') + ` with ${modelLabel} · review before Save (Phase 2).`);
                 }
@@ -32407,6 +32491,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     style: dcaPkVisualState.style
                 };
                 dcaRenderCurrentPkVisual(dcaState.pkVisual);
+                // V96.05 Evaluation pillar: the generated visual was kept (saved) —
+                // the positive signal for PK Visual keep-rate (kept / generated).
+                if (typeof recordAiEval === 'function') recordAiEval('pk_visual', dcaPkVisualState.model, 'kept');
                 if (typeof showToast === 'function') {
                     showToast(reused
                         ? '♻️ Reused existing image (dedup) · แสดงในฟอร์มแล้ว'
@@ -34049,6 +34136,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 dcaRefreshVerifyStrip();
                 dcaRenderReviewResults(findings, overallNote);
 
+                // V96.05 Evaluation pillar: record the suggestion signal + remember the
+                // model so dcaApplyReviewFix can attribute 'applied' to the same model.
+                dcaState._reviewModel = (resp && resp.model) || selectedModel;
+                if (findings.length && typeof recordAiEval === 'function') {
+                    recordAiEval('ai_review', dcaState._reviewModel, 'suggested', findings.length);
+                }
+
                 if (typeof showToast === 'function') {
                     const ml = (typeof dcaFormatModelLabel === 'function') ? dcaFormatModelLabel((resp && resp.model) || selectedModel) : ((resp && resp.model) || selectedModel);
                     showToast(findings.length
@@ -34203,6 +34297,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             el.value = next;
             try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) { /* best-effort */ }
             f._applied = true;
+            // V96.05 Evaluation pillar: this finding's proposed fix was accepted.
+            if (typeof recordAiEval === 'function') recordAiEval('ai_review', dcaState._reviewModel, 'applied');
             if (typeof showToast === 'function') showToast('✏️ Applied to ' + label + ' — verify ก่อน Save');
             dcaRenderReviewResults(dcaState.reviewFindingsFlat, dcaState._reviewOverall || '');
         }
