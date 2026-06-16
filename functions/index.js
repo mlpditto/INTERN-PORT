@@ -756,8 +756,24 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             const isImageRequest = /image/i.test(asModel);
             const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${asModel}:generateContent?key=${apiKey}`;
 
+            // V96.01: image-to-image editing — when visionData carries a base image,
+            // attach it as an inlineData part so the model EDITS the supplied image
+            // instead of generating from text alone (Drug Codex PK Visual "Refine").
+            // Tolerate both visionData shapes used in this proxy: {image_base64,
+            // image_mimetype} (Vertex branch convention) and {base64,mimeType}.
+            const asParts = [{ text: prompt }];
+            const asRawB64 = visionData && (visionData.image_base64 || visionData.base64);
+            if (asRawB64) {
+                const asB64 = asRawB64.includes("base64,") ? asRawB64.split("base64,")[1] : asRawB64;
+                asParts.push({
+                    inlineData: {
+                        mimeType: (visionData.image_mimetype || visionData.mimeType || "image/png"),
+                        data: asB64
+                    }
+                });
+            }
             const body = {
-                contents: [{ parts: [{ text: prompt }] }],
+                contents: [{ parts: asParts }],
                 ...(isImageRequest ? { generationConfig: { responseModalities: ["IMAGE", "TEXT"] } } : {})
             };
 
