@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.99</title>
+    <title>Nika V96.01</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13885,6 +13885,14 @@
             <!-- V95.09: free-text instructions appended to the prompt before Generate. -->
             <div class="dca-pk-visual-section-label">Extra instructions (optional)</div>
             <textarea id="dca-pv-extra" rows="2" placeholder="เพิ่มคำกำกับให้ AI เช่น 'ใส่ label ภาษาไทย' · 'เน้น CYP3A4' · 'โทนสีเย็น'…" style="width:100%; box-sizing:border-box; border:1.5px solid #c7d2fe; border-radius:10px; padding:8px 10px; font-family:inherit; font-size:0.86em; resize:vertical;"></textarea>
+            <!-- V96.01: image-to-image refine. When ON (and a base image exists — saved
+                 pkVisual or one generated this session), Generate EDITS that image using
+                 the Extra instructions above (keeps the existing layout) instead of
+                 creating a fresh image. Row is hidden until a base image is available. -->
+            <label id="dca-pv-refine-row" style="display:none; align-items:center; gap:8px; margin-top:8px; cursor:pointer; font-weight:700; font-size:0.84em; color:#5b21b6;">
+                <input type="checkbox" id="dca-pv-refine">
+                ✏️ Refine existing image — แก้ภาพเดิมตาม “Extra instructions” (เก็บ layout เดิม) แทนสร้างใหม่
+            </label>
             <div class="dca-pk-visual-preview-wrap" id="dcaPkVisualPreviewWrap">
                 <div class="dca-pk-visual-preview-placeholder" id="dcaPkVisualPlaceholder">
                     Click <strong>Generate</strong> below to render an ADMET infographic.<br>
@@ -31798,6 +31806,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             });
             const extraEl = document.getElementById('dca-pv-extra');
             if (extraEl) extraEl.value = '';
+            // V96.01: reset Refine toggle, then show it only if a saved base image
+            // exists for this drug (lastImageDataUrl was just cleared above).
+            const refineEl = document.getElementById('dca-pv-refine');
+            if (refineEl) refineEl.checked = false;
+            dcaPkVisualUpdateRefineVisibility();
             dcaPkVisualRenderPreview();
             const modal = document.getElementById('dcaPkVisualModal');
             if (modal) modal.style.display = 'flex';
@@ -31829,6 +31842,45 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 meta.textContent = bits ? ('Generated · ' + bits) : '';
             }
             wrap.style.display = 'block';
+        }
+
+        // V96.01: image-to-image "Refine" helpers. The base image to edit is the
+        // one generated this session (lastImageDataUrl, a data: URL) if present,
+        // else the drug's already-saved pkVisual.downloadUrl (a Storage https URL).
+        function dcaPkVisualGetBaseImageUrl() {
+            if (dcaPkVisualState.lastImageDataUrl) return dcaPkVisualState.lastImageDataUrl;
+            const drug = (dcaState.codex || []).find(d => d._id === dcaState.editingId);
+            const url = drug && drug.pkVisual && drug.pkVisual.downloadUrl;
+            return url ? String(url) : '';
+        }
+        // Show the Refine toggle only when a base image exists; uncheck + hide otherwise.
+        function dcaPkVisualUpdateRefineVisibility() {
+            const row = document.getElementById('dca-pv-refine-row');
+            if (!row) return;
+            const has = !!dcaPkVisualGetBaseImageUrl();
+            row.style.display = has ? 'inline-flex' : 'none';
+            if (!has) { const cb = document.getElementById('dca-pv-refine'); if (cb) cb.checked = false; }
+        }
+        // Fetch the base image → bare base64 + mime, for the proxy's visionData.
+        // Works for data: URLs (session image) and https Storage URLs (saved image,
+        // CORS-permitting). Throws a clear message the caller surfaces on failure.
+        async function dcaPkVisualLoadBaseImageB64() {
+            const url = dcaPkVisualGetBaseImageUrl();
+            if (!url) throw new Error('ไม่พบภาพต้นฉบับสำหรับ refine — กด Generate ก่อนหนึ่งครั้ง');
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error('โหลดภาพต้นฉบับไม่สำเร็จ (HTTP ' + resp.status + ')');
+            const blob = await resp.blob();
+            const dataUrl = await new Promise((res, rej) => {
+                const fr = new FileReader();
+                fr.onload = () => res(String(fr.result));
+                fr.onerror = () => rej(new Error('อ่านไฟล์ภาพไม่สำเร็จ'));
+                fr.readAsDataURL(blob);
+            });
+            const comma = dataUrl.indexOf(',');
+            return {
+                image_base64: comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl,
+                image_mimetype: blob.type || 'image/png'
+            };
         }
 
         function dcaSelectPkVisualModel(btn) {
@@ -32008,6 +32060,26 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     + extraFields.map(([k, v]) => `${k.toUpperCase()}: ${String(v).trim()}`).join('\n\n');
             }
             const drugName = drug.genericName || 'this drug';
+            // V96.01: image-to-image refine. The caller attaches the existing image as
+            // visionData; this prompt tells the model to EDIT it (preserve layout) and
+            // apply only the admin's Extra instructions. Early-return so it doesn't pick
+            // up the full from-scratch VISUAL DIRECTION of the style branches below.
+            if (opts.refine) {
+                const editInstr = (opts.extra && String(opts.extra).trim())
+                    ? String(opts.extra).trim()
+                    : 'Improve overall clarity and readability without changing any facts.';
+                return [
+                    `You are given an existing ADMET pharmacokinetics visual for the drug ${drugName}.`,
+                    'EDIT this image. Preserve its existing layout, composition, colors, icons, and all correct content.',
+                    'Apply ONLY the following change(s); leave everything else exactly as-is:',
+                    editInstr,
+                    '',
+                    'Keep all medical facts accurate and consistent with the ADMET data below.',
+                    'English labels (CYP3A4, eGFR, t½, etc.); clean professional medical look; text readable at a glance.',
+                    '',
+                    admetBlock
+                ].join('\n');
+            }
             let commonRules = [
                 '',
                 'STYLE CONSTRAINTS:',
@@ -32074,6 +32146,24 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 includeIndication: !!(document.getElementById('dca-pv-inc-indication') || {}).checked,
                 extra: pvExtraEl ? String(pvExtraEl.value || '').trim() : ''
             };
+            // V96.01: image-to-image refine. When the toggle is on, require an edit
+            // instruction, load the base image as visionData, and flag the prompt so
+            // it becomes an EDIT instruction instead of a from-scratch generation.
+            const refineOn = !!(document.getElementById('dca-pv-refine') || {}).checked;
+            let pvVision = null;
+            if (refineOn) {
+                if (!pvOpts.extra) {
+                    if (typeof showToast === 'function') showToast('✏️ พิมพ์สิ่งที่อยากแก้ในช่อง Extra instructions ก่อน');
+                    return;
+                }
+                pvOpts.refine = true;
+                try {
+                    pvVision = await dcaPkVisualLoadBaseImageB64();
+                } catch (e) {
+                    if (typeof showToast === 'function') showToast('✏️ Refine ไม่สำเร็จ: ' + (e && e.message ? e.message : 'โหลดภาพต้นฉบับไม่ได้'));
+                    return;
+                }
+            }
             const prompt = dcaBuildPkVisualPrompt(current, dcaPkVisualState.style, pvOpts);
             const modelLabel = DCA_PK_VISUAL_MODEL_LABELS[dcaPkVisualState.model] || dcaPkVisualState.model;
 
@@ -32112,9 +32202,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const resp = await window.callUniversalAI(
                     dcaPkVisualState.model,
                     prompt,
-                    false,   // isJson
-                    null,    // visionData
-                    '',      // quickApiKey
+                    false,     // isJson
+                    pvVision,  // V96.01: base image for refine (null = fresh generation)
+                    '',        // quickApiKey
                     { size: '1792x1024' }
                 );
                 // V94.62: prefer imageDataUrl/dataUrl over text. The proxy's
@@ -32173,7 +32263,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 dcaPkVisualState.lastImageDataUrl = dataUrl;
                 dcaPkVisualState.lastModelLabel = modelLabel;
                 if (typeof showToast === 'function') {
-                    showToast(`🎨 Generated with ${modelLabel} · review before Save (Phase 2).`);
+                    showToast((refineOn ? '✏️ Refined' : '🎨 Generated') + ` with ${modelLabel} · review before Save (Phase 2).`);
                 }
             } catch (err) {
                 console.error('[drug-codex pk-visual]', err);
@@ -32192,6 +32282,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (pvProgress) pvProgress.stop();
                 if (pvTimerId) clearInterval(pvTimerId);
                 dcaPkVisualRenderPreview();
+                // V96.01: a successful generate sets lastImageDataUrl → the Refine
+                // toggle can now appear so the admin can iteratively edit this result.
+                dcaPkVisualUpdateRefineVisibility();
                 // V94.59: re-show the persistent error AFTER renderPreview has
                 // run its top-of-function reset of the error box.
                 if (dcaPkVisualState.lastError) {
