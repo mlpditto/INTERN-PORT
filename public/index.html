@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.86)</title>
+    <title>Internship Portfolio (V95.87)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -8520,9 +8520,15 @@
             const target = QT_LANG_NAMES[targetLang] || targetLang;
             const prompt = `Translate the following text to ${target}. Output ONLY the translation, no explanations, no quotes, no markdown fences.\n\n${text}`;
             const PROXY_URL = 'https://us-central1-intern-port-edfa7.cloudfunctions.net/callAIProxy';
+            // V95.87: AI proxy now requires a Firebase ID token (the shared secret
+            // shipped in the bundle was a billing-abuse hole). Intern is signed in
+            // (LIFF + anonymous) by the time a quiz is open; empty token → 401 →
+            // caught upstream → original text shown.
+            let _idToken = '';
+            try { const u = firebase.auth().currentUser; if (u) _idToken = await u.getIdToken(); } catch (e) {}
             const resp = await fetch(PROXY_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-mlp-secret': 'mlp-secret-8888' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + _idToken },
                 body: JSON.stringify({ provider: 'typhoon', model: 'typhoon-v2.5-30b-a3b-instruct', prompt, isJson: false })
             });
             if (!resp.ok) throw new Error(`Typhoon HTTP ${resp.status}`);
