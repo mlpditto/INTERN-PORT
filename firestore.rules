@@ -368,6 +368,15 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // 32. AI usage metrics (V95.96 observability) — one doc per Bangkok day,
+    // ai_usage/{YYYY-MM-DD}, written ONLY by callAIProxy via the Admin SDK (which
+    // bypasses these rules). Client gets admin-only read for the dashboard; no
+    // client write so interns/anonymous can't tamper with the token counters.
+    match /ai_usage/{dateId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // 31. Disease Codex Drafts (intern submissions awaiting moderation).
     // Scaffolded in Phase 1 to mirror drug_codex_drafts Rule 29; no UI ships
     // until a future intern-submission phase. The required shape field is
