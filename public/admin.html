@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V95.99</title>
+    <title>Nika V96.00</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1659,6 +1659,10 @@
             margin: 0 0 10px 2px;
         }
         .dca-form-meta .dca-meta-sep { color: #cbd5e1; }
+        /* V95.99: per-field authorship color key folded inline into the meta strip
+           (was the standalone #dca-prov-legend row). Toggled via #dca-prov-inline-key. */
+        .dca-form-meta .dca-prov-key { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; }
+        .dca-form-meta .dca-prov-swatch { width: 10px; height: 10px; border-radius: 3px; }
         .dca-contributor-chip {
             display: inline-flex; align-items: center; gap: 4px;
             padding: 1px 8px; border-radius: 999px;
@@ -13271,14 +13275,12 @@
                      only; hidden in Add Drug since there's no saved state yet. Renders
                      from data.updatedAt + data.contributors[]; legacy docs synthesize
                      a single 'admin:<reviewedBy>' chip as fallback. -->
-                <div id="dca-form-meta" class="dca-form-meta" style="display:none;"></div>
-                <!-- V95.87: per-field authorship legend — shown only for intern-contributed
-                     entries; field borders are tinted green (intern) / blue (admin). -->
-                <div id="dca-prov-legend" class="lang-no-toggle">
-                    <span style="color:#64748b;">ผู้เขียนแต่ละช่อง ·</span>
-                    <span class="dca-prov-key" style="color:#047857;"><span class="dca-prov-swatch" style="background:#10b981;"></span>intern เขียน</span>
-                    <span class="dca-prov-key" style="color:#1d4ed8;"><span class="dca-prov-swatch" style="background:#3b82f6;"></span>admin เขียน/แก้</span>
-                </div>
+                <!-- V94.46 audit-trail meta strip (Updated + Contributors chips).
+                     V95.99: the per-field authorship color key (intern green / admin
+                     blue) is now folded INTO this strip's trailing #dca-prov-inline-key
+                     span — toggled by dcaApply/ClearProvenanceTint — so the standalone
+                     "ผู้เขียนแต่ละช่อง" legend row is gone (one row instead of two). -->
+                <div id="dca-form-meta" class="dca-form-meta lang-no-toggle" style="display:none;"></div>
 
                 <!-- V94.35 Phase 5: intern's free-text note to admin (drafts only).
                      Shown only when reviewing a draft that has a non-empty
@@ -32671,8 +32673,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const el = document.getElementById('dca-f-' + key);
                 if (el) el.classList.remove('dca-prov-intern', 'dca-prov-admin');
             });
-            const legend = document.getElementById('dca-prov-legend');
-            if (legend) legend.style.display = 'none';
+            // V95.99: hide the inline color key (folded into the meta strip).
+            const key = document.getElementById('dca-prov-inline-key');
+            if (key) { key.style.display = 'none'; key.innerHTML = ''; }
         }
         function dcaApplyProvenanceTint() {
             const draft = dcaState.internDraftValues;
@@ -32687,8 +32690,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const internV = dcaNormProvVal(key, draft[key]);
                 el.classList.add(internV && internV === curV ? 'dca-prov-intern' : 'dca-prov-admin');
             });
-            const legend = document.getElementById('dca-prov-legend');
-            if (legend) legend.style.display = 'flex';
+            // V95.99: render the per-field color key inline at the end of the meta
+            // strip (one row) instead of the removed standalone legend box.
+            const key = document.getElementById('dca-prov-inline-key');
+            if (key) {
+                key.innerHTML = '<span class="dca-meta-sep">·</span>'
+                    + '<span class="dca-prov-key" style="color:#047857;"><span class="dca-prov-swatch" style="background:#10b981;"></span>intern เขียน</span>'
+                    + '<span class="dca-prov-key" style="color:#1d4ed8;"><span class="dca-prov-swatch" style="background:#3b82f6;"></span>admin เขียน/แก้</span>';
+                key.style.display = 'inline-flex';
+                key.style.alignItems = 'center';
+                key.style.gap = '8px';
+            }
         }
         // Edit (published doc): the intern's original is the kept draft whose
         // publishedId == this doc. Only intern-contributed entries have one.
@@ -33219,7 +33231,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 return;
             }
             el.style.display = 'flex';
-            el.innerHTML = parts.join('<span class="dca-meta-sep">·</span>');
+            // V95.99: trailing placeholder for the per-field authorship color key.
+            // dcaApplyProvenanceTint fills + shows it (intern docs only); kept inside
+            // the meta strip so the key shares this single row instead of its own.
+            el.innerHTML = parts.join('<span class="dca-meta-sep">·</span>')
+                + '<span id="dca-prov-inline-key" style="display:none;"></span>';
         }
 
         // V94.70: Thai FDA (NDI) brand lookup (approach D — MVP, no auto-fill,
