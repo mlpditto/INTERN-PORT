@@ -294,6 +294,35 @@ async function recordAiUsage(provider, model, tokens, isAdmin) {
     }
 }
 
+// V95.97: centralized retry + backoff for AI provider calls (orchestration). ONLY
+// callAIProxy's provider axios.post calls use this — deliberately NOT the LINE push
+// notifies, which aren't idempotent (a retry would double-send a message). Retries
+// transient failures only (no response / 429 / 5xx) with exponential backoff +
+// jitter, honoring a Retry-After header (capped). A per-attempt timeout (default
+// 80s) stops one hung provider from eating the whole 300s function budget; 2 retries
+// keeps the worst case (~3×80s + backoff) safely under 300s.
+async function postWithRetry(url, data, config = {}) {
+    const retries = 2;
+    const baseDelayMs = 700;
+    const cfg = { timeout: 80000, ...config };
+    let lastErr;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            return await axios.post(url, data, cfg);
+        } catch (err) {
+            lastErr = err;
+            const status = err && err.response && err.response.status;
+            const retryable = !status || status === 429 || (status >= 500 && status <= 599);
+            if (!retryable || attempt === retries) throw err;
+            const retryAfter = Number(err && err.response && err.response.headers && err.response.headers["retry-after"]);
+            const backoff = (retryAfter > 0 ? Math.min(retryAfter * 1000, 10000) : baseDelayMs * Math.pow(2, attempt)) + Math.floor(Math.random() * 250);
+            console.warn(`[AI retry] ${url} attempt ${attempt + 1} failed (${status || (err && err.code) || "network"}); retrying in ${backoff}ms`);
+            await new Promise((r) => setTimeout(r, backoff));
+        }
+    }
+    throw lastErr;
+}
+
 function getAudioMimeType(audioEncoding) {
     const normalized = String(audioEncoding || "").toUpperCase();
     if (normalized === "MP3") return "audio/mpeg";
@@ -432,7 +461,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 return res.status(400).json({ error: "Missing input, voice, or audioConfig for cloud_tts" });
             }
 
-            const response = await axios.post("https://texttospeech.googleapis.com/v1/text:synthesize", ttsConfig, {
+            const response = await postWithRetry("https://texttospeech.googleapis.com/v1/text:synthesize", ttsConfig, {
                 headers: {
                     "Authorization": `Bearer ${token.token}`,
                     "x-goog-user-project": PROJECT_ID,
@@ -473,7 +502,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 [(actualModel.includes('o1') || actualModel.includes('gpt-5')) ? 'max_completion_tokens' : 'max_tokens']: isJson ? 4096 : 4096
             };
 
-            const response = await axios.post("https://api.openai.com/v1/chat/completions", body, {
+            const response = await postWithRetry("https://api.openai.com/v1/chat/completions", body, {
                 headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" }
             });
 
@@ -544,7 +573,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 });
             }
 
-            const response = await axios.post(endpoint, {
+            const response = await postWithRetry(endpoint, {
                 contents: [{ role: "user", parts: parts }],
                 generationConfig: {
                     temperature: 0.2,
@@ -622,7 +651,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 temperature: 0.2
             };
 
-            const response = await axios.post('https://api.opentyphoon.ai/v1/chat/completions', body, {
+            const response = await postWithRetry('https://api.opentyphoon.ai/v1/chat/completions', body, {
                 headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" }
             });
 
@@ -640,7 +669,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             }
 
             const modelName = model && model.startsWith("thaillm") ? "/model" : (model || "/model");
-            const response = await axios.post("https://thaillm.or.th/api/openthaigpt/v1/chat/completions", {
+            const response = await postWithRetry("https://thaillm.or.th/api/openthaigpt/v1/chat/completions", {
                 model: modelName,
                 messages: [{ role: "user", content: tailoredPrompt }],
                 max_tokens: isJson ? 4096 : 2048,
@@ -696,7 +725,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 Math.max(Number(generationOptions && generationOptions.maxOutputTokens) || 8192, 1024),
                 16384
             );
-            const response = await axios.post('https://api.anthropic.com/v1/messages', {
+            const response = await postWithRetry('https://api.anthropic.com/v1/messages', {
                 model: actualModel,
                 max_tokens: anthropicMaxTokens,
                 messages: [{ role: "user", content: tailoredPrompt }],
@@ -732,7 +761,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 ...(isImageRequest ? { generationConfig: { responseModalities: ["IMAGE", "TEXT"] } } : {})
             };
 
-            const response = await axios.post(endpoint, body, {
+            const response = await postWithRetry(endpoint, body, {
                 headers: { "Content-Type": "application/json" }
             });
 
@@ -796,7 +825,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 max_tokens: 4096
             };
 
-            const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", body, {
+            const response = await postWithRetry("https://openrouter.ai/api/v1/chat/completions", body, {
                 headers: {
                     "Authorization": `Bearer ${apiKey}`,
                     "Content-Type": "application/json",
