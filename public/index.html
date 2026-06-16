@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.87)</title>
+    <title>Internship Portfolio (V95.88)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -13467,11 +13467,21 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             return n + ' · ' + time;
         }
 
+        // V95.88: the "📝 Log" activity = Daily Reflection + Learning Note. LN entries
+        // (learning_path_entries) store their time in `createdAt`, not `timestamp`, so
+        // normalize them to the {timestamp} shape the streak helpers expect before merging.
+        function _combinedLogCache() {
+            const logs = window.myReflectiveLogsCache || [];
+            const notes = (window.myLpEntriesCache || []).map(e => ({ timestamp: e.createdAt }));
+            return logs.concat(notes);
+        }
+
         // Union of every day the user did ANY of: daily check-in, reflective log, case submit.
         function collectActivityDates() {
             const set = new Set();
             const add = ts => { if (ts && ts.toDate) set.add(getBangkokDateTimeParts(ts.toDate()).dateKey); };
             (window.myReflectiveLogsCache || []).forEach(l => add(l.timestamp));
+            (window.myLpEntriesCache || []).forEach(n => add(n.createdAt)); // V95.88: Learning Note counts as a Log activity
             (window.myCasesCache || []).forEach(c => add(c.timestamp));
             // reconstruct the stored check-in run (only lastDate + currentStreak are kept client-side)
             const c = myCheckin || {};
@@ -13565,7 +13575,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             }
 
             const checkDone = (myCheckin || {}).lastDate === todayKey;
-            const logDone = _activityDoneToday(window.myReflectiveLogsCache);
+            const logDone = _activityDoneToday(_combinedLogCache()); // V95.88: Daily Reflection OR Learning Note
             const caseDone = _activityDoneToday(window.myCasesCache);
 
             // V95.75: lean single-row card — time moved inline into the chip (was a
@@ -13574,7 +13584,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
             const doneChip = (icon, label, sub) => `<span title="${label} done today${sub ? ` · last ${sub}` : ''}" style="display:inline-flex; align-items:center; gap:4px; padding:5px 9px; border-radius:9px; background:#dcfce7; color:#15803d; font-weight:800; font-size:0.72em; white-space:nowrap;">${icon} ✓${sub ? `<span style="opacity:.65; margin-left:1px;">${sub}</span>` : ''}</span>`;
             const actChip = (icon, label, fn, primary, id, sub) => `<button ${id ? `id="${id}" ` : ''}onclick="${fn}" title="${label}${sub ? ` · last ${sub}` : ''}" style="display:inline-flex; align-items:center; gap:4px; width:auto; padding:5px 10px; border-radius:9px; background:${primary ? 'linear-gradient(135deg,#f97316,#ea580c)' : '#fff7ed'}; color:${primary ? '#fff' : '#c2410c'}; border:${primary ? 'none' : '1px solid #fed7aa'}; font-weight:800; font-size:0.72em; cursor:pointer; white-space:nowrap;">${icon} ${label}${sub ? `<span style="opacity:.7; font-weight:700; margin-left:1px;">· ${sub}</span>` : ''}</button>`;
 
-            const logCap = _activityChipCaption(window.myReflectiveLogsCache);
+            const logCap = _activityChipCaption(_combinedLogCache()); // V95.88: Daily Reflection + Learning Note
             const caseCap = _activityChipCaption(window.myCasesCache);
             const chipCheck = checkDone ? doneChip('✅', 'Check in') : actChip('✅', 'Check in', 'tryDailyCheckin()', true, 'daily-checkin-btn');
             const chipLog = logDone ? doneChip('📝', 'Log', logCap) : actChip('📝', 'Log', 'gotoLog()', false, null, logCap);
@@ -14760,6 +14770,8 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                 }
 
                 // V94.31: NO immediate score, NO checkin_log — admin will set adminBonus on entry to award pts
+                // V95.88: a Learning Note counts toward the unified daily streak — pay the +0.05 if this hits a 7-day multiple
+                awardEngagementBonusIfDue();
 
                 // Reset form
                 document.getElementById('lp-note-title').value = '';
@@ -15550,6 +15562,7 @@ async function archiveDoneCard(cardId) {
                     window.myLpEntriesCache = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(e => !e.deleted);
                     if (typeof renderLnCounter === 'function') renderLnCounter();
                     if (typeof renderLnHistory === 'function') renderLnHistory();
+                    if (typeof renderDailyCheckinCard === 'function') renderDailyCheckinCard(); // V95.88: LN feeds the unified Log chip + streak
                     // V94.33: try deep-link once entries are available (PR 3.2 LINE Flex Message target)
                     if (typeof lnInternHandleDeepLink === 'function') lnInternHandleDeepLink();
                 }, e => {
