@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.05</title>
+    <title>Nika V96.06</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -31621,7 +31621,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 return;
             }
             list.innerHTML = dcaState.drafts.map(draft => {
-                const submitter = draft.submittedByName || draft.submittedBy || 'unknown';
+                // V96.06: show the submitter's profile picture. submittedBy is the
+                // intern's Firebase AUTH uid (never matches usersData, keyed by LINE
+                // id), so resolve the LIVE profile via submittedByUserId — freshest if
+                // the intern changed name/pic. Fall back to the snapshot stored at
+                // submit time (submittedByName/submittedByPictureUrl), then the uid.
+                // Mirrors dcaContribChipHtml's intern-role resolution.
+                const lineId = draft.submittedByUserId || draft.submittedBy;
+                const subUser = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === lineId);
+                const submitterPic = (subUser && subUser.pictureUrl) || draft.submittedByPictureUrl || '';
+                const submitter = (subUser && subUser.displayName) || draft.submittedByName || draft.submittedBy || 'unknown';
+                const submitterAvatar = submitterPic
+                    ? `<img class="dca-contrib-avatar" src="${dcaEscapeHtml(submitterPic)}" alt="" onerror="this.outerHTML='📝'">`
+                    : '📝';
                 const created = draft.createdAt && draft.createdAt.toDate ? draft.createdAt.toDate() : null;
                 const dateStr = created ? created.toLocaleDateString('th-TH') : '—';
                 // V94.35 Phase 5: resolve targetDrugId → published drug name so the
@@ -31645,7 +31657,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         <div class="dca-draft-row-head">
                             <div style="flex:1; min-width:0;">
                                 <div class="dca-row-name">${dcaEscapeHtml(draft.genericName || '(no name)')}</div>
-                                <div class="dca-draft-submitter">submitted by ${dcaEscapeHtml(submitter)} · ${dateStr}</div>
+                                <div class="dca-draft-submitter">${submitterAvatar} submitted by ${dcaEscapeHtml(submitter)} · ${dateStr}</div>
                                 ${notesSnippet}
                             </div>
                             <div class="dca-draft-actions">
