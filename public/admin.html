@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.11</title>
+    <title>Nika V96.12</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1877,19 +1877,38 @@
             white-space: pre-wrap; word-wrap: break-word;
         }
         .dca-form-intern-notes-banner {
-            margin: 0 0 10px; padding: 8px 12px; border-radius: 10px;
+            margin: 0 0 10px; padding: 6px 10px; border-radius: 10px;
             background: linear-gradient(135deg, #ede9fe, #ddd6fe);
             border: 1px solid #c4b5fd; color: #5b21b6;
             font-size: 0.85em; line-height: 1.45;
-            white-space: pre-wrap; word-wrap: break-word;
-            /* V96.08: hard-cap height so a long intern note scrolls in place
-               instead of pushing the tab rail + form down the viewport. */
-            max-height: 96px; overflow-y: auto;
+            word-wrap: break-word;
         }
         .dca-form-intern-notes-banner-label {
             font-size: 0.7em; font-weight: 900; color: #6b21a8;
             text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 2px;
+            flex-shrink: 0;
         }
+        /* V96.12: collapsible intern's-note. Collapsed = label + 1-line preview
+           + ▸ toggle on a single row (was the V96.08 static capped/scroll block,
+           which still ate ~70-96px above the tab rail even for a short note).
+           Expanding reveals the full note, capped + scrollable. */
+        .dca-intern-note-head { display: flex; align-items: center; gap: 6px; }
+        .dca-intern-note-head .dca-form-intern-notes-banner-label { margin-bottom: 0; }
+        .dca-intern-note-preview {
+            flex: 1 1 auto; min-width: 0;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            color: #5b21b6; opacity: 0.8; font-size: 0.95em;
+        }
+        .dca-intern-note-toggle {
+            flex-shrink: 0; border: none; background: none; cursor: pointer;
+            color: #6d28d9; font-weight: 800; font-size: 0.9em; padding: 0 2px; line-height: 1;
+        }
+        .dca-intern-note-body {
+            margin-top: 4px; white-space: pre-wrap; word-wrap: break-word;
+            max-height: 120px; overflow-y: auto;
+        }
+        .dca-intern-note-wrap.is-collapsed .dca-intern-note-body { display: none; }
+        .dca-intern-note-wrap:not(.is-collapsed) .dca-intern-note-preview { display: none; }
         /* V94.38: Form tab navigation — one section visible at a time. Tab badges
            reflect fill status (green=has data, gray=empty, red=required missing).
            Banner sits above tabs so intern-notes context persists across tabs. */
@@ -32841,12 +32860,36 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // banner — pre-wrap renders every raw newline, so leading/trailing
                 // blanks + rapid Enter-presses by the intern would inflate height.
                 const noteText = String(draft.internNotes).replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
-                parts.push(`
-                    <div class="dca-form-intern-notes-banner-label" style="margin-top:${hasTarget ? '8px' : '0'};">📝 intern's note</div>
-                    <div>${dcaEscapeHtml(noteText)}</div>`);
+                parts.push(dcaInternNoteBlockHtml(noteText, hasTarget));
             }
             banner.innerHTML = parts.join('');
             banner.style.display = 'block';
+        }
+
+        // V96.12: collapsible note block, shared by Drug + Disease banners.
+        // Long/multiline notes start collapsed (label + 1-line preview + ▸);
+        // short notes render inline with no toggle. Expanding shows the full
+        // note (capped + scrollable via .dca-intern-note-body).
+        function dcaInternNoteBlockHtml(noteText, hasTarget) {
+            const oneLine = noteText.replace(/\s+/g, ' ').trim();
+            const isLong = noteText.length > 80 || /\n/.test(noteText);
+            const preview = oneLine.length > 80 ? (oneLine.slice(0, 80) + '…') : oneLine;
+            return `<div class="dca-intern-note-wrap${isLong ? ' is-collapsed' : ''}">`
+                + `<div class="dca-intern-note-head"${hasTarget ? ' style="margin-top:6px;"' : ''}>`
+                + `<span class="dca-form-intern-notes-banner-label">📝 intern's note</span>`
+                + (isLong ? `<span class="dca-intern-note-preview">${dcaEscapeHtml(preview)}</span>` : '')
+                + (isLong ? `<button type="button" class="dca-intern-note-toggle" onclick="dcaToggleInternNote(this)" title="ขยาย/ย่อ">▸</button>` : '')
+                + `</div>`
+                + `<div class="dca-intern-note-body">${dcaEscapeHtml(noteText)}</div>`
+                + `</div>`;
+        }
+
+        // V96.12: expand/collapse the intern's-note banner (shared Drug + Disease).
+        function dcaToggleInternNote(btn) {
+            const wrap = btn && btn.closest('.dca-intern-note-wrap');
+            if (!wrap) return;
+            const collapsed = wrap.classList.toggle('is-collapsed');
+            btn.textContent = collapsed ? '▸' : '▾';
         }
 
         function dcaHideInternNotesBanner() {
@@ -33458,6 +33501,21 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // V95.51: contributor pills for a list row. Renamed from dcaListMetaTrailHtml
         // and now wrapped in the inline .dca-row-side-contrib span so the chips sit on
         // the timestamp line in the right column instead of a dedicated bottom row.
+        // V96.12: drop a helper:/author: chip that credits the SAME person as the
+        // intern draft-origin chip. intern: ids are auth uids whose LINE id lives
+        // on doc.submittedByUserId; helper:/author: ids ARE LINE ids. So when an
+        // intern: entry is present, any helper/author whose id === submittedByUserId
+        // is a duplicate of that credit → remove it. Shared by Drug + Disease.
+        function codexDedupeContributors(contribList, doc) {
+            const lineId = doc && doc.submittedByUserId;
+            if (!lineId || !Array.isArray(contribList)) return contribList;
+            if (!contribList.some(c => /^intern:/.test(String(c)))) return contribList;
+            return contribList.filter(c => {
+                const m = /^(?:helper|author):(.+)$/.exec(String(c));
+                return !(m && m[1] === lineId);
+            });
+        }
+
         function dcaListContribChipsHtml(drug) {
             if (!drug) return '';
             const parts = [];
@@ -33465,6 +33523,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (contribList.length === 0 && drug.reviewedBy) {
                 contribList = ['admin:' + drug.reviewedBy];
             }
+            contribList = codexDedupeContributors(contribList, drug);
             if (contribList.length > 0) {
                 const seen = new Set();
                 contribList.forEach(item => {
@@ -33502,6 +33561,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (contribList.length === 0 && data.reviewedBy) {
                 contribList = ['admin:' + data.reviewedBy];
             }
+            contribList = codexDedupeContributors(contribList, data);
             if (contribList.length > 0) {
                 // De-dupe (in case of accidental array of duplicates).
                 const seen = new Set();
@@ -37114,10 +37174,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // V96.07: normalize before render so a short note doesn't balloon the
                 // banner (mirror of dcaShowInternNotesBanner) — pre-wrap renders every
                 // raw newline, so leading/trailing blanks would inflate height.
+                // V96.12: collapsible block shared with Drug Codex.
                 const noteText = String(draft.internNotes).replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
-                parts.push(`
-                    <div class="dca-form-intern-notes-banner-label" style="margin-top:${hasTarget ? '8px' : '0'};">📝 intern's note</div>
-                    <div>${dxaEscapeHtml(noteText)}</div>`);
+                parts.push(dcaInternNoteBlockHtml(noteText, hasTarget));
             }
             banner.innerHTML = parts.join('');
             banner.style.display = 'block';
@@ -37192,6 +37251,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const parts = [];
             let contribList = Array.isArray(disease.contributors) ? disease.contributors.slice() : [];
             if (contribList.length === 0 && disease.reviewedBy) contribList = ['admin:' + disease.reviewedBy];
+            contribList = codexDedupeContributors(contribList, disease);
             if (contribList.length > 0) {
                 const seen = new Set();
                 contribList.forEach(item => {
@@ -37220,6 +37280,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (updatedRel) parts.push(`<span><strong>Updated:</strong> ${dxaEscapeHtml(updatedRel)}</span>`);
             let contribList = Array.isArray(data.contributors) ? data.contributors.slice() : [];
             if (contribList.length === 0 && data.reviewedBy) contribList = ['admin:' + data.reviewedBy];
+            contribList = codexDedupeContributors(contribList, data);
             if (contribList.length > 0) {
                 const seen = new Set();
                 const chips = [];
