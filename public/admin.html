@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.10</title>
+    <title>Nika V96.11</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13503,6 +13503,9 @@
                                  + suggest list aren't wrapped + hidden by lang-toggle.js under
                                  an EN-default body (see feedback_lang_toggle_thai_blank). -->
                             <div id="dca-helper-chips" class="lang-no-toggle" style="margin-bottom:6px;"></div>
+                            <!-- V96.11: quick-pick chips — interns who recently contributed to
+                                 the codex (derived from dcaState.codex), click to add without typing. -->
+                            <div id="dca-helper-suggest-quick" class="lang-no-toggle" style="margin-bottom:6px;"></div>
                             <div style="position:relative;">
                                 <input type="text" id="dca-helper-input" placeholder="พิมพ์ชื่อ user เพื่อค้นหาแล้วเลือก…" autocomplete="off"
                                        oninput="dcaHelperInput()" onblur="setTimeout(dcaHideHelperSuggest, 150)" style="width:100%;">
@@ -31420,6 +31423,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 (b.genericName || ''), undefined, { sensitivity: 'base' }));
                         dcaRenderPublishedList();
                         dcaUpdateCounts();
+                        // V96.11: keep the contributor quick-pick fresh if a form is open
+                        // when codex data (re)arrives. Self-guards when the box is hidden.
+                        dcaRenderHelperSuggestions();
                     }, err => {
                         console.error('[drug-codex] codex snapshot error:', err);
                         const list = document.getElementById('dca-list');
@@ -33285,9 +33291,75 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // dcaState.helpers [{userId(lineId),name,pictureUrl}]; persisted into
         // contributors[] as helper:<lineId> on save. Mirrors the Disease Codex
         // Related-Drugs picker mechanics (input + suggest box + chip row).
+        // V96.11: quick-pick suggestions row. Surfaces interns who already
+        // contributed across the loaded codex (dcaState.codex), ranked by most
+        // recent contribution (tie-break: frequency), filtered to group INTERN,
+        // minus those already added. Clicking a chip runs dcaAddHelper — same
+        // path as picking from the search box — to cut typing for the common
+        // case of re-crediting the same active interns. Self-guards: hides when
+        // codex/users not loaded yet or no eligible candidate remains.
+        function dcaRenderHelperSuggestions() {
+            const box = document.getElementById('dca-helper-suggest-quick');
+            if (!box) return;
+            const codex = (dcaState && Array.isArray(dcaState.codex)) ? dcaState.codex : [];
+            const users = (typeof usersData !== 'undefined' ? usersData : []);
+            if (codex.length === 0 || users.length === 0) { box.style.display = 'none'; box.innerHTML = ''; return; }
+            const tsOf = (d) => {
+                const t = (d && (d.updatedAt || d.createdAt)) || null;
+                if (!t) return 0;
+                if (typeof t.toMillis === 'function') return t.toMillis();
+                if (typeof t.seconds === 'number') return t.seconds * 1000;
+                return 0;
+            };
+            // lineId -> { ts: most-recent contribution, n: how many docs }
+            const agg = new Map();
+            codex.forEach(d => {
+                const ts = tsOf(d);
+                const ids = new Set();
+                (Array.isArray(d.contributors) ? d.contributors : []).forEach(c => {
+                    const s = String(c || '');
+                    const i = s.indexOf(':');
+                    const role = i > 0 ? s.slice(0, i) : '';
+                    const id = i > 0 ? s.slice(i + 1) : s;
+                    // helper/author ids ARE LINE ids; intern id is an auth uid, so
+                    // resolve its LINE id via submittedByUserId (matches usersData).
+                    if (role === 'helper' || role === 'author') ids.add(id);
+                    else if (role === 'intern' && d.submittedByUserId) ids.add(d.submittedByUserId);
+                });
+                if (d.submittedByUserId) ids.add(d.submittedByUserId);
+                ids.forEach(id => {
+                    const cur = agg.get(id) || { ts: 0, n: 0 };
+                    agg.set(id, { ts: Math.max(cur.ts, ts), n: cur.n + 1 });
+                });
+            });
+            const already = new Set((dcaState.helpers || []).map(h => h.userId));
+            const cands = [];
+            agg.forEach((meta, id) => {
+                if (already.has(id)) return;
+                const u = users.find(x => x.id === id);
+                if (!u || String(u.group || '').toUpperCase() !== 'INTERN') return;
+                cands.push({ id, name: u.displayName || '', pic: u.pictureUrl || '', ts: meta.ts, n: meta.n });
+            });
+            cands.sort((a, b) => (b.ts - a.ts) || (b.n - a.n));
+            const top = cands.slice(0, 6);
+            if (top.length === 0) { box.style.display = 'none'; box.innerHTML = ''; return; }
+            box.style.display = 'block';
+            box.innerHTML = '<span style="color:#94a3b8; font-size:0.78em; margin-right:4px;">💡 แนะนำ:</span>'
+                + top.map(c => {
+                    const label = c.name || ('user (' + (c.id.length > 4 ? c.id.slice(-4) : c.id) + ')');
+                    const avatar = c.pic
+                        ? `<img src="${dcaEscapeHtml(c.pic)}" alt="" style="width:16px;height:16px;border-radius:50%;object-fit:cover;" onerror="this.outerHTML='🤝'">`
+                        : '🤝';
+                    return `<button type="button" onclick="dcaAddHelper('${dcaEscapeHtml(c.id)}')" title="เพิ่ม ${dcaEscapeHtml(label)} เป็นผู้ช่วย"`
+                        + ` style="display:inline-flex; align-items:center; gap:4px; margin:2px 4px 2px 0; padding:2px 8px; border-radius:999px; border:1px dashed #99f6e4; background:#f0fdfa; color:#0f766e; font-size:0.85em; cursor:pointer;">`
+                        + `${avatar} ${dcaEscapeHtml(label)} +</button>`;
+                }).join('');
+        }
+
         function dcaRenderHelperChips() {
             const wrap = document.getElementById('dca-helper-chips');
             if (!wrap) return;
+            dcaRenderHelperSuggestions();
             const list = dcaState.helpers || [];
             if (list.length === 0) {
                 wrap.innerHTML = '<span style="color:#94a3b8; font-size:0.85em;">— ยังไม่มีผู้ช่วยลงข้อมูล —</span>';
