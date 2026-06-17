@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.06</title>
+    <title>Nika V96.07</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1877,15 +1877,15 @@
             white-space: pre-wrap; word-wrap: break-word;
         }
         .dca-form-intern-notes-banner {
-            margin: 0 0 12px; padding: 10px 14px; border-radius: 10px;
+            margin: 0 0 10px; padding: 8px 12px; border-radius: 10px;
             background: linear-gradient(135deg, #ede9fe, #ddd6fe);
             border: 1px solid #c4b5fd; color: #5b21b6;
-            font-size: 0.85em; line-height: 1.5;
+            font-size: 0.85em; line-height: 1.45;
             white-space: pre-wrap; word-wrap: break-word;
         }
         .dca-form-intern-notes-banner-label {
             font-size: 0.7em; font-weight: 900; color: #6b21a8;
-            text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 4px;
+            text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 2px;
         }
         /* V94.38: Form tab navigation — one section visible at a time. Tab badges
            reflect fill status (green=has data, gray=empty, red=required missing).
@@ -32828,9 +32828,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 parts.push(`<div><strong>✨ Suggest edit for:</strong> ${dcaEscapeHtml(targetLabel)} <span style="color:#a78bfa; font-size:0.85em;">(${dcaEscapeHtml(draft.targetDrugId)})</span></div>`);
             }
             if (hasNotes) {
+                // V96.07: normalize before render so a short note doesn't balloon the
+                // banner — pre-wrap renders every raw newline, so leading/trailing
+                // blanks + rapid Enter-presses by the intern would inflate height.
+                const noteText = String(draft.internNotes).replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
                 parts.push(`
                     <div class="dca-form-intern-notes-banner-label" style="margin-top:${hasTarget ? '8px' : '0'};">📝 intern's note</div>
-                    <div>${dcaEscapeHtml(String(draft.internNotes))}</div>`);
+                    <div>${dcaEscapeHtml(noteText)}</div>`);
             }
             banner.innerHTML = parts.join('');
             banner.style.display = 'block';
@@ -37027,9 +37031,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 parts.push(`<div><strong>✨ Suggest edit for:</strong> ${dxaEscapeHtml(targetLabel)} <span style="color:#5eead4; font-size:0.85em;">(${dxaEscapeHtml(draft.targetDiseaseId)})</span></div>`);
             }
             if (hasNotes) {
+                // V96.07: normalize before render so a short note doesn't balloon the
+                // banner (mirror of dcaShowInternNotesBanner) — pre-wrap renders every
+                // raw newline, so leading/trailing blanks would inflate height.
+                const noteText = String(draft.internNotes).replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
                 parts.push(`
                     <div class="dca-form-intern-notes-banner-label" style="margin-top:${hasTarget ? '8px' : '0'};">📝 intern's note</div>
-                    <div>${dxaEscapeHtml(String(draft.internNotes))}</div>`);
+                    <div>${dxaEscapeHtml(noteText)}</div>`);
             }
             banner.innerHTML = parts.join('');
             banner.style.display = 'block';
