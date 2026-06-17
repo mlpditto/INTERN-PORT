@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.08</title>
+    <title>Nika V96.09</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -33334,11 +33334,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!term) { box.style.display = 'none'; box.innerHTML = ''; return; }
             const already = new Set((dcaState.helpers || []).map(h => h.userId));
             const pool = (typeof usersData !== 'undefined' ? usersData : []);
+            // V96.09: restrict contributor picker to interns only (group === 'INTERN').
+            // Other groups (Junior/EXTERN/Public) are excluded — this chip credits
+            // intern contributions. Case-insensitive guard against stored-casing drift.
             const matches = pool
-                .filter(u => u && u.id && !already.has(u.id) && String(u.displayName || '').toLowerCase().includes(term))
+                .filter(u => u && u.id && !already.has(u.id)
+                    && String(u.group || '').toUpperCase() === 'INTERN'
+                    && String(u.displayName || '').toLowerCase().includes(term))
                 .slice(0, 8);
             if (matches.length === 0) {
-                box.innerHTML = '<div style="padding:6px 10px; color:#94a3b8; font-size:0.85em;">ไม่พบ user</div>';
+                box.innerHTML = '<div style="padding:6px 10px; color:#94a3b8; font-size:0.85em;">ไม่พบ intern</div>';
                 box.style.display = 'block';
                 return;
             }
