@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.19</title>
+    <title>Nika V96.20</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -31496,6 +31496,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 (b.genericName || ''), undefined, { sensitivity: 'base' }));
                         dcaRenderPublishedList();
                         dcaUpdateCounts();
+                        dcaResolveAuthLinks(); // V96.20: backfill names for pre-V95.92 intern contributors
                         // V96.11: keep the contributor quick-pick fresh if a form is open
                         // when codex data (re)arrives. Self-guards when the box is hidden.
                         dcaRenderHelperSuggestions();
@@ -31511,6 +31512,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         dcaState.drafts = snap.docs.map(d => Object.assign({ _id: d.id }, d.data()));
                         dcaRenderDraftsList();
                         dcaUpdateCounts();
+                        dcaResolveAuthLinks(); // V96.20: resolve old draft submitters lacking submittedByUserId
                     }, err => {
                         // Drafts collection may have zero docs early on; index might still be
                         // building. Don't blast the UI — just log.
@@ -31709,7 +31711,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // the intern changed name/pic. Fall back to the snapshot stored at
                 // submit time (submittedByName/submittedByPictureUrl), then the uid.
                 // Mirrors dcaContribChipHtml's intern-role resolution.
-                const lineId = draft.submittedByUserId || draft.submittedBy;
+                const lineId = draft.submittedByUserId || (window.dcaAuthLinkCache || {})[draft.submittedBy] || draft.submittedBy;
                 const subUser = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === lineId);
                 const submitterPic = (subUser && subUser.pictureUrl) || draft.submittedByPictureUrl || '';
                 const submitter = (subUser && subUser.displayName) || draft.submittedByName || draft.submittedBy || 'unknown';
@@ -33357,6 +33359,51 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return `${dd}/${mm}/${yyyy} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
         }
 
+        // V96.20: live-resolve intern contributors whose draft was submitted BEFORE
+        // the V95.92 capture fix (submittedByUserId saved empty). contributors[] holds
+        // the Firebase AUTH uid; user_auth_links/{authUid} maps it → the LINE id
+        // (effectiveUserId / rawLiffUserId), which usersData is keyed by. Display-only:
+        // nothing is written back. Cache authUid → LINE id; a `null` entry marks
+        // "looked up, no link" so we never refetch. Shared by Drug + Disease.
+        window.dcaAuthLinkCache = window.dcaAuthLinkCache || {};
+        async function dcaResolveAuthLinks() {
+            const cache = window.dcaAuthLinkCache;
+            const need = new Set();
+            const consider = (authUid, submittedByUserId) => {
+                if (!authUid || submittedByUserId) return;            // already resolvable
+                if (Object.prototype.hasOwnProperty.call(cache, authUid)) return; // looked up
+                need.add(authUid);
+            };
+            const scanCodex = (arr) => (arr || []).forEach(doc => {
+                (doc.contributors || []).forEach(c => {
+                    const m = /^intern:(.+)$/.exec(String(c));
+                    if (m) consider(m[1], doc.submittedByUserId);
+                });
+            });
+            scanCodex(typeof dcaState !== 'undefined' && dcaState.codex);
+            scanCodex(typeof dxaState !== 'undefined' && dxaState.codex);
+            ((typeof dcaState !== 'undefined' && dcaState.drafts) || []).forEach(d => consider(d.submittedBy, d.submittedByUserId));
+            ((typeof dxaState !== 'undefined' && dxaState.drafts) || []).forEach(d => consider(d.submittedBy, d.submittedByUserId));
+            if (!need.size) return;
+            need.forEach(a => { cache[a] = null; }); // mark in-flight: concurrent calls skip these, still pick up new uids
+            let added = 0;
+            await Promise.all([...need].map(async authUid => {
+                try {
+                    const snap = await db.collection('user_auth_links').doc(authUid).get();
+                    const data = snap.exists ? (snap.data() || {}) : {};
+                    const lineId = data.effectiveUserId || data.rawLiffUserId || null;
+                    cache[authUid] = lineId;            // null = looked up, no link
+                    if (lineId) added++;
+                } catch (e) { /* leave uncached → retry on a later snapshot */ }
+            }));
+            if (added) {
+                if (typeof dcaRenderPublishedList === 'function') dcaRenderPublishedList();
+                if (typeof dcaRenderDraftsList === 'function') dcaRenderDraftsList();
+                if (typeof dxaRenderPublishedList === 'function') dxaRenderPublishedList();
+                if (typeof dxaRenderDraftsList === 'function') dxaRenderDraftsList();
+            }
+        }
+
         // V94.46: render a single contributor entry as a role-coded pill.
         // identifier is the 'admin:<email>' or 'intern:<uid>' string. Short form
         // = local-part of email (up to 8 chars) for admins, last 4 chars of uid
@@ -33382,7 +33429,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // Fall back to the name/picture snapshot stored at submit time
                 // (submittedByName / submittedByPictureUrl, V95.45), then the short label.
                 const short = id.length > 4 ? id.slice(-4) : id;
-                const lineId = (doc && doc.submittedByUserId) || id;
+                // V96.20: fall back to the auth-link cache (authUid → LINE id) for old
+                // entries whose submittedByUserId was saved empty (pre-V95.92).
+                const lineId = (doc && doc.submittedByUserId) || (window.dcaAuthLinkCache || {})[id] || id;
                 const u = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === lineId);
                 const pic = (u && u.pictureUrl) || (doc && doc.submittedByPictureUrl) || '';
                 const name = (u && u.displayName) || (doc && doc.submittedByName) || ('intern (' + short + ')');
@@ -34873,6 +34922,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 (b.diseaseName || ''), undefined, { sensitivity: 'base' }));
                         dxaRenderPublishedList();
                         dxaUpdateCounts();
+                        dcaResolveAuthLinks(); // V96.20: backfill names for pre-V95.92 intern contributors
                     }, err => {
                         console.error('[disease-codex] codex snapshot error:', err);
                         const list = document.getElementById('dxa-list');
@@ -34887,6 +34937,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         dxaState.drafts = snap.docs.map(d => Object.assign({ _id: d.id }, d.data()));
                         dxaRenderDraftsList();
                         dxaUpdateCounts();
+                        dcaResolveAuthLinks(); // V96.20: resolve old draft submitters lacking submittedByUserId
                     }, err => {
                         // Drafts collection may be empty early on; index might still be
                         // building. Don't blast the UI — just log.
@@ -37384,7 +37435,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // carried on the doc (submittedByUserId) for the LIVE profile; fall back
                 // to the submit-time name/picture snapshot, then the short-uid label.
                 const short = id.length > 4 ? id.slice(-4) : id;
-                const lineId = (doc && doc.submittedByUserId) || id;
+                // V96.20: fall back to the auth-link cache (authUid → LINE id) for old
+                // entries whose submittedByUserId was saved empty (pre-V95.92).
+                const lineId = (doc && doc.submittedByUserId) || (window.dcaAuthLinkCache || {})[id] || id;
                 const u = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === lineId);
                 const pic = (u && u.pictureUrl) || (doc && doc.submittedByPictureUrl) || '';
                 const name = (u && u.displayName) || (doc && doc.submittedByName) || ('intern (' + short + ')');
