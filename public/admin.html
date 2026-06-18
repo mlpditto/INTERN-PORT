@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.16</title>
+    <title>Nika V96.17</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -11762,10 +11762,11 @@
 
                             <!-- V95.12: optional downloadable materials. One per line:
                                  "Name | https://..." (or just the URL). Stored as
-                                 materials:[{name,url}] on the quiz; interns get 📎 links. -->
+                                 materials:[{name,url}] on the quiz; interns get 📎 links.
+                                 V96.17: optional 3rd segment "Name | URL | Description". -->
                             <div style="margin-bottom:8px;">
-                                <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:2px;"><i class="fa-solid fa-paperclip"></i> Materials (optional) <span class="lang-th">— บรรทัดละ 1 ไฟล์: ชื่อ | URL</span></label>
-                                <textarea id="quiz-materials" rows="2" placeholder="Lecture slides | https://drive.google.com/...&#10;https://example.com/handout.pdf" style="width:100%; padding:8px 12px; border:1px solid #334155; border-radius:8px; font-size:0.82em; background:#0f172a; color:#f1f5f9; resize:vertical; font-family:inherit;"></textarea>
+                                <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:2px;"><i class="fa-solid fa-paperclip"></i> Materials (optional) <span class="lang-th">— บรรทัดละ 1 ไฟล์: ชื่อ | URL | คำอธิบาย (ใส่หลายลิงก์ได้ บรรทัดละลิงก์; คำอธิบายไม่ใส่ก็ได้)</span></label>
+                                <textarea id="quiz-materials" rows="3" placeholder="สไลด์เลคเชอร์ | https://drive.google.com/... | อ่านก่อนทำข้อสอบ&#10;ใบงาน PDF | https://example.com/handout.pdf&#10;https://example.com/อ้างอิง.pdf" style="width:100%; padding:8px 12px; border:1px solid #334155; border-radius:8px; font-size:0.82em; background:#0f172a; color:#f1f5f9; resize:vertical; font-family:inherit;"></textarea>
                             </div>
 
                             <!-- V95.17: lean Audience row — Unlock-at-score + Target Group
@@ -20282,24 +20283,35 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         // V95.12: quiz materials — parse the textarea (one per line, "Name | URL"
         // or just a URL) into [{name,url}]; only http(s) URLs are kept. Name
         // defaults to the URL's filename.
+        // V96.17: optional 3rd segment "Name | URL | Description" → {name,url,desc};
+        // desc is only set when non-empty so existing {name,url} docs stay unchanged.
         function parseQuizMaterials(text) {
             return String(text || '').split('\n').map(function (line) {
                 line = line.trim();
                 if (!line) return null;
-                const pipe = line.indexOf('|');
-                let name = '', url = line;
-                if (pipe >= 0) { name = line.slice(0, pipe).trim(); url = line.slice(pipe + 1).trim(); }
+                // URLs never contain '|', so split is safe; desc may, so re-join the tail.
+                const parts = line.split('|');
+                let name = '', url = '', desc = '';
+                if (parts.length >= 3) { name = parts[0].trim(); url = parts[1].trim(); desc = parts.slice(2).join('|').trim(); }
+                else if (parts.length === 2) { name = parts[0].trim(); url = parts[1].trim(); }
+                else { url = parts[0].trim(); }
                 if (!/^https?:\/\//i.test(url)) return null;
                 if (!name) {
                     try { name = decodeURIComponent(url.split('/').pop().split('?')[0]) || 'เอกสาร'; }
                     catch (_) { name = 'เอกสาร'; }
                 }
-                return { name: name.slice(0, 80), url: url };
+                const m = { name: name.slice(0, 80), url: url };
+                if (desc) m.desc = desc.slice(0, 200);
+                return m;
             }).filter(Boolean);
         }
         function serializeQuizMaterials(mats) {
             return (Array.isArray(mats) ? mats : []).filter(function (m) { return m && m.url; })
-                .map(function (m) { return (m.name ? (m.name + ' | ') : '') + m.url; }).join('\n');
+                .map(function (m) {
+                    let s = (m.name ? (m.name + ' | ') : '') + m.url;
+                    if (m.desc && String(m.desc).trim()) s += ' | ' + String(m.desc).trim();
+                    return s;
+                }).join('\n');
         }
 
         function getQuizFormData() {
@@ -26448,7 +26460,9 @@ ${JSON.stringify(sourceObj)}`;
             if (existing) existing.remove();
             const links = mats.map(m => {
                 const name = (m.name && String(m.name).trim()) || 'เอกสาร';
-                return `<a href="${escapeHtml(String(m.url).trim())}" target="_blank" rel="noopener noreferrer" style="display:flex; align-items:center; gap:8px; padding:10px 14px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; border-radius:10px; font-weight:700; text-decoration:none; font-size:0.9em;">📎 ${escapeHtml(name)}</a>`;
+                const desc = (m.desc && String(m.desc).trim()) || '';
+                const descHtml = desc ? `<div style="font-size:0.78em; font-weight:500; color:#64748b; margin-top:2px;">${escapeHtml(desc)}</div>` : '';
+                return `<a href="${escapeHtml(String(m.url).trim())}" target="_blank" rel="noopener noreferrer" style="display:flex; flex-direction:column; align-items:flex-start; gap:0; padding:10px 14px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; border-radius:10px; font-weight:700; text-decoration:none; font-size:0.9em;"><span>📎 ${escapeHtml(name)}</span>${descHtml}</a>`;
             }).join('');
             const overlay = document.createElement('div');
             overlay.id = 'adminQuizMaterialsModal';
