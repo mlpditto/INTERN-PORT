@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.17</title>
+    <title>Nika V96.18</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -14823,6 +14823,8 @@
                                 <button type="button" onclick="loadAiEvals7d()" title="Refresh AI quality" style="background:none; border:1px solid #d8b4fe; color:#7c3aed; font-size:0.85em; padding:3px 9px; border-radius:7px; cursor:pointer;"><i class="fa-solid fa-rotate"></i></button>
                             </div>
                             <div id="ai-evals-7d" style="font-size:0.9em; color:#555;">Open to load…</div>
+                            <!-- V96.18 offline golden-set gate (complements the accept/keep online eval above) -->
+                            <button type="button" onclick="openAiEvalModal()" title="Run representative prompts through a model and check output shape — use before shipping a model/prompt change" style="width:100%; margin-top:8px; background:#faf5ff; color:#7c3aed; border:1px solid #d8b4fe; font-size:0.8em; font-weight:700; padding:6px; border-radius:7px; cursor:pointer;"><i class="fa-solid fa-flask"></i> Run AI Eval (offline golden set)</button>
                         </div>
                         <div style="border-top:1px solid #ddd; margin-top:10px; padding-top:10px;">
                             <div style="font-weight:bold; margin-bottom:5px; color:#667eea;"><i class="fa-solid fa-gauge-high"></i> Quota Status</div>
@@ -49190,6 +49192,234 @@ Reply ONLY with raw JSON, no markdown:
             setInterval(checkForUpdate, POLL_MS);
             window.addEventListener('focus', checkForUpdate);
         })();
+    </script>
+    <!-- ===================================================================
+         V96.18 — AI Evaluation Harness (offline golden-set quality gate)
+         Complements the ONLINE accept/keep eval (recordAiEval → ai_evals/{date},
+         V96.05). This is the OFFLINE half: run representative prompts for the
+         highest-risk AI features through callUniversalAI and apply deterministic
+         shape/format checks. A regression gate to run BEFORE shipping a model-id
+         or prompt change. Results show in a modal; nothing is persisted.
+         Shape-only (v1): JSON validity, required fields, language match,
+         empty/placeholder distractors, translation parity, correct-index range.
+         LIMITATION: the prompts below are representative copies of each feature's
+         contract — they catch model/behaviour regressions across models, NOT
+         silent edits to the production prompt strings. Sharing prompt builders
+         between the real functions and this harness is tracked as v1.1.
+         =================================================================== -->
+    <script>
+    (function () {
+        'use strict';
+
+        // ---- tiny helpers -------------------------------------------------
+        // Language detector limited to the two languages the golden set uses.
+        function evalLang(s) {
+            s = String(s || '');
+            if (/[฀-๿]/.test(s)) return 'th';
+            if (/[A-Za-z]/.test(s)) return 'en';
+            return 'other';
+        }
+        // A value that looks like an unfilled template/placeholder rather than real content.
+        function isPlaceholder(s) {
+            s = String(s == null ? '' : s).trim();
+            if (!s) return true;
+            if (s.includes('<<<') || s.includes('>>>')) return true;
+            if (s.includes('__')) return true;
+            return /^(option|distractor|answer|choice|ตัวเลือก|คำตอบ|ตัวลวง)\s*[a-d0-9]?$/i.test(s);
+        }
+        function chk(name, pass, detail) { return { name: name, pass: !!pass, detail: detail || '' }; }
+
+        // ---- golden set ---------------------------------------------------
+        // Each case: representative prompt + the model the feature ships with +
+        // a checks(parsed, raw) -> [{name,pass,detail}] function.
+        var GOLDEN = [
+            {
+                id: 'analyze-bilingual',
+                feature: 'quiz_analyzer',
+                label: 'Quiz Specialist — bilingual (TH + EN) no language slip',
+                model: 'gemini-2.5-pro',
+                prompt:
+                    'FORMAT CONTRACT — READ FIRST: respond with ONE JSON object only, starting with { and ending with }. No prose, no markdown fences.\n' +
+                    'You are an Assessment Specialist. For EACH source question detect its language from the stem; every "improvedQuestion.q" and its "options" MUST stay in that exact language (never translate). "issue"/"suggestion" are admin-facing Thai.\n' +
+                    'Questions:\n' +
+                    'Q1 (choice): ผู้ป่วยเบาหวานควรตรวจ HbA1c บ่อยแค่ไหน?\nOptions: ทุก 3 เดือน, ทุกสัปดาห์, ทุกวัน, ทุก 5 ปี\n\n' +
+                    'Q2 (choice): Which drug is first-line for uncomplicated hypertension?\nOptions: Amlodipine, Insulin, Warfarin, Salbutamol\n\n' +
+                    'OUTPUT JSON: {"analysisText":"<Thai summary>","items":[{"qNumber":1,"issue":"<Thai>","suggestion":"<Thai>","improvedQuestion":{"q":"<same language as source>","type":"choice","options":["..","..","..",".."],"correct":[1],"explanation":"<same language as q>"}}]}',
+                checks: function (p) {
+                    var out = [];
+                    out.push(chk('valid JSON', p !== null, p === null ? 'safeJsonParse returned null' : ''));
+                    if (!p) return out;
+                    var items = Array.isArray(p.items) ? p.items : null;
+                    out.push(chk('items[] present', !!items && items.length >= 1, items ? (items.length + ' items') : 'items not an array'));
+                    if (!items) return out;
+                    // language fidelity: any improvedQuestion must match its source language.
+                    var srcLang = { 1: 'th', 2: 'en' };
+                    var slips = [];
+                    var placeholders = 0;
+                    items.forEach(function (it) {
+                        var iq = it && it.improvedQuestion;
+                        if (!iq) return;
+                        var want = srcLang[it.qNumber];
+                        if (want && iq.q && evalLang(iq.q) !== 'other' && evalLang(iq.q) !== want) slips.push('Q' + it.qNumber);
+                        (iq.options || []).forEach(function (o) { if (isPlaceholder(o)) placeholders++; });
+                    });
+                    out.push(chk('no language slip', slips.length === 0, slips.length ? ('slipped: ' + slips.join(', ')) : ''));
+                    out.push(chk('no placeholder options', placeholders === 0, placeholders ? (placeholders + ' empty/placeholder options') : ''));
+                    return out;
+                }
+            },
+            {
+                id: 'case-to-quiz-pii',
+                feature: 'case_to_quiz',
+                label: 'Case → Quiz — 5×4 MCQ, PII redacted, valid correct index',
+                model: 'gemini-2.5-pro',
+                prompt:
+                    'You are a medical-education quiz writer. Generate EXACTLY 5 multiple-choice questions (EXACTLY 4 options each) from the case below.\n' +
+                    'STEP 0 — redact PII into "redactedCaseContent": HN/IDs → [HN], patient name → [Patient], ward → [Ward], attending → [Attending], dates → [Date]. Use ONLY the redacted version. No PII anywhere in the output.\n' +
+                    'CASE: ผู้ป่วยชาย HN 0099123 ชื่อ นายสมชาย ใจดี ward Med-2 มาด้วยอาการเจ็บหน้าอก 2 ชั่วโมง ตรวจ ECG พบ ST elevation lead II,III,aVF แพทย์เวร นพ.วิชัย วินิจฉัย inferior STEMI.\n' +
+                    'OUTPUT JSON only (no fences): {"redactedCaseContent":"..","title":"..","questions":[{"q":"..","type":"choice","options":["..","..","..",".."],"correct":[1],"explanation":".."}]}',
+                checks: function (p, raw) {
+                    var out = [];
+                    out.push(chk('valid JSON', p !== null, p === null ? 'safeJsonParse returned null' : ''));
+                    if (!p) return out;
+                    var qs = Array.isArray(p.questions) ? p.questions : null;
+                    out.push(chk('5 questions', !!qs && qs.length === 5, qs ? (qs.length + ' questions') : 'questions not an array'));
+                    var badOpts = 0, badIdx = 0, ph = 0;
+                    (qs || []).forEach(function (q) {
+                        if (!Array.isArray(q.options) || q.options.length !== 4) badOpts++;
+                        (q.options || []).forEach(function (o) { if (isPlaceholder(o)) ph++; });
+                        var ci = Array.isArray(q.correct) ? q.correct : [];
+                        ci.forEach(function (n) { if (typeof n !== 'number' || n < 0 || !q.options || n >= q.options.length) badIdx++; });
+                    });
+                    out.push(chk('every Q has 4 options', !!qs && badOpts === 0, badOpts ? (badOpts + ' Q not 4 options') : ''));
+                    out.push(chk('correct index in range', !!qs && badIdx === 0, badIdx ? (badIdx + ' bad indices') : ''));
+                    out.push(chk('no placeholder options', !!qs && ph === 0, ph ? (ph + ' empty/placeholder') : ''));
+                    // PII leak: the source HN must not survive anywhere in the output.
+                    var leak = /0099123|สมชาย|วิชัย|Med-2/.test(JSON.stringify(p));
+                    out.push(chk('no PII leak', !leak, leak ? 'raw HN/name/ward found in output' : ''));
+                    return out;
+                }
+            },
+            {
+                id: 'translate-th-en',
+                feature: 'quiz_translation',
+                label: 'Quiz translation TH → EN — parity + no Thai leak',
+                model: 'typhoon-v2.5-30b-a3b-instruct',
+                input: { questions: [
+                    { q: 'ยาตัวใดเป็น first-line สำหรับความดันโลหิตสูง?', options: ['Amlodipine', 'Insulin', 'Warfarin', 'Salbutamol'] },
+                    { q: 'HbA1c ควรตรวจบ่อยแค่ไหนในผู้ป่วยเบาหวาน?', options: ['ทุก 3 เดือน', 'ทุกวัน', 'ทุกสัปดาห์', 'ทุก 5 ปี'] }
+                ] },
+                prompt:
+                    'Translate the following quiz from Thai to English. Output ONLY strict valid JSON matching the input schema exactly — same number of questions, same number of options per question, same array order. Translate every "q" and every option. Do not translate drug proper nouns. No markdown fences, no commentary.\n' +
+                    'Source quiz:\n' +
+                    '{"questions":[{"q":"ยาตัวใดเป็น first-line สำหรับความดันโลหิตสูง?","options":["Amlodipine","Insulin","Warfarin","Salbutamol"]},{"q":"HbA1c ควรตรวจบ่อยแค่ไหนในผู้ป่วยเบาหวาน?","options":["ทุก 3 เดือน","ทุกวัน","ทุกสัปดาห์","ทุก 5 ปี"]}]}',
+                checks: function (p) {
+                    var out = [];
+                    out.push(chk('valid JSON', p !== null, p === null ? 'safeJsonParse returned null' : ''));
+                    if (!p) return out;
+                    var qs = Array.isArray(p.questions) ? p.questions : null;
+                    out.push(chk('2 questions (parity)', !!qs && qs.length === 2, qs ? (qs.length + ' questions') : 'questions not an array'));
+                    var badLen = 0, thLeak = 0;
+                    (qs || []).forEach(function (q) {
+                        if (!Array.isArray(q.options) || q.options.length !== 4) badLen++;
+                        if (evalLang(q.q) === 'th') thLeak++;
+                        (q.options || []).forEach(function (o) { if (evalLang(o) === 'th') thLeak++; });
+                    });
+                    out.push(chk('4 options each (parity)', !!qs && badLen === 0, badLen ? (badLen + ' Q wrong option count') : ''));
+                    out.push(chk('no untranslated Thai', !!qs && thLeak === 0, thLeak ? (thLeak + ' Thai strings remain') : ''));
+                    return out;
+                }
+            }
+        ];
+
+        // ---- runner -------------------------------------------------------
+        async function runOne(c, overrideModel) {
+            var model = overrideModel || c.model;
+            var raw = '', parsed = null, err = '';
+            try {
+                var resp = await window.callUniversalAI(model, c.prompt, true, null, '', { feature: 'ai_eval', maxOutputTokens: 16384 });
+                raw = (resp && resp.text) || '';
+                parsed = (typeof window.safeJsonParse === 'function') ? window.safeJsonParse(raw) : null;
+            } catch (e) {
+                err = (e && e.message) || String(e);
+            }
+            var checks = err ? [chk('AI call', false, err)] : c.checks(parsed, raw);
+            var passed = checks.every(function (x) { return x.pass; });
+            return { id: c.id, label: c.label, feature: c.feature, model: model, passed: passed, checks: checks, raw: raw };
+        }
+
+        window.runAiEvalSuite = async function () {
+            var body = document.getElementById('aiEvalBody');
+            var runBtn = document.getElementById('aiEvalRunBtn');
+            if (!body) return;
+            if (runBtn) { runBtn.disabled = true; runBtn.textContent = 'Running…'; }
+            var override = (document.getElementById('aiEvalModelOverride') || {}).value;
+            override = override ? override.trim() : '';
+            var results = [];
+            for (var i = 0; i < GOLDEN.length; i++) {
+                body.innerHTML = renderResults(results) +
+                    '<div style="padding:10px 4px; color:#7c3aed; font-weight:700;">⏳ Running ' + (i + 1) + '/' + GOLDEN.length + ' — ' + escHtml(GOLDEN[i].label) + '…</div>';
+                /* eslint-disable no-await-in-loop */
+                var r = await runOne(GOLDEN[i], override);
+                results.push(r);
+            }
+            body.innerHTML = renderResults(results);
+            if (runBtn) { runBtn.disabled = false; runBtn.textContent = '▶ Run again'; }
+        };
+
+        // ---- rendering ----------------------------------------------------
+        function escHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+            });
+        }
+        function renderResults(results) {
+            if (!results.length) return '<div style="color:#94a3b8; font-style:italic; padding:8px 4px;">Pick a model (optional) and click Run. Each case calls the model and runs shape checks. Uses tokens.</div>';
+            var totalChecks = 0, passChecks = 0, passCases = 0;
+            results.forEach(function (r) { if (r.passed) passCases++; r.checks.forEach(function (c) { totalChecks++; if (c.pass) passChecks++; }); });
+            var summary = '<div style="display:flex; gap:10px; margin-bottom:12px;">' +
+                '<div style="flex:1; background:' + (passCases === results.length ? '#dcfce7' : '#fef2f2') + '; border:1px solid ' + (passCases === results.length ? '#86efac' : '#fecaca') + '; border-radius:10px; padding:10px 12px; font-weight:800; color:' + (passCases === results.length ? '#166534' : '#991b1b') + ';">' +
+                (passCases === results.length ? '✅' : '⚠️') + ' Cases ' + passCases + '/' + results.length + '</div>' +
+                '<div style="flex:1; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:10px; padding:10px 12px; font-weight:800; color:#5b21b6;">Checks ' + passChecks + '/' + totalChecks + '</div></div>';
+            var rows = results.map(function (r) {
+                var head = '<div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">' +
+                    '<span style="font-size:1.05em;">' + (r.passed ? '🟢' : '🔴') + '</span>' +
+                    '<span style="font-weight:800; color:#0f172a;">' + escHtml(r.label) + '</span>' +
+                    '<span style="margin-left:auto; font-size:0.72em; color:#64748b; font-family:monospace;">' + escHtml(r.model) + '</span></div>';
+                var chips = r.checks.map(function (c) {
+                    return '<span title="' + escHtml(c.detail) + '" style="display:inline-flex; align-items:center; gap:4px; font-size:0.74em; font-weight:700; padding:3px 9px; border-radius:999px; margin:2px 4px 2px 0; background:' + (c.pass ? '#ecfdf5' : '#fef2f2') + '; color:' + (c.pass ? '#047857' : '#b91c1c') + '; border:1px solid ' + (c.pass ? '#a7f3d0' : '#fecaca') + ';">' + (c.pass ? '✓' : '✗') + ' ' + escHtml(c.name) + (c.detail ? ' · ' + escHtml(c.detail) : '') + '</span>';
+                }).join('');
+                var rawBlock = r.passed ? '' :
+                    '<details style="margin-top:6px;"><summary style="cursor:pointer; font-size:0.74em; color:#64748b;">raw output (first 600 chars)</summary><pre style="white-space:pre-wrap; word-break:break-word; background:#0f172a; color:#e2e8f0; padding:8px; border-radius:8px; font-size:0.72em; max-height:180px; overflow:auto;">' + escHtml(String(r.raw || '').slice(0, 600)) + '</pre></details>';
+                return '<div style="border:1px solid #e5e7eb; border-radius:12px; padding:10px 12px; margin-bottom:8px;">' + head + '<div>' + chips + '</div>' + rawBlock + '</div>';
+            }).join('');
+            return summary + rows;
+        }
+
+        window.openAiEvalModal = function () {
+            var existing = document.getElementById('aiEvalModal');
+            if (existing) existing.remove();
+            var overlay = document.createElement('div');
+            overlay.id = 'aiEvalModal';
+            overlay.style.cssText = 'position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:100000; display:flex; align-items:center; justify-content:center; padding:20px;';
+            overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
+            overlay.innerHTML =
+                '<div style="background:white; border-radius:16px; padding:20px; max-width:640px; width:100%; max-height:88vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,0.3);">' +
+                  '<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">' +
+                    '<div style="font-weight:900; color:#0f172a; font-size:1.05em;">🧪 AI Eval — offline golden-set gate</div>' +
+                    '<button type="button" onclick="document.getElementById(\'aiEvalModal\').remove()" style="background:none; border:none; font-size:1.2em; cursor:pointer; color:#64748b;">✕</button>' +
+                  '</div>' +
+                  '<div style="font-size:0.76em; color:#64748b; margin-bottom:10px;">Run representative prompts (analyze / case→quiz / translation) through a model and check output shape. Use before shipping a model-id or prompt change. <b>Costs tokens.</b></div>' +
+                  '<div style="display:flex; gap:8px; align-items:center; margin-bottom:12px;">' +
+                    '<input id="aiEvalModelOverride" type="text" placeholder="override model for ALL cases (optional, e.g. gemini-3.5-flash)" style="flex:1; padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.82em;">' +
+                    '<button id="aiEvalRunBtn" type="button" onclick="runAiEvalSuite()" style="background:linear-gradient(135deg,#7c3aed,#a855f7); color:white; border:none; padding:8px 18px; border-radius:8px; font-weight:800; font-size:0.82em; cursor:pointer; white-space:nowrap;">▶ Run</button>' +
+                  '</div>' +
+                  '<div id="aiEvalBody" style="overflow-y:auto; flex:1;"></div>' +
+                '</div>';
+            document.body.appendChild(overlay);
+            document.getElementById('aiEvalBody').innerHTML = renderResults([]);
+        };
+    })();
     </script>
 </body>
 
