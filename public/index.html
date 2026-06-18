@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.94)</title>
+    <title>Internship Portfolio (V95.97)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -7887,6 +7887,21 @@
             list.innerHTML = matched.map(qbRowHtml).join('');
         }
 
+        // V95.97: a material's display name. A bare Storage URL derives an opaque
+        // object-name "filename" (e.g. IQCaqMFQKREBRo-c-...) which admin never typed —
+        // show a friendly "ไฟล์แนบ #N" instead, and middle-ellipsis over-long real names.
+        function looksLikeOpaqueMaterialName(s) {
+            s = String(s || '').trim();
+            if (s.length < 20) return false;
+            if (/\.[a-z0-9]{1,5}$/i.test(s)) return false; // a real file extension → keep it
+            return /^[A-Za-z0-9_-]+$/.test(s);             // base64url-ish token, no spaces
+        }
+        function materialDisplayName(m, i) {
+            const raw = (m && m.name && String(m.name).trim()) || '';
+            if (!raw || looksLikeOpaqueMaterialName(raw)) return 'ไฟล์แนบ #' + ((i | 0) + 1);
+            return raw.length > 40 ? (raw.slice(0, 24) + '…' + raw.slice(-12)) : raw;
+        }
+
         // V95.12: render a quiz's downloadable materials as 📎 link chips
         // (admin pastes "Name | URL" lines → materials:[{name,url}]). '' when none.
         // V95.32: materials unlock ONLY after the intern completes the quiz — before
@@ -7899,15 +7914,15 @@
             // (metaMaterialsChip in renderAssignments) — no body row before completion.
             if (!done) return '';
             const qid = escapeHtml(String((q && q.id) || ''));
-            const links = mats.map(function (m) {
-                const name = (m.name && String(m.name).trim()) || 'เอกสาร';
+            const links = mats.map(function (m, i) {
+                const name = materialDisplayName(m, i);
                 const safeUrl = escapeHtml(String(m.url).trim());
                 // V96.17: optional short description, rendered as a muted subtitle.
                 const desc = (m.desc && String(m.desc).trim()) || '';
                 const descHtml = desc ? '<span style="font-size:0.74em; font-weight:500; color:#64748b;">' + escapeHtml(desc) + '</span>' : '';
                 // V95.63: data-* attrs + onclick feed qzLogMaterialClick (fire-and-forget
                 // download analytics). The href still opens the file regardless of logging.
-                return '<a href="' + safeUrl + '" target="_blank" rel="noopener noreferrer"'
+                return '<a href="' + safeUrl + '" target="_blank" rel="noopener noreferrer" title="' + safeUrl + '"'
                     + ' data-quiz-id="' + qid + '" data-mat-url="' + safeUrl + '" data-mat-name="' + escapeHtml(name) + '"'
                     + ' onclick="qzLogMaterialClick(this)"'
                     + ' style="display:inline-flex; flex-direction:column; align-items:flex-start; gap:1px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; padding:5px 11px; border-radius:8px; font-size:0.82em; font-weight:700; text-decoration:none; margin:3px 6px 3px 0;"><span>📎 ' + escapeHtml(name) + '</span>' + descHtml + '</a>';
