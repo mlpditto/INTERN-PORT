@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.90)</title>
+    <title>Internship Portfolio (V95.91)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -640,10 +640,10 @@
         }
 
         .assign-header {
-            padding: 12px 15px;
+            padding: 11px 14px 8px;
             display: flex;
             align-items: flex-start;
-            gap: 12px;
+            gap: 11px;
             border-bottom: 1px solid #f9f9f9;
         }
 
@@ -697,12 +697,15 @@
         }
 
         .assign-body {
-            padding: 12px 15px;
+            padding: 8px 14px;
             font-size: 0.85em;
             color: #555;
             line-height: 1.4;
             flex-grow: 1;
         }
+        /* lean: collapse the body entirely when it has no content (no deadline/desc/materials)
+           so empty cards don't carry dead vertical space. :empty ignores whitespace-only nodes. */
+        .assign-body:empty { padding: 0; }
 
         .assign-meta {
             display: flex;
@@ -720,9 +723,18 @@
         }
 
         .assign-footer {
-            padding: 12px 15px;
-            background: #fafafa;
-            border-top: 1px solid #f0f0f0;
+            padding: 6px 14px 12px;
+            background: transparent;
+            border-top: none;
+        }
+        /* lean: slimmer quiz CTA — overrides the global button{min-height:48px;padding:12px}.
+           Keeps full width + the inline gradient, just a thinner, quieter bar. */
+        .btn-quiz-cta {
+            min-height: 38px;
+            padding: 9px 16px;
+            font-size: 0.9em;
+            border-radius: 12px;
+            box-shadow: 0 3px 8px rgba(67, 97, 238, 0.22);
         }
 
         /* Status colors */
@@ -7191,11 +7203,23 @@
                         // separators. Type icon + label are color-tinted so Graded (red) vs
                         // Learning Mode (blue) still reads at a glance without a dedicated badge.
                         // 🔥 V91.47: Add Avatar Stack placeholder (will be populated by JS)
-                        quizMetaTitleSuffix = ` <span style="font-size:0.75em; font-weight:normal; color:#888; background:#f0f0f0; padding:2px 8px; border-radius:6px; margin-left:5px;"><i class="fa-solid fa-list-ol" style="font-size:0.8em;"></i> ${itemLabel} items <span style="opacity:0.4; margin:0 3px;">·</span> <i class="fa-solid fa-trophy" style="font-size:0.8em;"></i> ${pointLabel} pts <span style="opacity:0.4; margin:0 3px;">·</span> <i class="fa-solid ${primaryType.icon}" style="font-size:0.8em; color:${primaryType.color};"></i> <span style="color:${primaryType.color}; font-weight:600;">${primaryType.label}</span></span><span class="quiz-avatar-stack" data-quiz-id="${q.id}" style="display:inline-flex; align-items:center;"></span>`;
+                        // V95.91 lean: drop the always-on "Graded Quiz" segment — it's the
+                        // default for ~100% of the roster, so it's pure noise. Only surface the
+                        // non-default Learning Mode type (the meaningful exception).
+                        const typeSeg = (q.quizType === 'read_only')
+                            ? ` <span style="opacity:0.4; margin:0 3px;">·</span> <i class="fa-solid ${primaryType.icon}" style="font-size:0.8em; color:${primaryType.color};"></i> <span style="color:${primaryType.color}; font-weight:600;">${primaryType.label}</span>`
+                            : '';
+                        quizMetaTitleSuffix = ` <span style="font-size:0.75em; font-weight:normal; color:#888; background:#f0f0f0; padding:2px 8px; border-radius:6px; margin-left:5px;"><i class="fa-solid fa-list-ol" style="font-size:0.8em;"></i> ${itemLabel} items <span style="opacity:0.4; margin:0 3px;">·</span> <i class="fa-solid fa-trophy" style="font-size:0.8em;"></i> ${pointLabel} pts${typeSeg}</span><span class="quiz-avatar-stack" data-quiz-id="${q.id}" style="display:inline-flex; align-items:center;"></span>`;
 
-                        // Clean up description if it's identical to title
-                        let displayDesc = q.description || (q.quizType === 'read_only' ? "Learning Material" : "Quiz Assessment");
-                        if (displayDesc === q.title || displayDesc === q.shortTitle) displayDesc = "";
+                        // V95.91 lean: only show a real description. Drop the generic
+                        // "Quiz Assessment"/"Learning Material" fallback (noise, same on every
+                        // card), and hide a description that just restates the title — exact
+                        // match OR a date-prefixed restatement ("20260529 Foo" vs "Foo") OR
+                        // one fully contained in the other.
+                        let displayDesc = q.description || "";
+                        const _normDesc = s => String(s || '').replace(/^\s*\d{6,8}\s+/, '').trim().toLowerCase();
+                        const _nd = _normDesc(displayDesc), _nt = _normDesc(q.title), _ns = _normDesc(q.shortTitle);
+                        if (_nd && (_nd === _nt || _nd === _ns || (_nt && (_nt.includes(_nd) || _nd.includes(_nt))))) displayDesc = "";
 
                         bodyHtml = `
                             ${deadlineHtml}
@@ -7203,10 +7227,10 @@
                         `;
                         const isExpired = (dead && new Date() > dead);
                         if (isExpired) {
-                            actionHtml = `<button class="btn-warning" onclick="requestLateQuiz('${q.id}')" style="background:linear-gradient(135deg, #f39c12 0%, #e67e22 100%); border:none;">📨 Request Late Work</button>`;
+                            actionHtml = `<button class="btn-warning btn-quiz-cta" onclick="requestLateQuiz('${q.id}')" style="background:linear-gradient(135deg, #f39c12 0%, #e67e22 100%); border:none;">📨 Request Late Work</button>`;
                         } else {
                             const btnText = q.quizType === 'read_only' ? '📖 Start Learning' : '🚀 Start Quiz';
-                            actionHtml = `<button class="btn-primary" onclick="confirmRunQuiz('${q.id}')" style="background:linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%); border:none;">${btnText}</button>`;
+                            actionHtml = `<button class="btn-primary btn-quiz-cta" onclick="confirmRunQuiz('${q.id}')" style="background:linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%); border:none;">${btnText}</button>`;
                         }
                     }
 
@@ -7253,7 +7277,7 @@
                             </div>
                             ${isCollapsed ? '<i class="fa-solid fa-chevron-down" style="color:#ccc; font-size:0.9em; margin-left:10px;"></i>' : ''}
                         </div>
-                        <div class="assign-body" style="${isCollapsed ? 'display:none;' : ''}">${bodyHtml}${quizMaterialsHtml(q, quizMaterialsDone)}</div>
+                        <div class="assign-body" style="${isCollapsed ? 'display:none;' : ''}">${(bodyHtml + quizMaterialsHtml(q, quizMaterialsDone)).trim()}</div>
                         <div class="assign-footer" style="${isCollapsed ? 'display:none;' : ''}">${actionHtml}</div>
                     `;
                 }
@@ -7376,13 +7400,14 @@
                             stackEl.innerHTML += `<div class="avatar-more" title="${remaining} more users">+${remaining}</div>`;
                         }
                     } else {
-                        // No completions yet - show placeholder
-                        stackEl.innerHTML = '<div class="avatar-placeholder" title="No completions yet"><i class="fa-solid fa-user"></i></div>';
+                        // V95.91 lean: no completions yet → render nothing (the grey
+                        // person-placeholder was noise on every fresh quiz card).
+                        stackEl.innerHTML = '';
                     }
 
                 } catch (error) {
                     console.error(`Error loading avatars for quiz ${quizId}:`, error);
-                    stackEl.innerHTML = '<div class="avatar-placeholder"><i class="fa-solid fa-user"></i></div>';
+                    stackEl.innerHTML = '';
                 }
             }
         }
@@ -7865,7 +7890,8 @@
             const mats = (q && Array.isArray(q.materials)) ? q.materials.filter(function (m) { return m && m.url; }) : [];
             if (!mats.length) return '';
             if (!done) {
-                return '<div style="margin-top:10px; display:inline-flex; align-items:center; gap:6px; background:#f8fafc; border:1px dashed #cbd5e1; color:#94a3b8; padding:6px 11px; border-radius:8px; font-size:0.78em; font-weight:600;">🔒 📎 เอกสารประกอบ (' + mats.length + ') — ปลดล็อกหลังทำข้อสอบเสร็จ</div>';
+                // V95.91 lean: short locked hint; full explanation moves to the tooltip.
+                return '<div title="ปลดล็อกหลังทำข้อสอบเสร็จ" style="margin-top:8px; display:inline-flex; align-items:center; gap:5px; background:#f8fafc; border:1px dashed #cbd5e1; color:#94a3b8; padding:4px 10px; border-radius:8px; font-size:0.76em; font-weight:600;">🔒 เอกสาร (' + mats.length + ')</div>';
             }
             const qid = escapeHtml(String((q && q.id) || ''));
             const links = mats.map(function (m) {
