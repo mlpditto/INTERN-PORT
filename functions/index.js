@@ -274,20 +274,25 @@ function isAdminToken(decoded) {
 // ai_usage/{YYYY-MM-DD}; atomic FieldValue.increment makes each call a cheap merge
 // (no read), split by provider and caller role (admin / intern). Best-effort:
 // a usage-write failure must never affect the AI response. Tokens only (no $ cost).
-async function recordAiUsage(provider, model, tokens, isAdmin) {
+async function recordAiUsage(provider, model, tokens, isAdmin, feature) {
     try {
         const day = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" }); // YYYY-MM-DD
         const inc = (n) => admin.firestore.FieldValue.increment(n);
         const t = Number(tokens) || 0;
         const role = isAdmin ? "admin" : "intern";
         const prov = provider || "unknown";
+        // V96.14: per-feature cost attribution. Slug sanitized (no dots — Firestore
+        // map-key path safety) and length-capped, mirroring recordAiEval's clean().
+        // Callers that don't tag fall into "untagged" — itself a signal to tag more.
+        const feat = String(feature || "untagged").replace(/[~*/\[\].]/g, "_").slice(0, 60) || "untagged";
         await admin.firestore().collection("ai_usage").doc(day).set({
             date: day,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             totalTokens: inc(t),
             totalCount: inc(1),
             providers: { [prov]: { tokens: inc(t), count: inc(1) } },
-            roles: { [role]: { tokens: inc(t), count: inc(1) } }
+            roles: { [role]: { tokens: inc(t), count: inc(1) } },
+            features: { [feat]: { tokens: inc(t), count: inc(1) } }
         }, { merge: true });
     } catch (e) {
         console.warn("recordAiUsage failed:", e && e.message);
@@ -425,7 +430,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
         if (!decoded) return; // 401 already sent
         const callerIsAdmin = isAdminToken(decoded);
 
-        const { provider, model, prompt, isJson, visionData, generationOptions = {} } = req.body;
+        const { provider, model, prompt, isJson, visionData, generationOptions = {}, feature } = req.body;
         if (!provider || (provider !== "cloud_tts" && !prompt)) {
             return res.status(400).json({ error: "Missing provider or prompt" });
         }
@@ -443,7 +448,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
         const _sendJson = res.json.bind(res);
         res.json = (payload) => {
             if (payload && !payload.error) {
-                recordAiUsage(provider, payload.model || model, payload.tokens, callerIsAdmin);
+                recordAiUsage(provider, payload.model || model, payload.tokens, callerIsAdmin, feature);
             }
             return _sendJson(payload);
         };

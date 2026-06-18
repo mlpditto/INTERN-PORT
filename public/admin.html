@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.13</title>
+    <title>Nika V96.14</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -14992,6 +14992,18 @@
             const BACKUP_PROXY = DIRECT_PROXY;
             if (window.loadAIKeys) window.loadAIKeys();
 
+            // V96.14: per-feature cost attribution. Callers tag a call by passing
+            // generationOptions.feature (a stable slug, same vocabulary as recordAiEval
+            // — e.g. 'quiz_translation', 'ai_review'). We strip it here and send it as a
+            // top-level body field for recordAiUsage; it is NEVER forwarded to the
+            // provider's generation params. Untagged calls record as "untagged".
+            let aiFeature = '';
+            if (generationOptions && generationOptions.feature) {
+                aiFeature = generationOptions.feature;
+                const { feature: _f, ...restGenOpts } = generationOptions;
+                generationOptions = Object.keys(restGenOpts).length ? restGenOpts : null;
+            }
+
             // V94.60: prefix checks moved to TOP of the chain. Before this
             // fix, models like `as/gemini-2.5-flash-image-preview` hit the
             // `includes('gemini')` branch first → routed to provider='gemini'
@@ -15036,7 +15048,7 @@
                     const proxyResponse = await fetch(PROXY_URL, {
                         method: 'POST',
                         headers: await window._aiAuthHeaders(),
-                        body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData, generationOptions: generationOptions || undefined })
+                        body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData, generationOptions: generationOptions || undefined, feature: aiFeature || undefined })
                     });
                     if (proxyResponse.ok) {
                         const proxyData = await proxyResponse.json();
@@ -15049,7 +15061,7 @@
                         const backupResponse = await fetch(BACKUP_PROXY, {
                             method: 'POST',
                             headers: await window._aiAuthHeaders(),
-                            body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData, generationOptions: generationOptions || undefined })
+                            body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData, generationOptions: generationOptions || undefined, feature: aiFeature || undefined })
                         }).catch(() => null);
                         if (backupResponse && backupResponse.ok) {
                             const proxyData = await backupResponse.json();
@@ -15069,7 +15081,7 @@
                     const backupResponse = await fetch(BACKUP_PROXY, {
                         method: 'POST',
                         headers: await window._aiAuthHeaders(),
-                        body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData, generationOptions: generationOptions || undefined })
+                        body: JSON.stringify({ provider: proxyProvider, model: modelName, prompt: prompt, isJson: isJson, visionData: visionData, generationOptions: generationOptions || undefined, feature: aiFeature || undefined })
                     });
                     if (backupResponse.ok) {
                         const proxyData = await backupResponse.json();
@@ -15450,9 +15462,13 @@
                 const snap = await db.collection('ai_usage').where('date', '>=', since).orderBy('date', 'desc').get();
                 if (snap.empty) { el.innerHTML = '<span style="color:#999; font-style:italic;">No server usage recorded yet.</span>'; return; }
                 let grand = 0, html = '';
+                const feats = {}; // V96.14: aggregate per-feature tokens across the 7 days
                 snap.forEach(doc => {
                     const d = doc.data();
                     grand += d.totalTokens || 0;
+                    Object.entries(d.features || {}).forEach(([f, v]) => {
+                        feats[f] = (feats[f] || 0) + ((v || {}).tokens || 0);
+                    });
                     const provs = Object.entries(d.providers || {})
                         .sort((a, b) => ((b[1] || {}).tokens || 0) - ((a[1] || {}).tokens || 0))
                         .map(([p, v]) => `${p} ${((v || {}).tokens || 0).toLocaleString()}`).join(' · ');
@@ -15467,6 +15483,18 @@
                         <div style="color:#999; font-size:0.8em;">${roleStr}</div>
                     </div>`;
                 });
+                // V96.14: "by feature" breakdown — which feature is actually burning
+                // tokens. Sorted desc; "untagged" surfaces how much is not yet tagged.
+                const featRows = Object.entries(feats).sort((a, b) => b[1] - a[1]);
+                if (featRows.length) {
+                    const featStr = featRows
+                        .map(([f, tok]) => `<span style="white-space:nowrap;">${f === 'untagged' ? '<span style="color:#b45309;">untagged</span>' : f} ${tok.toLocaleString()}</span>`)
+                        .join(' · ');
+                    html += `<div style="margin-top:8px; padding-top:6px; border-top:1px dashed #ddd6f5;">
+                        <div style="font-size:0.8em; font-weight:800; color:#6d28d9; margin-bottom:2px;">By feature</div>
+                        <div style="font-size:0.82em; color:#555; line-height:1.7;">${featStr}</div>
+                    </div>`;
+                }
                 html += `<div style="text-align:right; font-weight:900; color:#6d28d9; margin-top:6px;">7-day total: ${grand.toLocaleString()} tokens</div>`;
                 el.innerHTML = html;
             } catch (e) {
@@ -15948,7 +15976,7 @@
                     // can exceed the proxy's default 8192-token cap and truncate mid-JSON,
                     // surfacing as a false "prose instead of JSON" banner. Request a larger
                     // output budget (proxy caps it server-side).
-                    const aiResp = await callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768 });
+                    const aiResp = await callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'quiz_analyzer' });
                     resultRaw = aiResp.text;
                     aiTokens = aiResp.tokens;
                     aiModel = aiResp.model;
@@ -16205,7 +16233,7 @@ RULES:
                 for (let attempt = 1; attempt <= 2; attempt++) {
                     // V95.16: same truncation guard as analyze — a full-quiz audit
                     // (per-question scorecard) can overrun the 8192 default and truncate.
-                    const aiResp = await callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768 });
+                    const aiResp = await callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'quiz_audit' });
                     resultRaw = aiResp.text;
                     aiTokens = aiResp.tokens;
                     aiModel = aiResp.model;
@@ -16387,7 +16415,7 @@ RULES:
             try {
                 let result = null, raw = '', model_used = '', tokens = 0;
                 for (let attempt = 1; attempt <= 2; attempt++) {
-                    const aiResp = await callUniversalAI(model, prompt, true);
+                    const aiResp = await callUniversalAI(model, prompt, true, null, '', { feature: 'case_to_quiz' });
                     raw = aiResp.text; model_used = aiResp.model; tokens = aiResp.tokens;
                     result = safeJsonParse(raw);
                     if (result && Array.isArray(result.questions) && result.questions.length > 0) break;
@@ -19021,7 +19049,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 If the order of options changes, make sure "correctIndices" points at the corresponding version of the original correct answers.`;
                 
                 // Use quick API key if provided, otherwise use stored keys
-                const { text: aiResponse, model: actualModel } = await window.callUniversalAI(selectedModelName, prompt, true, null, quickApiKey);
+                const { text: aiResponse, model: actualModel } = await window.callUniversalAI(selectedModelName, prompt, true, null, quickApiKey, { feature: 'question_enhance' });
                 window.setQuizMagicState(item, 'enhancing');
                 
                 
@@ -22264,7 +22292,7 @@ ${JSON.stringify(sourceObj)}`;
                 // V95.20: a big quiz (e.g. 29 questions × 4 options) translates to long
                 // JSON that overran Typhoon's default output cap and truncated mid-array,
                 // surfacing as "JSON parse failed". Request a larger budget (proxy caps it).
-                const response = await callUniversalAI('typhoon-v2.5-30b-a3b-instruct', prompt, true, null, '', { maxOutputTokens: 16384 });
+                const response = await callUniversalAI('typhoon-v2.5-30b-a3b-instruct', prompt, true, null, '', { maxOutputTokens: 16384, feature: 'quiz_translation' });
                 if (!response || !response.text) { lastErr = 'Empty response'; continue; }
 
                 const parsed = (typeof safeJsonParse === 'function')
@@ -25561,7 +25589,7 @@ ${JSON.stringify(sourceObj)}`;
                   "confidence": 0-100
                 }`;
 
-                const { text: aiResponse } = await window.callUniversalAI("gemini-3.5-flash", prompt, true);
+                const { text: aiResponse } = await window.callUniversalAI("gemini-3.5-flash", prompt, true, null, '', { feature: 'short_answer_eval' });
 
                 // V92.35: use shared safeJsonParse with bracket-extraction fallback
                 const result = safeJsonParse(aiResponse);
@@ -31158,7 +31186,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const resp = await fetch(PROXY_URL, {
                 method: 'POST',
                 headers: await window._aiAuthHeaders(),
-                body: JSON.stringify({ provider: 'typhoon', model: 'typhoon-v2.5-30b-a3b-instruct', prompt, isJson: false })
+                body: JSON.stringify({ provider: 'typhoon', model: 'typhoon-v2.5-30b-a3b-instruct', prompt, isJson: false, feature: 'i18n_translate' })
             });
             if (!resp.ok) throw new Error(`Typhoon HTTP ${resp.status}`);
             const data = await resp.json();
@@ -32349,7 +32377,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     false,     // isJson
                     pvVision,  // V96.01: base image for refine (null = fresh generation)
                     '',        // quickApiKey
-                    { size: '1792x1024' }
+                    { size: '1792x1024', feature: 'pk_visual' }
                 );
                 // V94.62: prefer imageDataUrl/dataUrl over text. The proxy's
                 // gemini-aistudio image-gen branch returns BOTH fields when
@@ -34296,12 +34324,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
             const prompt = dcaBuildReviewPrompt(current, filledLines, internContext);
             try {
-                const resp = await window.callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768 });
+                const resp = await window.callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'ai_review' });
                 const rawText = (resp && resp.text) ? resp.text : (typeof resp === 'string' ? resp : '');
                 if (!rawText) throw new Error('Empty response from AI');
                 let parsed = dcaParseAutoDraftResponse(rawText);
                 if (!parsed) {
-                    const resp2 = await window.callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768 });
+                    const resp2 = await window.callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'ai_review' });
                     const rawText2 = (resp2 && resp2.text) ? resp2.text : (typeof resp2 === 'string' ? resp2 : '');
                     parsed = dcaParseAutoDraftResponse(rawText2);
                     if (!parsed) {
@@ -48157,7 +48185,7 @@ Reply ONLY with raw JSON, no markdown:
 
             try {
                 const model = document.getElementById('ai-model-selector') ? document.getElementById('ai-model-selector').value : 'gpt-4o-mini';
-                const { text } = await window.callUniversalAI(model, prompt);
+                const { text } = await window.callUniversalAI(model, prompt, false, null, '', { feature: 'quiz_feedback' });
                 resultEl.innerHTML = text ? qfpRenderInsightMarkdown(text) : '(No response)';
             } catch (e) {
                 resultEl.innerText = 'Error: ' + e.message;
