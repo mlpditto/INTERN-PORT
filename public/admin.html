@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.20</title>
+    <title>Nika V96.21</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -20282,6 +20282,22 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             showToast(`⏱️ Set all ${timers.length} questions to ${val}s`);
         }
 
+        // V96.21: a material's display name. A bare Storage URL derives an opaque
+        // object-name "filename" (e.g. IQCaqMFQKREBRo-c-lqPwbNuAYQ9nmBg7Kpy...) — show
+        // a friendly "ไฟล์แนบ #N" instead, and middle-ellipsis any over-long real name.
+        // Shared by the parser fallback, the 📎 badge tooltip, and adminOpenQuizMaterials.
+        function looksLikeOpaqueMaterialName(s) {
+            s = String(s || '').trim();
+            if (s.length < 20) return false;
+            if (/\.[a-z0-9]{1,5}$/i.test(s)) return false; // a real file extension → keep it
+            return /^[A-Za-z0-9_-]+$/.test(s);             // base64url-ish token, no spaces
+        }
+        function materialDisplayName(m, i) {
+            const raw = (m && m.name && String(m.name).trim()) || '';
+            if (!raw || looksLikeOpaqueMaterialName(raw)) return 'ไฟล์แนบ #' + ((i | 0) + 1);
+            return raw.length > 40 ? (raw.slice(0, 24) + '…' + raw.slice(-12)) : raw;
+        }
+
         // V95.12: quiz materials — parse the textarea (one per line, "Name | URL"
         // or just a URL) into [{name,url}]; only http(s) URLs are kept. Name
         // defaults to the URL's filename.
@@ -20299,8 +20315,12 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 else { url = parts[0].trim(); }
                 if (!/^https?:\/\//i.test(url)) return null;
                 if (!name) {
-                    try { name = decodeURIComponent(url.split('/').pop().split('?')[0]) || 'เอกสาร'; }
-                    catch (_) { name = 'เอกสาร'; }
+                    // V96.21: don't store an opaque Storage object-name as the name —
+                    // leave it blank so the display layer shows "ไฟล์แนบ #N" instead.
+                    try {
+                        const derived = decodeURIComponent(url.split('/').pop().split('?')[0]) || '';
+                        name = looksLikeOpaqueMaterialName(derived) ? '' : derived;
+                    } catch (_) { name = ''; }
                 }
                 const m = { name: name.slice(0, 80), url: url };
                 if (desc) m.desc = desc.slice(0, 200);
@@ -26171,7 +26191,7 @@ ${JSON.stringify(sourceObj)}`;
                 // V95.31: surface attached downloadable materials so admin can see (and filter)
                 // which quizzes hand interns files after completion. Hover lists the names.
                 const _mats = Array.isArray(q.materials) ? q.materials.filter(m => m && m.url) : [];
-                const materialsLabel = _mats.length > 0 ? `<span class="badge" style="background:#1d4ed8; color:white; margin-left:5px; cursor:pointer;" title="คลิกเพื่อทดสอบโหลดเอกสาร: ${escapeHtml(_mats.map(m => (m.name && String(m.name).trim()) || 'เอกสาร').join(', '))}" onclick="event.stopPropagation(); adminOpenQuizMaterials('${q.id}')">📎 ${_mats.length}</span>` : '';
+                const materialsLabel = _mats.length > 0 ? `<span class="badge" style="background:#1d4ed8; color:white; margin-left:5px; cursor:pointer;" title="คลิกเพื่อทดสอบโหลดเอกสาร: ${escapeHtml(_mats.map((m, i) => materialDisplayName(m, i)).join(', '))}" onclick="event.stopPropagation(); adminOpenQuizMaterials('${q.id}')">📎 ${_mats.length}</span>` : '';
                 // V95.44: หมวด chips mirroring the Dashboard Quiz Coverage widget. Click
                 // opens the same per-system list modal (works from any tab — the modal is
                 // static and covByQuiz guarantees _qcovBuckets is fresh this render).
@@ -26460,11 +26480,12 @@ ${JSON.stringify(sourceObj)}`;
             if (mats.length === 1) { window.open(String(mats[0].url).trim(), '_blank', 'noopener'); return; }
             const existing = document.getElementById('adminQuizMaterialsModal');
             if (existing) existing.remove();
-            const links = mats.map(m => {
-                const name = (m.name && String(m.name).trim()) || 'เอกสาร';
+            const links = mats.map((m, i) => {
+                const name = materialDisplayName(m, i);
                 const desc = (m.desc && String(m.desc).trim()) || '';
                 const descHtml = desc ? `<div style="font-size:0.78em; font-weight:500; color:#64748b; margin-top:2px;">${escapeHtml(desc)}</div>` : '';
-                return `<a href="${escapeHtml(String(m.url).trim())}" target="_blank" rel="noopener noreferrer" style="display:flex; flex-direction:column; align-items:flex-start; gap:0; padding:10px 14px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; border-radius:10px; font-weight:700; text-decoration:none; font-size:0.9em;"><span>📎 ${escapeHtml(name)}</span>${descHtml}</a>`;
+                const fullUrl = escapeHtml(String(m.url).trim());
+                return `<a href="${fullUrl}" target="_blank" rel="noopener noreferrer" title="${fullUrl}" style="display:flex; flex-direction:column; align-items:flex-start; gap:0; padding:10px 14px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; border-radius:10px; font-weight:700; text-decoration:none; font-size:0.9em; word-break:break-word;"><span>📎 ${escapeHtml(name)}</span>${descHtml}</a>`;
             }).join('');
             const overlay = document.createElement('div');
             overlay.id = 'adminQuizMaterialsModal';
