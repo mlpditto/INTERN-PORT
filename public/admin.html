@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.18</title>
+    <title>Nika V96.19</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -33123,13 +33123,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // V95.71: carry the LINE user id so the contributor chip can resolve
                     // the LIVE profile from usersData (contributors[] holds the Auth uid).
                     if (draftDoc && draftDoc.submittedByUserId) payload.submittedByUserId = draftDoc.submittedByUserId;
+                    // V96.19: award the intern contributor (blank/0/Cancel = publish, no points).
+                    const _dcaEditBonus = dcaPromptContributorBonus(payload.genericName);
                     const batch = db.batch();
                     const newRef = db.collection('drug_codex').doc();
                     batch.set(newRef, Object.assign({ createdAt: nowTs }, payload));
                     const draftRef = db.collection('drug_codex_drafts').doc(dcaState.editingId);
                     batch.update(draftRef, { status: 'approved', approvedAt: nowTs, approvedBy: reviewerEmail, publishedId: newRef.id });
+                    const _dcaEditAwarded = dcaQueueCodexContributorAward(batch, draftDoc && draftDoc.submittedByUserId, _dcaEditBonus, 'drug_codex', payload.genericName, newRef.id);
                     await batch.commit();
-                    if (typeof showToast === 'function') showToast(`✅ Published "${payload.genericName}" from draft`);
+                    if (typeof showToast === 'function') showToast(`✅ Published "${payload.genericName}" from draft${_dcaEditAwarded ? ` (+${_dcaEditAwarded} pts)` : ''}`);
                 } else if (dcaState.editingId) {
                     // V95.93: rebuild contributors[] from a literal (no longer arrayUnion)
                     // so the helper picker is authoritative — adding AND removing a 🤝
@@ -33168,10 +33171,42 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         }
 
+        // V96.19: award an intern contributor for an approved codex draft. Mirrors the
+        // quiz/note approval pattern (users/{id}.score increment + a checkin_logs entry,
+        // admin.html:25705 / 46047) so codex contributions land in the SAME leaderboard +
+        // activity log. Adds the two writes to an already-open batch; no-op unless there's
+        // an intern submitter (submittedByUserId = the users/{id} doc id) + positive bonus.
+        // v1 = new draft approvals only (drug + disease, as-is + Review & Edit).
+        function dcaQueueCodexContributorAward(batch, submitterId, bonus, codexType, label, publishedId) {
+            if (!submitterId || !(bonus > 0)) return 0;
+            batch.update(db.collection('users').doc(submitterId),
+                { score: firebase.firestore.FieldValue.increment(bonus) });
+            batch.set(db.collection('checkin_logs').doc(), {
+                userId: submitterId,
+                type: codexType,
+                amount: bonus,
+                note: ('Codex contribution approved: ' + (label || '')).slice(0, 200),
+                relatedSubmissionId: publishedId || '',
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            return bonus;
+        }
+        // V96.19: ask the admin how many points to award the intern contributor (blank/0/
+        // Cancel = none). Used by the Review & Edit publish paths (the as-is paths fold the
+        // amount into their approve prompt). Returns a non-negative integer.
+        function dcaPromptContributorBonus(name) {
+            const s = prompt('คะแนนที่จะให้ผู้ contribute "' + (name || '') + '" (เว้นว่าง/0 = ไม่ให้):', '5');
+            return Math.max(0, parseInt(s, 10) || 0);
+        }
+
         async function dcaApproveDraft(draftId, btn) {
             const draft = dcaState.drafts.find(d => d._id === draftId);
             if (!draft) return;
-            if (!confirm(`Approve and publish "${draft.genericName || draftId}" to Drug Codex as-is? (Use "Review & Edit" if you want to edit fields before publishing.)`)) return;
+            // V96.19: prompt doubles as the approve gate AND the contributor reward input.
+            // Cancel = don't approve; blank/0 = approve without awarding points.
+            const _dcaBonusStr = prompt(`Approve & publish "${draft.genericName || draftId}" to Drug Codex as-is?\n(Use "Review & Edit" to edit fields first.)\n\nPoints to award the intern contributor (blank/0 = none):`, '5');
+            if (_dcaBonusStr === null) return;
+            const contributorBonus = Math.max(0, parseInt(_dcaBonusStr, 10) || 0);
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
             const nowTs = firebase.firestore.FieldValue.serverTimestamp();
             const reviewerEmail = (auth.currentUser && auth.currentUser.email) || 'admin-ui';
@@ -33210,8 +33245,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 batch.set(newRef, payload);
                 const draftRef = db.collection('drug_codex_drafts').doc(draftId);
                 batch.update(draftRef, { status: 'approved', approvedAt: nowTs, approvedBy: reviewerEmail, publishedId: newRef.id });
+                // V96.19: credit the intern contributor in the same leaderboard + checkin log.
+                const _awarded = dcaQueueCodexContributorAward(batch, draft.submittedByUserId, contributorBonus, 'drug_codex', payload.genericName, newRef.id);
                 await batch.commit();
-                if (typeof showToast === 'function') showToast(`✅ Approved "${payload.genericName}"`);
+                if (typeof showToast === 'function') showToast(`✅ Approved "${payload.genericName}"${_awarded ? ` (+${_awarded} pts)` : ''}`);
             } catch (err) {
                 console.error('[drug-codex] approve failed:', err);
                 alert('Approve failed: ' + (err && err.message ? err.message : 'unknown error'));
@@ -36334,13 +36371,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     if (draftDoc && draftDoc.submittedByPictureUrl) payload.submittedByPictureUrl = draftDoc.submittedByPictureUrl;
                     // V95.71: carry the LINE user id for live usersData resolution in the chip.
                     if (draftDoc && draftDoc.submittedByUserId) payload.submittedByUserId = draftDoc.submittedByUserId;
+                    // V96.19: award the intern contributor (blank/0/Cancel = publish, no points).
+                    const _dxaEditBonus = dcaPromptContributorBonus(payload.diseaseName);
                     const batch = db.batch();
                     const newRef = db.collection('disease_codex').doc();
                     batch.set(newRef, Object.assign({ createdAt: nowTs }, payload));
                     const draftRef = db.collection('disease_codex_drafts').doc(dxaState.editingId);
                     batch.update(draftRef, { status: 'approved', approvedAt: nowTs, approvedBy: reviewerEmail, publishedId: newRef.id });
+                    const _dxaEditAwarded = dcaQueueCodexContributorAward(batch, draftDoc && draftDoc.submittedByUserId, _dxaEditBonus, 'disease_codex', payload.diseaseName, newRef.id);
                     await batch.commit();
-                    if (typeof showToast === 'function') showToast(`✅ Published "${payload.diseaseName}" from draft`);
+                    if (typeof showToast === 'function') showToast(`✅ Published "${payload.diseaseName}" from draft${_dxaEditAwarded ? ` (+${_dxaEditAwarded} pts)` : ''}`);
                 } else if (dxaState.editingId) {
                     payload.contributors = firebase.firestore.FieldValue.arrayUnion('admin:' + reviewerEmail);
                     await db.collection('disease_codex').doc(dxaState.editingId).update(payload);
@@ -37169,7 +37209,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         async function dxaApproveDraft(draftId, btn) {
             const draft = dxaState.drafts.find(d => d._id === draftId);
             if (!draft) return;
-            if (!confirm(`Approve and publish "${draft.diseaseName || draftId}" to Disease Codex as-is? (Use "Review & Edit" if you want to edit fields before publishing.)`)) return;
+            // V96.19: prompt doubles as the approve gate AND the contributor reward input.
+            // Cancel = don't approve; blank/0 = approve without awarding points.
+            const _dxaBonusStr = prompt(`Approve & publish "${draft.diseaseName || draftId}" to Disease Codex as-is?\n(Use "Review & Edit" to edit fields first.)\n\nPoints to award the intern contributor (blank/0 = none):`, '5');
+            if (_dxaBonusStr === null) return;
+            const contributorBonus = Math.max(0, parseInt(_dxaBonusStr, 10) || 0);
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
             const nowTs = firebase.firestore.FieldValue.serverTimestamp();
             const reviewerEmail = (auth.currentUser && auth.currentUser.email) || 'admin-ui';
@@ -37210,8 +37254,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 batch.set(newRef, payload);
                 const draftRef = db.collection('disease_codex_drafts').doc(draftId);
                 batch.update(draftRef, { status: 'approved', approvedAt: nowTs, approvedBy: reviewerEmail, publishedId: newRef.id });
+                // V96.19: credit the intern contributor in the same leaderboard + checkin log.
+                const _awarded = dcaQueueCodexContributorAward(batch, draft.submittedByUserId, contributorBonus, 'disease_codex', payload.diseaseName, newRef.id);
                 await batch.commit();
-                if (typeof showToast === 'function') showToast(`✅ Approved "${payload.diseaseName}"`);
+                if (typeof showToast === 'function') showToast(`✅ Approved "${payload.diseaseName}"${_awarded ? ` (+${_awarded} pts)` : ''}`);
             } catch (err) {
                 console.error('[disease-codex] approve failed:', err);
                 alert('Approve failed: ' + (err && err.message ? err.message : 'unknown error'));
