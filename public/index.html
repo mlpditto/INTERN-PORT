@@ -7251,9 +7251,17 @@
                     const quizMaterialsDone = !!attempt && (['completed', 'graded', 'approved', 'pending'].indexOf(attempt.status) >= 0 || (attempt.totalQuestions && attempt.totalQuestions > 0));
                     // V95.93 lean: locked-materials indicator rides the meta line next to pts
                     // (was its own body row). Unlocked 📎 download links still live in the body.
+                    // V95.96: once unlocked AND the card is collapsed (e.g. answers reviewed →
+                    // .assign-body display:none), the body's 📎 links are hidden with no hint,
+                    // so interns "can't find the download". Surface an active 📎 chip on the
+                    // always-visible meta line; the header's onclick expands the card to reveal links.
                     const _metaMats = (q && Array.isArray(q.materials)) ? q.materials.filter(m => m && m.url) : [];
-                    const metaMaterialsChip = (_metaMats.length && !quizMaterialsDone)
+                    const metaMaterialsChip = !_metaMats.length
+                        ? ''
+                        : !quizMaterialsDone
                         ? ` <span title="ปลดล็อกหลังทำข้อสอบเสร็จ" style="display:inline-block; vertical-align:middle; font-size:0.72em; font-weight:600; color:#94a3b8; background:#f8fafc; border:1px dashed #cbd5e1; padding:1px 7px; border-radius:6px; margin-left:5px;">🔒 เอกสาร (${_metaMats.length})</span>`
+                        : isCollapsed
+                        ? ` <span title="กดเพื่อเปิดดูเอกสารประกอบ" style="display:inline-block; vertical-align:middle; font-size:0.72em; font-weight:600; color:#1d4ed8; background:#eff6ff; border:1px solid #bfdbfe; padding:1px 7px; border-radius:6px; margin-left:5px;">📎 เอกสาร (${_metaMats.length})</span>`
                         : '';
 
                     // V94.46/V94.48: card tint by state.
@@ -9722,10 +9730,14 @@
         function renderFeedbackTopicChips() {
             const rail = document.getElementById('fb-topic-chip-rail');
             if (!rail) return;
+            // V95.95: internal/system tags (e.g. AI_VARIANT marker on AI-generated
+            // quiz sets) must not surface as user-facing topic chips.
+            const FB_TOPIC_TAG_DENYLIST = new Set(['AI_VARIANT']);
             const counts = {};
             (quizzesCache || []).forEach(q => {
                 if (!q || !q.tags) return;
                 String(q.tags).split(',').map(t => t.trim()).filter(Boolean).forEach(t => {
+                    if (FB_TOPIC_TAG_DENYLIST.has(t)) return;
                     counts[t] = (counts[t] || 0) + 1;
                 });
             });
