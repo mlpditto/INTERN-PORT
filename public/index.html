@@ -9715,10 +9715,14 @@
         function renderFeedbackTopicChips() {
             const rail = document.getElementById('fb-topic-chip-rail');
             if (!rail) return;
+            // V95.95: internal/system tags (e.g. AI_VARIANT marker on AI-generated
+            // quiz sets) must not surface as user-facing topic chips.
+            const FB_TOPIC_TAG_DENYLIST = new Set(['AI_VARIANT']);
             const counts = {};
             (quizzesCache || []).forEach(q => {
                 if (!q || !q.tags) return;
                 String(q.tags).split(',').map(t => t.trim()).filter(Boolean).forEach(t => {
+                    if (FB_TOPIC_TAG_DENYLIST.has(t)) return;
                     counts[t] = (counts[t] || 0) + 1;
                 });
             });
