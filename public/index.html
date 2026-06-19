@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.97)</title>
+    <title>Internship Portfolio (V95.98)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -8561,7 +8561,7 @@
             return 'en';
         }
 
-        async function qtTranslateText(text, targetLang) {
+        async function qtTranslateText(text, targetLang, feature = 'intern_translate') {
             if (!text || !text.trim()) return { text: text || '', source: 'empty' };
             if (targetLang === 'orig') return { text, source: 'orig' };
 
@@ -8590,7 +8590,7 @@
             const resp = await fetch(PROXY_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + _idToken },
-                body: JSON.stringify({ provider: 'typhoon', model: 'typhoon-v2.5-30b-a3b-instruct', prompt, isJson: false })
+                body: JSON.stringify({ provider: 'typhoon', model: 'typhoon-v2.5-30b-a3b-instruct', prompt, isJson: false, feature })
             });
             if (!resp.ok) throw new Error(`Typhoon HTTP ${resp.status}`);
             const data = await resp.json();
@@ -8609,9 +8609,9 @@
             // V94.57: translate q.content too (read-only Learn mode long-form body).
             // Parallel with q + options — no extra wall-clock cost.
             const [qResult, optResults, contentResult] = await Promise.all([
-                qtTranslateText(q.q || '', targetLang),
-                Promise.all(opts.map(o => qtTranslateText(o || '', targetLang).catch(() => ({ text: o, source: 'failed' })))),
-                qtTranslateText(q.content || '', targetLang).catch(() => ({ text: q.content || '', source: 'failed' }))
+                qtTranslateText(q.q || '', targetLang, 'intern_quiz_translate'),
+                Promise.all(opts.map(o => qtTranslateText(o || '', targetLang, 'intern_quiz_translate').catch(() => ({ text: o, source: 'failed' })))),
+                qtTranslateText(q.content || '', targetLang, 'intern_quiz_translate').catch(() => ({ text: q.content || '', source: 'failed' }))
             ]);
             const translated = {
                 q: qResult.text,
@@ -8693,7 +8693,7 @@
                 const raw = localStorage.getItem(cacheKey);
                 if (raw) { const parsed = JSON.parse(raw); return { ...parsed, source: 'cached' }; }
             } catch (_) {}
-            const result = await qtTranslateText(currentQuiz.caseContent, targetLang);
+            const result = await qtTranslateText(currentQuiz.caseContent, targetLang, 'intern_quiz_translate');
             const data = { text: result.text, source: result.source };
             try { localStorage.setItem(cacheKey, JSON.stringify(data)); }
             catch (e) {
@@ -11177,7 +11177,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     if (typeof adminText === 'string' && adminText.trim()) {
                         return Promise.resolve({ text: adminText, source: 'manual' });
                     }
-                    return qtTranslateText(drug[key] || '', lang)
+                    return qtTranslateText(drug[key] || '', lang, 'intern_drug_translate')
                         .catch(() => ({ text: drug[key] || '', source: 'failed' }));
                 })
             );
@@ -11571,7 +11571,7 @@ ${incorrectQuestions.length > 0 ? `พบจุดอ่อนในหัวข
                     if (typeof adminText === 'string' && adminText.trim()) {
                         return Promise.resolve({ text: adminText, source: 'manual' });
                     }
-                    return qtTranslateText(disease[key] || '', lang)
+                    return qtTranslateText(disease[key] || '', lang, 'intern_disease_translate')
                         .catch(() => ({ text: disease[key] || '', source: 'failed' }));
                 })
             );
