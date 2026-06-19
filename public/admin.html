@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.21</title>
+    <title>Nika V96.22</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -33715,15 +33715,27 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // V96.12: drop a helper:/author: chip that credits the SAME person as the
         // intern draft-origin chip. intern: ids are auth uids whose LINE id lives
         // on doc.submittedByUserId; helper:/author: ids ARE LINE ids. So when an
-        // intern: entry is present, any helper/author whose id === submittedByUserId
+        // intern: entry is present, any helper/author whose id === that LINE id
         // is a duplicate of that credit → remove it. Shared by Drug + Disease.
+        // V96.22: resolve each intern: entry's effective LINE id the SAME way the
+        // chip does (submittedByUserId → dcaAuthLinkCache[uid] → raw uid). Pre-V96.22
+        // used only doc.submittedByUserId, so legacy docs with an empty
+        // submittedByUserId (the exact case the V96.20 auth-link cache exists for)
+        // left the duplicate visible — intern chip + author/helper chip for one human.
         function codexDedupeContributors(contribList, doc) {
-            const lineId = doc && doc.submittedByUserId;
-            if (!lineId || !Array.isArray(contribList)) return contribList;
-            if (!contribList.some(c => /^intern:/.test(String(c)))) return contribList;
+            if (!Array.isArray(contribList)) return contribList;
+            const cache = (typeof window !== 'undefined' && window.dcaAuthLinkCache) || {};
+            const internLineIds = new Set();
+            contribList.forEach(c => {
+                const m = /^intern:(.+)$/.exec(String(c));
+                if (!m) return;
+                const lineId = (doc && doc.submittedByUserId) || cache[m[1]] || m[1];
+                if (lineId) internLineIds.add(lineId);
+            });
+            if (internLineIds.size === 0) return contribList;
             return contribList.filter(c => {
                 const m = /^(?:helper|author):(.+)$/.exec(String(c));
-                return !(m && m[1] === lineId);
+                return !(m && internLineIds.has(m[1]));
             });
         }
 
@@ -33915,7 +33927,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (btn) { btn.disabled = true; if (btnTxt) btnTxt.textContent = '⏳'; }
             resEl.style.display = 'block';
             resEl.classList.remove('panel');
-            resEl.innerHTML = '<div class="dca-ndi-hint">กำลังค้นจากฐานข้อมูล อย. …</div>';
+            resEl.innerHTML = '<div class="dca-ndi-hint">กำลังค้นจากฐานข้อมูล …</div>';
             try {
                 const resp = await fetch('https://us-central1-intern-port-edfa7.cloudfunctions.net/ndiBrandLookup', {
                     method: 'POST',
