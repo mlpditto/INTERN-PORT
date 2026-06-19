@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V95.99)</title>
+    <title>Internship Portfolio (V96.00)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4633,7 +4633,7 @@
         <div class="modal-content" style="max-width:600px;">
             <span class="close-modal"
                 onclick="document.getElementById('quizResultModal').style.display='none'">&times;</span>
-            <h3>📊 Quiz Results ผลการสอบ</h3>
+            <h3 style="display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap;"><span>📊 Quiz Results ผลการสอบ</span><span id="quizResultMatsInline" class="lang-no-toggle" style="display:inline-flex; gap:6px; flex-wrap:wrap; align-items:center;"></span></h3>
             <div id="quiz-result-container" style="margin-top:20px;"></div>
             <button class="btn-primary" onclick="document.getElementById('quizResultModal').style.display='none'"
                 style="width:100%; margin-top:20px;">Close</button>
@@ -7915,7 +7915,7 @@
         // V95.32: materials unlock ONLY after the intern completes the quiz — before
         // that, show a locked hint (don't expose the download). `done` is passed by
         // the Mission card (true when the attempt is graded/submitted).
-        function quizMaterialsHtml(q, done) {
+        function quizMaterialsHtml(q, done, opts) {
             const mats = (q && Array.isArray(q.materials)) ? q.materials.filter(function (m) { return m && m.url; }) : [];
             if (!mats.length) return '';
             // V95.93 lean: the locked hint now rides the meta line next to pts
@@ -7935,6 +7935,9 @@
                     + ' onclick="qzLogMaterialClick(this)"'
                     + ' style="display:inline-flex; flex-direction:column; align-items:flex-start; gap:1px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; padding:5px 11px; border-radius:8px; font-size:0.82em; font-weight:700; text-decoration:none; margin:3px 6px 3px 0;"><span>📎 ' + escapeHtml(name) + '</span>' + descHtml + '</a>';
             }).join('');
+            // V96.00: inline mode returns bare chips (no "เอกสารประกอบ" label / wrapper)
+            // so the Quiz Results header can carry them on one line.
+            if (opts && opts.inline) return links;
             return '<div style="margin-top:10px;"><div style="font-size:0.78em; color:#64748b; font-weight:700; margin-bottom:4px;">📎 เอกสารประกอบ</div><div style="display:flex; flex-wrap:wrap;">' + links + '</div></div>';
         }
 
@@ -9150,16 +9153,17 @@
             let html = "";
             let totalScore = 0;
 
-            // V96.25: lead the review with the quiz title + its downloadable
-            // materials, so the learner knows which quiz this is and can pull the
-            // source files. Materials are unlocked here (the attempt is already
-            // submitted → done=true). lang-no-toggle: the title is user-authored
-            // content (often Thai-only) and must survive EN-only mode.
-            html += `<div class="lang-no-toggle" style="text-align:center; margin-bottom:14px;">
+            // V96.00: lead the review with the quiz title on its own row. The quiz's
+            // downloadable materials ride INLINE on the "Quiz Results" header line
+            // (#quizResultMatsInline) for a leaner layout. Materials are unlocked here
+            // (attempt is already submitted → done=true). Setting the slot to '' when
+            // there are none also clears any leftover from a prior render.
+            // lang-no-toggle: title is user-authored content (often Thai-only).
+            html += `<div class="lang-no-toggle" style="text-align:center; margin-bottom:16px;">
                 <div style="font-size:1.15em; font-weight:800; color:#1e293b; line-height:1.35;"><i class="fa-solid fa-clipboard-question" style="color:#4361ee; margin-right:7px;"></i>${q.title || q.shortTitle || 'Quiz'}</div>
             </div>`;
-            const _resultMatsHtml = (typeof quizMaterialsHtml === 'function') ? quizMaterialsHtml(q, true) : '';
-            if (_resultMatsHtml) html += `<div style="margin-bottom:18px;">${_resultMatsHtml}</div>`;
+            const _resultMatsSlot = document.getElementById('quizResultMatsInline');
+            if (_resultMatsSlot) _resultMatsSlot.innerHTML = (typeof quizMaterialsHtml === 'function') ? (quizMaterialsHtml(q, true, { inline: true }) || '') : '';
 
             // 🔥 Feedback Display (V84.6)
             if (attempt.adminComment) {
@@ -9653,6 +9657,10 @@
         // 🔥 V78: Show practice result — only shows which questions user got RIGHT (no answer key for wrong ones)
         function showPracticeResult(quiz, correctCount, answers) {
             const resultContainer = document.getElementById('quiz-result-container');
+            // V96.00: practice mode has no materials — clear the inline header slot so
+            // it can't leak from a prior viewQuizAnswers render of this shared modal.
+            const _pracMatsSlot = document.getElementById('quizResultMatsInline');
+            if (_pracMatsSlot) _pracMatsSlot.innerHTML = '';
             // V94.50: bilingual subtitle so EN-only mode still reads.
             let html = `
                 <div style="text-align:center; margin-bottom:20px; padding:20px; background:linear-gradient(135deg, #fff3cd, #ffeaa7); border-radius:12px;">
