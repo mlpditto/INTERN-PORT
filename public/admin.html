@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.24</title>
+    <title>Nika V96.25</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -33256,7 +33256,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // the LIVE profile from usersData (contributors[] holds the Auth uid).
                     if (draftDoc && draftDoc.submittedByUserId) payload.submittedByUserId = draftDoc.submittedByUserId;
                     // V96.19: award the intern contributor (blank/0/Cancel = publish, no points).
-                    const _dcaEditBonus = dcaPromptContributorBonus(payload.genericName);
+                    const _dcaEditBonus = await dcaPromptContributorBonus(payload.genericName);
                     const batch = db.batch();
                     const newRef = db.collection('drug_codex').doc();
                     batch.set(newRef, Object.assign({ createdAt: nowTs }, payload));
@@ -33323,22 +33323,79 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             });
             return bonus;
         }
-        // V96.19: ask the admin how many points to award the intern contributor (blank/0/
-        // Cancel = none). Used by the Review & Edit publish paths (the as-is paths fold the
-        // amount into their approve prompt). Returns a non-negative integer.
-        function dcaPromptContributorBonus(name) {
-            const s = prompt('คะแนนที่จะให้ผู้ contribute "' + (name || '') + '" (เว้นว่าง/0 = ไม่ให้):', '5');
-            return Math.max(0, parseInt(s, 10) || 0);
+        // V96.25: quick-pick points modal — replaces the native prompt() for contributor
+        // reward entry across Drug + Disease Codex. Quick chips for common values plus a
+        // free-text field. Returns Promise<number|null>: null = Cancel (abort), else a
+        // non-negative number. Uses parseFloat so fractional points (0.1/0.5) survive —
+        // the old parseInt() truncated them to 0.
+        function codexBonusPrompt(opts) {
+            opts = opts || {};
+            const heading = opts.heading || 'Points to award the intern contributor';
+            const defaultVal = (opts.defaultVal == null ? '1' : String(opts.defaultVal));
+            const presets = opts.presets || [0.1, 0.5, 1, 2, 5];
+            return new Promise(resolve => {
+                const overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:100050;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+                const chipsHtml = presets.map(p =>
+                    `<button type="button" data-val="${p}" style="background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;padding:8px 16px;border-radius:999px;cursor:pointer;font-weight:700;font-size:0.95em;width:auto;min-height:0;">${p}</button>`
+                ).join('');
+                overlay.innerHTML = `
+                    <div class="lang-no-toggle" style="background:white;width:92vw;max-width:420px;border-radius:18px;overflow:hidden;box-shadow:0 25px 50px rgba(0,0,0,0.3);font-family:Inter,sans-serif;">
+                        <div style="padding:18px 20px 6px;">
+                            <h3 style="margin:0 0 6px;color:#4361ee;font-size:1.05em;">🎁 ให้คะแนนผู้ contribute</h3>
+                            <div style="font-size:0.9em;color:#475569;white-space:pre-line;line-height:1.4;">${escapeHtml(heading)}</div>
+                        </div>
+                        <div style="padding:12px 20px;display:flex;flex-wrap:wrap;gap:8px;">${chipsHtml}</div>
+                        <div style="padding:0 20px;">
+                            <input type="text" inputmode="decimal" value="${escapeHtml(defaultVal)}" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:1.1em;font-weight:700;text-align:center;color:#1e293b;">
+                            <div style="font-size:0.78em;color:#94a3b8;margin-top:5px;">เว้นว่าง/0 = ไม่ให้คะแนน · รองรับทศนิยม เช่น 0.1</div>
+                        </div>
+                        <div style="padding:14px 20px 18px;display:flex;justify-content:flex-end;gap:10px;">
+                            <button type="button" data-act="cancel" style="background:#e2e8f0;color:#334155;border:none;padding:9px 18px;border-radius:10px;cursor:pointer;font-weight:700;width:auto;min-height:0;">Cancel</button>
+                            <button type="button" data-act="ok" style="background:#22c55e;color:white;border:none;padding:9px 22px;border-radius:10px;cursor:pointer;font-weight:700;width:auto;min-height:0;">OK</button>
+                        </div>
+                    </div>`;
+                const input = overlay.querySelector('input');
+                function cleanup(val) {
+                    document.removeEventListener('keydown', onKey);
+                    overlay.remove();
+                    resolve(val);
+                }
+                function commitOk() {
+                    const n = parseFloat(input.value);
+                    cleanup(isFinite(n) && n > 0 ? n : 0);
+                }
+                function onKey(e) {
+                    if (e.key === 'Escape') { e.preventDefault(); cleanup(null); }
+                    else if (e.key === 'Enter') { e.preventDefault(); commitOk(); }
+                }
+                overlay.querySelectorAll('button[data-val]').forEach(b => {
+                    b.addEventListener('click', () => { input.value = b.getAttribute('data-val'); input.focus(); });
+                });
+                overlay.querySelector('button[data-act="ok"]').addEventListener('click', commitOk);
+                overlay.querySelector('button[data-act="cancel"]').addEventListener('click', () => cleanup(null));
+                overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(null); });
+                document.addEventListener('keydown', onKey);
+                document.body.appendChild(overlay);
+                setTimeout(() => { try { input.focus(); input.select(); } catch (_) {} }, 30);
+            });
+        }
+
+        // V96.19→V96.25: ask the admin how many points to award the intern contributor.
+        // Used by the Review & Edit publish paths (the as-is paths fold the amount into
+        // their approve modal). Cancel/blank/0 = publish without points → returns 0.
+        async function dcaPromptContributorBonus(name) {
+            const v = await codexBonusPrompt({ heading: 'คะแนนที่จะให้ผู้ contribute "' + (name || '') + '"', defaultVal: 5 });
+            return v == null ? 0 : v;
         }
 
         async function dcaApproveDraft(draftId, btn) {
             const draft = dcaState.drafts.find(d => d._id === draftId);
             if (!draft) return;
-            // V96.19: prompt doubles as the approve gate AND the contributor reward input.
+            // V96.25: modal doubles as the approve gate AND the contributor reward input.
             // Cancel = don't approve; blank/0 = approve without awarding points.
-            const _dcaBonusStr = prompt(`Approve & publish "${draft.genericName || draftId}" to Drug Codex as-is?\n(Use "Review & Edit" to edit fields first.)\n\nPoints to award the intern contributor (blank/0 = none):`, '5');
-            if (_dcaBonusStr === null) return;
-            const contributorBonus = Math.max(0, parseInt(_dcaBonusStr, 10) || 0);
+            const contributorBonus = await codexBonusPrompt({ heading: `Approve & publish "${draft.genericName || draftId}" to Drug Codex as-is?\n(กด "Review & Edit" เพื่อแก้ฟิลด์ก่อนได้)`, defaultVal: 5 });
+            if (contributorBonus === null) return;
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
             const nowTs = firebase.firestore.FieldValue.serverTimestamp();
             const reviewerEmail = (auth.currentUser && auth.currentUser.email) || 'admin-ui';
@@ -36565,7 +36622,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // V95.71: carry the LINE user id for live usersData resolution in the chip.
                     if (draftDoc && draftDoc.submittedByUserId) payload.submittedByUserId = draftDoc.submittedByUserId;
                     // V96.19: award the intern contributor (blank/0/Cancel = publish, no points).
-                    const _dxaEditBonus = dcaPromptContributorBonus(payload.diseaseName);
+                    const _dxaEditBonus = await dcaPromptContributorBonus(payload.diseaseName);
                     const batch = db.batch();
                     const newRef = db.collection('disease_codex').doc();
                     batch.set(newRef, Object.assign({ createdAt: nowTs }, payload));
@@ -37402,11 +37459,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         async function dxaApproveDraft(draftId, btn) {
             const draft = dxaState.drafts.find(d => d._id === draftId);
             if (!draft) return;
-            // V96.19: prompt doubles as the approve gate AND the contributor reward input.
+            // V96.25: modal doubles as the approve gate AND the contributor reward input.
             // Cancel = don't approve; blank/0 = approve without awarding points.
-            const _dxaBonusStr = prompt(`Approve & publish "${draft.diseaseName || draftId}" to Disease Codex as-is?\n(Use "Review & Edit" to edit fields first.)\n\nPoints to award the intern contributor (blank/0 = none):`, '5');
-            if (_dxaBonusStr === null) return;
-            const contributorBonus = Math.max(0, parseInt(_dxaBonusStr, 10) || 0);
+            const contributorBonus = await codexBonusPrompt({ heading: `Approve & publish "${draft.diseaseName || draftId}" to Disease Codex as-is?\n(กด "Review & Edit" เพื่อแก้ฟิลด์ก่อนได้)`, defaultVal: 5 });
+            if (contributorBonus === null) return;
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
             const nowTs = firebase.firestore.FieldValue.serverTimestamp();
             const reviewerEmail = (auth.currentUser && auth.currentUser.email) || 'admin-ui';
