@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.23</title>
+    <title>Nika V96.24</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -23939,10 +23939,15 @@ ${JSON.stringify(sourceObj)}`;
                     : '';
                 // V95.33: surface the quiz's downloadable materials right in the review
                 // header so the admin can pull up the source material while grading.
-                // Reuses adminOpenQuizMaterials (1 file → open; many → chooser modal).
-                const _reviewMats = Array.isArray(quiz.materials) ? quiz.materials.filter(m => m && m.url) : [];
-                const materialsBtnHtml = _reviewMats.length > 0
-                    ? `<button onclick="adminOpenQuizMaterials('${escapeHtml(quiz.id)}')" style="background:#1d4ed8;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;" title="โหลดเอกสารประกอบของ Quiz นี้"><i class="fa-solid fa-paperclip"></i> Materials (${_reviewMats.length})</button>`
+                // V96.24: count ALL download links — the dedicated materials field PLUS
+                // any http(s) URL embedded in the quiz description or question content —
+                // so links that live inside the exam itself still get a button here.
+                // adminOpenQuizDownloads: 1 link → open; many → chooser modal.
+                const _reviewLinks = (typeof collectQuizDownloadLinks === 'function')
+                    ? collectQuizDownloadLinks(quiz)
+                    : (Array.isArray(quiz.materials) ? quiz.materials.filter(m => m && m.url) : []);
+                const materialsBtnHtml = _reviewLinks.length > 0
+                    ? `<button onclick="adminOpenQuizDownloads('${escapeHtml(quiz.id)}')" style="background:#1d4ed8;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:0.9em;" title="โหลดลิงก์/เอกสารของ Quiz นี้"><i class="fa-solid fa-paperclip"></i> Materials (${_reviewLinks.length})</button>`
                     : '';
 
                 // Create overlay directly on document.body
@@ -26524,6 +26529,83 @@ ${JSON.stringify(sourceObj)}`;
                     <button type="button" onclick="document.getElementById('adminQuizMaterialsModal').remove()" style="background:none; border:none; font-size:1.2em; cursor:pointer; color:#64748b;">✕</button>
                 </div>
                 <div style="display:flex; flex-direction:column; gap:8px;">${links}</div>
+            </div>`;
+            document.body.appendChild(overlay);
+        }
+
+        // V96.24: a quiz's download links can live in three places — the dedicated
+        // materials field, the quiz description, or any question's text/content/options.
+        // Gather them all (materials first, then http(s) URLs scanned from free text),
+        // deduped by URL, so the Review screen can show one combined list. Materials
+        // keep their friendly name + desc; scanned links get a source label (the URL
+        // char class stops at ) ] etc, so markdown links [name](url) don't capture the
+        // closing paren).
+        function collectQuizDownloadLinks(q) {
+            const out = [];
+            const seen = new Set();
+            const add = (rawUrl, name, source, desc) => {
+                const url = String(rawUrl || '').trim().replace(/[.,;]+$/, '');
+                if (!/^https?:\/\//i.test(url)) return;
+                const key = url.toLowerCase();
+                if (seen.has(key)) return;
+                seen.add(key);
+                const item = { url: url, name: name || '', source: source || '' };
+                if (desc) item.desc = desc;
+                out.push(item);
+            };
+            (Array.isArray(q && q.materials) ? q.materials : []).forEach((m, i) => {
+                if (m && m.url) add(m.url, materialDisplayName(m, i), 'เอกสาร', (m.desc && String(m.desc).trim()) || '');
+            });
+            const URL_RE = /https?:\/\/[^\s<>"')\]]+/gi;
+            const scan = (text, source) => {
+                const found = String(text || '').match(URL_RE);
+                if (found) found.forEach(u => add(u, '', source));
+            };
+            scan(q && q.description, 'คำอธิบาย');
+            (Array.isArray(q && q.questions) ? q.questions : []).forEach((qq, i) => {
+                const src = 'ข้อ ' + (i + 1);
+                scan(qq && qq.q, src);
+                scan(qq && qq.content, src);
+                (Array.isArray(qq && qq.options) ? qq.options : []).forEach(opt => scan(opt, src));
+            });
+            return out;
+        }
+
+        // V96.24: Review-screen opener for the combined download list (materials +
+        // links embedded in the quiz). One link opens directly; many show a chooser
+        // with a source chip per link. Reuses the #adminQuizMaterialsModal overlay id
+        // (both openers remove any existing instance first, so they never collide).
+        function adminOpenQuizDownloads(quizId) {
+            const q = (typeof quizzesData !== 'undefined' ? quizzesData : []).find(x => x.id === quizId);
+            if (!q) return;
+            const links = collectQuizDownloadLinks(q);
+            if (!links.length) return;
+            if (links.length === 1) { window.open(links[0].url, '_blank', 'noopener'); return; }
+            const existing = document.getElementById('adminQuizMaterialsModal');
+            if (existing) existing.remove();
+            const rows = links.map((lk) => {
+                const fullUrl = escapeHtml(lk.url);
+                let label = (lk.name && String(lk.name).trim()) || '';
+                if (!label) {
+                    try {
+                        const f = decodeURIComponent(lk.url.split('/').pop().split('?')[0]) || '';
+                        label = (f && !looksLikeOpaqueMaterialName(f)) ? f : lk.url;
+                    } catch (_) { label = lk.url; }
+                }
+                const srcChip = lk.source ? `<span style="font-size:0.7em; font-weight:700; color:#475569; background:#e2e8f0; border-radius:6px; padding:1px 7px; margin-left:6px;">${escapeHtml(lk.source)}</span>` : '';
+                const descHtml = (lk.desc && String(lk.desc).trim()) ? `<div style="font-size:0.78em; font-weight:500; color:#64748b; margin-top:2px;">${escapeHtml(lk.desc)}</div>` : '';
+                return `<a href="${fullUrl}" target="_blank" rel="noopener noreferrer" title="${fullUrl}" style="display:flex; flex-direction:column; align-items:flex-start; gap:0; padding:10px 14px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; border-radius:10px; font-weight:700; text-decoration:none; font-size:0.9em; word-break:break-word;"><span>📎 ${escapeHtml(label)}${srcChip}</span>${descHtml}</a>`;
+            }).join('');
+            const overlay = document.createElement('div');
+            overlay.id = 'adminQuizMaterialsModal';
+            overlay.style.cssText = 'position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:99999; display:flex; align-items:center; justify-content:center; padding:20px;';
+            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+            overlay.innerHTML = `<div style="background:white; border-radius:16px; padding:22px; max-width:420px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+                    <div style="font-weight:900; color:#0f172a; font-size:1.05em;">📎 ลิงก์ดาวน์โหลด (${links.length})</div>
+                    <button type="button" onclick="document.getElementById('adminQuizMaterialsModal').remove()" style="background:none; border:none; font-size:1.2em; cursor:pointer; color:#64748b;">✕</button>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:8px;">${rows}</div>
             </div>`;
             document.body.appendChild(overlay);
         }
