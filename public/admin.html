@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.22</title>
+    <title>Nika V96.23</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15871,35 +15871,14 @@
             }, 50);
         };
 
-        window.analyzeQuizAI = async function(clickedBtn) {
-            const oldPopup = document.getElementById('ai-analysis-popup');
-            if (oldPopup) oldPopup.remove();
-
-            const formData = getQuizFormData();
-            if (formData.questions.length < 1) return alert("Add at least 1 question to analyze.");
-            
-            const qList = formData.questions.map((q, i) => `Q${i+1} (${q.type}): ${q.q}\nOptions: ${q.options ? q.options.join(', ') : 'N/A'}`).join('\n\n');
-            const tagStr = Array.isArray(formData.tags) ? formData.tags.join(', ') : (formData.tags || '');
-            const btn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
-            const oldText = btn ? btn.innerHTML : "Analyze";
-            // V95.50: simulated progress %. analyzeQuizAI is a single opaque AI await with no
-            // real progress signal, so ease an estimate toward 95% while waiting (fast early,
-            // slowing near the cap so it never reaches 100% before the call returns). Cleared
-            // in the finally block.
-            let analyzeProgressTimer = null;
-
-            try {
-                if (btn) {
-                    let pct = 0;
-                    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analyzing 0%`;
-                    btn.disabled = true;
-                    analyzeProgressTimer = setInterval(() => {
-                        pct = Math.min(95, pct + Math.max(1, Math.round((95 - pct) * 0.08)));
-                        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analyzing ${pct}%`;
-                    }, 350);
-                }
-                
-                const prompt = `FORMAT CONTRACT — READ FIRST, OBEY ABSOLUTELY:
+        // V96.23 (#45 v1.1): shared prompt builder — single source of truth for the
+        // quiz-analyzer (Assessment Specialist) prompt. Called by BOTH analyzeQuizAI and
+        // the offline AI-eval golden set, so the harness exercises the REAL prompt, not a
+        // representative copy. Pure: same (questions, tags) in → byte-identical prompt out.
+        function buildQuizAnalyzePrompt(questions, tags) {
+            const qList = questions.map((q, i) => `Q${i+1} (${q.type}): ${q.q}\nOptions: ${q.options ? q.options.join(', ') : 'N/A'}`).join('\n\n');
+            const tagStr = Array.isArray(tags) ? tags.join(', ') : (tags || '');
+            return `FORMAT CONTRACT — READ FIRST, OBEY ABSOLUTELY:
                 Respond with ONE single JSON object. Begin your response with the character \`{\` and end with \`}\`. No prose before. No prose after. No markdown fences. No preamble like "Here is the analysis" or "Based on the provided…". Any text outside the JSON object is a hard format violation and will be rejected.
 
                 You are a high-level Assessment Specialist. Analyze these quiz questions for redundancy, logical variety, and cognitive depth (Bloom's Taxonomy).
@@ -15962,6 +15941,36 @@
                 3. SELF-CHECK before returning: re-read each improvedQuestion.q and confirm its language matches the source Q[qNumber] from STEP 0. If you find a mismatch, REGENERATE that item in the correct language. A language mismatch is a hard format error.
                 4. "improvedQuestion.explanation" is shown to LEARNERS post-submit (not admin meta) — write it as concise teaching, NOT as a critique. Same language as improvedQuestion.q. The other fields ("issue", "suggestion") stay admin-facing in Thai.
                 5. SELF-CHECK "suggestedTitles" before returning: do both titles name the quiz's subject matter (aligned with the Quiz tags), and are they free of every FORBIDDEN word? If not, regenerate them — a title describing the analysis is a hard error.`;
+        }
+        window.buildQuizAnalyzePrompt = buildQuizAnalyzePrompt;
+
+        window.analyzeQuizAI = async function(clickedBtn) {
+            const oldPopup = document.getElementById('ai-analysis-popup');
+            if (oldPopup) oldPopup.remove();
+
+            const formData = getQuizFormData();
+            if (formData.questions.length < 1) return alert("Add at least 1 question to analyze.");
+            
+            const btn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
+            const oldText = btn ? btn.innerHTML : "Analyze";
+            // V95.50: simulated progress %. analyzeQuizAI is a single opaque AI await with no
+            // real progress signal, so ease an estimate toward 95% while waiting (fast early,
+            // slowing near the cap so it never reaches 100% before the call returns). Cleared
+            // in the finally block.
+            let analyzeProgressTimer = null;
+
+            try {
+                if (btn) {
+                    let pct = 0;
+                    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analyzing 0%`;
+                    btn.disabled = true;
+                    analyzeProgressTimer = setInterval(() => {
+                        pct = Math.min(95, pct + Math.max(1, Math.round((95 - pct) * 0.08)));
+                        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analyzing ${pct}%`;
+                    }, 350);
+                }
+                
+                const prompt = buildQuizAnalyzePrompt(formData.questions, formData.tags);
                 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-2.5-pro';
 
@@ -16359,18 +16368,12 @@ RULES:
             return Array.from(allHits);
         }
 
-        window.generateQuizFromCase = async function(caseId) {
-            const caseItem = (casesData || []).find(c => c.id === caseId);
-            if (!caseItem) return alert('Case not found · 케이스를 찾을 수 없습니다.');
-            const note = (caseItem.note || '').trim();
-            if (note.length < 30) return alert('Case note too short to generate questions from (need 30+ chars).');
-
-            if (!confirm(`Generate 5 quiz questions from case ${caseItem.caseId || caseId}?\n\nPII (HN, attending name, ward, date, age 90+) will be anonymised by the AI prompt + post-checked.\n\nThe new quiz opens in the editor for review — nothing is saved until you click Save Quiz.`)) return;
-
-            const model = document.getElementById('ai-analyzer-model-val')?.value || 'gemini-2.5-pro';
-            showToast(`🧠 Generating quiz from case ${caseItem.caseId || ''}…`);
-
-            const prompt = `You are a medical-education quiz writer. Generate EXACTLY 5 multiple-choice questions from the clinical case below.
+        // V96.23 (#45 v1.1): shared prompt builder — single source of truth for the
+        // case→quiz generation prompt. Called by BOTH generateQuizFromCase and the
+        // offline AI-eval golden set, so the harness exercises the REAL prompt, not a
+        // representative copy. Pure: same `note` in → byte-identical prompt out.
+        function buildCaseToQuizPrompt(note) {
+            return `You are a medical-education quiz writer. Generate EXACTLY 5 multiple-choice questions from the clinical case below.
 
 ⚠️ STEP 0 — PII REDACTION (DO THIS BEFORE ANYTHING ELSE):
 Build "redactedCaseContent" by replacing the following PII categories in the source case note:
@@ -16414,6 +16417,21 @@ RULES:
 - All output text in the SAME language as the case note (Thai → Thai, English → English).
 - "explanation" is for learners — concise teaching tone, NOT critique.
 - ABSOLUTELY NO PII anywhere in the output (questions, options, explanations, or redactedCaseContent).`;
+        }
+        window.buildCaseToQuizPrompt = buildCaseToQuizPrompt;
+
+        window.generateQuizFromCase = async function(caseId) {
+            const caseItem = (casesData || []).find(c => c.id === caseId);
+            if (!caseItem) return alert('Case not found · 케이스를 찾을 수 없습니다.');
+            const note = (caseItem.note || '').trim();
+            if (note.length < 30) return alert('Case note too short to generate questions from (need 30+ chars).');
+
+            if (!confirm(`Generate 5 quiz questions from case ${caseItem.caseId || caseId}?\n\nPII (HN, attending name, ward, date, age 90+) will be anonymised by the AI prompt + post-checked.\n\nThe new quiz opens in the editor for review — nothing is saved until you click Save Quiz.`)) return;
+
+            const model = document.getElementById('ai-analyzer-model-val')?.value || 'gemini-2.5-pro';
+            showToast(`🧠 Generating quiz from case ${caseItem.caseId || ''}…`);
+
+            const prompt = buildCaseToQuizPrompt(note);
 
             try {
                 let result = null, raw = '', model_used = '', tokens = 0;
@@ -22296,7 +22314,11 @@ async function ensureAuthForQuizWrite(timeoutMs = 6000) {
             return 'en';
         }
 
-        async function qtAdminTranslateOneLang(questions, sourceLang, targetLang, caseContent) {
+        // V96.23 (#45 v1.1): shared prompt builder — single source of truth for the
+        // admin quiz-translation prompt. Called by BOTH qtAdminTranslateOneLang and the
+        // offline AI-eval golden set, so the harness exercises the REAL prompt, not a
+        // representative copy. Pure: same args in → byte-identical prompt out.
+        function buildQuizTranslatePrompt(questions, sourceLang, targetLang, caseContent) {
             const langName = QT_ADMIN_LANG_NAMES[targetLang] || targetLang;
             const srcName = QT_ADMIN_LANG_NAMES[sourceLang] || sourceLang;
             // V93.15: include `content` (read-only Learn mode long-form body) so intern
@@ -22308,10 +22330,15 @@ async function ensureAuthForQuizWrite(timeoutMs = 6000) {
             if (caseContent) sourceObj.caseContent = caseContent;
 
             const caseClause = caseContent ? ', and the top-level "caseContent" field' : '';
-            const prompt = `Translate the following quiz from ${srcName} to ${langName}. Output ONLY strict valid JSON matching the input schema exactly — same number of questions, same number of options per question, same array order. Translate every "q" field, every string inside every "options" array, every "content" field${caseClause}. Preserve markdown formatting inside translated text. Do not translate proper nouns of drugs, conditions, or people. No markdown fences around the JSON, no commentary, no explanations. JSON SAFETY (critical): inside every translated string value, escape any double-quote as \\" and any line break as \\n — never emit a raw newline or an unescaped quote inside a JSON string, as that breaks the JSON.
+            return `Translate the following quiz from ${srcName} to ${langName}. Output ONLY strict valid JSON matching the input schema exactly — same number of questions, same number of options per question, same array order. Translate every "q" field, every string inside every "options" array, every "content" field${caseClause}. Preserve markdown formatting inside translated text. Do not translate proper nouns of drugs, conditions, or people. No markdown fences around the JSON, no commentary, no explanations. JSON SAFETY (critical): inside every translated string value, escape any double-quote as \\" and any line break as \\n — never emit a raw newline or an unescaped quote inside a JSON string, as that breaks the JSON.
 
 Source quiz:
 ${JSON.stringify(sourceObj)}`;
+        }
+        window.buildQuizTranslatePrompt = buildQuizTranslatePrompt;
+
+        async function qtAdminTranslateOneLang(questions, sourceLang, targetLang, caseContent) {
+            const prompt = buildQuizTranslatePrompt(questions, sourceLang, targetLang, caseContent);
 
             // V94.89: Typhoon occasionally emits invalid JSON — most commonly a raw
             // newline or unescaped quote inside a translated markdown string, which
@@ -49334,10 +49361,13 @@ Reply ONLY with raw JSON, no markdown:
          or prompt change. Results show in a modal; nothing is persisted.
          Shape-only (v1): JSON validity, required fields, language match,
          empty/placeholder distractors, translation parity, correct-index range.
-         LIMITATION: the prompts below are representative copies of each feature's
-         contract — they catch model/behaviour regressions across models, NOT
-         silent edits to the production prompt strings. Sharing prompt builders
-         between the real functions and this harness is tracked as v1.1.
+         V96.23 (v1.1): the golden cases now call the SHARED production prompt
+         builders (window.buildQuizAnalyzePrompt / buildCaseToQuizPrompt /
+         buildQuizTranslatePrompt) with representative inputs — the SAME builders
+         analyzeQuizAI / generateQuizFromCase / qtAdminTranslateOneLang use. So a
+         silent edit to a production prompt string is now exercised here too, not
+         just model/behaviour regressions. (Drug/Disease Codex + LLM-judge tier
+         remain future scope.)
          =================================================================== -->
     <script>
     (function () {
@@ -49370,13 +49400,16 @@ Reply ONLY with raw JSON, no markdown:
                 feature: 'quiz_analyzer',
                 label: 'Quiz Specialist — bilingual (TH + EN) no language slip',
                 model: 'gemini-2.5-pro',
-                prompt:
-                    'FORMAT CONTRACT — READ FIRST: respond with ONE JSON object only, starting with { and ending with }. No prose, no markdown fences.\n' +
-                    'You are an Assessment Specialist. For EACH source question detect its language from the stem; every "improvedQuestion.q" and its "options" MUST stay in that exact language (never translate). "issue"/"suggestion" are admin-facing Thai.\n' +
-                    'Questions:\n' +
-                    'Q1 (choice): ผู้ป่วยเบาหวานควรตรวจ HbA1c บ่อยแค่ไหน?\nOptions: ทุก 3 เดือน, ทุกสัปดาห์, ทุกวัน, ทุก 5 ปี\n\n' +
-                    'Q2 (choice): Which drug is first-line for uncomplicated hypertension?\nOptions: Amlodipine, Insulin, Warfarin, Salbutamol\n\n' +
-                    'OUTPUT JSON: {"analysisText":"<Thai summary>","items":[{"qNumber":1,"issue":"<Thai>","suggestion":"<Thai>","improvedQuestion":{"q":"<same language as source>","type":"choice","options":["..","..","..",".."],"correct":[1],"explanation":"<same language as q>"}}]}',
+                // V96.23 (#45 v1.1): call the REAL production prompt builder with
+                // representative bilingual inputs (Q1 Thai, Q2 English) so this golden
+                // case exercises analyzeQuizAI's actual prompt, not a copy. Lazy (fn) so
+                // window.buildQuizAnalyzePrompt is resolved at run time, never at load.
+                buildPrompt: function () {
+                    return window.buildQuizAnalyzePrompt([
+                        { type: 'choice', q: 'ผู้ป่วยเบาหวานควรตรวจ HbA1c บ่อยแค่ไหน?', options: ['ทุก 3 เดือน', 'ทุกสัปดาห์', 'ทุกวัน', 'ทุก 5 ปี'] },
+                        { type: 'choice', q: 'Which drug is first-line for uncomplicated hypertension?', options: ['Amlodipine', 'Insulin', 'Warfarin', 'Salbutamol'] }
+                    ], []);
+                },
                 checks: function (p) {
                     var out = [];
                     out.push(chk('valid JSON', p !== null, p === null ? 'safeJsonParse returned null' : ''));
@@ -49405,11 +49438,12 @@ Reply ONLY with raw JSON, no markdown:
                 feature: 'case_to_quiz',
                 label: 'Case → Quiz — 5×4 MCQ, PII redacted, valid correct index',
                 model: 'gemini-2.5-pro',
-                prompt:
-                    'You are a medical-education quiz writer. Generate EXACTLY 5 multiple-choice questions (EXACTLY 4 options each) from the case below.\n' +
-                    'STEP 0 — redact PII into "redactedCaseContent": HN/IDs → [HN], patient name → [Patient], ward → [Ward], attending → [Attending], dates → [Date]. Use ONLY the redacted version. No PII anywhere in the output.\n' +
-                    'CASE: ผู้ป่วยชาย HN 0099123 ชื่อ นายสมชาย ใจดี ward Med-2 มาด้วยอาการเจ็บหน้าอก 2 ชั่วโมง ตรวจ ECG พบ ST elevation lead II,III,aVF แพทย์เวร นพ.วิชัย วินิจฉัย inferior STEMI.\n' +
-                    'OUTPUT JSON only (no fences): {"redactedCaseContent":"..","title":"..","questions":[{"q":"..","type":"choice","options":["..","..","..",".."],"correct":[1],"explanation":".."}]}',
+                // V96.23 (#45 v1.1): call the REAL buildCaseToQuizPrompt with a case note
+                // carrying PII (HN/name/ward/attending) so the golden case tests the actual
+                // production redaction prompt. Lazy fn → resolved at run time.
+                buildPrompt: function () {
+                    return window.buildCaseToQuizPrompt('ผู้ป่วยชาย HN 0099123 ชื่อ นายสมชาย ใจดี ward Med-2 มาด้วยอาการเจ็บหน้าอก 2 ชั่วโมง ตรวจ ECG พบ ST elevation lead II,III,aVF แพทย์เวร นพ.วิชัย วินิจฉัย inferior STEMI.');
+                },
                 checks: function (p, raw) {
                     var out = [];
                     out.push(chk('valid JSON', p !== null, p === null ? 'safeJsonParse returned null' : ''));
@@ -49437,14 +49471,15 @@ Reply ONLY with raw JSON, no markdown:
                 feature: 'quiz_translation',
                 label: 'Quiz translation TH → EN — parity + no Thai leak',
                 model: 'typhoon-v2.5-30b-a3b-instruct',
-                input: { questions: [
-                    { q: 'ยาตัวใดเป็น first-line สำหรับความดันโลหิตสูง?', options: ['Amlodipine', 'Insulin', 'Warfarin', 'Salbutamol'] },
-                    { q: 'HbA1c ควรตรวจบ่อยแค่ไหนในผู้ป่วยเบาหวาน?', options: ['ทุก 3 เดือน', 'ทุกวัน', 'ทุกสัปดาห์', 'ทุก 5 ปี'] }
-                ] },
-                prompt:
-                    'Translate the following quiz from Thai to English. Output ONLY strict valid JSON matching the input schema exactly — same number of questions, same number of options per question, same array order. Translate every "q" and every option. Do not translate drug proper nouns. No markdown fences, no commentary.\n' +
-                    'Source quiz:\n' +
-                    '{"questions":[{"q":"ยาตัวใดเป็น first-line สำหรับความดันโลหิตสูง?","options":["Amlodipine","Insulin","Warfarin","Salbutamol"]},{"q":"HbA1c ควรตรวจบ่อยแค่ไหนในผู้ป่วยเบาหวาน?","options":["ทุก 3 เดือน","ทุกวัน","ทุกสัปดาห์","ทุก 5 ปี"]}]}',
+                // V96.23 (#45 v1.1): call the REAL buildQuizTranslatePrompt (TH→EN) with
+                // representative bilingual questions so the golden case tests the production
+                // translation prompt. Lazy fn → resolved at run time.
+                buildPrompt: function () {
+                    return window.buildQuizTranslatePrompt([
+                        { q: 'ยาตัวใดเป็น first-line สำหรับความดันโลหิตสูง?', options: ['Amlodipine', 'Insulin', 'Warfarin', 'Salbutamol'] },
+                        { q: 'HbA1c ควรตรวจบ่อยแค่ไหนในผู้ป่วยเบาหวาน?', options: ['ทุก 3 เดือน', 'ทุกวัน', 'ทุกสัปดาห์', 'ทุก 5 ปี'] }
+                    ], 'th', 'en', '');
+                },
                 checks: function (p) {
                     var out = [];
                     out.push(chk('valid JSON', p !== null, p === null ? 'safeJsonParse returned null' : ''));
@@ -49469,7 +49504,11 @@ Reply ONLY with raw JSON, no markdown:
             var model = overrideModel || c.model;
             var raw = '', parsed = null, err = '';
             try {
-                var resp = await window.callUniversalAI(model, c.prompt, true, null, '', { feature: 'ai_eval', maxOutputTokens: 16384 });
+                // V96.23 (#45 v1.1): prefer the lazy buildPrompt() — it calls the REAL
+                // production prompt builder, so editing a prompt string in admin.html is
+                // now caught by this harness. Fall back to a literal c.prompt if present.
+                var promptStr = (typeof c.buildPrompt === 'function') ? c.buildPrompt() : c.prompt;
+                var resp = await window.callUniversalAI(model, promptStr, true, null, '', { feature: 'ai_eval', maxOutputTokens: 16384 });
                 raw = (resp && resp.text) || '';
                 parsed = (typeof window.safeJsonParse === 'function') ? window.safeJsonParse(raw) : null;
             } catch (e) {
