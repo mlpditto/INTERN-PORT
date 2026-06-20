@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.33</title>
+    <title>Nika V96.34</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -23473,11 +23473,14 @@ ${JSON.stringify(sourceObj)}`;
                     const name = u ? u.displayName : (att.displayName || "Unknown");
                     const pic = u ? u.pictureUrl : (att.pictureUrl || "");
 
+                    // V96.34: round the raw score to ≤4 decimals (partial credit can yield
+                    // 15.333333333333334); trailing zeros are dropped by Number→String.
+                    const fmtScore = (n) => { const r = Math.round(Number(n) * 1e4) / 1e4; return Number.isFinite(r) ? String(r) : String(n); };
                     let score = "-";
                     if (att.status === 'approved') {
-                        score = (att.correctCount + "/" + (att.totalQuestions || "-"));
+                        score = (fmtScore(att.correctCount) + "/" + (att.totalQuestions || "-"));
                     } else if (att.status === 'practice_done') {
-                        score = `<span style="color:#f57f17;">${att.practiceScore || 0}/${att.practiceTotalQ || "-"} (P)</span>`;
+                        score = `<span style="color:#f57f17;">${fmtScore(att.practiceScore || 0)}/${att.practiceTotalQ || "-"} (P)</span>`;
                     }
 
                     const statusColor = att.status === 'approved' ? '#2ec4b6' :
