@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.32</title>
+    <title>Nika V96.33</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -19242,6 +19242,20 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             }
         };
 
+        // V96.33: present options as a 1-based numbered list ("ข้อ 1: …") and refer to the
+        // marked answer with the SAME 1-based "ข้อ N". The earlier prompts mixed a 0-indexed
+        // options array with a 1-based "(i+1). " correct line, so models conflated e.g. "2."
+        // with 0-based index 2 and reported the wrong option (Fact-check flagged a correct
+        // answer as ❌). 1-based also matches the numbers the admin sees in the editor.
+        window._qImproveOptionLines = function(ctx) {
+            return ctx.options.map((o, i) => 'ข้อ ' + (i + 1) + ': ' + o).join('\n');
+        };
+        window._qImproveCorrectLabel = function(ctx) {
+            return ctx.correctIndices.length
+                ? ctx.correctIndices.map(i => 'ข้อ ' + (i + 1)).join(', ')
+                : '(ยังไม่ได้ติ๊กคำตอบถูก)';
+        };
+
         // V96.28 (track A): let AI propose which option(s) are correct when the admin
         // hasn't marked an answer yet (or wants a second opinion). Advisory only —
         // shows confidence + rationale, applies the answer ONLY when the admin clicks
@@ -19251,18 +19265,23 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const prompt = [
                 'ภาษา: ตอบ field ข้อความเป็นภาษาไทย (คงศัพท์เทคนิค/ชื่อยาเป็นภาษาอังกฤษได้)',
                 'คุณคือผู้เชี่ยวชาญด้านเภสัชกรรม/การแพทย์ ทำหน้าที่หาคำตอบที่ถูกต้องของข้อสอบปรนัย โดยอิงข้อเท็จจริงทางวิชาการที่ยอมรับกันเท่านั้น',
-                'สำคัญมาก: ถ้าไม่มั่นใจ ให้รายงาน confidence ต่ำตามจริง — ห้ามเดาแบบมั่นใจเกินจริง; ถ้าคิดว่าไม่มีตัวเลือกใดถูกเลย ให้ correctIndices เป็น []',
+                'สำคัญมาก: ถ้าไม่มั่นใจ ให้รายงาน confidence ต่ำตามจริง — ห้ามเดาแบบมั่นใจเกินจริง; ถ้าคิดว่าไม่มีตัวเลือกใดถูกเลย ให้ correctChoices เป็น []',
+                'อ้างอิงตัวเลือกด้วย "ข้อ N" (เลขข้อเริ่มที่ 1 ตรงกับที่ผู้ใช้เห็น) เสมอ',
                 '',
                 'โจทย์: ' + JSON.stringify(ctx.question),
-                'ตัวเลือก (0-indexed): ' + JSON.stringify(ctx.options),
+                'ตัวเลือก:\n' + window._qImproveOptionLines(ctx),
                 '',
                 'OUTPUT ต้องเป็น RAW JSON เท่านั้น ห้ามมี code fence ห้ามมีคำอธิบายนอก JSON:',
-                '{"correctIndices":[เลข index 0-based ที่ถูก],"confidence":<จำนวนเต็ม 0-100>,"rationale":"2-4 ประโยค: ทำไมข้อที่ถูกจึงถูก และทำไมตัวลวงหลักจึงผิด"}'
+                '{"correctChoices":[เลขข้อ 1-based ที่ถูก เช่น [2]],"confidence":<จำนวนเต็ม 0-100>,"rationale":"2-4 ประโยค: ทำไมข้อที่ถูกจึงถูก และทำไมตัวลวงหลักจึงผิด"}'
             ].join('\n');
             const res = await window.callUniversalAI(model, prompt, true, null, ctx.quickApiKey, { feature: 'answer_find' });
             const data = safeJsonParse(res.text);
-            if (!data || !Array.isArray(data.correctIndices)) throw new Error('AI ส่งค่าที่ไม่ใช่ JSON: ' + String(res.text || '').slice(0, 160));
-            const picks = data.correctIndices.map(Number).filter(i => Number.isInteger(i) && i >= 0 && i < ctx.options.length);
+            // V96.33: choices are 1-based "ข้อ N"; convert to 0-based. Accept a legacy
+            // 0-based correctIndices reply too (older model habit) by shifting it +1 first.
+            const rawChoices = Array.isArray(data && data.correctChoices) ? data.correctChoices
+                : (Array.isArray(data && data.correctIndices) ? data.correctIndices.map(n => Number(n) + 1) : null);
+            if (!data || !Array.isArray(rawChoices)) throw new Error('AI ส่งค่าที่ไม่ใช่ JSON: ' + String(res.text || '').slice(0, 160));
+            const picks = rawChoices.map(n => Number(n) - 1).filter(i => Number.isInteger(i) && i >= 0 && i < ctx.options.length);
             const conf = Number.isFinite(+data.confidence) ? Math.max(0, Math.min(100, Math.round(+data.confidence))) : null;
             const rationale = (data.rationale && String(data.rationale).trim()) || '';
             const confColor = conf == null ? '#94a3b8' : (conf >= 80 ? '#16a34a' : (conf >= 60 ? '#f59e0b' : '#ef4444'));
@@ -19294,19 +19313,19 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         };
 
         window._qImproveFactCheck = async function(item, ctx, model) {
-            const correctList = ctx.correctIndices.map(i => (i + 1) + '. ' + ctx.options[i]).join(' | ') || '(ยังไม่ได้ติ๊กคำตอบถูก)';
             const prompt = [
                 'ภาษา: ตอบทุก field ที่เป็นข้อความเป็นภาษาไทย (คงศัพท์เทคนิค/ชื่อยาเป็นภาษาอังกฤษได้)',
                 'คุณคือผู้เชี่ยวชาญด้านเภสัชกรรม/การแพทย์ ทำหน้าที่ตรวจสอบความถูกต้องเชิงข้อเท็จจริงของข้อสอบปรนัย',
                 'ตรวจสอบ: (1) คำตอบที่ทำเครื่องหมายว่าถูก ถูกต้องจริงหรือไม่ (2) มีข้อผิดพลาดเชิงข้อเท็จจริงหรือไม่ (3) โจทย์/ตัวเลือกกำกวม มีคำตอบถูกมากกว่าหนึ่ง หรือไม่มีคำตอบถูกหรือไม่',
+                'อ้างอิงตัวเลือกด้วย "ข้อ N" (เลขข้อเริ่มที่ 1 ตรงกับที่ผู้ใช้เห็น) เสมอ ห้ามใช้ index แบบเริ่มที่ 0',
                 'อย่าแก้ไขถ้อยคำ — รายงานผลการตรวจเท่านั้น',
                 '',
                 'โจทย์: ' + JSON.stringify(ctx.question),
-                'ตัวเลือก (0-indexed): ' + JSON.stringify(ctx.options),
-                'คำตอบที่ทำเครื่องหมายว่าถูก: ' + correctList,
+                'ตัวเลือก:\n' + window._qImproveOptionLines(ctx),
+                'คำตอบที่ทำเครื่องหมายว่าถูกตอนนี้: ' + window._qImproveCorrectLabel(ctx),
                 '',
                 'OUTPUT ต้องเป็น RAW JSON เท่านั้น ห้ามมี code fence ห้ามมีคำอธิบายนอก JSON:',
-                '{"verdict":"ok|warning|error","summary":"สรุปสั้นๆ","issues":["ปัญหาที่พบ"],"suggestedCorrectIndices":[เลข index ที่ควรถูก หรือ [] ถ้าไม่ต้องเปลี่ยน]}'
+                '{"verdict":"ok|warning|error","summary":"สรุปสั้นๆ","issues":["ปัญหาที่พบ"],"suggestedCorrectChoices":[เลขข้อ 1-based ที่ควรถูก เช่น [2] หรือ [] ถ้าไม่ต้องเปลี่ยน]}'
             ].join('\n');
             const res = await window.callUniversalAI(model, prompt, true, null, ctx.quickApiKey);
             const data = safeJsonParse(res.text);
@@ -19318,9 +19337,14 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             let html = '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px;"><strong>' + icon + ' Fact-check</strong><button type="button" class="q-improve-cancel" style="background:none; border:none; color:#94a3b8; cursor:pointer; font-size:1.05em; line-height:1;">✕</button></div>';
             if (data.summary) html += '<div style="margin-bottom:6px;">' + escapeHtml(String(data.summary)) + '</div>';
             if (issues.length) html += '<ul style="margin:6px 0 0; padding-left:18px;">' + issues.map(x => '<li>' + escapeHtml(String(x)) + '</li>').join('') + '</ul>';
-            if (Array.isArray(data.suggestedCorrectIndices) && data.suggestedCorrectIndices.length) {
-                const sug = data.suggestedCorrectIndices.map(i => Number(i) + 1).join(', ');
-                html += '<div style="margin-top:8px; color:#0f766e;">💡 AI เสนอว่าคำตอบที่ถูกควรเป็นข้อ: ' + escapeHtml(sug) + ' (โปรดตรวจสอบเองก่อนแก้)</div>';
+            // V96.33: suggestedCorrectChoices are already 1-based "ข้อ N". Accept a legacy
+            // 0-based suggestedCorrectIndices reply too (shift +1) so older model habits
+            // still render correctly.
+            const sugArr = Array.isArray(data.suggestedCorrectChoices) ? data.suggestedCorrectChoices
+                : (Array.isArray(data.suggestedCorrectIndices) ? data.suggestedCorrectIndices.map(i => Number(i) + 1) : []);
+            const sugNums = sugArr.map(n => Number(n)).filter(n => Number.isFinite(n));
+            if (sugNums.length) {
+                html += '<div style="margin-top:8px; color:#0f766e;">💡 AI เสนอว่าคำตอบที่ถูกควรเป็นข้อ: ' + escapeHtml(sugNums.join(', ')) + ' (โปรดตรวจสอบเองก่อนแก้)</div>';
             }
             html += '<div style="margin-top:8px; font-size:0.78em; color:#94a3b8;">model: ' + escapeHtml(String(res.model || model)) + '</div>';
             window._qImproveShowPanel(item, html, accent);
@@ -19395,15 +19419,14 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
 
         window._qImproveExplanation = async function(item, ctx, model) {
             if (!ctx.expTa) throw new Error('ไม่พบช่อง Explanation ของข้อนี้');
-            const correctList = ctx.correctIndices.map(i => (i + 1) + '. ' + ctx.options[i]).join(' | ') || '(ยังไม่ได้ติ๊กคำตอบถูก)';
             const prompt = [
                 'ภาษา: เขียนคำอธิบายเป็นภาษาเดียวกับโจทย์ (โจทย์ไทย→อธิบายไทย) คงศัพท์เทคนิค/ชื่อยาเป็นอังกฤษได้',
                 'งานของคุณ: เขียนคำอธิบายเฉลยสำหรับผู้เรียน อธิบายว่าทำไมคำตอบที่ถูกจึงถูก และทำไมตัวลวงจึงผิด',
-                'ความยาวกระชับ ไม่เกิน ~150 คำ ใช้ markdown เบาๆ ได้',
+                'ความยาวกระชับ ไม่เกิน ~150 คำ ใช้ markdown เบาๆ ได้; ถ้าอ้างถึงตัวเลือกให้ใช้ "ข้อ N" (เลขเริ่มที่ 1)',
                 '',
                 'โจทย์: ' + JSON.stringify(ctx.question),
-                'ตัวเลือก: ' + JSON.stringify(ctx.options),
-                'คำตอบที่ถูก: ' + correctList,
+                'ตัวเลือก:\n' + window._qImproveOptionLines(ctx),
+                'คำตอบที่ถูก: ' + window._qImproveCorrectLabel(ctx),
                 '',
                 'OUTPUT RAW JSON เท่านั้น ห้าม code fence: {"explanation":"..."}'
             ].join('\n');
