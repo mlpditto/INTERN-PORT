@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.27</title>
+    <title>Nika V96.28</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -19229,7 +19229,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             try {
                 window._qImproveChipBusy(chip, true);
                 window._qImproveShowPanel(item, '<i class="fa-solid fa-spinner fa-spin"></i> AI กำลังประมวลผล...', '#94a3b8');
-                if (action === 'factcheck') await window._qImproveFactCheck(item, ctx, model);
+                if (action === 'findanswer') await window._qImproveFindAnswer(item, ctx, model);
+                else if (action === 'factcheck') await window._qImproveFactCheck(item, ctx, model);
                 else if (action === 'polish') await window._qImprovePolish(item, ctx, model);
                 else if (action === 'distractors') await window._qImproveDistractors(item, ctx, model);
                 else if (action === 'explanation') await window._qImproveExplanation(item, ctx, model);
@@ -19239,6 +19240,57 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             } finally {
                 window._qImproveChipBusy(chip, false);
             }
+        };
+
+        // V96.28 (track A): let AI propose which option(s) are correct when the admin
+        // hasn't marked an answer yet (or wants a second opinion). Advisory only —
+        // shows confidence + rationale, applies the answer ONLY when the admin clicks
+        // Apply, and never auto-saves. Distinct from Fact-check (which VERIFIES an
+        // already-marked answer); this one FINDS it. Reuses the same panel/Apply plumbing.
+        window._qImproveFindAnswer = async function(item, ctx, model) {
+            const prompt = [
+                'ภาษา: ตอบ field ข้อความเป็นภาษาไทย (คงศัพท์เทคนิค/ชื่อยาเป็นภาษาอังกฤษได้)',
+                'คุณคือผู้เชี่ยวชาญด้านเภสัชกรรม/การแพทย์ ทำหน้าที่หาคำตอบที่ถูกต้องของข้อสอบปรนัย โดยอิงข้อเท็จจริงทางวิชาการที่ยอมรับกันเท่านั้น',
+                'สำคัญมาก: ถ้าไม่มั่นใจ ให้รายงาน confidence ต่ำตามจริง — ห้ามเดาแบบมั่นใจเกินจริง; ถ้าคิดว่าไม่มีตัวเลือกใดถูกเลย ให้ correctIndices เป็น []',
+                '',
+                'โจทย์: ' + JSON.stringify(ctx.question),
+                'ตัวเลือก (0-indexed): ' + JSON.stringify(ctx.options),
+                '',
+                'OUTPUT ต้องเป็น RAW JSON เท่านั้น ห้ามมี code fence ห้ามมีคำอธิบายนอก JSON:',
+                '{"correctIndices":[เลข index 0-based ที่ถูก],"confidence":<จำนวนเต็ม 0-100>,"rationale":"2-4 ประโยค: ทำไมข้อที่ถูกจึงถูก และทำไมตัวลวงหลักจึงผิด"}'
+            ].join('\n');
+            const res = await window.callUniversalAI(model, prompt, true, null, ctx.quickApiKey, { feature: 'answer_find' });
+            const data = safeJsonParse(res.text);
+            if (!data || !Array.isArray(data.correctIndices)) throw new Error('AI ส่งค่าที่ไม่ใช่ JSON: ' + String(res.text || '').slice(0, 160));
+            const picks = data.correctIndices.map(Number).filter(i => Number.isInteger(i) && i >= 0 && i < ctx.options.length);
+            const conf = Number.isFinite(+data.confidence) ? Math.max(0, Math.min(100, Math.round(+data.confidence))) : null;
+            const rationale = (data.rationale && String(data.rationale).trim()) || '';
+            const confColor = conf == null ? '#94a3b8' : (conf >= 80 ? '#16a34a' : (conf >= 60 ? '#f59e0b' : '#ef4444'));
+            const accent = picks.length ? confColor : '#ef4444';
+
+            let html = '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px;"><strong>🎯 หาคำตอบด้วย AI</strong><button type="button" class="q-improve-cancel" style="background:none; border:none; color:#94a3b8; cursor:pointer; font-size:1.05em; line-height:1;">✕</button></div>';
+            if (conf != null) html += '<div style="margin-bottom:6px;">ความมั่นใจ: <span style="color:' + confColor + '; font-weight:800;">' + conf + '%</span></div>';
+            html += '<div style="margin-bottom:6px;">' + ctx.options.map((o, i) =>
+                '<div style="padding:2px 0; color:' + (picks.includes(i) ? '#15803d' : '#64748b') + '; font-weight:' + (picks.includes(i) ? '700' : '400') + ';">' + (picks.includes(i) ? '✅' : '⬜') + ' ' + (i + 1) + '. ' + escapeHtml(String(o)) + '</div>'
+            ).join('') + '</div>';
+            if (rationale) html += '<div style="padding:6px 8px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; white-space:pre-wrap; margin-bottom:6px;">' + escapeHtml(rationale) + '</div>';
+            if (conf != null && conf < 60) html += '<div style="color:#b91c1c; margin-bottom:6px;">⚠️ ความมั่นใจต่ำ — โปรดตรวจสอบกับแหล่งอ้างอิงที่เชื่อถือได้ก่อนใช้</div>';
+            html += '<div style="margin-top:4px; font-size:0.78em; color:#94a3b8;">model: ' + escapeHtml(String(res.model || model)) + ' · AI อาจผิดได้ ตรวจก่อนเสมอ</div>';
+
+            if (!picks.length) { window._qImproveShowPanel(item, html, accent); return; }
+
+            const willFillExp = !!(ctx.expTa && rationale && !(ctx.expTa.value || '').trim());
+            const applyFn = () => {
+                const checks = item.querySelectorAll('.q-correct-check');
+                checks.forEach((cb, i) => {
+                    const should = picks.includes(i);
+                    if (cb.checked !== should) { cb.checked = should; toggleOptionCorrect(cb); }
+                });
+                if (willFillExp) ctx.expTa.value = rationale;
+                showToast('✅ ติ๊กคำตอบที่ AI เสนอแล้ว — ตรวจก่อนบันทึก');
+            };
+            html += window._qImproveActionBar('✅ ใช้คำตอบนี้' + (willFillExp ? ' + ใส่คำอธิบาย' : ''));
+            window._qImproveShowPanel(item, html, accent, applyFn);
         };
 
         window._qImproveFactCheck = async function(item, ctx, model) {
@@ -20670,6 +20722,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                                 <span class="q-improve-wrap" style="position:relative; display:inline-block;">
                                     <button type="button" class="btn-sm" onclick="toggleQImproveMenu(this)" title="ปรับปรุงข้อนี้แบบเจาะจง" style="padding:4px 12px; background:#fff; color:#0891b2; border:1.5px solid #0891b2; border-radius:12px; font-weight:900; font-size:0.75em; transition:all 0.2s;"><i class="fa-solid fa-screwdriver-wrench"></i> ปรับปรุง <i class="fa-solid fa-caret-down" style="font-size:0.85em;"></i></button>
                                     <div class="q-improve-menu lang-no-toggle" style="display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:60; background:#fff; border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 8px 24px rgba(15,23,42,0.18); padding:6px; min-width:210px;">
+                                        <button type="button" onclick="qImproveAction(this,'findanswer')" title="ให้ AI หาว่าตัวเลือกใดถูก แล้วติ๊กให้ (ตรวจก่อนบันทึกเสมอ)" style="display:block; width:100%; text-align:left; padding:7px 10px; background:none; border:none; border-radius:8px; font-size:0.85em; font-weight:800; color:#7c3aed; cursor:pointer;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">🎯 หาคำตอบด้วย AI</button>
                                         <button type="button" onclick="qImproveAction(this,'factcheck')" style="display:block; width:100%; text-align:left; padding:7px 10px; background:none; border:none; border-radius:8px; font-size:0.85em; font-weight:700; color:#0f172a; cursor:pointer;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">🩺 Fact-check คำตอบ</button>
                                         <button type="button" onclick="qImproveAction(this,'polish')" style="display:block; width:100%; text-align:left; padding:7px 10px; background:none; border:none; border-radius:8px; font-size:0.85em; font-weight:700; color:#0f172a; cursor:pointer;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">✏️ เกลาภาษา/ไวยากรณ์</button>
                                         <button type="button" onclick="qImproveAction(this,'distractors')" style="display:block; width:100%; text-align:left; padding:7px 10px; background:none; border:none; border-radius:8px; font-size:0.85em; font-weight:700; color:#0f172a; cursor:pointer;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">🎯 ปรับเฉพาะตัวลวง</button>
