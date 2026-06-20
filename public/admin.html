@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.28</title>
+    <title>Nika V96.29</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -26556,32 +26556,85 @@ ${JSON.stringify(sourceObj)}`;
         // 1 file → open it directly; multiple → a tiny self-contained chooser modal
         // (opening several tabs at once trips popup blockers). External links open in a
         // new tab with noopener.
-        function adminOpenQuizMaterials(quizId) {
+        // V96.29: editIdx (filtered-list index) renders that row as an inline name/note
+        // editor instead of a link. lang-no-toggle on the shell stops lang-toggle.js from
+        // blanking the Thai header/labels (which made the modal read as a bare "(N)").
+        function adminOpenQuizMaterials(quizId, editIdx) {
             const q = (typeof quizzesData !== 'undefined' ? quizzesData : []).find(x => x.id === quizId);
             const mats = (q && Array.isArray(q.materials)) ? q.materials.filter(m => m && m.url) : [];
             if (!mats.length) return;
-            if (mats.length === 1) { window.open(String(mats[0].url).trim(), '_blank', 'noopener'); return; }
+            // Single file opens directly — but not while editing (we need the list visible).
+            if (mats.length === 1 && editIdx == null) { window.open(String(mats[0].url).trim(), '_blank', 'noopener'); return; }
             const existing = document.getElementById('adminQuizMaterialsModal');
             if (existing) existing.remove();
             const links = mats.map((m, i) => {
+                const fullUrl = escapeHtml(String(m.url).trim());
+                if (i === editIdx) {
+                    // V96.29: inline note editor — prefill with the current name, blank if it's
+                    // the auto "ไฟล์แนบ #N" placeholder so the admin types a real label.
+                    const curName = (m.name && !looksLikeOpaqueMaterialName(String(m.name).trim())) ? String(m.name).trim() : '';
+                    return `<div style="display:flex; flex-direction:column; gap:6px; padding:10px 14px; background:#fefce8; border:1px solid #fde68a; border-radius:10px;">
+                        <div style="font-size:0.72em; color:#92400e; font-weight:700; word-break:break-all;" title="${fullUrl}">🔗 ${fullUrl}</div>
+                        <input id="matNoteInput" type="text" value="${escapeHtml(curName)}" placeholder="ชื่อ/โน้ตของไฟล์นี้ เช่น ใบงานเคส 1" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.9em; outline:none;" onkeydown="if(event.key==='Enter'){event.preventDefault();adminSaveMaterialNote('${quizId}',${i});}else if(event.key==='Escape'){adminOpenQuizMaterials('${quizId}');}">
+                        <div style="display:flex; gap:6px;">
+                            <button type="button" onclick="adminSaveMaterialNote('${quizId}',${i})" style="flex:1; padding:7px; background:#22c55e; color:#fff; border:none; border-radius:8px; font-weight:800; font-size:0.85em; cursor:pointer;">✓ บันทึก</button>
+                            <button type="button" onclick="adminOpenQuizMaterials('${quizId}')" style="padding:7px 12px; background:#e2e8f0; color:#475569; border:none; border-radius:8px; font-weight:700; font-size:0.85em; cursor:pointer;">ยกเลิก</button>
+                        </div>
+                    </div>`;
+                }
                 const name = materialDisplayName(m, i);
                 const desc = (m.desc && String(m.desc).trim()) || '';
                 const descHtml = desc ? `<div style="font-size:0.78em; font-weight:500; color:#64748b; margin-top:2px;">${escapeHtml(desc)}</div>` : '';
-                const fullUrl = escapeHtml(String(m.url).trim());
-                return `<a href="${fullUrl}" target="_blank" rel="noopener noreferrer" title="${fullUrl}" style="display:flex; flex-direction:column; align-items:flex-start; gap:0; padding:10px 14px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; border-radius:10px; font-weight:700; text-decoration:none; font-size:0.9em; word-break:break-word;"><span>📎 ${escapeHtml(name)}</span>${descHtml}</a>`;
+                return `<div style="display:flex; gap:8px; align-items:stretch;">
+                    <a href="${fullUrl}" target="_blank" rel="noopener noreferrer" title="${fullUrl}" style="flex:1; min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:0; padding:10px 14px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; border-radius:10px; font-weight:700; text-decoration:none; font-size:0.9em; word-break:break-word;"><span>📎 ${escapeHtml(name)}</span>${descHtml}</a>
+                    <button type="button" onclick="adminOpenQuizMaterials('${quizId}',${i})" title="ตั้งชื่อ/ใส่โน้ตให้ไฟล์นี้" style="flex-shrink:0; width:42px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; color:#64748b; cursor:pointer; font-size:0.95em;">✏️</button>
+                </div>`;
             }).join('');
+            const titleHtml = q && q.title ? `<div style="font-size:0.82em; color:#64748b; font-weight:700; margin-top:3px; word-break:break-word;">${escapeHtml(q.title)}</div>` : '';
             const overlay = document.createElement('div');
             overlay.id = 'adminQuizMaterialsModal';
             overlay.style.cssText = 'position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:99999; display:flex; align-items:center; justify-content:center; padding:20px;';
             overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-            overlay.innerHTML = `<div style="background:white; border-radius:16px; padding:22px; max-width:420px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
-                    <div style="font-weight:900; color:#0f172a; font-size:1.05em;">📎 เอกสารประกอบ (${mats.length})</div>
-                    <button type="button" onclick="document.getElementById('adminQuizMaterialsModal').remove()" style="background:none; border:none; font-size:1.2em; cursor:pointer; color:#64748b;">✕</button>
+            overlay.innerHTML = `<div class="lang-no-toggle" style="background:white; border-radius:16px; padding:22px; max-width:420px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+                <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:14px; gap:10px;">
+                    <div style="min-width:0;">
+                        <div style="font-weight:900; color:#0f172a; font-size:1.05em;">📎 เอกสารประกอบ (${mats.length})</div>
+                        ${titleHtml}
+                    </div>
+                    <button type="button" onclick="document.getElementById('adminQuizMaterialsModal').remove()" style="background:none; border:none; font-size:1.2em; cursor:pointer; color:#64748b; flex-shrink:0;">✕</button>
                 </div>
                 <div style="display:flex; flex-direction:column; gap:8px;">${links}</div>
             </div>`;
             document.body.appendChild(overlay);
+            if (editIdx != null) { const inp = document.getElementById('matNoteInput'); if (inp) { inp.focus(); inp.select(); } }
+        }
+
+        // V96.29: persist an inline material name edit back to the quiz's materials[].
+        // idx is the index within the url-filtered list shown in the modal; map it back to
+        // the real array position before writing. Reopens the modal in normal mode on save.
+        async function adminSaveMaterialNote(quizId, idx) {
+            const input = document.getElementById('matNoteInput');
+            if (!input) return;
+            const note = input.value.trim();
+            const q = (typeof quizzesData !== 'undefined' ? quizzesData : []).find(x => x.id === quizId);
+            if (!q || !Array.isArray(q.materials)) return;
+            const withUrl = q.materials.map((m, realIdx) => ({ m, realIdx })).filter(x => x.m && x.m.url);
+            const target = withUrl[idx];
+            if (!target) return;
+            const newMaterials = q.materials.map((m, realIdx) => {
+                if (realIdx !== target.realIdx) return m;
+                const copy = Object.assign({}, m);
+                if (note) copy.name = note; else delete copy.name;
+                return copy;
+            });
+            try {
+                await db.collection('quizzes').doc(quizId).update({ materials: newMaterials });
+                q.materials = newMaterials; // optimistic; the quizzes onSnapshot also reconciles
+                if (typeof showToast === 'function') showToast('✅ บันทึกชื่อไฟล์แล้ว');
+                adminOpenQuizMaterials(quizId);
+            } catch (e) {
+                if (typeof showToast === 'function') showToast('❌ บันทึกไม่สำเร็จ: ' + e.message);
+            }
         }
 
         // V96.24: a quiz's download links can live in three places — the dedicated
@@ -26651,10 +26704,14 @@ ${JSON.stringify(sourceObj)}`;
             overlay.id = 'adminQuizMaterialsModal';
             overlay.style.cssText = 'position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:99999; display:flex; align-items:center; justify-content:center; padding:20px;';
             overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-            overlay.innerHTML = `<div style="background:white; border-radius:16px; padding:22px; max-width:420px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
-                    <div style="font-weight:900; color:#0f172a; font-size:1.05em;">📎 ลิงก์ดาวน์โหลด (${links.length})</div>
-                    <button type="button" onclick="document.getElementById('adminQuizMaterialsModal').remove()" style="background:none; border:none; font-size:1.2em; cursor:pointer; color:#64748b;">✕</button>
+            const titleHtml = q && q.title ? `<div style="font-size:0.82em; color:#64748b; font-weight:700; margin-top:3px; word-break:break-word;">${escapeHtml(q.title)}</div>` : '';
+            overlay.innerHTML = `<div class="lang-no-toggle" style="background:white; border-radius:16px; padding:22px; max-width:420px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+                <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:14px; gap:10px;">
+                    <div style="min-width:0;">
+                        <div style="font-weight:900; color:#0f172a; font-size:1.05em;">📎 ลิงก์ดาวน์โหลด (${links.length})</div>
+                        ${titleHtml}
+                    </div>
+                    <button type="button" onclick="document.getElementById('adminQuizMaterialsModal').remove()" style="background:none; border:none; font-size:1.2em; cursor:pointer; color:#64748b; flex-shrink:0;">✕</button>
                 </div>
                 <div style="display:flex; flex-direction:column; gap:8px;">${rows}</div>
             </div>`;
