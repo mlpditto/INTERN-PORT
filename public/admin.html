@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.29</title>
+    <title>Nika V96.30</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -39268,15 +39268,24 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     return { quest: q, sub, status: getQuestLifecycleStatus(q, sub) };
                 })
                 .filter(item => item.status !== 'draft')
-                // V95.35: hide quests whose deadline passed before this user registered
+                // V95.35: hide quests whose deadline passed before this user became relevant
                 // (Public quests match everyone retroactively → phantom EXPIRED for new users).
                 // Keep anything the user actually submitted, and keep all quests for legacy
-                // users with no createdAt.
+                // users with no dates.
+                // V96.30: the relevance floor is the LATER of account creation (createdAt)
+                // and training start (startDate). A user whose 40-day training begins weeks
+                // after they registered was seeing Public quests that expired BEFORE their
+                // training window opened as phantom EXPIRED — those pre-training quests are
+                // outside their active period and should not count against them.
                 .filter(item => {
                     if (item.sub) return true;
                     const joined = toHubDate(user.createdAt);
+                    const trainingStart = toHubDate(user.startDate);
+                    const floor = (joined && trainingStart)
+                        ? (trainingStart > joined ? trainingStart : joined)
+                        : (trainingStart || joined);
                     const deadline = toHubDate(item.quest.deadline);
-                    return !(joined && deadline && deadline < joined);
+                    return !(floor && deadline && deadline < floor);
                 });
 
             allVisible.forEach(item => { if (counts[item.status] !== undefined) counts[item.status]++; });
