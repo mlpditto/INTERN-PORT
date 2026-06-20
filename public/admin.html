@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.34</title>
+    <title>Nika V96.35</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -39267,6 +39267,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return 'backlog';
         }
 
+        // V96.35: how to show a quest's "Start" in the Backlog. Quests with no scheduled
+        // start used to render "Now", which read as current even on long-expired quests.
+        // Fall back to the assignment date (createdAt) so Start lines up with Deadline;
+        // only "—" when neither a scheduled start nor a createdAt exists. Shared by both
+        // the grid card and the compact pill row so they can't drift apart again.
+        window._hubStartDisp = function(quest) {
+            const s = toHubDate(quest && (quest.startTime || quest.scheduledStart));
+            if (s) return window._fmtDate(s);
+            const c = toHubDate(quest && quest.createdAt);
+            return c ? window._fmtDate(c) : '—';
+        };
+
         // V92.37 — refresh Backlog tab when global quest/submission listeners fire,
         // but only if the popup is open AND the Backlog view is visible (avoid wasted work).
         function _maybeRefreshHubBacklog() {
@@ -39411,7 +39423,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             list.innerHTML = visible.map(({ quest, sub, status }) => {
                 const [label, bg, fg] = statusStyles[status] || statusStyles.backlog;
                 const deadline = toHubDate(quest.deadline);
-                const start = toHubDate(quest.startTime || quest.scheduledStart);
+                const startDisp = window._hubStartDisp(quest); // V96.35: createdAt fallback, not "Now"
                 const submitted = toHubDate(sub?.submittedAt);
                 const title = String(quest.question || 'Untitled Daily Quest');
                 const subId = sub?.id || '';
@@ -39493,7 +39505,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.76em; color:#64748b; font-weight:700;">
                             <div>Score<br><b style="color:#10b981;">+${Number(quest.baseScore || 0).toFixed(2)}</b></div>
                             <div>Duration<br><b>${quest.durationMinutes || 30}m</b></div>
-                            <div>Start<br><b>${start ? window._fmtDate(start) : 'Now'}</b></div>
+                            <div>Start<br><b>${startDisp}</b></div>
                             <div>Deadline<br><b>${window._fmtDate(deadline)}</b></div>
                         </div>
                         ${submittedBlock}
@@ -39932,7 +39944,6 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             };
             const [label, bg, fg] = statusStyles[status] || statusStyles.backlog;
             const deadline = toHubDate(quest.deadline);
-            const start = toHubDate(quest.startTime || quest.scheduledStart);
             const submitted = toHubDate(sub?.submittedAt);
             const reviewed = toHubDate(sub?.reviewedAt);
             const answer = sub ? String(sub.answer || sub.submission || sub.content || '').trim() : '';
@@ -39968,7 +39979,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; padding:8px 12px; background:#f8fafc; border-radius:10px; margin-bottom:10px; font-size:0.76em; color:#475569; font-weight:700;">
                         <span title="Base score awarded on receive">⭐ <b style="color:#10b981;">+${Number(quest.baseScore || 0).toFixed(2)}</b></span>
                         <span title="Time limit">⏱️ <b style="color:#1e293b;">${quest.durationMinutes || 30}m</b></span>
-                        <span title="Start time">▶️ ${start ? window._fmtDate(start) : '<b>Now</b>'}</span>
+                        <span title="Start time">▶️ ${window._hubStartDisp(quest)}</span>
                         <span title="Deadline">⏰ ${window._fmtDate(deadline)}</span>
                         ${submitted ? `<span style="border-left:1px solid #cbd5e1; padding-left:12px;" title="Submitted at">✓ <span style="color:#065f46;">${window._fmtDate(submitted)}</span></span>` : ''}
                         ${submitted ? `<span title="Auto-earned score">💰 <b style="color:#065f46;">+${earnedScore.toFixed(2)}</b></span>` : ''}
