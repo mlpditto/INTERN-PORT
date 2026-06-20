@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.31</title>
+    <title>Nika V96.32</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -20361,9 +20361,19 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             return /^[A-Za-z0-9_-]+$/.test(s);             // base64url-ish token, no spaces
         }
         function materialDisplayName(m, i) {
+            const ellip = (s) => s.length > 40 ? (s.slice(0, 24) + '…' + s.slice(-12)) : s;
             const raw = (m && m.name && String(m.name).trim()) || '';
-            if (!raw || looksLikeOpaqueMaterialName(raw)) return 'ไฟล์แนบ #' + ((i | 0) + 1);
-            return raw.length > 40 ? (raw.slice(0, 24) + '…' + raw.slice(-12)) : raw;
+            if (raw && !looksLikeOpaqueMaterialName(raw)) return ellip(raw);
+            // V96.32: no usable name → derive a readable filename from the URL before
+            // falling back to the generic "ไฟล์แนบ #N" (opaque Storage tokens still fall back).
+            const url = (m && m.url && String(m.url).trim()) || '';
+            if (url) {
+                try {
+                    const fname = decodeURIComponent(url.split(/[?#]/)[0]).split('/').pop() || '';
+                    if (fname && !looksLikeOpaqueMaterialName(fname)) return ellip(fname);
+                } catch (_) { /* malformed URI → fall through */ }
+            }
+            return 'ไฟล์แนบ #' + ((i | 0) + 1);
         }
 
         // V95.12: quiz materials — parse the textarea (one per line, "Name | URL"

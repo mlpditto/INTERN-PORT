@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.01)</title>
+    <title>Internship Portfolio (V96.02)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -7905,9 +7905,19 @@
             return /^[A-Za-z0-9_-]+$/.test(s);             // base64url-ish token, no spaces
         }
         function materialDisplayName(m, i) {
+            const ellip = (s) => s.length > 40 ? (s.slice(0, 24) + '…' + s.slice(-12)) : s;
             const raw = (m && m.name && String(m.name).trim()) || '';
-            if (!raw || looksLikeOpaqueMaterialName(raw)) return 'ไฟล์แนบ #' + ((i | 0) + 1);
-            return raw.length > 40 ? (raw.slice(0, 24) + '…' + raw.slice(-12)) : raw;
+            if (raw && !looksLikeOpaqueMaterialName(raw)) return ellip(raw);
+            // V96.32: no usable name → derive a readable filename from the URL before
+            // falling back to the generic "ไฟล์แนบ #N" (opaque Storage tokens still fall back).
+            const url = (m && m.url && String(m.url).trim()) || '';
+            if (url) {
+                try {
+                    const fname = decodeURIComponent(url.split(/[?#]/)[0]).split('/').pop() || '';
+                    if (fname && !looksLikeOpaqueMaterialName(fname)) return ellip(fname);
+                } catch (_) { /* malformed URI → fall through */ }
+            }
+            return 'ไฟล์แนบ #' + ((i | 0) + 1);
         }
 
         // V95.12: render a quiz's downloadable materials as 📎 link chips
