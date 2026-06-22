@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.36</title>
+    <title>Nika V96.37</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -9995,7 +9995,7 @@
                         : ("Please review the following transcript and polish it to make it sound natural, professional, and well-structured for spoken audio/podcast narration. Fix any grammatical errors and improve the flow. Only return the final polished text without any conversational filler or introductory remarks.\n\n" + ttsInput.value);
                     
                     const selectedModel = document.getElementById('tts-polish-model')?.value || "gemini-3.5-flash";
-                    const response = await window.callUniversalAI(selectedModel, prompt, true);
+                    const response = await window.callUniversalAI(selectedModel, prompt, true, null, '', { feature: 'tts_polish' });
                     if (response && response.text) {
                         ttsInput.value = response.text;
                         if (typeof updateTtsTranscriptCounter === 'function') updateTtsTranscriptCounter();
@@ -16524,7 +16524,7 @@ RULES:
                 ]`;
 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-2.5-pro';
-                const { text: resultJson } = await callUniversalAI(selectedModel, prompt, true);
+                const { text: resultJson } = await callUniversalAI(selectedModel, prompt, true, null, '', { feature: 'quiz_bulk_improve' });
 
                 // V92.35: use shared safeJsonParse with bracket-extraction fallback
                 const newQuestions = safeJsonParse(resultJson);
@@ -16680,7 +16680,7 @@ RULES:
                 ]`;
 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-2.5-pro';
-                const { text: resultRaw } = await callUniversalAI(selectedModel, prompt, true);
+                const { text: resultRaw } = await callUniversalAI(selectedModel, prompt, true, null, '', { feature: 'quiz_suggestion' });
                 // V92.35: use shared safeJsonParse with bracket-extraction fallback
                 const suggestions = safeJsonParse(resultRaw);
                 if (!suggestions) throw new Error('AI returned invalid JSON. First 200 chars: ' + String(resultRaw || '').slice(0, 200));
@@ -16762,7 +16762,7 @@ RULES:
             try {
                 showToast(" Regenerating with custom focus...");
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-2.5-pro';
-                const { text: resultRaw } = await callUniversalAI(selectedModel, prompt, true);
+                const { text: resultRaw } = await callUniversalAI(selectedModel, prompt, true, null, '', { feature: 'quiz_suggestion' });
                 // V92.35: use shared safeJsonParse with bracket-extraction fallback
                 const suggestions = safeJsonParse(resultRaw);
                 if (!suggestions) throw new Error('AI returned invalid JSON. First 200 chars: ' + String(resultRaw || '').slice(0, 200));
@@ -16968,7 +16968,7 @@ RULES:
                 // V94.27: Phase 3-C — Step 1 enhancer model driven by chip rail (#ai-model-design-enhancer).
                 // Default 'gemini-3.5-flash' preserves prior behavior; admin can switch to OpenRouter chips.
                 const enhancerModel = getAIDesignEnhancerModel();
-                const { text: enhancedPrompt } = await callUniversalAI(enhancerModel, enhancerPrompt);
+                const { text: enhancedPrompt } = await callUniversalAI(enhancerModel, enhancerPrompt, false, null, '', { feature: 'design_enhance' });
                 
                 // Step 2: Show Prompt Editor Modal ([Version: V87.17])
                 const finalPrompt = await new Promise((resolve) => {
@@ -17006,7 +17006,7 @@ RULES:
                     </div>
                 `;
 
-                const { text: imageUrl } = await callUniversalAI(engine, finalPrompt);
+                const { text: imageUrl } = await callUniversalAI(engine, finalPrompt, false, null, '', { feature: 'design_image' });
 
                 previewContainer.innerHTML = `<img src="${imageUrl}" id="generated-image" style="max-width:100%; max-height:100%; border-radius:15px; box-shadow:0 10px 40px rgba(0,0,0,0.15);">`;
                 actions.style.display = "flex";
@@ -17783,7 +17783,7 @@ Rules:
 - Preserve the original supportive tone and meaning
 - Output only the rewritten feedback. No explanation, no quotes, no preamble.`;
 
-                const result = await window.callUniversalAI(modelName, prompt);
+                const result = await window.callUniversalAI(modelName, prompt, false, null, '', { feature: 'reflective_feedback' });
                 if (result && result.text) {
                     const cleaned = result.text.trim().replace(/^["']+|["']+$/g, '');
                     // [V93.35] Route through Quill setter (syncs hidden textarea + chip state)
@@ -17872,10 +17872,10 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
                 const userOptedOut = grammarOff ? false : await isUserGrammarOptedOut(reviewUid);
                 const skipGrammar = grammarOff || userOptedOut;
                 const [feedbackResult, grammarResult] = await Promise.allSettled([
-                    window.callUniversalAI(selectedModelName, feedbackPrompt, true),
+                    window.callUniversalAI(selectedModelName, feedbackPrompt, true, null, '', { feature: 'reflective_feedback' }),
                     // V94.09: isJson=true → proxy sets responseMimeType:application/json
                     // so the grammar response is raw JSON (no ```json markdown fences).
-                    skipGrammar ? Promise.resolve(null) : window.callUniversalAI(grammarModel, grammarPrompt, true)
+                    skipGrammar ? Promise.resolve(null) : window.callUniversalAI(grammarModel, grammarPrompt, true, null, '', { feature: 'writing_analysis' })
                 ]);
 
                 if (feedbackResult.status === 'fulfilled') {
@@ -18132,7 +18132,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             try {
                 // V94.18: honor chip rail selection on Retry too — admin can switch Flash→Pro and re-run.
                 const grammarModel = getGrammarModel();
-                const result = await window.callUniversalAI(grammarModel, buildGrammarPrompt(grammarSource, detectLanguage(grammarSource)), true);
+                const result = await window.callUniversalAI(grammarModel, buildGrammarPrompt(grammarSource, detectLanguage(grammarSource)), true, null, '', { feature: 'writing_analysis' });
                 renderGrammarAnalysis(result.text, grammarSource);
                 saveGrammarCache(result.text, grammarSource);
                 persistGrammarGrade(result.text, grammarModel);
@@ -19327,7 +19327,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 'OUTPUT ต้องเป็น RAW JSON เท่านั้น ห้ามมี code fence ห้ามมีคำอธิบายนอก JSON:',
                 '{"verdict":"ok|warning|error","summary":"สรุปสั้นๆ","issues":["ปัญหาที่พบ"],"suggestedCorrectChoices":[เลขข้อ 1-based ที่ควรถูก เช่น [2] หรือ [] ถ้าไม่ต้องเปลี่ยน]}'
             ].join('\n');
-            const res = await window.callUniversalAI(model, prompt, true, null, ctx.quickApiKey);
+            const res = await window.callUniversalAI(model, prompt, true, null, ctx.quickApiKey, { feature: 'question_factcheck' });
             const data = safeJsonParse(res.text);
             if (!data) throw new Error('AI ส่งค่าที่ไม่ใช่ JSON: ' + String(res.text || '').slice(0, 160));
             const verdict = String(data.verdict || 'warning').toLowerCase();
@@ -19362,7 +19362,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 '',
                 'OUTPUT ต้องเป็น RAW JSON เท่านั้น ห้าม code fence: {"question":"...","options":["...",...]} โดย options ต้องมีจำนวนและลำดับเท่าเดิม'
             ].join('\n');
-            const res = await window.callUniversalAI(model, prompt, true, null, ctx.quickApiKey);
+            const res = await window.callUniversalAI(model, prompt, true, null, ctx.quickApiKey, { feature: 'question_polish' });
             const data = safeJsonParse(res.text);
             if (!data || typeof data.question !== 'string' || !Array.isArray(data.options)) throw new Error('AI ส่งรูปแบบไม่ถูกต้อง');
             if (data.options.length !== ctx.options.length) throw new Error('จำนวนตัวเลือกไม่ตรงกับเดิม (AI ส่ง ' + data.options.length + ' จากเดิม ' + ctx.options.length + ') — ลองใหม่อีกครั้ง');
@@ -19399,7 +19399,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 '',
                 'OUTPUT RAW JSON เท่านั้น ห้าม code fence: {"options":["...",...]} จำนวนและลำดับเท่าเดิม โดย index ที่เป็นคำตอบถูกต้องเหมือนเดิมเป๊ะ'
             ].join('\n');
-            const res = await window.callUniversalAI(model, prompt, true, null, ctx.quickApiKey);
+            const res = await window.callUniversalAI(model, prompt, true, null, ctx.quickApiKey, { feature: 'question_distractors' });
             const data = safeJsonParse(res.text);
             if (!data || !Array.isArray(data.options) || data.options.length !== ctx.options.length) throw new Error('AI ส่งจำนวนตัวเลือกไม่ตรง — ลองใหม่อีกครั้ง');
             const newOpts = data.options.map(o => String(o));
@@ -19430,7 +19430,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 '',
                 'OUTPUT RAW JSON เท่านั้น ห้าม code fence: {"explanation":"..."}'
             ].join('\n');
-            const res = await window.callUniversalAI(model, prompt, true, null, ctx.quickApiKey);
+            const res = await window.callUniversalAI(model, prompt, true, null, ctx.quickApiKey, { feature: 'question_explanation' });
             const data = safeJsonParse(res.text);
             if (!data || typeof data.explanation !== 'string' || !data.explanation.trim()) throw new Error('AI ไม่ได้ส่งคำอธิบายกลับมา');
             const expl = data.explanation.trim();
@@ -21481,7 +21481,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     const res = await callUniversalAI(aiModel, prompt, true, {
                         image_base64: base64,
                         image_mimetype: imageBlob.type || 'image/png'
-                    });
+                    }, '', { feature: 'quiz_vision_scan' });
 
                     // Parse JSON from markdown block (res is an object)
                     if (!res || !res.text) throw new Error("AI returned empty result for vision scan.");
@@ -24762,8 +24762,8 @@ ${JSON.stringify(sourceObj)}`;
                                     text: "Please transcribe all visible information, text, and data from this image into a detailed and structured text format. If it's a document (like a medication list or report), preserve the layout and columns in text form. If it's a visual, describe it in detail. DO NOT omit any technical data.",
                                     imageBase64: rawResult
                                 };
-                                const { text: transcription } = await callUniversalAI('multimodal', visionPrompt);
-                                content = transcription; 
+                                const { text: transcription } = await callUniversalAI('multimodal', visionPrompt, false, null, '', { feature: 'kb_image_index' });
+                                content = transcription;
                             }
 
                             const folderName = document.getElementById('kb-folder-name').value.trim() || 'General';
@@ -25023,7 +25023,7 @@ ${JSON.stringify(sourceObj)}`;
                 
                 LANGUAGE: Match the primary language of the content.`;
 
-                const res = await callUniversalAI(model, systemPrompt, true);
+                const res = await callUniversalAI(model, systemPrompt, true, null, '', { feature: 'kb_to_quiz' });
                 let quizJson = [];
                 
                 try {
@@ -25119,11 +25119,11 @@ ${JSON.stringify(sourceObj)}`;
                         text: systemPrompt + "\n\nUser Question: " + question,
                         imageBase64: window.pendingAttachedImage
                     };
-                    responseObj = await callUniversalAI('multimodal', visionPrompt);
+                    responseObj = await callUniversalAI('multimodal', visionPrompt, false, null, '', { feature: 'research_image' });
                     window.clearAttachedImage(); // Reset
                 } else {
                     const fullPrompt = systemPrompt + "\n\nUser: " + question;
-                    responseObj = await window.callUniversalAI(selectedModel, fullPrompt); 
+                    responseObj = await window.callUniversalAI(selectedModel, fullPrompt, false, null, '', { feature: 'research_qa' });
                 }
                 
                 if (!responseObj || !responseObj.text) {
@@ -29649,7 +29649,7 @@ ${JSON.stringify(sourceObj)}`;
                     '',
                     cleanSummary
                 ].filter(Boolean).join('\n');
-                const { text } = await window.callUniversalAI('gpt-4o-mini', prompt);
+                const { text } = await window.callUniversalAI('gpt-4o-mini', prompt, false, null, '', { feature: 'casecard_translate' });
                 return String(text || '').trim() || cleanSummary;
             } catch (error) {
                 console.warn('Failed to translate anonymized summary to English:', error);
@@ -29743,7 +29743,7 @@ ${JSON.stringify(sourceObj)}`;
                     refineBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Refining';
                 }
                 if (metaEl) metaEl.textContent = `${modelName} is refining the GenMage prompt... · ${modelName}이(가) GenMage 프롬프트를 다듬는 중...`;
-                const { text, model } = await window.callUniversalAI(modelName, refinePrompt);
+                const { text, model } = await window.callUniversalAI(modelName, refinePrompt, false, null, '', { feature: 'casecard_prompt' });
                 const refinedPrompt = String(text || '').replace(/^```(?:text)?/i, '').replace(/```$/g, '').trim();
                 if (!refinedPrompt) throw new Error(`${modelName} returned an empty prompt.`);
                 promptEl.value = refinedPrompt;
@@ -30103,7 +30103,7 @@ ${JSON.stringify(sourceObj)}`;
                     false,
                     null,
                     '',
-                    { size: '1024x1024' }
+                    { size: '1024x1024', feature: 'casecard_image' }
                 );
                 const { model } = imageResponse || {};
                 const rawImage = imageResponse?.text
@@ -30275,7 +30275,7 @@ Required sections:
 Case Data:
 ${buildAlabastaCaseSnapshot(caseItem)}`;
 
-                const { text } = await window.callUniversalAI('gemini-3.5-flash', prompt, true);
+                const { text } = await window.callUniversalAI('gemini-3.5-flash', prompt, true, null, '', { feature: 'laboon_brief' });
                 outputEl.value = String(text || '').trim();
                 if (metaEl) metaEl.textContent = 'AI brief generated. You can edit it here or send it to Laboon studio.';
             } catch (e) {
@@ -45731,7 +45731,7 @@ ${i+1}. **${s.author}** (${s.date.toLocaleDateString('th-TH')})
 ✨ **เขียนแบบนักวรรณกรรม:** ใช้ภาษาสร้างสรรค์ อุปมาอุปไมย์ และมองโลกในมุมมองที่ลึกซึ้ง`;
 
             try {
-                const response = await callUniversalAI(activeModel, prompt);
+                const response = await callUniversalAI(activeModel, prompt, false, null, '', { feature: 'laugh_tale_narrative' });
                 renderStorytellerResult('Voyage Narrative Analysis', activeModel, response.text, 'analysis');
             } catch (error) {
                 console.error("LaughTale Analysis Error:", error);
@@ -45773,7 +45773,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 ✨ **วิเคราะห์แบบโหราศาสตร์:** ใช้ภาษาลึกลับ มองหาความเชื่อมโยงที่มองไม่เห็น`;
 
             try {
-                const response = await callUniversalAI(activeModel, prompt);
+                const response = await callUniversalAI(activeModel, prompt, false, null, '', { feature: 'laugh_tale_patterns' });
                 renderStorytellerResult('Hidden Pattern Constellation', activeModel, response.text, 'patterns');
             } catch (error) {
                 console.error("LaughTale Patterns Error:", error);
@@ -45848,7 +45848,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
             try {
                 const activeModel = document.getElementById('laughtale-ai-model').value;
-                const response = await callUniversalAI(activeModel, prompt);
+                const response = await callUniversalAI(activeModel, prompt, false, null, '', { feature: 'laugh_tale_comment' });
                 commentSection.innerHTML = `
                     <div style="font-size:0.75em; font-weight:bold; color:#667eea; text-transform:uppercase; margin-bottom:8px;">
                         <i class="fa-solid fa-feather"></i> AI Storyteller's Whisper
@@ -47746,7 +47746,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     throw new Error("AI engine is missing or still initializing. Status: " + window.AI_CORE_READY);
                 }
 
-                const response = await window.callUniversalAI(modelVal, prompt, false);
+                const response = await window.callUniversalAI(modelVal, prompt, false, null, '', { feature: 'quiz_tagging' });
                 const suggestedTags = response.text;
 
                 if (suggestedTags && suggestedTags.trim().length > 2) {
@@ -47803,7 +47803,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 }`;
                 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-3.5-flash';
-                const { text: resultJson } = await callUniversalAI(selectedModel, prompt, true);
+                const { text: resultJson } = await callUniversalAI(selectedModel, prompt, true, null, '', { feature: 'quiz_regen_suggestion' });
                 // V92.35: use shared safeJsonParse with bracket-extraction fallback
                 const newSuggestion = safeJsonParse(resultJson);
                 if (!newSuggestion) throw new Error('AI returned invalid JSON. First 200 chars: ' + String(resultJson || '').slice(0, 200));
@@ -47894,7 +47894,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         }
 
         async function qfpCallAI(model, prompt) {
-            const resp = await window.callUniversalAI(model, prompt);
+            const resp = await window.callUniversalAI(model, prompt, false, null, '', { feature: 'quiz_feedback' });
             if (resp && typeof resp === 'object') {
                 return String(resp.text || resp.outputText || resp.response || '').trim();
             }
