@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.35</title>
+    <title>Nika V96.36</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -47265,6 +47265,47 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             return { diffs, hasMeaningfulDiff: diffs.length > 0 };
         };
 
+        // V96.36: resolve an _aiAnalysisItems entry's quiz-question index, mirroring the
+        // same fallback chain the Individual Improvements list uses (qNumber-1 → index → 0),
+        // clamped to the current form. Single source for the compare-modal Prev/Next nav.
+        window.getAiItemQIndex = function(arrIdx) {
+            const items = window._aiAnalysisItems || [];
+            const item = items[arrIdx];
+            if (!item) return 0;
+            let qIdx = (item.qNumber !== undefined) ? item.qNumber - 1 : (item.index !== undefined ? item.index : 0);
+            const total = getQuizFormData().questions.length;
+            return Math.max(0, Math.min(qIdx, total - 1));
+        };
+
+        // V96.36: jump the Quality Improvement Comparison modal to another proposed item.
+        // Tears down the current overlay and re-opens previewAiFix for the target arrIdx.
+        window.gotoAiCompare = function(arrIdx) {
+            const items = window._aiAnalysisItems || [];
+            if (arrIdx < 0 || arrIdx >= items.length) return;
+            const overlay = document.getElementById('ai-compare-overlay');
+            if (overlay) overlay.remove();
+            window.previewAiFix(window.getAiItemQIndex(arrIdx), arrIdx);
+        };
+
+        // V96.36: Apply-and-advance. Applies the fix, then auto-opens the next proposed
+        // item so the admin can review all suggestions without closing the modal. On a
+        // cancelled/invalid apply (ok === false) the overlay is left untouched so the admin
+        // can regenerate and retry from the same comparison.
+        window.applyAiFixAndAdvance = function(index, improvedArg, arrIdx) {
+            const ok = window.applySingleAiFix(index, improvedArg, arrIdx);
+            const overlay = document.getElementById('ai-compare-overlay');
+            if (!ok) return; // cancelled or no-meaningful-diff → keep this comparison open
+            const items = window._aiAnalysisItems || [];
+            const nextArr = arrIdx + 1;
+            if (nextArr < items.length) {
+                if (overlay) overlay.remove();
+                window.previewAiFix(window.getAiItemQIndex(nextArr), nextArr);
+            } else {
+                if (overlay) overlay.remove();
+                showToast('🎉 All AI improvements reviewed');
+            }
+        };
+
         window.previewAiFix = function(index, arrIdx) {
             try {
                 const item = window._aiAnalysisItems[arrIdx];
@@ -47374,8 +47415,19 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     ? `<button class="btn" onclick="addSingleAiAsNewQuestion(${index}, '${improvedJson}'); document.getElementById('ai-compare-overlay').remove();" style="padding:10px 22px; border-radius:12px; font-weight:700; background:#0ea5e9; color:white; border:none; box-shadow:0 4px 15px rgba(14,165,233,0.28);">➕ Add as New Question</button>`
                     : `<button class="btn" disabled title="Regenerate until the improved version is meaningfully different." style="padding:10px 22px; border-radius:12px; font-weight:700; background:#e2e8f0; color:#64748b; border:none; cursor:not-allowed; box-shadow:none; opacity:0.95;">➕ Add as New Question</button>`;
                 const applyButtonHtml = canApplyImprovement
-                    ? `<button class="btn btn-primary" onclick="applySingleAiFix(${index}, '${improvedJson}', ${arrIdx}); document.getElementById('ai-compare-overlay').remove();" style="padding:10px 30px; border-radius:12px; font-weight:700; background:#22c55e; border:none; box-shadow:0 4px 15px rgba(34,197,94,0.3);">✅ Apply This Fix</button>`
+                    ? `<button class="btn btn-primary" onclick="applyAiFixAndAdvance(${index}, '${improvedJson}', ${arrIdx})" style="padding:10px 30px; border-radius:12px; font-weight:700; background:#22c55e; border:none; box-shadow:0 4px 15px rgba(34,197,94,0.3);">✅ ${arrIdx < ((window._aiAnalysisItems||[]).length - 1) ? 'Apply &amp; Next' : 'Apply This Fix'}</button>`
                     : `<button class="btn btn-primary" disabled title="Regenerate until the improved version is meaningfully different." style="padding:10px 30px; border-radius:12px; font-weight:700; background:#cbd5e1; color:#64748b; border:none; cursor:not-allowed; box-shadow:none; opacity:0.95;">✅ Apply This Fix</button>`;
+
+                // V96.36: header Prev/Next carousel — walk all AI-proposed improvements without
+                // closing the modal. Shown only when there's more than one item. Bounds disable
+                // the edge button. gotoAiCompare re-opens previewAiFix for the neighbour arrIdx.
+                const totalItems = (window._aiAnalysisItems || []).length;
+                const navHtml = (typeof arrIdx === 'number' && totalItems > 1) ? `
+                    <div style="display:flex; align-items:center; gap:6px; background:#f1f5f9; border-radius:14px; padding:4px;">
+                        <button onclick="gotoAiCompare(${arrIdx - 1})" ${arrIdx <= 0 ? 'disabled' : ''} title="Previous suggestion" style="width:34px; height:34px; border-radius:10px; border:none; cursor:${arrIdx <= 0 ? 'not-allowed' : 'pointer'}; background:${arrIdx <= 0 ? 'transparent' : '#fff'}; color:${arrIdx <= 0 ? '#cbd5e1' : '#475569'}; font-size:0.95em; font-weight:800; box-shadow:${arrIdx <= 0 ? 'none' : '0 1px 3px rgba(0,0,0,0.08)'};">◀</button>
+                        <span style="font-size:0.78em; font-weight:800; color:#475569; min-width:48px; text-align:center; letter-spacing:0.5px;">${arrIdx + 1} / ${totalItems}</span>
+                        <button onclick="gotoAiCompare(${arrIdx + 1})" ${arrIdx >= totalItems - 1 ? 'disabled' : ''} title="Next suggestion" style="width:34px; height:34px; border-radius:10px; border:none; cursor:${arrIdx >= totalItems - 1 ? 'not-allowed' : 'pointer'}; background:${arrIdx >= totalItems - 1 ? 'transparent' : '#fff'}; color:${arrIdx >= totalItems - 1 ? '#cbd5e1' : '#475569'}; font-size:0.95em; font-weight:800; box-shadow:${arrIdx >= totalItems - 1 ? 'none' : '0 1px 3px rgba(0,0,0,0.08)'};">▶</button>
+                    </div>` : '';
 
                 const overlay = document.createElement('div');
                 overlay.id = "ai-compare-overlay";
@@ -47389,7 +47441,10 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                                 <h3 style="margin:0; font-size:1.3em; color:#1e293b;">🛠️ Quality Improvement Comparison</h3>
                                 <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; align-items:center;">${statusHtml}${modelChipHtml ? `<span style="color:#cbd5e1; font-weight:800; margin:0 2px; user-select:none;">·</span>${modelChipHtml}` : ''}</div>
                             </div>
-                            <button onclick="document.getElementById('ai-compare-overlay').remove()" style="width:40px; height:40px; border-radius:50%; border:none; background:#f1f5f9; color:#64748b; cursor:pointer; font-size:1.3em; display:flex; align-items:center; justify-content:center; transition:0.2s;" onmouseover="this.style.background='#e2e8f0'; this.style.color='#0f172a'">✕</button>
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                ${navHtml}
+                                <button onclick="document.getElementById('ai-compare-overlay').remove()" style="width:40px; height:40px; border-radius:50%; border:none; background:#f1f5f9; color:#64748b; cursor:pointer; font-size:1.3em; display:flex; align-items:center; justify-content:center; transition:0.2s; flex-shrink:0;" onmouseover="this.style.background='#e2e8f0'; this.style.color='#0f172a'">✕</button>
+                            </div>
                         </div>
 
                         <div style="padding:30px; overflow-y:auto; flex:1; display:flex; flex-wrap:wrap; gap:25px; align-items:stretch; background:linear-gradient(to bottom right, #f8fafc, #eff6ff);">
@@ -47527,9 +47582,10 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 const { improvedQ, allQs } = getImprovedQuestionPayload(index, improvedArg);
                 const diffState = window.getAiImprovementDiffState(allQs[index], improvedQ);
                 if (!diffState.hasMeaningfulDiff) {
-                    return alert("This improved version is still too similar to the original. Please regenerate a different fix first.");
+                    alert("This improved version is still too similar to the original. Please regenerate a different fix first.");
+                    return false; // V96.36: signal failure so applyAiFixAndAdvance keeps the modal open
                 }
-                if (!confirm(`Apply improved version to Question ${index + 1}?`)) return;
+                if (!confirm(`Apply improved version to Question ${index + 1}?`)) return false;
 
                 // V93.89 Quiz Quality Q4-C: chain AI explanation into Q2's .q-explanation,
                 // but ONLY when admin's field is blank (preserve manually-typed explanations).
@@ -47563,9 +47619,11 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                         }
                     }
                 }
+                return true; // V96.36: success → applyAiFixAndAdvance may advance to next item
             } catch (e) {
                 console.error("Single fix error:", e);
                 alert("Error applying fix: " + e.message);
+                return false;
             }
         };
 
