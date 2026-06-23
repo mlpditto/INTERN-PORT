@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.37</title>
+    <title>Nika V96.38</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13912,10 +13912,12 @@
             <div class="dca-pk-visual-section-label">Model</div>
             <div class="dca-pk-visual-chip-rail" id="dcaPkVisualModelRail">
                 <!-- V95.06: decluttered to the one working image model. The 3 OpenRouter
-                     image chips (GPT-5.4 / Nano Banana 2 / Grok) were removed because
-                     callAIProxy misroutes OpenRouter image models through /chat/completions
-                     and returns text, not an image — they only confused admins. Re-add them
-                     here once callAIProxy gains /images routing for the or/ provider. -->
+                     image chips (GPT-5.4 / Nano Banana 2 / Grok) were removed and stay removed.
+                     NOTE (V96.38): this is NOT a routing bug — callAIProxy routes or/ image
+                     models correctly via modalities-on-chat since V94.60. The real reason is
+                     those OpenRouter model IDs do not exist on OpenRouter ("model not found",
+                     verified 2026-06-23). AI Studio (gemini-aistudio provider) is the proven
+                     image-gen path; re-add an or/ chip only if a real OpenRouter image model ships. -->
                 <button type="button" class="dca-pk-visual-chip active" data-value="as/gemini-3.1-flash-image-preview" onclick="dcaSelectPkVisualModel(this)" title="Google AI Studio · Gemini 3.1 Flash Image Preview (Nano Banana) — real image gen via callAIProxy gemini-aistudio provider (V92.70).">🍌 Nano Banana · AI Studio</button>
             </div>
             <div class="dca-pk-visual-section-label">Style</div>
@@ -13994,10 +13996,12 @@
             <div class="dca-pk-visual-section-label">Model</div>
             <div class="dca-pk-visual-chip-rail" id="dxaPathoVisualModelRail">
                 <!-- V94.99: decluttered to the one working image model. The 3 OpenRouter
-                     image chips (GPT-5.4 / Nano Banana 2 / Grok) were removed because
-                     callAIProxy misroutes OpenRouter image models through /chat/completions
-                     and returns text, not an image — they only confused admins. Re-add them
-                     here once callAIProxy gains /images routing for the or/ provider. -->
+                     image chips (GPT-5.4 / Nano Banana 2 / Grok) were removed and stay removed.
+                     NOTE (V96.38): this is NOT a routing bug — callAIProxy routes or/ image
+                     models correctly via modalities-on-chat since V94.60. The real reason is
+                     those OpenRouter model IDs do not exist on OpenRouter ("model not found",
+                     verified 2026-06-23). AI Studio (gemini-aistudio provider) is the proven
+                     image-gen path; re-add an or/ chip only if a real OpenRouter image model ships. -->
                 <button type="button" class="dca-pk-visual-chip active" data-value="as/gemini-3.1-flash-image-preview" onclick="dxaSelectPathoVisualModel(this)" title="Google AI Studio · Gemini 3.1 Flash Image Preview (Nano Banana) — real image gen via callAIProxy gemini-aistudio provider.">🍌 Nano Banana · AI Studio</button>
             </div>
             <div class="dca-pk-visual-section-label">Style</div>
@@ -32210,9 +32214,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // most recent Generate result so Phase 2 Save can hash + upload it
         // without re-calling the AI. Reset on every modal open.
         const dcaPkVisualState = {
-            // V94.58: default switched from `or/openai/gpt-5.4-image-2` (which
-            // returns text via callAIProxy chat-route misroute) to AI Studio
-            // Nano Banana — real image gen path proven by Alabasta Case Card.
+            // V94.58/V96.38: AI Studio Nano Banana is the image-gen model. The old
+            // `or/...image` models were dropped — NOT a routing issue (callAIProxy
+            // handles or/ image routing correctly via modalities-on-chat since V94.60);
+            // those OpenRouter model IDs are simply unavailable ("model not found",
+            // verified 2026-06-23). AI Studio path proven by Alabasta Case Card.
             // V94.61: model bumped from `gemini-2.5-flash-image-preview`
             // (deprecated from v1beta endpoint) to `gemini-3.1-flash-image-preview`
             // (matching the OpenRouter chip's labeled current Nano Banana 2).
@@ -32228,10 +32234,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             lastErrorModelLabel: ''
         };
         const DCA_PK_VISUAL_MODEL_LABELS = {
-            'as/gemini-3.1-flash-image-preview':        'Nano Banana · AI Studio',
-            'or/openai/gpt-5.4-image-2':                'GPT-5.4 Image 2 (⚠ misrouted)',
-            'or/google/gemini-3.1-flash-image-preview': 'Nano Banana 2 (⚠ misrouted)',
-            'or/x-ai/grok-2-image':                     'Grok Imagine (⚠ misrouted)'
+            'as/gemini-3.1-flash-image-preview':        'Nano Banana · AI Studio'
         };
 
         // Open modal. Snapshots the current PK textareas via dcaCollectForm —
@@ -32788,8 +32791,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             try {
                 // 1. Decode URL → Blob. fetch() handles both `data:image/...`
                 //    and `https://...` shapes; CORS may block cross-origin
-                //    https URLs from OpenRouter image models (currently all
-                //    marked ⚠ misrouted, so unlikely path).
+                //    https URLs from OpenRouter image models (currently
+                //    unavailable on OpenRouter, so unlikely path).
                 const resp = await fetch(dcaPkVisualState.lastImageDataUrl);
                 if (!resp.ok) {
                     throw new Error(`Image fetch failed (${resp.status} ${resp.statusText}). If the source is a remote https URL it may be CORS-blocked.`);
@@ -36810,10 +36813,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             lastErrorModelLabel: ''
         };
         const DXA_PATHO_VISUAL_MODEL_LABELS = {
-            'as/gemini-3.1-flash-image-preview':        'Nano Banana · AI Studio',
-            'or/openai/gpt-5.4-image-2':                'GPT-5.4 Image 2 (⚠ misrouted)',
-            'or/google/gemini-3.1-flash-image-preview': 'Nano Banana 2 (⚠ misrouted)',
-            'or/x-ai/grok-2-image':                     'Grok Imagine (⚠ misrouted)'
+            'as/gemini-3.1-flash-image-preview':        'Nano Banana · AI Studio'
         };
 
         // Open modal. Snapshots the current form via dxaCollectForm so unsaved
