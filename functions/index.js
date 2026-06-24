@@ -348,7 +348,15 @@ function sanitizeProxyErrorMessage(err) {
 
     return String(rawMessage)
         .replace(/sk-[A-Za-z0-9_-]+/g, "sk-REDACTED")
-        .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer REDACTED");
+        .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer REDACTED")
+        // Provider error messages can embed a dashboard URL that carries a key
+        // identifier — e.g. OpenRouter's credit/limit error links to
+        // https://openrouter.ai/workspaces/default/keys/<64-hex> ("…adjust the
+        // key's monthly limit"). Strip ALL URLs so no key-bearing link reaches the
+        // client (or our logs), then redact any leftover long hex token that could
+        // be a key id. The human-useful text (e.g. "requires more credits") stays.
+        .replace(/https?:\/\/\S+/gi, "[link redacted]")
+        .replace(/\b[A-Fa-f0-9]{24,}\b/g, "[redacted]");
 }
 
 function getSafeProviderError(err) {
