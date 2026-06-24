@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.39</title>
+    <title>Nika V96.40</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15256,8 +15256,14 @@
         };
 
         window.callTtsProxy = async function(payload) {
-            const PROXY_URL = (window.location.hostname === 'mlp-int.work') ? '/api/ai' : 'https://mlp-int.work/api/ai';
-            const BACKUP_PROXY = 'https://intern-port-edfa7.web.app/api/ai';
+            // V96.40: mirror callUniversalAI's URL logic. Cross-origin POSTs to the
+            // /api/ai Hosting rewrite (mlp-int.work / web.app) fail the CORS preflight
+            // from github.io ("Failed to fetch" before auth) — verified live 2026-06-24.
+            // Use the same-origin rewrite ONLY when actually served from those hosts;
+            // otherwise hit the function directly (handles CORS + Authorization correctly).
+            const DIRECT_PROXY = 'https://us-central1-intern-port-edfa7.cloudfunctions.net/callAIProxy';
+            const PROXY_URL = (window.location.hostname === 'mlp-int.work' || window.location.hostname.endsWith('web.app')) ? '/api/ai' : DIRECT_PROXY;
+            const BACKUP_PROXY = DIRECT_PROXY;
 
             const callEndpoint = async (url) => {
                 const response = await fetch(url, {
