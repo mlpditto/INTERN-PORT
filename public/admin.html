@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.48</title>
+    <title>Nika V96.49</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15890,9 +15890,21 @@
         // quiz-analyzer (Assessment Specialist) prompt. Called by BOTH analyzeQuizAI and
         // the offline AI-eval golden set, so the harness exercises the REAL prompt, not a
         // representative copy. Pure: same (questions, tags) in → byte-identical prompt out.
-        function buildQuizAnalyzePrompt(questions, tags) {
+        function buildQuizAnalyzePrompt(questions, tags, auditNote) {
             const qList = questions.map((q, i) => `Q${i+1} (${q.type}): ${q.q}\nOptions: ${q.options ? q.options.join(', ') : 'N/A'}`).join('\n\n');
             const tagStr = Array.isArray(tags) ? tags.join(', ') : (tags || '');
+            // V96.49 Phase 2-full: when launched from the Quality Audit "Suggest fix",
+            // inject the audit's weakest dimension + Thai reviewer note so the rewrite
+            // targets that specific finding instead of a generic "make it harder".
+            const _auditDimNames = { clarity: 'Clarity', distractorQuality: 'Distractor Quality', bloomLevel: 'Bloom Level (cognitive demand)', clinicalDepth: 'Clinical Depth', languageConsistency: 'Language Consistency' };
+            const _hasAudit = auditNote && (auditNote.rationale || auditNote.weakestDim);
+            const auditBlock = _hasAudit ? `
+
+                ⚠️ AUDIT FINDING for the question above — the improvedQuestion MUST directly fix THIS first:
+                ${auditNote.weakestDim ? `- Weakest dimension: ${_auditDimNames[auditNote.weakestDim] || auditNote.weakestDim}${(auditNote.weakestVal != null) ? ` (scored ${auditNote.weakestVal}/5)` : ''}` : ''}
+                ${auditNote.rationale ? `- Reviewer note (Thai — treat as the target to resolve): ${auditNote.rationale}` : ''}
+                Prioritise fixing this weakness above all else; keep the question's topic and the intent of the correct answer.
+` : '';
             return `FORMAT CONTRACT — READ FIRST, OBEY ABSOLUTELY:
                 Respond with ONE single JSON object. Begin your response with the character \`{\` and end with \`}\`. No prose before. No prose after. No markdown fences. No preamble like "Here is the analysis" or "Based on the provided…". Any text outside the JSON object is a hard format violation and will be rejected.
 
@@ -15920,7 +15932,7 @@
 
                 Questions list:
                 ${qList}
-
+                ${auditBlock}
                 ⚠️ TITLE RULE for "suggestedTitles" (the most common mistake — read carefully):
                 "suggestedTitles" must name the QUIZ ITSELF by its subject matter — the title a learner sees on the quiz card. It is NOT a title for this analysis report. Derive it from what the questions actually test, anchored to the Quiz tags above.
                 - "full"  = a descriptive quiz title, roughly 4-12 words.
@@ -15996,7 +16008,7 @@
                     }, 350);
                 }
                 
-                const prompt = buildQuizAnalyzePrompt(promptQuestions, formData.tags);
+                const prompt = buildQuizAnalyzePrompt(promptQuestions, formData.tags, (opts && opts.auditNote) || null);
                 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-2.5-pro';
 
@@ -16303,6 +16315,17 @@ RULES:
                     throw new Error('AI returned invalid JSON after 2 attempts. First 300 chars:\n\n' + String(resultRaw || '').slice(0, 300));
                 }
 
+                // V96.49 Phase 2-full: stash per-Q findings (Thai rationale + weakest
+                // dimension) keyed by qNumber so "Suggest fix" can feed them into the
+                // improve prompt and target the specific weakness the audit flagged.
+                window._lastAuditByQ = {};
+                result.perQuestionAudit.forEach(a => {
+                    const scores = a.scores || {};
+                    let weakestDim = null, weakestVal = 99;
+                    Object.keys(scores).forEach(k => { const v = Number(scores[k]); if (!isNaN(v) && v < weakestVal) { weakestVal = v; weakestDim = k; } });
+                    window._lastAuditByQ[a.qNumber] = { rationale: a.rationale || '', weakestDim, weakestVal: weakestVal === 99 ? null : weakestVal };
+                });
+
                 renderAuditScorecard(result, aiModel, aiTokens, bp);
 
             } catch (e) {
@@ -16399,7 +16422,9 @@ RULES:
             const auditPopup = document.getElementById('ai-audit-popup');
             if (auditPopup) auditPopup.remove();
 
-            await window.analyzeQuizAI(null, { onlyQNumber: qNumber });
+            // V96.49 Phase 2-full: feed this question's audit finding into the improve prompt.
+            const auditNote = (window._lastAuditByQ && window._lastAuditByQ[qNumber]) || null;
+            await window.analyzeQuizAI(null, { onlyQNumber: qNumber, auditNote: auditNote });
 
             // analyzeQuizAI shows its own banner on prose-fallback / error — bail quietly then.
             const popup = document.getElementById('ai-analysis-popup');
