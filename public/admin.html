@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.44</title>
+    <title>Nika V96.45</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16192,6 +16192,11 @@
 
             const btn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
             const oldText = btn ? btn.innerHTML : 'Audit';
+            // V96.45: simulated progress %. auditQuizAI is a single opaque AI await with no
+            // real progress signal — ease an estimate toward 95% while waiting (fast early,
+            // slowing near the cap so it never hits 100% before the call returns). Same
+            // approach as analyzeQuizAI V95.50. Cleared in the finally block.
+            let auditProgressTimer = null;
 
             const bp = formData.blueprint || {};
             const bpLines = [];
@@ -16210,7 +16215,15 @@
             }).join('\n\n');
 
             try {
-                if (btn) { btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Auditing...`; btn.disabled = true; }
+                if (btn) {
+                    let pct = 0;
+                    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Auditing 0%`;
+                    btn.disabled = true;
+                    auditProgressTimer = setInterval(() => {
+                        pct = Math.min(95, pct + Math.max(1, Math.round((95 - pct) * 0.08)));
+                        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Auditing ${pct}%`;
+                    }, 350);
+                }
 
                 const prompt = `You are a Quality Auditor for medical-education multiple-choice questions.
 
@@ -16274,6 +16287,7 @@ RULES:
                 console.error('Audit error:', e);
                 alert('Audit error: ' + e.message);
             } finally {
+                if (auditProgressTimer) clearInterval(auditProgressTimer); // V96.45: stop the progress ticker
                 if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
             }
         };
