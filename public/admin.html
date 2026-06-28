@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.45</title>
+    <title>Nika V96.46</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15955,13 +15955,24 @@
         }
         window.buildQuizAnalyzePrompt = buildQuizAnalyzePrompt;
 
-        window.analyzeQuizAI = async function(clickedBtn) {
+        window.analyzeQuizAI = async function(clickedBtn, opts = {}) {
             const oldPopup = document.getElementById('ai-analysis-popup');
             if (oldPopup) oldPopup.remove();
 
             const formData = getQuizFormData();
             if (formData.questions.length < 1) return alert("Add at least 1 question to analyze.");
-            
+
+            // V96.46: optional single-question scope (used by the Quality Audit "Suggest fix"
+            // button). Analyzing one question instead of the whole quiz keeps the AI output
+            // tiny so a large (e.g. 40-Q) quiz can't overflow the token budget and truncate
+            // mid-JSON → the "prose instead of JSON" fallback. We prompt with just that
+            // question and remap the returned item's qNumber back to the real index after
+            // parse so Compare/Fix/Apply still target the right question.
+            const onlyQNumber = (opts && opts.onlyQNumber) || null;
+            const promptQuestions = (onlyQNumber && formData.questions[onlyQNumber - 1])
+                ? [formData.questions[onlyQNumber - 1]]
+                : formData.questions;
+
             const btn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
             const oldText = btn ? btn.innerHTML : "Analyze";
             // V95.50: simulated progress %. analyzeQuizAI is a single opaque AI await with no
@@ -15981,7 +15992,7 @@
                     }, 350);
                 }
                 
-                const prompt = buildQuizAnalyzePrompt(formData.questions, formData.tags);
+                const prompt = buildQuizAnalyzePrompt(promptQuestions, formData.tags);
                 
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-2.5-pro';
 
@@ -16040,6 +16051,13 @@
                     `;
                     document.body.appendChild(fallbackDiv);
                     return;
+                }
+
+                // V96.46: single-question scope sees only one question, so the model returns
+                // qNumber:1 — remap to the real quiz index so getAiItemQIndex/Compare/Fix/Apply
+                // (which read the FULL question list) target the audited question, not Q1.
+                if (onlyQNumber && Array.isArray(result.items)) {
+                    result.items.forEach(it => { it.qNumber = onlyQNumber; });
                 }
 
                 const analysis = result.analysisText || "Analysis complete.";
@@ -16368,14 +16386,16 @@ RULES:
         // V96.44 Quality Audit "Suggest fix": bridge a weak audit question into the
         // existing Specialist (analyzeQuizAI) improve flow — the audit scorecard is
         // read-only judgement, this turns a low score into one click toward a rewrite.
-        // Surgical: we don't touch analyzeQuizAI; we just run it (it rebuilds
-        // #ai-analysis-popup + window._aiAnalysisItems from the current quiz form) and
-        // scroll/highlight the targeted question's existing Compare/Fix card. No new prompt.
+        // It rebuilds #ai-analysis-popup + window._aiAnalysisItems and we scroll/highlight
+        // the targeted question's existing Compare/Fix card.
+        // V96.46: scope the Specialist to THIS question only (onlyQNumber). Running the
+        // whole quiz overflowed the token budget on large (e.g. 40-Q) quizzes → truncated
+        // JSON → "prose instead of JSON" fallback, so Suggest fix produced no card.
         window.auditSuggestFix = async function(qNumber) {
             const auditPopup = document.getElementById('ai-audit-popup');
             if (auditPopup) auditPopup.remove();
 
-            await window.analyzeQuizAI();
+            await window.analyzeQuizAI(null, { onlyQNumber: qNumber });
 
             // analyzeQuizAI shows its own banner on prose-fallback / error — bail quietly then.
             const popup = document.getElementById('ai-analysis-popup');
