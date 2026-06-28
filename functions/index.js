@@ -845,13 +845,22 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             const isImageRequest = (requestedModalities && requestedModalities.includes("image"))
                 || /(^|\/|-)image(-|\d|$)/i.test(orModel);
 
+            // V96.47: honor generationOptions.maxOutputTokens (default 8192 / cap 16384),
+            // matching the Gemini + Anthropic branches. The old hard 4096 truncated large
+            // JSON outputs (e.g. a whole-quiz Analyze/Audit) mid-object → the client
+            // surfaced it as "prose instead of JSON". Applies to every OpenRouter model
+            // (Llama, Xiaomi MiMo, …).
+            const orMaxTokens = Math.min(
+                Math.max(Number(generationOptions && generationOptions.maxOutputTokens) || 8192, 1024),
+                16384
+            );
             const body = {
                 model: orModel,
                 messages: [{ role: "user", content: tailoredPrompt }],
                 ...(isJson ? { response_format: { type: "json_object" } } : {}),
                 ...(isImageRequest ? { modalities: ["image", "text"] } : {}),
                 temperature: 0.7,
-                max_tokens: 4096
+                max_tokens: orMaxTokens
             };
 
             const response = await postWithRetry("https://openrouter.ai/api/v1/chat/completions", body, {
