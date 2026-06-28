@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.47</title>
+    <title>Nika V96.48</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -48736,11 +48736,160 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             }
         };
 
+        // ── V96.48: 2-model compare (Phase 3 of the quality-audit-suggest plan) ──────────
+        // Run the single-Q improve prompt through a SECOND model and show its proposal as a
+        // 3rd column beside Original + Improved-A. Model A = the Intelligence rail choice
+        // (already in _aiAnalysisItems[arrIdx].improvedQuestion); Model B is picked in the
+        // compare modal (persisted in localStorage). Single-question scope → no truncation.
+        // See [[project_quality_audit_suggest_plan]].
+        window._buildSingleQImprovePrompt = function(originalQ, issue, suggestion) {
+            return `Based on this question and the identified issue, provide a DIFFERENT and MORE CHALLENGING improved version.
+
+                CRITICAL REQUIREMENTS:
+                1. INCREASE DIFFICULTY: Use high-order clinical reasoning (Bloom's Taxonomy: Analysis/Evaluation).
+                2. DEEP INTEGRATION: If it's a medical/clinical question, provide a rich, realistic patient case with subtle clues.
+                3. PLAUSIBLE DISTRACTORS: All options must be highly plausible to someone with only superficial knowledge. Avoid "none of the above" or obviously wrong answers.
+                4. NO EASY CLUES: Ensure the correct answer requires synthesis of information, not just simple recall.
+
+                Question to improve: ${JSON.stringify(originalQ)}
+                Identified Issue: ${issue || ''}
+                Previous Suggestion: ${suggestion || ''}
+
+                Output ONLY a JSON object representing the improved question:
+                {
+                  "q": "...",
+                  "options": [...],
+                  "correct": [...],
+                  "suggestion": "Brief explanation of how this version increases challenge and addresses the issue..."
+                }`;
+        };
+
+        window._compareModelMeta = function(modelId) {
+            const m = String(modelId || '').toLowerCase();
+            if (m.includes('mimo')) return { label: 'MiMo', emoji: '📱', color: '#f97316' };
+            if (m.includes('flash')) return { label: 'Flash', emoji: '⚡', color: '#fbbf24' };
+            if (m.includes('claude')) return { label: 'Claude', emoji: '🤖', color: '#f59e0b' };
+            if (m.includes('gpt')) return { label: 'GPT', emoji: '✨', color: '#10b981' };
+            if (m.includes('typhoon')) return { label: 'Typhoon', emoji: '🌀', color: '#06b6d4' };
+            if (m.includes('llama')) return { label: 'Llama', emoji: '🦙', color: '#a78bfa' };
+            if (m.includes('gemini')) return { label: 'Pro', emoji: '🧠', color: '#6366f1' };
+            return { label: 'AI', emoji: '🧠', color: '#64748b' };
+        };
+
+        window._compareModelB = function() {
+            return localStorage.getItem('ai_default_2model_b') || 'claude-4-sonnet-latest';
+        };
+        window.setCompareModelB = function(chip) {
+            localStorage.setItem('ai_default_2model_b', chip.dataset.value);
+            [...chip.parentElement.children].forEach(c => c.classList.toggle('active', c === chip));
+        };
+        window._compareModelBPickerHtml = function() {
+            const cur = window._compareModelB();
+            const chips = [
+                { v: 'gemini-2.5-pro', t: 'Pro' },
+                { v: 'gpt-4o', t: 'GPT' },
+                { v: 'claude-4-sonnet-latest', t: 'Claude' },
+                { v: 'typhoon-v2.5-30b-a3b-instruct', t: '🌀' },
+                { v: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', t: '🦙' },
+                { v: 'or/xiaomi/mimo-v2.5', t: 'MiMo' }
+            ];
+            const items = chips.map(c => `<div class="glass-toggle-item${c.v === cur ? ' active' : ''}" data-value="${c.v}" onclick="window.setCompareModelB(this)" style="font-size:0.62em; font-weight:800; padding:2px 9px; border-radius:7px; color:#475569;">${c.t}</div>`).join('');
+            return `<div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:0.62em; font-weight:900; color:#0891b2; letter-spacing:0.5px; text-transform:uppercase; white-space:nowrap;">Model B</span>
+                <div class="glass-toggle-container" style="margin:0; background:rgba(0,0,0,0.05); border:1px solid rgba(0,0,0,0.06); padding:2px; border-radius:9px; gap:2px;">${items}</div>
+            </div>`;
+        };
+
+        window.generateAiProposalB = async function(qIdx, arrIdx, btn) {
+            const oldHtml = btn ? btn.innerHTML : null;
+            try {
+                if (btn) { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Comparing...'; btn.disabled = true; }
+                const item = window._aiAnalysisItems[arrIdx];
+                const originalQ = getQuizFormData().questions[qIdx];
+                const modelB = window._compareModelB();
+                const prompt = window._buildSingleQImprovePrompt(originalQ, item.issue, item.suggestion);
+                let parsed = null, actual = modelB, raw = '';
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    const r = await callUniversalAI(modelB, prompt, true, null, '', { feature: 'quiz_2model_compare', maxOutputTokens: 8192 });
+                    raw = r.text; actual = r.model || modelB;
+                    parsed = safeJsonParse(raw);
+                    if (parsed) break;
+                }
+                if (!parsed) throw new Error('Model B returned invalid JSON. First 200 chars: ' + String(raw || '').slice(0, 200));
+                item.improvedQuestionB = parsed;
+                item.improvedQuestionBModel = actual;
+                document.getElementById('ai-compare-overlay').remove();
+                window.previewAiFix(qIdx, arrIdx);
+            } catch (e) {
+                console.error('2-model compare error:', e);
+                alert('Model B failed: ' + e.message);
+                if (btn) { btn.innerHTML = oldHtml; btn.disabled = false; }
+            }
+        };
+
+        // green-add word diff (improved vs original) — standalone copy used by the 3-col renderer
+        window._renderAddDiff = function(orig, improved) {
+            const aw = (orig || '').split(/(\s+)/), bw = (improved || '').split(/(\s+)/);
+            const n = aw.length, m = bw.length;
+            const dp = Array(n + 1).fill().map(() => Array(m + 1).fill(0));
+            for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) dp[i][j] = aw[i] === bw[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+            const out = []; let i = 0, j = 0;
+            while (i < n && j < m) { if (aw[i] === bw[j]) { out.push({ t: 'eq', v: aw[i] }); i++; j++; } else if (dp[i + 1][j] >= dp[i][j + 1]) { i++; } else { out.push({ t: 'add', v: bw[j] }); j++; } }
+            while (j < m) out.push({ t: 'add', v: bw[j++] });
+            return out.map(d => d.t === 'eq'
+                ? escapeHtml(d.v)
+                : `<span style="background:#dcfce7; color:#166534; font-weight:700; padding:0 3px; border-radius:3px;">${escapeHtml(d.v)}</span>`).join('');
+        };
+
+        // Unified column renderer for the 3-column (2-model) compare view.
+        // o = { kind:'original'|'improved', label, color, originalRef, modelId, qIdx, arrIdx, slot:'a'|'b' }
+        window._renderCompareCol = function(q, o) {
+            const isImproved = o.kind === 'improved';
+            const optionsHtml = (q.options || []).map((opt, i) => {
+                const isCorrect = q.correct && q.correct.includes(i);
+                const body = isImproved
+                    ? (window._renderAddDiff((o.originalRef && o.originalRef.options && o.originalRef.options[i]) || '', opt || '') || '<span style="opacity:0.4; font-style:italic;">(empty)</span>')
+                    : (escapeHtml(opt || '') || '<span style="opacity:0.4; font-style:italic;">(empty)</span>');
+                return `<div style="padding:6px 12px; margin:4px 0; border-radius:10px; font-size:0.85em; background:${isCorrect ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.5)'}; border:1px solid ${isCorrect ? 'rgba(34,197,94,0.2)' : 'rgba(0,0,0,0.05)'}; display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:1.1em;">${isCorrect ? '✅' : '⚪'}</span>
+                    <span style="color:${isCorrect ? '#15803d' : '#475569'}; font-weight:${isCorrect ? '700' : '500'};">${body}</span>
+                </div>`;
+            }).join('');
+            const stemHtml = isImproved
+                ? (window._renderAddDiff((o.originalRef && o.originalRef.q) || '', q.q || '') || '(No Question Text)')
+                : (escapeHtml(q.q || '') || '(No Question Text)');
+            const meta = window._compareModelMeta(o.modelId);
+            const modelChip = isImproved ? `<span style="background:rgba(255,255,255,0.22); padding:2px 9px; border-radius:20px; font-size:0.78em; font-weight:800; display:inline-flex; align-items:center; gap:4px;">${meta.emoji} ${meta.label}</span>` : '';
+            let footer = '';
+            if (isImproved) {
+                const jsonEsc = JSON.stringify(q || {}).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const regenCall = o.slot === 'b' ? `generateAiProposalB(${o.qIdx}, ${o.arrIdx}, this)` : `regenerateSingleAiSuggestion(${o.qIdx}, ${o.arrIdx}, true, this)`;
+                footer = `<div style="display:flex; gap:6px; margin-top:14px; padding-top:12px; border-top:1px dashed #e2e8f0; flex-wrap:wrap; align-items:center;">
+                    <button class="btn" title="Regenerate this column" onclick="${regenCall}" style="padding:7px 11px; border-radius:10px; font-weight:700; font-size:0.78em; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;">🔄</button>
+                    <button class="btn" onclick="addSingleAiAsNewQuestion(${o.qIdx}, '${jsonEsc}'); document.getElementById('ai-compare-overlay').remove();" style="padding:7px 11px; border-radius:10px; font-weight:700; font-size:0.78em; background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;">➕ Add</button>
+                    <button class="btn" onclick="if(applySingleAiFix(${o.qIdx}, '${jsonEsc}', ${o.arrIdx})) document.getElementById('ai-compare-overlay').remove();" style="padding:7px 14px; border-radius:10px; font-weight:800; font-size:0.78em; background:#22c55e; color:white; border:none; box-shadow:0 3px 10px rgba(34,197,94,0.3); margin-left:auto;">✅ Apply ${meta.label}</button>
+                </div>`;
+            }
+            return `<div style="flex:1; min-width:280px; display:flex; flex-direction:column;">
+                <div style="background:${o.color}; color:white; padding:10px 16px; border-radius:16px 16px 0 0; font-weight:800; font-size:0.85em; display:flex; align-items:center; justify-content:space-between; gap:8px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+                    <span style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${o.label} Q${o.qIdx + 1}${modelChip}</span>
+                    <span style="background:rgba(255,255,255,0.2); padding:2px 10px; border-radius:20px; font-size:0.8em; text-transform:uppercase; flex-shrink:0;">${q.type || 'choice'}</span>
+                </div>
+                <div style="background:rgba(255,255,255,0.85); border:1.5px solid rgba(0,0,0,0.05); border-top:none; border-radius:0 0 16px 16px; padding:18px; flex:1; box-shadow:0 10px 30px rgba(0,0,0,0.05);">
+                    <div style="font-weight:700; color:#1e293b; margin-bottom:14px; font-size:1.02em; line-height:1.5;">${stemHtml}</div>
+                    <div>${optionsHtml || '<div style="color:#94a3b8; font-style:italic;">No options provided</div>'}</div>
+                    <div style="font-size:0.72em; color:#64748b; display:flex; gap:14px; padding-top:10px; margin-top:10px; border-top:1px dashed #e2e8f0;"><span>⏱️ <b>${q.timer || 60}s</b></span><span>📊 <b>${(q.options || []).length}</b> Options</span></div>
+                    ${footer}
+                </div>
+            </div>`;
+        };
+
         window.previewAiFix = function(index, arrIdx) {
             try {
                 const item = window._aiAnalysisItems[arrIdx];
                 if (!item || !item.improvedQuestion) return alert("No improvement data found.");
                 const improvedQ = item.improvedQuestion;
+                const improvedB = item.improvedQuestionB || null;
                 const currentQs = getQuizFormData().questions;
                 if (index < 0 || index >= currentQs.length) return alert("Question index out of sync.");
                 const currentQ = currentQs[index];
@@ -48877,17 +49026,27 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                             </div>
                         </div>
 
-                        <div style="padding:30px; overflow-y:auto; flex:1; display:flex; flex-wrap:wrap; gap:25px; align-items:stretch; background:linear-gradient(to bottom right, #f8fafc, #eff6ff);">
-                            ${renderQInner(currentQ, 'ORIGINAL', '#64748b', index, 'original')}
-                            <div style="display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:1.5em; flex-shrink:0;">➡️</div>
-                            ${renderQInner(improvedQ, 'IMPROVED', 'linear-gradient(135deg, #6366f1, #4338ca)', index, 'improved')}
+                        <div style="padding:30px; overflow-y:auto; flex:1; display:flex; flex-wrap:wrap; gap:20px; align-items:stretch; background:linear-gradient(to bottom right, #f8fafc, #eff6ff);">
+                            ${improvedB ? `
+                                ${window._renderCompareCol(currentQ, { kind: 'original', label: 'ORIGINAL', color: '#64748b', qIdx: index })}
+                                ${window._renderCompareCol(improvedQ, { kind: 'improved', label: 'A', color: 'linear-gradient(135deg, #6366f1, #4338ca)', originalRef: currentQ, modelId: (window._aiAnalysisModel || ''), qIdx: index, arrIdx: arrIdx, slot: 'a' })}
+                                ${window._renderCompareCol(improvedB, { kind: 'improved', label: 'B', color: 'linear-gradient(135deg, #0891b2, #0e7490)', originalRef: currentQ, modelId: (item.improvedQuestionBModel || window._compareModelB()), qIdx: index, arrIdx: arrIdx, slot: 'b' })}
+                            ` : `
+                                ${renderQInner(currentQ, 'ORIGINAL', '#64748b', index, 'original')}
+                                <div style="display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:1.5em; flex-shrink:0;">➡️</div>
+                                ${renderQInner(improvedQ, 'IMPROVED', 'linear-gradient(135deg, #6366f1, #4338ca)', index, 'improved')}
+                            `}
                         </div>
 
-                        <div style="padding:20px 30px; background:#fff; border-top:1.5px solid #edf2f7; display:flex; justify-content:flex-end; gap:12px;">
-                            <button class="btn btn-secondary" onclick="document.getElementById('ai-compare-overlay').remove()" style="padding:10px 25px; border-radius:12px; font-weight:700;">Keep Original</button>
-                            <button class="btn" style="padding:10px 22px; border-radius:12px; font-weight:700; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; display:flex; align-items:center; gap:8px;" onclick="regenerateSingleAiSuggestion(${index}, ${arrIdx}, true, this)">🔄 Regenerate</button>
-                            ${addButtonHtml}
-                            ${applyButtonHtml}
+                        <div style="padding:18px 30px; background:#fff; border-top:1.5px solid #edf2f7; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                                ${window._compareModelBPickerHtml()}
+                                ${improvedB ? '' : `<button class="btn" onclick="generateAiProposalB(${index}, ${arrIdx}, this)" style="padding:10px 18px; border-radius:12px; font-weight:800; font-size:0.82em; background:linear-gradient(135deg,#0891b2,#0e7490); color:white; border:none; box-shadow:0 4px 12px rgba(8,145,178,0.3); display:flex; align-items:center; gap:6px;">⚖️ Compare 2 models</button>`}
+                            </div>
+                            <div style="display:flex; gap:12px; align-items:center;">
+                                <button class="btn btn-secondary" onclick="document.getElementById('ai-compare-overlay').remove()" style="padding:10px 22px; border-radius:12px; font-weight:700;">Keep Original</button>
+                                ${improvedB ? '' : `<button class="btn" style="padding:10px 22px; border-radius:12px; font-weight:700; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; display:flex; align-items:center; gap:8px;" onclick="regenerateSingleAiSuggestion(${index}, ${arrIdx}, true, this)">🔄 Regenerate</button>${addButtonHtml}${applyButtonHtml}`}
+                            </div>
                         </div>
                     </div>
                 `;
