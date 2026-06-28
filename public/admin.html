@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.49</title>
+    <title>Nika V96.50</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -48861,6 +48861,12 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             const out = []; let i = 0, j = 0;
             while (i < n && j < m) { if (aw[i] === bw[j]) { out.push({ t: 'eq', v: aw[i] }); i++; j++; } else if (dp[i + 1][j] >= dp[i][j + 1]) { i++; } else { out.push({ t: 'add', v: bw[j] }); j++; } }
             while (j < m) out.push({ t: 'add', v: bw[j++] });
+            // V96.50: word-diff on a near-total rewrite (especially Thai — no inter-word
+            // spaces, so the whole stem is ONE token) marks almost everything 'add' → a
+            // wall of green that reads as a UI glitch. When additions dominate the text the
+            // diff carries no signal — render the improved text plain instead.
+            const addChars = out.reduce((s, d) => s + ((d.t === 'add' && d.v) ? d.v.length : 0), 0);
+            if (addChars / ((improved || '').length || 1) > 0.6) return escapeHtml(improved || '');
             return out.map(d => d.t === 'eq'
                 ? escapeHtml(d.v)
                 : `<span style="background:#dcfce7; color:#166534; font-weight:700; padding:0 3px; border-radius:3px;">${escapeHtml(d.v)}</span>`).join('');
