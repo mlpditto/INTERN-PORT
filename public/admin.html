@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.50</title>
+    <title>Nika V96.51</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15548,8 +15548,9 @@
         const AI_EVAL_RATE = {
             ai_review: { pos: 'applied',   total: 'suggested', label: 'applied' },
             pk_visual: { pos: 'kept',      total: 'generated', label: 'kept' },
+            quiz_improve: { pos: 'applied', total: 'suggested', label: 'applied' },
         };
-        const AI_EVAL_FEATURE_LABEL = { ai_review: '🔍 AI Review', pk_visual: '🎨 PK Visual' };
+        const AI_EVAL_FEATURE_LABEL = { ai_review: '🔍 AI Review', pk_visual: '🎨 PK Visual', quiz_improve: '🛠️ Quiz Improve' };
         window.loadAiEvals7d = async function() {
             const el = document.getElementById('ai-evals-7d');
             if (!el) return;
@@ -15586,6 +15587,30 @@
                         <div style="color:#7a6207; font-size:0.85em; margin-top:1px;">${breakdown || '—'}</div>
                     </div>`;
                 });
+                // V96.51: per-model breakdown ("which model gets applied") from the models map.
+                const mdls = {};
+                snap.forEach(doc => {
+                    const ms = doc.data().models || {};
+                    Object.entries(ms).forEach(([m, outs]) => {
+                        mdls[m] = mdls[m] || {};
+                        Object.entries(outs || {}).forEach(([o, c]) => { mdls[m][o] = (mdls[m][o] || 0) + (c || 0); });
+                    });
+                });
+                const modelRows = Object.entries(mdls)
+                    .filter(([, o]) => ((o.applied || 0) + (o.suggested || 0)) > 0)
+                    .sort((a, b) => (b[1].applied || 0) - (a[1].applied || 0));
+                if (modelRows.length) {
+                    html += `<div style="margin-top:8px; padding-top:6px; border-top:1px dashed #d8b4fe; font-size:0.72em; font-weight:900; color:#6d28d9; text-transform:uppercase; letter-spacing:0.4px;">By model — applied</div>`;
+                    modelRows.forEach(([m, o]) => {
+                        const ap = o.applied || 0, sg = o.suggested || 0;
+                        const pct = sg > 0 ? Math.round(ap / sg * 100) : null;
+                        const col = pct == null ? '#64748b' : (pct >= 60 ? '#15803d' : (pct >= 30 ? '#a16207' : '#b91c1c'));
+                        html += `<div style="display:flex; justify-content:space-between; padding:3px 0; font-size:0.85em;">
+                            <span style="color:#4b5563; font-weight:700;">${m}</span>
+                            <span style="color:#7a6207;">applied ${ap} · suggested ${sg}${pct != null ? ` <b style="color:${col};">(${pct}%)</b>` : ''}</span>
+                        </div>`;
+                    });
+                }
                 el.innerHTML = html || '<span style="color:#999; font-style:italic;">No quality signals yet.</span>';
             } catch (e) {
                 el.innerHTML = `<span style="color:#c0392b;">Load failed: ${e.message}</span>`;
@@ -16092,6 +16117,11 @@
                 // from callUniversalAI's actual resolution (may differ from selectedModel if
                 // the proxy fell back); selectedModel is the chip choice as final fallback.
                 window._aiAnalysisModel = aiModel || selectedModel || null;
+                // V96.51: quality signal — one 'suggested' per proposed item, tagged by model.
+                if (result.items && result.items.length && typeof recordAiEval === 'function') {
+                    const _m = window._compareModelMeta ? window._compareModelMeta(aiModel || selectedModel).label : (aiModel || selectedModel || 'AI');
+                    recordAiEval('quiz_improve', _m, 'suggested', result.items.length);
+                }
 
                 let improvementsHtml = "";
                 if (result.items && result.items.length > 0) {
@@ -48843,6 +48873,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 if (!parsed) throw new Error('Model B returned invalid JSON. First 200 chars: ' + String(raw || '').slice(0, 200));
                 item.improvedQuestionB = parsed;
                 item.improvedQuestionBModel = actual;
+                if (typeof recordAiEval === 'function') recordAiEval('quiz_improve', window._compareModelMeta(actual).label, 'suggested');
                 document.getElementById('ai-compare-overlay').remove();
                 window.previewAiFix(qIdx, arrIdx);
             } catch (e) {
@@ -48898,7 +48929,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 footer = `<div style="display:flex; gap:6px; margin-top:14px; padding-top:12px; border-top:1px dashed #e2e8f0; flex-wrap:wrap; align-items:center;">
                     <button class="btn" title="Regenerate this column" onclick="${regenCall}" style="padding:7px 11px; border-radius:10px; font-weight:700; font-size:0.78em; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;">🔄</button>
                     <button class="btn" onclick="addSingleAiAsNewQuestion(${o.qIdx}, '${jsonEsc}'); document.getElementById('ai-compare-overlay').remove();" style="padding:7px 11px; border-radius:10px; font-weight:700; font-size:0.78em; background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;">➕ Add</button>
-                    <button class="btn" onclick="if(applySingleAiFix(${o.qIdx}, '${jsonEsc}', ${o.arrIdx})) document.getElementById('ai-compare-overlay').remove();" style="padding:7px 14px; border-radius:10px; font-weight:800; font-size:0.78em; background:#22c55e; color:white; border:none; box-shadow:0 3px 10px rgba(34,197,94,0.3); margin-left:auto;">✅ Apply ${meta.label}</button>
+                    <button class="btn" onclick="if(applySingleAiFix(${o.qIdx}, '${jsonEsc}', ${o.arrIdx}, '${meta.label}')) document.getElementById('ai-compare-overlay').remove();" style="padding:7px 14px; border-radius:10px; font-weight:800; font-size:0.78em; background:#22c55e; color:white; border:none; box-shadow:0 3px 10px rgba(34,197,94,0.3); margin-left:auto;">✅ Apply ${meta.label}</button>
                 </div>`;
             }
             return `<div style="flex:1; min-width:280px; display:flex; flex-direction:column;">
@@ -49197,7 +49228,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             });
         }
 
-        window.applySingleAiFix = function(index, improvedArg, arrIdx) {
+        window.applySingleAiFix = function(index, improvedArg, arrIdx, modelLabel) {
             try {
                 const { improvedQ, allQs } = getImprovedQuestionPayload(index, improvedArg);
                 const diffState = window.getAiImprovementDiffState(allQs[index], improvedQ);
@@ -49238,6 +49269,13 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                             fixBtn.disabled = true;
                         }
                     }
+                }
+                // V96.51: quality signal — record which model's rewrite the admin applied
+                // so the AI quality panel shows a per-model accept-rate. modelLabel is passed
+                // by the 2-model B column; default = the analysis model (A).
+                if (typeof recordAiEval === 'function') {
+                    const _mdl = modelLabel || (window._compareModelMeta ? window._compareModelMeta(window._aiAnalysisModel).label : (window._aiAnalysisModel || 'AI'));
+                    recordAiEval('quiz_improve', _mdl, 'applied');
                 }
                 return true; // V96.36: success → applyAiFixAndAdvance may advance to next item
             } catch (e) {
