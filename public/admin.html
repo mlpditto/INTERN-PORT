@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.51</title>
+    <title>Nika V96.52</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1387,6 +1387,21 @@
             margin-top: 10px; padding: 8px 12px; border-radius: 8px;
             background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
             font-size: 0.82em; white-space: pre-wrap;
+        }
+        /* V96.52: sort toggle row (A-Z vs completeness) above the A-Z rail. */
+        .dca-sort-row {
+            display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+        }
+        .dca-sort-label {
+            font-size: 0.8em; font-weight: 600; color: #64748b;
+        }
+        /* V96.52: per-row completeness chip in the published list. Colour is
+           set inline from dcaCompletenessColor; this just handles shape. */
+        .dca-row-complete {
+            display: inline-flex; align-items: center; gap: 3px;
+            padding: 2px 8px; border-radius: 999px;
+            font-size: 0.74em; font-weight: 700; white-space: nowrap;
+            border: 1px solid transparent; cursor: default;
         }
         .dca-az-rail {
             display: flex; flex-wrap: wrap; gap: 3px;
@@ -13212,7 +13227,7 @@
             <!-- View tabs (Published / Pending drafts) -->
             <div class="dca-view-tabs">
                 <button type="button" class="dca-view-tab" data-view="published" onclick="dcaSwitchView('published')">
-                    📚 Published <span id="dca-published-count" style="color:#94a3b8; font-weight:600;">(0)</span>
+                    📚 Published <span id="dca-published-count" style="color:#94a3b8; font-weight:600;">(0)</span><span id="dca-published-summary" class="lang-no-toggle" style="color:#94a3b8; font-weight:600; font-size:0.85em;"></span>
                 </button>
                 <button type="button" class="dca-view-tab" data-view="drafts" onclick="dcaSwitchView('drafts')">
                     📥 Pending Drafts <span id="dca-drafts-badge" class="dca-view-tab-badge" style="display:none;">0</span>
@@ -13251,6 +13266,16 @@
                         <button type="button" id="dca-ai-go-btn" class="dca-ai-go-btn" onclick="dcaAutoDraftGo()">Generate</button>
                     </div>
                     <div id="dca-ai-error" class="dca-ai-error" style="display:none;"></div>
+                </div>
+
+                <!-- V96.52: sort toggle — A-Z (default) vs least-complete-first.
+                     lang-no-toggle: Thai label + chip text must not be hidden by lang-toggle.js EN-default body. -->
+                <div class="dca-sort-row lang-no-toggle">
+                    <span class="dca-sort-label">เรียง:</span>
+                    <div class="glass-toggle-container">
+                        <div class="glass-toggle-item active" data-sort="az" onclick="dcaSetSort('az', this)">A–Z</div>
+                        <div class="glass-toggle-item" data-sort="completeness" onclick="dcaSetSort('completeness', this)" title="ยาที่ข้อมูลไม่ครบขึ้นก่อน">📊 ความสมบูรณ์</div>
+                    </div>
                 </div>
 
                 <div class="dca-az-rail" id="dca-az-rail"></div>
@@ -31666,6 +31691,47 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             { key: 'refs',     fields: ['references'] }
         ];
 
+        // V96.52: data-completeness score for a published drug. Single source of
+        // truth — counts non-empty fields out of the 19 DCA_FIELD_KEYS, computed
+        // on-the-fly (never written to the doc). Array fields check .length;
+        // ADMET (pk section) falls back to the legacy single `pharmacokinetics`
+        // field so old docs that predate the ADMET split aren't penalised — if
+        // all 5 ADMET keys are empty but legacy PK has content, pk counts 5/5
+        // (mirrors intern's dcRenderDrug fallback). Returns per-section tallies
+        // for the row tooltip + an overall pct.
+        function dcaCompletenessScore(drug) {
+            const d = drug || {};
+            const isFilled = (key) => {
+                if (DCA_ARRAY_FIELDS[key]) return Array.isArray(d[key]) && d[key].length > 0;
+                return String(d[key] || '').trim().length > 0;
+            };
+            const sections = {};
+            let filled = 0, total = 0;
+            DCA_SECTION_DEFS.forEach(def => {
+                let sf = 0;
+                def.fields.forEach(k => { if (isFilled(k)) sf++; });
+                // Legacy ADMET fallback: empty new fields + populated old field = full.
+                if (def.key === 'pk' && sf === 0 && String(d.pharmacokinetics || '').trim()) {
+                    sf = def.fields.length;
+                }
+                sections[def.key] = { filled: sf, total: def.fields.length };
+                filled += sf;
+                total += def.fields.length;
+            });
+            const pct = total ? Math.round((filled / total) * 100) : 0;
+            return { filled, total, pct, sections };
+        }
+
+        // V96.52: section keys → short Thai labels for the completeness tooltip.
+        const DCA_SECTION_LABELS = { core: 'พื้นฐาน', clinical: 'คลินิก', moa: 'กลไก', pk: 'PK', edu: 'การศึกษา', refs: 'อ้างอิง' };
+
+        // V96.52: colour band for a completeness pct. ≥90 green · 60–89 amber · <60 red.
+        function dcaCompletenessColor(pct) {
+            if (pct >= 90) return { bg: '#dcfce7', fg: '#15803d', bd: '#86efac' };
+            if (pct >= 60) return { bg: '#fef3c7', fg: '#b45309', bd: '#fcd34d' };
+            return { bg: '#fee2e2', fg: '#b91c1c', bd: '#fca5a5' };
+        }
+
         function dcaSwitchSection(sectionKey) {
             document.querySelectorAll('.dca-form-tab-btn[data-section]').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.section === sectionKey);
@@ -31875,7 +31941,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             verified: {},          // V95.65: section keys the admin confirmed this session ({core:true, ...}); reset per form open
             reviewFindings: {},    // V95.66: AI Review results keyed by section ({clinical:[...]}); reset per form open
             helpers: [],           // V95.93: admin-curated contributor picker state [{userId(lineId),name,pictureUrl}]; persisted as helper:<lineId> in contributors[]
-            searchTerm: ''
+            searchTerm: '',
+            sortMode: 'az'         // V96.52: 'az' (A-Z grouped, default) | 'completeness' (flat, least-complete first)
         };
 
         function openDrugCodexAdmin() {
@@ -31993,6 +32060,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function dcaUpdateCounts() {
             const pubCount = document.getElementById('dca-published-count');
             if (pubCount) pubCount.textContent = `(${dcaState.codex.length})`;
+            // V96.52: codex-wide completeness summary — avg pct + count below 90% ("ยังไม่ครบ").
+            const summary = document.getElementById('dca-published-summary');
+            if (summary) {
+                const n = dcaState.codex.length;
+                if (!n) {
+                    summary.textContent = '';
+                } else {
+                    const pcts = dcaState.codex.map(d => dcaCompletenessScore(d).pct);
+                    const avg = Math.round(pcts.reduce((a, b) => a + b, 0) / n);
+                    const incomplete = pcts.filter(p => p < 90).length;
+                    summary.textContent = ` · เฉลี่ย ${avg}%` + (incomplete ? ` · ${incomplete} ยังไม่ครบ` : '');
+                }
+            }
             const badge = document.getElementById('dca-drafts-badge');
             if (badge) {
                 if (dcaState.drafts.length > 0) {
@@ -32008,6 +32088,27 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const el = document.getElementById('dca-search');
             dcaState.searchTerm = el ? String(el.value || '').trim().toLowerCase() : '';
             dcaRenderPublishedList();
+        }
+
+        // V96.52: switch published-list sort mode (A-Z grouped vs least-complete first).
+        function dcaSetSort(mode, btn) {
+            dcaState.sortMode = mode;
+            if (btn && btn.parentElement) {
+                btn.parentElement.querySelectorAll('.glass-toggle-item').forEach(it => it.classList.remove('active'));
+                btn.classList.add('active');
+            }
+            dcaRenderPublishedList();
+        }
+
+        // V96.52: completeness chip for a published-list row.
+        function dcaCompleteChipHtml(drug) {
+            const s = dcaCompletenessScore(drug);
+            const c = dcaCompletenessColor(s.pct);
+            const missing = DCA_SECTION_DEFS
+                .filter(def => s.sections[def.key].filled < s.sections[def.key].total)
+                .map(def => DCA_SECTION_LABELS[def.key] || def.key);
+            const tip = `ข้อมูล ${s.filled}/${s.total} ฟิลด์` + (missing.length ? ` · ยังขาด: ${missing.join(', ')}` : ' · ครบทุกส่วน');
+            return `<span class="dca-row-complete" style="background:${c.bg};color:${c.fg};border-color:${c.bd};" title="${dcaEscapeHtml(tip)}">📊 ${s.pct}%</span>`;
         }
 
         function dcaMatchesSearch(drug, term) {
@@ -32055,13 +32156,57 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (heading && heading.scrollIntoView) heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
+        // V96.52: single row template, reused by both sort modes.
+        function dcaPublishedRowHtml(drug) {
+            const brands = Array.isArray(drug.brandNames) && drug.brandNames.length > 0
+                ? `<div class="dca-row-brands">${dcaEscapeHtml(drug.brandNames.join(', '))}</div>` : '';
+            const chips = [];
+            if (drug.atcCode) chips.push(`<span class="dca-row-meta-chip">${dcaEscapeHtml(drug.atcCode)}</span>`);
+            if (drug.class) chips.push(`<span style="color:#475569;">${dcaEscapeHtml(drug.class)}</span>`);
+            if (drug.aiDrafted) chips.push('<span class="dca-ai-badge">🤖 AI</span>');
+            const updatedAbs = dcaFormatAbsolute(drug.updatedAt || drug.createdAt);
+            return `
+                        <div class="dca-row">
+                            <div class="dca-row-main">
+                                <div class="dca-row-name">${dcaEscapeHtml(drug.genericName)}</div>
+                                <div class="dca-row-meta">${chips.join('')}</div>
+                                ${brands}
+                            </div>
+                            <div class="dca-row-side">
+                                <div class="dca-row-side-top">
+                                    ${dcaCompleteChipHtml(drug)}
+                                    ${dcaListContribChipsHtml(drug)}
+                                    ${updatedAbs ? `<div class="dca-row-updated-abs" title="Last updated">🕒 ${dcaEscapeHtml(updatedAbs)}</div>` : ''}
+                                </div>
+                                <div class="dca-row-actions">
+                                    <button type="button" class="dca-row-edit-btn" onclick="dcaEdit('${dcaEscapeHtml(drug._id)}')">Edit</button>
+                                    <button type="button" class="dca-row-visual-btn" onclick="dcaQuickVisual('${dcaEscapeHtml(drug._id)}')" title="🎨 สร้าง/แก้ PK Visual อย่างรวดเร็ว — เปิด edit + modal ให้เลย">🎨</button>
+                                    <button type="button" class="dca-row-copy-btn" onclick="dcaCopyRow('${dcaEscapeHtml(drug._id)}', this)" title="Copy as Markdown">📋</button>
+                                    <button type="button" class="dca-row-del-btn" onclick="dcaDelete('${dcaEscapeHtml(drug._id)}', this)" title="Delete">🗑️</button>
+                                </div>
+                            </div>
+                        </div>`;
+        }
+
         function dcaRenderPublishedList() {
             dcaRenderAzRail();
             const list = document.getElementById('dca-list');
             if (!list) return;
+            // V96.52: A-Z rail only makes sense in grouped mode (no letter headings to jump to in completeness mode).
+            const azRail = document.getElementById('dca-az-rail');
+            if (azRail) azRail.style.display = dcaState.sortMode === 'completeness' ? 'none' : '';
             const filtered = dcaState.codex.filter(d => dcaMatchesSearch(d, dcaState.searchTerm));
             if (filtered.length === 0) {
                 list.innerHTML = `<div class="dca-empty-state">${dcaState.searchTerm ? 'No drugs match the search.' : 'No drugs published yet. Click + Add Drug to begin building the codex.'}</div>`;
+                return;
+            }
+            // V96.52: completeness mode — flat list, least-complete first.
+            if (dcaState.sortMode === 'completeness') {
+                const sorted = filtered.slice().sort((a, b) => {
+                    const d = dcaCompletenessScore(a).pct - dcaCompletenessScore(b).pct;
+                    return d !== 0 ? d : String(a.genericName || '').localeCompare(String(b.genericName || ''));
+                });
+                list.innerHTML = sorted.map(dcaPublishedRowHtml).join('');
                 return;
             }
             // Group by first letter A-Z, with non-A-Z (digits / Thai) bucketed under '#'.
@@ -32078,35 +32223,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 return a.localeCompare(b);
             });
             list.innerHTML = orderedKeys.map(letter => {
-                const rows = groups[letter].map(drug => {
-                    const brands = Array.isArray(drug.brandNames) && drug.brandNames.length > 0
-                        ? `<div class="dca-row-brands">${dcaEscapeHtml(drug.brandNames.join(', '))}</div>` : '';
-                    const chips = [];
-                    if (drug.atcCode) chips.push(`<span class="dca-row-meta-chip">${dcaEscapeHtml(drug.atcCode)}</span>`);
-                    if (drug.class) chips.push(`<span style="color:#475569;">${dcaEscapeHtml(drug.class)}</span>`);
-                    if (drug.aiDrafted) chips.push('<span class="dca-ai-badge">🤖 AI</span>');
-                    const updatedAbs = dcaFormatAbsolute(drug.updatedAt || drug.createdAt);
-                    return `
-                        <div class="dca-row">
-                            <div class="dca-row-main">
-                                <div class="dca-row-name">${dcaEscapeHtml(drug.genericName)}</div>
-                                <div class="dca-row-meta">${chips.join('')}</div>
-                                ${brands}
-                            </div>
-                            <div class="dca-row-side">
-                                <div class="dca-row-side-top">
-                                    ${dcaListContribChipsHtml(drug)}
-                                    ${updatedAbs ? `<div class="dca-row-updated-abs" title="Last updated">🕒 ${dcaEscapeHtml(updatedAbs)}</div>` : ''}
-                                </div>
-                                <div class="dca-row-actions">
-                                    <button type="button" class="dca-row-edit-btn" onclick="dcaEdit('${dcaEscapeHtml(drug._id)}')">Edit</button>
-                                    <button type="button" class="dca-row-visual-btn" onclick="dcaQuickVisual('${dcaEscapeHtml(drug._id)}')" title="🎨 สร้าง/แก้ PK Visual อย่างรวดเร็ว — เปิด edit + modal ให้เลย">🎨</button>
-                                    <button type="button" class="dca-row-copy-btn" onclick="dcaCopyRow('${dcaEscapeHtml(drug._id)}', this)" title="Copy as Markdown">📋</button>
-                                    <button type="button" class="dca-row-del-btn" onclick="dcaDelete('${dcaEscapeHtml(drug._id)}', this)" title="Delete">🗑️</button>
-                                </div>
-                            </div>
-                        </div>`;
-                }).join('');
+                const rows = groups[letter].map(dcaPublishedRowHtml).join('');
                 return `<div class="dca-letter-heading" data-letter="${letter}">${letter}</div>${rows}`;
             }).join('');
         }
