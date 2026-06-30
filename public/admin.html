@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.52</title>
+    <title>Nika V96.53</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -13562,9 +13562,9 @@
                                  avatar list of every intern (usersData group INTERN) minus those
                                  already added; tap a row to add. Covers interns absent from the
                                  💡 quick-pick (which only knows past contributors). -->
-                            <div style="margin-top:6px;">
+                            <div class="lang-no-toggle" style="margin-top:6px;">
                                 <button type="button" id="dca-helper-browse-btn" onclick="dcaToggleHelperBrowse()"
-                                        style="border:1px dashed #99f6e4; background:#f0fdfa; color:#0f766e; border-radius:8px; padding:4px 10px; font-size:0.82em; font-weight:700; cursor:pointer;">📋 เลือกจากรายชื่อ ▾</button>
+                                        style="width:auto; min-height:0; border:1px dashed #99f6e4; background:#f0fdfa; color:#0f766e; border-radius:8px; padding:4px 10px; font-size:0.82em; font-weight:700; cursor:pointer;">📋 เลือกจากรายชื่อ ▾</button>
                                 <div id="dca-helper-browse" class="lang-no-toggle" style="display:none; margin-top:6px; border:1px solid #cbd5e1; border-radius:8px; max-height:240px; overflow-y:auto;"></div>
                             </div>
                             <div style="font-size:0.78em; color:#94a3b8; margin-top:4px;">เครดิต user ที่ช่วยลงข้อมูลยานี้ · แสดงเป็น 🤝 บนการ์ด (แยกจาก intern ที่ส่ง draft) · กด ⇄ บน chip เพื่อสลับเป็น ✍️ ผู้เขียน (assign เป็น user คนนั้นแบบเขียว+รูปเหมือน intern)</div>
@@ -33312,7 +33312,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const helperInput = document.getElementById('dca-helper-input');
             if (helperInput) helperInput.value = '';
             dcaHideHelperSuggest();
-            dcaHideHelperBrowse();
+            dcaShowHelperBrowse(); // V96.53: open the avatar grid by default so the photo picker is visible
             dcaRenderHelperChips();
             // Doc id strip
             const idEl = document.getElementById('dca-form-doc-id');
@@ -34163,16 +34163,32 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 panel.innerHTML = '<div style="padding:10px; color:#94a3b8; font-size:0.85em; text-align:center;">เพิ่มครบทุก intern แล้ว / ไม่มี intern</div>';
                 return;
             }
-            panel.innerHTML = interns.map(u => {
-                const pic = u.pictureUrl
-                    ? `<img src="${dcaEscapeHtml(u.pictureUrl)}" alt="" style="width:24px;height:24px;border-radius:50%;object-fit:cover;margin-right:8px;flex-shrink:0;">`
-                    : '<span style="margin-right:8px;">🤝</span>';
-                const score = Number(u.score || 0);
-                return `<div onclick="dcaAddHelper('${dcaEscapeHtml(u.id)}')" style="display:flex; align-items:center; padding:6px 10px; cursor:pointer; border-bottom:1px solid #f1f5f9; font-size:0.9em;">`
-                    + pic
-                    + `<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${dcaEscapeHtml(u.displayName || u.id)}</span>`
-                    + `<span style="color:#94a3b8; font-size:0.78em; flex-shrink:0; margin-left:8px;">${score} pts</span></div>`;
-            }).join('');
+            // V96.53: avatar grid — tap a profile photo to add (easier than typing).
+            // width:auto + min-height:0 on each tile defeats the global
+            // button{width:100%;min-height:48px} rule (see feedback_global_button_width_trap).
+            panel.innerHTML = '<div style="display:flex; flex-wrap:wrap; gap:6px; padding:10px;">'
+                + interns.map(u => {
+                    const name = u.displayName || u.id;
+                    const avatar = u.pictureUrl
+                        ? `<img src="${dcaEscapeHtml(u.pictureUrl)}" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid #99f6e4;" onerror="this.outerHTML='<span style=\\'font-size:32px;line-height:44px;\\'>🤝</span>'">`
+                        : '<span style="font-size:32px;line-height:44px;">🤝</span>';
+                    return `<button type="button" onclick="dcaAddHelper('${dcaEscapeHtml(u.id)}')" title="เพิ่ม ${dcaEscapeHtml(name)} (${Number(u.score || 0)} pts) เป็นผู้ช่วย"`
+                        + ` style="width:74px; min-height:0; display:flex; flex-direction:column; align-items:center; gap:3px; background:none; border:none; cursor:pointer; padding:3px;">`
+                        + avatar
+                        + `<span style="font-size:0.7em; color:#334155; max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${dcaEscapeHtml(name)}</span>`
+                        + `</button>`;
+                }).join('')
+                + '</div>';
+        }
+
+        // V96.53: open the browse grid (used to show it by default on form open so
+        // the profile-photo picker is visible without first clicking the toggle).
+        function dcaShowHelperBrowse() {
+            const panel = document.getElementById('dca-helper-browse');
+            const btn = document.getElementById('dca-helper-browse-btn');
+            if (panel) panel.style.display = 'block';
+            if (btn) btn.innerHTML = '📋 เลือกจากรายชื่อ ▴';
+            dcaRenderHelperBrowse();
         }
 
         function dcaRenderHelperChips() {
