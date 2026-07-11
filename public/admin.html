@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.53</title>
+    <title>Nika V96.54</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12031,6 +12031,7 @@
 
                         <!-- Group 2: Bulk Actions -->
                         <div style="display:flex; align-items:center; gap:4px; padding-right:8px; border-right:1px solid rgba(245,158,11,0.35);">
+                            <button class="btn-sm" onclick="openBulkPasteModal()" title="📋 Paste many questions at once" style="background:linear-gradient(135deg,#7c3aed,#6d28d9); color:#ede9fe; border:none; padding:0 10px; border-radius:8px; font-weight:800; font-size:0.68em; height:28px; cursor:pointer; display:flex; align-items:center; gap:4px;">📋 Bulk Paste</button>
                             <button class="btn-sm" onclick="openImportQuizModal()" title="📥 Import from Quiz" style="background:linear-gradient(135deg,#0f766e,#0d9488); color:#ecfeff; border:none; padding:0 10px; border-radius:8px; font-weight:800; font-size:0.68em; height:28px; cursor:pointer; display:flex; align-items:center; gap:4px;">📥 Import</button>
                             <button class="btn-sm" onclick="openExportQuizPdfModal()" title="📄 Export Quiz PDF" style="background:linear-gradient(135deg,#0284c7,#0369a1); color:#fef3c7; border:none; padding:0 10px; border-radius:8px; font-weight:800; font-size:0.68em; height:28px; cursor:pointer; display:flex; align-items:center; gap:4px;">📄 Export PDF</button>
                             <button class="btn-sm" onclick="openBulkExportModal()" title="🧩 Split to New Quiz" style="background:linear-gradient(135deg,#1d4ed8,#1e40af); color:#dbeafe; border:none; padding:0 10px; border-radius:8px; font-weight:800; font-size:0.68em; height:28px; cursor:pointer; display:flex; align-items:center; gap:4px;">🧩 Split</button>
@@ -19429,29 +19430,40 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         // shows confidence + rationale, applies the answer ONLY when the admin clicks
         // Apply, and never auto-saves. Distinct from Fact-check (which VERIFIES an
         // already-marked answer); this one FINDS it. Reuses the same panel/Apply plumbing.
-        window._qImproveFindAnswer = async function(item, ctx, model) {
+        // V96.54: pure "find the correct answer" primitive — question + options →
+        // {picks (0-based), conf, rationale, model}. Shared by the single-question
+        // 🎯 Find-answer panel (_qImproveFindAnswer) AND the Bulk Paste importer, so
+        // the medical answer-finding prompt lives in exactly one place (no drift).
+        window._aiFindAnswerCore = async function(question, options, model, quickApiKey) {
+            const optionLines = (options || []).map((o, i) => 'ข้อ ' + (i + 1) + ': ' + o).join('\n');
             const prompt = [
                 'ภาษา: ตอบ field ข้อความเป็นภาษาไทย (คงศัพท์เทคนิค/ชื่อยาเป็นภาษาอังกฤษได้)',
                 'คุณคือผู้เชี่ยวชาญด้านเภสัชกรรม/การแพทย์ ทำหน้าที่หาคำตอบที่ถูกต้องของข้อสอบปรนัย โดยอิงข้อเท็จจริงทางวิชาการที่ยอมรับกันเท่านั้น',
                 'สำคัญมาก: ถ้าไม่มั่นใจ ให้รายงาน confidence ต่ำตามจริง — ห้ามเดาแบบมั่นใจเกินจริง; ถ้าคิดว่าไม่มีตัวเลือกใดถูกเลย ให้ correctChoices เป็น []',
                 'อ้างอิงตัวเลือกด้วย "ข้อ N" (เลขข้อเริ่มที่ 1 ตรงกับที่ผู้ใช้เห็น) เสมอ',
                 '',
-                'โจทย์: ' + JSON.stringify(ctx.question),
-                'ตัวเลือก:\n' + window._qImproveOptionLines(ctx),
+                'โจทย์: ' + JSON.stringify(question),
+                'ตัวเลือก:\n' + optionLines,
                 '',
                 'OUTPUT ต้องเป็น RAW JSON เท่านั้น ห้ามมี code fence ห้ามมีคำอธิบายนอก JSON:',
                 '{"correctChoices":[เลขข้อ 1-based ที่ถูก เช่น [2]],"confidence":<จำนวนเต็ม 0-100>,"rationale":"2-4 ประโยค: ทำไมข้อที่ถูกจึงถูก และทำไมตัวลวงหลักจึงผิด"}'
             ].join('\n');
-            const res = await window.callUniversalAI(model, prompt, true, null, ctx.quickApiKey, { feature: 'answer_find' });
+            const res = await window.callUniversalAI(model, prompt, true, null, quickApiKey, { feature: 'answer_find' });
             const data = safeJsonParse(res.text);
             // V96.33: choices are 1-based "ข้อ N"; convert to 0-based. Accept a legacy
             // 0-based correctIndices reply too (older model habit) by shifting it +1 first.
             const rawChoices = Array.isArray(data && data.correctChoices) ? data.correctChoices
                 : (Array.isArray(data && data.correctIndices) ? data.correctIndices.map(n => Number(n) + 1) : null);
             if (!data || !Array.isArray(rawChoices)) throw new Error('AI ส่งค่าที่ไม่ใช่ JSON: ' + String(res.text || '').slice(0, 160));
-            const picks = rawChoices.map(n => Number(n) - 1).filter(i => Number.isInteger(i) && i >= 0 && i < ctx.options.length);
+            const picks = rawChoices.map(n => Number(n) - 1).filter(i => Number.isInteger(i) && i >= 0 && i < (options || []).length);
             const conf = Number.isFinite(+data.confidence) ? Math.max(0, Math.min(100, Math.round(+data.confidence))) : null;
             const rationale = (data.rationale && String(data.rationale).trim()) || '';
+            return { picks: picks, conf: conf, rationale: rationale, model: res.model || model };
+        };
+
+        window._qImproveFindAnswer = async function(item, ctx, model) {
+            const core = await window._aiFindAnswerCore(ctx.question, ctx.options, model, ctx.quickApiKey);
+            const picks = core.picks, conf = core.conf, rationale = core.rationale;
             const confColor = conf == null ? '#94a3b8' : (conf >= 80 ? '#16a34a' : (conf >= 60 ? '#f59e0b' : '#ef4444'));
             const accent = picks.length ? confColor : '#ef4444';
 
@@ -19462,7 +19474,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             ).join('') + '</div>';
             if (rationale) html += '<div style="padding:6px 8px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; white-space:pre-wrap; margin-bottom:6px;">' + escapeHtml(rationale) + '</div>';
             if (conf != null && conf < 60) html += '<div style="color:#b91c1c; margin-bottom:6px;">⚠️ ความมั่นใจต่ำ — โปรดตรวจสอบกับแหล่งอ้างอิงที่เชื่อถือได้ก่อนใช้</div>';
-            html += '<div style="margin-top:4px; font-size:0.78em; color:#94a3b8;">model: ' + escapeHtml(String(res.model || model)) + ' · AI อาจผิดได้ ตรวจก่อนเสมอ</div>';
+            html += '<div style="margin-top:4px; font-size:0.78em; color:#94a3b8;">model: ' + escapeHtml(String(core.model || model)) + ' · AI อาจผิดได้ ตรวจก่อนเสมอ</div>';
 
             if (!picks.length) { window._qImproveShowPanel(item, html, accent); return; }
 
@@ -25219,6 +25231,157 @@ ${JSON.stringify(sourceObj)}`;
                 console.error("P2Q Error:", err);
                 alert("Generation Error: " + err.message);
             }
+        }
+
+        // ============================================================
+        // V96.54: Bulk Paste — paste many questions at once.
+        // Deterministic parser (no AI needed to SPLIT): blocks are separated
+        // by a blank line; within a block the first flush-left line(s) = stem
+        // and indented / A)-B)-prefixed / bulleted lines = options. Reuses the
+        // same option-prefix heuristics as the single-question Smart Paste
+        // (processQuizPaste). The pasted source usually has NO answer key, so
+        // the correct answer is left empty and the admin either marks it in the
+        // preview OR runs 🎯 "Find answers with AI" (reuses _aiFindAnswerCore).
+        // ============================================================
+        window._bulkPasteParsed = [];
+
+        function parseBulkQuestions(text) {
+            if (!text || !text.trim()) return [];
+            const optPrefixRe = /^([A-Ia-i]|[1-9]|[ก-ฮ])[\.\)\-\:]+\s*(.*)/;
+            const bulletRe = /^[\-•\*]\s*(.*)/;
+            const blocks = text.replace(/\r\n/g, '\n').split(/\n[ \t]*\n+/);
+            const out = [];
+            blocks.forEach(block => {
+                const lines = block.split('\n');
+                let stemLines = [], optLines = [], inOptions = false;
+                lines.forEach(line => {
+                    if (line.trim() === '') return;
+                    const indented = /^[ \t]+/.test(line);
+                    const prefixed = optPrefixRe.test(line.trim()) || bulletRe.test(line.trim());
+                    // Switch to options at the first indented/prefixed line that
+                    // follows at least one stem line (so the stem is never eaten).
+                    if (!inOptions && stemLines.length > 0 && (indented || prefixed)) inOptions = true;
+                    if (inOptions) optLines.push(line); else stemLines.push(line);
+                });
+                // Fallback for sources that strip indentation and use no prefixes:
+                // a tidy 3–7 line block = first line stem, the rest options.
+                if (optLines.length === 0) {
+                    const nb = lines.filter(l => l.trim() !== '');
+                    if (nb.length >= 3 && nb.length <= 7) { stemLines = [nb[0]]; optLines = nb.slice(1); }
+                }
+                const q = stemLines.join('\n').trim();
+                const options = optLines.map(l => {
+                    const t = l.trim();
+                    const pm = t.match(optPrefixRe);
+                    if (pm) return pm[2].trim();
+                    const bm = t.match(bulletRe);
+                    if (bm) return bm[1].trim();
+                    return t;
+                }).filter(o => o !== '');
+                if (q && options.length >= 2) out.push({ q: q, options: options, correct: [], conf: null, rationale: '', include: true });
+            });
+            return out;
+        }
+
+        function openBulkPasteModal() {
+            const modal = document.getElementById('bulkPasteModal');
+            if (!modal) { showToast('Bulk Paste modal missing. Please refresh.', 'error'); return; }
+            window._bulkPasteParsed = [];
+            document.getElementById('bp-input-stage').style.display = 'block';
+            document.getElementById('bp-preview-stage').style.display = 'none';
+            modal.style.display = 'block';
+        }
+
+        function bulkPasteBackToInput() {
+            document.getElementById('bp-input-stage').style.display = 'block';
+            document.getElementById('bp-preview-stage').style.display = 'none';
+        }
+
+        function bulkPasteParse() {
+            const text = document.getElementById('bp-textarea').value;
+            const parsed = parseBulkQuestions(text);
+            if (parsed.length === 0) { showToast('ไม่พบข้อที่แยกได้ — ตรวจว่าคั่นแต่ละข้อด้วยบรรทัดว่าง', 'error'); return; }
+            window._bulkPasteParsed = parsed;
+            document.getElementById('bp-input-stage').style.display = 'none';
+            document.getElementById('bp-preview-stage').style.display = 'block';
+            renderBulkPastePreview();
+        }
+
+        function renderBulkPastePreview() {
+            const list = document.getElementById('bp-preview-list');
+            const rows = window._bulkPasteParsed;
+            const chosen = rows.filter(r => r.include).length;
+            document.getElementById('bp-preview-count').textContent = 'พบ ' + rows.length + ' ข้อ · เลือก ' + chosen + ' ข้อ';
+            list.innerHTML = rows.map((r, i) => {
+                const confBadge = r.conf != null
+                    ? '<span style="font-size:0.72em; font-weight:800; padding:2px 8px; border-radius:8px; color:#fff; background:' + (r.conf >= 80 ? '#16a34a' : (r.conf >= 60 ? '#f59e0b' : '#ef4444')) + ';">AI ' + r.conf + '%</span>'
+                    : '';
+                const opts = r.options.map((o, oi) => {
+                    const isC = r.correct.includes(oi);
+                    return '<div onclick="bulkPasteToggleCorrect(' + i + ',' + oi + ')" style="cursor:pointer; padding:4px 8px; border-radius:8px; margin:2px 0; font-size:0.86em; display:flex; gap:6px; align-items:flex-start; background:' + (isC ? '#dcfce7' : '#f8fafc') + '; border:1px solid ' + (isC ? '#16a34a' : '#e2e8f0') + '; color:' + (isC ? '#15803d' : '#475569') + '; font-weight:' + (isC ? '700' : '400') + ';"><span>' + (isC ? '✅' : '⬜') + '</span><span>' + escapeHtml(o) + '</span></div>';
+                }).join('');
+                return '<div style="border:1.5px solid ' + (r.include ? '#ddd6fe' : '#eee') + '; border-radius:14px; padding:12px 14px; background:' + (r.include ? '#fff' : '#f8f8f8') + '; opacity:' + (r.include ? '1' : '0.55') + ';">'
+                    + '<div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:6px;">'
+                    + '<input type="checkbox" ' + (r.include ? 'checked' : '') + ' onchange="bulkPasteToggleInclude(' + i + ')" style="margin-top:4px; width:16px; height:16px; cursor:pointer; flex-shrink:0;">'
+                    + '<div style="flex:1; min-width:0;"><div style="font-weight:700; color:#1e293b; font-size:0.92em;">' + (i + 1) + '. ' + escapeHtml(r.q) + '</div></div>'
+                    + confBadge
+                    + '</div>'
+                    + '<div style="padding-left:24px;">' + opts + '</div>'
+                    + (r.rationale ? '<div style="margin:6px 0 0 24px; padding:6px 8px; background:#faf5ff; border:1px solid #e9d5ff; border-radius:8px; font-size:0.8em; color:#6b21a8; white-space:pre-wrap;">' + escapeHtml(r.rationale) + '</div>' : '')
+                    + '</div>';
+            }).join('');
+        }
+
+        function bulkPasteToggleInclude(idx) {
+            const r = window._bulkPasteParsed[idx];
+            if (r) { r.include = !r.include; renderBulkPastePreview(); }
+        }
+
+        function bulkPasteToggleCorrect(idx, optIdx) {
+            const r = window._bulkPasteParsed[idx];
+            if (!r) return;
+            const pos = r.correct.indexOf(optIdx);
+            if (pos >= 0) r.correct.splice(pos, 1); else r.correct.push(optIdx);
+            renderBulkPastePreview();
+        }
+
+        async function bulkPasteFindAnswers() {
+            const btn = document.getElementById('bp-find-btn');
+            const rows = window._bulkPasteParsed.filter(r => r.include);
+            if (rows.length === 0) { showToast('ยังไม่ได้เลือกข้อ', 'error'); return; }
+            if (typeof window._aiFindAnswerCore !== 'function' || typeof window.callUniversalAI !== 'function') {
+                showToast('AI engine ยังไม่พร้อม — reload แล้วลองใหม่', 'error'); return;
+            }
+            const modelEl = document.getElementById('ai-analyzer-model-val');
+            const model = modelEl && modelEl.value ? modelEl.value : 'gemini-3.5-flash';
+            const countEl = document.getElementById('bp-preview-count');
+            btn.disabled = true; const origLabel = btn.textContent;
+            let done = 0, failed = 0;
+            for (const r of rows) {
+                countEl.textContent = '🎯 กำลังหาคำตอบ... ' + (done + 1) + '/' + rows.length;
+                try {
+                    const core = await window._aiFindAnswerCore(r.q, r.options, model, '');
+                    r.correct = core.picks;
+                    r.conf = core.conf;
+                    r.rationale = core.rationale;
+                } catch (e) { failed++; console.warn('bulkPaste findAnswer failed:', e); }
+                done++;
+                renderBulkPastePreview();
+            }
+            btn.disabled = false; btn.textContent = origLabel;
+            showToast('🎯 หาคำตอบเสร็จ ' + (done - failed) + '/' + rows.length + (failed ? ' (พลาด ' + failed + ')' : '') + ' — ตรวจก่อนบันทึก', failed ? 'warning' : 'success');
+        }
+
+        function bulkPasteInsert() {
+            const rows = window._bulkPasteParsed.filter(r => r.include);
+            if (rows.length === 0) { showToast('ยังไม่ได้เลือกข้อ', 'error'); return; }
+            rows.forEach(r => addQuestionUI({ q: r.q, type: 'choice', options: r.options, correct: r.correct, timer: 60 }));
+            document.getElementById('bulkPasteModal').style.display = 'none';
+            if (typeof triggerAutoSave === 'function') triggerAutoSave();
+            const items = document.querySelectorAll('.quiz-q-item');
+            quizQPageIndex = Math.max(0, items.length - rows.length);
+            if (typeof updateQuizPagination === 'function') updateQuizPagination();
+            showToast('✅ เพิ่ม ' + rows.length + ' ข้อแล้ว', 'success');
         }
 
         function clearResearchChat() {
@@ -51381,6 +51544,45 @@ Reply ONLY with raw JSON, no markdown:
             <div style="margin-top:25px; border-top:1px solid #eee; padding-top:15px; text-align:right; display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-size:0.75em; color:#999; font-style:italic;">* AI will attempt to generate structured data.</span>
                 <button class="btn-dark" onclick="document.getElementById('pdfToQuizModal').style.display='none'" style="padding:10px 30px; border-radius:30px; font-weight:bold;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- V96.54: Bulk Paste Questions Modal -->
+    <div id="bulkPasteModal" class="modal" style="z-index:5200;">
+        <div class="modal-content" style="max-width:780px; padding:28px; border-radius:24px;">
+            <span class="close-modal" onclick="document.getElementById('bulkPasteModal').style.display='none'">&times;</span>
+            <div style="display:flex; align-items:center; gap:14px; margin-bottom:16px; border-bottom:1px solid #eee; padding-bottom:14px;">
+                <div style="width:48px; height:48px; background:#ede9fe; border-radius:14px; display:flex; align-items:center; justify-content:center; color:#7c3aed; font-size:1.4em;">📋</div>
+                <div>
+                    <h3 style="margin:0;">Bulk Paste Questions</h3>
+                    <p style="margin:2px 0 0 0; font-size:0.85em; color:#666;">วางข้อสอบหลายข้อทีเดียว — คั่นแต่ละข้อด้วย<b>บรรทัดว่าง</b>, ตัวเลือกขึ้นบรรทัดใหม่ (ย่อหน้า หรือใส่ A) B) / 1) 2) ก็ได้)</p>
+                </div>
+            </div>
+
+            <!-- Stage 1: paste -->
+            <div id="bp-input-stage">
+                <textarea id="bp-textarea" placeholder="วางข้อสอบที่นี่...&#10;&#10;ข้อใดถูกต้องเกี่ยวกับ ...&#10;    ตัวเลือกที่ 1&#10;    ตัวเลือกที่ 2&#10;    ตัวเลือกที่ 3&#10;    ตัวเลือกที่ 4&#10;&#10;ข้อถัดไป ...&#10;    ..." style="width:100%; height:220px; border:1.5px solid #ddd; border-radius:14px; padding:14px; font-size:0.9em; line-height:1.6; box-sizing:border-box; font-family:inherit; resize:vertical;"></textarea>
+                <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                    <span style="font-size:0.75em; color:#999; font-style:italic;">เฉลยไม่จำเป็นในข้อความ — ติ๊กเองหรือให้ AI ช่วยหาในหน้าถัดไปได้</span>
+                    <button class="magic-btn" onclick="bulkPasteParse()" style="padding:10px 26px;">✂️ แยกข้อ (Parse)</button>
+                </div>
+            </div>
+
+            <!-- Stage 2: preview -->
+            <div id="bp-preview-stage" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+                    <div id="bp-preview-count" style="font-weight:800; color:#6d28d9; font-size:0.9em;"></div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <button class="btn-sm" onclick="bulkPasteBackToInput()" style="background:#e2e8f0; color:#475569; border:none; padding:6px 14px; border-radius:10px; font-weight:700; font-size:0.8em; cursor:pointer;">← แก้ข้อความ</button>
+                        <button class="btn-sm" id="bp-find-btn" onclick="bulkPasteFindAnswers()" title="ให้ AI เสนอคำตอบทุกข้อ (advisory — ตรวจก่อนบันทึก)" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed); color:white; border:none; padding:6px 14px; border-radius:10px; font-weight:800; font-size:0.8em; cursor:pointer;">🎯 หาคำตอบด้วย AI ทั้งชุด</button>
+                    </div>
+                </div>
+                <div id="bp-preview-list" style="max-height:44vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:2px;"></div>
+                <div style="margin-top:16px; border-top:1px solid #eee; padding-top:14px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <span style="font-size:0.75em; color:#999; font-style:italic;">* จะ append เข้า quiz ปัจจุบัน · คลิกตัวเลือกเพื่อติ๊กเฉลย · ตรวจเฉลย AI ก่อนบันทึกเสมอ</span>
+                    <button class="magic-btn" onclick="bulkPasteInsert()" style="padding:10px 26px;">➕ เพิ่มข้อที่เลือก</button>
+                </div>
             </div>
         </div>
     </div>
