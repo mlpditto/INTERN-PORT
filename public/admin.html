@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.58</title>
+    <title>Nika V96.59</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -25251,6 +25251,28 @@ ${JSON.stringify(sourceObj)}`;
 
         function parseBulkQuestions(text) {
             if (!text || !text.trim()) return [];
+            // V96.59: table-layout copies (exam sites rendered as tables) put the
+            // marker on its own line ("1 ." / "ก .") with tab-only lines between —
+            // merge each marker with its next content line and drop blank lines,
+            // so the numbered sub-split below sees the normal "1. stem" shape.
+            // Gate on ≥4 marker-only lines so normal pastes are untouched.
+            const markerOnlyRe = /^[ \t]*(\d{1,3}|[ก-ฮ]|[A-Ia-i])[ \t]*([\.\)])[ \t]*$/;
+            const srcLines = text.replace(/\r\n/g, '\n').split('\n');
+            if (srcLines.filter(l => markerOnlyRe.test(l)).length >= 4) {
+                const flat = [];
+                for (let i = 0; i < srcLines.length; i++) {
+                    const m = srcLines[i].match(markerOnlyRe);
+                    if (m) {
+                        let j = i + 1;
+                        while (j < srcLines.length && srcLines[j].trim() === '') j++;
+                        flat.push(m[1] + m[2] + ' ' + (j < srcLines.length ? srcLines[j].trim() : ''));
+                        i = j;
+                    } else if (srcLines[i].trim() !== '') {
+                        flat.push(srcLines[i].trim());
+                    }
+                }
+                text = flat.join('\n');
+            }
             const optPrefixRe = /^([A-Ia-i]|[1-9]|[ก-ฮ])[\.\)\-\:]+\s*(.*)/;
             const bulletRe = /^[\-•\*]\s*(.*)/;
             // V96.57: Google Forms copies have NO blank line between questions
@@ -51615,7 +51637,7 @@ Reply ONLY with raw JSON, no markdown:
                 <div style="width:48px; height:48px; background:#ede9fe; border-radius:14px; display:flex; align-items:center; justify-content:center; color:#7c3aed; font-size:1.4em;">📋</div>
                 <div>
                     <h3 style="margin:0;">Bulk Paste Questions</h3>
-                    <p style="margin:2px 0 0 0; font-size:0.85em; color:#666;">วางข้อสอบหลายข้อทีเดียว — คั่นแต่ละข้อด้วย<b>บรรทัดว่าง</b> หรือ<b>เลขข้อ (5. 6. 7.)</b>, ตัวเลือกขึ้นบรรทัดใหม่ (ย่อหน้า หรือใส่ A) B) / 1) 2) ก็ได้) · copy จาก Google Forms ได้เลย</p>
+                    <p style="margin:2px 0 0 0; font-size:0.85em; color:#666;">วางข้อสอบหลายข้อทีเดียว — คั่นแต่ละข้อด้วย<b>บรรทัดว่าง</b> หรือ<b>เลขข้อ (5. 6. 7.)</b>, ตัวเลือกขึ้นบรรทัดใหม่ (ย่อหน้า หรือใส่ A) B) / 1) 2) ก็ได้) · copy จาก Google Forms หรือหน้าข้อสอบแบบตาราง ได้เลย</p>
                 </div>
             </div>
 
