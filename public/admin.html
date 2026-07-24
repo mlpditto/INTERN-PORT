@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.59</title>
+    <title>Nika V96.60</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -25275,13 +25275,20 @@ ${JSON.stringify(sourceObj)}`;
             }
             const optPrefixRe = /^([A-Ia-i]|[1-9]|[ก-ฮ])[\.\)\-\:]+\s*(.*)/;
             const bulletRe = /^[\-•\*]\s*(.*)/;
+            // V96.60: Google Forms copies carry two artifact lines per question —
+            // a bare required marker ("*") and a score line ("10/10"). The "*"
+            // matches bulletRe (flips options mode) and the score then becomes a
+            // fake first option on every question. Strip both before splitting.
+            const scoreRe = /^[ \t]*\d+[ \t]*\/[ \t]*\d+[ \t]*$/;
+            text = text.replace(/\r\n/g, '\n').split('\n')
+                .filter(l => !/^[ \t]*\*[ \t]*$/.test(l) && !scoreRe.test(l))
+                .join('\n');
             // V96.57: Google Forms copies have NO blank line between questions
             // ("5. stem / options... / 6. stem / options..."). Sub-split a block
             // before each numbered line that CONTINUES the question sequence
             // (same delimiter, number = previous + 1, and at least one line
             // apart — so consecutive numbered OPTION lists 1) 2) 3) never split).
             const qNumRe = /^[ \t]*(\d{1,3})([\.\)])[ \t]*\S/;
-            const scoreRe = /^[ \t]*\d+[ \t]*\/[ \t]*\d+[ \t]*$/;
             const rawBlocks = text.replace(/\r\n/g, '\n').split(/\n[ \t]*\n+/);
             const blocks = [];
             rawBlocks.forEach(rb => {
@@ -25301,10 +25308,16 @@ ${JSON.stringify(sourceObj)}`;
                     blocks.push({ lines: rlines, numbered: false });
                 }
             });
-            const out = [];
+            const stripOpt = t => {
+                const pm = t.match(optPrefixRe);
+                if (pm) return pm[2].trim();
+                const bm = t.match(bulletRe);
+                if (bm) return bm[1].trim();
+                return t;
+            };
+            const parsed = [];
             blocks.forEach(bk => {
-                // Drop a Forms score line ("1/1") sitting right under the question line.
-                const lines = bk.lines.filter((l, i) => !(scoreRe.test(l) && i > 0 && qNumRe.test(bk.lines[i - 1])));
+                const lines = bk.lines;
                 let stemLines = [], optLines = [], inOptions = false;
                 lines.forEach(line => {
                     if (line.trim() === '') return;
@@ -25325,16 +25338,25 @@ ${JSON.stringify(sourceObj)}`;
                 // Numbered-sequence mode: the pasted running number ("5.") would
                 // duplicate the editor's own numbering — strip it from the stem.
                 if (bk.numbered) q = q.replace(/^\d{1,3}[\.\)][ \t]*/, '');
-                const options = optLines.map(l => {
-                    const t = l.trim();
-                    const pm = t.match(optPrefixRe);
-                    if (pm) return pm[2].trim();
-                    const bm = t.match(bulletRe);
-                    if (bm) return bm[1].trim();
-                    return t;
-                }).filter(o => o !== '');
-                if (q && options.length >= 2) out.push({ q: q, options: options, correct: [], conf: null, rationale: '', include: true });
+                const options = optLines.map(l => stripOpt(l.trim())).filter(o => o !== '');
+                parsed.push({ q: q, options: options, lines: lines.filter(l => l.trim() !== '') });
             });
+            // V96.60: a blank line between a stem and its (now stripped) "*" marker
+            // splits one question into a stem-only block + an options-only block —
+            // the stem got dropped (0 options) and the options block grew a fake
+            // stem. Re-join such pairs: stem-only block + next block that does not
+            // start a new numbered question = one question.
+            const out = [];
+            for (let i = 0; i < parsed.length; i++) {
+                const pb = parsed[i];
+                let options = pb.options;
+                const nx = parsed[i + 1];
+                if (pb.q && options.length === 0 && nx && nx.lines.length >= 2 && !qNumRe.test(nx.lines[0])) {
+                    const merged = nx.lines.map(l => stripOpt(l.trim())).filter(o => o !== '');
+                    if (merged.length >= 2) { options = merged; i++; }
+                }
+                if (pb.q && options.length >= 2) out.push({ q: pb.q, options: options, correct: [], conf: null, rationale: '', include: true });
+            }
             return out;
         }
 
@@ -25373,7 +25395,7 @@ ${JSON.stringify(sourceObj)}`;
                     : '';
                 const opts = r.options.map((o, oi) => {
                     const isC = r.correct.includes(oi);
-                    return '<div onclick="bulkPasteToggleCorrect(' + i + ',' + oi + ')" style="cursor:pointer; padding:4px 8px; border-radius:8px; margin:2px 0; font-size:0.86em; display:flex; gap:6px; align-items:flex-start; background:' + (isC ? '#dcfce7' : '#f8fafc') + '; border:1px solid ' + (isC ? '#16a34a' : '#e2e8f0') + '; color:' + (isC ? '#15803d' : '#475569') + '; font-weight:' + (isC ? '700' : '400') + ';"><span>' + (isC ? '✅' : '⬜') + '</span><span>' + escapeHtml(o) + '</span></div>';
+                    return '<div onclick="bulkPasteToggleCorrect(' + i + ',' + oi + ')" style="cursor:pointer; padding:4px 8px; border-radius:8px; margin:2px 0; font-size:0.86em; display:flex; gap:6px; align-items:flex-start; background:' + (isC ? '#dcfce7' : '#f8fafc') + '; border:1px solid ' + (isC ? '#16a34a' : '#e2e8f0') + '; color:' + (isC ? '#15803d' : '#475569') + '; font-weight:' + (isC ? '700' : '400') + ';"><span>' + (isC ? '✅' : '⬜') + '</span><span style="flex:1; min-width:0;">' + escapeHtml(o) + '</span><span onclick="event.stopPropagation();bulkPasteRemoveOption(' + i + ',' + oi + ')" title="ตัดตัวเลือกนี้ออก" style="flex-shrink:0; padding:0 4px; color:#94a3b8; font-weight:700;">✕</span></div>';
                 }).join('');
                 return '<div style="border:1.5px solid ' + (r.include ? '#ddd6fe' : '#eee') + '; border-radius:14px; padding:12px 14px; background:' + (r.include ? '#fff' : '#f8f8f8') + '; opacity:' + (r.include ? '1' : '0.55') + ';">'
                     + '<div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:6px;">'
@@ -25397,6 +25419,15 @@ ${JSON.stringify(sourceObj)}`;
             if (!r) return;
             const pos = r.correct.indexOf(optIdx);
             if (pos >= 0) r.correct.splice(pos, 1); else r.correct.push(optIdx);
+            renderBulkPastePreview();
+        }
+
+        function bulkPasteRemoveOption(idx, optIdx) {
+            const r = window._bulkPasteParsed[idx];
+            if (!r) return;
+            if (r.options.length <= 2) { showToast('ต้องเหลืออย่างน้อย 2 ตัวเลือก', 'error'); return; }
+            r.options.splice(optIdx, 1);
+            r.correct = r.correct.filter(c => c !== optIdx).map(c => (c > optIdx ? c - 1 : c));
             renderBulkPastePreview();
         }
 
