@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.60</title>
+    <title>Nika V96.61</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -25356,6 +25356,16 @@ ${JSON.stringify(sourceObj)}`;
                     if (merged.length >= 2) { options = merged; i++; }
                 }
                 if (pb.q && options.length >= 2) out.push({ q: pb.q, options: options, correct: [], conf: null, rationale: '', include: true });
+            }
+            // V96.61: blank-line-separated numbered pastes keep the pasted "N."
+            // in the stem (the strip above only runs in sub-split mode) and the
+            // editor adds its own numbering. Strip when ALL stems carry numbers
+            // forming an increasing sequence — a real sequence, not stems that
+            // merely start with a figure.
+            const stemNumRe = /^(\d{1,3})[\.\)][ \t]*/;
+            const nums = out.map(x => { const m = x.q.match(stemNumRe); return m ? parseInt(m[1], 10) : null; });
+            if (out.length >= 2 && nums.every((n, i) => n !== null && (i === 0 || n > nums[i - 1]))) {
+                out.forEach(x => { x.q = x.q.replace(stemNumRe, ''); });
             }
             return out;
         }
