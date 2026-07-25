@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.20)</title>
+    <title>Internship Portfolio (V96.21)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -3527,8 +3527,15 @@
                                         <input type="hidden" id="rl-mood" value="😊">
                                         <input type="hidden" id="rl-mood-secondary" value="">
 
+                                        <!-- V96.21: writing helper — scaffold today's Quiz/Case/Note activity into the box -->
+                                        <div style="margin-top:12px;">
+                                            <button type="button" id="rl-summarize-btn" class="lang-no-toggle" onclick="insertTodayReflectionSummary()"
+                                                data-reflect-i18n="drSummarizeToday"
+                                                title="ดึงกิจกรรมวันนี้ (Quiz / Case / Note) มาช่วยเริ่มเขียน"
+                                                style="width:auto; min-height:0; padding:7px 14px; border:1px solid #ddd6fe; background:#f5f3ff; color:#6d28d9; font-weight:800; font-size:0.82em; border-radius:999px; cursor:pointer;">✨ สรุปกิจกรรมวันนี้</button>
+                                        </div>
                                         <!-- V94.01: Textarea + Submit (moved above Learning Tools) -->
-                                        <div style="position:relative; margin-top:15px;">
+                                        <div style="position:relative; margin-top:10px;">
                                             <textarea id="rl-content" rows="5"
                                                 data-reflect-i18n="drTextareaPlaceholder"
                                                 placeholder="What did I learn today? What problems did I face? What's next?"
@@ -8511,6 +8518,15 @@
                 ja: '(+0.1 pts · 1日1回)',
                 zh: '(+0.1 pts · 每天一次)',
             },
+            // V96.21: "summarize today" writing helper
+            drSummarizeToday: { orig: '✨ Summarize today', th: '✨ สรุปกิจกรรมวันนี้', en: '✨ Summarize today', ko: '✨ 오늘 요약', ja: '✨ 今日のまとめ', zh: '✨ 总结今天' },
+            drSummaryHeader:   { orig: 'Today I did:', th: 'วันนี้ฉันได้ทำ:', en: 'Today I did:', ko: '오늘 한 일:', ja: '今日やったこと:', zh: '今天我做了:' },
+            drSummaryQuiz:     { orig: 'Quiz', th: 'ทำ Quiz', en: 'Quiz', ko: '퀴즈', ja: 'クイズ', zh: '测验' },
+            drSummaryCase:     { orig: 'Case', th: 'บันทึกเคส', en: 'Case', ko: '케이스', ja: 'ケース', zh: '病例' },
+            drSummaryNote:     { orig: 'Note', th: 'จดโน้ต', en: 'Note', ko: '노트', ja: 'ノート', zh: '笔记' },
+            drSummaryLearned:  { orig: 'What I learned:', th: 'สิ่งที่ได้เรียนรู้:', en: 'What I learned:', ko: '배운 점:', ja: '学んだこと:', zh: '我学到了:' },
+            drSummaryNext:     { orig: 'Still curious / want to improve:', th: 'ยังสงสัย / อยากพัฒนาต่อ:', en: 'Still curious / want to improve:', ko: '아직 궁금한 점 / 개선할 점:', ja: 'まだ気になること / 改善したいこと:', zh: '仍有疑问 / 想改进:' },
+            drSummaryNone:     { orig: 'No activity logged today yet — do a Quiz, Case, or Note first.', th: 'วันนี้ยังไม่มีกิจกรรม (Quiz / Case / Note) — ลองทำสักอย่างก่อนนะ', en: 'No activity logged today yet — do a Quiz, Case, or Note first.', ko: '오늘 아직 활동이 없어요 — 퀴즈, 케이스, 노트를 먼저 해보세요.', ja: '今日はまだ活動がありません — クイズ・ケース・ノートを先にどうぞ。', zh: '今天还没有活动 — 先做一个测验、病例或笔记吧。' },
         };
 
         // V94.90: emoji → REFLECT_I18N key map. Used by rlMoodLabel() to make
@@ -14738,6 +14754,48 @@
         function updateCharCount() {
             const content = document.getElementById('rl-content').value;
             document.getElementById('char-count').innerText = content.length;
+        }
+
+        // V96.21: Daily Reflection writing helper — deterministically scaffold today's
+        // activity (scored quizzes + logged cases + learning notes) into the textarea
+        // so the intern isn't staring at a blank box. No AI, no network. Labels follow
+        // the quiz-translation chip via reflectT.
+        function insertTodayReflectionSummary() {
+            const ta = document.getElementById('rl-content');
+            if (!ta) return;
+            const todayKey = new Date().toDateString();
+            const isToday = ts => ts && ts.toDate && ts.toDate().toDateString() === todayKey;
+            const lines = [];
+            Object.values(window.quizAttemptsCache || {}).forEach(att => {
+                if (!isToday(att.timestamp)) return;
+                if (['approved', 'pending', 'completed', 'graded'].indexOf(att.status) < 0) return;
+                const quiz = (window.quizzesCache || []).find(q => q.id === att.quizId);
+                const title = (quiz && quiz.title) || att.quizId || 'Quiz';
+                const score = (att.totalQuestions && typeof att.correctCount === 'number') ? ' (' + att.correctCount + '/' + att.totalQuestions + ')' : '';
+                lines.push('• 📝 ' + reflectT('drSummaryQuiz') + ': ' + title + score);
+            });
+            (window.myCasesCache || []).forEach(c => {
+                if (!isToday(c.timestamp)) return;
+                const name = (c.disease && c.disease.trim()) || String(c.diseaseSystemLabel || '').split('/')[0].trim() || 'Case';
+                lines.push('• 🩺 ' + reflectT('drSummaryCase') + ': ' + name);
+            });
+            (window.myLpEntriesCache || []).forEach(n => {
+                if (!isToday(n.createdAt)) return;
+                const title = (n.title && n.title.trim()) || 'Note';
+                lines.push('• 🎓 ' + reflectT('drSummaryNote') + ': ' + title);
+            });
+            if (!lines.length) { alert(reflectT('drSummaryNone')); return; }
+            const learnedHdr = reflectT('drSummaryLearned');
+            const scaffold = reflectT('drSummaryHeader') + '\n' + lines.join('\n')
+                + '\n\n' + learnedHdr + '\n'
+                + '\n' + reflectT('drSummaryNext') + '\n';
+            const existing = ta.value.trim();
+            ta.value = existing ? (scaffold + '\n' + existing) : scaffold;
+            updateCharCount();
+            ta.focus();
+            // Drop the cursor on the blank line under "What I learned" so typing starts there.
+            const anchor = ta.value.indexOf(learnedHdr);
+            if (anchor >= 0) { const c = anchor + learnedHdr.length + 1; ta.setSelectionRange(c, c); }
         }
 
         function showFloatingPoints(anchorEl) {
