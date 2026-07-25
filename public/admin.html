@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.61</title>
+    <title>Nika V96.62</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -26580,7 +26580,34 @@ ${JSON.stringify(sourceObj)}`;
             _renderQuizzesTimer = setTimeout(renderQuizzesNow, 120);
         }
 
+        // V96.62: material-click analytics (PR2 of the V95.63 intern logger).
+        // One-time read of material_clicks, aggregated per quiz + per file URL;
+        // rows repaint once loaded via the debounced renderQuizzes.
+        window._matClickStats = null;
+        let _matClicksFetched = false;
+        function loadMaterialClickStats() {
+            if (_matClicksFetched) return;
+            _matClicksFetched = true;
+            db.collection('material_clicks').get().then(snap => {
+                const stats = {};
+                snap.forEach(doc => {
+                    const c = doc.data() || {};
+                    const quizId = c.quizId, url = String(c.materialUrl || '').trim();
+                    if (!quizId || !url) return;
+                    const s = stats[quizId] || (stats[quizId] = { total: 0, users: new Set(), byUrl: {} });
+                    s.total++;
+                    if (c.userId) s.users.add(c.userId);
+                    const u = s.byUrl[url] || (s.byUrl[url] = { count: 0, users: new Set() });
+                    u.count++;
+                    if (c.userId) u.users.add(c.userId);
+                });
+                window._matClickStats = stats;
+                if (Object.keys(stats).length) renderQuizzes();
+            }).catch(e => console.warn('material_clicks load failed:', e));
+        }
+
         function renderQuizzesNow() {
+            loadMaterialClickStats();
 
             const tbodyActive = document.querySelector("#quizzesTableActive tbody");
             const tbodyInactive = document.querySelector("#quizzesTableInactive tbody");
@@ -26738,6 +26765,9 @@ ${JSON.stringify(sourceObj)}`;
                 // which quizzes hand interns files after completion. Hover lists the names.
                 const _mats = Array.isArray(q.materials) ? q.materials.filter(m => m && m.url) : [];
                 const materialsLabel = _mats.length > 0 ? `<span class="badge" style="background:#1d4ed8; color:white; margin-left:5px; cursor:pointer;" title="คลิกเพื่อทดสอบโหลดเอกสาร: ${escapeHtml(_mats.map((m, i) => materialDisplayName(m, i)).join(', '))}" onclick="event.stopPropagation(); adminOpenQuizMaterials('${q.id}')">📎 ${_mats.length}</span>` : '';
+                // V96.62: 👁 click-analytics badge — total opens · distinct interns (from material_clicks).
+                const _mcs = window._matClickStats ? window._matClickStats[q.id] : null;
+                const clicksLabel = (_mcs && _mcs.total > 0) ? `<span class="badge" style="background:#0e7490; color:white; margin-left:5px; cursor:pointer;" title="เอกสารถูกเปิด ${_mcs.total} ครั้ง โดย ${_mcs.users.size} คน" onclick="event.stopPropagation(); adminOpenQuizMaterials('${q.id}')">👁 ${_mcs.total}</span>` : '';
                 // V95.44: หมวด chips mirroring the Dashboard Quiz Coverage widget. Click
                 // opens the same per-system list modal (works from any tab — the modal is
                 // static and covByQuiz guarantees _qcovBuckets is fresh this render).
@@ -26796,7 +26826,7 @@ ${JSON.stringify(sourceObj)}`;
                             </div>
                             <div style="display:flex; flex-wrap:wrap; gap:3px; align-items:center;">
                                 ${_liveTag} ${modeLabel} ${oneTimeLabel} ${homeworkLabel}
-                                ${pollLabel} ${subjLabel} ${orderingLabel} ${flashcardLabel} ${templateLabel} ${targetGroupLabel} ${unlockLabel} ${materialsLabel} ${systemLabel}
+                                ${pollLabel} ${subjLabel} ${orderingLabel} ${flashcardLabel} ${templateLabel} ${targetGroupLabel} ${unlockLabel} ${materialsLabel} ${clicksLabel} ${systemLabel}
                             </div>
                             <div style="margin-top:4px;"><small style="color:#999;">(${q.shortTitle || '-'})</small></div>
                         </td>
@@ -27048,8 +27078,12 @@ ${JSON.stringify(sourceObj)}`;
                 const name = materialDisplayName(m, i);
                 const desc = (m.desc && String(m.desc).trim()) || '';
                 const descHtml = desc ? `<div style="font-size:0.78em; font-weight:500; color:#64748b; margin-top:2px;">${escapeHtml(desc)}</div>` : '';
+                // V96.62: per-file click count from material_clicks (matched by trimmed URL).
+                const _fstats = window._matClickStats && window._matClickStats[quizId];
+                const _fu = _fstats ? _fstats.byUrl[String(m.url).trim()] : null;
+                const fileClicksHtml = _fu ? `<span style="margin-left:6px; font-size:0.78em; font-weight:800; color:#0e7490; background:#ecfeff; border:1px solid #a5f3fc; padding:1px 8px; border-radius:999px; white-space:nowrap;" title="เปิด ${_fu.count} ครั้ง โดย ${_fu.users.size} คน">👁 ${_fu.count} · ${_fu.users.size} คน</span>` : '';
                 return `<div style="display:flex; gap:8px; align-items:stretch;">
-                    <a href="${fullUrl}" target="_blank" rel="noopener noreferrer" title="${fullUrl}" style="flex:1; min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:0; padding:10px 14px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; border-radius:10px; font-weight:700; text-decoration:none; font-size:0.9em; word-break:break-word;"><span>📎 ${escapeHtml(name)}</span>${descHtml}</a>
+                    <a href="${fullUrl}" target="_blank" rel="noopener noreferrer" title="${fullUrl}" style="flex:1; min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:0; padding:10px 14px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; border-radius:10px; font-weight:700; text-decoration:none; font-size:0.9em; word-break:break-word;"><span>📎 ${escapeHtml(name)}${fileClicksHtml}</span>${descHtml}</a>
                     <button type="button" onclick="adminOpenQuizMaterials('${quizId}',${i})" title="ตั้งชื่อ/ใส่โน้ตให้ไฟล์นี้" style="flex-shrink:0; width:42px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; color:#64748b; cursor:pointer; font-size:0.95em;">✏️</button>
                 </div>`;
             }).join('');
