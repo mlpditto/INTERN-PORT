@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.62</title>
+    <title>Nika V96.63</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -25411,6 +25411,7 @@ ${JSON.stringify(sourceObj)}`;
                     + '<div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:6px;">'
                     + '<input type="checkbox" ' + (r.include ? 'checked' : '') + ' onchange="bulkPasteToggleInclude(' + i + ')" style="margin-top:4px; width:16px; height:16px; cursor:pointer; flex-shrink:0;">'
                     + '<div style="flex:1; min-width:0;"><div style="font-weight:700; color:#1e293b; font-size:0.92em;">' + (i + 1) + '. ' + escapeHtml(r.q) + '</div></div>'
+                    + '<button type="button" onclick="bulkPasteCopyQuestion(' + i + ')" title="คัดลอกโจทย์ + ตัวเลือก (ไม่รวมเฉลย)" style="flex-shrink:0; width:auto; min-height:0; padding:2px 8px; border:1px solid #e2e8f0; background:#f8fafc; border-radius:8px; cursor:pointer; font-size:0.85em; line-height:1.4;">📋</button>'
                     + confBadge
                     + '</div>'
                     + '<div style="padding-left:24px;">' + opts + '</div>'
@@ -25439,6 +25440,31 @@ ${JSON.stringify(sourceObj)}`;
             r.options.splice(optIdx, 1);
             r.correct = r.correct.filter(c => c !== optIdx).map(c => (c > optIdx ? c - 1 : c));
             renderBulkPastePreview();
+        }
+
+        // V96.63: 📋 per-question copy — stem + options only (no answer key /
+        // rationale, per user pick), A) B) C) prefixes for pasting elsewhere.
+        function bulkPasteCopyQuestion(idx) {
+            const r = window._bulkPasteParsed[idx];
+            if (!r) return;
+            const text = r.q + '\n' + r.options.map((o, oi) => String.fromCharCode(65 + oi) + ') ' + o).join('\n');
+            const done = () => showToast('📋 คัดลอกข้อ ' + (idx + 1) + ' แล้ว', 'success');
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(done).catch(() => bulkPasteCopyFallback(text, done));
+            } else {
+                bulkPasteCopyFallback(text, done);
+            }
+        }
+
+        function bulkPasteCopyFallback(text, done) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.cssText = 'position:fixed; left:-9999px;';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); done(); }
+            catch (e) { showToast('คัดลอกไม่สำเร็จ: ' + e.message, 'error'); }
+            ta.remove();
         }
 
         async function bulkPasteFindAnswers() {
