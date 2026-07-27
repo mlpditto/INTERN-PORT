@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.68</title>
+    <title>Nika V96.69</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -21593,6 +21593,42 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             return { doc, setPdfFont };
         }
 
+        // V96.69: jsPDF draws glyphs without OpenType mark positioning (no GPOS), so a
+        // Thai tone mark that should sit ABOVE an upper vowel is drawn at the vowel's
+        // own anchor. Both marks are zero-advance, so they overprint and the tone mark
+        // vanishes: "ที่" renders as "ที", "เท่านั้น" as "เท่านัน". Draw the line with
+        // those stacked marks removed, then place each one manually one step higher.
+        // Removing them cannot shift anything because their advance width is zero.
+        const THAI_UPPER_VOWEL = /[ัิ-ื็ํ]/;
+        const THAI_TONE_MARK = /[่-์]/;
+        const THAI_TONE_RAISE_RATIO = 0.28; // of the font size; tuned against Sarabun
+
+        function drawPdfText(doc, text, x, y, align) {
+            const str = String(text == null ? '' : text);
+            const opts = align ? { align } : undefined;
+            if (!THAI_TONE_MARK.test(str)) { doc.text(str, x, y, opts); return; }
+
+            const keep = [];
+            const raised = [];
+            for (let i = 0; i < str.length; i++) {
+                const ch = str[i];
+                if (THAI_TONE_MARK.test(ch) && i > 0 && THAI_UPPER_VOWEL.test(str[i - 1])) {
+                    raised.push({ ch, at: keep.length });
+                } else {
+                    keep.push(ch);
+                }
+            }
+            const base = keep.join('');
+            doc.text(base, x, y, opts);
+            if (!raised.length) return;
+
+            const raise = doc.getFontSize() * 0.3528 * THAI_TONE_RAISE_RATIO; // pt → mm
+            const originX = (align === 'right') ? x - doc.getTextWidth(base)
+                : (align === 'center') ? x - doc.getTextWidth(base) / 2
+                    : x;
+            raised.forEach(r => doc.text(r.ch, originX + doc.getTextWidth(base.slice(0, r.at)), y - raise));
+        }
+
         function createQuizPdfRenderer(doc, setPdfFont, options = {}) {
             const pageW = doc.internal.pageSize.getWidth();
             const pageH = doc.internal.pageSize.getHeight();
@@ -21618,13 +21654,13 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 y = layout.top;
                 setPdfFont('bold');
                 doc.setFontSize(layout.titleSize);
-                doc.text(headerTitle, left, y);
+                drawPdfText(doc, headerTitle, left, y);
                 y += layout.headerGap;
                 setPdfFont('normal');
                 doc.setFontSize(layout.metaSize);
                 doc.setTextColor(90, 90, 90);
                 if (showGenerated) {
-                    doc.text(`Generated: ${new Date().toLocaleString()}`, left, y);
+                    drawPdfText(doc, `Generated: ${new Date().toLocaleString()}`, left, y);
                     y += layout.headerGap;
                 }
                 doc.setTextColor(20, 20, 20);
@@ -21644,7 +21680,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 const lines = doc.splitTextToSize(safeText, maxW - indent);
                 lines.forEach((ln) => {
                     ensureSpace(lineGap + 1);
-                    doc.text(ln, left + indent, y);
+                    drawPdfText(doc, ln, left + indent, y);
                     y += lineGap;
                 });
             };
@@ -21661,10 +21697,10 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     setPdfFont(idx === 0 ? 'bold' : 'normal');
                     doc.setFontSize(layout.optionSize);
                     if (idx === 0) {
-                        doc.text(prefix, left + layout.optionIndent, y);
+                        drawPdfText(doc, prefix, left + layout.optionIndent, y);
                     }
                     setPdfFont('normal');
-                    doc.text(ln, bodyX, y);
+                    drawPdfText(doc, ln, bodyX, y);
                     y += layout.optionGap;
                 });
                 if (isCorrect) {
@@ -21672,7 +21708,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     setPdfFont('italic');
                     doc.setFontSize(layout.optionSize - 0.3);
                     doc.setTextColor(22, 101, 52);
-                    doc.text('Correct answer', bodyX, y);
+                    drawPdfText(doc, 'Correct answer', bodyX, y);
                     doc.setTextColor(20, 20, 20);
                     y += layout.optionGap - 0.5;
                 }
@@ -21730,7 +21766,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     y = layout.top;
                     setPdfFont('bold');
                     doc.setFontSize(layout.titleSize);
-                    doc.text(headingText, left, y);
+                    drawPdfText(doc, headingText, left, y);
                     y += layout.headerGap;
                     doc.setDrawColor(220, 220, 220);
                     doc.line(left, y, pageW - right, y);
@@ -21744,8 +21780,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                         const label = `${i + 1}. ${entry.title}${entry.shortTitle ? ` (${entry.shortTitle})` : ''}`;
                         const pageLabel = `${entry.count} Q · p.${entry.page}`;
                         const lines = doc.splitTextToSize(label, maxW - doc.getTextWidth(pageLabel) - 6);
-                        doc.text(lines[0] + (lines.length > 1 ? '…' : ''), left, y);
-                        doc.text(pageLabel, pageW - right, y, { align: 'right' });
+                        drawPdfText(doc, lines[0] + (lines.length > 1 ? '…' : ''), left, y);
+                        drawPdfText(doc, pageLabel, pageW - right, y, 'right');
                         y += layout.qGap;
                         drawn++;
                     });
@@ -21755,7 +21791,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     if (drawn < entries.length) {
                         setPdfFont('normal');
                         doc.setFontSize(layout.metaSize);
-                        doc.text(`… and ${entries.length - drawn} more (see pages that follow)`, left, pageH - layout.bottom - 6);
+                        drawPdfText(doc, `… and ${entries.length - drawn} more (see pages that follow)`, left, pageH - layout.bottom - 6);
                     }
                 }
             };
@@ -21771,8 +21807,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 setPdfFont('normal');
                 doc.setFontSize(layout.footerSize);
                 doc.setTextColor(100, 116, 139);
-                doc.text('Nika • Quiz Export', left, pageH - layout.bottom + 1);
-                doc.text(`Page ${i} / ${totalPages}`, pageW - right, pageH - layout.bottom + 1, { align: 'right' });
+                drawPdfText(doc, 'Nika • Quiz Export', left, pageH - layout.bottom + 1);
+                drawPdfText(doc, `Page ${i} / ${totalPages}`, pageW - right, pageH - layout.bottom + 1, 'right');
                 doc.setTextColor(20, 20, 20);
             }
         }
