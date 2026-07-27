@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.69</title>
+    <title>Nika V96.70</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -21218,11 +21218,17 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         // bulk share one path. Quiz docs already carry the fields the PDF needs.
         function getQuizPdfSourceList() {
             if (_quizPdfBulkQuizzes) {
+                // V96.70: order the pack the way a learner meets it rather than the
+                // order the checkboxes were ticked — unlock gate first, then title,
+                // so a numbered series ("1) …", "2) …", "10) …") reads in sequence.
+                // Sorting here covers the preview and both output modes at once.
                 return _quizPdfBulkQuizzes.map(q => ({
                     title: q.title || '',
                     shortTitle: q.shortTitle || '',
+                    unlockScore: q.unlockScore || 0,
                     questions: Array.isArray(q.questions) ? q.questions : []
-                }));
+                })).sort((a, b) => (a.unlockScore - b.unlockScore)
+                    || String(a.title).localeCompare(String(b.title), undefined, { numeric: true }));
             }
             return [getQuizFormData()];
         }
