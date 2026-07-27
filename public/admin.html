@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.66</title>
+    <title>Nika V96.67</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6526,6 +6526,7 @@
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
                         <button onclick="bulkSetQuizActive(true)" style="padding:6px 14px; border:none; border-radius:8px; background:#10b981; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">🚀 Activate</button>
                         <button onclick="bulkSetQuizActive(false)" style="padding:6px 14px; border:none; border-radius:8px; background:#64748b; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">⏹️ Deactivate</button>
+                        <button onclick="openBulkExportQuizPdfModal()" title="Export the selected quizzes as PDF — one combined file or one file each" style="padding:6px 14px; border:none; border-radius:8px; background:#0284c7; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">📄 Export PDF</button>
                         <button onclick="bulkDeleteQuizzes()" style="padding:6px 14px; border:none; border-radius:8px; background:#ef4444; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">🗑️ Delete</button>
                         <button onclick="clearQuizSelection()" style="padding:6px 12px; border:1px solid #c7d2fe; border-radius:8px; background:#fff; color:#3730a3; font-size:0.78em; font-weight:800; cursor:pointer;">Clear</button>
                     </div>
@@ -14599,9 +14600,29 @@
                         </label>
                     </div>
 
+                    <!-- V96.67: only meaningful when several quizzes were selected in
+                         the Quiz Engine list, so it stays hidden in single-quiz mode. -->
+                    <div id="quiz-export-file-mode-row" style="display:none; margin-top:12px; border:1px solid #dbe3ef; border-radius:14px; padding:10px 12px; background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);">
+                        <div style="font-weight:900; font-size:0.85em; color:#0f172a; margin-bottom:8px;">📦 Bulk output</div>
+                        <label style="display:flex; align-items:flex-start; gap:9px; cursor:pointer; margin-bottom:8px;">
+                            <input type="radio" name="quiz-export-pdf-file-mode" value="combined" checked style="margin-top:3px; width:auto; min-width:16px; flex:0 0 auto; accent-color:#2563eb;">
+                            <div>
+                                <div style="font-weight:800; font-size:0.88em; color:#0f172a;">One combined PDF</div>
+                                <div style="font-size:0.76em; color:#64748b; line-height:1.25;">Contents page first, then each quiz on its own page. Best for printing a packet.</div>
+                            </div>
+                        </label>
+                        <label style="display:flex; align-items:flex-start; gap:9px; cursor:pointer;">
+                            <input type="radio" name="quiz-export-pdf-file-mode" value="separate" style="margin-top:3px; width:auto; min-width:16px; flex:0 0 auto; accent-color:#2563eb;">
+                            <div>
+                                <div style="font-weight:800; font-size:0.88em; color:#0f172a;">Separate PDF per quiz</div>
+                                <div style="font-size:0.76em; color:#64748b; line-height:1.25;">One download per quiz — your browser may ask permission for multiple downloads.</div>
+                            </div>
+                        </label>
+                    </div>
+
                     <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
                         <button class="btn-sm" onclick="closeExportQuizPdfModal()" style="padding:8px 16px; border-radius:11px; background:#e2e8f0; color:#334155; border:none;">🪵 Cancel</button>
-                        <button class="magic-btn" onclick="exportQuizToPdfFromModal()" style="padding:8px 18px; border-radius:11px; background:linear-gradient(135deg,#0284c7,#0369a1); color:#fef3c7;">🚢 Export PDF</button>
+                        <button id="quiz-export-run-btn" class="magic-btn" onclick="exportQuizToPdfFromModal()" style="padding:8px 18px; border-radius:11px; background:linear-gradient(135deg,#0284c7,#0369a1); color:#fef3c7;">🚢 Export PDF</button>
                     </div>
                 </div>
 
@@ -21189,7 +21210,60 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             }
         }
 
+        // V96.67: null = single-quiz mode (reads the open editor); an array of quiz
+        // docs = bulk mode launched from the Quiz Engine selection bar.
+        let _quizPdfBulkQuizzes = null;
+
+        // Everything downstream (preview + export) works off this list, so single and
+        // bulk share one path. Quiz docs already carry the fields the PDF needs.
+        function getQuizPdfSourceList() {
+            if (_quizPdfBulkQuizzes) {
+                return _quizPdfBulkQuizzes.map(q => ({
+                    title: q.title || '',
+                    shortTitle: q.shortTitle || '',
+                    questions: Array.isArray(q.questions) ? q.questions : []
+                }));
+            }
+            return [getQuizFormData()];
+        }
+
+        function setQuizPdfBulkUi(isBulk) {
+            const row = document.getElementById('quiz-export-file-mode-row');
+            if (row) row.style.display = isBulk ? 'block' : 'none';
+        }
+
+        function openBulkExportQuizPdfModal() {
+            const ids = [...selectedQuizIds];
+            if (!ids.length) return showToast('Select at least 1 quiz first', 'error');
+
+            const picked = ids.map(id => quizzesData.find(q => q.id === id)).filter(Boolean);
+            const usable = picked.filter(q => (q.questions || []).length);
+            if (!usable.length) return alert('None of the selected quizzes have questions to export.');
+
+            _quizPdfBulkQuizzes = usable;
+            const totalQ = usable.reduce((n, q) => n + q.questions.length, 0);
+            const skipped = picked.length - usable.length;
+            const statEl = document.getElementById('export-quiz-pdf-count');
+            if (statEl) {
+                statEl.innerText = `${usable.length} quizzes · ${totalQ} questions will be exported`
+                    + (skipped ? ` (${skipped} skipped — no questions)` : '');
+            }
+            const showGeneratedEl = document.getElementById('quiz-export-pdf-show-generated');
+            if (showGeneratedEl) showGeneratedEl.checked = false;
+            const showFooterEl = document.getElementById('quiz-export-pdf-show-footer');
+            if (showFooterEl) showFooterEl.checked = true;
+            const layoutEl = document.getElementById('quiz-export-pdf-layout');
+            if (layoutEl) layoutEl.value = 'premium';
+            const combinedEl = document.querySelector('input[name="quiz-export-pdf-file-mode"][value="combined"]');
+            if (combinedEl) combinedEl.checked = true;
+            setQuizPdfBulkUi(true);
+            forceShowModal('exportQuizPdfModal');
+            refreshQuizPdfPreview();
+        }
+
         function openExportQuizPdfModal() {
+            _quizPdfBulkQuizzes = null;
+            setQuizPdfBulkUi(false);
             const formData = getQuizFormData();
             const qCount = (formData.questions || []).length;
             if (!qCount) return alert("No questions to export. Please add at least 1 question.");
@@ -21212,10 +21286,41 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
 
         function exportQuizToPdfFromModal() {
             const settings = getQuizPdfSettingsFromModal();
-            exportQuizToPdf(settings.mode, settings).catch(e => {
+            const run = _quizPdfBulkQuizzes
+                ? exportSelectedQuizzesToPdf(settings)
+                : exportQuizToPdf(settings.mode, settings);
+            run.catch(e => {
                 console.error('Quiz PDF export failed:', e);
                 alert('PDF export failed: ' + (e && e.message ? e.message : e));
             });
+        }
+
+        async function exportSelectedQuizzesToPdf(settings) {
+            const list = getQuizPdfSourceList();
+            if (!list.length) return;
+
+            const btn = document.getElementById('quiz-export-run-btn');
+            const original = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Exporting…'; }
+            try {
+                if (settings.fileMode === 'separate') {
+                    for (let i = 0; i < list.length; i++) {
+                        if (btn) btn.innerHTML = `⏳ Exporting ${i + 1}/${list.length}…`;
+                        await saveSingleQuizPdf(list[i], settings.mode, settings);
+                        // Browsers throttle back-to-back downloads; space them out so
+                        // none are silently dropped. Chrome asks once for permission.
+                        if (i < list.length - 1) await new Promise(r => setTimeout(r, 400));
+                    }
+                    showToast(`📄 Exported ${list.length} PDF files`);
+                } else {
+                    await saveCombinedQuizPdf(list, settings.mode, settings);
+                    const totalQ = list.reduce((n, fd) => n + (fd.questions || []).length, 0);
+                    showToast(`📄 Exported 1 PDF (${list.length} quizzes · ${totalQ} questions)`);
+                }
+                closeExportQuizPdfModal();
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = original; }
+            }
         }
 
         function getQuizPdfSettingsFromModal() {
@@ -21223,11 +21328,13 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const showGeneratedEl = document.getElementById('quiz-export-pdf-show-generated');
             const showFooterEl = document.getElementById('quiz-export-pdf-show-footer');
             const layoutEl = document.getElementById('quiz-export-pdf-layout');
+            const fileModeEl = document.querySelector('input[name="quiz-export-pdf-file-mode"]:checked');
             return {
                 mode: selected ? selected.value : 'with_options_no_answers',
                 showGenerated: showGeneratedEl ? showGeneratedEl.checked : true,
                 showFooter: showFooterEl ? showFooterEl.checked : true,
-                layout: layoutEl ? layoutEl.value : 'premium'
+                layout: layoutEl ? layoutEl.value : 'premium',
+                fileMode: fileModeEl ? fileModeEl.value : 'combined'
             };
         }
 
@@ -21356,7 +21463,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const metaEl = document.getElementById('quiz-export-preview-meta');
             if (!previewEl) return;
 
-            const formData = getQuizFormData();
+            const sourceList = getQuizPdfSourceList();
+            const formData = sourceList[0] || { questions: [] };
             const settings = getQuizPdfSettingsFromModal();
             const layout = getQuizPdfLayoutConfig(settings.layout);
             const blocks = buildQuizPdfBlocks(formData, settings.mode);
@@ -21367,8 +21475,10 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 questions_only: 'Questions Only'
             }[settings.mode] || settings.mode;
 
+            const isBulk = sourceList.length > 1;
             if (metaEl) {
-                metaEl.textContent = `${modeLabel} • ${settings.layout} layout • ${settings.showFooter ? 'footer on' : 'footer off'}`;
+                metaEl.textContent = `${modeLabel} • ${settings.layout} layout • ${settings.showFooter ? 'footer on' : 'footer off'}`
+                    + (isBulk ? ` • ${settings.fileMode === 'separate' ? `${sourceList.length} files` : '1 combined file'}` : '');
             }
 
             if (!blocks.length) {
@@ -21380,8 +21490,17 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 ? '<div style="margin-top:16px; padding-top:10px; border-top:1px solid #e2e8f0; font-size:0.75em; color:#64748b; display:flex; justify-content:space-between;"><span>Nika • Quiz Export</span><span>Page 1 / ?</span></div>'
                 : '';
 
+            const bulkListHtml = isBulk
+                ? `<div style="margin-bottom:14px; padding:10px 12px; border-radius:12px; background:#eef2ff; border:1px solid #c7d2fe; font-size:0.82em; color:#3730a3;">
+                        <div style="font-weight:800; margin-bottom:4px;">📦 ${sourceList.length} quizzes in this export${settings.fileMode === 'separate' ? ' (one file each)' : ' (one file, contents page first)'}</div>
+                        <div style="line-height:1.6;">${sourceList.map((fd, i) => `${i + 1}. ${escapeHtml(fd.shortTitle || fd.title || '(untitled)')} · ${(fd.questions || []).length} Q`).join('<br>')}</div>
+                        <div style="margin-top:6px; color:#4338ca;">Preview below shows the first quiz only.</div>
+                   </div>`
+                : '';
+
             previewEl.innerHTML = `
                 <div style="max-width:760px; margin:0 auto; color:#0f172a;">
+                    ${bulkListHtml}
                     <div style="padding-bottom:10px; border-bottom:1px solid #e2e8f0; margin-bottom:14px;">
                         <div style="font-size:1.25em; font-weight:900; line-height:1.25;">${escapeHtml(formData.title || 'Quiz Export')}</div>
                         <div style="margin-top:5px; display:flex; gap:10px; flex-wrap:wrap; font-size:0.76em; color:#64748b;">
@@ -21439,19 +21558,14 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             return _quizPdfThaiFontCache;
         }
 
-        async function exportQuizToPdf(mode, options = {}) {
+        // V96.67: the PDF engine is split into three reusable pieces so one document
+        // can hold many quizzes: createQuizPdfDoc (registers the Thai font once),
+        // createQuizPdfRenderer (draws quiz after quiz into that doc) and
+        // applyQuizPdfFooter (numbers every page at the end). Layout maths is
+        // unchanged — only the plumbing moved out of exportQuizToPdf.
+        async function createQuizPdfDoc() {
             const jsPdfCtor = window.jspdf && window.jspdf.jsPDF;
-            if (!jsPdfCtor) {
-                alert("PDF engine is not ready. Please refresh and try again.");
-                return;
-            }
-
-            const formData = getQuizFormData();
-            const questions = formData.questions || [];
-            if (!questions.length) {
-                alert("No questions to export.");
-                return;
-            }
+            if (!jsPdfCtor) throw new Error('PDF engine is not ready. Please refresh and try again.');
 
             const doc = new jsPdfCtor('p', 'mm', 'a4');
             const sarabun = await loadQuizPdfThaiFont();
@@ -21471,6 +21585,10 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     : style;
                 doc.setFont(exportFontName, s);
             };
+            return { doc, setPdfFont };
+        }
+
+        function createQuizPdfRenderer(doc, setPdfFont, options = {}) {
             const pageW = doc.internal.pageSize.getWidth();
             const pageH = doc.internal.pageSize.getHeight();
             const layout = getQuizPdfLayoutConfig(options.layout || 'premium');
@@ -21479,9 +21597,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const maxW = pageW - left - right;
             const bottomPad = layout.bottom + (options.showFooter !== false ? 7 : 0);
             let y = layout.top;
+            let headerTitle = 'Quiz Export';
             const showGenerated = options.showGenerated !== false;
-            const showFooter = options.showFooter !== false;
-            const blocks = buildQuizPdfBlocks(formData, mode);
 
             const getWrappedHeight = (text, width, lineGap, size, style = 'normal') => {
                 const safeText = String(text || '').trim() || '-';
@@ -21496,7 +21613,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 y = layout.top;
                 setPdfFont('bold');
                 doc.setFontSize(layout.titleSize);
-                doc.text(formData.title || 'Quiz Export', left, y);
+                doc.text(headerTitle, left, y);
                 y += layout.headerGap;
                 setPdfFont('normal');
                 doc.setFontSize(layout.metaSize);
@@ -21572,49 +21689,147 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 return questionHeight + optionsHeight + guidelineHeight + layout.blockGap + 2;
             };
 
-            addPageHeader(true);
+            return {
+                layout, pageW, pageH, left, right, maxW,
+                // Draws one quiz. startOnCurrentPage=false begins it on a fresh page,
+                // which is how a bulk pack separates quizzes. Returns the page it
+                // started on so the contents page can link to it.
+                renderQuiz(formData, mode, startOnCurrentPage = true) {
+                    headerTitle = formData.title || 'Quiz Export';
+                    const blocks = buildQuizPdfBlocks(formData, mode);
+                    addPageHeader(startOnCurrentPage);
+                    const startPage = doc.getNumberOfPages();
 
-            blocks.forEach((block) => {
-                ensureSpace(estimateBlockHeight(block));
-                addWrapped(`${block.number}. ${block.questionText}`, 0, layout.qGap, layout.qSize, 'bold');
+                    blocks.forEach((block) => {
+                        ensureSpace(estimateBlockHeight(block));
+                        addWrapped(`${block.number}. ${block.questionText}`, 0, layout.qGap, layout.qSize, 'bold');
 
-                if (mode === 'questions_only') {
-                    y += layout.blockGap;
-                    return;
+                        if (mode === 'questions_only') {
+                            y += layout.blockGap;
+                            return;
+                        }
+
+                        block.options.forEach(opt => addOptionWrapped(opt.prefix, opt.text, opt.correct));
+
+                        if (block.guideline) {
+                            addWrapped(block.guideline, layout.optionIndent, layout.optionGap, layout.optionSize - 0.1, 'italic');
+                        }
+
+                        y += layout.blockGap;
+                    });
+
+                    return startPage;
+                },
+                // Contents page for a bulk pack. Drawn on whatever page is current.
+                renderTableOfContents(entries, headingText) {
+                    y = layout.top;
+                    setPdfFont('bold');
+                    doc.setFontSize(layout.titleSize);
+                    doc.text(headingText, left, y);
+                    y += layout.headerGap;
+                    doc.setDrawColor(220, 220, 220);
+                    doc.line(left, y, pageW - right, y);
+                    y += layout.headerGap;
+
+                    let drawn = 0;
+                    entries.forEach((entry, i) => {
+                        if (y > pageH - layout.bottom - 12) return;
+                        setPdfFont('normal');
+                        doc.setFontSize(layout.qSize - 0.6);
+                        const label = `${i + 1}. ${entry.title}${entry.shortTitle ? ` (${entry.shortTitle})` : ''}`;
+                        const pageLabel = `${entry.count} Q · p.${entry.page}`;
+                        const lines = doc.splitTextToSize(label, maxW - doc.getTextWidth(pageLabel) - 6);
+                        doc.text(lines[0] + (lines.length > 1 ? '…' : ''), left, y);
+                        doc.text(pageLabel, pageW - right, y, { align: 'right' });
+                        y += layout.qGap;
+                        drawn++;
+                    });
+
+                    // The contents page is always exactly one page, so the +1 page
+                    // shift applied to every recorded start page stays correct.
+                    if (drawn < entries.length) {
+                        setPdfFont('normal');
+                        doc.setFontSize(layout.metaSize);
+                        doc.text(`… and ${entries.length - drawn} more (see pages that follow)`, left, pageH - layout.bottom - 6);
+                    }
                 }
+            };
+        }
 
-                block.options.forEach(opt => addOptionWrapped(opt.prefix, opt.text, opt.correct));
+        function applyQuizPdfFooter(doc, setPdfFont, renderer) {
+            const { layout, pageW, pageH, left, right } = renderer;
+            const totalPages = doc.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                doc.setPage(i);
+                doc.setDrawColor(226, 232, 240);
+                doc.line(left, pageH - layout.bottom - 4, pageW - right, pageH - layout.bottom - 4);
+                setPdfFont('normal');
+                doc.setFontSize(layout.footerSize);
+                doc.setTextColor(100, 116, 139);
+                doc.text('Nika • Quiz Export', left, pageH - layout.bottom + 1);
+                doc.text(`Page ${i} / ${totalPages}`, pageW - right, pageH - layout.bottom + 1, { align: 'right' });
+                doc.setTextColor(20, 20, 20);
+            }
+        }
 
-                if (block.guideline) {
-                    addWrapped(block.guideline, layout.optionIndent, layout.optionGap, layout.optionSize - 0.1, 'italic');
-                }
+        function quizPdfModeShort(mode) {
+            return mode === 'with_answers' ? 'with_answers' : (mode === 'questions_only' ? 'questions_only' : 'no_answers');
+        }
 
-                y += layout.blockGap;
+        function quizPdfFileName(formData, mode) {
+            const base = (formData.shortTitle || formData.title || 'quiz').replace(/[^a-zA-Z0-9-_]/g, '_');
+            return `${base}_${quizPdfModeShort(mode)}.pdf`;
+        }
+
+        // One quiz per file. Used by the editor's single export and by the bulk
+        // "separate files" option, which calls it once per selected quiz.
+        async function saveSingleQuizPdf(formData, mode, options) {
+            const { doc, setPdfFont } = await createQuizPdfDoc();
+            const renderer = createQuizPdfRenderer(doc, setPdfFont, options);
+            renderer.renderQuiz(formData, mode, true);
+            if (options.showFooter !== false) applyQuizPdfFooter(doc, setPdfFont, renderer);
+            doc.save(quizPdfFileName(formData, mode));
+        }
+
+        // All selected quizzes in ONE file: a contents page, then each quiz starting
+        // on its own page. The contents page is inserted at the front afterwards, so
+        // recorded start pages shift by exactly one.
+        async function saveCombinedQuizPdf(list, mode, options) {
+            const { doc, setPdfFont } = await createQuizPdfDoc();
+            const renderer = createQuizPdfRenderer(doc, setPdfFont, options);
+            const entries = [];
+
+            list.forEach((formData, i) => {
+                const startPage = renderer.renderQuiz(formData, mode, i === 0);
+                entries.push({
+                    title: formData.title || '(untitled)',
+                    shortTitle: formData.shortTitle || '',
+                    count: (formData.questions || []).length,
+                    page: startPage + 1
+                });
             });
 
-            if (showFooter) {
-                const totalPages = doc.getNumberOfPages();
-                for (let i = 1; i <= totalPages; i++) {
-                    doc.setPage(i);
-                    doc.setDrawColor(226, 232, 240);
-                    doc.line(left, pageH - layout.bottom - 4, pageW - right, pageH - layout.bottom - 4);
-                    setPdfFont('normal');
-                    doc.setFontSize(layout.footerSize);
-                    doc.setTextColor(100, 116, 139);
-                    doc.text('Nika • Quiz Export', left, pageH - layout.bottom + 1);
-                    doc.text(`Page ${i} / ${totalPages}`, pageW - right, pageH - layout.bottom + 1, { align: 'right' });
-                    doc.setTextColor(20, 20, 20);
-                }
-            }
+            doc.insertPage(1);
+            doc.setPage(1);
+            renderer.renderTableOfContents(entries, `Quiz Pack — ${list.length} quizzes`);
 
-            const base = (formData.shortTitle || formData.title || 'quiz').replace(/[^a-zA-Z0-9-_]/g, '_');
-            const modeShort = mode === 'with_answers' ? 'with_answers' : (mode === 'questions_only' ? 'questions_only' : 'no_answers');
-            doc.save(`${base}_${modeShort}.pdf`);
+            if (options.showFooter !== false) applyQuizPdfFooter(doc, setPdfFont, renderer);
+            doc.save(`quiz_pack_${list.length}_${quizPdfModeShort(mode)}.pdf`);
+        }
+
+        async function exportQuizToPdf(mode, options = {}) {
+            const formData = getQuizFormData();
+            const questions = formData.questions || [];
+            if (!questions.length) {
+                alert("No questions to export.");
+                return;
+            }
+            await saveSingleQuizPdf(formData, mode, options);
             showToast(`📄 Exported PDF (${questions.length} questions)`);
             closeExportQuizPdfModal();
         }
 
-        document.querySelectorAll('input[name="quiz-export-pdf-mode"], #quiz-export-pdf-show-generated, #quiz-export-pdf-show-footer, #quiz-export-pdf-layout')
+        document.querySelectorAll('input[name="quiz-export-pdf-mode"], input[name="quiz-export-pdf-file-mode"], #quiz-export-pdf-show-generated, #quiz-export-pdf-show-footer, #quiz-export-pdf-layout')
             .forEach(el => el.addEventListener('change', refreshQuizPdfPreview));
 
         function toggleQType(el) {
