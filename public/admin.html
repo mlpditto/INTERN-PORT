@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.70</title>
+    <title>Nika V96.71</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -20271,7 +20271,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         function fillQuizForm(q) {
             document.getElementById('quiz-title').value = q.title || "";
             document.getElementById('quiz-short-title').value = q.shortTitle || "";
-            document.getElementById('quiz-target-group').value = q.targetGroup || "Public";
+            setQuizTargetGroupValue(q.targetGroup || "Public");
             if (document.getElementById('quiz-unlock-score')) document.getElementById('quiz-unlock-score').value = q.unlockScore || 0;
             // V95.40: restore the stored limit — this was never loaded, so editing
             // quiz B after quiz A silently saved A's leftover input value into B.
@@ -20354,6 +20354,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('edit-quiz-id').value = "";
             document.getElementById('quiz-title').value = "";
             document.getElementById('quiz-short-title').value = "";
+            refreshQuizTargetGroupOptions();
             document.getElementById('quiz-target-group').value = "Public";
             if (document.getElementById('quiz-unlock-score')) document.getElementById('quiz-unlock-score').value = 0;
             if (document.getElementById('quiz-feedback-limit')) document.getElementById('quiz-feedback-limit').value = 280;
@@ -20467,6 +20468,43 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         function filterHomeworkUsers() {
             const val = document.getElementById('homework-user-search').value;
             renderHomeworkUserList(val);
+        }
+
+        // V96.71: the Target Group list was hardcoded, so a quiz saved with a group
+        // that isn't in it (e.g. "Junior") loaded into an EMPTY select — and the next
+        // save read that empty value and silently rewrote the audience to "Public",
+        // publishing the quiz to everyone. Build the list from the groups users
+        // actually have, and always keep an option for the value being loaded.
+        function refreshQuizTargetGroupOptions() {
+            const sel = document.getElementById('quiz-target-group');
+            if (!sel) return;
+            const known = new Set([...sel.options].map(o => o.value));
+            const groups = [...new Set((typeof usersData !== 'undefined' ? usersData : [])
+                .map(u => (u && u.group ? String(u.group).trim() : ''))
+                .filter(Boolean))].sort((a, b) => a.localeCompare(b));
+            groups.forEach(g => {
+                if (known.has(g)) return;
+                const opt = document.createElement('option');
+                opt.value = g;
+                opt.text = g;
+                sel.add(opt);
+                known.add(g);
+            });
+        }
+
+        function setQuizTargetGroupValue(value) {
+            const sel = document.getElementById('quiz-target-group');
+            if (!sel) return;
+            refreshQuizTargetGroupOptions();
+            const wanted = String(value || 'Public');
+            if (![...sel.options].some(o => o.value === wanted)) {
+                // a group nobody currently belongs to still has to survive a round-trip
+                const opt = document.createElement('option');
+                opt.value = wanted;
+                opt.text = wanted;
+                sel.add(opt);
+            }
+            sel.value = wanted;
         }
 
         function selectAllHomeworkUsers() {
@@ -20649,7 +20687,14 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         function getQuizFormData() {
             const title = document.getElementById('quiz-title').value.trim();
             const shortTitle = document.getElementById('quiz-short-title').value.trim();
-            const targetGroup = document.getElementById('quiz-target-group').value.trim() || "Public";
+            // V96.71: never let an empty select downgrade an existing quiz to Public —
+            // fall back to whatever audience it was already saved with.
+            let targetGroup = (document.getElementById('quiz-target-group').value || '').trim();
+            if (!targetGroup) {
+                const editingId = (document.getElementById('edit-quiz-id') || {}).value || '';
+                const prevQuiz = editingId ? quizzesData.find(x => x.id === editingId) : null;
+                targetGroup = (prevQuiz && prevQuiz.targetGroup) || "Public";
+            }
             const unlockScore = Math.max(0, parseFloat(document.getElementById('quiz-unlock-score')?.value) || 0);
             const description = document.getElementById('quiz-description').value;
             const totalPoints = parseFloat(document.getElementById('quiz-total-points').value) || 1.0;
