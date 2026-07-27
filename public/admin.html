@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.63</title>
+    <title>Nika V96.64</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -21208,7 +21208,10 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
 
         function exportQuizToPdfFromModal() {
             const settings = getQuizPdfSettingsFromModal();
-            exportQuizToPdf(settings.mode, settings);
+            exportQuizToPdf(settings.mode, settings).catch(e => {
+                console.error('Quiz PDF export failed:', e);
+                alert('PDF export failed: ' + (e && e.message ? e.message : e));
+            });
         }
 
         function getQuizPdfSettingsFromModal() {
@@ -21390,7 +21393,37 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             `;
         }
 
-        function exportQuizToPdf(mode, options = {}) {
+        // V96.64: Thai-capable font for the quiz PDF export. jsPDF's built-in
+        // helvetica has no Thai glyphs, so Thai quizzes exported as mojibake
+        // while the modal's HTML preview (browser fonts) looked fine. Sarabun
+        // (public/fonts/, SIL OFL — see fonts/OFL.txt) is fetched same-origin
+        // on first export, cached as base64, and registered on each jsPDF doc.
+        // On fetch failure the export falls back to helvetica so EN-only
+        // quizzes keep working even if the font files are unreachable.
+        let _quizPdfThaiFontCache = null;
+        async function loadQuizPdfThaiFont() {
+            if (_quizPdfThaiFontCache) return _quizPdfThaiFontCache;
+            try {
+                const grab = async (file) => {
+                    const res = await fetch('fonts/' + file);
+                    if (!res.ok) throw new Error(file + ' HTTP ' + res.status);
+                    const bytes = new Uint8Array(await res.arrayBuffer());
+                    let bin = '';
+                    for (let i = 0; i < bytes.length; i += 0x8000) {
+                        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+                    }
+                    return btoa(bin);
+                };
+                const [regular, bold] = await Promise.all([grab('Sarabun-Regular.ttf'), grab('Sarabun-Bold.ttf')]);
+                _quizPdfThaiFontCache = { regular, bold };
+            } catch (e) {
+                console.warn('Quiz PDF: Thai font unavailable, falling back to helvetica.', e);
+                _quizPdfThaiFontCache = null;
+            }
+            return _quizPdfThaiFontCache;
+        }
+
+        async function exportQuizToPdf(mode, options = {}) {
             const jsPdfCtor = window.jspdf && window.jspdf.jsPDF;
             if (!jsPdfCtor) {
                 alert("PDF engine is not ready. Please refresh and try again.");
@@ -21405,6 +21438,23 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             }
 
             const doc = new jsPdfCtor('p', 'mm', 'a4');
+            const sarabun = await loadQuizPdfThaiFont();
+            let exportFontName = 'helvetica';
+            if (sarabun) {
+                doc.addFileToVFS('Sarabun-Regular.ttf', sarabun.regular);
+                doc.addFont('Sarabun-Regular.ttf', 'Sarabun', 'normal');
+                doc.addFileToVFS('Sarabun-Bold.ttf', sarabun.bold);
+                doc.addFont('Sarabun-Bold.ttf', 'Sarabun', 'bold');
+                exportFontName = 'Sarabun';
+            }
+            // Sarabun ships normal+bold only — fold italic onto normal there;
+            // helvetica fallback keeps its real italic.
+            const setPdfFont = (style = 'normal') => {
+                const s = (exportFontName === 'Sarabun')
+                    ? (String(style).includes('bold') ? 'bold' : 'normal')
+                    : style;
+                doc.setFont(exportFontName, s);
+            };
             const pageW = doc.internal.pageSize.getWidth();
             const pageH = doc.internal.pageSize.getHeight();
             const layout = getQuizPdfLayoutConfig(options.layout || 'premium');
@@ -21419,7 +21469,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
 
             const getWrappedHeight = (text, width, lineGap, size, style = 'normal') => {
                 const safeText = String(text || '').trim() || '-';
-                doc.setFont('helvetica', style);
+                setPdfFont(style);
                 doc.setFontSize(size);
                 const lines = doc.splitTextToSize(safeText, width);
                 return { lines, height: Math.max(1, lines.length) * lineGap };
@@ -21428,11 +21478,11 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const addPageHeader = (firstPage = false) => {
                 if (!firstPage) doc.addPage();
                 y = layout.top;
-                doc.setFont('helvetica', 'bold');
+                setPdfFont('bold');
                 doc.setFontSize(layout.titleSize);
                 doc.text(formData.title || 'Quiz Export', left, y);
                 y += layout.headerGap;
-                doc.setFont('helvetica', 'normal');
+                setPdfFont('normal');
                 doc.setFontSize(layout.metaSize);
                 doc.setTextColor(90, 90, 90);
                 if (showGenerated) {
@@ -21451,7 +21501,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
 
             const addWrapped = (text, indent = 0, lineGap = 4.8, size = 11, style = 'normal') => {
                 const safeText = String(text || '').trim() || '-';
-                doc.setFont('helvetica', style);
+                setPdfFont(style);
                 doc.setFontSize(size);
                 const lines = doc.splitTextToSize(safeText, maxW - indent);
                 lines.forEach((ln) => {
@@ -21462,7 +21512,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             };
 
             const addOptionWrapped = (prefix, text, isCorrect = false) => {
-                doc.setFont('helvetica', 'bold');
+                setPdfFont('bold');
                 doc.setFontSize(layout.optionSize);
                 const prefixWidth = Math.max(8, doc.getTextWidth(`${prefix} `) + 2);
                 const bodyX = left + layout.optionIndent + prefixWidth;
@@ -21470,18 +21520,18 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 const wrapped = getWrappedHeight(text, bodyWidth, layout.optionGap, layout.optionSize, 'normal').lines;
                 wrapped.forEach((ln, idx) => {
                     ensureSpace(layout.optionGap + 1);
-                    doc.setFont('helvetica', idx === 0 ? 'bold' : 'normal');
+                    setPdfFont(idx === 0 ? 'bold' : 'normal');
                     doc.setFontSize(layout.optionSize);
                     if (idx === 0) {
                         doc.text(prefix, left + layout.optionIndent, y);
                     }
-                    doc.setFont('helvetica', 'normal');
+                    setPdfFont('normal');
                     doc.text(ln, bodyX, y);
                     y += layout.optionGap;
                 });
                 if (isCorrect) {
                     ensureSpace(layout.optionGap + 1);
-                    doc.setFont('helvetica', 'italic');
+                    setPdfFont('italic');
                     doc.setFontSize(layout.optionSize - 0.3);
                     doc.setTextColor(22, 101, 52);
                     doc.text('Correct answer', bodyX, y);
@@ -21493,7 +21543,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const estimateBlockHeight = (block) => {
                 const questionHeight = getWrappedHeight(`${block.number}. ${block.questionText}`, maxW, layout.qGap, layout.qSize, 'bold').height;
                 const optionsHeight = block.options.reduce((sum, opt) => {
-                    doc.setFont('helvetica', 'bold');
+                    setPdfFont('bold');
                     doc.setFontSize(layout.optionSize);
                     const prefixWidth = Math.max(8, doc.getTextWidth(`${opt.prefix} `) + 2);
                     const bodyWidth = Math.max(10, maxW - layout.optionIndent - prefixWidth);
@@ -21532,7 +21582,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     doc.setPage(i);
                     doc.setDrawColor(226, 232, 240);
                     doc.line(left, pageH - layout.bottom - 4, pageW - right, pageH - layout.bottom - 4);
-                    doc.setFont('helvetica', 'normal');
+                    setPdfFont('normal');
                     doc.setFontSize(layout.footerSize);
                     doc.setTextColor(100, 116, 139);
                     doc.text('Nika • Quiz Export', left, pageH - layout.bottom + 1);
