@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ตรวจสอบเกียรติบัตร | MEDLIFE Plus Certificate Verification V1.0</title>
+    <link rel="icon" href="assets/medlife-logo.png" type="image/png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Leelawadee UI', Tahoma, sans-serif;
+            background: linear-gradient(160deg, #f0fdfa 0%, #e6f7f4 45%, #f7f1e3 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 15px 45px rgba(10, 25, 47, 0.12);
+            max-width: 460px;
+            width: 100%;
+            overflow: hidden;
+        }
+        .card-head {
+            background: #0a192f;
+            padding: 22px 24px 18px;
+            text-align: center;
+        }
+        .card-head img { height: 54px; }
+        .card-head h1 { color: #fff; font-size: 1.05em; margin-top: 10px; font-weight: 700; }
+        .card-head p { color: #94a3b8; font-size: 0.78em; margin-top: 2px; }
+        .card-body { padding: 24px; }
+        .badge {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            border-radius: 14px; padding: 14px; font-weight: 800; font-size: 1.05em;
+            margin-bottom: 18px;
+        }
+        .badge.valid { background: #ecfdf5; color: #047857; border: 1.5px solid #6ee7b7; }
+        .badge.revoked { background: #fef2f2; color: #b91c1c; border: 1.5px solid #fca5a5; }
+        .badge.notfound { background: #fffbeb; color: #92400e; border: 1.5px solid #fcd34d; }
+        .badge.error { background: #f1f5f9; color: #475569; border: 1.5px solid #cbd5e1; }
+        .row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 2px; border-bottom: 1px dashed #e2e8f0; font-size: 0.9em; }
+        .row:last-of-type { border-bottom: none; }
+        .row .k { color: #64748b; flex-shrink: 0; }
+        .row .v { color: #0f172a; font-weight: 700; text-align: right; word-break: break-word; }
+        .no-pill {
+            text-align: center; margin: 0 0 16px;
+            font-family: Consolas, monospace; font-weight: 700; font-size: 0.92em;
+            background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 10px;
+            padding: 9px 12px; color: #334155; word-break: break-all;
+        }
+        .reason { font-size: 0.82em; color: #b91c1c; background: #fef2f2; border-radius: 10px; padding: 10px 12px; margin-top: 12px; }
+        .line-btn {
+            display: block; text-align: center; margin-top: 20px;
+            background: #06c755; color: #fff; text-decoration: none;
+            border-radius: 12px; padding: 12px; font-weight: 800; font-size: 0.92em;
+        }
+        .foot { text-align: center; font-size: 0.72em; color: #94a3b8; padding: 0 24px 20px; }
+        .spin {
+            width: 34px; height: 34px; margin: 26px auto;
+            border: 4px solid #e2e8f0; border-top-color: #0d9488;
+            border-radius: 50%; animation: sp 0.8s linear infinite;
+        }
+        @keyframes sp { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="card-head">
+            <img src="assets/medlife-logo.png" alt="MEDLIFE Plus" onerror="this.style.display='none'">
+            <h1>ตรวจสอบเกียรติบัตร</h1>
+            <p>Certificate Verification — MEDLIFE PLUS CO.,LTD.</p>
+        </div>
+        <div class="card-body" id="body">
+            <div class="spin"></div>
+        </div>
+        <p class="foot">เอกสารนี้ตรวจสอบจากทะเบียนเกียรติบัตรของ MEDLIFE Plus โดยตรง<br>This result is fetched live from the MEDLIFE Plus certificate registry.</p>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script>
+        firebase.initializeApp({
+            apiKey: "AIzaSyCnyZoNfk_YE7TfLeEXFo9GgA-QMj3tv6Q",
+            authDomain: "intern-port-edfa7.firebaseapp.com",
+            projectId: "intern-port-edfa7",
+            storageBucket: "intern-port-edfa7.firebasestorage.app",
+            messagingSenderId: "367076866368",
+            appId: "1:367076866368:web:9c6559652cb0a78ddce2a5"
+        });
+
+        const TPL_LABELS = {
+            internship: { th: 'หลักสูตรฝึกงาน (Internship)', en: 'Internship Program' },
+            bootcamp: { th: 'เปิดโลกวิชาชีพเภสัชกรรมชุมชน — PharmCamp (12 ชั่วโมง)', en: 'Community Pharmacy Experience Program — PharmCamp (12 hours)' }
+        };
+        const LINE_URL = 'https://lin.ee/hbNfX0U';
+        const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+        function render(html) { document.getElementById('body').innerHTML = html; }
+        function lineBtn() { return `<a class="line-btn" href="${LINE_URL}" target="_blank" rel="noopener">💬 ติดต่อ / เพิ่มเพื่อน LINE @medlifeplus</a>`; }
+
+        async function run() {
+            const no = new URLSearchParams(location.search).get('no');
+            if (!no) {
+                render(`<div class="badge notfound">⚠️ ไม่พบเลขที่เกียรติบัตรใน URL</div>
+                    <p style="font-size:0.85em; color:#64748b; text-align:center;">กรุณาสแกน QR Code บนเกียรติบัตรอีกครั้ง<br>Please scan the QR Code on the certificate.</p>${lineBtn()}`);
+                return;
+            }
+            try {
+                const snap = await firebase.firestore().collection('certificates').doc(no).get();
+                if (!snap.exists) {
+                    render(`<div class="no-pill">${esc(no)}</div>
+                        <div class="badge notfound">❌ ไม่พบเลขนี้ในทะเบียน (Not Found)</div>
+                        <p style="font-size:0.85em; color:#64748b; text-align:center;">ไม่พบเกียรติบัตรเลขที่นี้ในระบบ หากเชื่อว่าเป็นความผิดพลาด กรุณาติดต่อเรา</p>${lineBtn()}`);
+                    return;
+                }
+                const d = snap.data();
+                const tpl = TPL_LABELS[d.template] || { th: d.template || '-', en: '' };
+                const issued = d.issuedAt && d.issuedAt.toDate ? d.issuedAt.toDate().toLocaleDateString('en-GB') : '-';
+                const nameLine = d.nickname ? `${d.name} (${d.nickname})` : d.name;
+                const revoked = d.status !== 'valid';
+                render(`
+                    <div class="no-pill">${esc(d.no || no)}</div>
+                    ${revoked
+                        ? '<div class="badge revoked">🚫 เกียรติบัตรนี้ถูกเพิกถอนแล้ว (REVOKED)</div>'
+                        : '<div class="badge valid">✅ เกียรติบัตรถูกต้อง (VALID)</div>'}
+                    <div class="row"><span class="k">ผู้รับ (Name)</span><span class="v">${esc(nameLine)}</span></div>
+                    <div class="row"><span class="k">หลักสูตร (Program)</span><span class="v">${esc(tpl.th)}</span></div>
+                    <div class="row"><span class="k">วันที่อบรม (Date)</span><span class="v">${esc(d.dateText || '-')}</span></div>
+                    <div class="row"><span class="k">วันที่ออกใบ (Issued)</span><span class="v">${esc(issued)}</span></div>
+                    ${revoked && d.revokedReason ? `<div class="reason">เหตุผล: ${esc(d.revokedReason)}</div>` : ''}
+                    ${lineBtn()}`);
+            } catch (e) {
+                console.error(e);
+                render(`<div class="badge error">⚠️ ตรวจสอบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง</div>
+                    <p style="font-size:0.8em; color:#94a3b8; text-align:center;">${esc(e.message || e)}</p>${lineBtn()}`);
+            }
+        }
+        run();
+    </script>
+</body>
+</html>

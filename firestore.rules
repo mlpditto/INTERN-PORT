@@ -410,5 +410,19 @@ service cloud.firestore {
           && resource.data.submittedBy == request.auth.uid
           && resource.data.status == 'pending');
     }
+
+    // 32. Certificate registry (V96.83 Phase 3). Public verify page fetches a
+    // single doc by its full number (running seq + random suffix, so numbers
+    // are not enumerable); list stays admin-only to prevent scraping.
+    match /certificates/{certNo} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // 33. Certificate counter (running number source, admin-only).
+    match /cert_meta/{docId} {
+      allow read, write: if isAdmin();
+    }
   }
 }
