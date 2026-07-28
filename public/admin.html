@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.76</title>
+    <title>Nika V96.77</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6737,6 +6737,8 @@
                         style="background:#f59e0b; color:white; border:none; border-radius:14px; padding:8px 18px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">📜 Certs</button>
                     <button class="btn-sm" onclick="generatePharmCampCerts()" title="ออกเกียรติบัตร PharmCamp ให้ทุกคนในกลุ่ม Junior เป็นไฟล์เดียว"
                         style="background:#10b981; color:white; border:none; border-radius:14px; padding:8px 18px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">🧪 PharmCamp Certs</button>
+                    <button class="btn-sm" onclick="openCertPasteModal()" title="วางรายชื่อแล้วออกเกียรติบัตรได้เลย ไม่ต้องลงทะเบียน user"
+                        style="background:#0ea5e9; color:white; border:none; border-radius:14px; padding:8px 18px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">📋 Paste Certs</button>
                 </div>
             </div>
             
@@ -11691,6 +11693,40 @@
                 <div style="display:flex; gap:10px; justify-content:flex-end;"><button class="btn-sm" style="background:#64748b; color:white;" onclick="updateCertPreview()">🔄 Redraw</button><button class="btn-sm btn-primary"
                         onclick="saveUserDates()">💾 Save & Approve</button><button class="btn-sm btn-warning"
                         id="btn-gen-pdf" onclick="generateCertPDF()">🖨️ PDF</button></div>
+            </div>
+        </div>
+        <!-- V96.77: paste-a-name-list certificates — the renderer only needs a name and
+             a date text, so certs for people who never registered (e.g. camp attendees)
+             can be issued from a pasted list without creating any user document. -->
+        <div id="certPasteModal" class="modal">
+            <div class="modal-content" style="max-width:560px;"><span class="close-modal"
+                    onclick="document.getElementById('certPasteModal').style.display='none'">&times;</span>
+                <h2>📋 Paste Certs</h2>
+                <div class="lang-no-toggle" style="margin:0 0 12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <span style="font-size:0.78em; color:#666; font-weight:700;">แบบใบรับรอง:</span>
+                    <div id="cert-paste-tpl-rail" style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <button type="button" class="cert-tpl-chip active" data-tpl="bootcamp" onclick="setCertPasteTemplate('bootcamp', this)"
+                            style="width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1.5px solid #4361ee; background:#4361ee; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">🧪 PharmCamp</button>
+                        <button type="button" class="cert-tpl-chip" data-tpl="internship" onclick="setCertPasteTemplate('internship', this)"
+                            style="width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1.5px solid #cbd5e1; background:#fff; color:#475569; font-size:0.78em; font-weight:800; cursor:pointer;">🎓 ฝึกงาน</button>
+                    </div>
+                </div>
+                <div class="lang-no-toggle" style="margin-bottom:12px;">
+                    <label style="font-size:0.8em; color:#666;">วันที่บนใบ (Date text):</label>
+                    <input type="text" id="cert-paste-dates" placeholder="เช่น 28/7/2569 - 29/7/2569">
+                </div>
+                <div class="lang-no-toggle" style="margin-bottom:12px;">
+                    <label style="font-size:0.8em; color:#666;">รายชื่อ บรรทัดละ 1 คน — ใส่ชื่อเล่นต่อท้ายด้วย | ได้:</label>
+                    <textarea id="cert-paste-names" rows="8" oninput="updateCertPasteCount()"
+                        style="width:100%; font-family:inherit; font-size:0.9em; line-height:1.5;"
+                        placeholder="Somchai Jaidee|Chai&#10;Suda Rakdee"></textarea>
+                </div>
+                <div class="lang-no-toggle" style="display:flex; gap:10px; justify-content:flex-end; align-items:center;">
+                    <span id="cert-paste-count" style="font-size:0.85em; color:#666; font-weight:700; margin-right:auto;"></span>
+                    <button class="btn-sm" style="background:#64748b; color:white;"
+                        onclick="document.getElementById('certPasteModal').style.display='none'">Cancel</button>
+                    <button class="btn-sm" style="background:#0ea5e9; color:white;" onclick="generatePasteCerts()">🖨️ Generate PDF</button>
+                </div>
             </div>
         </div>
         <div id="quizManageModal" class="modal">
@@ -46127,6 +46163,58 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // V96.74: one click for the whole camp cohort — bootcamp wording, camp dates.
         function generatePharmCampCerts() {
             return generateBulkCert({ group: 'Junior', template: 'bootcamp', dateText: pharmCampDateRange() || '-' });
+        }
+
+        // V96.77: paste-a-name-list certs — same renderer + PDF loop as generateBulkCert,
+        // but the recipients come from a pasted textarea instead of usersData, so no
+        // Firestore user document is ever needed (camp attendees, guest participants).
+        let certPasteTemplate = 'bootcamp';
+        function setCertPasteTemplate(tpl, btn) {
+            certPasteTemplate = CERT_TEMPLATES[tpl] ? tpl : 'bootcamp';
+            document.querySelectorAll('#cert-paste-tpl-rail .cert-tpl-chip').forEach(c => {
+                const on = c === btn;
+                c.style.background = on ? '#4361ee' : '#fff';
+                c.style.color = on ? '#fff' : '#475569';
+                c.style.borderColor = on ? '#4361ee' : '#cbd5e1';
+                c.classList.toggle('active', on);
+            });
+        }
+
+        function certPasteNames() {
+            return document.getElementById('cert-paste-names').value
+                .split('\n').map(l => l.trim()).filter(Boolean);
+        }
+
+        function updateCertPasteCount() {
+            const n = certPasteNames().length;
+            document.getElementById('cert-paste-count').textContent = n ? `${n} คน` : '';
+        }
+
+        function openCertPasteModal() {
+            const d = document.getElementById('cert-paste-dates');
+            if (!d.value && certPasteTemplate === 'bootcamp') d.value = pharmCampDateRange();
+            updateCertPasteCount();
+            document.getElementById('certPasteModal').style.display = 'block';
+        }
+
+        function generatePasteCerts() {
+            const names = certPasteNames();
+            if (!names.length) return alert("Paste at least one name (one per line).");
+            const tpl = certPasteTemplate;
+            const dateText = document.getElementById('cert-paste-dates').value.trim() || '-';
+            if (!confirm(`Generating ${CERT_TEMPLATES[tpl].label} certificates for ${names.length} name(s) in a single file. Do you want to proceed?`)) return;
+
+            showToast("Generating Bulk PDF... Please wait.");
+            const { jsPDF } = window.jspdf;
+            const c = document.createElement('canvas');
+            const doc = new jsPDF('l', 'mm', 'a4');
+            for (let i = 0; i < names.length; i++) {
+                renderCertificateCanvas(c, [names[i], dateText, [], 1, 0, tpl], CERT_EXPORT_SCALE);
+                if (i > 0) doc.addPage();
+                doc.addImage(c.toDataURL('image/png'), 'PNG', 0, 0, 297, 210);
+            }
+            doc.save("Certificates_Pasted.pdf");
+            showToast("Export Completed!");
         }
 
         function generateCertPDF() {
