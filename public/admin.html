@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.72</title>
+    <title>Nika V96.73</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -20330,7 +20330,11 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     if (typeof d === 'string') return d.slice(0, 16);
                     const dateObj = d.toDate ? d.toDate() : (d instanceof Date ? d : new Date(d));
                     if (isNaN(dateObj.getTime())) return "";
-                    return dateObj.toISOString().slice(0, 16);
+                    // V96.73: a datetime-local input holds LOCAL time, but toISOString()
+                    // returns UTC. Feeding UTC in made the field show a time shifted by
+                    // the timezone offset, and saving wrote that shifted value back — so
+                    // every open-and-save moved startTime/deadline 7 hours earlier here.
+                    return toLocalDatetimeInputValue(dateObj);
                 } catch (e) { return ""; }
             };
 
@@ -23462,7 +23466,7 @@ ${JSON.stringify(sourceObj)}`;
 
         async function endQuizNow() {
             const now = new Date();
-            document.getElementById('quiz-deadline').value = now.toISOString().slice(0, 16);
+            document.getElementById('quiz-deadline').value = toLocalDatetimeInputValue(now);
             if (!confirm("🛑 End Quiz Immediately? (Deadline will be set to NOW)")) return;
             await saveQuiz();
         }
@@ -26987,6 +26991,14 @@ ${JSON.stringify(sourceObj)}`;
             if (ts.seconds) return new Date(ts.seconds * 1000);
             return null;
         }
+        // V96.73: format a Date for a <input type="datetime-local">, which expects
+        // LOCAL wall-clock time. toISOString() alone yields UTC and silently shifts
+        // the value by the timezone offset.
+        function toLocalDatetimeInputValue(dateObj) {
+            const local = new Date(dateObj.getTime() - dateObj.getTimezoneOffset() * 60000);
+            return local.toISOString().slice(0, 16);
+        }
+
         function convertDate(val) {
             if (!val || val.trim() === "") return null;
             const d = new Date(val);
