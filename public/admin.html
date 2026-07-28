@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.74</title>
+    <title>Nika V96.75</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -46083,7 +46083,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const tpl = CERT_TEMPLATES[opts.template] ? opts.template : 'internship';
             const { jsPDF } = window.jspdf;
             const inGroup = (u) => !opts.group || String(u.group || '').split(',').map(x => x.trim()).includes(opts.group);
-            const users = usersData.filter(u => !u.isIgnored && inGroup(u) && (opts.dateText || (u.startDate && u.endDate)));
+            // V96.75: isIgnored keeps a user out of leaderboards and stats — a camp
+            // cohort is flagged that way so it does not pollute the intern ranking.
+            // It must not also block issuing their certificates, so an explicitly
+            // requested group overrides it; the untargeted legacy call still skips them.
+            const users = usersData.filter(u => (opts.group ? true : !u.isIgnored) && inGroup(u) && (opts.dateText || (u.startDate && u.endDate)));
             if (!users.length) return alert(opts.group
                 ? `No users found in group "${opts.group}".`
                 : "No students found with complete start/end dates.");
