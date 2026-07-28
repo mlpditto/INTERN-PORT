@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.71</title>
+    <title>Nika V96.72</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -21504,12 +21504,19 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     }
                 }
 
+                // V96.72: a short_answer question prints no choices, so on a handout
+                // there was nothing under it to write on. Give it ruled lines — but
+                // only where no answer key is shown, so the instructor copy keeps its
+                // Guideline line instead of blank space.
+                const writingLines = (mode !== 'with_answers' && qType === 'short_answer') ? 2 : 0;
+
                 return {
                     number: qi + 1,
                     questionText,
                     qType,
                     options,
-                    guideline
+                    guideline,
+                    writingLines
                 };
             });
         }
@@ -21765,6 +21772,22 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 }
             };
 
+            // Ruled lines for handwritten answers on a printed handout.
+            const WRITING_LINE_GAP = 7.5;
+            const addWritingLines = (count) => {
+                if (!count) return;
+                for (let i = 0; i < count; i++) {
+                    ensureSpace(WRITING_LINE_GAP + 1);
+                    y += WRITING_LINE_GAP;
+                    doc.setDrawColor(148, 163, 184);
+                    doc.setLineDashPattern([0.7, 1.1], 0);
+                    doc.line(left + layout.optionIndent, y, pageW - right, y);
+                    doc.setLineDashPattern([], 0);
+                    doc.setDrawColor(220, 220, 220);
+                }
+                y += 1.5;
+            };
+
             const estimateBlockHeight = (block) => {
                 const questionHeight = getWrappedHeight(`${block.number}. ${block.questionText}`, maxW, layout.qGap, layout.qSize, 'bold').height;
                 const optionsHeight = block.options.reduce((sum, opt) => {
@@ -21778,7 +21801,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 const guidelineHeight = block.guideline
                     ? getWrappedHeight(block.guideline, maxW - layout.optionIndent, layout.optionGap, layout.optionSize - 0.1, 'italic').height
                     : 0;
-                return questionHeight + optionsHeight + guidelineHeight + layout.blockGap + 2;
+                const writingHeight = (block.writingLines || 0) * WRITING_LINE_GAP + (block.writingLines ? 1.5 : 0);
+                return questionHeight + optionsHeight + guidelineHeight + writingHeight + layout.blockGap + 2;
             };
 
             return {
@@ -21797,6 +21821,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                         addWrapped(`${block.number}. ${block.questionText}`, 0, layout.qGap, layout.qSize, 'bold');
 
                         if (mode === 'questions_only') {
+                            addWritingLines(block.writingLines);
                             y += layout.blockGap;
                             return;
                         }
@@ -21807,6 +21832,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                             addWrapped(block.guideline, layout.optionIndent, layout.optionGap, layout.optionSize - 0.1, 'italic');
                         }
 
+                        addWritingLines(block.writingLines);
                         y += layout.blockGap;
                     });
 
