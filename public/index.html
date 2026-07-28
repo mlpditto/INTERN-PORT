@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.22)</title>
+    <title>Internship Portfolio (V96.23)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4372,7 +4372,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V96.22 (multi-group audience — targetGroup accepts a comma-separated list so a quiz can be shared with the staff supervising it without going Public)
+                <span id="intern-version-current">V94.04</span> — Last feature: V96.23 (locked steps stay visible in Mission as a dimmed card with the reason and opening time, instead of being hidden) | V96.22 (multi-group audience — targetGroup accepts a comma-separated list so a quiz can be shared with the staff supervising it without going Public)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -6941,11 +6941,6 @@
 
                 if (!audienceIncludesMe(q.targetGroup)) return;
 
-                // V95.33: score gate — hide locked quizzes until the user's cumulative
-                // score reaches unlockScore. Skip the gate once they have an attempt so a
-                // later score dip can't yank a quiz they already engaged with. 0 = no gate.
-                if ((q.unlockScore || 0) > (myScore || 0) && !attempt) return;
-
                 if (q.isHomework && q.assignedUsers && q.assignedUsers.length > 0) {
                     if (!q.assignedUsers.includes(userId)) return;
                 }
@@ -6954,8 +6949,22 @@
                 const isExpired = (dead && now > dead);
                 const hasStarted = (start && now >= start) || !start;
 
-                if (!hasStarted) return;
                 if (!isActive) return;
+
+                // V96.23: a quiz that is merely WAITING — not open yet, or below the score
+                // gate — used to be hidden outright (V95.33 / V84.8). For a course run as a
+                // numbered sequence that made the whole path invisible: learners only ever
+                // saw the one step they could do. Keep it in the list as a locked card
+                // showing why and when, so the route ahead is visible but still in order.
+                // A quiz already attempted never locks, so a later score dip can't yank it.
+                let lockReason = '';
+                if (!attempt) {
+                    if (!hasStarted) {
+                        lockReason = '⏳ เปิด ' + formatThaiDate(start, { time: true });
+                    } else if ((q.unlockScore || 0) > (myScore || 0)) {
+                        lockReason = '🔒 ต้องมีคะแนนสะสม ' + q.unlockScore + ' แต้ม (ตอนนี้ ' + formatQuizCount(myScore || 0) + ')';
+                    }
+                }
 
                 const status = attempt ? attempt.status : 'none';
                 // V94.66: match the card's score formula (correctCount/totalQuestions);
@@ -6987,6 +6996,8 @@
                     data: q,
                     myData: attempt,
                     isExpired: isExpired,
+                    lockReason: lockReason,
+                    lockAt: start || null,
                     timestamp: q.createdAt ? q.createdAt.toDate() : (q.timestamp ? q.timestamp.toDate() : (dead || new Date(0)))
                 });
             });
@@ -6998,7 +7009,19 @@
                 const expB = b.isExpired ? 1 : 0;
                 if (expA !== expB) return expA - expB;
 
-                // Priority 2: Newest timestamp first
+                // V96.23 Priority 2: what you can do now sits above what is still locked,
+                // and locked cards run in the order they open — so the list reads as the
+                // route ahead rather than a jumble.
+                const lockA = a.lockReason ? 1 : 0;
+                const lockB = b.lockReason ? 1 : 0;
+                if (lockA !== lockB) return lockA - lockB;
+                if (lockA && lockB) {
+                    const oA = a.lockAt ? a.lockAt.getTime() : Infinity;
+                    const oB = b.lockAt ? b.lockAt.getTime() : Infinity;
+                    if (oA !== oB) return oA - oB;
+                }
+
+                // Priority 3: Newest timestamp first
                 const tA = a.timestamp ? a.timestamp.getTime() : 0;
                 const tB = b.timestamp ? b.timestamp.getTime() : 0;
                 return tB - tA;
@@ -7363,6 +7386,13 @@
                     // case where attempt.status is non-'approved' (e.g. 'graded'/'completed')
                     // but the existing badge logic still renders "Approved" text, leading the
                     // retake button to appear under (isExpired && !isApproved).
+                    // V96.23: a still-locked step shows why and when instead of a start
+                    // button, so the sequence stays visible without becoming startable.
+                    if (item.lockReason) {
+                        actionHtml = `<div style="flex:1; text-align:center; padding:11px 12px; border-radius:12px; background:#f1f5f9; color:#64748b; border:1px dashed #cbd5e1; font-weight:700; font-size:0.86em;">${item.lockReason}</div>`;
+                        card.style.opacity = '0.72';
+                    }
+
                     if (showRetake) card.classList.add('status-retake');
                     else if (attempt && attempt.status === 'approved') card.classList.add('status-approved');
                     else if (attempt && attempt.status === 'pending') card.classList.add('status-pending');
@@ -7664,6 +7694,14 @@
                 const _lockAttempt = quizAttemptsCache[quizId];
                 if ((currentQuiz.unlockScore || 0) > (myScore || 0) && !_lockAttempt) {
                     alert(`🔒 ข้อสอบนี้ยังล็อกอยู่\nต้องมีคะแนนสะสม ${currentQuiz.unlockScore} แต้มก่อนจึงจะทำได้\n(ตอนนี้คุณมี ${(myScore || 0).toFixed(2)} แต้ม)`);
+                    currentQuiz = null;
+                    return;
+                }
+                // V96.23: locked steps are now VISIBLE in the feed, so the same chokepoint
+                // must also refuse one that has not opened yet.
+                const _startAt = currentQuiz.startTime ? currentQuiz.startTime.toDate() : null;
+                if (_startAt && new Date() < _startAt && !_lockAttempt) {
+                    alert(`⏳ ข้อสอบนี้ยังไม่เปิด\nจะเปิดให้ทำวันที่ ${formatThaiDate(_startAt, { time: true })}`);
                     currentQuiz = null;
                     return;
                 }
