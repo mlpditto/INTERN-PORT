@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.83</title>
+    <title>Nika V96.84</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -45842,12 +45842,21 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // V96.81: version query busts browser/CDN caches when the asset file changes
         // (the V96.80 transparent version was shadowed by the cached opaque V96.79).
         CERT_LOGO.src = 'assets/medlife-logo.png?v=2';
-        function certLogoReady() {
-            if (CERT_LOGO.complete) return Promise.resolve();
+        // V96.84 Phase 2: authorized signature above the line + signer identity under
+        // it. The line still prints blank for wet-ink signing if the asset is missing.
+        const CERT_SIGN = new Image();
+        CERT_SIGN.src = 'assets/cert-signature.png?v=1';
+        // Per owner's choice (2026-07-29): position only, no personal name printed.
+        const CERT_SIGNER = { name: 'Managing Pharmacist', title: 'MEDLIFE PLUS CO.,LTD.' };
+        function _certImgReady(img) {
+            if (img.complete) return Promise.resolve();
             return new Promise(r => {
-                CERT_LOGO.addEventListener('load', r, { once: true });
-                CERT_LOGO.addEventListener('error', r, { once: true });
+                img.addEventListener('load', r, { once: true });
+                img.addEventListener('error', r, { once: true });
             });
+        }
+        function certLogoReady() {
+            return Promise.all([_certImgReady(CERT_LOGO), _certImgReady(CERT_SIGN)]);
         }
 
         function drawCertificate(ctx, name, dates, awards, level, score, template, lang, certNo) {
@@ -46062,6 +46071,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
             ctx.fillText(dateStr, 80, 530);
 
+            // V96.84: real signature sitting on the line
+            if (CERT_SIGN.complete && CERT_SIGN.naturalWidth) {
+                const sigH = 52, sigW = sigH * CERT_SIGN.naturalWidth / CERT_SIGN.naturalHeight;
+                ctx.drawImage(CERT_SIGN, 480 - sigW / 2, 524 - sigH, sigW, sigH);
+            }
+
             // Signature Line (V96.82: shifted right, clear of the date column and of
             // the gold curve that moved inward with the narrower navy band)
             ctx.beginPath();
@@ -46071,9 +46086,23 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             ctx.lineWidth = 1;
             ctx.stroke();
 
-            ctx.font = "italic 11px Montserrat";
-            ctx.fillStyle = "#777";
-            ctx.fillText("Issued by: MEDLIFE PLUS CO.,LTD.", 390, 545);
+            // V96.84: signer name + title under the line, centered; falls back to
+            // the old Issued-by caption when no signer is configured.
+            if (CERT_SIGNER.name) {
+                ctx.textAlign = "center";
+                ctx.font = "bold 12px Montserrat";
+                ctx.fillStyle = "#333";
+                ctx.fillText(CERT_SIGNER.name, 480, 541);
+                if (CERT_SIGNER.title) {
+                    ctx.font = "10px Montserrat";
+                    ctx.fillStyle = "#777";
+                    ctx.fillText(CERT_SIGNER.title, 480, 555);
+                }
+            } else {
+                ctx.font = "italic 11px Montserrat";
+                ctx.fillStyle = "#777";
+                ctx.fillText("Issued by: MEDLIFE PLUS CO.,LTD.", 390, 545);
+            }
 
             // 12. Verify QR + Certificate No. (V96.83: replaces the old random serial
             // and placeholder box — certNo comes from the Firestore registry and is
