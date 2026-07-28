@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.78</title>
+    <title>Nika V96.79</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -45661,6 +45661,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         };
 
+        // V96.79: company logo on the certificate. Preloaded once; canvas drawing is
+        // synchronous, so every generate/preview path awaits certLogoReady() first.
+        const CERT_LOGO = new Image();
+        CERT_LOGO.src = 'assets/medlife-logo.png';
+        function certLogoReady() {
+            if (CERT_LOGO.complete) return Promise.resolve();
+            return new Promise(r => {
+                CERT_LOGO.addEventListener('load', r, { once: true });
+                CERT_LOGO.addEventListener('error', r, { once: true });
+            });
+        }
+
         function drawCertificate(ctx, name, dates, awards, level, score, template) {
             const tpl = CERT_TEMPLATES[template] || CERT_TEMPLATES.internship;
             // Handle both array (multiple) and string (legacy)
@@ -45724,6 +45736,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             ctx.strokeRect(30, 30, w - 60, h - 60);
             ctx.lineWidth = 3;
             ctx.strokeRect(40, 40, w - 80, h - 80);
+
+            // V96.79: small company logo, top-left above the header (skipped if the
+            // asset failed to load — the certificate must still render without it)
+            if (CERT_LOGO.complete && CERT_LOGO.naturalWidth) {
+                const logoH = 52, logoW = logoH * CERT_LOGO.naturalWidth / CERT_LOGO.naturalHeight;
+                ctx.drawImage(CERT_LOGO, 58, 44, logoW, logoH);
+            }
 
             // 6. Header Typography
             ctx.textAlign = "left";
@@ -46122,6 +46141,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             try {
                 const c = document.getElementById('cert-canvas');
                 if (!c) return;
+                await certLogoReady();
                 const drawArgs = getCurrentCertificateDrawArgs();
                 renderCertificateCanvas(c, drawArgs, 1);
             } catch(err) {
@@ -46149,6 +46169,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!confirm(`Generating ${CERT_TEMPLATES[tpl].label} certificates for ${users.length} user(s) in a single file. Do you want to proceed?`)) return;
 
             showToast("Generating Bulk PDF... Please wait.");
+            await certLogoReady();
 
             const c = document.createElement('canvas');
 
@@ -46223,7 +46244,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.getElementById('certPasteModal').style.display = 'block';
         }
 
-        function generatePasteCerts() {
+        async function generatePasteCerts() {
             const names = certPasteNames();
             if (!names.length) return alert("Paste at least one name (one per line).");
             const tpl = certPasteTemplate;
@@ -46231,6 +46252,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!confirm(`Generating ${CERT_TEMPLATES[tpl].label} certificates for ${names.length} name(s) in a single file. Do you want to proceed?`)) return;
 
             showToast("Generating Bulk PDF... Please wait.");
+            await certLogoReady();
             const { jsPDF } = window.jspdf;
             const c = document.createElement('canvas');
             const doc = new jsPDF('l', 'mm', 'a4');
@@ -46243,10 +46265,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             showToast("Export Completed!");
         }
 
-        function generateCertPDF() {
+        async function generateCertPDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('l', 'mm', 'a4');
             const exportCanvas = document.createElement('canvas');
+            await certLogoReady();
             const drawArgs = getCurrentCertificateDrawArgs();
             renderCertificateCanvas(exportCanvas, drawArgs, CERT_EXPORT_SCALE);
             const imgData = exportCanvas.toDataURL('image/png');
