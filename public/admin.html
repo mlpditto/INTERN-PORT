@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.82</title>
+    <title>Nika V96.83</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4225,6 +4225,8 @@
         rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- V96.83: vendored QR encoder (MIT, kazuhikoarase/qrcode-generator) for certificate verify QR -->
+    <script src="libs/qrcode-generator.js?v=1.5.0"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -11739,6 +11741,9 @@
                     <button type="button" onclick="certMenuPick(openCertPasteModal)"
                         style="min-height:0; text-align:left; padding:12px 16px; border-radius:14px; border:1.5px solid #7dd3fc; background:#f0f9ff; color:#075985; font-weight:800; cursor:pointer;">📋 Paste Certs<br>
                         <small style="font-weight:600; color:#0369a1;">วางรายชื่อเอง ไม่ต้องลงทะเบียน user</small></button>
+                    <button type="button" onclick="certMenuPick(openCertRegistryModal)"
+                        style="min-height:0; text-align:left; padding:12px 16px; border-radius:14px; border:1.5px solid #cbd5e1; background:#f8fafc; color:#334155; font-weight:800; cursor:pointer;">🗂️ ทะเบียน Certs<br>
+                        <small style="font-weight:600; color:#64748b;">ดูเลขที่ออกแล้ว ค้นหา คัดลอกลิงก์ เพิกถอน</small></button>
                 </div>
             </div>
         </div>
@@ -11792,6 +11797,18 @@
                         onclick="document.getElementById('certPasteModal').style.display='none'">Cancel</button>
                     <button class="btn-sm" style="background:#0ea5e9; color:white;" onclick="generatePasteCerts()">🖨️ Generate PDF</button>
                 </div>
+            </div>
+        </div>
+        <!-- V96.83 Phase 3: certificate registry viewer — search, copy verify link, revoke -->
+        <div id="certRegistryModal" class="modal">
+            <div class="modal-content" style="max-width:760px;"><span class="close-modal"
+                    onclick="document.getElementById('certRegistryModal').style.display='none'">&times;</span>
+                <h2>🗂️ ทะเบียน Certs</h2>
+                <div class="lang-no-toggle" style="display:flex; gap:8px; margin-bottom:12px;">
+                    <input type="text" id="cert-reg-search" placeholder="ค้นหา ชื่อ / เลขที่..." oninput="renderCertRegistry()" style="flex:1;">
+                    <button class="btn-sm" style="background:#64748b; color:white; width:auto; min-height:0;" onclick="loadCertRegistry()">🔄 Reload</button>
+                </div>
+                <div id="cert-reg-list" class="lang-no-toggle" style="max-height:62vh; overflow-y:auto;"></div>
             </div>
         </div>
         <div id="quizManageModal" class="modal">
@@ -45754,6 +45771,71 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return `${part(true)} (${part(false)})`;
         }
 
+        // ============ V96.83 Phase 3: Certificate Registry ============
+        // Real running numbers live in Firestore `certificates/{no}` with the counter
+        // in `cert_meta/counter`. Numbers are minted ONLY at PDF-export time (never on
+        // preview) and re-exporting the same recipient+template+dates REUSES the
+        // existing valid number, so bulk buttons are safe to press repeatedly.
+        const CERT_VERIFY_BASE = 'https://mlpditto.github.io/INTERN-PORT/verify.html?no=';
+        function _certRandSuffix() {
+            // Unambiguous alphabet (no 0/O/1/I/L) — the suffix makes numbers
+            // non-enumerable since verify shows the recipient's name.
+            const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+            let s = '';
+            for (let i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)];
+            return s;
+        }
+        function _certDedupeKey(name, template, ds, de) {
+            return `${String(name || '').trim().toLowerCase()}|${template}|${ds || ''}|${de || ''}`;
+        }
+        // items: [{name, nickname, template, dateStart, dateEnd, dateText, lang, cal, userId}]
+        // Returns array of numbers aligned with items. Throws on any Firestore failure
+        // — callers must abort the export so no unregistered paper exists.
+        async function issueCertNumbers(items) {
+            const slots = await Promise.all(items.map(async (it) => {
+                const key = _certDedupeKey(it.name, it.template, it.dateStart, it.dateEnd);
+                const snap = await db.collection('certificates').where('dedupeKey', '==', key).limit(5).get();
+                const valid = snap.docs.map(d => d.data()).find(d => d.status === 'valid');
+                return { item: it, key, no: valid ? valid.no : null };
+            }));
+            const toMint = slots.filter(s => !s.no);
+            if (toMint.length) {
+                const startSeq = await db.runTransaction(async (tx) => {
+                    const ref = db.collection('cert_meta').doc('counter');
+                    const s = await tx.get(ref);
+                    const cur = (s.exists && s.data().seq) || 0;
+                    tx.set(ref, { seq: cur + toMint.length }, { merge: true });
+                    return cur + 1;
+                });
+                const batch = db.batch();
+                const year = new Date().getFullYear();
+                toMint.forEach((slot, i) => {
+                    const seq = startSeq + i;
+                    slot.no = `MLP-${year}-${String(seq).padStart(4, '0')}-${_certRandSuffix()}`;
+                    const it = slot.item;
+                    batch.set(db.collection('certificates').doc(slot.no), {
+                        no: slot.no,
+                        seq: seq,
+                        dedupeKey: slot.key,
+                        name: it.name || '',
+                        nickname: it.nickname || '',
+                        template: it.template,
+                        dateStart: it.dateStart || '',
+                        dateEnd: it.dateEnd || '',
+                        dateText: it.dateText || '',
+                        lang: it.lang || 'both',
+                        cal: it.cal || 'both',
+                        userId: it.userId || null,
+                        issuedBy: (auth.currentUser && auth.currentUser.email) || '',
+                        issuedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        status: 'valid'
+                    });
+                });
+                await batch.commit();
+            }
+            return slots.map(s => s.no);
+        }
+
         // V96.79: company logo on the certificate. Preloaded once; canvas drawing is
         // synchronous, so every generate/preview path awaits certLogoReady() first.
         const CERT_LOGO = new Image();
@@ -45768,7 +45850,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             });
         }
 
-        function drawCertificate(ctx, name, dates, awards, level, score, template, lang) {
+        function drawCertificate(ctx, name, dates, awards, level, score, template, lang, certNo) {
             const tpl = CERT_TEMPLATES[template] || CERT_TEMPLATES.internship;
             lang = (lang === 'th' || lang === 'en') ? lang : 'both';
             // V96.82: one gold pair for every accent — subtitle, underline, ornament,
@@ -45993,27 +46075,49 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             ctx.fillStyle = "#777";
             ctx.fillText("Issued by: MEDLIFE PLUS CO.,LTD.", 390, 545);
 
-            // 12. QR Code Placeholder & Serial ([Version: V89.17] Added Level/Score context)
-            const lvPart = (level !== undefined) ? `L${level}` : "";
-            const scPart = (score !== undefined) ? `S${Math.floor(score)}` : "";
-            const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
-            const serial = `MLP-2026-${lvPart}${scPart}-${randomPart}`;
-            ctx.textAlign = "right";
-            ctx.font = "bold 10px Montserrat";
-            ctx.fillStyle = "#888";
-            ctx.fillText(serial, w - 40, h - 20);
+            // 12. Verify QR + Certificate No. (V96.83: replaces the old random serial
+            // and placeholder box — certNo comes from the Firestore registry and is
+            // only present on real exports, never on previews)
+            if (certNo) {
+                ctx.textAlign = "left";
+                ctx.font = "bold 10px Montserrat";
+                ctx.fillStyle = "#555";
+                ctx.fillText(`Certificate No. ${certNo}`, 80, 557);
+                if (typeof qrcode === 'function') {
+                    try {
+                        const qr = qrcode(0, 'M');
+                        qr.addData(CERT_VERIFY_BASE + certNo);
+                        qr.make();
+                        const n = qr.getModuleCount();
+                        // White card gives the QR its quiet zone on the navy band
+                        const cardX = w - 112, cardY = h - 112, cardS = 68, qrS = 56;
+                        ctx.fillStyle = "#fff";
+                        ctx.beginPath();
+                        if (ctx.roundRect) ctx.roundRect(cardX, cardY, cardS, cardS, 8); else ctx.rect(cardX, cardY, cardS, cardS);
+                        ctx.fill();
+                        const cell = qrS / n;
+                        ctx.fillStyle = "#0a192f";
+                        for (let qr_r = 0; qr_r < n; qr_r++) {
+                            for (let qr_c = 0; qr_c < n; qr_c++) {
+                                if (qr.isDark(qr_r, qr_c)) ctx.fillRect(cardX + 6 + qr_c * cell, cardY + 6 + qr_r * cell, Math.ceil(cell), Math.ceil(cell));
+                            }
+                        }
+                    } catch (e) { console.error('QR draw failed:', e); }
+                }
+            } else {
+                ctx.fillStyle = "rgba(0,0,0,0.05)";
+                ctx.fillRect(w - 105, h - 105, 60, 60);
+                ctx.strokeStyle = "rgba(0,0,0,0.1)";
+                ctx.strokeRect(w - 105, h - 105, 60, 60);
+                ctx.textAlign = "center";
+                ctx.font = "7px Montserrat";
+                ctx.fillStyle = "#888";
+                ctx.fillText("QR on export", w - 75, h - 72);
+            }
 
-            // Minimalist QR placeholder
-            ctx.fillStyle = "rgba(0,0,0,0.05)";
-            ctx.fillRect(w - 75, h - 90, 45, 45);
-            ctx.strokeStyle = "rgba(0,0,0,0.1)";
-            ctx.strokeRect(w - 75, h - 90, 45, 45);
-            ctx.textAlign = "center";
-            ctx.font = "7px Montserrat";
-            ctx.fillText("MLP-ID", w - 52.5, h - 35);
-
-            // 13. Main Seal: EXCELLENCE AWARDS
-            const sealX = w * 0.85, sealY = h * 0.78;
+            // 13. Main Seal: EXCELLENCE AWARDS (V96.83: raised 0.78h→0.70h to clear
+            // the verify QR card in the bottom-right corner)
+            const sealX = w * 0.85, sealY = h * 0.70;
 
             ctx.shadowColor = "rgba(0,0,0,0.3)";
             ctx.shadowBlur = 15;
@@ -46324,6 +46428,27 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             showToast("Generating Bulk PDF... Please wait.");
             await certLogoReady();
 
+            // V96.83: mint/reuse registry numbers for the whole batch up-front;
+            // abort the entire file on failure (no unregistered paper).
+            const items = users.map(u => ({
+                name: u.fullNameEn || u.fullName || u.displayName || '',
+                nickname: u.nickname || '',
+                template: tpl,
+                dateStart: (u.startDate && u.endDate) ? u.startDate : (opts.dateRange ? opts.dateRange.start : ''),
+                dateEnd: (u.startDate && u.endDate) ? u.endDate : (opts.dateRange ? opts.dateRange.end : ''),
+                dateText: (u.startDate && u.endDate)
+                    ? formatCertDateRange(u.startDate, u.endDate, certDateCal)
+                    : (opts.dateRange ? formatCertDateRange(opts.dateRange.start, opts.dateRange.end, certDateCal) : ''),
+                lang: certLang, cal: certDateCal, userId: u.id
+            }));
+            let certNos;
+            try {
+                certNos = await issueCertNumbers(items);
+            } catch (err) {
+                console.error('Cert registry error:', err);
+                return alert('ออกเลขทะเบียนไม่สำเร็จ ยกเลิกการพิมพ์: ' + (err.message || err));
+            }
+
             const c = document.createElement('canvas');
 
             const doc = new jsPDF('l', 'mm', 'a4');
@@ -46339,10 +46464,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
                 const lv = Math.floor((u.score || 0) / 10) + 1;
                 const sc = parseFloat((u.score || 0).toFixed(2));
-                const dateText = (u.startDate && u.endDate)
-                    ? formatCertDateRange(u.startDate, u.endDate, certDateCal)
-                    : (opts.dateRange ? formatCertDateRange(opts.dateRange.start, opts.dateRange.end, certDateCal) : '');
-                renderCertificateCanvas(c, [displayNameForCert, dateText, finalAwards, lv, sc, tpl, certLang], CERT_EXPORT_SCALE);
+                renderCertificateCanvas(c, [displayNameForCert, items[i].dateText, finalAwards, lv, sc, tpl, certLang, certNos[i]], CERT_EXPORT_SCALE);
 
                 const imgData = c.toDataURL('image/png');
                 if (i > 0) doc.addPage();
@@ -46356,6 +46478,77 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // V96.74: one click for the whole camp cohort — bootcamp wording, camp dates.
         function generatePharmCampCerts() {
             return generateBulkCert({ group: 'Junior', template: 'bootcamp', dateRange: pharmCampDateRange() });
+        }
+
+        // V96.83 Phase 3: registry viewer — recent 200, client-side search, revoke.
+        let _certRegRows = [];
+        function openCertRegistryModal() {
+            document.getElementById('certRegistryModal').style.display = 'block';
+            loadCertRegistry();
+        }
+        async function loadCertRegistry() {
+            const box = document.getElementById('cert-reg-list');
+            box.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:24px;">Loading...</div>';
+            try {
+                const snap = await db.collection('certificates').orderBy('seq', 'desc').limit(200).get();
+                _certRegRows = snap.docs.map(d => d.data());
+                renderCertRegistry();
+            } catch (e) {
+                box.innerHTML = `<div style="color:#ef4444; padding:16px;">${escapeHtml(e.message || String(e))}</div>`;
+            }
+        }
+        function renderCertRegistry() {
+            const q = (document.getElementById('cert-reg-search').value || '').trim().toLowerCase();
+            const rows = _certRegRows.filter(r => !q || `${r.no} ${r.name} ${r.nickname || ''}`.toLowerCase().includes(q));
+            const box = document.getElementById('cert-reg-list');
+            if (!rows.length) {
+                box.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:24px;">— ไม่มีรายการ —</div>';
+                return;
+            }
+            box.innerHTML = rows.map(r => {
+                const revoked = r.status !== 'valid';
+                const tplIcon = r.template === 'bootcamp' ? '🧪' : '🎓';
+                const issued = (r.issuedAt && r.issuedAt.toDate) ? r.issuedAt.toDate().toLocaleDateString('en-GB') : '-';
+                return `
+                <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid ${revoked ? '#fecaca' : '#e2e8f0'}; border-radius:12px; margin-bottom:8px; background:${revoked ? '#fff5f5' : '#fff'};">
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-family:Consolas,monospace; font-size:0.8em; font-weight:700; color:#334155;">${escapeHtml(r.no)}</div>
+                        <div style="font-weight:800; font-size:0.9em; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${tplIcon} ${escapeHtml(r.name)}${r.nickname ? ` (${escapeHtml(r.nickname)})` : ''}</div>
+                        <div style="font-size:0.75em; color:#64748b;">${escapeHtml(r.dateText || '-')} · ออกเมื่อ ${issued}${revoked ? ` · <b style="color:#b91c1c;">REVOKED</b>${r.revokedReason ? ': ' + escapeHtml(r.revokedReason) : ''}` : ''}</div>
+                    </div>
+                    <span style="flex-shrink:0; font-size:0.72em; font-weight:800; padding:3px 10px; border-radius:999px; ${revoked ? 'background:#fee2e2; color:#b91c1c;' : 'background:#dcfce7; color:#15803d;'}">${revoked ? '🚫 REVOKED' : '✅ VALID'}</span>
+                    <button class="btn-sm" title="คัดลอกลิงก์ verify" onclick="copyCertLink('${escapeHtml(r.no)}')" style="width:auto; min-height:0; padding:6px 10px; background:#eef2ff; color:#4361ee; border:none; border-radius:8px; cursor:pointer;">🔗</button>
+                    <button class="btn-sm" title="${revoked ? 'คืนสถานะ VALID' : 'เพิกถอน'}" onclick="toggleRevokeCert('${escapeHtml(r.no)}')" style="width:auto; min-height:0; padding:6px 10px; background:${revoked ? '#ecfdf5' : '#fef2f2'}; color:${revoked ? '#047857' : '#b91c1c'}; border:none; border-radius:8px; cursor:pointer;">${revoked ? '↩️' : '🚫'}</button>
+                </div>`;
+            }).join('');
+        }
+        function copyCertLink(no) {
+            navigator.clipboard.writeText(CERT_VERIFY_BASE + no);
+            showToast('คัดลอกลิงก์ verify แล้ว!');
+        }
+        async function toggleRevokeCert(no) {
+            const row = _certRegRows.find(r => r.no === no);
+            if (!row) return;
+            try {
+                if (row.status === 'valid') {
+                    const reason = prompt(`เหตุผลการเพิกถอน ${no}:`);
+                    if (reason === null) return;
+                    await db.collection('certificates').doc(no).update({
+                        status: 'revoked',
+                        revokedReason: reason || '',
+                        revokedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } else {
+                    if (!confirm(`คืนสถานะ VALID ให้ ${no}?`)) return;
+                    await db.collection('certificates').doc(no).update({
+                        status: 'valid',
+                        revokedReason: firebase.firestore.FieldValue.delete(),
+                        revokedAt: firebase.firestore.FieldValue.delete()
+                    });
+                }
+                showToast('Updated!');
+                loadCertRegistry();
+            } catch (e) { alert('Error: ' + (e.message || e)); }
         }
 
         // V96.78: chooser behind the single 📜 Certs toolbar button.
@@ -46416,11 +46609,28 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
             showToast("Generating Bulk PDF... Please wait.");
             await certLogoReady();
+            // V96.83: registry numbers for pasted (unregistered) recipients too —
+            // userId stays null; dedupe still applies on name+template+dates.
+            const items = names.map(line => {
+                const parts = line.split('|');
+                return {
+                    name: parts[0].trim(), nickname: (parts[1] || '').trim(),
+                    template: tpl, dateStart: ps, dateEnd: pe || ps, dateText: dateText,
+                    lang: certLang, cal: certDateCal, userId: null
+                };
+            });
+            let certNos;
+            try {
+                certNos = await issueCertNumbers(items);
+            } catch (err) {
+                console.error('Cert registry error:', err);
+                return alert('ออกเลขทะเบียนไม่สำเร็จ ยกเลิกการพิมพ์: ' + (err.message || err));
+            }
             const { jsPDF } = window.jspdf;
             const c = document.createElement('canvas');
             const doc = new jsPDF('l', 'mm', 'a4');
             for (let i = 0; i < names.length; i++) {
-                renderCertificateCanvas(c, [names[i], dateText, [], 1, 0, tpl, certLang], CERT_EXPORT_SCALE);
+                renderCertificateCanvas(c, [names[i], dateText, [], 1, 0, tpl, certLang, certNos[i]], CERT_EXPORT_SCALE);
                 if (i > 0) doc.addPage();
                 doc.addImage(c.toDataURL('image/png'), 'PNG', 0, 0, 297, 210);
             }
@@ -46434,7 +46644,27 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const exportCanvas = document.createElement('canvas');
             await certLogoReady();
             const drawArgs = getCurrentCertificateDrawArgs();
-            renderCertificateCanvas(exportCanvas, drawArgs, CERT_EXPORT_SCALE);
+            // V96.83: mint (or reuse) the registry number before printing — abort on
+            // failure so no unregistered certificate ever leaves the system.
+            const _s = document.getElementById('cert-start').value;
+            const _e = document.getElementById('cert-end').value;
+            const _fn = document.getElementById('cert-fullname').value || (certUser ? certUser.name : '');
+            const _nnEl = document.getElementById('cert-nickname');
+            const _incNn = document.getElementById('cert-include-nickname');
+            const _nn = (_nnEl && (!_incNn || _incNn.checked)) ? _nnEl.value : '';
+            let certNo;
+            try {
+                [certNo] = await issueCertNumbers([{
+                    name: _fn, nickname: _nn, template: currentCertTemplate,
+                    dateStart: _s, dateEnd: _e || _s, dateText: drawArgs[1],
+                    lang: certLang, cal: certDateCal,
+                    userId: certUser ? certUser.uid : null
+                }]);
+            } catch (err) {
+                console.error('Cert registry error:', err);
+                return alert('ออกเลขทะเบียนไม่สำเร็จ ยกเลิกการพิมพ์: ' + (err.message || err));
+            }
+            renderCertificateCanvas(exportCanvas, [...drawArgs, certNo], CERT_EXPORT_SCALE);
             const imgData = exportCanvas.toDataURL('image/png');
             doc.addImage(imgData, 'PNG', 0, 0, 297, 210);
             doc.save(`Certificate_${document.getElementById('cert-fullname').value || "User"}.pdf`);
