@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.73</title>
+    <title>Nika V96.74</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6735,6 +6735,8 @@
                         style="background:#6366f1; color:white; border:none; border-radius:14px; padding:8px 18px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">👥 Entry</button>
                     <button class="btn-sm" onclick="generateBulkCert()"
                         style="background:#f59e0b; color:white; border:none; border-radius:14px; padding:8px 18px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">📜 Certs</button>
+                    <button class="btn-sm" onclick="generatePharmCampCerts()" title="ออกเกียรติบัตร PharmCamp ให้ทุกคนในกลุ่ม Junior เป็นไฟล์เดียว"
+                        style="background:#10b981; color:white; border:none; border-radius:14px; padding:8px 18px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">🧪 PharmCamp Certs</button>
                 </div>
             </div>
             
@@ -11503,6 +11505,17 @@
             <div class="modal-content"><span class="close-modal"
                     onclick="document.getElementById('certModal').style.display='none'">&times;</span>
                 <h2> Certificate <small style="font-size:0.4em; opacity:0.5;">v90.29r</small></h2><input type="hidden" id="cert-uid"><input type="hidden" id="cert-uname">
+                <!-- V96.74: template picker — the body wording differs between the
+                     internship programme and a short bootcamp such as PharmCamp. -->
+                <div class="lang-no-toggle" style="margin:0 0 10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <span style="font-size:0.78em; color:#666; font-weight:700;">แบบใบรับรอง:</span>
+                    <div id="cert-template-rail" style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <button type="button" class="cert-tpl-chip active" data-tpl="internship" onclick="setCertTemplate('internship', this)"
+                            style="width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1.5px solid #4361ee; background:#4361ee; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">🎓 ฝึกงาน</button>
+                        <button type="button" class="cert-tpl-chip" data-tpl="bootcamp" onclick="setCertTemplate('bootcamp', this)"
+                            style="width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1.5px solid #cbd5e1; background:#fff; color:#475569; font-size:0.78em; font-weight:800; cursor:pointer;">🧪 PharmCamp</button>
+                    </div>
+                </div>
                 <div class="reflective-review-card reflective-review-field">
                     <label style="font-size:0.8em; color:#666; display:block; margin-bottom:8px;"> Special Awards
                         (Multiple selectable):</label>
@@ -39526,6 +39539,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 cb.checked = currentAwards.includes(cb.value);
             });
 
+            // V96.74: preselect the wording that fits this recipient — a camp attendee
+            // never did an internship, so default them to the bootcamp template.
+            const _tpl = String(u.group || '').split(',').map(x => x.trim()).includes('Junior') ? 'bootcamp' : 'internship';
+            const _chip = document.querySelector(`#cert-template-rail .cert-tpl-chip[data-tpl="${_tpl}"]`);
+            if (_chip) setCertTemplate(_tpl, _chip); else currentCertTemplate = _tpl;
+            if (_tpl === 'bootcamp' && !document.getElementById('cert-start').value) {
+                const _range = pharmCampDateRange();
+                if (_range) {
+                    document.getElementById('cert-start').value = _range.split(' - ')[0];
+                    document.getElementById('cert-end').value = _range.split(' - ').pop();
+                }
+            }
+
             document.getElementById('certModal').style.display = "block";
             // Wait for modal to render before drawing on canvas
             setTimeout(() => {
@@ -45562,7 +45588,27 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 showToast("✅ Quest closed → Done ปิดแล้ว");
             } catch (e) { alert("Error: " + e.message); }
         }
-        function drawCertificate(ctx, name, dates, awards, level, score) {
+        // V96.74: the certificate wording was hard-coded for the internship programme,
+        // so it could not be handed out for a short course like the PharmCamp bootcamp
+        // ("สำเร็จการฝึกงาน" is simply untrue for a 2-day camp). The layout is shared;
+        // only the subtitle and the two description lines differ per template.
+        const CERT_TEMPLATES = {
+            internship: {
+                label: '🎓 ฝึกงาน (Internship)',
+                subtitle: 'OF ACHIEVEMENT',
+                thai: 'ได้รับเกียรติบัตรเนื่องในโอกาสสำเร็จการฝึกงานด้วยความมุ่งมั่นและวิริยะอุตสาหะ',
+                en: '(Successfully completed the internship program with excellence and dedication)'
+            },
+            bootcamp: {
+                label: '🧪 PharmCamp (Bootcamp)',
+                subtitle: 'OF COMPLETION',
+                thai: 'สำเร็จการอบรมหลักสูตรเปิดโลกวิชาชีพเภสัชกรรมชุมชน ระยะเวลา 12 ชั่วโมง',
+                en: '(Completed the 12-hour Community Pharmacy Experience Program — PharmCamp)'
+            }
+        };
+
+        function drawCertificate(ctx, name, dates, awards, level, score, template) {
+            const tpl = CERT_TEMPLATES[template] || CERT_TEMPLATES.internship;
             // Handle both array (multiple) and string (legacy)
             const awardList = Array.isArray(awards) ? awards : (awards && awards !== 'none' ? [awards] : []);
             const w = 800, h = 600;
@@ -45633,7 +45679,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
             ctx.font = "italic 24px 'Cormorant Garamond', serif";
             ctx.fillStyle = "#c5a021";
-            ctx.fillText("OF ACHIEVEMENT", 75, 185);
+            ctx.fillText(tpl.subtitle, 75, 185);
 
             // 7. Bilingual Introduction
             ctx.textAlign = "left";
@@ -45696,10 +45742,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             ctx.textAlign = "center";
             ctx.fillStyle = "#333";
             ctx.font = "500 16px Montserrat, sans-serif";
-            ctx.fillText("ได้รับเกียรติบัตรเนื่องในโอกาสสำเร็จการฝึกงานด้วยความมุ่งมั่นและวิริยะอุตสาหะ", w * 0.38, recipientNickname ? 435 : 415);
+            ctx.fillText(tpl.thai, w * 0.38, recipientNickname ? 435 : 415);
             ctx.font = "12px Montserrat, sans-serif";
             ctx.fillStyle = "#666";
-            ctx.fillText("(Successfully completed the internship program with excellence and dedication)", w * 0.38, recipientNickname ? 455 : 435);
+            ctx.fillText(tpl.en, w * 0.38, recipientNickname ? 455 : 435);
 
             // 11. Dates & Signature Area
             ctx.textAlign = "left";
@@ -45989,7 +46035,33 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
 
             const dateStr = s && e ? `${s} - ${e}` : "";
-            return [displayNameForCert, dateStr, awards, level, score];
+            return [displayNameForCert, dateStr, awards, level, score, currentCertTemplate];
+        }
+
+        // V96.74: which wording the preview + PDF use. Chip rail, per house style.
+        let currentCertTemplate = 'internship';
+        function setCertTemplate(tpl, btn) {
+            currentCertTemplate = CERT_TEMPLATES[tpl] ? tpl : 'internship';
+            document.querySelectorAll('#cert-template-rail .cert-tpl-chip').forEach(c => {
+                const on = c === btn;
+                c.style.background = on ? '#4361ee' : '#fff';
+                c.style.color = on ? '#fff' : '#475569';
+                c.style.borderColor = on ? '#4361ee' : '#cbd5e1';
+                c.classList.toggle('active', on);
+            });
+            updateCertPreview();
+        }
+
+        // The camp's own date range, read from its quizzes so it never goes stale.
+        function pharmCampDateRange() {
+            const days = (quizzesData || [])
+                .filter(q => String(q.tags || '').includes('PharmCamp') && q.startTime)
+                .map(q => q.startTime.toDate())
+                .sort((a, b) => a - b);
+            if (!days.length) return '';
+            const fmt = d => `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear() + 543}`;
+            const first = fmt(days[0]), last = fmt(days[days.length - 1]);
+            return first === last ? first : `${first} - ${last}`;
         }
 
                 async function updateCertPreview() {
@@ -46003,12 +46075,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         }
 
-        async function generateBulkCert() {
+        // V96.74: opts = { group, template, dateText } — a camp cohort has no
+        // internship start/end dates on file, so bulk can take the range from the
+        // camp itself and skip the dates requirement.
+        async function generateBulkCert(opts) {
+            opts = opts || {};
+            const tpl = CERT_TEMPLATES[opts.template] ? opts.template : 'internship';
             const { jsPDF } = window.jspdf;
-            const users = usersData.filter(u => !u.isIgnored && u.startDate && u.endDate);
-            if (!users.length) return alert("No students found with complete start/end dates.");
+            const inGroup = (u) => !opts.group || String(u.group || '').split(',').map(x => x.trim()).includes(opts.group);
+            const users = usersData.filter(u => !u.isIgnored && inGroup(u) && (opts.dateText || (u.startDate && u.endDate)));
+            if (!users.length) return alert(opts.group
+                ? `No users found in group "${opts.group}".`
+                : "No students found with complete start/end dates.");
 
-            if (!confirm(`Generating certificates for ${users.length} users in a single file. Do you want to proceed?`)) return;
+            if (!confirm(`Generating ${CERT_TEMPLATES[tpl].label} certificates for ${users.length} user(s) in a single file. Do you want to proceed?`)) return;
 
             showToast("Generating Bulk PDF... Please wait.");
 
@@ -46027,15 +46107,21 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
                 const lv = Math.floor((u.score || 0) / 10) + 1;
                 const sc = parseFloat((u.score || 0).toFixed(2));
-                renderCertificateCanvas(c, [displayNameForCert, `${u.startDate} - ${u.endDate}`, finalAwards, lv, sc], CERT_EXPORT_SCALE);
+                const dateText = (u.startDate && u.endDate) ? `${u.startDate} - ${u.endDate}` : (opts.dateText || '');
+                renderCertificateCanvas(c, [displayNameForCert, dateText, finalAwards, lv, sc, tpl], CERT_EXPORT_SCALE);
 
                 const imgData = c.toDataURL('image/png');
                 if (i > 0) doc.addPage();
                 doc.addImage(imgData, 'PNG', 0, 0, 297, 210); // Fill A4
             }
 
-            doc.save("Bulk_Certificates.pdf");
+            doc.save(opts.group ? `Certificates_${opts.group}.pdf` : "Bulk_Certificates.pdf");
             showToast("Export Completed!");
+        }
+
+        // V96.74: one click for the whole camp cohort — bootcamp wording, camp dates.
+        function generatePharmCampCerts() {
+            return generateBulkCert({ group: 'Junior', template: 'bootcamp', dateText: pharmCampDateRange() || '-' });
         }
 
         function generateCertPDF() {
