@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.77</title>
+    <title>Nika V96.78</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6733,12 +6733,10 @@
                         style="background:#8338ec; color:white; border:none; border-radius:14px; padding:8px 18px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">🛡️ Units</button>
                     <button class="btn-sm" onclick="openPreRegModal()"
                         style="background:#6366f1; color:white; border:none; border-radius:14px; padding:8px 18px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">👥 Entry</button>
-                    <button class="btn-sm" onclick="generateBulkCert()"
+                    <!-- V96.78: the three cert buttons crowded the toolbar — one 📜 Certs
+                         button now opens a small chooser (Bulk / PharmCamp / Paste). -->
+                    <button class="btn-sm" onclick="openCertMenuModal()"
                         style="background:#f59e0b; color:white; border:none; border-radius:14px; padding:8px 18px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">📜 Certs</button>
-                    <button class="btn-sm" onclick="generatePharmCampCerts()" title="ออกเกียรติบัตร PharmCamp ให้ทุกคนในกลุ่ม Junior เป็นไฟล์เดียว"
-                        style="background:#10b981; color:white; border:none; border-radius:14px; padding:8px 18px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">🧪 PharmCamp Certs</button>
-                    <button class="btn-sm" onclick="openCertPasteModal()" title="วางรายชื่อแล้วออกเกียรติบัตรได้เลย ไม่ต้องลงทะเบียน user"
-                        style="background:#0ea5e9; color:white; border:none; border-radius:14px; padding:8px 18px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">📋 Paste Certs</button>
                 </div>
             </div>
             
@@ -11693,6 +11691,25 @@
                 <div style="display:flex; gap:10px; justify-content:flex-end;"><button class="btn-sm" style="background:#64748b; color:white;" onclick="updateCertPreview()">🔄 Redraw</button><button class="btn-sm btn-primary"
                         onclick="saveUserDates()">💾 Save & Approve</button><button class="btn-sm btn-warning"
                         id="btn-gen-pdf" onclick="generateCertPDF()">🖨️ PDF</button></div>
+            </div>
+        </div>
+        <!-- V96.78: chooser behind the single 📜 Certs toolbar button — picks which of
+             the three cert flows to run (bulk internship / PharmCamp cohort / paste list). -->
+        <div id="certMenuModal" class="modal">
+            <div class="modal-content" style="max-width:420px;"><span class="close-modal"
+                    onclick="document.getElementById('certMenuModal').style.display='none'">&times;</span>
+                <h2>📜 Certs</h2>
+                <div class="lang-no-toggle" style="display:flex; flex-direction:column; gap:10px;">
+                    <button type="button" onclick="certMenuPick(generateBulkCert)"
+                        style="min-height:0; text-align:left; padding:12px 16px; border-radius:14px; border:1.5px solid #fcd34d; background:#fffbeb; color:#92400e; font-weight:800; cursor:pointer;">🎓 Bulk Internship Certs<br>
+                        <small style="font-weight:600; color:#b45309;">ทุกคนที่มีวันที่เริ่ม-จบฝึกงาน รวมไฟล์เดียว</small></button>
+                    <button type="button" onclick="certMenuPick(generatePharmCampCerts)"
+                        style="min-height:0; text-align:left; padding:12px 16px; border-radius:14px; border:1.5px solid #6ee7b7; background:#ecfdf5; color:#065f46; font-weight:800; cursor:pointer;">🧪 PharmCamp Certs<br>
+                        <small style="font-weight:600; color:#047857;">กลุ่ม Junior ทั้งหมด แบบ bootcamp + วันแคมป์อัตโนมัติ</small></button>
+                    <button type="button" onclick="certMenuPick(openCertPasteModal)"
+                        style="min-height:0; text-align:left; padding:12px 16px; border-radius:14px; border:1.5px solid #7dd3fc; background:#f0f9ff; color:#075985; font-weight:800; cursor:pointer;">📋 Paste Certs<br>
+                        <small style="font-weight:600; color:#0369a1;">วางรายชื่อเอง ไม่ต้องลงทะเบียน user</small></button>
+                </div>
             </div>
         </div>
         <!-- V96.77: paste-a-name-list certificates — the renderer only needs a name and
@@ -46163,6 +46180,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // V96.74: one click for the whole camp cohort — bootcamp wording, camp dates.
         function generatePharmCampCerts() {
             return generateBulkCert({ group: 'Junior', template: 'bootcamp', dateText: pharmCampDateRange() || '-' });
+        }
+
+        // V96.78: chooser behind the single 📜 Certs toolbar button.
+        function openCertMenuModal() {
+            document.getElementById('certMenuModal').style.display = 'block';
+        }
+        function certMenuPick(action) {
+            document.getElementById('certMenuModal').style.display = 'none';
+            action();
         }
 
         // V96.77: paste-a-name-list certs — same renderer + PDF loop as generateBulkCert,
