@@ -538,15 +538,21 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             //   Removed the `gemini-3` substring catch from V93.95 — it would have
             //   rewritten the new 3.5-flash chip back to 2.5. Pro alias still maps to
             //   2.5-pro because gemini-3.5-pro is not GA yet (Google: June 2026).
+            // V96.85: Google discontinues Gemini 2.5 Flash/Flash-Lite/Pro on Vertex AI
+            //   2026-10-20 (email 2026-07-29). Pro chips migrated to gemini-3.6-flash
+            //   (GA 2026-07-21); treat any straggler gemini-2.5-pro request as a legacy
+            //   alias so it rewrites to 3.6 and takes the fast-fail → AI Studio
+            //   fallback below instead of hitting the dying Vertex model.
             const reqModel = (model || '').toLowerCase();
             const isLegacyAlias = !reqModel
                 || reqModel === 'multimodal'
                 || reqModel === 'gemini-flash'
                 || reqModel === 'gemini-pro'
+                || reqModel === 'gemini-2.5-pro'
                 || reqModel.includes('1.5')
                 || reqModel.includes('2.0');
             if (isLegacyAlias) {
-                actualModelName = reqModel.includes('pro') ? "gemini-2.5-pro" : "gemini-3.5-flash";
+                actualModelName = reqModel.includes('pro') ? "gemini-3.6-flash" : "gemini-3.5-flash";
             }
 
             // V94.16 HOTFIX: Vertex AI in this project's region does not currently
@@ -1763,69 +1769,9 @@ exports.notifyPurgeDigest = onSchedule({
     }
 });
 
-// ============================================================
-// pingRestrictedGeminiModels
-//
-// Google Cloud product update (email 2026-05-28): starting 2026-06-15,
-// access to gemini-2.5-flash / gemini-2.5-flash-lite / gemini-3-flash-preview
-// is revoked for projects with zero generateContent calls to the specific
-// model id in the trailing 90 days. Activity is evaluated per-model, so a
-// call to e.g. gemini-2.5-pro does NOT preserve access to gemini-2.5-flash.
-//
-// Audit 2026-05-28: no chip in this codebase routes to any of the three
-// restricted ids (all Gemini text chips map to gemini-3.5-flash or
-// gemini-2.5-pro). This scheduled keep-alive preserves the OPTION to use
-// the two surviving models later without re-applying for access.
-//
-// Cron: 0 3 1 */2 * Asia/Bangkok = 03:00 ICT on the 1st of every odd
-// month (Jan/Mar/May/Jul/Sep/Nov) — unix-cron `*/2` in the month field
-// counts from 1, so the matching months are odd-numbered. Interval is
-// 59-62 days, comfortably under Google's 90-day inactivity threshold.
-// Initial smoke test fired 2026-05-28 (Force Run via Cloud Console);
-// next scheduled run 2026-07-01.
-//
-// 2026-05-28 follow-up: gemini-3-flash-preview removed from the ping list
-// because Vertex us-central1 does not host it ("Publisher Model not
-// found"). The project will lose access to that specific model on
-// 2026-06-15 — acceptable because no chip uses it. To regain access
-// later, ping it via a region that hosts the 3.x family or via the
-// `global` endpoint and add it back here.
-// ============================================================
-exports.pingRestrictedGeminiModels = onSchedule({
-    schedule: '0 3 1 */2 *',
-    timeZone: 'Asia/Bangkok',
-    region: 'us-central1',
-    timeoutSeconds: 120,
-    memory: '256MiB'
-}, async () => {
-    const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
-    const auth = new GoogleAuth({ scopes: 'https://www.googleapis.com/auth/cloud-platform' });
-    let token;
-    try {
-        const client = await auth.getClient();
-        token = (await client.getAccessToken()).token;
-    } catch (err) {
-        console.error('[pingRestrictedGeminiModels] auth failed:', err.message);
-        return;
-    }
-
-    const body = {
-        contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
-        generationConfig: { maxOutputTokens: 8 }
-    };
-
-    for (const m of MODELS) {
-        const url = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/publishers/google/models/${m}:generateContent`;
-        try {
-            await axios.post(url, body, {
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                timeout: 30000
-            });
-            console.log(`[pingRestrictedGeminiModels] ${m} OK`);
-        } catch (err) {
-            const status = err && err.response ? err.response.status : null;
-            const apiMessage = (err && err.response && err.response.data && err.response.data.error && err.response.data.error.message) || (err && err.message) || 'unknown';
-            console.warn(`[pingRestrictedGeminiModels] ${m} FAIL status=${status || 'no-response'} message=${JSON.stringify(apiMessage)}`);
-        }
-    }
-});
+// pingRestrictedGeminiModels (V96.85: RETIRED) — bimonthly keep-alive that
+// preserved 90-day access to gemini-2.5-flash / gemini-2.5-flash-lite on
+// Vertex AI. Google discontinues the whole Gemini 2.5 family on Vertex on
+// 2026-10-20 (email 2026-07-29), so there is nothing left to keep alive.
+// Deployed function removed via `firebase functions:delete
+// pingRestrictedGeminiModels --region us-central1`.
