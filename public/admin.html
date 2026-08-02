@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.86</title>
+    <title>Nika V96.87</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -50344,6 +50344,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 2. DEEP INTEGRATION: If it's a medical/clinical question, provide a rich, realistic patient case with subtle clues.
                 3. PLAUSIBLE DISTRACTORS: All options must be highly plausible to someone with only superficial knowledge. Avoid "none of the above" or obviously wrong answers.
                 4. NO EASY CLUES: Ensure the correct answer requires synthesis of information, not just simple recall.
+                5. "explanation" is shown to LEARNERS after they submit — write it as concise teaching, NOT as a critique. "suggestion" stays admin-facing.
 
                 Question to improve: ${JSON.stringify(originalQ)}
                 Identified Issue: ${issue || ''}
@@ -50354,6 +50355,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                   "q": "...",
                   "options": [...],
                   "correct": [...],
+                  "explanation": "<<<learner-facing rationale, SAME LANGUAGE as the q field you just wrote, ~150 chars — why the correct answer is correct and briefly why the strongest distractor is wrong>>>",
                   "suggestion": "Brief explanation of how this version increases challenge and addresses the issue..."
                 }`;
         };
@@ -50449,7 +50451,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         // <span>s (struck-through deletions on ORIGINAL, green additions on IMPROVED),
         // so innerText would copy words that aren't part of that version. Text format
         // matches bulkPasteCopyQuestion (A) B) C) prefixes, no answer key).
-        window._copyCompareQ = function(jsonStr, btn) {
+        // V96.87: full=true also appends the answer key + explanation, since an
+        // explanation that argues "why B is correct" is unreadable without the key.
+        window._copyCompareQ = function(jsonStr, btn, full) {
             let q;
             try {
                 q = JSON.parse(String(jsonStr).replace(/&quot;/g, '"').replace(/&#39;/g, "'"));
@@ -50457,13 +50461,28 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 return showToast("Copy failed — could not read question data");
             }
             const opts = Array.isArray(q.options) ? q.options : [];
-            const text = (q.q || '') + (opts.length ? '\n' + opts.map((o, i) => String.fromCharCode(65 + i) + ') ' + o).join('\n') : '');
+            let text = (q.q || '') + (opts.length ? '\n' + opts.map((o, i) => String.fromCharCode(65 + i) + ') ' + o).join('\n') : '');
+            if (full) {
+                const keys = (Array.isArray(q.correct) ? q.correct : [])
+                    .filter(i => Number.isInteger(i) && i >= 0 && i < opts.length)
+                    .map(i => String.fromCharCode(65 + i));
+                if (keys.length) text += '\n\nเฉลย: ' + keys.join(', ');
+                const exp = String(q.explanation || '').trim();
+                if (exp) text += (keys.length ? '\n' : '\n\n') + 'คำอธิบาย: ' + exp;
+            }
             unifiedCopyToClipboard(text, btn);
         };
 
         window._compareCopyBtnHtml = function(q) {
             const jsonEsc = JSON.stringify(q || {}).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-            return `<button onclick="_copyCompareQ('${jsonEsc}', this)" title="Copy question + options" style="width:26px; height:26px; min-height:0; padding:0; border-radius:8px; border:none; background:rgba(255,255,255,0.2); color:#fff; cursor:pointer; font-size:0.9em; line-height:1; display:flex; align-items:center; justify-content:center; flex-shrink:0;">📋</button>`;
+            const btnStyle = "width:26px; height:26px; min-height:0; padding:0; border-radius:8px; border:none; background:rgba(255,255,255,0.2); color:#fff; cursor:pointer; font-size:0.9em; line-height:1; display:flex; align-items:center; justify-content:center; flex-shrink:0;";
+            // V96.87: the 💡 button appears ONLY when this version actually carries an
+            // explanation — the card body never renders that field, so its presence is
+            // also the admin's only hint that one exists.
+            const fullBtn = String((q || {}).explanation || '').trim()
+                ? `<button onclick="_copyCompareQ('${jsonEsc}', this, true)" title="Copy question + options + answer key + explanation" style="${btnStyle}">💡</button>`
+                : '';
+            return `<button onclick="_copyCompareQ('${jsonEsc}', this)" title="Copy question + options" style="${btnStyle}">📋</button>${fullBtn}`;
         };
 
         window._renderCompareCol = function(q, o) {
