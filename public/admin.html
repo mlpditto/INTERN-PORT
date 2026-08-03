@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.91</title>
+    <title>Nika V96.92</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -17120,6 +17120,11 @@ RULES:
         window.showAiSuggestionsPopup = function(suggestions) {
             const resultDiv = document.createElement('div');
             resultDiv.id = "ai-suggestions-popup";
+            // V96.92: AI-written stems/options/explanations are injected at runtime, so
+            // lang-toggle.js wrapped their Thai in <span class="lang-th"> and the
+            // EN-default body hid it — a Thai suggestion showed only its Latin tokens
+            // and options with no Latin at all rendered empty. feedback_lang_toggle_thai_blank.
+            resultDiv.className = 'lang-no-toggle';
             resultDiv.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:800px; max-height:85vh; background:#f8fafc; padding:30px; border-radius:32px; box-shadow:0 30px 80px rgba(0,0,0,0.3); z-index:10002; overflow-y:auto; font-family:'Inter', sans-serif; border: 1px solid #fff;";
 
             let itemsHtml = suggestions.map((q, i) => {
@@ -26332,7 +26337,7 @@ ${JSON.stringify(sourceObj)}`;
                     const cleanCode = sanitizeMermaid(mermaidCode);
 
                     const replacement = `
-                        <div class="mermaid-block" style="margin:15px 0; background:#fdfdfd; padding:15px; border-radius:15px; border:1px solid #eee; position:relative;">
+                        <div class="mermaid-block lang-no-toggle" style="margin:15px 0; background:#fdfdfd; padding:15px; border-radius:15px; border:1px solid #eee; position:relative;">
                             <div style="position:absolute; top:10px; right:10px; z-index:10; display:flex; gap:5px;">
                                 <button onclick="openExportMenu('${chartId}')" style="background:white; border:1px solid #ddd; width:28px; height:28px; border-radius:6px; cursor:pointer; color:#666;" title="Export Multi-Format"><i class="fa-solid fa-cloud-arrow-down"></i></button>
                                 <button onclick="zoomMermaid('${chartId}')" style="background:white; border:1px solid #ddd; width:28px; height:28px; border-radius:6px; cursor:pointer; color:#666;" title="Zoom"><i class="fa-solid fa-maximize"></i></button>
@@ -26586,6 +26591,11 @@ ${JSON.stringify(sourceObj)}`;
             if (!container) return;
             const svgSource = container.innerHTML;
             const modal = document.createElement('div');
+            // V96.92: the walker does reach SVG <text> nodes — a Thai mermaid label
+            // gets a <span class="lang-th"> inside the SVG, which the EN-default body
+            // hides, so the node renders with only its Latin words. Needed on the zoom
+            // copy as well as on .mermaid-block, since this is a fresh insertion.
+            modal.className = 'lang-no-toggle';
             modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:11000; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px;";
             modal.onclick = (e) => { if(e.target === modal) modal.remove(); };
             
