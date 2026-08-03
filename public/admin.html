@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.89</title>
+    <title>Nika V96.91</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -22577,6 +22577,11 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
 
             const modal = document.createElement('div');
             modal.id = 'bulk-export-modal';
+            // V96.91: the question list is user content injected at runtime, so
+            // lang-toggle.js's observer wrapped every Thai run in <span class="lang-th">
+            // and the EN-default body hid it — Thai stems showed only their Latin
+            // fragments ("pH NAC", "NAC NAPQI"). See feedback_lang_toggle_thai_blank.
+            modal.className = 'lang-no-toggle';
             modal.setAttribute('role', 'dialog');
             modal.setAttribute('aria-modal', 'true');
             modal.setAttribute('aria-labelledby', 'bulk-export-title');
@@ -25963,6 +25968,8 @@ ${JSON.stringify(sourceObj)}`;
                     + '<input type="checkbox" ' + (r.include ? 'checked' : '') + ' onchange="bulkPasteToggleInclude(' + i + ')" style="margin-top:4px; width:16px; height:16px; cursor:pointer; flex-shrink:0;">'
                     + '<div style="flex:1; min-width:0;"><div style="font-weight:700; color:#1e293b; font-size:0.92em;">' + (i + 1) + '. ' + escapeHtml(r.q) + '</div></div>'
                     + '<button type="button" onclick="bulkPasteCopyQuestion(' + i + ')" title="คัดลอกโจทย์ + ตัวเลือก (ไม่รวมเฉลย)" style="flex-shrink:0; width:auto; min-height:0; padding:2px 8px; border:1px solid #e2e8f0; background:#f8fafc; border-radius:8px; cursor:pointer; font-size:0.85em; line-height:1.4;">📋</button>'
+                    // V96.90: 💡 only once the AI has written a rationale for this row.
+                    + (r.rationale ? '<button type="button" onclick="bulkPasteCopyQuestionFull(' + i + ')" title="คัดลอกโจทย์ + เฉลย + คำอธิบาย" style="flex-shrink:0; width:auto; min-height:0; padding:2px 8px; border:1px solid #e9d5ff; background:#faf5ff; border-radius:8px; cursor:pointer; font-size:0.85em; line-height:1.4;">💡</button>' : '')
                     + confBadge
                     + '</div>'
                     + '<div style="padding-left:24px;">' + opts + '</div>'
@@ -25995,16 +26002,57 @@ ${JSON.stringify(sourceObj)}`;
 
         // V96.63: 📋 per-question copy — stem + options only (no answer key /
         // rationale, per user pick), A) B) C) prefixes for pasting elsewhere.
-        function bulkPasteCopyQuestion(idx) {
-            const r = window._bulkPasteParsed[idx];
-            if (!r) return;
-            const text = r.q + '\n' + r.options.map((o, oi) => String.fromCharCode(65 + oi) + ') ' + o).join('\n');
-            const done = () => showToast('📋 คัดลอกข้อ ' + (idx + 1) + ' แล้ว', 'success');
+        // V96.90: text building split out so the 💡 per-row and 📚 whole-set
+        // buttons share one format. full=true appends the answer key + the AI
+        // rationale; r.conf is deliberately omitted — confidence is admin-side
+        // metadata, not part of the question. Labels match the compare card's
+        // 💡 button (V96.87) so both surfaces paste identically.
+        function bulkPasteRowText(r, full, num) {
+            let text = (num ? num + '. ' : '') + (r.q || '')
+                + '\n' + r.options.map((o, oi) => String.fromCharCode(65 + oi) + ') ' + o).join('\n');
+            if (full) {
+                const keys = (r.correct || [])
+                    .filter(i => Number.isInteger(i) && i >= 0 && i < r.options.length)
+                    .map(i => String.fromCharCode(65 + i));
+                if (keys.length) text += '\n\nเฉลย: ' + keys.join(', ');
+                const rat = String(r.rationale || '').trim();
+                if (rat) text += (keys.length ? '\n' : '\n\n') + 'คำอธิบาย: ' + rat;
+            }
+            return text;
+        }
+
+        function bulkPasteCopyText(text, doneMsg) {
+            const done = () => showToast(doneMsg, 'success');
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(text).then(done).catch(() => bulkPasteCopyFallback(text, done));
             } else {
                 bulkPasteCopyFallback(text, done);
             }
+        }
+
+        function bulkPasteCopyQuestion(idx) {
+            const r = window._bulkPasteParsed[idx];
+            if (!r) return;
+            bulkPasteCopyText(bulkPasteRowText(r, false), '📋 คัดลอกข้อ ' + (idx + 1) + ' แล้ว');
+        }
+
+        // V96.90: 💡 per-row copy including the answer key + AI rationale.
+        function bulkPasteCopyQuestionFull(idx) {
+            const r = window._bulkPasteParsed[idx];
+            if (!r) return;
+            bulkPasteCopyText(bulkPasteRowText(r, true), '💡 คัดลอกข้อ ' + (idx + 1) + ' พร้อมเฉลยแล้ว');
+        }
+
+        // V96.90: 📚 copy every selected question at once. Numbering follows the
+        // preview's own numbers (not 1..n of the selection) so a copied block
+        // still lines up with what is on screen after some rows are unticked.
+        function bulkPasteCopyAllFull() {
+            const picked = window._bulkPasteParsed
+                .map((r, i) => ({ r: r, n: i + 1 }))
+                .filter(x => x.r.include);
+            if (picked.length === 0) { showToast('ยังไม่ได้เลือกข้อ', 'error'); return; }
+            const text = picked.map(x => bulkPasteRowText(x.r, true, x.n)).join('\n\n');
+            bulkPasteCopyText(text, '📚 คัดลอก ' + picked.length + ' ข้อ พร้อมเฉลยแล้ว');
         }
 
         function bulkPasteCopyFallback(text, done) {
@@ -26048,7 +26096,11 @@ ${JSON.stringify(sourceObj)}`;
         function bulkPasteInsert() {
             const rows = window._bulkPasteParsed.filter(r => r.include);
             if (rows.length === 0) { showToast('ยังไม่ได้เลือกข้อ', 'error'); return; }
-            rows.forEach(r => addQuestionUI({ q: r.q, type: 'choice', options: r.options, correct: r.correct, timer: 60 }));
+            // V96.90: carry the AI rationale into the question's explanation field.
+            // It was dropped here before, so the rationale the admin reviewed in the
+            // preview vanished on insert even though addQuestionUI prefills
+            // .q-explanation from data.explanation.
+            rows.forEach(r => addQuestionUI({ q: r.q, type: 'choice', options: r.options, correct: r.correct, timer: 60, explanation: (r.rationale || '').trim() }));
             document.getElementById('bulkPasteModal').style.display = 'none';
             if (typeof triggerAutoSave === 'function') triggerAutoSave();
             const items = document.querySelectorAll('.quiz-q-item');
@@ -52882,6 +52934,8 @@ Reply ONLY with raw JSON, no markdown:
                     <div id="bp-preview-count" style="font-weight:800; color:#6d28d9; font-size:0.9em;"></div>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
                         <button class="btn-sm" onclick="bulkPasteBackToInput()" style="background:#e2e8f0; color:#475569; border:none; padding:6px 14px; border-radius:10px; font-weight:700; font-size:0.8em; cursor:pointer;">← แก้ข้อความ</button>
+                        <!-- V96.90 -->
+                        <button class="btn-sm" onclick="bulkPasteCopyAllFull()" title="คัดลอกทุกข้อที่เลือก พร้อมเฉลย + คำอธิบาย" style="background:#faf5ff; color:#6b21a8; border:1px solid #e9d5ff; padding:6px 14px; border-radius:10px; font-weight:800; font-size:0.8em; cursor:pointer;">📚 คัดลอกทั้งชุด</button>
                         <button class="btn-sm" id="bp-find-btn" onclick="bulkPasteFindAnswers()" title="ให้ AI เสนอคำตอบทุกข้อ (advisory — ตรวจก่อนบันทึก)" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed); color:white; border:none; padding:6px 14px; border-radius:10px; font-weight:800; font-size:0.8em; cursor:pointer;">🎯 หาคำตอบด้วย AI ทั้งชุด</button>
                     </div>
                 </div>
