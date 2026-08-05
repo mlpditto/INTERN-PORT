@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.23)</title>
+    <title>Internship Portfolio (V96.25)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4372,7 +4372,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V96.23 (locked steps stay visible in Mission as a dimmed card with the reason and opening time, instead of being hidden) | V96.22 (multi-group audience — targetGroup accepts a comma-separated list so a quiz can be shared with the staff supervising it without going Public)
+                <span id="intern-version-current">V94.04</span> — Last feature: V96.25 (quiz card icon now matches its category — women's-health keyword list widened + tags folded into the match text, e.g. a hormonal contraceptive pill quiz no longer falls back to the generic brain icon) | V96.24 (Quiz can only be taken Mon-Fri 09:00-21:00, device local time — gated at the single runQuiz() chokepoint) | V96.23 (locked steps stay visible in Mission as a dimmed card with the reason and opening time, instead of being hidden) | V96.22 (multi-group audience — targetGroup accepts a comma-separated list so a quiz can be shared with the staff supervising it without going Public)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -6819,7 +6819,7 @@
 
         const QUIZ_ICON_RESOLUTION = [
             // Demographic / cross-cutting (run before disease systems)
-            { re: /women|female|gyne|obs|ob[-\s]?gyn|\bvvc\b|\bbv\b|vaginal|cervical|breast|ผู้หญิง|สตรี|มดลูก|เต้านม/i,
+            { re: /women|female|gyne|obs|ob[-\s]?gyn|\bvvc\b|\bbv\b|vaginal|cervical|breast|contracept|birth[-\s]?control|\bocp\b|ผู้หญิง|สตรี|มดลูก|เต้านม|คุมกำเนิด|ช่องคลอด/i,
               icon: 'fa-venus', bg: 'linear-gradient(135deg, #ec407a, #d81b60)' },
             { re: /pediatric|child|baby|infant|neonatal|ทารก|เด็ก|กุมาร/i,
               icon: 'fa-baby', bg: 'linear-gradient(135deg, #42a5f5, #1976d2)' },
@@ -6867,7 +6867,9 @@
                 if (sys) return { emoji: sys.emoji, bg: QUIZ_SYSTEM_PALETTE[q.diseaseSystemKey] };
             }
 
-            const haystack = `${String(q.title || '')} ${String(q.shortTitle || '')} ${String(q.description || '')}`;
+            // V96.25: q.tags folded in — admin's own category chips (e.g. "Women's Health")
+            // are free-text tags, and titles alone don't always carry the matching keyword.
+            const haystack = `${String(q.title || '')} ${String(q.shortTitle || '')} ${String(q.description || '')} ${String(q.tags || '')}`;
             for (const rule of QUIZ_ICON_RESOLUTION) {
                 if (!rule.re.test(haystack)) continue;
                 if (rule.system) {
@@ -7682,6 +7684,22 @@
         async function runQuiz(quizId) {
             currentQuiz = quizzesCache.find(x => x.id === quizId);
             if (!currentQuiz) return;
+
+            // V96.24: global quiz window — Mon-Fri 09:00-21:00 (device local time)
+            // only. Single chokepoint every take-path funnels through, so this
+            // covers fresh starts, resumes, ONE-TIME practice/real-exam, and
+            // late-submission runs alike.
+            {
+                const _now = new Date();
+                const _day = _now.getDay(); // 0=Sun ... 6=Sat
+                const _hour = _now.getHours();
+                const _inWindow = _day >= 1 && _day <= 5 && _hour >= 9 && _hour < 21;
+                if (!_inWindow) {
+                    alert("⛔ ทำ Quiz ได้เฉพาะวันจันทร์-ศุกร์ เวลา 09:00-21:00 เท่านั้น\nQuizzes can only be taken Monday-Friday, 09:00-21:00.");
+                    currentQuiz = null;
+                    return;
+                }
+            }
 
             // V95.62 Phase 4 hardening: hard-block score-locked quizzes at the open
             // step. The Mission feed (renderAssignments) + Browse (qbRenderList)
