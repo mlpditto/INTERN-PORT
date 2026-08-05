@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.93</title>
+    <title>Nika V96.94</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -43681,7 +43681,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // If it's claimed but not acknowledged, let Section 5 handle it in "Review"
                     if (log.pointsClaimed && !log.adminAcknowledged) return;
 
-                    const status = isPending ? "Review" : "Done";
+                    // V96.77: pending logs already have a dedicated, searchable table above
+                    // (#reflectiveLogsTable) — skip the duplicate Kanban "Review" card. Reviewed
+                    // logs still render into "Done" below (no table equivalent for that view).
+                    if (isPending) return;
+
+                    const status = "Done";
                     cnt[status]++;
                     
                     const moodEmoji = { 'happy': '😊', 'normal': '😐', 'sad': '😔', 'tired': '😫' }[log.mood] || '📝';
@@ -43841,61 +43846,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 });
             } catch (e) { console.error("Kanban Section 5 Error:", e); }
 
-            // 6. Render Pending Quiz Reviews in "Review"
-            try {
-                pendingQuizzesCache.forEach(att => {
-                    const q = quizzesData.find(x => x.id === att.quizId) || {};
-                    const qTitle = q.shortTitle || q.title || "Unknown Quiz";
-                    // V92.76: mirror renderPendingQuizzes (line ~16342) — fall back to usersData when
-                    // attempt doc is missing displayName/pictureUrl (older docs or "requesting" state)
-                    let uImg = att.pictureUrl || '';
-                    let uName = att.displayName || 'Unknown';
-                    if (att.userId) {
-                        const u = usersData.find(x => x.id === att.userId);
-                        if (u) {
-                            if (!uImg) uImg = u.pictureUrl || '';
-                            if (!uName || uName === 'Unknown') uName = u.displayName || 'Unknown';
-                        }
-                    }
-                    const isRequest = att.status === 'requesting';
-
-                    if (filter && !qTitle.toLowerCase().includes(filter) && !uName.toLowerCase().includes(filter)) return;
-                    
-                    // Group filtering
-                    if (activeBoardGroup !== 'All') {
-                        const user = usersData.find(u => u.id === att.userId);
-                        if ((user?.group || 'Public') !== activeBoardGroup) return;
-                    }
-
-                    cnt["Review"]++;
-                    const d = document.createElement('div');
-                    d.className = 'kanban-card card-Review quiz-card';
-                    d.style.borderLeft = "4px solid var(--primary)";
-                    
-                    let actionBtn = `<button class="btn-sm btn-info" style="width:100%;" onclick="reviewQuiz('${att.id}')"><i class="fa-solid fa-magnifying-glass"></i> Review Answers</button>`;
-                    if (isRequest) {
-                        actionBtn = `
-                            <div style="display:flex; gap:5px;">
-                                <button class="btn-sm btn-success" style="flex:1;" onclick="allowLateQuiz('${att.id}')">Allow</button>
-                                <button class="btn-sm btn-danger" style="flex:1;" onclick="rejectQuiz('${att.id}')">Deny</button>
-                            </div>
-                        `;
-                    }
-
-                    d.innerHTML = `
-                        <div class="card-header-row">
-                            <span class="badge" style="background:var(--primary);">${isRequest ? 'Late Quiz' : 'Quiz Review'}</span>
-                            <div class="card-header-right"><img src="${uImg}" class="assignee-img" title="${uName}"></div>
-                        </div>
-                        <div style="font-weight:bold; font-size:0.9em; margin-bottom:4px;">${uName}</div>
-                        <div class="lang-no-toggle" style="font-size:0.85em; color:#444; font-weight:500;">📖 ${qTitle}</div>
-                        <div style="margin-top:8px;">
-                            ${actionBtn}
-                        </div>
-                    `;
-                    cols["Review"].appendChild(d);
-                });
-            } catch (e) { console.error("Kanban Section 6 Error:", e); }
+            // 6. Pending Quiz Reviews — V96.77: removed from Kanban "Review" column. The
+            // dedicated table above (#pendingQuizzesTable / renderPendingQuizzes) already
+            // covers both quiz-review and late-quiz-request cards 1:1 (same pendingQuizzesCache,
+            // same reviewQuiz/allowLateQuiz/rejectQuiz actions) — the Kanban cards were a pure
+            // duplicate with no unique data or action.
 
             // 7. Render Active Daily Quests (Bounties) — Backlog if 0 subs, Doing if ≥1 sub
             try {
