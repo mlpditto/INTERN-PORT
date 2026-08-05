@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.95</title>
+    <title>Nika V96.97</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -45174,12 +45174,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
 
             targets.forEach(target => {
+                // V96.96: a merge is destructive + irreversible (deletes the source account),
+                // so a row must never render with an identity so blank it's unreadable —
+                // flag it loudly instead of silently falling through to empty text.
+                const hasDisplayName = target.displayName && String(target.displayName).trim();
+                const nameHtml = hasDisplayName
+                    ? target.displayName
+                    : '<span style="color:#dc2626;">⚠️ No Name (id: ' + target.id + ')</span>';
                 list.innerHTML += `
                     <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid #f8fafc; background:white; border-radius:12px; margin-bottom:6px; transition:all 0.2s; border:1px solid #f1f5f9;">
                         <div style="display:flex; align-items:center; gap:12px;">
                             <img src="${target.pictureUrl || 'https://cdn-icons-png.flaticon.com/512/847/847969.png'}" style="width:36px; height:36px; border-radius:50%; object-fit:cover; border:2px solid #f1f5f9;">
                             <div>
-                                <div style="font-weight:bold; font-size:0.95em; color:#1e293b;">${target.displayName}</div>
+                                <div style="font-weight:bold; font-size:0.95em; color:#1e293b;">${nameHtml}</div>
                                 <div style="font-size:0.7em; color:#64748b; margin-top:1px;">${target.fullName || 'No Real Name'} | Score: <b>${(target.score || 0).toFixed(2)}</b></div>
                             </div>
                         </div>
@@ -49340,25 +49347,48 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         }
 
         // V91.73 PR γ.2: Render Suggested taxonomy chips (3 axes from taxonomy.js with One Piece colors)
+        // V96.97: reported as consistently blank — no code path or Firestore data issue found
+        // on inspection, so this now (a) never fails silently (try/catch + loud visible error
+        // instead of an empty div), and (b) logs enough state to console.debug to diagnose the
+        // next occurrence instantly instead of guessing again.
         function lnrRenderSuggestedTaxonomy() {
             const container = document.getElementById('lnr-tag-suggested');
             if (!container) return;
-            if (!window.LP_TAXONOMY) {
-                container.innerHTML = '<span style="color:#94a3b8; font-size:0.78em;">taxonomy.js not loaded</span>';
-                return;
-            }
-            const html = Object.values(window.LP_TAXONOMY).map(axis => {
-                const c = axis.colors || { border: '#d8b4fe', text: '#6b21a8', hoverBg: '#f3e8ff' };
-                const egg = axis.easterEgg ? ` ${axis.easterEgg}` : '';
-                const axisLabel = `${axis.icon} ${axis.label.en} ${axis.label.ko} ${axis.label.th}${egg}`;
-                const allTags = axis.systems.reduce((acc, sys) => acc.concat(sys.tags), []);
-                const chips = allTags.map(tag => {
-                    const safe = String(tag).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
-                    return `<button type="button" onclick="lnrAddTag('${safe}')" style="width:auto; padding:4px 10px; background:#fff; border:1px solid ${c.border}; border-radius:14px; font-size:0.75em; color:${c.text}; cursor:pointer; flex-shrink:0; white-space:nowrap; min-height:auto;" onmouseover="this.style.background='${c.hoverBg}'" onmouseout="this.style.background='#fff'">${tag}</button>`;
+            const loudWarn = (msg) => {
+                container.innerHTML = '<div style="color:#b91c1c; font-size:0.8em; font-weight:700; padding:6px 8px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px;">⚠️ ' + msg + ' — ดู DevTools Console (F12) แล้วแจ้งข้อความ [lnr-taxonomy] ให้แอดมิน dev</div>';
+            };
+            try {
+                if (!window.LP_TAXONOMY) {
+                    console.warn('[lnr-taxonomy] window.LP_TAXONOMY missing — taxonomy.js did not set it (blocked/failed load?)');
+                    loudWarn('taxonomy.js not loaded');
+                    return;
+                }
+                const axes = Object.values(window.LP_TAXONOMY);
+                console.debug('[lnr-taxonomy] axes found:', axes.length, axes.map(a => ({
+                    label: a && a.label && a.label.en, systemsCount: a && Array.isArray(a.systems) ? a.systems.length : 'NOT-ARRAY'
+                })));
+                if (axes.length === 0) {
+                    console.warn('[lnr-taxonomy] window.LP_TAXONOMY is an empty object — no axes to render');
+                    loudWarn('taxonomy data is empty');
+                    return;
+                }
+                const html = axes.map(axis => {
+                    const c = axis.colors || { border: '#d8b4fe', text: '#6b21a8', hoverBg: '#f3e8ff' };
+                    const egg = axis.easterEgg ? ` ${axis.easterEgg}` : '';
+                    const axisLabel = `${axis.icon} ${axis.label.en} ${axis.label.ko} ${axis.label.th}${egg}`;
+                    const systems = Array.isArray(axis.systems) ? axis.systems : [];
+                    const allTags = systems.reduce((acc, sys) => acc.concat(Array.isArray(sys.tags) ? sys.tags : []), []);
+                    const chips = allTags.map(tag => {
+                        const safe = String(tag).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
+                        return `<button type="button" onclick="lnrAddTag('${safe}')" style="width:auto; padding:4px 10px; background:#fff; border:1px solid ${c.border}; border-radius:14px; font-size:0.75em; color:${c.text}; cursor:pointer; flex-shrink:0; white-space:nowrap; min-height:auto;" onmouseover="this.style.background='${c.hoverBg}'" onmouseout="this.style.background='#fff'">${tag}</button>`;
+                    }).join('');
+                    return `<div style="margin-bottom:8px;"><div style="font-size:0.7em; color:#666; margin-bottom:4px; font-weight:600;">${axisLabel}</div><div style="display:flex; flex-wrap:wrap; gap:4px;">${chips}</div></div>`;
                 }).join('');
-                return `<div style="margin-bottom:8px;"><div style="font-size:0.7em; color:#666; margin-bottom:4px; font-weight:600;">${axisLabel}</div><div style="display:flex; flex-wrap:wrap; gap:4px;">${chips}</div></div>`;
-            }).join('');
-            container.innerHTML = html;
+                container.innerHTML = html;
+            } catch (e) {
+                console.error('[lnr-taxonomy] render threw — see stack below:', e);
+                loudWarn('render error: ' + (e && e.message ? e.message : 'unknown'));
+            }
         }
 
         // V91.73 PR γ.2: Auto-suggest — substring scan content against LP_ALL_TAGS
@@ -53050,7 +53080,10 @@ Reply ONLY with raw JSON, no markdown:
             
             <div style="margin-bottom:12px;">
                 <div style="margin-bottom:6px; font-weight:bold; font-size:0.85em; color:#444;">Select Destination User:</div>
-                <input type="text" id="merge-search" placeholder="🔍 Search target user..." onkeyup="renderMergeTargetList(this.value)" 
+                <!-- V96.96: oninput (not onkeyup) — keyup misses paste-via-right-click,
+                     browser autofill, and on-screen/mobile keyboards, all of which leave
+                     the list showing stale results from before the last real filter run. -->
+                <input type="text" id="merge-search" placeholder="🔍 Search target user..." oninput="renderMergeTargetList(this.value)"
                     style="width:100%; padding:10px; border-radius:12px; border:1px solid #ddd; font-size:0.9em; outline:none; transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 3px rgba(67,97,238,0.1)';">
             </div>
 
