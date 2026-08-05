@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.94</title>
+    <title>Nika V96.95</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1383,6 +1383,16 @@
             color: #fff; font-weight: 800; cursor: pointer; font-size: 0.8em; white-space: nowrap;
         }
         .dca-review-fill-btn:hover { background: linear-gradient(135deg, #d97706, #b45309); }
+        /* V96.95: AI-suggested contributor score block — same layout as the
+           completeness box above, green/reward tint to read as a distinct signal. */
+        .dca-review-score {
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+            margin-top: 8px; padding: 8px 12px;
+            background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px;
+        }
+        .dca-review-score-text { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 2px; }
+        .dca-review-score-head { font-size: 0.82em; font-weight: 800; color: #047857; }
+        .dca-review-score-sub { font-size: 0.74em; color: #059669; font-weight: 600; }
         .dca-ai-error {
             margin-top: 10px; padding: 8px 12px; border-radius: 8px;
             background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
@@ -13394,15 +13404,16 @@
                         <input type="text" id="dca-ai-name" placeholder="Generic name e.g. Metformin · Atorvastatin · Amoxicillin" maxlength="80" onkeydown="if(event.key==='Enter'){event.preventDefault();dcaAutoDraftGo();}">
                         <div class="glass-toggle-container dca-ai-chip-rail" id="dca-ai-chip-rail">
                             <div class="glass-toggle-item" data-value="gemini-3.5-flash" onclick="dcaSelectAutoDraftModel(this)">Flash</div>
-                            <div class="glass-toggle-item active" data-value="gemini-3.6-flash" onclick="dcaSelectAutoDraftModel(this)">Pro</div>
+                            <div class="glass-toggle-item" data-value="gemini-3.6-flash" onclick="dcaSelectAutoDraftModel(this)">Pro</div>
                             <div class="glass-toggle-item" data-value="gpt-4o" onclick="dcaSelectAutoDraftModel(this)">GPT</div>
-                            <div class="glass-toggle-item" data-value="claude-4-sonnet-latest" onclick="dcaSelectAutoDraftModel(this)">Claude</div>
+                            <!-- V96.95: default chip moved here from Pro (user request). -->
+                            <div class="glass-toggle-item active" data-value="claude-4-sonnet-latest" onclick="dcaSelectAutoDraftModel(this)">Claude</div>
                             <div class="glass-toggle-item" data-value="typhoon-v2.5-30b-a3b-instruct" onclick="dcaSelectAutoDraftModel(this)" title="Typhoon">🌀</div>
                             <!-- V94.37: Xiaomi MiMo-V2.5 via OpenRouter. `or/` prefix is stripped by callUniversalAI router (admin.html:13511) so OpenRouter receives `xiaomi/mimo-v2.5(-pro)`. Both verified via Phase 0 OpenRouter playground smoke test 2026-05-27 (Metformin prompt + temp 0.3 + JSON FORMAT CONTRACT pass + Thai patientCounseling pass). Default chip stays gemini-2.5-pro. -->
                             <div class="glass-toggle-item" data-value="or/xiaomi/mimo-v2.5-pro" onclick="dcaSelectAutoDraftModel(this)" title="MiMo-V2.5-Pro via OpenRouter — frontier-level benchmarks at ≈50% of Gemini Pro token cost. Verified Phase 0 smoke 2026-05-27.">MiMo Pro</div>
                             <div class="glass-toggle-item" data-value="or/xiaomi/mimo-v2.5" onclick="dcaSelectAutoDraftModel(this)" title="MiMo-V2.5 base via OpenRouter — $0.14/$0.28 per 1M tokens (cheaper than Gemini Flash). Slightly less clinical depth than Pro; admin reviews before save.">MiMo</div>
                         </div>
-                        <input type="hidden" id="dca-ai-model-val" value="gemini-3.6-flash">
+                        <input type="hidden" id="dca-ai-model-val" value="claude-4-sonnet-latest">
                         <button type="button" id="dca-ai-go-btn" class="dca-ai-go-btn" onclick="dcaAutoDraftGo()">Generate</button>
                     </div>
                     <div id="dca-ai-error" class="dca-ai-error" style="display:none;"></div>
@@ -32904,6 +32915,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             formAiDrafted: false,  // V95.65: current form opened as an AI draft (drives the per-tab verify tracker)
             verified: {},          // V95.65: section keys the admin confirmed this session ({core:true, ...}); reset per form open
             reviewFindings: {},    // V95.66: AI Review results keyed by section ({clinical:[...]}); reset per form open
+            _reviewSuggestedScore: null, // V96.95: {value,rationale} from AI Review, pre-fills dcaPromptContributorBonus; cleared on drug switch
             helpers: [],           // V95.93: admin-curated contributor picker state [{userId(lineId),name,pictureUrl}]; persisted as helper:<lineId> in contributors[]
             searchTerm: '',
             sortMode: 'az'         // V96.52: 'az' (A-Z grouped, default) | 'completeness' (flat, least-complete first)
@@ -34181,6 +34193,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             dcaNdiLast = null;
             // V95.66: clear stale AI Review findings from a previous drug (static DOM).
             if (typeof dcaDismissReviewResults === 'function') dcaDismissReviewResults();
+            // V96.95: also clear the suggested score here (not inside dcaDismissReviewResults
+            // itself — that fn is also the ✕ button handler, and dismissing the panel mid-
+            // review of the SAME drug shouldn't drop the score) so it can never leak into a
+            // DIFFERENT drug's award-points prompt (dcaPromptContributorBonus reads it as default).
+            dcaState._reviewSuggestedScore = null;
             // V95.87: clear stale per-field authorship tint; the caller (Edit/Review) re-applies.
             dcaState.internDraftValues = null;
             if (typeof dcaClearProvenanceTint === 'function') dcaClearProvenanceTint();
@@ -34748,8 +34765,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // V96.19→V96.25: ask the admin how many points to award the intern contributor.
         // Used by the Review & Edit publish paths (the as-is paths fold the amount into
         // their approve modal). Cancel/blank/0 = publish without points → returns 0.
+        // V96.95: if 🔍 AI Review ran on this draft, its suggested score pre-fills the
+        // default instead of the flat 0.1 — admin still confirms/edits before it counts.
         async function dcaPromptContributorBonus(name) {
-            const v = await codexBonusPrompt({ heading: 'คะแนนที่จะให้ผู้ contribute "' + (name || '') + '"', defaultVal: 0.1 });
+            const suggested = dcaState._reviewSuggestedScore;
+            const heading = suggested
+                ? 'คะแนนที่จะให้ผู้ contribute "' + (name || '') + '"\n🎁 AI แนะนำ ' + suggested.value + ' pts' + (suggested.rationale ? ' — ' + suggested.rationale : '')
+                : 'คะแนนที่จะให้ผู้ contribute "' + (name || '') + '"';
+            const v = await codexBonusPrompt({ heading, defaultVal: suggested ? suggested.value : 0.1 });
             return v == null ? 0 : v;
         }
 
@@ -34840,7 +34863,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // FORMAT CONTRACT leads, language rule explicit per-field, SELF-CHECK at end.
         // ===================================================================
         const DCA_AI_LS_KEY = 'ai_default_drug_codex_model';
-        const DCA_AI_FALLBACK_MODEL = 'gemini-3.6-flash';
+        const DCA_AI_FALLBACK_MODEL = 'claude-4-sonnet-latest'; // V96.95: default moved from gemini-3.6-flash (user request)
 
         // V94.45: friendly labels for AI fill provenance — match the Auto-Draft
         // chip-rail names so admin sees the same label as the chip they picked.
@@ -35906,11 +35929,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return def ? def.key : null;
         }
 
-        function dcaBuildReviewPrompt(data, filledLines, internContext) {
+        // V96.95: fixed score scale the admin's contributor-points modal already uses
+        // (codexBonusPrompt presets) — the AI is asked to pick one of these, not a
+        // free number, so its suggestion always lands on a value the admin can award
+        // with one click.
+        const DCA_REVIEW_SCORE_PRESETS = [0, 0.1, 0.5, 1, 2, 5];
+
+        function dcaBuildReviewPrompt(data, filledLines, internContext, completeness) {
             return [
                 'ROLE: senior clinical pharmacist auditing a DRAFT drug monograph for an internal medical-intern study tool (Thailand). The draft was written by a junior intern (or an AI) and needs your review before publishing.',
                 '',
-                'TASK: review ONLY the fields provided below (they are the ones that have content). Find concrete problems. For each problem, when you are confident, propose the EXACT corrected text (current → proposed) so the admin can apply it; if you cannot be confident in a specific replacement, leave current/proposed empty and only describe the issue. Do NOT comment on fields that are absent.',
+                'TASK: review ONLY the fields provided below (they are the ones that have content). Find concrete problems. For each problem, when you are confident, propose the EXACT corrected text (current → proposed) so the admin can apply it; if you cannot be confident in a specific replacement, leave current/proposed empty and only describe the issue. Do NOT comment on fields that are absent. You also grade the draft as a CONTRIBUTION so the admin can decide how many points to award the intern.',
                 '',
                 'FORMAT CONTRACT — RESPOND WITH PURE JSON ONLY.',
                 'NO MARKDOWN. NO PROSE OUTSIDE JSON. NO ```json``` FENCE.',
@@ -35926,7 +35955,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 '      "suggestion": "<<<what to check or correct · one sentence · medical English · empty string if none>>>"',
                 '    }',
                 '  ],',
-                '  "overallNote": "<<<one-line overall impression · empty string if nothing notable>>>"',
+                '  "overallNote": "<<<one-line overall impression · empty string if nothing notable>>>",',
+                '  "suggestedScore": {',
+                '    "value":     "<<<ONE of these exact numbers: ' + DCA_REVIEW_SCORE_PRESETS.join(', ') + '>>>",',
+                '    "rationale": "<<<one sentence, Thai, why this score · cite completeness/accuracy/safety findings>>>"',
+                '  }',
                 '}',
                 '',
                 'SEVERITY MEANING:',
@@ -35941,16 +35974,27 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 '- If the draft looks clinically sound, return an EMPTY findings array. An empty array is a valid, good answer.',
                 '- Keep each "issue" / "suggestion" under 220 characters. Plain medical English.',
                 '',
+                'SCORING GUIDE — pick the single closest preset for "suggestedScore.value":',
+                '- 0   = not usable as-is; would need a near-total rewrite.',
+                '- 0.1 = minimal/trivial contribution — mostly empty, or copy-pasted with little independent value.',
+                '- 0.5 = partial draft — several fields missing or need real correction.',
+                '- 1   = solid, mostly complete and accurate draft, ready to publish with only minor fixes (typical baseline for a good single-drug entry).',
+                '- 2   = excellent — thorough, accurate, well-organized, close to publish-ready.',
+                '- 5   = exceptional — reference-quality, far beyond typical intern effort.',
+                'Base the score on completeness (see COMPLETENESS line below) + accuracy (fewer/no factual or consistency findings). ANY "safety" finding caps the score at 0.5 regardless of completeness.',
+                '',
                 'SELF-CHECK before responding:',
                 '1. Is the response valid JSON (no fence, no prose outside braces)?',
                 '2. Does every finding.field match one of the provided field keys exactly?',
                 '3. Is every finding.severity one of the four allowed values?',
                 '4. Did you avoid flagging anything you are not confident about?',
                 '5. When you filled "current", is it copied VERBATIM from the field text above (character-for-character, so it can be found and replaced)?',
+                '6. Is suggestedScore.value EXACTLY one of the listed preset numbers (not a rounded/free value)?',
                 'If any check fails, fix it before sending.',
                 '',
                 'DRUG: <<<' + (data.genericName || '') + '>>>' + (data.class ? ' · class as drafted: ' + data.class : ''),
                 internContext ? ('INTERN CONTEXT / CITATION (for your awareness, do not audit it directly): <<<' + internContext + '>>>') : '',
+                completeness ? ('COMPLETENESS: ' + completeness.filled + ' of ' + completeness.total + ' fields filled.') : '',
                 '',
                 'FIELDS TO REVIEW:',
                 filledLines.join('\n')
@@ -36004,7 +36048,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
             if (btn) { btn.disabled = true; btn.textContent = '⏳ Reviewing…'; }
 
-            const prompt = dcaBuildReviewPrompt(current, filledLines, internContext);
+            // V96.95: field-completeness context for the score rubric (deterministic,
+            // same field set the prompt reviews — excludes the genericName anchor).
+            let totalReviewableFields = 0;
+            DCA_SECTION_DEFS.forEach(def => { totalReviewableFields += def.fields.filter(k => k !== 'genericName').length; });
+            const completeness = { filled: filledLines.length, total: totalReviewableFields };
+
+            const prompt = dcaBuildReviewPrompt(current, filledLines, internContext, completeness);
             try {
                 const resp = await window.callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'ai_review' });
                 const rawText = (resp && resp.text) ? resp.text : (typeof resp === 'string' ? resp : '');
@@ -36042,6 +36092,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }).filter(Boolean);
                 const overallNote = String(parsed.overallNote || '').trim();
 
+                // V96.95: suggested contributor score — snap whatever the model returned
+                // to the nearest allowed preset (defensive: models sometimes ignore the
+                // "exact value" instruction) so it always matches a codexBonusPrompt chip.
+                let suggestedScore = null;
+                const rawScore = (parsed.suggestedScore && typeof parsed.suggestedScore === 'object') ? parsed.suggestedScore : null;
+                if (rawScore) {
+                    const v = parseFloat(rawScore.value);
+                    if (isFinite(v) && v >= 0) {
+                        const snapped = DCA_REVIEW_SCORE_PRESETS.reduce((best, p) =>
+                            Math.abs(p - v) < Math.abs(best - v) ? p : best, DCA_REVIEW_SCORE_PRESETS[0]);
+                        suggestedScore = { value: snapped, rationale: String(rawScore.rationale || '').trim().slice(0, 300) };
+                    }
+                }
+
                 // V96.02: stash a flat indexed list + overall so dcaApplyReviewFix can
                 // look a finding up by index (onclick passes only an int → sidesteps
                 // quoting Thai / multi-line proposed text into an attribute) and so a
@@ -36049,6 +36113,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 findings.forEach((f, i) => { f._idx = i; });
                 dcaState.reviewFindingsFlat = findings;
                 dcaState._reviewOverall = overallNote;
+                dcaState._reviewSuggestedScore = suggestedScore;
 
                 // Map section → findings for per-tab hinting.
                 dcaState.reviewFindings = {};
@@ -36059,7 +36124,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 dcaState.formAiDrafted = true;
                 dcaUpdateSectionBadges();
                 dcaRefreshVerifyStrip();
-                dcaRenderReviewResults(findings, overallNote);
+                dcaRenderReviewResults(findings, overallNote, suggestedScore);
 
                 // V96.05 Evaluation pillar: record the suggestion signal + remember the
                 // model so dcaApplyReviewFix can attribute 'applied' to the same model.
@@ -36103,7 +36168,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return out;
         }
 
-        function dcaRenderReviewResults(findings, overallNote) {
+        function dcaRenderReviewResults(findings, overallNote, suggestedScore) {
             const panel = document.getElementById('dca-review-results');
             if (!panel) return;
             const esc = (typeof dcaEscapeHtml === 'function') ? dcaEscapeHtml : (s => String(s));
@@ -36116,6 +36181,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 '</div>'
             );
             if (overallNote) parts.push('<div class="dca-review-overall">' + esc(overallNote) + '</div>');
+
+            // V96.95: AI-suggested contributor score. Advisory only — admin still picks/
+            // confirms the amount in the award-points modal (dcaPromptContributorBonus),
+            // this just pre-fills that modal's default so the common case is one click.
+            if (suggestedScore) {
+                parts.push(
+                    '<div class="dca-review-score">' +
+                        '<div class="dca-review-score-text">' +
+                            '<span class="dca-review-score-head">🎁 AI แนะนำคะแนนให้ intern: ' + suggestedScore.value + ' pts</span>' +
+                            (suggestedScore.rationale ? '<span class="dca-review-score-sub">' + esc(suggestedScore.rationale) + '</span>' : '') +
+                        '</div>' +
+                    '</div>'
+                );
+            }
 
             if (findings.length === 0) {
                 parts.push('<div class="dca-review-empty">✅ AI ไม่พบปัญหาในเนื้อหาที่กรอก — ยังต้องตรวจยืนยันแต่ละแท็บเอง</div>');
@@ -36225,7 +36304,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // V96.05 Evaluation pillar: this finding's proposed fix was accepted.
             if (typeof recordAiEval === 'function') recordAiEval('ai_review', dcaState._reviewModel, 'applied');
             if (typeof showToast === 'function') showToast('✏️ Applied to ' + label + ' — verify ก่อน Save');
-            dcaRenderReviewResults(dcaState.reviewFindingsFlat, dcaState._reviewOverall || '');
+            dcaRenderReviewResults(dcaState.reviewFindingsFlat, dcaState._reviewOverall || '', dcaState._reviewSuggestedScore);
         }
 
         function dcaDismissReviewResults() {
