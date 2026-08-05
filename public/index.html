@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.25)</title>
+    <title>Internship Portfolio (V96.26)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4372,7 +4372,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V96.25 (quiz card icon now matches its category — women's-health keyword list widened + tags folded into the match text, e.g. a hormonal contraceptive pill quiz no longer falls back to the generic brain icon) | V96.24 (Quiz can only be taken Mon-Fri 09:00-21:00, device local time — gated at the single runQuiz() chokepoint) | V96.23 (locked steps stay visible in Mission as a dimmed card with the reason and opening time, instead of being hidden) | V96.22 (multi-group audience — targetGroup accepts a comma-separated list so a quiz can be shared with the staff supervising it without going Public)
+                <span id="intern-version-current">V94.04</span> — Last feature: V96.26 (quiz-taking screen gets a bullet question-map to jump directly to any question — per-question timers now freeze on leave and resume exactly where left instead of resetting, so jumping around can never manufacture extra time; the old Previous-button free-reset loophole is closed as a side effect) | V96.25 (quiz card icon now matches its category — women's-health keyword list widened + tags folded into the match text, e.g. a hormonal contraceptive pill quiz no longer falls back to the generic brain icon) | V96.24 (Quiz can only be taken Mon-Fri 09:00-21:00, device local time — gated at the single runQuiz() chokepoint) | V96.23 (locked steps stay visible in Mission as a dimmed card with the reason and opening time, instead of being hidden) | V96.22 (multi-group audience — targetGroup accepts a comma-separated list so a quiz can be shared with the staff supervising it without going Public)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -7554,6 +7554,11 @@
         let stepStartTimestamp = Date.now(); // V86.14: Track duration per question
         let durationsPerQuestion = [];
         let lastBonusTime = 0;   // 🔥 V81.3: Track bonus for UI display
+        // V96.26: per-question "frozen" remaining time — [step] => seconds left when
+        // last frozen, or null if never visited. Lets the bullet nav (jumpToQuizStep)
+        // resume a question exactly where its timer was left instead of resetting it,
+        // so hopping between questions can never manufacture extra time.
+        let stepTimeRemaining = [];
 
         // V95.29: styled start-quiz confirmation (replaces the native confirm()).
         // Shows the user's current toggle language first + the other two in an
@@ -7752,6 +7757,7 @@
                     currentStep = Math.min(existing.currentStep || 0, currentQuiz.questions.length);
                     accumulatedTime = existing.accumulatedTime || 0;
                     durationsPerQuestion = new Array(currentQuiz.questions.length).fill(0);
+                    stepTimeRemaining = new Array(currentQuiz.questions.length).fill(null);
                     stepStartTimestamp = Date.now();
                     // The auto-save joins multi-select (ordering) answers with "\n---\n";
                     // reverse that here so userAnswers holds real arrays again.
@@ -7782,6 +7788,7 @@
                 currentStep = 0;
                 accumulatedTime = 0;
                 durationsPerQuestion = new Array(currentQuiz.questions.length).fill(0); // V86.14
+                stepTimeRemaining = new Array(currentQuiz.questions.length).fill(null);
                 stepStartTimestamp = Date.now();
                 userAnswers = new Array(currentQuiz.questions.length).fill(null);
                 // 🔥 V78.1: Timer initialization based on mode
@@ -7801,6 +7808,7 @@
                 currentStep = 0;
                 accumulatedTime = 0;
                 durationsPerQuestion = new Array(currentQuiz.questions ? currentQuiz.questions.length : 1).fill(0); // V86.14
+                stepTimeRemaining = new Array(currentQuiz.questions ? currentQuiz.questions.length : 1).fill(null);
                 stepStartTimestamp = Date.now();
                 userAnswers = new Array(currentQuiz.questions ? currentQuiz.questions.length : 1).fill(null);
                 // 🔥 V78.1: Timer initialization based on mode
@@ -8984,6 +8992,36 @@
             if (typeof refreshDailyReflectionI18N === 'function') refreshDailyReflectionI18N();
         }
 
+        // V96.26: has this question got any answer recorded yet? Drives the bullet
+        // nav's answered/unanswered coloring only — never touches scoring.
+        function quizStepIsAnswered(idx) {
+            const a = (typeof userAnswers !== 'undefined' && userAnswers) ? userAnswers[idx] : undefined;
+            if (a === null || a === undefined) return false;
+            if (Array.isArray(a)) return a.some(v => (typeof v === 'string' ? v.trim() !== '' : v !== null && v !== undefined));
+            if (typeof a === 'string') return a.trim() !== '';
+            return true; // number (choice/flashcard index, incl. 0)
+        }
+
+        // V96.26: question-map bullet row — lets the user jump to any question
+        // directly instead of only stepping via Previous/Next. Current = blue,
+        // answered = green, unanswered = outline. Read-only (Learning) quizzes
+        // never reach this — renderQuizStep() returns early for those before
+        // this is called.
+        function renderQuizStepBullets() {
+            if (!currentQuiz || !currentQuiz.questions || currentQuiz.questions.length < 2) return '';
+            const bullets = currentQuiz.questions.map((_, idx) => {
+                const isCurrent = idx === currentStep;
+                const isAnswered = quizStepIsAnswered(idx);
+                const bg = isCurrent ? '#4361ee' : (isAnswered ? '#d1fae5' : '#fff');
+                const color = isCurrent ? '#fff' : (isAnswered ? '#047857' : '#94a3b8');
+                const border = isCurrent ? '#4361ee' : (isAnswered ? '#6ee7b7' : '#e2e8f0');
+                const title = isAnswered ? 'ตอบแล้ว / Answered' : 'ยังไม่ตอบ / Not answered';
+                return `<button type="button" onclick="jumpToQuizStep(${idx})" title="${title}"
+                    style="width:30px; height:30px; flex:0 0 auto; border-radius:50%; border:2px solid ${border}; background:${bg}; color:${color}; font-weight:800; font-size:0.78em; cursor:pointer; padding:0; min-height:0;">${idx + 1}</button>`;
+            }).join('');
+            return `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;">${bullets}</div>`;
+        }
+
         function renderQuizStep(useExistingTime = false) {
             try {
                 const quizRunContainer = document.getElementById('quiz-run-container');
@@ -9027,33 +9065,48 @@
                 const isTotalTimeMode = currentQuiz.timerMode === 'total_time';
 
                 if (!useExistingTime && !isTotalTimeMode) {
-                    // Per-question mode: accumulate remaining time from previous question
-                    const baseTimer = question.timer || 60;
-                    lastBonusTime = (accumulatedTime || 0);
-                    timeLeftForStep = baseTimer + lastBonusTime;
-                    accumulatedTime = 0; // Reset after applying to base
+                    // V96.26: a question visited before resumes exactly where its timer
+                    // was frozen (see freezeCurrentStepTime) instead of getting a fresh
+                    // base timer — otherwise free jump-navigation could "reset the clock"
+                    // by bouncing between questions. Only a NEVER-visited question draws
+                    // from the shared bonus pool built up by finishing earlier ones early.
+                    if (stepTimeRemaining[currentStep] != null) {
+                        timeLeftForStep = stepTimeRemaining[currentStep];
+                        lastBonusTime = 0;
+                    } else {
+                        const baseTimer = question.timer || 60;
+                        lastBonusTime = (accumulatedTime || 0);
+                        timeLeftForStep = baseTimer + lastBonusTime;
+                        accumulatedTime = 0; // pool drained into this newly-opened question
+                    }
                 }
                 // For total_time mode, timeLeftForStep keeps counting down without reset
                 updateTimerUI();
 
-                quizTimerInterval = setInterval(() => {
-                    timeLeftForStep--;
-                    updateTimerUI();
-                    if (timeLeftForStep <= 0) {
-                        clearInterval(quizTimerInterval);
-                        if (isTotalTimeMode) {
-                            alert("🍭 หมดเวลารวมแล้ว! ระบบจะส่งคำตอบให้อัตโนมัติ");
-                            submitQuiz();
-                        } else {
-                            alert("🍭 หมดเวลาสำหรับข้อนี้!");
-                            if (currentStep < currentQuiz.questions.length - 1) {
-                                nextQuizStep();
-                            } else {
+                // V96.26: a jump back to a question that already timed out (frozen at
+                // <=0) has nothing left to count down — skip starting the interval so
+                // revisiting it doesn't immediately re-fire the "time's up" alert loop.
+                // The question still renders normally below; it's just frozen at 0s.
+                if (isTotalTimeMode || timeLeftForStep > 0) {
+                    quizTimerInterval = setInterval(() => {
+                        timeLeftForStep--;
+                        updateTimerUI();
+                        if (timeLeftForStep <= 0) {
+                            clearInterval(quizTimerInterval);
+                            if (isTotalTimeMode) {
+                                alert("🍭 หมดเวลารวมแล้ว! ระบบจะส่งคำตอบให้อัตโนมัติ");
                                 submitQuiz();
+                            } else {
+                                alert("🍭 หมดเวลาสำหรับข้อนี้!");
+                                if (currentStep < currentQuiz.questions.length - 1) {
+                                    nextQuizStep();
+                                } else {
+                                    submitQuiz();
+                                }
                             }
                         }
-                    }
-                }, 1000);
+                    }, 1000);
+                }
 
                 const qType = question.type || 'choice';
                 let inputHtml = "";
@@ -9147,6 +9200,7 @@
                 <div class="lang-no-toggle">
                     <div style="margin-bottom:15px;">
                         <span class="badge" style="background:#4361ee; margin-bottom:10px;">Q ${currentStep + 1}/${currentQuiz.questions.length} (${qType.toUpperCase()})</span>
+                        ${renderQuizStepBullets()}
                         ${qtRenderBar(question)}
                         <div class="md-render" style="font-weight:bold; font-size:1.1em; color:#333;">${window.renderMd(question.q)}</div>
                     </div>
@@ -9564,6 +9618,38 @@
             stepStartTimestamp = Date.now();
         }
 
+        // V96.26: freezes the CURRENT step's remaining time before navigation leaves
+        // it (Next, Previous, or a bullet jump), so a later revisit resumes exactly
+        // here instead of resetting to a fresh base timer. The leftover only banks
+        // into the shared bonus pool the first time this question is left — otherwise
+        // hopping in and out of an already-visited question would bank the same
+        // leftover seconds repeatedly.
+        function freezeCurrentStepTime() {
+            if (!currentQuiz || currentQuiz.timerMode === 'total_time') return;
+            const firstTimeLeaving = stepTimeRemaining[currentStep] == null;
+            stepTimeRemaining[currentStep] = timeLeftForStep;
+            if (firstTimeLeaving && timeLeftForStep > 0) {
+                accumulatedTime += timeLeftForStep;
+            }
+        }
+
+        // V96.26: shared auto-save used by nextQuizStep + jumpToQuizStep (extracted
+        // so bullet-jump navigation persists progress the same way Next already did).
+        function autoSaveQuizStepProgress() {
+            if (!userId || isPracticeMode) return;
+            const finalAnswers = userAnswers.map(ans => {
+                if (ans === undefined) return null; // Firestore safety
+                if (Array.isArray(ans)) return ans.join("\n---\n");
+                return ans;
+            });
+            saveQuizProgress({
+                answers: finalAnswers,
+                currentStep: currentStep,
+                lastActive: firebase.firestore.FieldValue.serverTimestamp(),
+                accumulatedTime: accumulatedTime
+            });
+        }
+
         async function nextQuizStep() {
             recordStepDuration(); // V86.14
             try {
@@ -9575,12 +9661,7 @@
                 const maxSteps = isReadOnly ? currentQuiz.questions.length : (currentQuiz.questions.length - 1);
 
                 if (currentStep < maxSteps) {
-                    // 🔥 V78.1: Only accumulate time in per-question mode
-                    if (currentQuiz.timerMode !== 'total_time') {
-                        if (timeLeftForStep > 0) {
-                            accumulatedTime += timeLeftForStep;
-                        }
-                    }
+                    freezeCurrentStepTime();
 
                     currentStep++;
                     console.log('[Quiz] Moving to step:', currentStep);
@@ -9589,19 +9670,7 @@
                     renderQuizStep(currentQuiz.timerMode === 'total_time');
 
                     // Async auto-save (non-blocking)
-                    if (userId && !isPracticeMode) {
-                        const finalAnswers = userAnswers.map(ans => {
-                            if (ans === undefined) return null; // Firestore safety
-                            if (Array.isArray(ans)) return ans.join("\n---\n");
-                            return ans;
-                        });
-                        saveQuizProgress({
-                            answers: finalAnswers,
-                            currentStep: currentStep,
-                            lastActive: firebase.firestore.FieldValue.serverTimestamp(),
-                            accumulatedTime: accumulatedTime
-                        });
-                    }
+                    autoSaveQuizStepProgress();
                 } else {
                     console.log('[Quiz] Already at last step, cannot go next');
                 }
@@ -9614,9 +9683,28 @@
         function prevQuizStep() {
             if (currentStep > 0) {
                 recordStepDuration(); // V86.14
+                freezeCurrentStepTime();
                 currentStep--;
                 renderQuizStep(currentQuiz.timerMode === 'total_time');
             }
+        }
+
+        // V96.26: bullet-nav jump — go directly to any question. Timer-safe by
+        // construction: freezeCurrentStepTime() always freezes the step being left
+        // before switching, and renderQuizStep resumes the target step's own frozen
+        // time (or, if never visited, its base timer + bonus pool) — so no amount of
+        // jumping around can create extra time versus taking the quiz in order.
+        function jumpToQuizStep(targetStep) {
+            if (!currentQuiz || !currentQuiz.questions) return;
+            if (targetStep === currentStep) return;
+            if (targetStep < 0 || targetStep >= currentQuiz.questions.length) return;
+            if (currentQuiz.quizType === 'read_only') return; // bullets aren't shown there anyway
+
+            recordStepDuration(); // V86.14
+            freezeCurrentStepTime();
+            currentStep = targetStep;
+            renderQuizStep(currentQuiz.timerMode === 'total_time');
+            autoSaveQuizStepProgress();
         }
 
         let isSubmittingQuiz = false;
