@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.26)</title>
+    <title>Internship Portfolio (V96.27)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4372,7 +4372,7 @@
             <div style="height:50px;"></div>
             <div style="text-align:center; font-size:0.8em; color:#ccc; margin-top:30px; padding-bottom:20px;">
                 LINE LIFF Internship Management System<br>
-                <span id="intern-version-current">V94.04</span> — Last feature: V96.26 (quiz-taking screen gets a bullet question-map to jump directly to any question — per-question timers now freeze on leave and resume exactly where left instead of resetting, so jumping around can never manufacture extra time; the old Previous-button free-reset loophole is closed as a side effect) | V96.25 (quiz card icon now matches its category — women's-health keyword list widened + tags folded into the match text, e.g. a hormonal contraceptive pill quiz no longer falls back to the generic brain icon) | V96.24 (Quiz can only be taken Mon-Fri 09:00-21:00, device local time — gated at the single runQuiz() chokepoint) | V96.23 (locked steps stay visible in Mission as a dimmed card with the reason and opening time, instead of being hidden) | V96.22 (multi-group audience — targetGroup accepts a comma-separated list so a quiz can be shared with the staff supervising it without going Public)
+                <span id="intern-version-current">V94.04</span> — Last feature: V96.27 (Mission header's "✅ Done" badge now requires all 3 tabs done today — Quiz scored, Daily Reflection written, Learning Note submitted — instead of reflecting Daily Reflection alone; shows 🟡 when reflection is done but Quiz/LN aren't yet) | V96.26 (quiz-taking screen gets a bullet question-map to jump directly to any question — per-question timers now freeze on leave and resume exactly where left instead of resetting, so jumping around can never manufacture extra time; the old Previous-button free-reset loophole is closed as a side effect) | V96.25 (quiz card icon now matches its category — women's-health keyword list widened + tags folded into the match text, e.g. a hormonal contraceptive pill quiz no longer falls back to the generic brain icon) | V96.24 (Quiz can only be taken Mon-Fri 09:00-21:00, device local time — gated at the single runQuiz() chokepoint) | V96.23 (locked steps stay visible in Mission as a dimmed card with the reason and opening time, instead of being hidden) | V96.22 (multi-group audience — targetGroup accepts a comma-separated list so a quiz can be shared with the staff supervising it without going Public)
             </div>
             <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('intern-version-current');if(m&&b)b.textContent=m[0];})();</script>
         </div>
@@ -6782,6 +6782,8 @@
                 // V95.16: quiz attempts now also feed the unified Work > History timeline
                 if (typeof renderUnifiedHistory === 'function') renderUnifiedHistory();
                 updateGrandLineDashboard();
+                // V96.27: quiz completion feeds the Mission "Done" badge too.
+                if (typeof updateMissionDoneBadge === 'function') updateMissionDoneBadge();
             }, e => handleFirestoreListenerError('quiz attempts listener', e));
         }
 
@@ -14047,15 +14049,53 @@
                 streakBadge.style.display = 'none';
             }
 
+            // Reflection form lock stays tied to reflection-only completion — unrelated
+            // to the other two tabs.
             if (metrics.doneToday) {
-                status.innerHTML = '<span style="color:#28a745; font-weight:bold;"><i class="fa-solid fa-check-circle"></i> Done</span>';
                 formArea.style.opacity = '0.5';
                 formArea.style.pointerEvents = 'none';
                 document.getElementById('rl-submit-btn').innerText = 'Done';
             } else {
-                status.innerHTML = '<span style="font-size:1.2em; filter: drop-shadow(0 0 5px rgba(239,35,60,0.4));">🔴</span>';
                 formArea.style.opacity = '1';
                 formArea.style.pointerEvents = 'auto';
+            }
+
+            // V96.27: the Mission-header "✅ Done" badge (same `status` element) used
+            // to reflect Daily Reflection alone. Recomputed in its own function so the
+            // Quiz and Learning Note listeners can also refresh it when their data changes.
+            updateMissionDoneBadge();
+        }
+
+        // V96.27: Mission-header "✅ Done" badge — green only once the user has done
+        // something in ALL THREE tabs today (Quiz scored/submitted, Daily Reflection
+        // written, Learning Note submitted). Uses toDateKey (local device date) to
+        // match collectReflectiveMetrics' doneToday so all three checks agree on what
+        // "today" means. Called from the reflective-logs, quiz-attempts, and
+        // learning-path-entries listeners so it stays live regardless of which tab
+        // changed.
+        function updateMissionDoneBadge() {
+            const status = document.getElementById('rl-today-status');
+            if (!status) return;
+            const todayKey = toDateKey(new Date());
+
+            const reflectionDoneToday = (reflectiveLogsCache || []).some(l =>
+                l && l.timestamp && l.timestamp.toDate && toDateKey(l.timestamp.toDate()) === todayKey
+            );
+            const quizDoneToday = Object.values(quizAttemptsCache || {}).some(a =>
+                a && (a.status === 'approved' || a.status === 'pending') &&
+                a.timestamp && a.timestamp.toDate && toDateKey(a.timestamp.toDate()) === todayKey
+            );
+            const lnDoneToday = (window.myLpEntriesCache || []).some(e =>
+                e && e.createdAt && e.createdAt.toDate && toDateKey(e.createdAt.toDate()) === todayKey
+            );
+
+            if (reflectionDoneToday && quizDoneToday && lnDoneToday) {
+                status.innerHTML = '<span style="color:#28a745; font-weight:bold;"><i class="fa-solid fa-check-circle"></i> Done</span>';
+            } else if (reflectionDoneToday) {
+                // Reflection done, but Quiz and/or Learning Note still pending today.
+                status.innerHTML = '<span style="font-size:1.2em;" title="ทำ Quiz และ Learning Note วันนี้ให้ครบด้วยเพื่อปลด Done">🟡</span>';
+            } else {
+                status.innerHTML = '<span style="font-size:1.2em; filter: drop-shadow(0 0 5px rgba(239,35,60,0.4));">🔴</span>';
             }
         }
 
@@ -15656,6 +15696,8 @@ async function archiveDoneCard(cardId) {
                     if (typeof renderDailyCheckinCard === 'function') renderDailyCheckinCard(); // V95.88: LN feeds the unified Log chip + streak
                     // V94.33: try deep-link once entries are available (PR 3.2 LINE Flex Message target)
                     if (typeof lnInternHandleDeepLink === 'function') lnInternHandleDeepLink();
+                    // V96.27: Learning Note submissions feed the Mission "Done" badge too.
+                    if (typeof updateMissionDoneBadge === 'function') updateMissionDoneBadge();
                 }, e => {
                     console.warn('Error loading my LN entries:', e);
                 });
