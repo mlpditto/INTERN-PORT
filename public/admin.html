@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.97</title>
+    <title>Nika V96.98</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6261,6 +6261,13 @@
                 </div>
                 <div id="chip-diseasedraft" class="stat-badge" style="display:none; background:rgba(13, 148, 136, 0.08); color:#0d9488; border:1px solid rgba(13, 148, 136, 0.15); padding:6px 14px; border-radius:14px; font-weight:800; font-size:0.85em; display:flex; align-items:center; gap:8px; cursor:pointer; transition:0.2s;" onmouseover="this.style.background='rgba(13, 148, 136, 0.15)'" onmouseout="this.style.background='rgba(13, 148, 136, 0.08)'" onclick="openDiseaseCodexDrafts()" title="Intern-submitted Disease Codex drafts awaiting moderation">
                     <span style="font-size:1.2em;">🩺</span> Disease Drafts <span id="stat-diseasedraft-count" style="margin-left:4px; opacity:0.8;">0</span>
+                </div>
+                <!-- V96.98: Alabasta case chip. Case submissions previously had no top-level
+                     signal — admin had to click into the Alabasta tab to see the Inbox count.
+                     Count is driven by the existing renderAlabastaInbox() (same pending-case
+                     computation as the Inbox badge, no new listener needed). -->
+                <div id="chip-alabasta" class="stat-badge" style="display:none; background:rgba(3, 105, 161, 0.08); color:#0369a1; border:1px solid rgba(3, 105, 161, 0.15); padding:6px 14px; border-radius:14px; font-weight:800; font-size:0.85em; display:flex; align-items:center; gap:8px; cursor:pointer; transition:0.2s;" onmouseover="this.style.background='rgba(3, 105, 161, 0.15)'" onmouseout="this.style.background='rgba(3, 105, 161, 0.08)'" onclick="openAlabastaInbox()" title="New cases submitted from the intern LIFF, awaiting review">
+                    <span style="font-size:1.2em;">📥</span> New Cases <span id="stat-alabasta-count" style="margin-left:4px; opacity:0.8;">0</span>
                 </div>
             </div>
 
@@ -20249,6 +20256,12 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         function openDiseaseCodexDrafts() {
             if (typeof openDiseaseCodexAdmin === 'function') openDiseaseCodexAdmin();
             if (typeof dxaSwitchView === 'function') dxaSwitchView('drafts');
+        }
+        // V96.98: Dashboard "New Cases" chip click → jump to the Alabasta tab, where the
+        // Inbox section (pending cases) already sits at the top — mirrors the same
+        // try/catch switchTab pattern used elsewhere for cross-tab chip navigation.
+        function openAlabastaInbox() {
+            try { switchTab('tab-alabasta'); } catch (_) {}
         }
 
         var quizzesData = [];
@@ -39326,6 +39339,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             ).sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
 
             countEl.textContent = pending.length;
+
+            // V96.98: mirror the same count onto the Dashboard "New Cases" chip.
+            const chipEl = document.getElementById('chip-alabasta');
+            const chipCountEl = document.getElementById('stat-alabasta-count');
+            if (chipCountEl) chipCountEl.textContent = pending.length;
+            if (chipEl) chipEl.style.display = pending.length > 0 ? 'flex' : 'none';
 
             if (pending.length === 0) {
                 container.innerHTML = '';
