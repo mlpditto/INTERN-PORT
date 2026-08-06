@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.98</title>
+    <title>Nika V97.02</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -45170,14 +45170,26 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             
             let allTargets = [...usersData];
             if (!sourceIsPreReg) {
-                const unclaimedPreRegs = preRegData.filter(p => !p.claimed).map(p => ({
-                    id: p.id,
-                    isPreReg: true,
-                    displayName: `⏳ [Pre-Reg] ${p.fullName || p.nickName || 'No Name'}`,
-                    fullName: p.fullName,
-                    score: 0,
-                    pictureUrl: 'https://cdn-icons-png.flaticon.com/512/847/847969.png'
-                }));
+                // V97.01: (a) fixed p.nickName → p.nickname — the pre_users doc field is
+                // lowercase (addPreRegUser writes `nickname`), so the old capital-N read
+                // always missed a typed nickname and fell straight to the empty fallback.
+                // (b) reported: rows were indistinguishable when fullName/nickname are both
+                // blank — subtitle now always carries the enrollment code (+ group), the
+                // one thing that reliably tells two blank pre-regs apart.
+                const unclaimedPreRegs = preRegData.filter(p => !p.claimed).map(p => {
+                    const subParts = [];
+                    if (p.fullName && p.nickname) subParts.push(p.nickname);
+                    if (p.code) subParts.push('รหัส ' + p.code);
+                    if (p.group) subParts.push(p.group);
+                    return {
+                        id: p.id,
+                        isPreReg: true,
+                        displayName: `⏳ [Pre-Reg] ${p.fullName || p.nickname || 'ยังไม่ระบุชื่อ'}`,
+                        fullName: subParts.join(' · '),
+                        score: 0,
+                        pictureUrl: 'https://cdn-icons-png.flaticon.com/512/847/847969.png'
+                    };
+                });
                 allTargets = [...allTargets, ...unclaimedPreRegs];
             }
 
@@ -45240,7 +45252,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 
                 const confirmMsg = `🚀 ATTENTION: LINK PRE-REGISTRATION?\n\n` +
                                    `USER: ${userDoc.displayName || userDoc.fullName || 'Unknown'}\n` +
-                                   `PRE-REG: ⏳ ${preRegDoc.fullName || preRegDoc.nickName || 'No Name'}\n\n` +
+                                   `PRE-REG: ⏳ ${preRegDoc.fullName || preRegDoc.nickname || 'No Name'}\n\n` +
                                    `This will manually claim the pre-registration for the user. Group '${preRegDoc.group}' and dates will be applied to the user.`;
                 
                 if (!confirm(confirmMsg)) return;
@@ -45265,7 +45277,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         isIntern: preRegDoc.group === 'INTERN',
                         status: 'active'
                     };
-                    if (preRegDoc.nickName) updateData.nickName = preRegDoc.nickName;
+                    // V97.01: was preRegDoc.nickName (wrong casing — pre_users stores
+                    // `nickname`, always undefined) writing to users.nickName (also wrong
+                    // casing — users store `nickname`). Silently dropped the intern's
+                    // nickname on every pre-reg link/merge.
+                    if (preRegDoc.nickname) updateData.nickname = preRegDoc.nickname;
                     
                     batch.update(db.collection("users").doc(userId), updateData);
                     await batch.commit();
