@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.98</title>
+    <title>Nika V97.01</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -34595,14 +34595,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
 
             // V95.65: verify gate — for AI-drafted forms, warn before saving if any
-            // filled tab is still unverified. Admin can override; cancelling jumps to
-            // the first unchecked tab so they can review it.
+            // filled tab is still unverified. V97.00: custom popup (codexVerifyGatePrompt)
+            // lets the admin verify each tab in-place or jump to it, instead of a plain
+            // confirm() that only let Cancel jump to the FIRST unchecked tab.
             if (dcaState.formAiDrafted) {
                 const unchecked = dcaUnverifiedFilledSections();
                 if (unchecked.length) {
-                    const names = unchecked.map(k => DCA_SECTION_TITLES[k] || k).join('\n• ');
-                    const ok = confirm(`ยังมี ${unchecked.length} แท็บที่ยังไม่ได้ตรวจ:\n• ${names}\n\nบันทึกเลยหรือไม่?`);
-                    if (!ok) { dcaSwitchSection(unchecked[0]); return; }
+                    const ok = await codexVerifyGatePrompt({
+                        keys: unchecked,
+                        titles: DCA_SECTION_TITLES,
+                        onJumpTo: key => dcaSwitchSection(key),
+                        onMarkVerified: key => { dcaState.verified[key] = true; dcaUpdateSectionBadges(); dcaRefreshVerifyStrip(); }
+                    });
+                    if (!ok) return;
                 }
             }
 
@@ -34772,6 +34777,76 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 document.addEventListener('keydown', onKey);
                 document.body.appendChild(overlay);
                 setTimeout(() => { try { input.focus(); input.select(); } catch (_) {} }, 30);
+            });
+        }
+
+        // V97.00: shared "unverified tabs" gate popup — replaces confirm() for both Drug
+        // and Disease Codex save flows (dcaSaveForm/dxaSaveForm). Each row can be verified
+        // in-place (no need to leave the popup and hunt for the tab) or jumped-to for a
+        // closer look. Resolves true (proceed with save) when the admin clicks "Save
+        // anyway" OR every row gets verified in-place (auto-continues to save); resolves
+        // false (abort save, stay on form) on Cancel/Escape/backdrop-click/jump-to-tab.
+        function codexVerifyGatePrompt(opts) {
+            opts = opts || {};
+            const keys = opts.keys || [];
+            const titles = opts.titles || {};
+            const onJumpTo = typeof opts.onJumpTo === 'function' ? opts.onJumpTo : () => {};
+            const onMarkVerified = typeof opts.onMarkVerified === 'function' ? opts.onMarkVerified : () => {};
+            return new Promise(resolve => {
+                const overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:100050;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+                const rowHtml = key => `
+                    <div class="cvg-row" data-key="${escapeHtml(key)}" style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 12px; border:1px solid #fde68a; background:#fffbeb; border-radius:10px; margin-bottom:8px;">
+                        <span style="font-weight:700; color:#92400e; font-size:0.9em;">${escapeHtml(titles[key] || key)}</span>
+                        <div style="display:flex; gap:6px; flex-shrink:0;">
+                            <button type="button" data-act="jump" style="width:auto; min-height:0; padding:6px 12px; background:#fff; border:1px solid #d97706; color:#b45309; border-radius:8px; font-weight:700; font-size:0.8em; cursor:pointer;">👁 ไปดู</button>
+                            <button type="button" data-act="verify" style="width:auto; min-height:0; padding:6px 12px; background:#22c55e; border:none; color:#fff; border-radius:8px; font-weight:700; font-size:0.8em; cursor:pointer;">✓ ตรวจแล้ว</button>
+                        </div>
+                    </div>`;
+                overlay.innerHTML = `
+                    <div class="lang-no-toggle" style="background:white; width:92vw; max-width:460px; max-height:80vh; display:flex; flex-direction:column; border-radius:18px; overflow:hidden; box-shadow:0 25px 50px rgba(0,0,0,0.3); font-family:Inter,sans-serif;">
+                        <div style="padding:18px 20px 6px;">
+                            <h3 style="margin:0 0 6px; color:#b45309; font-size:1.05em;">⚠️ ยังมี <span data-count>${keys.length}</span> แท็บที่ยังไม่ได้ตรวจ</h3>
+                            <div style="font-size:0.85em; color:#78716c;">กด "👁 ไปดู" เพื่อเปิดแท็บนั้น หรือ "✓ ตรวจแล้ว" ถ้าดูแล้วโอเค</div>
+                        </div>
+                        <div data-rows style="padding:12px 20px; overflow-y:auto; flex:1;">${keys.map(rowHtml).join('')}</div>
+                        <div style="padding:14px 20px 18px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid #f1f5f9;">
+                            <button type="button" data-act="cancel" style="background:#e2e8f0; color:#334155; border:none; padding:9px 18px; border-radius:10px; cursor:pointer; font-weight:700; width:auto; min-height:0;">Cancel</button>
+                            <button type="button" data-act="save-anyway" style="background:#f59e0b; color:#fff; border:none; padding:9px 18px; border-radius:10px; cursor:pointer; font-weight:700; width:auto; min-height:0;">💾 บันทึกเลย (ข้ามตรวจ)</button>
+                        </div>
+                    </div>`;
+                function cleanup(val) {
+                    document.removeEventListener('keydown', onKey);
+                    overlay.remove();
+                    resolve(val);
+                }
+                function onKey(e) {
+                    if (e.key === 'Escape') { e.preventDefault(); cleanup(false); }
+                }
+                const rowsWrap = overlay.querySelector('[data-rows]');
+                const countEl = overlay.querySelector('[data-count]');
+                rowsWrap.addEventListener('click', e => {
+                    const btn = e.target.closest('button[data-act]');
+                    if (!btn) return;
+                    const row = btn.closest('.cvg-row');
+                    const key = row && row.dataset.key;
+                    if (!key) return;
+                    if (btn.dataset.act === 'jump') {
+                        onJumpTo(key);
+                        cleanup(false); // admin is going to look at it manually; re-trigger Save when ready
+                    } else if (btn.dataset.act === 'verify') {
+                        onMarkVerified(key);
+                        row.remove();
+                        const remaining = rowsWrap.querySelectorAll('.cvg-row').length;
+                        if (countEl) countEl.textContent = remaining;
+                        if (remaining === 0) cleanup(true); // all verified in-place — proceed straight to save
+                    }
+                });
+                overlay.querySelector('button[data-act="cancel"]').addEventListener('click', () => cleanup(false));
+                overlay.querySelector('button[data-act="save-anyway"]').addEventListener('click', () => cleanup(true));
+                overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); });
+                document.addEventListener('keydown', onKey);
+                document.body.appendChild(overlay);
             });
         }
 
@@ -38054,13 +38129,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
 
             // V95.65: verify gate — for AI-drafted forms, warn before saving if any
-            // filled tab is still unverified. Cancel jumps to the first unchecked tab.
+            // filled tab is still unverified. V97.00: custom popup (codexVerifyGatePrompt,
+            // shared with Drug Codex) lets the admin verify each tab in-place or jump to
+            // it, instead of a plain confirm() that only let Cancel jump to the FIRST
+            // unchecked tab.
             if (dxaState.formAiDrafted) {
                 const unchecked = dxaUnverifiedFilledSections();
                 if (unchecked.length) {
-                    const names = unchecked.map(k => DXA_SECTION_TITLES[k] || k).join('\n• ');
-                    const ok = confirm(`ยังมี ${unchecked.length} แท็บที่ยังไม่ได้ตรวจ:\n• ${names}\n\nบันทึกเลยหรือไม่?`);
-                    if (!ok) { dxaSwitchSection(unchecked[0]); return; }
+                    const ok = await codexVerifyGatePrompt({
+                        keys: unchecked,
+                        titles: DXA_SECTION_TITLES,
+                        onJumpTo: key => dxaSwitchSection(key),
+                        onMarkVerified: key => { dxaState.verified[key] = true; dxaUpdateSectionBadges(); dxaRefreshVerifyStrip(); }
+                    });
+                    if (!ok) return;
                 }
             }
 
