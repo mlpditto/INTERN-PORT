@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.06</title>
+    <title>Nika V97.07</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -28220,6 +28220,11 @@ ${JSON.stringify(sourceObj)}`;
             forceShowModal('quizCompareModal');
         }
 
+        // V97.07: click-to-expand for the AI overlap cards below — resolved quiz+question
+        // refs for the currently-rendered overlap list, indexed to match the DOM cards
+        // (toggleQuizCompareOverlapDetail reads this by index instead of re-parsing HTML).
+        let quizCompareOverlapData = [];
+
         // V97.06: "🤖 AI Deep Compare" — the free n-gram pass above only catches literal/
         // near-literal text reuse. It structurally can't catch two questions that test the
         // SAME clinical concept in different words (different scenario framing, vignette vs
@@ -28280,16 +28285,25 @@ RULES:
 
                 if (resultEl) {
                     if (!result.overlaps.length) {
+                        quizCompareOverlapData = [];
                         resultEl.innerHTML = '<div style="padding:10px 12px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; color:#166534; font-size:0.85em;">✅ AI ไม่พบคู่คำถามที่ทดสอบแนวคิดเดียวกัน</div>';
                     } else {
-                        resultEl.innerHTML = '<div style="font-weight:800; color:#0f172a; font-size:0.9em; margin-bottom:8px;">🤖 AI พบความซ้ำซ้อนเชิงเนื้อหา ' + result.overlaps.length + ' คู่</div>'
-                            + result.overlaps.map(o => {
+                        // V97.07: resolve each overlap's quiz-name labels back to the actual
+                        // quiz objects (still in scope via `usable`) so a click can render the
+                        // full stem+choices without another AI call or re-fetch.
+                        const findQuiz = label => usable.find(q => (q.shortTitle || q.title || q.id) === label);
+                        quizCompareOverlapData = result.overlaps.map(o => ({ o, qa: findQuiz(o.quizA), qb: findQuiz(o.quizB) }));
+                        resultEl.innerHTML = '<div style="font-weight:800; color:#0f172a; font-size:0.9em; margin-bottom:8px;">🤖 AI พบความซ้ำซ้อนเชิงเนื้อหา ' + result.overlaps.length + ' คู่ <span style="font-weight:600; color:#64748b; font-size:0.85em;">(กดที่การ์ดเพื่อดูโจทย์เต็ม)</span></div>'
+                            + quizCompareOverlapData.map((item, idx) => {
+                                const o = item.o;
                                 const strong = o.confidence === 'high';
                                 const bg = strong ? '#fee2e2' : '#fef3c7';
                                 const fg = strong ? '#991b1b' : '#92400e';
-                                return `<div style="padding:8px 10px; border-radius:8px; background:${bg}; border:1px solid ${fg}33; margin-bottom:6px; font-size:0.85em;">
+                                return `<div class="quiz-compare-overlap-card" onclick="toggleQuizCompareOverlapDetail(${idx})" style="padding:8px 10px; border-radius:8px; background:${bg}; border:1px solid ${fg}33; margin-bottom:6px; font-size:0.85em; cursor:pointer;">
                                     <span style="font-weight:700; color:${fg};">${escapeHtml(o.confidence || '')}</span> — ${escapeHtml(o.quizA || '')} Q${o.qA} ↔ ${escapeHtml(o.quizB || '')} Q${o.qB}
+                                    <span id="quiz-compare-overlap-caret-${idx}" style="float:right; font-size:0.85em; color:${fg}; font-weight:700;">▾ ดูโจทย์เต็ม</span>
                                     <div style="color:#334155; margin-top:2px;">${escapeHtml(o.concept || '')}</div>
+                                    <div id="quiz-compare-overlap-detail-${idx}" style="display:none; margin-top:8px;" onclick="event.stopPropagation()"></div>
                                 </div>`;
                             }).join('');
                     }
@@ -28300,6 +28314,42 @@ RULES:
             } finally {
                 if (btn) { btn.disabled = false; btn.innerHTML = oldText; }
             }
+        }
+
+        // V97.07: click-to-expand for an AI overlap card — renders both questions' full
+        // stem + choices (correct answer highlighted) inline, from already-loaded
+        // quizzesData. No extra AI call, no navigation away from the Compare modal.
+        function toggleQuizCompareOverlapDetail(idx) {
+            const item = quizCompareOverlapData[idx];
+            const panel = document.getElementById(`quiz-compare-overlap-detail-${idx}`);
+            const caret = document.getElementById(`quiz-compare-overlap-caret-${idx}`);
+            if (!item || !panel) return;
+            const isOpen = panel.style.display !== 'none';
+            if (isOpen) {
+                panel.style.display = 'none';
+                panel.innerHTML = '';
+                if (caret) caret.textContent = '▾ ดูโจทย์เต็ม';
+                return;
+            }
+            panel.innerHTML = quizCompareRenderQuestionBlock(item.qa, item.o.qA) + quizCompareRenderQuestionBlock(item.qb, item.o.qB);
+            panel.style.display = 'block';
+            if (caret) caret.textContent = '▴ ซ่อน';
+        }
+
+        function quizCompareRenderQuestionBlock(quiz, qNum) {
+            if (!quiz) return '<div style="color:#94a3b8; font-size:0.82em;">ไม่พบข้อมูลควิซ</div>';
+            const question = (quiz.questions || [])[qNum - 1];
+            if (!question) return '<div style="color:#94a3b8; font-size:0.82em;">ไม่พบคำถามข้อนี้</div>';
+            const correct = Array.isArray(question.correct) ? question.correct : [];
+            const opts = (question.options || []).map((opt, i) => {
+                const isCorrect = correct.includes(i);
+                return `<div style="padding:4px 8px; margin:2px 0; border-radius:6px; background:${isCorrect ? '#dcfce7' : '#f8fafc'}; border:1px solid ${isCorrect ? '#86efac' : '#e2e8f0'}; font-size:0.85em; color:${isCorrect ? '#166534' : '#334155'}; font-weight:${isCorrect ? 800 : 400};">${i + 1}. ${escapeHtml(opt)}</div>`;
+            }).join('');
+            return `<div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:6px;">
+                <div style="font-weight:800; font-size:0.8em; color:#0891b2; margin-bottom:4px;">${escapeHtml(quiz.shortTitle || quiz.title || 'Quiz')} Q${qNum}</div>
+                <div style="font-size:0.85em; color:#1e293b; margin-bottom:6px; white-space:pre-wrap;">${escapeHtml(quizCompareStripMd(question.q))}</div>
+                ${opts}
+            </div>`;
         }
 
         async function toggleTemplateStatus(id, current) {
