@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.05</title>
+    <title>Nika V97.06</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -14812,14 +14812,21 @@
 
     <!-- V97.05: "🔍 Compare Selected" — bulk-select N quizzes in the list (checkbox
          column, existing selectedQuizIds), open this modal to spot possible content
-         overlap without leaving the list. No AI call — client-side n-gram similarity
-         over question stems (openQuizCompareModal / quizCompareCompute). -->
+         overlap without leaving the list. Free tier: client-side n-gram similarity
+         over question stems (openQuizCompareModal). V97.06: reported the n-gram pass
+         missed same-CONCEPT-different-wording pairs (a short direct question vs a long
+         clinical vignette both testing the same fact) — added an optional 🤖 AI Deep
+         Compare pass (quizCompareAiDeepCompare) for that case; costs tokens, opt-in. -->
     <div id="quizCompareModal" class="modal lang-no-toggle" style="z-index:4200;">
         <div class="modal-content" style="max-width:1040px; width:95%; text-align:left; border-radius:18px; padding:20px 22px;">
             <span class="close-modal" onclick="document.getElementById('quizCompareModal').style.display='none'">&times;</span>
-            <h3 style="margin:0 0 4px; color:#0891b2; font-size:1.3em; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-code-compare"></i> Compare Selected Quizzes</h3>
-            <div id="quiz-compare-summary" style="font-size:0.85em; color:#475569; margin-bottom:14px;"></div>
-            <div id="quiz-compare-body" style="display:flex; flex-direction:column; gap:16px; max-height:70vh; overflow-y:auto;"></div>
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                <h3 style="margin:0 0 4px; color:#0891b2; font-size:1.3em; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-code-compare"></i> Compare Selected Quizzes</h3>
+                <button id="quiz-compare-ai-btn" type="button" onclick="quizCompareAiDeepCompare()" title="Ask AI to find questions testing the same concept in different words — the free text-similarity pass above only catches literal overlap. Costs tokens." style="padding:6px 14px; border:none; border-radius:8px; background:linear-gradient(135deg,#7c3aed,#a855f7); color:#fff; font-size:0.78em; font-weight:800; cursor:pointer; white-space:nowrap;">🤖 AI Deep Compare</button>
+            </div>
+            <div id="quiz-compare-summary" style="font-size:0.85em; color:#475569; margin-bottom:10px;"></div>
+            <div id="quiz-compare-ai-result" style="margin-bottom:14px;"></div>
+            <div id="quiz-compare-body" style="display:flex; flex-direction:column; gap:16px; max-height:60vh; overflow-y:auto;"></div>
         </div>
     </div>
 
@@ -28105,7 +28112,16 @@ ${JSON.stringify(sourceObj)}`;
         // on mixed Thai+English text without a word tokenizer (Thai has no reliable
         // word-boundary spacing, so naive .split(' ') badly undercounts overlap).
         const QUIZ_COMPARE_NGRAM = 5;
-        const QUIZ_COMPARE_THRESHOLD = 0.25; // below this, treat as unrelated — tune if too noisy/quiet
+        // V97.06: reported — Q10 (long VTE-risk direct question) and Q4 (long VTE-risk
+        // clinical vignette, different quiz) test the SAME fact but weren't flagged.
+        // Root cause: Jaccard (inter/union) penalizes pairs of very different LENGTH —
+        // a long vignette contributes many unique shingles unrelated to the shared fact,
+        // inflating the union and shrinking the score even when the shorter question is
+        // almost entirely contained in the longer one. Switched to containment/overlap
+        // coefficient (inter/min(|A|,|B|)), which is length-symmetric. Threshold bumped
+        // accordingly (containment runs higher than Jaccard structurally) — still a
+        // starting guess pending live tuning, not empirically calibrated.
+        const QUIZ_COMPARE_THRESHOLD = 0.3; // below this, treat as unrelated — tune if too noisy/quiet
         function quizCompareShingles(text) {
             const clean = String(text || '')
                 .replace(/[#*_`>\[\]()!]/g, '')  // strip common markdown syntax
@@ -28124,8 +28140,7 @@ ${JSON.stringify(sourceObj)}`;
             if (sa.size === 0 || sb.size === 0) return 0;
             let inter = 0;
             sa.forEach(s => { if (sb.has(s)) inter++; });
-            const union = sa.size + sb.size - inter;
-            return union === 0 ? 0 : inter / union;
+            return inter / Math.min(sa.size, sb.size); // containment, not Jaccard — see comment above
         }
         function quizCompareStripMd(s) {
             return String(s || '').replace(/[#*_`>\[\]()]/g, '').replace(/\s+/g, ' ').trim();
@@ -28181,9 +28196,11 @@ ${JSON.stringify(sourceObj)}`;
                             const otherQuiz = usable[m.other.quizIdx];
                             const otherStem = quizCompareStripMd((otherQuiz.questions[m.other.qIndex] || {}).q || '');
                             const pct = Math.round(m.score * 100);
-                            return `<span title="${escapeHtml(otherStem.slice(0, 200))}" style="display:inline-block; margin:3px 4px 0 0; padding:2px 8px; border-radius:999px; font-size:0.72em; font-weight:700; background:${pct >= 50 ? '#fee2e2' : '#fef3c7'}; color:${pct >= 50 ? '#991b1b' : '#92400e'};">≈ ${pct}% · ${escapeHtml(otherQuiz.shortTitle || otherQuiz.title || 'Quiz')} Q${m.other.qIndex + 1}</span>`;
+                            // V97.06: "strong" tier bumped 50%→60% — containment runs
+                            // structurally higher than the old Jaccard score did.
+                            return `<span title="${escapeHtml(otherStem.slice(0, 200))}" style="display:inline-block; margin:3px 4px 0 0; padding:2px 8px; border-radius:999px; font-size:0.72em; font-weight:700; background:${pct >= 60 ? '#fee2e2' : '#fef3c7'}; color:${pct >= 60 ? '#991b1b' : '#92400e'};">≈ ${pct}% · ${escapeHtml(otherQuiz.shortTitle || otherQuiz.title || 'Quiz')} Q${m.other.qIndex + 1}</span>`;
                         }).join('');
-                        const rowBg = myMatches.length ? (myMatches[0].score >= 0.5 ? '#fef2f2' : '#fffbeb') : '#fff';
+                        const rowBg = myMatches.length ? (myMatches[0].score >= 0.6 ? '#fef2f2' : '#fffbeb') : '#fff';
                         const rowBorder = myMatches.length ? '#fde68a' : '#f1f5f9';
                         return `<div style="padding:8px 10px; border-radius:8px; background:${rowBg}; border:1px solid ${rowBorder};">
                             <div style="font-size:0.85em; color:#1e293b;"><b>Q${i + 1}.</b> ${escapeHtml(stem)}${fullStem.length > 160 ? '…' : ''}</div>
@@ -28201,6 +28218,88 @@ ${JSON.stringify(sourceObj)}`;
             }
 
             forceShowModal('quizCompareModal');
+        }
+
+        // V97.06: "🤖 AI Deep Compare" — the free n-gram pass above only catches literal/
+        // near-literal text reuse. It structurally can't catch two questions that test the
+        // SAME clinical concept in different words (different scenario framing, vignette vs
+        // direct question) — reported exactly this case (VTE-risk question asked two ways
+        // across two quizzes). One AI call for the whole selection (not O(n²) pairwise —
+        // keeps cost flat regardless of question count) asks the model to name concept-level
+        // overlaps. Opt-in / costs tokens, so it's a separate button, not automatic.
+        async function quizCompareAiDeepCompare() {
+            const ids = [...selectedQuizIds];
+            const picked = ids.map(id => quizzesData.find(q => q.id === id)).filter(Boolean);
+            const usable = picked.filter(q => (q.questions || []).length);
+            if (usable.length < 2) return alert('Need at least 2 selected quizzes with questions to compare.');
+
+            const btn = document.getElementById('quiz-compare-ai-btn');
+            const resultEl = document.getElementById('quiz-compare-ai-result');
+            const oldText = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> AI กำลังเทียบ…'; }
+            if (resultEl) resultEl.innerHTML = '';
+
+            const label = q => q.shortTitle || q.title || q.id;
+            const qList = usable.map(q => {
+                const stems = (q.questions || []).map((question, i) => `  Q${i + 1}: ${quizCompareStripMd(question.q).slice(0, 400)}`).join('\n');
+                return `QUIZ "${label(q)}":\n${stems}`;
+            }).join('\n\n');
+
+            const prompt = `You are auditing a set of medical-education multiple-choice quizzes for CONCEPTUAL redundancy — questions from DIFFERENT quizzes that test the same underlying clinical fact or decision point even when worded completely differently (e.g. a short direct question vs a long clinical vignette). A plain text-similarity pass already caught literal/near-literal overlap; you are specifically looking for same-concept-different-wording pairs it would miss.
+
+QUIZZES (each question numbered within its own quiz):
+${qList}
+
+OUTPUT FORMAT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
+{
+  "overlaps": [
+    { "quizA": "<<<exact quiz name from above>>>", "qA": 1, "quizB": "<<<exact quiz name from above>>>", "qB": 1, "concept": "<<<one short phrase, Thai, naming the shared concept/fact>>>", "confidence": "high|medium" }
+  ]
+}
+
+RULES:
+- Only report pairs from DIFFERENT quizzes — never qA/qB inside the same quiz.
+- "confidence":"high" = a learner who answered one already knows the answer to the other (same fact/decision point). "medium" = overlapping topic but a meaningfully different angle or depth — admin should judge.
+- Do NOT report every pair that merely mentions the same drug/disease name — that's expected across a topical quiz series, not redundancy.
+- Each unordered pair appears at most once.
+- If no overlaps found, return {"overlaps": []}. An empty array is a valid, good answer.`;
+
+            try {
+                const selectedModel = document.getElementById('ai-analyzer-model-val')?.value || 'gemini-3.6-flash';
+                let resultRaw = '', result = null;
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    const aiResp = await callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 8192, feature: 'quiz_compare_ai' });
+                    resultRaw = aiResp.text;
+                    result = safeJsonParse(resultRaw);
+                    if (result) break;
+                    if (attempt === 1) console.warn('[quizCompareAiDeepCompare] attempt 1 non-JSON, retrying. Snippet:', String(resultRaw || '').slice(0, 200));
+                }
+                if (!result || !Array.isArray(result.overlaps)) {
+                    throw new Error('AI returned invalid JSON after 2 attempts. First 300 chars:\n\n' + String(resultRaw || '').slice(0, 300));
+                }
+
+                if (resultEl) {
+                    if (!result.overlaps.length) {
+                        resultEl.innerHTML = '<div style="padding:10px 12px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; color:#166534; font-size:0.85em;">✅ AI ไม่พบคู่คำถามที่ทดสอบแนวคิดเดียวกัน</div>';
+                    } else {
+                        resultEl.innerHTML = '<div style="font-weight:800; color:#0f172a; font-size:0.9em; margin-bottom:8px;">🤖 AI พบความซ้ำซ้อนเชิงเนื้อหา ' + result.overlaps.length + ' คู่</div>'
+                            + result.overlaps.map(o => {
+                                const strong = o.confidence === 'high';
+                                const bg = strong ? '#fee2e2' : '#fef3c7';
+                                const fg = strong ? '#991b1b' : '#92400e';
+                                return `<div style="padding:8px 10px; border-radius:8px; background:${bg}; border:1px solid ${fg}33; margin-bottom:6px; font-size:0.85em;">
+                                    <span style="font-weight:700; color:${fg};">${escapeHtml(o.confidence || '')}</span> — ${escapeHtml(o.quizA || '')} Q${o.qA} ↔ ${escapeHtml(o.quizB || '')} Q${o.qB}
+                                    <div style="color:#334155; margin-top:2px;">${escapeHtml(o.concept || '')}</div>
+                                </div>`;
+                            }).join('');
+                    }
+                }
+            } catch (e) {
+                console.error('[quizCompareAiDeepCompare]', e);
+                if (resultEl) resultEl.innerHTML = '<div style="padding:10px 12px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; color:#991b1b; font-size:0.85em;">⚠️ AI compare error: ' + escapeHtml(e && e.message ? e.message : 'unknown') + '</div>';
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = oldText; }
+            }
         }
 
         async function toggleTemplateStatus(id, current) {
