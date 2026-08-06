@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.08</title>
+    <title>Nika V97.09</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16273,6 +16273,14 @@
             // slowing near the cap so it never reaches 100% before the call returns). Cleared
             // in the finally block.
             let analyzeProgressTimer = null;
+            // V97.09: callUniversalAI's fetch has no client-side timeout, so a hung proxy/
+            // network call left the button frozen at "Analyzing 95%" forever with no error.
+            // Race each attempt against a 2-minute cap so the catch block always fires and
+            // the button resets — full-quiz audits normally finish in well under this.
+            const withTimeout = (promise, ms) => Promise.race([
+                promise,
+                new Promise((_, reject) => setTimeout(() => reject(new Error(`Timed out after ${Math.round(ms / 1000)}s waiting for the AI proxy. Try again or switch model.`)), ms))
+            ]);
 
             try {
                 if (btn) {
@@ -16303,7 +16311,7 @@
                     // can exceed the proxy's default 8192-token cap and truncate mid-JSON,
                     // surfacing as a false "prose instead of JSON" banner. Request a larger
                     // output budget (proxy caps it server-side).
-                    const aiResp = await callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'quiz_analyzer' });
+                    const aiResp = await withTimeout(callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'quiz_analyzer' }), 120000);
                     resultRaw = aiResp.text;
                     aiTokens = aiResp.tokens;
                     aiModel = aiResp.model;
