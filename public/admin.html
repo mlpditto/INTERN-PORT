@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V96.99</title>
+    <title>Nika V97.00</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -35108,7 +35108,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             agg.forEach((meta, id) => {
                 if (already.has(id)) return;
                 const u = users.find(x => x.id === id);
-                if (!u || String(u.group || '').toUpperCase() !== 'INTERN') return;
+                // V96.99: was group==='INTERN' only — excluded real enrolled interns whose
+                // group is 'Junior'/'EXTERN'/etc (the pre-reg default is 'Junior', not
+                // 'INTERN'), so new users never showed up here. Now: any enrolled group
+                // counts, only unenrolled 'Public' is excluded (reported: new users missing).
+                if (!u || String(u.group || 'Public').toUpperCase() === 'PUBLIC') return;
                 cands.push({ id, name: u.displayName || '', pic: u.pictureUrl || '', ts: meta.ts, n: meta.n });
             });
             cands.sort((a, b) => (b.ts - a.ts) || (b.n - a.n));
@@ -35128,10 +35132,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         // V96.13: browse-all-interns picker — a no-typing alternative to the
-        // search box + 💡 quick-pick. Lists EVERY intern (usersData group
-        // INTERN), so even those who never contributed (absent from 💡) can be
-        // added. Sorted by score desc (matches the leaderboard) then displayName.
-        // Excludes already-added helpers. Self-guards when the panel is closed.
+        // search box + 💡 quick-pick. Lists EVERY enrolled user (any group but
+        // Public — V96.99: was group==='INTERN' only, which excluded real interns
+        // enrolled under 'Junior'/'EXTERN', the actual pre-reg group values; see
+        // dcaHelperInput comment), so even those who never contributed (absent
+        // from 💡) can be added. Sorted by score desc (matches the leaderboard)
+        // then displayName. Excludes already-added helpers. Self-guards when the
+        // panel is closed.
         function dcaToggleHelperBrowse() {
             const panel = document.getElementById('dca-helper-browse');
             const btn = document.getElementById('dca-helper-browse-btn');
@@ -35156,7 +35163,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const already = new Set((dcaState.helpers || []).map(h => h.userId));
             const pool = (typeof usersData !== 'undefined' ? usersData : []);
             const interns = pool
-                .filter(u => u && u.id && !already.has(u.id) && String(u.group || '').toUpperCase() === 'INTERN')
+                .filter(u => u && u.id && !already.has(u.id) && String(u.group || 'Public').toUpperCase() !== 'PUBLIC')
                 .sort((a, b) => (Number(b.score || 0) - Number(a.score || 0))
                     || String(a.displayName || '').localeCompare(String(b.displayName || '')));
             if (interns.length === 0) {
@@ -35242,12 +35249,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!term) { box.style.display = 'none'; box.innerHTML = ''; return; }
             const already = new Set((dcaState.helpers || []).map(h => h.userId));
             const pool = (typeof usersData !== 'undefined' ? usersData : []);
-            // V96.09: restrict contributor picker to interns only (group === 'INTERN').
-            // Other groups (Junior/EXTERN/Public) are excluded — this chip credits
-            // intern contributions. Case-insensitive guard against stored-casing drift.
+            // V96.09: restrict contributor picker to interns only.
+            // V96.99: was group==='INTERN' literal — excluded real enrolled interns
+            // whose group is 'Junior' or 'EXTERN' (the pre-reg default is 'Junior',
+            // not 'INTERN' — see admin.html prereg-group select), so newly-enrolled
+            // users never appeared here (reported bug). Now any enrolled group counts;
+            // only unenrolled 'Public' is excluded. Case-insensitive guard against
+            // stored-casing drift.
             const matches = pool
                 .filter(u => u && u.id && !already.has(u.id)
-                    && String(u.group || '').toUpperCase() === 'INTERN'
+                    && String(u.group || 'Public').toUpperCase() !== 'PUBLIC'
                     && String(u.displayName || '').toLowerCase().includes(term))
                 .slice(0, 8);
             if (matches.length === 0) {
