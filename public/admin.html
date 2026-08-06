@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.07</title>
+    <title>Nika V97.08</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -28331,9 +28331,32 @@ RULES:
                 if (caret) caret.textContent = '▾ ดูโจทย์เต็ม';
                 return;
             }
-            panel.innerHTML = quizCompareRenderQuestionBlock(item.qa, item.o.qA) + quizCompareRenderQuestionBlock(item.qb, item.o.qB);
+            const copyBtn = `<button type="button" onclick="quizCompareCopyOverlapText(${idx})" style="display:inline-flex; align-items:center; gap:5px; margin-bottom:8px; padding:4px 10px; border:none; border-radius:6px; background:#0891b2; color:#fff; font-size:0.75em; font-weight:700; cursor:pointer;"><i class="fa-solid fa-copy"></i> Copy โจทย์ทั้งคู่</button>`;
+            panel.innerHTML = copyBtn + quizCompareRenderQuestionBlock(item.qa, item.o.qA) + quizCompareRenderQuestionBlock(item.qb, item.o.qB);
             panel.style.display = 'block';
             if (caret) caret.textContent = '▴ ซ่อน';
+        }
+
+        // V97.08: plain-text export of a compared pair — stem + choices with the correct
+        // one marked ✅, no markdown/HTML — pastes cleanly anywhere (chat, notes, docs).
+        function quizCompareCopyOverlapText(idx) {
+            const item = quizCompareOverlapData[idx];
+            if (!item) return;
+            const block = (quiz, qNum) => {
+                if (!quiz) return `Q${qNum}: (ไม่พบข้อมูลควิซ)`;
+                const question = (quiz.questions || [])[qNum - 1];
+                if (!question) return `Q${qNum}: (ไม่พบคำถามข้อนี้)`;
+                const correct = Array.isArray(question.correct) ? question.correct : [];
+                const label = quiz.shortTitle || quiz.title || 'Quiz';
+                const stem = quizCompareStripMd(question.q);
+                const opts = (question.options || []).map((opt, i) => `${correct.includes(i) ? '✅' : '  '} ${i + 1}. ${quizCompareStripMd(opt)}`).join('\n');
+                return `━━ ${label} Q${qNum} ━━\n${stem}\n${opts}`;
+            };
+            const o = item.o;
+            const text = `[${o.concept || ''}] ${o.quizA || ''} Q${o.qA} ↔ ${o.quizB || ''} Q${o.qB}\n\n${block(item.qa, o.qA)}\n\n${block(item.qb, o.qB)}`;
+            navigator.clipboard.writeText(text)
+                .then(() => showToast('📋 Copied'))
+                .catch(() => alert('Copy failed — clipboard permission blocked?'));
         }
 
         function quizCompareRenderQuestionBlock(quiz, qNum) {
