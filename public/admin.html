@@ -34605,14 +34605,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
 
             // V95.65: verify gate — for AI-drafted forms, warn before saving if any
-            // filled tab is still unverified. Admin can override; cancelling jumps to
-            // the first unchecked tab so they can review it.
+            // filled tab is still unverified. V97.00: custom popup (codexVerifyGatePrompt)
+            // lets the admin verify each tab in-place or jump to it, instead of a plain
+            // confirm() that only let Cancel jump to the FIRST unchecked tab.
             if (dcaState.formAiDrafted) {
                 const unchecked = dcaUnverifiedFilledSections();
                 if (unchecked.length) {
-                    const names = unchecked.map(k => DCA_SECTION_TITLES[k] || k).join('\n• ');
-                    const ok = confirm(`ยังมี ${unchecked.length} แท็บที่ยังไม่ได้ตรวจ:\n• ${names}\n\nบันทึกเลยหรือไม่?`);
-                    if (!ok) { dcaSwitchSection(unchecked[0]); return; }
+                    const ok = await codexVerifyGatePrompt({
+                        keys: unchecked,
+                        titles: DCA_SECTION_TITLES,
+                        onJumpTo: key => dcaSwitchSection(key),
+                        onMarkVerified: key => { dcaState.verified[key] = true; dcaUpdateSectionBadges(); dcaRefreshVerifyStrip(); }
+                    });
+                    if (!ok) return;
                 }
             }
 
@@ -34782,6 +34787,76 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 document.addEventListener('keydown', onKey);
                 document.body.appendChild(overlay);
                 setTimeout(() => { try { input.focus(); input.select(); } catch (_) {} }, 30);
+            });
+        }
+
+        // V97.00: shared "unverified tabs" gate popup — replaces confirm() for both Drug
+        // and Disease Codex save flows (dcaSaveForm/dxaSaveForm). Each row can be verified
+        // in-place (no need to leave the popup and hunt for the tab) or jumped-to for a
+        // closer look. Resolves true (proceed with save) when the admin clicks "Save
+        // anyway" OR every row gets verified in-place (auto-continues to save); resolves
+        // false (abort save, stay on form) on Cancel/Escape/backdrop-click/jump-to-tab.
+        function codexVerifyGatePrompt(opts) {
+            opts = opts || {};
+            const keys = opts.keys || [];
+            const titles = opts.titles || {};
+            const onJumpTo = typeof opts.onJumpTo === 'function' ? opts.onJumpTo : () => {};
+            const onMarkVerified = typeof opts.onMarkVerified === 'function' ? opts.onMarkVerified : () => {};
+            return new Promise(resolve => {
+                const overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:100050;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+                const rowHtml = key => `
+                    <div class="cvg-row" data-key="${escapeHtml(key)}" style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 12px; border:1px solid #fde68a; background:#fffbeb; border-radius:10px; margin-bottom:8px;">
+                        <span style="font-weight:700; color:#92400e; font-size:0.9em;">${escapeHtml(titles[key] || key)}</span>
+                        <div style="display:flex; gap:6px; flex-shrink:0;">
+                            <button type="button" data-act="jump" style="width:auto; min-height:0; padding:6px 12px; background:#fff; border:1px solid #d97706; color:#b45309; border-radius:8px; font-weight:700; font-size:0.8em; cursor:pointer;">👁 ไปดู</button>
+                            <button type="button" data-act="verify" style="width:auto; min-height:0; padding:6px 12px; background:#22c55e; border:none; color:#fff; border-radius:8px; font-weight:700; font-size:0.8em; cursor:pointer;">✓ ตรวจแล้ว</button>
+                        </div>
+                    </div>`;
+                overlay.innerHTML = `
+                    <div class="lang-no-toggle" style="background:white; width:92vw; max-width:460px; max-height:80vh; display:flex; flex-direction:column; border-radius:18px; overflow:hidden; box-shadow:0 25px 50px rgba(0,0,0,0.3); font-family:Inter,sans-serif;">
+                        <div style="padding:18px 20px 6px;">
+                            <h3 style="margin:0 0 6px; color:#b45309; font-size:1.05em;">⚠️ ยังมี <span data-count>${keys.length}</span> แท็บที่ยังไม่ได้ตรวจ</h3>
+                            <div style="font-size:0.85em; color:#78716c;">กด "👁 ไปดู" เพื่อเปิดแท็บนั้น หรือ "✓ ตรวจแล้ว" ถ้าดูแล้วโอเค</div>
+                        </div>
+                        <div data-rows style="padding:12px 20px; overflow-y:auto; flex:1;">${keys.map(rowHtml).join('')}</div>
+                        <div style="padding:14px 20px 18px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid #f1f5f9;">
+                            <button type="button" data-act="cancel" style="background:#e2e8f0; color:#334155; border:none; padding:9px 18px; border-radius:10px; cursor:pointer; font-weight:700; width:auto; min-height:0;">Cancel</button>
+                            <button type="button" data-act="save-anyway" style="background:#f59e0b; color:#fff; border:none; padding:9px 18px; border-radius:10px; cursor:pointer; font-weight:700; width:auto; min-height:0;">💾 บันทึกเลย (ข้ามตรวจ)</button>
+                        </div>
+                    </div>`;
+                function cleanup(val) {
+                    document.removeEventListener('keydown', onKey);
+                    overlay.remove();
+                    resolve(val);
+                }
+                function onKey(e) {
+                    if (e.key === 'Escape') { e.preventDefault(); cleanup(false); }
+                }
+                const rowsWrap = overlay.querySelector('[data-rows]');
+                const countEl = overlay.querySelector('[data-count]');
+                rowsWrap.addEventListener('click', e => {
+                    const btn = e.target.closest('button[data-act]');
+                    if (!btn) return;
+                    const row = btn.closest('.cvg-row');
+                    const key = row && row.dataset.key;
+                    if (!key) return;
+                    if (btn.dataset.act === 'jump') {
+                        onJumpTo(key);
+                        cleanup(false); // admin is going to look at it manually; re-trigger Save when ready
+                    } else if (btn.dataset.act === 'verify') {
+                        onMarkVerified(key);
+                        row.remove();
+                        const remaining = rowsWrap.querySelectorAll('.cvg-row').length;
+                        if (countEl) countEl.textContent = remaining;
+                        if (remaining === 0) cleanup(true); // all verified in-place — proceed straight to save
+                    }
+                });
+                overlay.querySelector('button[data-act="cancel"]').addEventListener('click', () => cleanup(false));
+                overlay.querySelector('button[data-act="save-anyway"]').addEventListener('click', () => cleanup(true));
+                overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); });
+                document.addEventListener('keydown', onKey);
+                document.body.appendChild(overlay);
             });
         }
 
@@ -35118,7 +35193,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             agg.forEach((meta, id) => {
                 if (already.has(id)) return;
                 const u = users.find(x => x.id === id);
-                if (!u || String(u.group || '').toUpperCase() !== 'INTERN') return;
+                // V96.99: was group==='INTERN' only — excluded real enrolled interns whose
+                // group is 'Junior'/'EXTERN'/etc (the pre-reg default is 'Junior', not
+                // 'INTERN'), so new users never showed up here. Now: any enrolled group
+                // counts, only unenrolled 'Public' is excluded (reported: new users missing).
+                if (!u || String(u.group || 'Public').toUpperCase() === 'PUBLIC') return;
                 cands.push({ id, name: u.displayName || '', pic: u.pictureUrl || '', ts: meta.ts, n: meta.n });
             });
             cands.sort((a, b) => (b.ts - a.ts) || (b.n - a.n));
@@ -35138,10 +35217,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         // V96.13: browse-all-interns picker — a no-typing alternative to the
-        // search box + 💡 quick-pick. Lists EVERY intern (usersData group
-        // INTERN), so even those who never contributed (absent from 💡) can be
-        // added. Sorted by score desc (matches the leaderboard) then displayName.
-        // Excludes already-added helpers. Self-guards when the panel is closed.
+        // search box + 💡 quick-pick. Lists EVERY enrolled user (any group but
+        // Public — V96.99: was group==='INTERN' only, which excluded real interns
+        // enrolled under 'Junior'/'EXTERN', the actual pre-reg group values; see
+        // dcaHelperInput comment), so even those who never contributed (absent
+        // from 💡) can be added. Sorted by score desc (matches the leaderboard)
+        // then displayName. Excludes already-added helpers. Self-guards when the
+        // panel is closed.
         function dcaToggleHelperBrowse() {
             const panel = document.getElementById('dca-helper-browse');
             const btn = document.getElementById('dca-helper-browse-btn');
@@ -35166,7 +35248,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const already = new Set((dcaState.helpers || []).map(h => h.userId));
             const pool = (typeof usersData !== 'undefined' ? usersData : []);
             const interns = pool
-                .filter(u => u && u.id && !already.has(u.id) && String(u.group || '').toUpperCase() === 'INTERN')
+                .filter(u => u && u.id && !already.has(u.id) && String(u.group || 'Public').toUpperCase() !== 'PUBLIC')
                 .sort((a, b) => (Number(b.score || 0) - Number(a.score || 0))
                     || String(a.displayName || '').localeCompare(String(b.displayName || '')));
             if (interns.length === 0) {
@@ -35252,12 +35334,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!term) { box.style.display = 'none'; box.innerHTML = ''; return; }
             const already = new Set((dcaState.helpers || []).map(h => h.userId));
             const pool = (typeof usersData !== 'undefined' ? usersData : []);
-            // V96.09: restrict contributor picker to interns only (group === 'INTERN').
-            // Other groups (Junior/EXTERN/Public) are excluded — this chip credits
-            // intern contributions. Case-insensitive guard against stored-casing drift.
+            // V96.09: restrict contributor picker to interns only.
+            // V96.99: was group==='INTERN' literal — excluded real enrolled interns
+            // whose group is 'Junior' or 'EXTERN' (the pre-reg default is 'Junior',
+            // not 'INTERN' — see admin.html prereg-group select), so newly-enrolled
+            // users never appeared here (reported bug). Now any enrolled group counts;
+            // only unenrolled 'Public' is excluded. Case-insensitive guard against
+            // stored-casing drift.
             const matches = pool
                 .filter(u => u && u.id && !already.has(u.id)
-                    && String(u.group || '').toUpperCase() === 'INTERN'
+                    && String(u.group || 'Public').toUpperCase() !== 'PUBLIC'
                     && String(u.displayName || '').toLowerCase().includes(term))
                 .slice(0, 8);
             if (matches.length === 0) {
@@ -38064,13 +38150,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
 
             // V95.65: verify gate — for AI-drafted forms, warn before saving if any
-            // filled tab is still unverified. Cancel jumps to the first unchecked tab.
+            // filled tab is still unverified. V97.00: custom popup (codexVerifyGatePrompt,
+            // shared with Drug Codex) lets the admin verify each tab in-place or jump to
+            // it, instead of a plain confirm() that only let Cancel jump to the FIRST
+            // unchecked tab.
             if (dxaState.formAiDrafted) {
                 const unchecked = dxaUnverifiedFilledSections();
                 if (unchecked.length) {
-                    const names = unchecked.map(k => DXA_SECTION_TITLES[k] || k).join('\n• ');
-                    const ok = confirm(`ยังมี ${unchecked.length} แท็บที่ยังไม่ได้ตรวจ:\n• ${names}\n\nบันทึกเลยหรือไม่?`);
-                    if (!ok) { dxaSwitchSection(unchecked[0]); return; }
+                    const ok = await codexVerifyGatePrompt({
+                        keys: unchecked,
+                        titles: DXA_SECTION_TITLES,
+                        onJumpTo: key => dxaSwitchSection(key),
+                        onMarkVerified: key => { dxaState.verified[key] = true; dxaUpdateSectionBadges(); dxaRefreshVerifyStrip(); }
+                    });
+                    if (!ok) return;
                 }
             }
 
@@ -45184,14 +45277,26 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             
             let allTargets = [...usersData];
             if (!sourceIsPreReg) {
-                const unclaimedPreRegs = preRegData.filter(p => !p.claimed).map(p => ({
-                    id: p.id,
-                    isPreReg: true,
-                    displayName: `⏳ [Pre-Reg] ${p.fullName || p.nickName || 'No Name'}`,
-                    fullName: p.fullName,
-                    score: 0,
-                    pictureUrl: 'https://cdn-icons-png.flaticon.com/512/847/847969.png'
-                }));
+                // V97.01: (a) fixed p.nickName → p.nickname — the pre_users doc field is
+                // lowercase (addPreRegUser writes `nickname`), so the old capital-N read
+                // always missed a typed nickname and fell straight to the empty fallback.
+                // (b) reported: rows were indistinguishable when fullName/nickname are both
+                // blank — subtitle now always carries the enrollment code (+ group), the
+                // one thing that reliably tells two blank pre-regs apart.
+                const unclaimedPreRegs = preRegData.filter(p => !p.claimed).map(p => {
+                    const subParts = [];
+                    if (p.fullName && p.nickname) subParts.push(p.nickname);
+                    if (p.code) subParts.push('รหัส ' + p.code);
+                    if (p.group) subParts.push(p.group);
+                    return {
+                        id: p.id,
+                        isPreReg: true,
+                        displayName: `⏳ [Pre-Reg] ${p.fullName || p.nickname || 'ยังไม่ระบุชื่อ'}`,
+                        fullName: subParts.join(' · '),
+                        score: 0,
+                        pictureUrl: 'https://cdn-icons-png.flaticon.com/512/847/847969.png'
+                    };
+                });
                 allTargets = [...allTargets, ...unclaimedPreRegs];
             }
 
@@ -45254,7 +45359,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 
                 const confirmMsg = `🚀 ATTENTION: LINK PRE-REGISTRATION?\n\n` +
                                    `USER: ${userDoc.displayName || userDoc.fullName || 'Unknown'}\n` +
-                                   `PRE-REG: ⏳ ${preRegDoc.fullName || preRegDoc.nickName || 'No Name'}\n\n` +
+                                   `PRE-REG: ⏳ ${preRegDoc.fullName || preRegDoc.nickname || 'No Name'}\n\n` +
                                    `This will manually claim the pre-registration for the user. Group '${preRegDoc.group}' and dates will be applied to the user.`;
                 
                 if (!confirm(confirmMsg)) return;
@@ -45279,7 +45384,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         isIntern: preRegDoc.group === 'INTERN',
                         status: 'active'
                     };
-                    if (preRegDoc.nickName) updateData.nickName = preRegDoc.nickName;
+                    // V97.01: was preRegDoc.nickName (wrong casing — pre_users stores
+                    // `nickname`, always undefined) writing to users.nickName (also wrong
+                    // casing — users store `nickname`). Silently dropped the intern's
+                    // nickname on every pre-reg link/merge.
+                    if (preRegDoc.nickname) updateData.nickname = preRegDoc.nickname;
                     
                     batch.update(db.collection("users").doc(userId), updateData);
                     await batch.commit();
@@ -49270,11 +49379,23 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             const tsStr = ts ? ts.toLocaleString() : '—';
             metaEl.innerHTML = `<strong>${escHtml(note.displayName || 'Unknown')}</strong> · ${tsStr}`;
 
+            // V96.99: reported as showing incomplete/missing note text — no clobbering
+            // write path found on inspection (save flow never touches `description`), so
+            // make this loud + logged instead of a silent blank box (same pattern as the
+            // V96.97 suggested-taxonomy fix) to diagnose the next occurrence instantly.
             const content = note.description || '';
-            if (window.marked && window.DOMPurify) {
-                contentEl.innerHTML = window.DOMPurify.sanitize(window.marked.parse(content, { breaks: true, gfm: true }));
-            } else {
-                contentEl.textContent = content;
+            console.debug('[lnr-content] note', note.id, 'description length:', content.length, 'raw:', note.description);
+            try {
+                if (!content) {
+                    contentEl.innerHTML = '<div style="color:#b91c1c; font-size:0.85em; font-weight:700;">⚠️ No content found on this submission (description field is empty) — ดู DevTools Console (F12) แล้วแจ้งข้อความ [lnr-content] ให้แอดมิน dev</div>';
+                } else if (window.marked && window.DOMPurify) {
+                    contentEl.innerHTML = window.DOMPurify.sanitize(window.marked.parse(content, { breaks: true, gfm: true }));
+                } else {
+                    contentEl.textContent = content;
+                }
+            } catch (e) {
+                console.error('[lnr-content] render threw — see stack below:', e);
+                contentEl.innerHTML = '<div style="color:#b91c1c; font-size:0.85em; font-weight:700;">⚠️ render error: ' + escHtml(e && e.message ? e.message : 'unknown') + ' — ดู DevTools Console (F12)</div>';
             }
 
             scoreInput.value = '';
