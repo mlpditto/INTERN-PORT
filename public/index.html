@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.28)</title>
+    <title>Internship Portfolio (V96.29)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4881,6 +4881,18 @@
                 <span class="lang-en">An admin reviewed and edited this entry. The full change log is shown below for transparency.</span><span class="lang-th">ผู้ดูแลได้แก้ไขบันทึกนี้ บันทึกการเปลี่ยนแปลงทั้งหมดแสดงด้านล่างเพื่อความโปร่งใส</span>
             </div>
             <div id="ln-history-modal-list" style="display:flex; flex-direction:column; gap:10px; max-height:55vh; overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <!-- V97.02: read-only full-text view for a Learning Note card — the card in "My
+         Notes" was clamped to 3 lines with no way to open it. -->
+    <div id="lnNoteViewModal" class="modal" style="z-index:10004;">
+        <div class="modal-content" style="max-width:680px; width:95%; text-align:left; border-radius:18px; padding:22px;">
+            <span class="close-modal" onclick="document.getElementById('lnNoteViewModal').style.display='none'" style="float:right; font-size:24px; cursor:pointer; color:#64748b;">&times;</span>
+            <h3 id="ln-view-modal-title" style="margin:0 22px 4px 0; color:#5b21b6; font-size:1.15em; word-break:break-word;">🎓 —</h3>
+            <div id="ln-view-modal-meta" style="font-size:0.78em; color:#64748b; margin-bottom:10px;"></div>
+            <div id="ln-view-modal-tags" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px;"></div>
+            <div id="ln-view-modal-content" class="md-render" style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:12px; padding:14px 16px; max-height:50vh; overflow-y:auto; font-size:0.92em; line-height:1.6; color:#1f2937; word-break:break-word;"></div>
         </div>
     </div>
 
@@ -14576,11 +14588,15 @@
                     ? `<span style="background:#ecfdf5; color:#059669; padding:2px 8px; border-radius:999px; font-size:0.7em; font-weight:800;">+${score.toFixed(2)}</span>`
                     : `<span style="background:#f1f5f9; color:#64748b; padding:2px 8px; border-radius:999px; font-size:0.7em; font-weight:700;">pending</span>`;
                 // V94.33: Show admin-edit badge so intern knows their entry was modified by an admin
+                // V97.02: badge click must not also fire the new card-level view-note handler below.
                 const editCount = Array.isArray(e.editHistory) ? e.editHistory.length : 0;
                 const editedBadgeHtml = editCount > 0
-                    ? `<button onclick="lnInternOpenHistory('${e.id}')" title="Admin edited this entry ${editCount} time${editCount > 1 ? 's' : ''} — tap to view history" style="background:#ede9fe; color:#5b21b6; border:none; padding:3px 9px; border-radius:999px; font-size:0.7em; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:3px;">✏️ Edited by admin · ${editCount}</button>`
+                    ? `<button onclick="event.stopPropagation(); lnInternOpenHistory('${e.id}')" title="Admin edited this entry ${editCount} time${editCount > 1 ? 's' : ''} — tap to view history" style="background:#ede9fe; color:#5b21b6; border:none; padding:3px 9px; border-radius:999px; font-size:0.7em; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:3px;">✏️ Edited by admin · ${editCount}</button>`
                     : '';
-                return `<div style="padding:10px 12px; border:1px solid #f1f5f9; border-radius:10px; background:white;">
+                // V97.02: reported — tapping a note card to read the full text (clamped to
+                // 3 lines below) did nothing; there was no click handler at all. Card now
+                // opens a read-only full-text view (lnNoteViewModal).
+                return `<div onclick="lnInternViewNote('${e.id}')" title="Tap to view the full note" style="padding:10px 12px; border:1px solid #f1f5f9; border-radius:10px; background:white; cursor:pointer;">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
                         <div style="flex:1; min-width:0; font-weight:800; color:#1e293b; font-size:0.9em;">🎓 ${escapeHtml(e.title || 'Untitled')}</div>
                         ${scoreHtml}
@@ -14620,6 +14636,34 @@
         // ═══════════════════════════════════════════════════════════════════
         // V94.33 — Read-only admin edit history viewer for the entry owner
         // ═══════════════════════════════════════════════════════════════════
+        // V97.02: open the full-text view for a Learning Note card (reported: tapping
+        // a note to read what was typed did nothing — the card had no click handler
+        // and the preview is clamped to 3 lines).
+        window.lnInternViewNote = function(entryId) {
+            const cache = window.myLpEntriesCache || [];
+            const entry = cache.find(x => x.id === entryId);
+            if (!entry) { alert('Entry not found in your history.'); return; }
+            const escapeHtml = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const titleEl = document.getElementById('ln-view-modal-title');
+            const metaEl = document.getElementById('ln-view-modal-meta');
+            const tagsEl = document.getElementById('ln-view-modal-tags');
+            const contentEl = document.getElementById('ln-view-modal-content');
+            if (titleEl) titleEl.textContent = '🎓 ' + (entry.title || 'Untitled');
+            const dateMs = entry.createdAt?.toMillis ? entry.createdAt.toMillis() : (new Date(entry.createdAt || 0)).getTime();
+            if (metaEl) metaEl.textContent = dateMs ? new Date(dateMs).toLocaleString() : '';
+            const tags = Array.isArray(entry.tags) ? entry.tags : [];
+            if (tagsEl) {
+                tagsEl.innerHTML = tags.map(t => {
+                    const a = lnTagAxis(t);
+                    const s = LN_AXIS_STYLE[a];
+                    return `<span style="background:${s.bg}; color:${s.fg}; padding:2px 8px; border-radius:999px; font-size:0.72em; font-weight:800;">${escapeHtml(t)}</span>`;
+                }).join('');
+            }
+            if (contentEl) contentEl.innerHTML = window.renderMd(entry.contentMarkdown || '') || '<span style="color:#94a3b8;">(no content)</span>';
+            const modal = document.getElementById('lnNoteViewModal');
+            if (modal) modal.style.display = 'flex';
+        };
+
         window.lnInternOpenHistory = function(entryId) {
             const cache = window.myLpEntriesCache || [];
             const entry = cache.find(x => x.id === entryId);
