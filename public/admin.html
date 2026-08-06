@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.04</title>
+    <title>Nika V97.05</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6549,6 +6549,8 @@
                         <button onclick="bulkSetQuizActive(true)" style="padding:6px 14px; border:none; border-radius:8px; background:#10b981; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">🚀 Activate</button>
                         <button onclick="bulkSetQuizActive(false)" style="padding:6px 14px; border:none; border-radius:8px; background:#64748b; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">⏹️ Deactivate</button>
                         <button onclick="openBulkExportQuizPdfModal()" title="Export the selected quizzes as PDF — one combined file or one file each" style="padding:6px 14px; border:none; border-radius:8px; background:#0284c7; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">📄 Export PDF</button>
+                        <!-- V97.05: spot overlapping/duplicate questions across the selected quizzes before deciding to merge/retire any. -->
+                        <button onclick="openQuizCompareModal()" title="Compare question stems across the selected quizzes — flags likely-duplicate questions" style="padding:6px 14px; border:none; border-radius:8px; background:#0891b2; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">🔍 Compare</button>
                         <button onclick="bulkDeleteQuizzes()" style="padding:6px 14px; border:none; border-radius:8px; background:#ef4444; color:#fff; font-size:0.78em; font-weight:800; cursor:pointer;">🗑️ Delete</button>
                         <button onclick="clearQuizSelection()" style="padding:6px 12px; border:1px solid #c7d2fe; border-radius:8px; background:#fff; color:#3730a3; font-size:0.78em; font-weight:800; cursor:pointer;">Clear</button>
                     </div>
@@ -14805,6 +14807,19 @@
                     <div id="quiz-export-pdf-preview" style="min-height:380px; max-height:540px; overflow:auto; border-radius:16px; background:#fff; border:1px solid #cbd5e1; padding:18px 20px; box-shadow:inset 0 1px 3px rgba(15,23,42,0.05);"></div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- V97.05: "🔍 Compare Selected" — bulk-select N quizzes in the list (checkbox
+         column, existing selectedQuizIds), open this modal to spot possible content
+         overlap without leaving the list. No AI call — client-side n-gram similarity
+         over question stems (openQuizCompareModal / quizCompareCompute). -->
+    <div id="quizCompareModal" class="modal lang-no-toggle" style="z-index:4200;">
+        <div class="modal-content" style="max-width:1040px; width:95%; text-align:left; border-radius:18px; padding:20px 22px;">
+            <span class="close-modal" onclick="document.getElementById('quizCompareModal').style.display='none'">&times;</span>
+            <h3 style="margin:0 0 4px; color:#0891b2; font-size:1.3em; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-code-compare"></i> Compare Selected Quizzes</h3>
+            <div id="quiz-compare-summary" style="font-size:0.85em; color:#475569; margin-bottom:14px;"></div>
+            <div id="quiz-compare-body" style="display:flex; flex-direction:column; gap:16px; max-height:70vh; overflow-y:auto;"></div>
         </div>
     </div>
 
@@ -28085,6 +28100,109 @@ ${JSON.stringify(sourceObj)}`;
                 alert('Bulk delete failed: ' + e.message);
             }
         }
+        // V97.05: "🔍 Compare Selected" — no-AI duplicate-question finder across the
+        // bulk-selected quizzes. Character n-gram (shingle) Jaccard similarity: works
+        // on mixed Thai+English text without a word tokenizer (Thai has no reliable
+        // word-boundary spacing, so naive .split(' ') badly undercounts overlap).
+        const QUIZ_COMPARE_NGRAM = 5;
+        const QUIZ_COMPARE_THRESHOLD = 0.25; // below this, treat as unrelated — tune if too noisy/quiet
+        function quizCompareShingles(text) {
+            const clean = String(text || '')
+                .replace(/[#*_`>\[\]()!]/g, '')  // strip common markdown syntax
+                .replace(/\s+/g, ' ')
+                .trim()
+                .toLowerCase();
+            if (!clean) return new Set();
+            if (clean.length < QUIZ_COMPARE_NGRAM) return new Set([clean]);
+            const shingles = new Set();
+            for (let i = 0; i <= clean.length - QUIZ_COMPARE_NGRAM; i++) shingles.add(clean.slice(i, i + QUIZ_COMPARE_NGRAM));
+            return shingles;
+        }
+        function quizCompareSimilarity(a, b) {
+            const sa = quizCompareShingles(a);
+            const sb = quizCompareShingles(b);
+            if (sa.size === 0 || sb.size === 0) return 0;
+            let inter = 0;
+            sa.forEach(s => { if (sb.has(s)) inter++; });
+            const union = sa.size + sb.size - inter;
+            return union === 0 ? 0 : inter / union;
+        }
+        function quizCompareStripMd(s) {
+            return String(s || '').replace(/[#*_`>\[\]()]/g, '').replace(/\s+/g, ' ').trim();
+        }
+
+        function openQuizCompareModal() {
+            const ids = [...selectedQuizIds];
+            if (ids.length < 2) return showToast('Select at least 2 quizzes to compare', 'error');
+            const picked = ids.map(id => quizzesData.find(q => q.id === id)).filter(Boolean);
+            const usable = picked.filter(q => (q.questions || []).length);
+            if (usable.length < 2) return alert('Need at least 2 selected quizzes with questions to compare.');
+
+            // Flatten questions with a back-reference to their quiz (index into `usable`).
+            const pool = [];
+            usable.forEach((q, qi) => {
+                (q.questions || []).forEach((question, i) => pool.push({ quizIdx: qi, qIndex: i, text: question.q || '' }));
+            });
+
+            // Pairwise similarity, skipping pairs from the SAME quiz (that's not the
+            // question we're asking — we care about cross-quiz overlap).
+            const matches = [];
+            for (let i = 0; i < pool.length; i++) {
+                for (let j = i + 1; j < pool.length; j++) {
+                    if (pool[i].quizIdx === pool[j].quizIdx) continue;
+                    const score = quizCompareSimilarity(pool[i].text, pool[j].text);
+                    if (score >= QUIZ_COMPARE_THRESHOLD) matches.push({ a: pool[i], b: pool[j], score });
+                }
+            }
+            const keyOf = it => `${it.quizIdx}-${it.qIndex}`;
+            const matchesByItem = new Map();
+            matches.forEach(m => {
+                if (!matchesByItem.has(keyOf(m.a))) matchesByItem.set(keyOf(m.a), []);
+                if (!matchesByItem.has(keyOf(m.b))) matchesByItem.set(keyOf(m.b), []);
+                matchesByItem.get(keyOf(m.a)).push({ other: m.b, score: m.score });
+                matchesByItem.get(keyOf(m.b)).push({ other: m.a, score: m.score });
+            });
+
+            const summaryEl = document.getElementById('quiz-compare-summary');
+            if (summaryEl) {
+                summaryEl.textContent = matches.length
+                    ? `⚠️ Found ${matches.length} likely-duplicate question pair${matches.length === 1 ? '' : 's'} across ${usable.length} quizzes (${pool.length} questions scanned) — highlighted below.`
+                    : `✅ No likely-duplicate questions found across ${usable.length} quizzes (${pool.length} questions scanned).`;
+            }
+
+            const bodyEl = document.getElementById('quiz-compare-body');
+            if (bodyEl) {
+                bodyEl.innerHTML = usable.map((q, qi) => {
+                    const rows = (q.questions || []).map((question, i) => {
+                        const myMatches = (matchesByItem.get(`${qi}-${i}`) || []).sort((a, b) => b.score - a.score);
+                        const fullStem = quizCompareStripMd(question.q);
+                        const stem = fullStem.slice(0, 160);
+                        const badges = myMatches.map(m => {
+                            const otherQuiz = usable[m.other.quizIdx];
+                            const otherStem = quizCompareStripMd((otherQuiz.questions[m.other.qIndex] || {}).q || '');
+                            const pct = Math.round(m.score * 100);
+                            return `<span title="${escapeHtml(otherStem.slice(0, 200))}" style="display:inline-block; margin:3px 4px 0 0; padding:2px 8px; border-radius:999px; font-size:0.72em; font-weight:700; background:${pct >= 50 ? '#fee2e2' : '#fef3c7'}; color:${pct >= 50 ? '#991b1b' : '#92400e'};">≈ ${pct}% · ${escapeHtml(otherQuiz.shortTitle || otherQuiz.title || 'Quiz')} Q${m.other.qIndex + 1}</span>`;
+                        }).join('');
+                        const rowBg = myMatches.length ? (myMatches[0].score >= 0.5 ? '#fef2f2' : '#fffbeb') : '#fff';
+                        const rowBorder = myMatches.length ? '#fde68a' : '#f1f5f9';
+                        return `<div style="padding:8px 10px; border-radius:8px; background:${rowBg}; border:1px solid ${rowBorder};">
+                            <div style="font-size:0.85em; color:#1e293b;"><b>Q${i + 1}.</b> ${escapeHtml(stem)}${fullStem.length > 160 ? '…' : ''}</div>
+                            ${badges ? `<div style="margin-top:4px;">${badges}</div>` : ''}
+                        </div>`;
+                    }).join('');
+                    return `<div>
+                        <div style="font-weight:900; color:#0f172a; font-size:0.95em; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                            <span style="background:#e0f2fe; color:#0369a1; border-radius:6px; padding:2px 8px; font-size:0.75em;">${(q.questions || []).length} Q</span>
+                            ${escapeHtml(q.shortTitle || q.title || 'Untitled')}
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:6px;">${rows || '<div style="color:#94a3b8; font-size:0.82em;">No questions.</div>'}</div>
+                    </div>`;
+                }).join('<hr style="border:none; border-top:1px solid #e2e8f0; margin:2px 0;">');
+            }
+
+            forceShowModal('quizCompareModal');
+        }
+
         async function toggleTemplateStatus(id, current) {
             try {
                 await db.collection("quizzes").doc(id).update({ isTemplate: !current });
