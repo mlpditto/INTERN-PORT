@@ -49267,11 +49267,23 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             const tsStr = ts ? ts.toLocaleString() : '—';
             metaEl.innerHTML = `<strong>${escHtml(note.displayName || 'Unknown')}</strong> · ${tsStr}`;
 
+            // V96.99: reported as showing incomplete/missing note text — no clobbering
+            // write path found on inspection (save flow never touches `description`), so
+            // make this loud + logged instead of a silent blank box (same pattern as the
+            // V96.97 suggested-taxonomy fix) to diagnose the next occurrence instantly.
             const content = note.description || '';
-            if (window.marked && window.DOMPurify) {
-                contentEl.innerHTML = window.DOMPurify.sanitize(window.marked.parse(content, { breaks: true, gfm: true }));
-            } else {
-                contentEl.textContent = content;
+            console.debug('[lnr-content] note', note.id, 'description length:', content.length, 'raw:', note.description);
+            try {
+                if (!content) {
+                    contentEl.innerHTML = '<div style="color:#b91c1c; font-size:0.85em; font-weight:700;">⚠️ No content found on this submission (description field is empty) — ดู DevTools Console (F12) แล้วแจ้งข้อความ [lnr-content] ให้แอดมิน dev</div>';
+                } else if (window.marked && window.DOMPurify) {
+                    contentEl.innerHTML = window.DOMPurify.sanitize(window.marked.parse(content, { breaks: true, gfm: true }));
+                } else {
+                    contentEl.textContent = content;
+                }
+            } catch (e) {
+                console.error('[lnr-content] render threw — see stack below:', e);
+                contentEl.innerHTML = '<div style="color:#b91c1c; font-size:0.85em; font-weight:700;">⚠️ render error: ' + escHtml(e && e.message ? e.message : 'unknown') + ' — ดู DevTools Console (F12)</div>';
             }
 
             scoreInput.value = '';
