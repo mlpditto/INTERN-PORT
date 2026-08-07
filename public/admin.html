@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.14</title>
+    <title>Nika V97.15</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -26030,7 +26030,12 @@ ${JSON.stringify(sourceObj)}`;
             // before each numbered line that CONTINUES the question sequence
             // (same delimiter, number = previous + 1, and at least one line
             // apart — so consecutive numbered OPTION lists 1) 2) 3) never split).
-            const qNumRe = /^[ \t]*(\d{1,3})([\.\)])[ \t]*\S/;
+            // V97.15: leading "\(?" so a parenthesized-number style ("(9) stem...")
+            // is recognized as the same running-question marker as "9." / "9)" —
+            // previously only the bare digit+delimiter form matched, so pastes
+            // using "(N)" numbering both failed the no-blank-line sub-split AND
+            // (below, stemNumRe) kept the "(N)" duplicated inside the stem text.
+            const qNumRe = /^[ \t]*\(?(\d{1,3})([\.\)])[ \t]*\S/;
             const rawBlocks = text.replace(/\r\n/g, '\n').split(/\n[ \t]*\n+/);
             const blocks = [];
             rawBlocks.forEach(rb => {
@@ -26079,7 +26084,7 @@ ${JSON.stringify(sourceObj)}`;
                 let q = stemLines.join('\n').trim();
                 // Numbered-sequence mode: the pasted running number ("5.") would
                 // duplicate the editor's own numbering — strip it from the stem.
-                if (bk.numbered) q = q.replace(/^\d{1,3}[\.\)][ \t]*/, '');
+                if (bk.numbered) q = q.replace(/^\(?\d{1,3}[\.\)][ \t]*/, '');
                 const options = optLines.map(l => stripOpt(l.trim())).filter(o => o !== '');
                 parsed.push({ q: q, options: options, lines: lines.filter(l => l.trim() !== '') });
             });
@@ -26104,7 +26109,11 @@ ${JSON.stringify(sourceObj)}`;
             // editor adds its own numbering. Strip when ALL stems carry numbers
             // forming an increasing sequence — a real sequence, not stems that
             // merely start with a figure.
-            const stemNumRe = /^(\d{1,3})[\.\)][ \t]*/;
+            // V97.15: leading "\(?" so "(9) stem..." (parenthesized numbering,
+            // e.g. exported from some question banks) strips the same as "9."/"9)"
+            // instead of surviving into the stem as a duplicate of the editor's
+            // own "9." prefix.
+            const stemNumRe = /^\(?(\d{1,3})[\.\)][ \t]*/;
             const nums = out.map(x => { const m = x.q.match(stemNumRe); return m ? parseInt(m[1], 10) : null; });
             if (out.length >= 2 && nums.every((n, i) => n !== null && (i === 0 || n > nums[i - 1]))) {
                 out.forEach(x => { x.q = x.q.replace(stemNumRe, ''); });
