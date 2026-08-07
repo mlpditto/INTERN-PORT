@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.13</title>
+    <title>Nika V97.14</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16633,6 +16633,14 @@ RULES:
                     Object.keys(scores).forEach(k => { const v = Number(scores[k]); if (!isNaN(v) && v < weakestVal) { weakestVal = v; weakestDim = k; } });
                     window._lastAuditByQ[a.qNumber] = { rationale: a.rationale || '', weakestDim, weakestVal: weakestVal === 99 ? null : weakestVal };
                 });
+                // V97.14: also stash the FULL per-question scores (all 5 dims), tagged
+                // with which quiz they belong to, so other features (AI Trim in the Split
+                // modal) can rank by a specific dimension (e.g. bloomLevel) instead of just
+                // "weakest dim". Tagging by quiz id means a stale audit from a different
+                // quiz is never mistaken for this one's.
+                window._lastAuditScoresByQ = {};
+                result.perQuestionAudit.forEach(a => { window._lastAuditScoresByQ[a.qNumber] = a.scores || {}; });
+                window._lastAuditQuizId = (document.getElementById('edit-quiz-id') || {}).value || null;
 
                 renderAuditScorecard(result, aiModel, aiTokens, bp);
 
@@ -22619,6 +22627,88 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             return `${base}-${Date.now().toString().slice(-4)}`;
         };
 
+        // V97.14: AI Trim — pre-select the lowest-Bloom-level questions as "suggested
+        // cut" in the Split modal, using scores from the last Quality Audit run on THIS
+        // quiz (window._lastAuditScoresByQ, stashed by auditQuizAI). Never invents a new
+        // AI call — reuses the Audit's own per-question scorecard. Admin still reviews/
+        // adjusts the checkboxes and clicks Create New Quiz Set themselves; nothing here
+        // deletes anything on its own.
+        window.suggestAiTrimByDifficulty = function() {
+            const formData = getQuizFormData();
+            const questions = formData.questions || [];
+            const currentQuizId = (document.getElementById('edit-quiz-id') || {}).value || null;
+
+            if (!window._lastAuditScoresByQ || window._lastAuditQuizId !== currentQuizId) {
+                alert('Run Quality Audit (✅ Audit button) on this quiz first, then come back and press Suggest.\n\nรัน Quality Audit (ปุ่ม ✅ Audit) ของ quiz นี้ก่อน แล้วค่อยกลับมากด Suggest');
+                return;
+            }
+
+            const keepInput = document.getElementById('bulk-ai-keep-count');
+            const keepN = Math.max(0, Math.min(questions.length, parseInt(keepInput && keepInput.value, 10) || 0));
+            const cutCount = questions.length - keepN;
+            if (cutCount <= 0) {
+                alert('Nothing to cut — Keep count is already ≥ total questions.');
+                return;
+            }
+
+            // Rank ascending by Bloom level (lowest = easiest = first candidate to cut),
+            // tie-broken by clinicalDepth. Questions with no audit score (e.g. added
+            // after the audit ran) are NEVER auto-cut — sorted to the end so they're
+            // only picked if literally nothing else is left to cut.
+            const ranked = questions.map((q, idx) => {
+                const scores = window._lastAuditScoresByQ[idx + 1] || null; // qNumber is 1-based
+                return {
+                    idx,
+                    bloomLevel: scores ? Number(scores.bloomLevel) : null,
+                    clinicalDepth: scores ? Number(scores.clinicalDepth) : null,
+                    hasScore: !!scores && !isNaN(Number(scores.bloomLevel))
+                };
+            }).sort((a, b) => {
+                if (a.hasScore !== b.hasScore) return a.hasScore ? -1 : 1;
+                if (!a.hasScore) return 0;
+                if (a.bloomLevel !== b.bloomLevel) return a.bloomLevel - b.bloomLevel;
+                return (a.clinicalDepth || 0) - (b.clinicalDepth || 0);
+            });
+
+            const cutList = ranked.slice(0, cutCount);
+            const cutIndices = new Set(cutList.map(r => r.idx));
+
+            document.querySelectorAll('.bulk-q-check').forEach(cb => {
+                cb.checked = cutIndices.has(parseInt(cb.value, 10));
+            });
+            if (typeof updateBulkSelectCounter === 'function') updateBulkSelectCounter();
+
+            // Trimming means shrinking THIS quiz, so the cut questions must leave it —
+            // auto-check "remove from current quiz" (they still land safely in the new
+            // split-off quiz, nothing is deleted).
+            const cutOriginalCb = document.getElementById('bulk-delete-original');
+            if (cutOriginalCb) {
+                cutOriginalCb.checked = true;
+                if (typeof updateBulkExportPreview === 'function') updateBulkExportPreview();
+            }
+
+            const titleEl = document.getElementById('bulk-new-title');
+            const shortEl = document.getElementById('bulk-new-short');
+            if (titleEl) { titleEl.value = `${formData.title || 'Untitled'} — ตัดออก (Bloom ต่ำ)`; window._bxTitleEdited = true; }
+            if (shortEl) shortEl.value = generateBulkExportShortTitle('CUT-' + (formData.shortTitle || 'QUIZ'));
+
+            // Badge each suggested row so the admin can see WHY it was picked.
+            document.querySelectorAll('.bulk-ai-cut-badge').forEach(b => b.remove());
+            cutList.forEach(r => {
+                if (!r.hasScore) return;
+                const checkbox = document.getElementById('bulk-q-' + r.idx);
+                const row = checkbox && checkbox.closest('.bulk-q-row');
+                if (!row) return;
+                const badge = document.createElement('span');
+                badge.className = 'bulk-ai-cut-badge';
+                badge.textContent = `🎯 Bloom ${r.bloomLevel}/5`;
+                badge.style = 'flex-shrink:0; background:rgba(139,92,246,0.15); color:#c4b5fd; border:1px solid rgba(139,92,246,0.3); padding:2px 8px; border-radius:8px; font-size:0.7em; font-weight:800;';
+                row.appendChild(badge);
+            });
+
+            if (typeof showToast === 'function') showToast(`🤖 Suggested cutting ${cutCount} question${cutCount === 1 ? '' : 's'} (lowest Bloom level)`);
+        };
+
         // [V91.61] Esc + backdrop modal close handler reference
         window._bulkExportEscHandler = null;
         window.closeBulkExportModal = function() {
@@ -22694,6 +22784,16 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                             <button class="bulk-dest-btn" data-mode="new" onclick="setBulkDest('new')" style="flex:1; padding:8px 12px; border-radius:8px; border:none; background:linear-gradient(135deg, #4f46e5, #4338ca); color:white; font-size:0.82em; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition:all 0.15s;">📦 New quiz</button>
                             <button class="bulk-dest-btn" data-mode="existing" onclick="setBulkDest('existing')" style="flex:1; padding:8px 12px; border-radius:8px; border:none; background:transparent; color:#94a3b8; font-size:0.82em; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition:all 0.15s;">📚 Existing quiz</button>
                         </div>
+                    </div>
+                    <div style="padding:14px 24px; border-bottom:1px solid #334155; background:rgba(139,92,246,0.06);">
+                        <label style="display:block; font-size:0.65em; font-weight:800; color:#a78bfa; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:6px;">🤖 AI Suggest Cut (by difficulty)</label>
+                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                            <span style="font-size:0.8em; color:#cbd5e1; white-space:nowrap;">Keep</span>
+                            <input type="number" id="bulk-ai-keep-count" min="1" max="${questions.length}" value="${Math.max(1, questions.length - 1)}" style="width:70px; padding:8px 10px; border-radius:10px; background:#0f172a; border:1px solid #475569; color:white; font-size:0.9em; font-weight:700; box-sizing:border-box; outline:none; text-align:center;">
+                            <span style="font-size:0.8em; color:#cbd5e1; white-space:nowrap;">of ${questions.length} questions</span>
+                            <button class="btn-sm" onclick="suggestAiTrimByDifficulty()" style="margin-left:auto; background:linear-gradient(135deg,#8b5cf6,#7c3aed); color:white; border:none; padding:8px 14px; border-radius:10px; font-size:0.8em; font-weight:800; cursor:pointer; white-space:nowrap;">🤖 Suggest</button>
+                        </div>
+                        <div style="font-size:0.7em; color:#94a3b8; margin-top:6px;">Cuts the lowest-Bloom-level questions first, using the last Quality Audit run on this quiz (run ✅ Audit first if the button says so).</div>
                     </div>
                     <div id="bulk-new-quiz-fields" style="padding:14px 24px; border-bottom:1px solid #334155; background:rgba(0,0,0,0.05);">
                         <div style="display:grid; grid-template-columns: 1fr 160px; gap:10px;">
