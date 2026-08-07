@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.29)</title>
+    <title>Internship Portfolio (V96.30)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -5246,6 +5246,11 @@
         let quizTotalStartTime = null; // 🔥 V84.1: Track when quiz actually started
         let currentQuizIdForFeedback = null;
         let currentPointsForFeedback = 0;
+        // V97.17: elapsed time for the feedback doc, computed by whichever entry
+        // point opens the modal (live submission OR "give feedback later" on a past
+        // attempt) — submitFeedback() just reads this instead of deriving it from
+        // quizTotalStartTime, which is null/stale outside a live quiz session.
+        let currentTimeUsedForFeedback = 0;
         let isAdmin = false; // 🔥 V84.6: Track admin status for history deletion
         let isPreview = false; // 🔥 Global flag for preview mode
         let leaderboardMode = 'score';
@@ -7313,10 +7318,18 @@
                                 const viewLabel = score > 0 ? '👁️ View Answers ดูเฉลย' : '🔍 Review Mistakes ดูข้อที่ตอบผิด';
                                 viewBtn = `<button class="btn-sm btn-info" onclick="viewQuizAnswers('${q.id}')" style="margin-top:5px; width:100%; border-radius:6px;">${viewLabel}</button>`;
                             }
+                            // V97.17: "give feedback later" — only for graded, non-poll, standard
+                            // quizzes (matches the gate the live post-submit modal already uses).
+                            // openFeedbackForPastAttempt() blocks a duplicate submit on click.
+                            let feedbackBtn = "";
+                            if (!isPending && !q.isPoll && (q.quizType === 'standard' || !q.quizType)) {
+                                feedbackBtn = `<button class="btn-sm" onclick="openFeedbackForPastAttempt('${q.id}')" style="margin-top:5px; width:100%; border-radius:6px; background:#ecfdf5; color:#059669; border:none; font-weight:700;">💬 Give Feedback ให้ Feedback</button>`;
+                            }
 
                             actionHtml = `
                                 <div style="text-align:right; font-size:0.85em; color:#999; margin-bottom:5px;">Submitted ส่งเมื่อ: ${attempt.timestamp ? attempt.timestamp.toDate().toLocaleString('th-TH') : '-'}</div>
                                 ${viewBtn}
+                                ${feedbackBtn}
                             `;
                         }
 
@@ -9944,6 +9957,7 @@
                     currentPointsForFeedback = pointsAwarded;
 
                     const timeUsed = quizTotalStartTime ? Math.floor((new Date() - quizTotalStartTime) / 1000) : 0;
+                    currentTimeUsedForFeedback = timeUsed;
                     const mins = Math.floor(timeUsed / 60);
                     const secs = timeUsed % 60;
 
@@ -10153,6 +10167,7 @@
             if (form) form.style.display = '';
             if (card) card.style.display = 'none';
             currentQuizIdForFeedback = null;
+            currentTimeUsedForFeedback = 0;
             quizTotalStartTime = null;
         }
 
@@ -10197,7 +10212,10 @@
             }
 
             try {
-                const timeUsed = quizTotalStartTime ? Math.floor((new Date() - quizTotalStartTime) / 1000) : 0;
+                // V97.17: read the elapsed time computed by whichever entry point opened
+                // this modal (live submission or "give feedback later" on a past attempt)
+                // instead of deriving it here from quizTotalStartTime, which is null/stale
+                // once the admin/user has navigated away from the live quiz session.
                 await db.collection("quiz_feedback").add({
                     quizId: submittedQuizId,
                     userId: userId,
@@ -10205,7 +10223,7 @@
                     rating: parseInt(rating),
                     nextTopic: nextTopic,
                     comment: trimmedComment,
-                    timeUsedSeconds: timeUsed,
+                    timeUsedSeconds: currentTimeUsedForFeedback,
                     pointsEarned: currentPointsForFeedback,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
@@ -10221,6 +10239,53 @@
             } catch (e) {
                 alert("Feedback Error: " + e.message);
             }
+        }
+
+        // V97.17: "Give Feedback" from a past graded attempt — until now the feedback
+        // modal only ever opened automatically right after a live quiz submission
+        // (currentQuizIdForFeedback was set exclusively at that one callsite). Once
+        // dismissed ("Maybe later"), there was no way back for that quiz. This reuses
+        // the same modal/submitFeedback() flow, computing pointsEarned/timeUsed from
+        // the stored attempt instead of live in-session variables (quizTotalStartTime
+        // is null/stale outside a live quiz), and blocks a duplicate submission for a
+        // quiz the user already gave feedback on.
+        async function openFeedbackForPastAttempt(quizId) {
+            const q = quizzesCache.find(x => x.id === quizId);
+            const attempt = quizAttemptsCache[quizId];
+            if (!q || !attempt) return alert("Data not found");
+            if (!(q.quizType === 'standard' || !q.quizType)) return; // feedback only applies to standard quizzes
+            if (attempt.status === 'pending') return; // not graded yet
+
+            try {
+                const existing = await db.collection("quiz_feedback")
+                    .where("quizId", "==", quizId)
+                    .where("userId", "==", userId)
+                    .limit(1)
+                    .get();
+                if (!existing.empty) {
+                    alert("คุณให้ feedback ควิซนี้ไปแล้ว ขอบคุณครับ 🙏\nYou already gave feedback for this quiz.");
+                    return;
+                }
+            } catch (e) {
+                console.warn("Feedback existence check failed, proceeding anyway:", e);
+            }
+
+            currentQuizIdForFeedback = quizId;
+            currentPointsForFeedback = attempt.totalQuestions
+                ? computeQuizScore(attempt.correctCount, attempt.totalQuestions, q.totalPoints)
+                : (attempt.score || 0);
+            // durations[] (per-question seconds) was already recorded at submission —
+            // sum it instead of leaving timeUsedSeconds at 0 for retroactive feedback.
+            currentTimeUsedForFeedback = Array.isArray(attempt.durations)
+                ? attempt.durations.reduce((sum, d) => sum + (Number(d) || 0), 0)
+                : 0;
+
+            setFbRating(0);
+            document.getElementById('fb-next-topic').value = "";
+            document.getElementById('fb-comment').value = "";
+            updateFeedbackCommentCounter();
+            renderFeedbackTopicChips();
+            document.getElementById('quizFeedbackModal').style.display = 'flex';
         }
 
         // 🔥 V78: View practice answers (from saved attempt data)
@@ -16368,6 +16433,16 @@ async function archiveDoneCard(cardId) {
                 const label = (Number(sub.score) > 0) ? '👁️ View Answers ดูเฉลย' : '🔍 Review Mistakes ดูข้อที่ตอบผิด';
                 viewBtn = `<button onclick="viewQuizAnswers('${sub.quizId}')" style="margin-top:12px; width:100%; border:none; cursor:pointer; background:#eef2ff; color:#4361ee; font-size:0.8em; font-weight:700; padding:9px 14px; border-radius:8px;">${label}</button>`;
             }
+            // V97.17: "give feedback later" — same gate as viewBtn plus standard-quiz-only
+            // (matches the gate the live post-submit modal uses). quizType isn't on `sub`
+            // itself, so look the quiz doc up the same way matsHtml does just below.
+            let feedbackBtn = '';
+            if (sub && sub.status !== 'pending' && sub.canViewAnswers && sub.quizId && typeof quizzesCache !== 'undefined' && quizzesCache) {
+                const fbQuiz = quizzesCache.find(q => q.id === sub.quizId);
+                if (fbQuiz && (fbQuiz.quizType === 'standard' || !fbQuiz.quizType)) {
+                    feedbackBtn = `<button onclick="openFeedbackForPastAttempt('${sub.quizId}')" style="margin-top:8px; width:100%; border:none; cursor:pointer; background:#ecfdf5; color:#059669; font-size:0.8em; font-weight:700; padding:9px 14px; border-radius:8px;">💬 Give Feedback ให้ Feedback</button>`;
+                }
+            }
             // V95.57: downloadable materials — every attempt here is already submitted,
             // which is exactly the V95.32 unlock condition. Pending quizzes left the
             // Mission card in V95.52, so while awaiting grading this is the intern's
@@ -16383,7 +16458,8 @@ async function archiveDoneCard(cardId) {
                 ${tagsHtml}
                 ${m.duration ? `<div style="font-size:0.78em; color:#64748b; margin-top:6px;">⏱ Duration: ${escapeUnifiedHtml(String(m.duration))}s</div>` : ''}
                 ${matsHtml}
-                ${viewBtn}`;
+                ${viewBtn}
+                ${feedbackBtn}`;
         }
 
         function renderWorkDetailHtml(sub, m) {
