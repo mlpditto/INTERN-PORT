@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.15</title>
+    <title>Nika V97.16</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16353,7 +16353,7 @@
                     fallbackDiv.innerHTML = `
                         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f8f9fa; padding-bottom:15px; margin-bottom:15px;">
                             <h2 style="margin:0; color:var(--primary); font-size:1.5em;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Quiz Analysis</h2>
-                            <button onclick="this.parentElement.parentElement.remove()" style="border:none; background:#f8f9fa; color:#666; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">✕</button>
+                            <button onclick="this.parentElement.parentElement.remove(); restoreAuditPopupIfHidden();" style="border:none; background:#f8f9fa; color:#666; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">✕</button>
                         </div>
                         <div style="background:#fef3c7; border:1px solid #fcd34d; color:#92400e; padding:14px 18px; border-radius:14px; margin-bottom:18px; font-size:0.95em; line-height:1.5;">
                             <b><i class="fa-solid fa-triangle-exclamation"></i> Model returned prose instead of JSON.</b><br>
@@ -16362,7 +16362,7 @@
                         <div style="white-space:pre-wrap; line-height:1.8; color:#333; font-size:1em; margin-bottom:20px; background:#fafafa; padding:20px; border-radius:20px; border:1px solid #f0f0f0;">${escapeHtml(String(resultRaw || ''))}</div>
                         <div style="text-align:right; display:flex; gap:10px; justify-content:flex-end;">
                             <button class="btn-sm" style="background:#4361ee; color:white; border:none; padding:8px 22px; border-radius:10px; font-weight:600; cursor:pointer;" onclick="this.parentElement.parentElement.remove(); analyzeQuizAI();"><i class="fa-solid fa-arrows-rotate"></i> Retry</button>
-                            <button class="btn-sm btn-dark" onclick="this.parentElement.parentElement.remove()" style="padding:8px 25px; border-radius:10px;">Close</button>
+                            <button class="btn-sm btn-dark" onclick="this.parentElement.parentElement.remove(); restoreAuditPopupIfHidden();" style="padding:8px 25px; border-radius:10px;">Close</button>
                         </div>
                         <div style="margin-top:20px; padding-top:15px; border-top:1px solid #eee; font-size:0.7em; color:#999;">
                             🚀 Model: <b>${escapeHtml(aiModel || selectedModel || 'unknown')}</b> | 💡 Tokens: <b>${(aiTokens || 0).toLocaleString()}</b> | Mode: prose-fallback
@@ -16468,7 +16468,7 @@
                 resultDiv.innerHTML = `
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f8f9fa; padding-bottom:15px; margin-bottom:15px;">
                         <h2 style="margin:0; color:var(--primary); font-size:1.5em;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Quiz Analysis</h2>
-                        <button onclick="this.parentElement.parentElement.remove()" style="border:none; background:#f8f9fa; color:#666; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">✕</button>
+                        <button onclick="this.parentElement.parentElement.remove(); restoreAuditPopupIfHidden();" style="border:none; background:#f8f9fa; color:#666; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">✕</button>
                     </div>
                     
                     ${titleSection}
@@ -16498,9 +16498,9 @@
                     </div>
 
                     <div style="text-align:right;">
-                        <button class="btn-sm btn-dark" onclick="this.parentElement.parentElement.remove()" style="padding:8px 25px; border-radius:10px;">Close</button>
+                        <button class="btn-sm btn-dark" onclick="this.parentElement.parentElement.remove(); restoreAuditPopupIfHidden();" style="padding:8px 25px; border-radius:10px;">Close</button>
                     </div>
-                    
+
                     <div style="margin-top:20px; padding-top:15px; border-top:1px solid #eee; font-size:0.7em; color:#999; display:flex; justify-content:space-between;">
                         <span>🚀 Model: <b>${aiModel}</b> | 💡 Tokens: <b>${aiTokens.toLocaleString()}</b></span>
                         <span style="opacity:0.6">V90.20 Unified Analysis</span>
@@ -16726,6 +16726,16 @@ RULES:
             document.body.appendChild(modal);
         }
 
+        // V97.16: auditSuggestFix used to permanently destroy the Audit scorecard
+        // (.remove()) with no way back — admins who fixed one question and closed
+        // the Specialist popup lost the whole audit run (all 16 questions' scores)
+        // and had to pay for a fresh AI call just to see the rest again. Hide it
+        // instead and bring it back once the Specialist popup is dismissed.
+        window.restoreAuditPopupIfHidden = function() {
+            const p = document.getElementById('ai-audit-popup');
+            if (p) p.style.display = 'block';
+        };
+
         // V96.44 Quality Audit "Suggest fix": bridge a weak audit question into the
         // existing Specialist (analyzeQuizAI) improve flow — the audit scorecard is
         // read-only judgement, this turns a low score into one click toward a rewrite.
@@ -16736,15 +16746,17 @@ RULES:
         // JSON → "prose instead of JSON" fallback, so Suggest fix produced no card.
         window.auditSuggestFix = async function(qNumber) {
             const auditPopup = document.getElementById('ai-audit-popup');
-            if (auditPopup) auditPopup.remove();
+            if (auditPopup) auditPopup.style.display = 'none'; // V97.16: hide, don't destroy
 
             // V96.49 Phase 2-full: feed this question's audit finding into the improve prompt.
             const auditNote = (window._lastAuditByQ && window._lastAuditByQ[qNumber]) || null;
             await window.analyzeQuizAI(null, { onlyQNumber: qNumber, auditNote: auditNote });
 
             // analyzeQuizAI shows its own banner on prose-fallback / error — bail quietly then.
+            // V97.16: no Specialist popup means no close button will ever fire the restore,
+            // so bring the audit scorecard back right here instead of leaving it stranded hidden.
             const popup = document.getElementById('ai-analysis-popup');
-            if (!popup) return;
+            if (!popup) { window.restoreAuditPopupIfHidden(); return; }
 
             const items = window._aiAnalysisItems || [];
             const arrIdx = items.findIndex(it => {
