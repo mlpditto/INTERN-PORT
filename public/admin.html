@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.21</title>
+    <title>Nika V97.23</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -26227,6 +26227,12 @@ ${JSON.stringify(sourceObj)}`;
                 const confBadge = r.conf != null
                     ? '<span style="font-size:0.72em; font-weight:800; padding:2px 8px; border-radius:8px; color:#fff; background:' + (r.conf >= 80 ? '#16a34a' : (r.conf >= 60 ? '#f59e0b' : '#ef4444')) + ';">AI ' + r.conf + '%</span>'
                     : '';
+                // V97.22: image-generated rows carry which model authored them, so
+                // compare-mode candidates for the same picture are tellable apart.
+                // Text-pasted rows have no .model and render nothing here.
+                const modelBadge = r.model
+                    ? '<span title="' + escapeHtml(r.srcImage ? 'จากรูป: ' + r.srcImage : 'โมเดลที่สร้างข้อนี้') + '" style="font-size:0.68em; font-weight:800; padding:2px 7px; border-radius:8px; background:#fef3c7; color:#92400e; border:1px solid #fde68a; white-space:nowrap;">' + escapeHtml(r.model) + '</span>'
+                    : '';
                 const opts = r.options.map((o, oi) => {
                     const isC = r.correct.includes(oi);
                     return '<div onclick="bulkPasteToggleCorrect(' + i + ',' + oi + ')" style="cursor:pointer; padding:4px 8px; border-radius:8px; margin:2px 0; font-size:0.86em; display:flex; gap:6px; align-items:flex-start; background:' + (isC ? '#dcfce7' : '#f8fafc') + '; border:1px solid ' + (isC ? '#16a34a' : '#e2e8f0') + '; color:' + (isC ? '#15803d' : '#475569') + '; font-weight:' + (isC ? '700' : '400') + ';"><span>' + (isC ? '✅' : '⬜') + '</span><span style="flex:1; min-width:0;">' + escapeHtml(o) + '</span><span onclick="event.stopPropagation();bulkPasteRemoveOption(' + i + ',' + oi + ')" title="ตัดตัวเลือกนี้ออก" style="flex-shrink:0; padding:0 4px; color:#94a3b8; font-weight:700;">✕</span></div>';
@@ -26235,11 +26241,22 @@ ${JSON.stringify(sourceObj)}`;
                     + '<div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:6px;">'
                     + '<input type="checkbox" ' + (r.include ? 'checked' : '') + ' onchange="bulkPasteToggleInclude(' + i + ')" style="margin-top:4px; width:16px; height:16px; cursor:pointer; flex-shrink:0;">'
                     + '<div style="flex:1; min-width:0;"><div style="font-weight:700; color:#1e293b; font-size:0.92em;">' + (i + 1) + '. ' + escapeHtml(r.q) + '</div></div>'
+                    + '</div>'
+                    // V97.23: actions + badges moved out of the stem's flex row onto their
+                    // own wrapping row. Inline, they competed with the question text for
+                    // width, and on a narrow viewport squeezed the stem down to roughly one
+                    // word per line — which only showed up once the 🎨 button and the model
+                    // badge joined the existing 📋/💡/confidence chips.
+                    + '<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; justify-content:flex-end; margin:0 0 6px 24px;">'
                     + '<button type="button" onclick="bulkPasteCopyQuestion(' + i + ')" title="คัดลอกโจทย์ + ตัวเลือก (ไม่รวมเฉลย)" style="flex-shrink:0; width:auto; min-height:0; padding:2px 8px; border:1px solid #e2e8f0; background:#f8fafc; border-radius:8px; cursor:pointer; font-size:0.85em; line-height:1.4;">📋</button>'
                     // V96.90: 💡 only once the AI has written a rationale for this row.
                     + (r.rationale ? '<button type="button" onclick="bulkPasteCopyQuestionFull(' + i + ')" title="คัดลอกโจทย์ + เฉลย + คำอธิบาย" style="flex-shrink:0; width:auto; min-height:0; padding:2px 8px; border:1px solid #e9d5ff; background:#faf5ff; border-radius:8px; cursor:pointer; font-size:0.85em; line-height:1.4;">💡</button>' : '')
+                    // V97.23: 🎨 ask an image model for an illustration for this question.
+                    + '<button type="button" id="bp-illus-' + i + '" onclick="bulkPasteGenIllustration(' + i + ')" title="ให้ AI สร้างภาพประกอบข้อนี้ (ไม่มีตัวอักษร ไม่บอกใบ้เฉลย)" style="flex-shrink:0; width:auto; min-height:0; padding:2px 8px; border:1px solid #fde68a; background:#fffbeb; border-radius:8px; cursor:pointer; font-size:0.85em; line-height:1.4;">🎨</button>'
+                    + modelBadge
                     + confBadge
                     + '</div>'
+                    + (r.illustrationUrl ? '<div style="margin:8px 0 2px 24px; display:flex; align-items:flex-start; gap:8px; flex-wrap:wrap;"><img src="' + escapeHtml(r.illustrationUrl) + '" alt="ภาพประกอบ" style="width:190px; max-width:100%; max-height:140px; object-fit:contain; border-radius:10px; border:1px solid #e2e8f0;"><button type="button" onclick="bulkPasteRemoveIllustration(' + i + ')" title="ลบภาพประกอบข้อนี้" style="flex-shrink:0; width:auto; min-height:0; padding:2px 8px; border:1px solid #fecaca; background:#fef2f2; color:#b91c1c; border-radius:8px; cursor:pointer; font-size:0.78em;">✕ ลบภาพ</button></div>' : '')
                     + '<div style="padding-left:24px;">' + opts + '</div>'
                     + (r.rationale ? '<div style="margin:6px 0 0 24px; padding:6px 8px; background:#faf5ff; border:1px solid #e9d5ff; border-radius:8px; font-size:0.8em; color:#6b21a8; white-space:pre-wrap;">' + escapeHtml(r.rationale) + '</div>' : '')
                     + '</div>';
@@ -26361,6 +26378,83 @@ ${JSON.stringify(sourceObj)}`;
             showToast('🎯 หาคำตอบเสร็จ ' + (done - failed) + '/' + rows.length + (failed ? ' (พลาด ' + failed + ')' : '') + ' — ตรวจก่อนบันทึก', failed ? 'warning' : 'success');
         }
 
+        // ============================================================
+        // V97.23: 🎨 per-question AI illustration.
+        // No schema change is needed — the intern side already renders question
+        // text through marked + DOMPurify (index.html renderMd), so a plain
+        // Markdown image tag displays as a picture today.
+        //
+        // The URL is stored on the ROW (r.illustrationUrl), not spliced into r.q,
+        // so the preview text and the 📋/💡 copy output stay clean; the Markdown is
+        // prepended only at bulkPasteInsert time when the real question is built.
+        //
+        // Image models hand back a data URL, which must NOT be written into
+        // Firestore directly (1 MB doc cap — the exact trap the Quill image
+        // handler hit in V93.38). Upload to Storage first, content-addressed by
+        // SHA-256 so regenerating the same image reuses the existing file.
+        // _sha256Hex/_MIME_TO_EXT live in the module block (~L17802) and are only
+        // reachable here via window.* — see [[feedback_admin_module_vs_classic_scope]].
+        // ============================================================
+        async function bulkPasteUploadImage(dataUrl) {
+            if (/^https?:\/\//i.test(dataUrl)) return dataUrl;   // already hosted
+            const blob = await (await fetch(dataUrl)).blob();
+            const hash = await window._sha256Hex(blob);
+            const ext = (window._MIME_TO_EXT || {})[blob.type] || '.png';
+            const app = window.adminApp || firebase.app('admin');
+            const ref = app.storage().ref('quiz-images/' + hash + ext);
+            try {
+                return await ref.getDownloadURL();               // dedup hit — skip upload
+            } catch (probeErr) {
+                if (probeErr && probeErr.code !== 'storage/object-not-found') throw probeErr;
+                const snap = await ref.put(blob, { contentType: blob.type || 'image/png' });
+                return await snap.ref.getDownloadURL();
+            }
+        }
+
+        async function bulkPasteGenIllustration(idx) {
+            const r = window._bulkPasteParsed[idx];
+            if (!r) return;
+            const engine = (document.getElementById('design-engine') || {}).value || 'as/gemini-2.5-flash-image';
+            const btn = document.getElementById('bp-illus-' + idx);
+            if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+            try {
+                const prompt = [
+                    'Create a clean, simple educational illustration to accompany an exam question.',
+                    'Style: flat vector, clear outlines, generous white space, textbook-diagram look.',
+                    // Generated lettering comes out garbled, and any legible label risks
+                    // handing the learner the answer straight off the picture.
+                    'CRITICAL: render NO text, letters, numbers, labels or watermarks anywhere in the image.',
+                    'CRITICAL: do NOT depict or hint at the correct answer — set the scene only.',
+                    '',
+                    'Question context: ' + String(r.q || '').slice(0, 600)
+                ].join('\n');
+                const res = await window.callUniversalAI(engine, prompt, false, null, '', { feature: 'quiz_illustration' });
+                const raw = String((res && res.text) || '');
+                // Same response-shape handling the PK Visual generator uses (~L34761):
+                // models return a data URL, a hosted URL, a markdown ![](url), or bare base64.
+                const mdMatch = raw.match(/!\[[^\]]*\]\((https?:\/\/[^)]+)\)/);
+                const extracted = mdMatch ? mdMatch[1] : raw;
+                let dataUrl = '';
+                if (extracted.startsWith('data:image/')) dataUrl = extracted;
+                else if (/^https?:\/\//i.test(extracted)) dataUrl = extracted;
+                else if (extracted.length > 100) dataUrl = 'data:image/png;base64,' + extracted;
+                if (!dataUrl) throw new Error('โมเดลไม่ได้ส่งรูปกลับมา — ลองเปลี่ยนโมเดลสร้างภาพ');
+                r.illustrationUrl = await bulkPasteUploadImage(dataUrl);
+                showToast('🎨 สร้างภาพประกอบข้อ ' + (idx + 1) + ' แล้ว', 'success');
+            } catch (e) {
+                console.warn('bulkPasteGenIllustration failed:', e);
+                showToast('สร้างภาพไม่สำเร็จ: ' + ((e && e.message) || e), 'error');
+            }
+            renderBulkPastePreview();   // also restores the button out of its ⏳ state
+        }
+
+        function bulkPasteRemoveIllustration(idx) {
+            const r = window._bulkPasteParsed[idx];
+            if (!r) return;
+            delete r.illustrationUrl;
+            renderBulkPastePreview();
+        }
+
         function bulkPasteInsert() {
             const rows = window._bulkPasteParsed.filter(r => r.include);
             if (rows.length === 0) { showToast('ยังไม่ได้เลือกข้อ', 'error'); return; }
@@ -26368,7 +26462,15 @@ ${JSON.stringify(sourceObj)}`;
             // It was dropped here before, so the rationale the admin reviewed in the
             // preview vanished on insert even though addQuestionUI prefills
             // .q-explanation from data.explanation.
-            rows.forEach(r => addQuestionUI({ q: r.q, type: 'choice', options: r.options, correct: r.correct, timer: 60, explanation: (r.rationale || '').trim() }));
+            // V97.23: the illustration is prepended as Markdown only here, at the
+            // moment the real question is built — renderMd on the intern side turns
+            // it into an <img>. Keeping it off r.q until now is what lets the
+            // preview and the 📋/💡 copy output stay free of raw Markdown noise.
+            rows.forEach(r => addQuestionUI({
+                q: (r.illustrationUrl ? '![ภาพประกอบ](' + r.illustrationUrl + ')\n\n' : '') + r.q,
+                type: 'choice', options: r.options, correct: r.correct, timer: 60,
+                explanation: (r.rationale || '').trim()
+            }));
             document.getElementById('bulkPasteModal').style.display = 'none';
             if (typeof triggerAutoSave === 'function') triggerAutoSave();
             const items = document.querySelectorAll('.quiz-q-item');
@@ -26395,12 +26497,53 @@ ${JSON.stringify(sourceObj)}`;
         // ============================================================
         window._imgQuizFiles = [];
 
+        // V97.22: ONLY providers whose proxy branch actually forwards the image.
+        // Verified against functions/index.js: gemini builds an inlineData part
+        // (:585) and typhoon swaps to its vision model + image_url (:642), while
+        // openai (:508), anthropic (:731) and openrouter (:864) all send a plain
+        // text `content` — the image is dropped server-side with no error, which
+        // is the same silent-hallucination class as the V97.21 fix. Offering only
+        // the two that work removes the old blind "swap text-only chips to Gemini"
+        // heuristic, which swapped Typhoon (works) but NOT GPT/Claude (don't).
+        // `textId` is the id to use for the TEXT-only verify call. Typhoon needs the
+        // split: the proxy only swaps in the vision model when visionData is present
+        // (functions/index.js:643), so passing the vision id to a text call would
+        // forward `typhoon-v2.5-vision-instruct` as a plain chat model. Gemini ids
+        // serve both modes, so they need no override.
+        const IMG_QUIZ_VISION_MODELS = [
+            { id: 'gemini-3.5-flash', label: 'Gemini Flash' },
+            { id: 'gemini-3.6-flash', label: 'Gemini Pro' },
+            { id: 'typhoon-v2.5-vision-instruct', textId: 'typhoon-v2.5-30b-a3b-instruct', label: '🌀 Typhoon' }
+        ];
+        window._imgQuizModels = ['gemini-3.5-flash'];
+
+        function imageQuizRenderModelRail() {
+            const rail = document.getElementById('img-quiz-model-rail');
+            if (!rail) return;
+            rail.innerHTML = IMG_QUIZ_VISION_MODELS.map(m => {
+                const on = window._imgQuizModels.includes(m.id);
+                return '<button type="button" onclick="imageQuizToggleModel(\'' + m.id + '\')" style="width:auto; min-height:0; padding:5px 13px; border-radius:999px; cursor:pointer; font-size:0.78em; font-weight:800; border:1.5px solid ' + (on ? '#d97706' : '#e2e8f0') + '; background:' + (on ? 'linear-gradient(135deg,#f59e0b,#d97706)' : '#fff') + '; color:' + (on ? '#fff' : '#64748b') + ';">' + (on ? '✓ ' : '') + m.label + '</button>';
+            }).join('');
+        }
+
+        function imageQuizToggleModel(id) {
+            const cur = window._imgQuizModels;
+            const at = cur.indexOf(id);
+            // Keep at least one selected — an empty rail would silently generate nothing.
+            if (at >= 0) { if (cur.length === 1) { showToast('ต้องเลือกอย่างน้อย 1 โมเดล', 'error'); return; } cur.splice(at, 1); }
+            else cur.push(id);
+            imageQuizRenderModelRail();
+        }
+
         function openImageQuizModal() {
             window._imgQuizFiles = [];
             document.getElementById('img-quiz-file-input').value = '';
             document.getElementById('img-quiz-file-status').textContent = 'ยังไม่ได้เลือกรูป';
             document.getElementById('img-quiz-progress').textContent = '';
+            document.getElementById('img-quiz-progress-wrap').style.display = 'none';
+            document.getElementById('img-quiz-progress-bar').style.width = '0%';
             document.getElementById('img-quiz-generate-btn').disabled = true;
+            imageQuizRenderModelRail();
             document.getElementById('imageQuizModal').style.display = 'flex';
         }
 
@@ -26431,24 +26574,38 @@ ${JSON.stringify(sourceObj)}`;
                 showToast('AI engine ยังไม่พร้อม — reload แล้วลองใหม่', 'error'); return;
             }
 
+            const models = window._imgQuizModels.slice();
+            if (!models.length) { showToast('ยังไม่ได้เลือกโมเดล', 'error'); return; }
+
             const btn = document.getElementById('img-quiz-generate-btn');
             const progressEl = document.getElementById('img-quiz-progress');
+            const progressBar = document.getElementById('img-quiz-progress-bar');
+            document.getElementById('img-quiz-progress-wrap').style.display = 'block';
             btn.disabled = true;
 
-            // Vision needs a model that actually supports image input — the app's
-            // own AI Vision Scan (processQuizVision) always uses Gemini for this
-            // reason. Reuse the shared model rail for anything text-capable (the
-            // verify pass below), but silently swap known text-only chips to
-            // Gemini for the vision step specifically, mirroring the ThaiLLM →
-            // Gemini local-fallback pattern used elsewhere in callUniversalAI.
-            const chosenModel = document.getElementById('ai-analyzer-model-val')?.value || 'gemini-3.5-flash';
-            const visionModel = /typhoon|llama|mimo/i.test(chosenModel) ? 'gemini-3.5-flash' : chosenModel;
+            // V97.22: real percentage. Each (image × model) pair costs TWO AI calls
+            // (author, then verify), so the unit of progress is a call, not a file —
+            // otherwise a single-image run sat at "1/1" for the whole time with no
+            // sign of life.
+            const totalSteps = files.length * models.length * 2;
+            let step = 0;
+            const tick = (fileIdx, modelLabel, phase) => {
+                const pct = Math.round((step / totalSteps) * 100);
+                progressBar.style.width = pct + '%';
+                progressEl.textContent = `${pct}% · รูป ${fileIdx + 1}/${files.length} · ${modelLabel} · ${phase}`;
+            };
 
             const generated = [];
             let failed = 0;
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                progressEl.textContent = `🧩 กำลังไขปริศนา... ${i + 1}/${files.length} (${file.name})`;
+              for (const modelId of models) {
+                const spec = IMG_QUIZ_VISION_MODELS.find(m => m.id === modelId) || {};
+                const modelLabel = spec.label || modelId;
+                const visionModel = modelId;          // image call
+                const chosenModel = spec.textId || modelId;  // text-only verify call
+                const pairStart = step;
+                tick(i, modelLabel, '🧩 กำลังไขปริศนา + แต่งโจทย์');
                 try {
                     const base64 = await imageQuizReadBase64(file);
                     const prompt = [
@@ -26491,6 +26648,9 @@ ${JSON.stringify(sourceObj)}`;
                         .map(n => Number(n)).filter(n => Number.isInteger(n) && n >= 0 && n < data.options.length);
                     const genRationale = (data.rationale && String(data.rationale).trim()) || '';
 
+                    step = pairStart + 1;
+                    tick(i, modelLabel, '🔍 กำลังตรวจทานเฉลย');
+
                     // Independent verify pass — blind to genCorrect/genRationale above.
                     let finalCorrect = genCorrect;
                     let finalRationale = genRationale;
@@ -26515,15 +26675,25 @@ ${JSON.stringify(sourceObj)}`;
 
                     if (finalCorrect.length === 0) throw new Error('ไม่พบเฉลยที่ใช้ได้ทั้งจากขั้นสร้างและขั้นตรวจทาน');
 
-                    generated.push({ q: data.q, options: data.options, correct: finalCorrect, conf: conf, rationale: finalRationale, include: true });
+                    // `model` is what badges the row in the Bulk Paste preview when
+                    // more than one model ran, so the admin can tell the candidates
+                    // apart before keeping one.
+                    generated.push({ q: data.q, options: data.options, correct: finalCorrect, conf: conf, rationale: finalRationale, include: true, model: modelLabel, srcImage: file.name });
                 } catch (e) {
                     failed++;
-                    console.warn('imageQuizGenerate failed for', file.name, e);
+                    console.warn('imageQuizGenerate failed for', file.name, '/', modelId, e);
+                } finally {
+                    // Settle this pair's full 2-call budget however it ended, so a
+                    // failure mid-pair can't leave the bar stalled below 100%.
+                    step = pairStart + 2;
                 }
+              }
             }
 
             btn.disabled = false;
+            progressBar.style.width = '100%';
             progressEl.textContent = '';
+            document.getElementById('img-quiz-progress-wrap').style.display = 'none';
 
             if (generated.length === 0) {
                 showToast('สร้างโจทย์ไม่สำเร็จเลย — ลองรูปอื่นหรือตรวจสอบ AI engine', 'error');
@@ -53944,8 +54114,25 @@ Reply ONLY with raw JSON, no markdown:
             </button>
             <div id="img-quiz-file-status" style="font-size:0.82em; color:#94a3b8; margin-bottom:14px;">ยังไม่ได้เลือกรูป</div>
 
-            <div style="margin-top:6px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
-                <span id="img-quiz-progress" style="font-size:0.78em; color:#94a3b8; font-style:italic;"></span>
+            <!-- V97.22: vision-model rail. Multi-select = compare mode (each picked
+                 model produces its own candidate row per image, badged in the preview
+                 so the admin keeps the better one and unticks the rest). -->
+            <div style="margin-bottom:14px;">
+                <div style="font-size:0.78em; font-weight:800; color:#475569; margin-bottom:6px;">
+                    โมเดล AI <span style="font-weight:400; color:#94a3b8;">· เลือกหลายตัวเพื่อเปรียบเทียบ (ได้ 1 ข้อต่อรูปต่อโมเดล)</span>
+                </div>
+                <div id="img-quiz-model-rail" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+                <div style="font-size:0.72em; color:#94a3b8; margin-top:6px; font-style:italic;">* แสดงเฉพาะโมเดลที่อ่านรูปได้จริงผ่าน AI proxy — GPT/Claude/OpenRouter ยังส่งได้แต่ข้อความ จึงไม่อยู่ในลิสต์</div>
+            </div>
+
+            <div id="img-quiz-progress-wrap" style="display:none; margin:14px 0;">
+                <div style="height:8px; background:#f1f5f9; border-radius:4px; overflow:hidden;">
+                    <div id="img-quiz-progress-bar" style="height:100%; width:0%; background:linear-gradient(90deg,#f59e0b,#d97706); border-radius:4px; transition:width 0.25s;"></div>
+                </div>
+                <div id="img-quiz-progress" style="font-size:0.78em; color:#b45309; font-weight:700; margin-top:6px;"></div>
+            </div>
+
+            <div style="margin-top:6px; display:flex; justify-content:flex-end; align-items:center; gap:10px;">
                 <button class="magic-btn" id="img-quiz-generate-btn" onclick="imageQuizGenerate()" disabled style="padding:10px 26px;">🪄 สร้างโจทย์จากรูป</button>
             </div>
         </div>
