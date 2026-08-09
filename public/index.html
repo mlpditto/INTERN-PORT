@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.31)</title>
+    <title>Internship Portfolio (V96.32)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -4656,6 +4656,7 @@
             <span onclick="closeQuiz()" style="float:right;font-size:24px;cursor:pointer;">&times;</span>
             <div id="quiz-q-timer"
                 style="float:right; font-weight:bold; color:#ef233c; margin-right:20px; font-size:1.2em;"></div>
+            <span id="quiz-q-type-badge" class="badge" style="float:right; background:#4361ee; margin-right:10px; margin-top:3px;"></span>
             <h3 id="quiz-run-title">Quiz</h3>
             <!-- 🔥 Case Study Reader Section (V77.23) -->
             <div id="quiz-case-passage-area" style="display:none; margin-bottom:15px;">
@@ -8471,6 +8472,9 @@
             // Stop existing timer first
             clearInterval(quizTimerInterval);
             document.getElementById('quiz-q-timer').innerText = "";
+            // V96.32: read-only mode has no type badge — clear any leftover from
+            // a scored quiz shown earlier in the same modal.
+            document.getElementById('quiz-q-type-badge').innerText = "";
 
             if (isPoll && !isAnswered && !isPracticeMode) {
                 startReadOnlyTimer(page.timer || 60);
@@ -9225,10 +9229,15 @@
                 // V93.01: wrap entire innerHTML in lang-no-toggle so options get
                 // shielded too (V93.00 only shielded question text + bar — Thai
                 // option text was rendered blank by lang-toggle.js auto-wrap).
+                // V96.32: question type now shown as a compact badge next to the
+                // timer (top-right) instead of a full "Q X/Y (TYPE)" row — the
+                // "X/Y" part duplicated the position already shown by the
+                // answered/current bullets below, so only the type moved.
+                document.getElementById('quiz-q-type-badge').innerText = qType.toUpperCase();
+
                 quizRunContainer.innerHTML = `
                 <div class="lang-no-toggle">
                     <div style="margin-bottom:15px;">
-                        <span class="badge" style="background:#4361ee; margin-bottom:10px;">Q ${currentStep + 1}/${currentQuiz.questions.length} (${qType.toUpperCase()})</span>
                         ${renderQuizStepBullets()}
                         ${qtRenderBar(question)}
                         <div class="md-render" style="font-weight:bold; font-size:1.1em; color:#333;">${window.renderMd(question.q)}</div>
