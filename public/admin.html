@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.19</title>
+    <title>Nika V97.20</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12209,6 +12209,7 @@
                         <!-- Group 2: Bulk Actions -->
                         <div style="display:flex; align-items:center; gap:4px; padding-right:8px; border-right:1px solid rgba(245,158,11,0.35);">
                             <button class="btn-sm" onclick="openBulkPasteModal()" title="📋 Paste many questions at once" style="background:linear-gradient(135deg,#7c3aed,#6d28d9); color:#ede9fe; border:none; padding:0 10px; border-radius:8px; font-weight:800; font-size:0.68em; height:28px; cursor:pointer; display:flex; align-items:center; gap:4px;">📋 Bulk Paste</button>
+                            <button class="btn-sm" onclick="openImageQuizModal()" title="🧩 Generate quiz from image(s) — puzzles/scenarios with no ready-made options" style="background:linear-gradient(135deg,#f59e0b,#d97706); color:#fffbeb; border:none; padding:0 10px; border-radius:8px; font-weight:800; font-size:0.68em; height:28px; cursor:pointer; display:flex; align-items:center; gap:4px;">🧩 จากรูป</button>
                             <button class="btn-sm" onclick="openImportQuizModal()" title="📥 Import from Quiz" style="background:linear-gradient(135deg,#0f766e,#0d9488); color:#ecfeff; border:none; padding:0 10px; border-radius:8px; font-weight:800; font-size:0.68em; height:28px; cursor:pointer; display:flex; align-items:center; gap:4px;">📥 Import</button>
                             <button class="btn-sm" onclick="openExportQuizPdfModal()" title="📄 Export Quiz PDF" style="background:linear-gradient(135deg,#0284c7,#0369a1); color:#fef3c7; border:none; padding:0 10px; border-radius:8px; font-weight:800; font-size:0.68em; height:28px; cursor:pointer; display:flex; align-items:center; gap:4px;">📄 Export PDF</button>
                             <button class="btn-sm" onclick="openBulkExportModal()" title="🧩 Split to New Quiz" style="background:linear-gradient(135deg,#1d4ed8,#1e40af); color:#dbeafe; border:none; padding:0 10px; border-radius:8px; font-weight:800; font-size:0.68em; height:28px; cursor:pointer; display:flex; align-items:center; gap:4px;">🧩 Split</button>
@@ -26361,6 +26362,157 @@ ${JSON.stringify(sourceObj)}`;
             quizQPageIndex = Math.max(0, items.length - rows.length);
             if (typeof updateQuizPagination === 'function') updateQuizPagination();
             showToast('✅ เพิ่ม ' + rows.length + ' ข้อแล้ว', 'success');
+        }
+
+        // ============================================================
+        // V97.20: Generate Quiz from Image(s) — for source material with no
+        // ready-made options (puzzles, scenario illustrations). Distinct from
+        // 🤖 AI Vision Scan (processQuizVision) which only extracts a Q+options
+        // that already exist in the image. Two AI calls per image:
+        //   1. generation — vision model reads the image, solves it internally,
+        //      then authors ONE MC question whose "correct" must match its own
+        //      solved answer.
+        //   2. verify — reuses _aiFindAnswerCore (same primitive Bulk Paste's
+        //      "🎯 หาคำตอบด้วย AI" uses) as an independent, blind second opinion
+        //      on the freshly-authored Q+options. Disagreement flags the row
+        //      instead of silently trusting a single pass — logic puzzles are
+        //      exactly the case where a model can misauthor its own answer key.
+        // Results feed into the existing Bulk Paste preview stage so review/
+        // edit/select is one consistent flow regardless of text vs image input.
+        // ============================================================
+        window._imgQuizFiles = [];
+
+        function openImageQuizModal() {
+            window._imgQuizFiles = [];
+            document.getElementById('img-quiz-file-input').value = '';
+            document.getElementById('img-quiz-file-status').textContent = 'ยังไม่ได้เลือกรูป';
+            document.getElementById('img-quiz-progress').textContent = '';
+            document.getElementById('img-quiz-generate-btn').disabled = true;
+            document.getElementById('imageQuizModal').style.display = 'flex';
+        }
+
+        function imageQuizFilesChosen(input) {
+            window._imgQuizFiles = Array.from(input.files || []);
+            const n = window._imgQuizFiles.length;
+            document.getElementById('img-quiz-file-status').textContent = n
+                ? `เลือกแล้ว ${n} รูป: ` + window._imgQuizFiles.map(f => f.name).join(', ')
+                : 'ยังไม่ได้เลือกรูป';
+            document.getElementById('img-quiz-generate-btn').disabled = n === 0;
+        }
+
+        // Promisified FileReader — mirrors the reader used by processQuizVision,
+        // just wrapped so the generate loop below can await it per-file.
+        function imageQuizReadBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = () => reject(new Error('อ่านไฟล์รูปไม่สำเร็จ: ' + file.name));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function imageQuizGenerate() {
+            const files = window._imgQuizFiles;
+            if (!files.length) { showToast('ยังไม่ได้เลือกรูป', 'error'); return; }
+            if (typeof window.callUniversalAI !== 'function' || typeof window._aiFindAnswerCore !== 'function') {
+                showToast('AI engine ยังไม่พร้อม — reload แล้วลองใหม่', 'error'); return;
+            }
+
+            const btn = document.getElementById('img-quiz-generate-btn');
+            const progressEl = document.getElementById('img-quiz-progress');
+            btn.disabled = true;
+
+            // Vision needs a model that actually supports image input — the app's
+            // own AI Vision Scan (processQuizVision) always uses Gemini for this
+            // reason. Reuse the shared model rail for anything text-capable (the
+            // verify pass below), but silently swap known text-only chips to
+            // Gemini for the vision step specifically, mirroring the ThaiLLM →
+            // Gemini local-fallback pattern used elsewhere in callUniversalAI.
+            const chosenModel = document.getElementById('ai-analyzer-model-val')?.value || 'gemini-3.5-flash';
+            const visionModel = /typhoon|llama|mimo/i.test(chosenModel) ? 'gemini-3.5-flash' : chosenModel;
+
+            const generated = [];
+            let failed = 0;
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                progressEl.textContent = `🧩 กำลังไขปริศนา... ${i + 1}/${files.length} (${file.name})`;
+                try {
+                    const base64 = await imageQuizReadBase64(file);
+                    const prompt = [
+                        'คุณคือผู้เชี่ยวชาญด้านการออกแบบข้อสอบปรนัย ทำหน้าที่สร้างโจทย์จากเนื้อหาในรูปภาพ',
+                        '',
+                        'ขั้นตอนที่ 1 (คิดในใจ ห้ามใส่ในคำตอบ): อ่านเนื้อหา/สถานการณ์/ปริศนาในรูปอย่างละเอียด ไล่เงื่อนไขทีละขั้นตอนจนได้คำตอบที่ถูกต้องแน่ชัด แล้วทวนคำตอบอีกครั้งก่อนสรุป — ถ้าเป็นปริศนาตรรกะ/คณิตศาสตร์ ต้องคำนวณจริง ห้ามเดา',
+                        '',
+                        'ขั้นตอนที่ 2: แต่งโจทย์ปรนัย 1 ข้อจากเนื้อหานี้ (ควรถามสิ่งที่ต้องใช้ความเข้าใจ/การไขปริศนาจริง ไม่ใช่แค่จำตัวเลขในรูป) พร้อมตัวเลือก 4 ข้อ:',
+                        '- คำตอบที่ถูกต้อง 1 ข้อ ต้องตรงกับคำตอบที่ไขได้จากขั้นตอนที่ 1 เป๊ะๆ',
+                        '- ตัวลวง 3 ข้อ ต้องสมเหตุสมผล ดูน่าเป็นไปได้ (เช่น เป็นผลจากความเข้าใจผิดที่พบได้บ่อย) ห้ามเป็นตัวเลือกไร้สาระที่ตัดทิ้งได้ทันที',
+                        '',
+                        'ภาษา: ใช้ภาษาเดียวกับข้อความในรูป',
+                        '',
+                        'OUTPUT ต้องเป็น RAW JSON เท่านั้น ห้ามมี code fence ห้ามมีคำอธิบายนอก JSON:',
+                        '{"q":"โจทย์ที่แต่งขึ้น...","options":["ตัวเลือก 1","ตัวเลือก 2","ตัวเลือก 3","ตัวเลือก 4"],"correct":[เลขข้อ 0-based ที่ถูกต้อง เช่น [1]],"rationale":"อธิบายวิธีไขปริศนาโดยย่อ 2-4 ประโยค ว่าทำไมคำตอบนี้ถูก"}'
+                    ].join('\n');
+
+                    const genRes = await callUniversalAI(visionModel, prompt, true, {
+                        image_base64: base64,
+                        image_mimetype: file.type || 'image/png'
+                    }, '', { feature: 'quiz_image_generate' });
+                    const data = safeJsonParse(genRes.text);
+                    if (!data || !data.q || !Array.isArray(data.options) || data.options.length < 2) {
+                        throw new Error('AI ส่งค่าที่ใช้ไม่ได้: ' + String(genRes.text || '').slice(0, 160));
+                    }
+                    const genCorrect = (Array.isArray(data.correct) ? data.correct : [])
+                        .map(n => Number(n)).filter(n => Number.isInteger(n) && n >= 0 && n < data.options.length);
+                    const genRationale = (data.rationale && String(data.rationale).trim()) || '';
+
+                    // Independent verify pass — blind to genCorrect/genRationale above.
+                    let finalCorrect = genCorrect;
+                    let finalRationale = genRationale;
+                    let conf = 85; // generation + verify agreed
+                    try {
+                        const verify = await window._aiFindAnswerCore(data.q, data.options, chosenModel, '');
+                        const agree = verify.picks.length && genCorrect.length
+                            && verify.picks.length === genCorrect.length
+                            && verify.picks.every(p => genCorrect.includes(p));
+                        if (!agree) {
+                            finalCorrect = verify.picks.length ? verify.picks : genCorrect;
+                            finalRationale = '⚠️ รอบสร้างโจทย์กับรอบตรวจทานให้เฉลยไม่ตรงกัน — ใช้ผลตรวจทานเป็นหลัก โปรดตรวจซ้ำก่อนบันทึก\n\n'
+                                + 'เหตุผลตอนสร้าง: ' + (genRationale || '-')
+                                + '\nเหตุผลตอนตรวจทาน: ' + (verify.rationale || '-');
+                            conf = 40;
+                        }
+                    } catch (ve) {
+                        console.warn('imageQuizGenerate verify failed:', ve);
+                        finalRationale = genRationale + (genRationale ? '\n\n' : '') + '⚠️ ตรวจทานเฉลยไม่สำเร็จ — ใช้เฉลยจากขั้นสร้างโจทย์เท่านั้น โปรดตรวจซ้ำก่อนบันทึก';
+                        conf = 55;
+                    }
+
+                    if (finalCorrect.length === 0) throw new Error('ไม่พบเฉลยที่ใช้ได้ทั้งจากขั้นสร้างและขั้นตรวจทาน');
+
+                    generated.push({ q: data.q, options: data.options, correct: finalCorrect, conf: conf, rationale: finalRationale, include: true });
+                } catch (e) {
+                    failed++;
+                    console.warn('imageQuizGenerate failed for', file.name, e);
+                }
+            }
+
+            btn.disabled = false;
+            progressEl.textContent = '';
+
+            if (generated.length === 0) {
+                showToast('สร้างโจทย์ไม่สำเร็จเลย — ลองรูปอื่นหรือตรวจสอบ AI engine', 'error');
+                return;
+            }
+
+            // Hand off to the existing Bulk Paste preview stage — same review/
+            // edit/select UI regardless of text-paste vs image-generate source.
+            window._bulkPasteParsed = generated;
+            document.getElementById('imageQuizModal').style.display = 'none';
+            document.getElementById('bulkPasteModal').style.display = 'flex';
+            document.getElementById('bp-input-stage').style.display = 'none';
+            document.getElementById('bp-preview-stage').style.display = 'block';
+            renderBulkPastePreview();
+            showToast(`🧩 สร้างโจทย์ได้ ${generated.length}/${files.length} ข้อ` + (failed ? ` (พลาด ${failed})` : '') + ' — ตรวจก่อนบันทึก', failed ? 'warning' : 'success');
         }
 
         function clearResearchChat() {
@@ -53741,6 +53893,34 @@ Reply ONLY with raw JSON, no markdown:
                     <span style="font-size:0.75em; color:#999; font-style:italic;">* จะ append เข้า quiz ปัจจุบัน · คลิกตัวเลือกเพื่อติ๊กเฉลย · ตรวจเฉลย AI ก่อนบันทึกเสมอ</span>
                     <button class="magic-btn" onclick="bulkPasteInsert()" style="padding:10px 26px;">➕ เพิ่มข้อที่เลือก</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- V97.20: Generate Quiz from Image(s) — for source material with no ready-made
+         options (puzzles, scenario illustrations), unlike 🤖 AI Vision Scan which only
+         extracts an already-formatted Q+options. Feeds results into the Bulk Paste
+         preview stage above so review/edit/select is one consistent flow either way. -->
+    <div id="imageQuizModal" class="modal" style="z-index:5200;">
+        <div class="modal-content lang-no-toggle" style="max-width:600px; padding:28px; border-radius:24px;">
+            <span class="close-modal" onclick="document.getElementById('imageQuizModal').style.display='none'">&times;</span>
+            <div style="display:flex; align-items:center; gap:14px; margin-bottom:16px; border-bottom:1px solid #eee; padding-bottom:14px;">
+                <div style="width:48px; height:48px; background:#fef3c7; border-radius:14px; display:flex; align-items:center; justify-content:center; color:#b45309; font-size:1.4em;">🧩</div>
+                <div>
+                    <h3 style="margin:0;">สร้างโจทย์จากรูป</h3>
+                    <p style="margin:2px 0 0 0; font-size:0.85em; color:#666;">สำหรับรูปที่ยังไม่มีตัวเลือกสำเร็จรูป (ปริศนา/สถานการณ์เล่าเรื่อง) — AI จะไขปริศนาในรูปก่อน แล้วค่อยแต่งโจทย์ปรนัย 1 ข้อต่อรูป พร้อมตรวจทานเฉลยซ้ำอีกรอบก่อนแสดงผล</p>
+                </div>
+            </div>
+
+            <input type="file" id="img-quiz-file-input" accept="image/*" multiple style="display:none;" onchange="imageQuizFilesChosen(this)">
+            <button class="magic-btn" onclick="document.getElementById('img-quiz-file-input').click()" style="width:100%; background:linear-gradient(135deg,#f59e0b,#d97706); padding:12px; border-radius:12px; font-size:0.9em; margin-bottom:10px;">
+                <i class="fa-solid fa-image"></i> เลือกรูป (เลือกได้หลายรูป)
+            </button>
+            <div id="img-quiz-file-status" style="font-size:0.82em; color:#94a3b8; margin-bottom:14px;">ยังไม่ได้เลือกรูป</div>
+
+            <div style="margin-top:6px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                <span id="img-quiz-progress" style="font-size:0.78em; color:#94a3b8; font-style:italic;"></span>
+                <button class="magic-btn" id="img-quiz-generate-btn" onclick="imageQuizGenerate()" disabled style="padding:10px 26px;">🪄 สร้างโจทย์จากรูป</button>
             </div>
         </div>
     </div>
