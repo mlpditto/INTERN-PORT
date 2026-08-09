@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.32)</title>
+    <title>Internship Portfolio (V96.33)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -7322,8 +7322,10 @@
                             // V97.17: "give feedback later" — only for graded, non-poll, standard
                             // quizzes (matches the gate the live post-submit modal already uses).
                             // openFeedbackForPastAttempt() blocks a duplicate submit on click.
+                            // V97.19: also hide once attempt.feedbackGiven is set, instead of
+                            // staying clickable and only rejecting after a round-trip query.
                             let feedbackBtn = "";
-                            if (!isPending && !q.isPoll && (q.quizType === 'standard' || !q.quizType)) {
+                            if (!isPending && !q.isPoll && (q.quizType === 'standard' || !q.quizType) && !attempt.feedbackGiven) {
                                 feedbackBtn = `<button class="btn-sm" onclick="openFeedbackForPastAttempt('${q.id}')" style="margin-top:5px; width:100%; border-radius:6px; background:#ecfdf5; color:#059669; border:none; font-weight:700;">💬 Give Feedback ให้ Feedback</button>`;
                             }
 
@@ -10235,6 +10237,15 @@
                     pointsEarned: currentPointsForFeedback,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
+
+                // V97.19: flag the attempt so the "Give Feedback" button (Mission card +
+                // History detail) can hide itself once feedback exists, instead of staying
+                // clickable and only rejecting on click via the quiz_feedback existence
+                // query above. Best-effort — a failure here shouldn't block the reward UI.
+                db.collection("quiz_attempts").doc(`${submittedQuizId}_${userId}`)
+                    .set({ feedbackGiven: true }, { merge: true })
+                    .catch(e => console.warn("feedbackGiven flag write failed:", e));
+                if (quizAttemptsCache[submittedQuizId]) quizAttemptsCache[submittedQuizId].feedbackGiven = true;
 
                 let streak = 1;
                 try {
@@ -16444,8 +16455,10 @@ async function archiveDoneCard(cardId) {
             // V97.17: "give feedback later" — same gate as viewBtn plus standard-quiz-only
             // (matches the gate the live post-submit modal uses). quizType isn't on `sub`
             // itself, so look the quiz doc up the same way matsHtml does just below.
+            // V97.19: also hide once m.feedbackGiven is set (see mapQuizAttemptsToUnified),
+            // instead of staying clickable and only rejecting after a round-trip query.
             let feedbackBtn = '';
-            if (sub && sub.status !== 'pending' && sub.canViewAnswers && sub.quizId && typeof quizzesCache !== 'undefined' && quizzesCache) {
+            if (sub && sub.status !== 'pending' && sub.canViewAnswers && sub.quizId && !m.feedbackGiven && typeof quizzesCache !== 'undefined' && quizzesCache) {
                 const fbQuiz = quizzesCache.find(q => q.id === sub.quizId);
                 if (fbQuiz && (fbQuiz.quizType === 'standard' || !fbQuiz.quizType)) {
                     feedbackBtn = `<button onclick="openFeedbackForPastAttempt('${sub.quizId}')" style="margin-top:8px; width:100%; border:none; cursor:pointer; background:#ecfdf5; color:#059669; font-size:0.8em; font-weight:700; padding:9px 14px; border-radius:8px;">💬 Give Feedback ให้ Feedback</button>`;
@@ -16578,7 +16591,18 @@ async function archiveDoneCard(cardId) {
                 const quiz = (typeof quizzesCache !== 'undefined' && quizzesCache) ? quizzesCache.find(q => q.id === qid) : null;
                 let score;
                 if (att.isExamSession && Number.isFinite(Number(att.groupScore))) score = Number(att.groupScore);
-                else { score = Number(att.score); if (!Number.isFinite(score)) score = 0; }
+                else {
+                    score = Number(att.score);
+                    // V97.19: mirror the legacy renderHistory() fallback — some approve
+                    // paths (admin.html approveQuiz) never persisted att.score, so a
+                    // fully-correct attempt displayed "0.00" here even though correctCount/
+                    // totalQuestions (used by the expanded detail bar) were right all along.
+                    if (!Number.isFinite(score) || score === 0) {
+                        score = (att.correctCount !== undefined && att.totalQuestions)
+                            ? computeQuizScore(att.correctCount, att.totalQuestions, quiz && quiz.totalPoints)
+                            : 0;
+                    }
+                }
                 out.push({
                     id: `${qid}_${userId}`,
                     submissionType: 'quiz',
@@ -16596,7 +16620,8 @@ async function archiveDoneCard(cardId) {
                         correctCount: att.correctCount,
                         totalQuestions: att.totalQuestions,
                         duration: att.duration,
-                        tags: att.tags
+                        tags: att.tags,
+                        feedbackGiven: !!att.feedbackGiven
                     }
                 });
             });
