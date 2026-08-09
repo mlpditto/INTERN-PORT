@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.23</title>
+    <title>Nika V97.24</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -26535,6 +26535,33 @@ ${JSON.stringify(sourceObj)}`;
             imageQuizRenderModelRail();
         }
 
+        // V97.24: when ON, the stem must carry every fact needed to answer, so the
+        // learner never has to see the source picture. Deliberately a toggle rather
+        // than always-on: for a rash photo / ECG / X-ray, describing the picture in
+        // words IS the answer, and those questions are supposed to depend on it.
+        window._imgQuizSelfContained = true;
+
+        function imageQuizRenderSelfContainedChip() {
+            const chip = document.getElementById('img-quiz-selfcontained-chip');
+            const hint = document.getElementById('img-quiz-selfcontained-hint');
+            if (!chip) return;
+            const on = window._imgQuizSelfContained;
+            chip.style.border = '1.5px solid ' + (on ? '#0d9488' : '#e2e8f0');
+            chip.style.background = on ? 'linear-gradient(135deg,#14b8a6,#0d9488)' : '#fff';
+            chip.style.color = on ? '#fff' : '#64748b';
+            chip.textContent = (on ? '✓ ' : '') + '📝 ยกข้อมูลจากรูปมาใส่ในโจทย์';
+            if (hint) {
+                hint.textContent = on
+                    ? 'โจทย์จะมีข้อมูลครบในตัว (ตัวเลข/ตาราง/เงื่อนไข) — นักศึกษาตอบได้โดยไม่ต้องเห็นรูป เหมาะกับปริศนา ตาราง ข้อมูลตัวเลข'
+                    : 'โจทย์จะอ้างอิงรูปได้ (เช่น "จากภาพ...") — เหมาะกับรูปผื่น ฟิล์ม X-ray ECG ที่ถ้าบรรยายเป็นข้อความจะเท่ากับเฉลย ⚠️ ต้องแนบรูปให้นักศึกษาเห็นเอง';
+            }
+        }
+
+        function imageQuizToggleSelfContained() {
+            window._imgQuizSelfContained = !window._imgQuizSelfContained;
+            imageQuizRenderSelfContainedChip();
+        }
+
         function openImageQuizModal() {
             window._imgQuizFiles = [];
             document.getElementById('img-quiz-file-input').value = '';
@@ -26544,6 +26571,7 @@ ${JSON.stringify(sourceObj)}`;
             document.getElementById('img-quiz-progress-bar').style.width = '0%';
             document.getElementById('img-quiz-generate-btn').disabled = true;
             imageQuizRenderModelRail();
+            imageQuizRenderSelfContainedChip();
             document.getElementById('imageQuizModal').style.display = 'flex';
         }
 
@@ -26576,6 +26604,7 @@ ${JSON.stringify(sourceObj)}`;
 
             const models = window._imgQuizModels.slice();
             if (!models.length) { showToast('ยังไม่ได้เลือกโมเดล', 'error'); return; }
+            const selfContained = window._imgQuizSelfContained !== false;
 
             const btn = document.getElementById('img-quiz-generate-btn');
             const progressEl = document.getElementById('img-quiz-progress');
@@ -26616,6 +26645,18 @@ ${JSON.stringify(sourceObj)}`;
                         'ขั้นตอนที่ 2: แต่งโจทย์ปรนัย 1 ข้อจากเนื้อหานี้ (ควรถามสิ่งที่ต้องใช้ความเข้าใจ/การไขปริศนาจริง ไม่ใช่แค่จำตัวเลขในรูป) พร้อมตัวเลือก 4 ข้อ:',
                         '- คำตอบที่ถูกต้อง 1 ข้อ ต้องตรงกับคำตอบที่ไขได้จากขั้นตอนที่ 1 เป๊ะๆ',
                         '- ตัวลวง 3 ข้อ ต้องสมเหตุสมผล ดูน่าเป็นไปได้ (เช่น เป็นผลจากความเข้าใจผิดที่พบได้บ่อย) ห้ามเป็นตัวเลือกไร้สาระที่ตัดทิ้งได้ทันที',
+                        '',
+                        // V97.24: the learner never sees the source picture unless the admin
+                        // attaches one, so by default every fact needed to answer must be
+                        // restated inside the stem.
+                        selfContained
+                            ? [
+                                'สำคัญมาก — โจทย์ต้องสมบูรณ์ในตัวเอง (นักศึกษาจะไม่เห็นรูปนี้):',
+                                '- ยกข้อมูลทุกอย่างที่ต้องใช้ในการหาคำตอบจากรูปมาเขียนไว้ในตัวโจทย์ให้ครบ (ตัวเลข ชื่อ กติกา เงื่อนไข ลำดับ ตาราง ฯลฯ)',
+                                '- ห้ามอ้างถึงรูปเด็ดขาด ห้ามใช้คำว่า "จากรูป" "ในภาพ" "ตามภาพ" "ข้างต้น" หรือคำอื่นที่บังคับให้ต้องเห็นรูป',
+                                '- อ่านโจทย์ที่แต่งเสร็จอีกครั้ง แล้วถามตัวเองว่า "ถ้าไม่เคยเห็นรูปนี้เลย ตอบข้อนี้ได้ไหม" ถ้าตอบไม่ได้ ให้เขียนโจทย์ใหม่'
+                              ].join('\n')
+                            : 'หมายเหตุ: โจทย์อ้างอิงรูปได้ (เช่น "จากภาพ...") เพราะผู้สอนจะแนบรูปให้นักศึกษาเห็นเอง',
                         '',
                         'ภาษา: ใช้ภาษาเดียวกับข้อความในรูป',
                         '',
@@ -26674,6 +26715,17 @@ ${JSON.stringify(sourceObj)}`;
                     }
 
                     if (finalCorrect.length === 0) throw new Error('ไม่พบเฉลยที่ใช้ได้ทั้งจากขั้นสร้างและขั้นตรวจทาน');
+
+                    // V97.24: asking for a self-contained stem doesn't guarantee one, and
+                    // a stem that still points at a picture the learner never sees is
+                    // unanswerable — the exact failure this option exists to prevent.
+                    // Flag it loudly rather than dropping the row: the wording is often
+                    // salvageable with a small edit right here in the preview.
+                    if (selfContained && /จากรูป|จากภาพ|ในรูป|ในภาพ|ตามรูป|ตามภาพ|ดังรูป|ดังภาพ|from the image|in the (image|figure|picture)|shown above/i.test(String(data.q || ''))) {
+                        finalRationale = '⚠️ โจทย์ยังอ้างถึงรูปอยู่ ทั้งที่เปิดโหมด "ยกข้อมูลจากรูปมาใส่ในโจทย์" — นักศึกษาจะไม่เห็นรูปนี้ ควรแก้ถ้อยคำให้ข้อมูลครบในตัวโจทย์ก่อนบันทึก\n\n'
+                            + finalRationale;
+                        conf = Math.min(conf, 45);
+                    }
 
                     // `model` is what badges the row in the Bulk Paste preview when
                     // more than one model ran, so the admin can tell the candidates
@@ -54123,6 +54175,17 @@ Reply ONLY with raw JSON, no markdown:
                 </div>
                 <div id="img-quiz-model-rail" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
                 <div style="font-size:0.72em; color:#94a3b8; margin-top:6px; font-style:italic;">* แสดงเฉพาะโมเดลที่อ่านรูปได้จริงผ่าน AI proxy — GPT/Claude/OpenRouter ยังส่งได้แต่ข้อความ จึงไม่อยู่ในลิสต์</div>
+            </div>
+
+            <!-- V97.24: self-contained toggle. ON = lift every fact the question needs
+                 out of the picture and into the stem, so the learner can answer without
+                 seeing it (tables, numbers, logic puzzles). OFF is deliberately kept for
+                 the cases where describing the picture WOULD be the answer — a rash
+                 photo, an ECG, an X-ray. Defaults ON: the reported failure was a
+                 generated question nobody could answer. -->
+            <div style="margin-bottom:14px;">
+                <button type="button" id="img-quiz-selfcontained-chip" onclick="imageQuizToggleSelfContained()" style="width:auto; min-height:0; padding:7px 14px; border-radius:999px; cursor:pointer; font-size:0.78em; font-weight:800; text-align:left;"></button>
+                <div id="img-quiz-selfcontained-hint" style="font-size:0.72em; color:#94a3b8; margin-top:6px; font-style:italic;"></div>
             </div>
 
             <div id="img-quiz-progress-wrap" style="display:none; margin:14px 0;">
