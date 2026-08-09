@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.18</title>
+    <title>Nika V97.19</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -52057,6 +52057,24 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             // V95.58: single mm:ss value instead of "6 min" + "373s avg" (same value twice)
             const avgTimeR = Math.round(avgTime);
             const avgTimeMMSS = `${Math.floor(avgTimeR / 60)}:${String(avgTimeR % 60).padStart(2, '0')}`;
+            // V97.21: surface who's currently fastest right in the Avg Time card —
+            // requires a real (>0) recorded time so a missing/zeroed value never wins.
+            const timedFeedbacks = _qfpFeedbacks.filter(f => typeof f.timeUsedSeconds === 'number' && f.timeUsedSeconds > 0);
+            const fastest = timedFeedbacks.length
+                ? timedFeedbacks.reduce((a, b) => (b.timeUsedSeconds < a.timeUsedSeconds ? b : a))
+                : null;
+            let fastestHtml = '';
+            if (fastest) {
+                const fu = usersData.find(x => x.id === fastest.userId);
+                const fPic = (fu && fu.pictureUrl) || fastest.pictureUrl || '';
+                const fName = (fu && fu.displayName) || fastest.displayName || 'Anonymous';
+                const fMin = Math.floor(fastest.timeUsedSeconds / 60);
+                const fSec = fastest.timeUsedSeconds % 60;
+                fastestHtml = `<div style="display:flex;align-items:center;gap:5px;margin-top:6px;">
+                    ${fPic ? `<img src="${qfpEscapeHtml(fPic)}" alt="" style="width:20px;height:20px;border-radius:50%;object-fit:cover;border:1.5px solid #93c5fd;flex-shrink:0;" onerror="this.style.display='none'">` : ''}
+                    <span style="font-size:0.72em;color:#1e40af;font-weight:700;" title="Fastest recorded time">🏆 ${qfpEscapeHtml(fName)} · ${fMin}:${String(fSec).padStart(2, '0')}</span>
+                </div>`;
+            }
 
             const starFill = avgRating !== null ? Math.round(avgRating / 10 * 5) : null;
             const starsHtml = starFill !== null ? '★'.repeat(starFill) + '☆'.repeat(5 - starFill) : '—';
@@ -52075,6 +52093,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     <div style="font-size:0.75em;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:0.5px;">Avg Time</div>
                     <div style="font-size:2em;font-weight:900;color:#1d4ed8;">${avgTimeMMSS}<span style="font-size:0.5em;color:#3b82f6;"> min</span></div>
                     <div style="font-size:0.75em;color:#60a5fa;">เฉลี่ยต่อคน</div>
+                    ${fastestHtml}
                 </div>
                 ${(topics.length || blankTopicCount > 0) ? `<div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:12px;padding:12px 18px;flex:2;min-width:200px;">
                     <div style="font-size:0.75em;font-weight:700;color:#6b21a8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">🎯 Next Topics Requested</div>
