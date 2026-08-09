@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.20</title>
+    <title>Nika V97.21</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -15411,10 +15411,23 @@
                     else if (mName === 'gemini-2.5-pro' || mName === 'gemini-3.5-pro') mName = 'gemini-3.6-flash';
                     const model = genAI.getGenerativeModel({ model: mName });
                     let result;
-                    if (visionData && visionData.base64) {
+                    // V97.21: accept BOTH visionData shapes. The proxy contract is
+                    // {image_base64, image_mimetype} (functions/index.js:586) and every
+                    // in-app vision caller passes THAT shape — but this local-SDK
+                    // fallback only ever checked {base64, mimeType}. So whenever the
+                    // proxy was unavailable the image was SILENTLY dropped here and the
+                    // model answered from the text prompt alone: a "make a question from
+                    // this image" prompt then invented a question about an image it never
+                    // saw. functions/index.js:784 already tolerates both shapes for the
+                    // image-edit path; match that here. Also strip a leading data-URL
+                    // prefix the same way the proxy does, so callers may pass either.
+                    const visB64raw = visionData && (visionData.image_base64 || visionData.base64);
+                    const visMime = visionData && (visionData.image_mimetype || visionData.mimeType);
+                    if (visB64raw) {
+                        const visB64 = String(visB64raw).includes('base64,') ? String(visB64raw).split('base64,')[1] : visB64raw;
                         const parts = [
                             { text: prompt },
-                            { inlineData: { data: visionData.base64, mimeType: visionData.mimeType || "image/jpeg" } }
+                            { inlineData: { data: visB64, mimeType: visMime || "image/jpeg" } }
                         ];
                         result = await model.generateContent(parts);
                     } else {
@@ -26449,8 +26462,11 @@ ${JSON.stringify(sourceObj)}`;
                         '',
                         'ภาษา: ใช้ภาษาเดียวกับข้อความในรูป',
                         '',
+                        'สำคัญที่สุด — ห้ามเดาเนื้อหารูป: ถ้าคุณไม่ได้รับรูปภาพ หรือมองรูปไม่เห็น/อ่านไม่ออก',
+                        'ให้ตอบ {"error":"NO_IMAGE"} เท่านั้น ห้ามแต่งโจทย์ขึ้นมาเองจากจินตนาการเด็ดขาด',
+                        '',
                         'OUTPUT ต้องเป็น RAW JSON เท่านั้น ห้ามมี code fence ห้ามมีคำอธิบายนอก JSON:',
-                        '{"q":"โจทย์ที่แต่งขึ้น...","options":["ตัวเลือก 1","ตัวเลือก 2","ตัวเลือก 3","ตัวเลือก 4"],"correct":[เลขข้อ 0-based ที่ถูกต้อง เช่น [1]],"rationale":"อธิบายวิธีไขปริศนาโดยย่อ 2-4 ประโยค ว่าทำไมคำตอบนี้ถูก"}'
+                        '{"imageSummary":"บรรยาย 1-2 ประโยคว่าเห็นอะไรในรูปจริงๆ (หัวข้อ ตัวละคร ตัวเลข ที่ปรากฏ) เพื่อยืนยันว่าคุณเห็นรูปจริง","q":"โจทย์ที่แต่งขึ้น...","options":["ตัวเลือก 1","ตัวเลือก 2","ตัวเลือก 3","ตัวเลือก 4"],"correct":[เลขข้อ 0-based ที่ถูกต้อง เช่น [1]],"rationale":"อธิบายวิธีไขปริศนาโดยย่อ 2-4 ประโยค ว่าทำไมคำตอบนี้ถูก"}'
                     ].join('\n');
 
                     const genRes = await callUniversalAI(visionModel, prompt, true, {
@@ -26458,8 +26474,18 @@ ${JSON.stringify(sourceObj)}`;
                         image_mimetype: file.type || 'image/png'
                     }, '', { feature: 'quiz_image_generate' });
                     const data = safeJsonParse(genRes.text);
+                    // V97.21: hard-stop when the model reports it never received the image.
+                    // Without this a dropped image (see the visionData shape bug fixed in
+                    // callUniversalAI) produced a confident, fully-formed question about a
+                    // picture that was never seen — far worse than a visible failure.
+                    if (data && String(data.error || '').toUpperCase() === 'NO_IMAGE') {
+                        throw new Error('โมเดลแจ้งว่าไม่ได้รับรูป — ลองใหม่ หรือเปลี่ยนโมเดลที่รองรับ vision');
+                    }
                     if (!data || !data.q || !Array.isArray(data.options) || data.options.length < 2) {
                         throw new Error('AI ส่งค่าที่ใช้ไม่ได้: ' + String(genRes.text || '').slice(0, 160));
+                    }
+                    if (!String(data.imageSummary || '').trim()) {
+                        throw new Error('โมเดลไม่ได้ยืนยันว่าเห็นรูป (ไม่มี imageSummary) — ผลลัพธ์อาจถูกแต่งขึ้นเอง จึงข้ามรูปนี้');
                     }
                     const genCorrect = (Array.isArray(data.correct) ? data.correct : [])
                         .map(n => Number(n)).filter(n => Number.isInteger(n) && n >= 0 && n < data.options.length);
