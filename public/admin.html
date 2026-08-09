@@ -27359,7 +27359,11 @@ ${JSON.stringify(sourceObj)}`;
             }
             try {
                 const b = db.batch();
-                b.update(db.collection("quiz_attempts").doc(attemptId), { status: 'approved', approvedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                // V97.19: this approve path never wrote `score` onto the attempt doc
+                // itself (only incremented the user's running total below) — the
+                // intern's Unified History card reads att.score directly with no
+                // fallback, so a fully-correct, approved attempt displayed "0.00".
+                b.update(db.collection("quiz_attempts").doc(attemptId), { status: 'approved', score: score, approvedAt: firebase.firestore.FieldValue.serverTimestamp() });
                 b.update(db.collection("users").doc(uid), { score: firebase.firestore.FieldValue.increment(score) });
                 const quizId = attemptId.split('_')[0];
                 const quizObj = quizzesData.find(q => q.id === quizId);
