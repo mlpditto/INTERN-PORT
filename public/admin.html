@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.22</title>
+    <title>Nika V97.23</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -26241,12 +26241,22 @@ ${JSON.stringify(sourceObj)}`;
                     + '<div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:6px;">'
                     + '<input type="checkbox" ' + (r.include ? 'checked' : '') + ' onchange="bulkPasteToggleInclude(' + i + ')" style="margin-top:4px; width:16px; height:16px; cursor:pointer; flex-shrink:0;">'
                     + '<div style="flex:1; min-width:0;"><div style="font-weight:700; color:#1e293b; font-size:0.92em;">' + (i + 1) + '. ' + escapeHtml(r.q) + '</div></div>'
+                    + '</div>'
+                    // V97.23: actions + badges moved out of the stem's flex row onto their
+                    // own wrapping row. Inline, they competed with the question text for
+                    // width, and on a narrow viewport squeezed the stem down to roughly one
+                    // word per line — which only showed up once the 🎨 button and the model
+                    // badge joined the existing 📋/💡/confidence chips.
+                    + '<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; justify-content:flex-end; margin:0 0 6px 24px;">'
                     + '<button type="button" onclick="bulkPasteCopyQuestion(' + i + ')" title="คัดลอกโจทย์ + ตัวเลือก (ไม่รวมเฉลย)" style="flex-shrink:0; width:auto; min-height:0; padding:2px 8px; border:1px solid #e2e8f0; background:#f8fafc; border-radius:8px; cursor:pointer; font-size:0.85em; line-height:1.4;">📋</button>'
                     // V96.90: 💡 only once the AI has written a rationale for this row.
                     + (r.rationale ? '<button type="button" onclick="bulkPasteCopyQuestionFull(' + i + ')" title="คัดลอกโจทย์ + เฉลย + คำอธิบาย" style="flex-shrink:0; width:auto; min-height:0; padding:2px 8px; border:1px solid #e9d5ff; background:#faf5ff; border-radius:8px; cursor:pointer; font-size:0.85em; line-height:1.4;">💡</button>' : '')
+                    // V97.23: 🎨 ask an image model for an illustration for this question.
+                    + '<button type="button" id="bp-illus-' + i + '" onclick="bulkPasteGenIllustration(' + i + ')" title="ให้ AI สร้างภาพประกอบข้อนี้ (ไม่มีตัวอักษร ไม่บอกใบ้เฉลย)" style="flex-shrink:0; width:auto; min-height:0; padding:2px 8px; border:1px solid #fde68a; background:#fffbeb; border-radius:8px; cursor:pointer; font-size:0.85em; line-height:1.4;">🎨</button>'
                     + modelBadge
                     + confBadge
                     + '</div>'
+                    + (r.illustrationUrl ? '<div style="margin:8px 0 2px 24px; display:flex; align-items:flex-start; gap:8px; flex-wrap:wrap;"><img src="' + escapeHtml(r.illustrationUrl) + '" alt="ภาพประกอบ" style="width:190px; max-width:100%; max-height:140px; object-fit:contain; border-radius:10px; border:1px solid #e2e8f0;"><button type="button" onclick="bulkPasteRemoveIllustration(' + i + ')" title="ลบภาพประกอบข้อนี้" style="flex-shrink:0; width:auto; min-height:0; padding:2px 8px; border:1px solid #fecaca; background:#fef2f2; color:#b91c1c; border-radius:8px; cursor:pointer; font-size:0.78em;">✕ ลบภาพ</button></div>' : '')
                     + '<div style="padding-left:24px;">' + opts + '</div>'
                     + (r.rationale ? '<div style="margin:6px 0 0 24px; padding:6px 8px; background:#faf5ff; border:1px solid #e9d5ff; border-radius:8px; font-size:0.8em; color:#6b21a8; white-space:pre-wrap;">' + escapeHtml(r.rationale) + '</div>' : '')
                     + '</div>';
@@ -26368,6 +26378,83 @@ ${JSON.stringify(sourceObj)}`;
             showToast('🎯 หาคำตอบเสร็จ ' + (done - failed) + '/' + rows.length + (failed ? ' (พลาด ' + failed + ')' : '') + ' — ตรวจก่อนบันทึก', failed ? 'warning' : 'success');
         }
 
+        // ============================================================
+        // V97.23: 🎨 per-question AI illustration.
+        // No schema change is needed — the intern side already renders question
+        // text through marked + DOMPurify (index.html renderMd), so a plain
+        // Markdown image tag displays as a picture today.
+        //
+        // The URL is stored on the ROW (r.illustrationUrl), not spliced into r.q,
+        // so the preview text and the 📋/💡 copy output stay clean; the Markdown is
+        // prepended only at bulkPasteInsert time when the real question is built.
+        //
+        // Image models hand back a data URL, which must NOT be written into
+        // Firestore directly (1 MB doc cap — the exact trap the Quill image
+        // handler hit in V93.38). Upload to Storage first, content-addressed by
+        // SHA-256 so regenerating the same image reuses the existing file.
+        // _sha256Hex/_MIME_TO_EXT live in the module block (~L17802) and are only
+        // reachable here via window.* — see [[feedback_admin_module_vs_classic_scope]].
+        // ============================================================
+        async function bulkPasteUploadImage(dataUrl) {
+            if (/^https?:\/\//i.test(dataUrl)) return dataUrl;   // already hosted
+            const blob = await (await fetch(dataUrl)).blob();
+            const hash = await window._sha256Hex(blob);
+            const ext = (window._MIME_TO_EXT || {})[blob.type] || '.png';
+            const app = window.adminApp || firebase.app('admin');
+            const ref = app.storage().ref('quiz-images/' + hash + ext);
+            try {
+                return await ref.getDownloadURL();               // dedup hit — skip upload
+            } catch (probeErr) {
+                if (probeErr && probeErr.code !== 'storage/object-not-found') throw probeErr;
+                const snap = await ref.put(blob, { contentType: blob.type || 'image/png' });
+                return await snap.ref.getDownloadURL();
+            }
+        }
+
+        async function bulkPasteGenIllustration(idx) {
+            const r = window._bulkPasteParsed[idx];
+            if (!r) return;
+            const engine = (document.getElementById('design-engine') || {}).value || 'as/gemini-2.5-flash-image';
+            const btn = document.getElementById('bp-illus-' + idx);
+            if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+            try {
+                const prompt = [
+                    'Create a clean, simple educational illustration to accompany an exam question.',
+                    'Style: flat vector, clear outlines, generous white space, textbook-diagram look.',
+                    // Generated lettering comes out garbled, and any legible label risks
+                    // handing the learner the answer straight off the picture.
+                    'CRITICAL: render NO text, letters, numbers, labels or watermarks anywhere in the image.',
+                    'CRITICAL: do NOT depict or hint at the correct answer — set the scene only.',
+                    '',
+                    'Question context: ' + String(r.q || '').slice(0, 600)
+                ].join('\n');
+                const res = await window.callUniversalAI(engine, prompt, false, null, '', { feature: 'quiz_illustration' });
+                const raw = String((res && res.text) || '');
+                // Same response-shape handling the PK Visual generator uses (~L34761):
+                // models return a data URL, a hosted URL, a markdown ![](url), or bare base64.
+                const mdMatch = raw.match(/!\[[^\]]*\]\((https?:\/\/[^)]+)\)/);
+                const extracted = mdMatch ? mdMatch[1] : raw;
+                let dataUrl = '';
+                if (extracted.startsWith('data:image/')) dataUrl = extracted;
+                else if (/^https?:\/\//i.test(extracted)) dataUrl = extracted;
+                else if (extracted.length > 100) dataUrl = 'data:image/png;base64,' + extracted;
+                if (!dataUrl) throw new Error('โมเดลไม่ได้ส่งรูปกลับมา — ลองเปลี่ยนโมเดลสร้างภาพ');
+                r.illustrationUrl = await bulkPasteUploadImage(dataUrl);
+                showToast('🎨 สร้างภาพประกอบข้อ ' + (idx + 1) + ' แล้ว', 'success');
+            } catch (e) {
+                console.warn('bulkPasteGenIllustration failed:', e);
+                showToast('สร้างภาพไม่สำเร็จ: ' + ((e && e.message) || e), 'error');
+            }
+            renderBulkPastePreview();   // also restores the button out of its ⏳ state
+        }
+
+        function bulkPasteRemoveIllustration(idx) {
+            const r = window._bulkPasteParsed[idx];
+            if (!r) return;
+            delete r.illustrationUrl;
+            renderBulkPastePreview();
+        }
+
         function bulkPasteInsert() {
             const rows = window._bulkPasteParsed.filter(r => r.include);
             if (rows.length === 0) { showToast('ยังไม่ได้เลือกข้อ', 'error'); return; }
@@ -26375,7 +26462,15 @@ ${JSON.stringify(sourceObj)}`;
             // It was dropped here before, so the rationale the admin reviewed in the
             // preview vanished on insert even though addQuestionUI prefills
             // .q-explanation from data.explanation.
-            rows.forEach(r => addQuestionUI({ q: r.q, type: 'choice', options: r.options, correct: r.correct, timer: 60, explanation: (r.rationale || '').trim() }));
+            // V97.23: the illustration is prepended as Markdown only here, at the
+            // moment the real question is built — renderMd on the intern side turns
+            // it into an <img>. Keeping it off r.q until now is what lets the
+            // preview and the 📋/💡 copy output stay free of raw Markdown noise.
+            rows.forEach(r => addQuestionUI({
+                q: (r.illustrationUrl ? '![ภาพประกอบ](' + r.illustrationUrl + ')\n\n' : '') + r.q,
+                type: 'choice', options: r.options, correct: r.correct, timer: 60,
+                explanation: (r.rationale || '').trim()
+            }));
             document.getElementById('bulkPasteModal').style.display = 'none';
             if (typeof triggerAutoSave === 'function') triggerAutoSave();
             const items = document.querySelectorAll('.quiz-q-item');
