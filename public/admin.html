@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.26</title>
+    <title>Nika V97.27</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -10804,6 +10804,9 @@
                         <input type="checkbox" id="alabasta-case-show-archived" onchange="renderAlabastaCases()" hidden>
                         <!-- V95.97: one-shot backfill — sync reviewed cases whose intern submissions mirror is stuck on 'pending' -->
                         <button type="button" id="alabasta-reconcile-btn" onclick="reconcileSubmissionMirrors()" title="Sync reviewed cases/work/reflective to intern view · 인턴 화면과 동기화" aria-label="Sync intern view" style="margin:0; padding:4px 11px; font-size:0.72em; font-weight:800; color:#92400e; background:#fff; border:1px solid #fcd34d; border-radius:999px; cursor:pointer;">🔧 Sync intern</button>
+                        <!-- V97.27: sibling to 🔧 Sync intern — that one repairs mirrors whose
+                             SOURCE still exists; this one finds mirrors whose source is GONE. -->
+                        <button type="button" id="alabasta-orphan-btn" onclick="scanOrphanMirrors()" title="หา history ค้างของงานที่ถูกลบไปแล้ว (scan อย่างเดียว ยังไม่ลบ)" style="margin:0; padding:4px 11px; font-size:0.72em; font-weight:800; color:#b91c1c; background:#fff; border:1px solid #fecaca; border-radius:999px; cursor:pointer;">🔎 Scan orphans</button>
                         <span style="font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:3px 10px;">Total · 전체 <b id="alabasta-case-total">0</b></span>
                         <span style="font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:3px 10px;">Pending · 대기 <b id="alabasta-case-pending">0</b></span>
                         <span style="font-size:0.72em; color:#166534; font-weight:700; background:#fff; border:1px solid #86efac; border-radius:999px; padding:3px 10px;">Reviewed · 검토 완료 <b id="alabasta-case-reviewed">0</b></span>
@@ -32641,10 +32644,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     batch.delete(db.collection('checkin_logs').doc(logId));
                 });
 
+                // V97.27: cases are mirrored into `submissions` too, and this path
+                // never removed the twin — same orphan the reflective delete had.
+                const mirrorCount = await stageSubmissionMirrorDelete(batch, caseDocId);
+
                 await batch.commit();
                 casesData = casesData.filter(c => c.id !== caseDocId);
                 renderAlabastaCases();
-                if (typeof showToast === 'function') showToast(bonus > 0 ? `Case deleted and reverted ${bonus.toFixed(2)} pts` : 'Case deleted', 'success');
+                if (typeof showToast === 'function') showToast((bonus > 0 ? `Case deleted and reverted ${bonus.toFixed(2)} pts` : 'Case deleted') + (mirrorCount ? ` · cleared ${mirrorCount} history entr${mirrorCount === 1 ? 'y' : 'ies'}` : ''), 'success');
             } catch (e) {
                 console.error('Failed to delete case:', e);
                 alert('Failed to delete case: ' + e.message);
@@ -32690,6 +32697,94 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // orphan-cleanup scan is for.
                 console.warn('[submission mirror] delete sync failed for', srcDocId, e && e.message);
                 return 0;
+            }
+        }
+
+        // ============================================================
+        // V97.27: orphan-mirror scan + cleanup.
+        //
+        // reconcileSubmissionMirrors (below) repairs mirrors whose SOURCE STILL
+        // EXISTS but whose review state drifted. This is the opposite case: mirrors
+        // whose source is GONE, left behind by every delete path that predates
+        // stageSubmissionMirrorDelete (reflective before V97.25; cases and works
+        // before V97.27). Those rows keep rendering in the intern's Work History
+        // forever, for work that no longer exists and whose points were reverted.
+        //
+        // Deliberately two-phase: this pass only SCANS and reports. Nothing is
+        // deleted until the admin sees the count and confirms — a bug in the
+        // liveness check here would otherwise wipe healthy history rows.
+        // ============================================================
+        const ORPHAN_MIRROR_TYPES = [
+            { submissionType: 'reflective', sourceCollection: 'reflective_logs' },
+            { submissionType: 'case',       sourceCollection: 'cases' },
+            { submissionType: 'work',       sourceCollection: 'works' }
+        ];
+
+        async function _findOrphanMirrors() {
+            const orphans = [];
+            for (const t of ORPHAN_MIRROR_TYPES) {
+                // Single-field equality → auto-indexed, no composite needed.
+                const mirrorSnap = await db.collection('submissions')
+                    .where('submissionType', '==', t.submissionType).get();
+                const withSource = mirrorSnap.docs.filter(d => {
+                    const m = (d.data() || {}).metadata || {};
+                    return !!m.sourceId;
+                });
+                if (!withSource.length) continue;
+
+                // One read of the source collection's ids beats one existence check
+                // per mirror row.
+                const liveIds = new Set();
+                const srcSnap = await db.collection(t.sourceCollection).get();
+                srcSnap.forEach(d => liveIds.add(d.id));
+
+                withSource.forEach(d => {
+                    const sourceId = ((d.data() || {}).metadata || {}).sourceId;
+                    if (!liveIds.has(sourceId)) {
+                        orphans.push({ id: d.id, ref: d.ref, type: t.submissionType, sourceId: sourceId, title: (d.data() || {}).title || '(untitled)' });
+                    }
+                });
+            }
+            return orphans;
+        }
+
+        async function scanOrphanMirrors() {
+            const btn = document.getElementById('alabasta-orphan-btn');
+            const orig = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> scanning…'; }
+            try {
+                const orphans = await _findOrphanMirrors();
+                if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+
+                if (!orphans.length) {
+                    showToast('✅ ไม่พบ history ค้าง — mirror ตรงกับต้นทางทั้งหมด', 'success');
+                    return;
+                }
+
+                const byType = {};
+                orphans.forEach(o => { byType[o.type] = (byType[o.type] || 0) + 1; });
+                const summary = Object.entries(byType).map(([k, v]) => `${k}: ${v}`).join(' · ');
+                const sample = orphans.slice(0, 8).map(o => `• [${o.type}] ${String(o.title).slice(0, 48)}`).join('\n');
+                const more = orphans.length > 8 ? `\n… และอีก ${orphans.length - 8} รายการ` : '';
+
+                if (!confirm(`พบ history ค้าง ${orphans.length} รายการ (${summary})\n\nรายการเหล่านี้ยังโผล่ใน Work History ของนักศึกษา ทั้งที่งานต้นทางถูกลบไปแล้ว\n\n${sample}${more}\n\nลบทิ้งทั้งหมด?`)) {
+                    showToast(`สแกนแล้วพบ ${orphans.length} รายการ — ยังไม่ได้ลบ`, 'warning');
+                    return;
+                }
+
+                // Chunked well under the 500-op batch ceiling.
+                let removed = 0;
+                for (let i = 0; i < orphans.length; i += 400) {
+                    const batch = db.batch();
+                    orphans.slice(i, i + 400).forEach(o => batch.delete(o.ref));
+                    await batch.commit();
+                    removed += Math.min(400, orphans.length - i);
+                }
+                showToast(`🧹 ลบ history ค้าง ${removed} รายการแล้ว`, 'success');
+            } catch (e) {
+                if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+                console.error('scanOrphanMirrors failed:', e);
+                alert('Scan failed: ' + e.message);
             }
         }
 
@@ -32865,14 +32960,21 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     }
                 });
 
+                // V97.27: same missing mirror cleanup as the single-case path. Queries
+                // run before commit (stageSubmissionMirrorDelete is async), so they are
+                // awaited together here rather than inside the forEach above.
+                let mirrorCount = 0;
+                for (const id of ids) mirrorCount += await stageSubmissionMirrorDelete(batch, id);
+
                 await batch.commit();
                 const deletedSet = new Set(ids);
                 casesData = casesData.filter(c => !deletedSet.has(c.id));
                 clearAlabastaSelection();
                 renderAlabastaCases();
-                const toastMsg = totalRevert > 0
+                const toastMsg = (totalRevert > 0
                     ? `Bulk deleted ${ids.length} case(s), reverted ${totalRevert.toFixed(2)} pts · ${ids.length}건 삭제 / ${totalRevert.toFixed(2)}점 회수`
-                    : `Bulk deleted ${ids.length} case(s) · ${ids.length}건 일괄 삭제`;
+                    : `Bulk deleted ${ids.length} case(s) · ${ids.length}건 일괄 삭제`)
+                    + (mirrorCount ? ` · cleared ${mirrorCount} history entr${mirrorCount === 1 ? 'y' : 'ies'}` : '');
                 if (typeof showToast === 'function') showToast(toastMsg, 'success');
             } catch (e) {
                 console.error('Bulk delete failed:', e);
@@ -46223,7 +46325,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         async function archiveClosedQuest(id) { await db.collection("quests").doc(id).update({ isArchivedKanban: true }); drawKanban(); }
         function toggleKanbanArchive() { showArchivedKanban = !showArchivedKanban; const btn = document.getElementById('btn-kanban-archive'); if (btn) { btn.style.background = showArchivedKanban ? '#4361ee' : ''; btn.style.color = showArchivedKanban ? 'white' : ''; } drawKanban(); }
         async function delUser(id) { if (confirm("Del?")) await db.collection("users").doc(id).delete(); }
-        async function delWork(id) { if (confirm("Del?")) await db.collection("works").doc(id).delete(); }
+        // V97.27: works are mirrored into `submissions` as well, so a bare doc delete
+        // left the intern's history copy behind. Batched so both go together.
+        async function delWork(id) {
+            if (!confirm("Delete this work?\n\n• Removes it from the intern's Work History as well\n\nThis cannot be undone.")) return;
+            try {
+                const batch = db.batch();
+                const mirrorCount = await stageSubmissionMirrorDelete(batch, id);
+                batch.delete(db.collection("works").doc(id));
+                await batch.commit();
+                if (typeof showToast === 'function') showToast('Work deleted' + (mirrorCount ? ` · cleared ${mirrorCount} history entr${mirrorCount === 1 ? 'y' : 'ies'}` : ''), 'success');
+            } catch (e) {
+                alert('Delete failed: ' + e.message);
+            }
+        }
         function toggleIgnoreUser(id, s) { db.collection("users").doc(id).update({ isIgnored: !s }); }
         function toggleHidePeriod(id, s) { db.collection("users").doc(id).update({ hidePeriod: !s }); }
         function toggleForm() { const f = document.getElementById('sq-form'); f.style.display = f.style.display === 'none' ? 'block' : 'none'; }
