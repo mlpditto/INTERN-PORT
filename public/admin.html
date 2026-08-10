@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.24</title>
+    <title>Nika V97.25</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -32661,6 +32661,28 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         }
 
+        // V97.25: the DELETE side of the same one-way mirror. stageSubmissionMirror
+        // above keeps review state in sync, but nothing ever removed a mirror row, so
+        // deleting a source doc (deleteReflectiveLog) left its `submissions` twin
+        // behind — the intern kept seeing the card in Work History (which reads
+        // `submissions`) long after the admin deleted it and the points were clawed
+        // back. Stages the mirror deletes onto the caller's batch; async (queries
+        // first) so it must be awaited BEFORE batch.commit().
+        async function stageSubmissionMirrorDelete(batch, srcDocId) {
+            if (!srcDocId) return 0;
+            try {
+                const snap = await db.collection('submissions').where('metadata.sourceId', '==', srcDocId).get();
+                snap.forEach(doc => batch.delete(doc.ref));
+                return snap.size;
+            } catch (e) {
+                // Non-fatal on purpose: failing here would abort a delete the admin
+                // already confirmed. Any row missed this way is exactly what the
+                // orphan-cleanup scan is for.
+                console.warn('[submission mirror] delete sync failed for', srcDocId, e && e.message);
+                return 0;
+            }
+        }
+
         // V95.97: build the reviewed mirror field-set from the awarded score/bonus. Intern
         // treats any status other than 'pending'/'รอตรวจ' as reviewed (index.html isReviewed
         // check), so 'reviewed' clears the banner + shows the ตรวจแล้ว badge.
@@ -48402,6 +48424,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                              <button onclick="copyLaughCard('ltcard-${log.id}')" style="background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-main); border-radius:50%; width:38px; height:38px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.05);" title="Copy Text">📋</button>
                              <button onclick="blindLaughCard('ltcard-${log.id}')" style="background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-main); border-radius:50%; width:38px; height:38px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.05);" title="Blind Identity">🙈</button>
                              <button onclick="unarchiveReflective('${log.id}')" style="background:#ecfdf5; border:1px solid #d1fae5; color:#059669; border-radius:50%; width:38px; height:38px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.03);" title="Archive / Recycle" onmouseover="this.style.background='#d1fae5'" onmouseout="this.style.background='#ecfdf5'">♻️</button>
+                             <!-- V97.25: ♻️ only sends the log back to the Dashboard (isArchived:false);
+                                  there was no way to actually delete one from this view. -->
+                             <button onclick="deleteReflectiveLog('${log.id}')" style="background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; border-radius:50%; width:38px; height:38px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.03);" title="ลบถาวร — คืนแต้ม + ลบออกจาก History ของนักศึกษาด้วย" onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fef2f2'">🗑</button>
                         </div>
                     </div>
                 `; 
@@ -50860,7 +50885,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         }
 
         async function deleteReflectiveLog(id) {
-            if (!confirm('Delete this reflective log? Any scores awarded from this log will be removed automatically.')) return;
+            // V97.25: the wording now matches what actually happens — the intern's own
+            // history copy goes too, which was the part that silently didn't before.
+            if (!confirm('Delete this reflective log?\n\n• Removes it from the intern\'s Work History as well\n• Any scores awarded from this log are reverted automatically\n\nThis cannot be undone.')) return;
 
             try {
                 const logRef = db.collection("reflective_logs").doc(id);
@@ -50894,6 +50921,11 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     });
                 }
 
+                // V97.25: drop the `submissions` twin in the SAME batch. Without this
+                // the log vanished from admin but stayed in the intern's Work History,
+                // with the points already taken back.
+                const mirrorCount = await stageSubmissionMirrorDelete(batch, id);
+
                 batch.delete(logRef);
                 await batch.commit();
 
@@ -50901,7 +50933,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     forceHideModal('reflectiveReviewModal');
                 }
 
-                showToast(`Deleted reflective log${totalRevert > 0 ? ` and reverted ${totalRevert.toFixed(2)} pts` : ''}`);
+                showToast(`Deleted reflective log${totalRevert > 0 ? ` and reverted ${totalRevert.toFixed(2)} pts` : ''}${mirrorCount ? ` · cleared ${mirrorCount} history entr${mirrorCount === 1 ? 'y' : 'ies'}` : ''}`);
             } catch (e) {
                 alert('Delete failed: ' + e.message);
             }
