@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.25</title>
+    <title>Nika V97.27</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -10703,6 +10703,16 @@
                 <!-- 👥 User Filter Bar (Turbo V2) -->
                 <div id="laughtale-user-filter" style="display:flex; gap:8px; overflow-x:auto; padding:10px 0 20px 0; margin-bottom:10px; scrollbar-width:none; -ms-overflow-style:none;"></div>
                 
+                <!-- V97.26: bulk selection bar. Hidden until at least one card is
+                     ticked so the default single-card flow stays uncluttered. -->
+                <div id="laughtale-bulk-bar" style="display:none; align-items:center; gap:10px; flex-wrap:wrap; background:#fef2f2; border:1px solid #fecaca; border-radius:14px; padding:10px 16px; margin-bottom:16px;">
+                    <span id="lt-bulk-count" style="font-weight:900; color:#b91c1c; font-size:0.9em;"></span>
+                    <span style="flex:1;"></span>
+                    <button onclick="ltSelectAll()" style="width:auto; min-height:0; padding:6px 14px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; color:#475569; font-weight:700; font-size:0.8em; cursor:pointer;">เลือกทั้งหมดที่แสดง</button>
+                    <button onclick="ltClearSelection()" style="width:auto; min-height:0; padding:6px 14px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; color:#475569; font-weight:700; font-size:0.8em; cursor:pointer;">ล้างที่เลือก</button>
+                    <button id="lt-bulk-delete-btn" onclick="ltBulkDelete()" style="width:auto; min-height:0; padding:6px 16px; border-radius:10px; border:none; background:#dc2626; color:#fff; font-weight:800; font-size:0.8em; cursor:pointer;">🗑 ลบที่เลือก</button>
+                </div>
+
                 <div id="laughtale-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap:25px;">
                     <!-- Archived Reflective Logs injected here -->
                 </div>
@@ -10794,6 +10804,9 @@
                         <input type="checkbox" id="alabasta-case-show-archived" onchange="renderAlabastaCases()" hidden>
                         <!-- V95.97: one-shot backfill — sync reviewed cases whose intern submissions mirror is stuck on 'pending' -->
                         <button type="button" id="alabasta-reconcile-btn" onclick="reconcileSubmissionMirrors()" title="Sync reviewed cases/work/reflective to intern view · 인턴 화면과 동기화" aria-label="Sync intern view" style="margin:0; padding:4px 11px; font-size:0.72em; font-weight:800; color:#92400e; background:#fff; border:1px solid #fcd34d; border-radius:999px; cursor:pointer;">🔧 Sync intern</button>
+                        <!-- V97.27: sibling to 🔧 Sync intern — that one repairs mirrors whose
+                             SOURCE still exists; this one finds mirrors whose source is GONE. -->
+                        <button type="button" id="alabasta-orphan-btn" onclick="scanOrphanMirrors()" title="หา history ค้างของงานที่ถูกลบไปแล้ว (scan อย่างเดียว ยังไม่ลบ)" style="margin:0; padding:4px 11px; font-size:0.72em; font-weight:800; color:#b91c1c; background:#fff; border:1px solid #fecaca; border-radius:999px; cursor:pointer;">🔎 Scan orphans</button>
                         <span style="font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:3px 10px;">Total · 전체 <b id="alabasta-case-total">0</b></span>
                         <span style="font-size:0.72em; color:#92400e; font-weight:700; background:#fff; border:1px solid #fcd34d; border-radius:999px; padding:3px 10px;">Pending · 대기 <b id="alabasta-case-pending">0</b></span>
                         <span style="font-size:0.72em; color:#166534; font-weight:700; background:#fff; border:1px solid #86efac; border-radius:999px; padding:3px 10px;">Reviewed · 검토 완료 <b id="alabasta-case-reviewed">0</b></span>
@@ -32631,10 +32644,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     batch.delete(db.collection('checkin_logs').doc(logId));
                 });
 
+                // V97.27: cases are mirrored into `submissions` too, and this path
+                // never removed the twin — same orphan the reflective delete had.
+                const mirrorCount = await stageSubmissionMirrorDelete(batch, caseDocId);
+
                 await batch.commit();
                 casesData = casesData.filter(c => c.id !== caseDocId);
                 renderAlabastaCases();
-                if (typeof showToast === 'function') showToast(bonus > 0 ? `Case deleted and reverted ${bonus.toFixed(2)} pts` : 'Case deleted', 'success');
+                if (typeof showToast === 'function') showToast((bonus > 0 ? `Case deleted and reverted ${bonus.toFixed(2)} pts` : 'Case deleted') + (mirrorCount ? ` · cleared ${mirrorCount} history entr${mirrorCount === 1 ? 'y' : 'ies'}` : ''), 'success');
             } catch (e) {
                 console.error('Failed to delete case:', e);
                 alert('Failed to delete case: ' + e.message);
@@ -32680,6 +32697,94 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // orphan-cleanup scan is for.
                 console.warn('[submission mirror] delete sync failed for', srcDocId, e && e.message);
                 return 0;
+            }
+        }
+
+        // ============================================================
+        // V97.27: orphan-mirror scan + cleanup.
+        //
+        // reconcileSubmissionMirrors (below) repairs mirrors whose SOURCE STILL
+        // EXISTS but whose review state drifted. This is the opposite case: mirrors
+        // whose source is GONE, left behind by every delete path that predates
+        // stageSubmissionMirrorDelete (reflective before V97.25; cases and works
+        // before V97.27). Those rows keep rendering in the intern's Work History
+        // forever, for work that no longer exists and whose points were reverted.
+        //
+        // Deliberately two-phase: this pass only SCANS and reports. Nothing is
+        // deleted until the admin sees the count and confirms — a bug in the
+        // liveness check here would otherwise wipe healthy history rows.
+        // ============================================================
+        const ORPHAN_MIRROR_TYPES = [
+            { submissionType: 'reflective', sourceCollection: 'reflective_logs' },
+            { submissionType: 'case',       sourceCollection: 'cases' },
+            { submissionType: 'work',       sourceCollection: 'works' }
+        ];
+
+        async function _findOrphanMirrors() {
+            const orphans = [];
+            for (const t of ORPHAN_MIRROR_TYPES) {
+                // Single-field equality → auto-indexed, no composite needed.
+                const mirrorSnap = await db.collection('submissions')
+                    .where('submissionType', '==', t.submissionType).get();
+                const withSource = mirrorSnap.docs.filter(d => {
+                    const m = (d.data() || {}).metadata || {};
+                    return !!m.sourceId;
+                });
+                if (!withSource.length) continue;
+
+                // One read of the source collection's ids beats one existence check
+                // per mirror row.
+                const liveIds = new Set();
+                const srcSnap = await db.collection(t.sourceCollection).get();
+                srcSnap.forEach(d => liveIds.add(d.id));
+
+                withSource.forEach(d => {
+                    const sourceId = ((d.data() || {}).metadata || {}).sourceId;
+                    if (!liveIds.has(sourceId)) {
+                        orphans.push({ id: d.id, ref: d.ref, type: t.submissionType, sourceId: sourceId, title: (d.data() || {}).title || '(untitled)' });
+                    }
+                });
+            }
+            return orphans;
+        }
+
+        async function scanOrphanMirrors() {
+            const btn = document.getElementById('alabasta-orphan-btn');
+            const orig = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> scanning…'; }
+            try {
+                const orphans = await _findOrphanMirrors();
+                if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+
+                if (!orphans.length) {
+                    showToast('✅ ไม่พบ history ค้าง — mirror ตรงกับต้นทางทั้งหมด', 'success');
+                    return;
+                }
+
+                const byType = {};
+                orphans.forEach(o => { byType[o.type] = (byType[o.type] || 0) + 1; });
+                const summary = Object.entries(byType).map(([k, v]) => `${k}: ${v}`).join(' · ');
+                const sample = orphans.slice(0, 8).map(o => `• [${o.type}] ${String(o.title).slice(0, 48)}`).join('\n');
+                const more = orphans.length > 8 ? `\n… และอีก ${orphans.length - 8} รายการ` : '';
+
+                if (!confirm(`พบ history ค้าง ${orphans.length} รายการ (${summary})\n\nรายการเหล่านี้ยังโผล่ใน Work History ของนักศึกษา ทั้งที่งานต้นทางถูกลบไปแล้ว\n\n${sample}${more}\n\nลบทิ้งทั้งหมด?`)) {
+                    showToast(`สแกนแล้วพบ ${orphans.length} รายการ — ยังไม่ได้ลบ`, 'warning');
+                    return;
+                }
+
+                // Chunked well under the 500-op batch ceiling.
+                let removed = 0;
+                for (let i = 0; i < orphans.length; i += 400) {
+                    const batch = db.batch();
+                    orphans.slice(i, i + 400).forEach(o => batch.delete(o.ref));
+                    await batch.commit();
+                    removed += Math.min(400, orphans.length - i);
+                }
+                showToast(`🧹 ลบ history ค้าง ${removed} รายการแล้ว`, 'success');
+            } catch (e) {
+                if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+                console.error('scanOrphanMirrors failed:', e);
+                alert('Scan failed: ' + e.message);
             }
         }
 
@@ -32855,14 +32960,21 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     }
                 });
 
+                // V97.27: same missing mirror cleanup as the single-case path. Queries
+                // run before commit (stageSubmissionMirrorDelete is async), so they are
+                // awaited together here rather than inside the forEach above.
+                let mirrorCount = 0;
+                for (const id of ids) mirrorCount += await stageSubmissionMirrorDelete(batch, id);
+
                 await batch.commit();
                 const deletedSet = new Set(ids);
                 casesData = casesData.filter(c => !deletedSet.has(c.id));
                 clearAlabastaSelection();
                 renderAlabastaCases();
-                const toastMsg = totalRevert > 0
+                const toastMsg = (totalRevert > 0
                     ? `Bulk deleted ${ids.length} case(s), reverted ${totalRevert.toFixed(2)} pts · ${ids.length}건 삭제 / ${totalRevert.toFixed(2)}점 회수`
-                    : `Bulk deleted ${ids.length} case(s) · ${ids.length}건 일괄 삭제`;
+                    : `Bulk deleted ${ids.length} case(s) · ${ids.length}건 일괄 삭제`)
+                    + (mirrorCount ? ` · cleared ${mirrorCount} history entr${mirrorCount === 1 ? 'y' : 'ies'}` : '');
                 if (typeof showToast === 'function') showToast(toastMsg, 'success');
             } catch (e) {
                 console.error('Bulk delete failed:', e);
@@ -46213,7 +46325,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         async function archiveClosedQuest(id) { await db.collection("quests").doc(id).update({ isArchivedKanban: true }); drawKanban(); }
         function toggleKanbanArchive() { showArchivedKanban = !showArchivedKanban; const btn = document.getElementById('btn-kanban-archive'); if (btn) { btn.style.background = showArchivedKanban ? '#4361ee' : ''; btn.style.color = showArchivedKanban ? 'white' : ''; } drawKanban(); }
         async function delUser(id) { if (confirm("Del?")) await db.collection("users").doc(id).delete(); }
-        async function delWork(id) { if (confirm("Del?")) await db.collection("works").doc(id).delete(); }
+        // V97.27: works are mirrored into `submissions` as well, so a bare doc delete
+        // left the intern's history copy behind. Batched so both go together.
+        async function delWork(id) {
+            if (!confirm("Delete this work?\n\n• Removes it from the intern's Work History as well\n\nThis cannot be undone.")) return;
+            try {
+                const batch = db.batch();
+                const mirrorCount = await stageSubmissionMirrorDelete(batch, id);
+                batch.delete(db.collection("works").doc(id));
+                await batch.commit();
+                if (typeof showToast === 'function') showToast('Work deleted' + (mirrorCount ? ` · cleared ${mirrorCount} history entr${mirrorCount === 1 ? 'y' : 'ies'}` : ''), 'success');
+            } catch (e) {
+                alert('Delete failed: ' + e.message);
+            }
+        }
         function toggleIgnoreUser(id, s) { db.collection("users").doc(id).update({ isIgnored: !s }); }
         function toggleHidePeriod(id, s) { db.collection("users").doc(id).update({ hidePeriod: !s }); }
         function toggleForm() { const f = document.getElementById('sq-form'); f.style.display = f.style.display === 'none' ? 'block' : 'none'; }
@@ -48420,6 +48545,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             </div>
                             ${log.adminBonus ? `<div style="margin-top:20px; text-align:right;"><span style="background:rgba(16,185,129,0.15); color:#10b981; padding:8px 22px; border-radius:40px; font-weight:900; font-size:1em; box-shadow:0 4px 12px rgba(16,185,129,0.15);">+${log.adminBonus} PTS</span></div>` : ''}
                         </div>
+                        <!-- V97.26: bulk-select tick. Sits bottom-left, away from the
+                             action cluster top-right, so it can't be hit by accident
+                             while reaching for 🗑. -->
+                        <label style="position:absolute; bottom:18px; left:18px; display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none; background:var(--bg-card); border:1px solid var(--border-color); border-radius:20px; padding:5px 12px; box-shadow:0 4px 6px rgba(0,0,0,0.04);" title="เลือกเพื่อลบหลายใบพร้อมกัน">
+                            <input type="checkbox" id="ltsel-${log.id}" ${window._ltSelected && window._ltSelected.has(log.id) ? 'checked' : ''} onclick="ltToggleSelect('${log.id}', event)" style="width:15px; height:15px; cursor:pointer; margin:0;">
+                            <span style="font-size:0.72em; font-weight:800; color:var(--text-sub);">เลือก</span>
+                        </label>
                         <div style="position:absolute; top:20px; right:20px; display:flex; gap:10px;">
                              <button onclick="copyLaughCard('ltcard-${log.id}')" style="background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-main); border-radius:50%; width:38px; height:38px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.05);" title="Copy Text">📋</button>
                              <button onclick="blindLaughCard('ltcard-${log.id}')" style="background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-main); border-radius:50%; width:38px; height:38px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.05);" title="Blind Identity">🙈</button>
@@ -48429,10 +48561,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                              <button onclick="deleteReflectiveLog('${log.id}')" style="background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; border-radius:50%; width:38px; height:38px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.03);" title="ลบถาวร — คืนแต้ม + ลบออกจาก History ของนักศึกษาด้วย" onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fef2f2'">🗑</button>
                         </div>
                     </div>
-                `; 
+                `;
             }).join("");
+
+            // V97.26: a re-render replaces every card node, so the bulk bar has to be
+            // re-synced against the surviving selection (e.g. after a filter change,
+            // where some selected cards are no longer on screen).
+            ltSyncBulkBar();
         }
-        
+
         window.toggleLaughTaleFullscreen = function() {
             const el = document.getElementById('tab-laughtale');
             if (el.style.position === 'fixed') {
@@ -50884,50 +51021,59 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             }
         }
 
+        // V97.26: the delete itself, minus the confirm and the toast, so the bulk
+        // path can reuse it verbatim instead of growing a second copy that could
+        // drift out of sync on the points-revert or mirror-cleanup rules.
+        // Returns {skipped} when the doc is already gone, else {reverted, mirrorCount}.
+        // Each log commits its OWN batch: per-log atomicity means one failure in a
+        // bulk run can't half-apply someone else's points revert.
+        async function _deleteReflectiveLogCore(id) {
+            const logRef = db.collection("reflective_logs").doc(id);
+            const snap = await logRef.get();
+            if (!snap.exists) return { skipped: true, reverted: 0, mirrorCount: 0 };
+
+            const log = snap.data() || {};
+            const uid = log.userId || '';
+            const autoScore = Number.isFinite(parseFloat(log.autoScore)) ? parseFloat(log.autoScore) : 0.1;
+            const claimedBonus = log.pointsClaimed === true ? (parseFloat(log.adminBonus) || 0) : 0;
+            const totalRevert = autoScore + claimedBonus;
+
+            const batch = db.batch();
+            if (uid && totalRevert > 0) {
+                batch.update(db.collection("users").doc(uid), {
+                    score: firebase.firestore.FieldValue.increment(-totalRevert)
+                });
+                batch.set(db.collection("checkin_logs").doc(), {
+                    userId: uid,
+                    type: 'reflective_delete_revert',
+                    amount: -totalRevert,
+                    note: `Admin deleted reflective log: ${id}`,
+                    relatedLogId: id,
+                    autoRevert: autoScore,
+                    bonusRevert: claimedBonus,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+
+            // V97.25: drop the `submissions` twin in the SAME batch. Without this
+            // the log vanished from admin but stayed in the intern's Work History,
+            // with the points already taken back.
+            const mirrorCount = await stageSubmissionMirrorDelete(batch, id);
+
+            batch.delete(logRef);
+            await batch.commit();
+            return { skipped: false, reverted: totalRevert, mirrorCount: mirrorCount };
+        }
+
         async function deleteReflectiveLog(id) {
             // V97.25: the wording now matches what actually happens — the intern's own
             // history copy goes too, which was the part that silently didn't before.
             if (!confirm('Delete this reflective log?\n\n• Removes it from the intern\'s Work History as well\n• Any scores awarded from this log are reverted automatically\n\nThis cannot be undone.')) return;
 
             try {
-                const logRef = db.collection("reflective_logs").doc(id);
-                const snap = await logRef.get();
-                if (!snap.exists) {
-                    showToast('Log not found (already deleted)');
-                    return;
-                }
-
-                const log = snap.data() || {};
-                const uid = log.userId || '';
-                const autoScore = Number.isFinite(parseFloat(log.autoScore)) ? parseFloat(log.autoScore) : 0.1;
-                const claimedBonus = log.pointsClaimed === true ? (parseFloat(log.adminBonus) || 0) : 0;
-                const totalRevert = autoScore + claimedBonus;
-
-                const batch = db.batch();
-                if (uid && totalRevert > 0) {
-                    batch.update(db.collection("users").doc(uid), {
-                        score: firebase.firestore.FieldValue.increment(-totalRevert)
-                    });
-
-                    batch.set(db.collection("checkin_logs").doc(), {
-                        userId: uid,
-                        type: 'reflective_delete_revert',
-                        amount: -totalRevert,
-                        note: `Admin deleted reflective log: ${id}`,
-                        relatedLogId: id,
-                        autoRevert: autoScore,
-                        bonusRevert: claimedBonus,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                }
-
-                // V97.25: drop the `submissions` twin in the SAME batch. Without this
-                // the log vanished from admin but stayed in the intern's Work History,
-                // with the points already taken back.
-                const mirrorCount = await stageSubmissionMirrorDelete(batch, id);
-
-                batch.delete(logRef);
-                await batch.commit();
+                const res = await _deleteReflectiveLogCore(id);
+                if (res.skipped) { showToast('Log not found (already deleted)'); return; }
+                const totalRevert = res.reverted, mirrorCount = res.mirrorCount;
 
                 if (document.getElementById('reflective-review-id')?.value === id) {
                     forceHideModal('reflectiveReviewModal');
@@ -50937,6 +51083,95 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             } catch (e) {
                 alert('Delete failed: ' + e.message);
             }
+        }
+
+        // ============================================================
+        // V97.26: Laugh Tale bulk delete. Reuses _deleteReflectiveLogCore per log so
+        // points-revert and mirror-cleanup rules stay in exactly one place.
+        // ============================================================
+        window._ltSelected = new Set();
+
+        function ltToggleSelect(id, ev) {
+            if (ev) ev.stopPropagation();   // the card itself has other click targets
+            if (window._ltSelected.has(id)) window._ltSelected.delete(id);
+            else window._ltSelected.add(id);
+            ltSyncBulkBar();
+        }
+
+        // Only the currently VISIBLE (filtered) cards — "select all" must never reach
+        // logs the admin can't see, which is the whole point of the user filter.
+        function _ltVisibleIds() {
+            return Array.from(document.querySelectorAll('#laughtale-grid .laugh-card'))
+                .map(el => el.id.replace(/^ltcard-/, ''))
+                .filter(Boolean);
+        }
+
+        function ltSelectAll() {
+            _ltVisibleIds().forEach(id => window._ltSelected.add(id));
+            renderLaughTale();
+        }
+
+        function ltClearSelection() {
+            window._ltSelected.clear();
+            renderLaughTale();
+        }
+
+        function ltSyncBulkBar() {
+            const bar = document.getElementById('laughtale-bulk-bar');
+            const count = document.getElementById('lt-bulk-count');
+            if (!bar) return;
+            const n = window._ltSelected.size;
+            bar.style.display = n > 0 ? 'flex' : 'none';
+            if (count) count.textContent = `เลือกไว้ ${n} ใบ`;
+            // Keep each card's tick in step without a full re-render on every click.
+            _ltVisibleIds().forEach(id => {
+                const cb = document.getElementById('ltsel-' + id);
+                if (cb) cb.checked = window._ltSelected.has(id);
+            });
+        }
+
+        async function ltBulkDelete() {
+            const ids = Array.from(window._ltSelected);
+            if (!ids.length) { showToast('ยังไม่ได้เลือกการ์ด', 'error'); return; }
+
+            // Show the total points about to be clawed back BEFORE confirming — the
+            // number is the part that is hard to undo, so it belongs in the prompt.
+            let estPts = 0;
+            ids.forEach(id => {
+                const l = (reflectiveLogsCache || []).find(x => x.id === id) || {};
+                const auto = Number.isFinite(parseFloat(l.autoScore)) ? parseFloat(l.autoScore) : 0.1;
+                const bonus = l.pointsClaimed === true ? (parseFloat(l.adminBonus) || 0) : 0;
+                estPts += auto + bonus;
+            });
+            if (!confirm(`ลบ ${ids.length} การ์ดนี้ถาวร?\n\n• ลบออกจาก Work History ของนักศึกษาด้วย\n• คืนแต้มรวมประมาณ ${estPts.toFixed(2)} pts\n\nกู้คืนไม่ได้`)) return;
+
+            const btn = document.getElementById('lt-bulk-delete-btn');
+            const countEl = document.getElementById('lt-bulk-count');
+            if (btn) btn.disabled = true;
+
+            let done = 0, failed = 0, skipped = 0, reverted = 0, mirrors = 0;
+            for (const id of ids) {
+                if (countEl) countEl.textContent = `กำลังลบ ${done + 1}/${ids.length}...`;
+                try {
+                    const res = await _deleteReflectiveLogCore(id);
+                    if (res.skipped) skipped++;
+                    else { reverted += res.reverted; mirrors += res.mirrorCount; }
+                    window._ltSelected.delete(id);
+                } catch (e) {
+                    failed++;
+                    console.warn('ltBulkDelete failed for', id, e);
+                }
+                done++;
+            }
+
+            if (btn) btn.disabled = false;
+            ltSyncBulkBar();
+            const parts = [`ลบแล้ว ${done - failed - skipped}/${ids.length} ใบ`];
+            if (reverted > 0) parts.push(`คืนแต้ม ${reverted.toFixed(2)} pts`);
+            if (mirrors > 0) parts.push(`เคลียร์ history ${mirrors} รายการ`);
+            if (skipped > 0) parts.push(`ข้าม ${skipped} (ถูกลบไปแล้ว)`);
+            if (failed > 0) parts.push(`ล้มเหลว ${failed}`);
+            showToast('🗑 ' + parts.join(' · '), failed ? 'warning' : 'success');
         }
 
         async function reviewReflective(id) {
