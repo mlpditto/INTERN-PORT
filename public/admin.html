@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.29</title>
+    <title>Nika V97.30</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -52017,6 +52017,170 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
             }
         };
 
+        // ── V97.30: 🧩 manual per-option merge builder ───────────────────────────────────
+        // The AI merge (V97.29) decides the blend for you. This one doesn't: it pools every
+        // option from every version on the table, the admin ticks the ones to keep and marks
+        // the answer, and the question is assembled from that. The whole reason it is its own
+        // panel is the answer key — "correct" holds INDEXES into "options", so the key is
+        // recomputed from the TICKED ORDER at build time and never copied from a source
+        // version, which is the one way a hand-mixed question silently ships mis-keyed.
+        window._mergeBuilder = null;
+
+        window.openMergeBuilder = function(index, arrIdx) {
+            const item = (window._aiAnalysisItems || [])[arrIdx] || {};
+            const currentQ = (getQuizFormData().questions || [])[index];
+            if (!currentQ) return alert('Question index out of sync.');
+            const sources = [{ key: 'original', label: 'เดิม', q: currentQ }];
+            if (item.improvedQuestion) sources.push({ key: 'improved', label: 'ใหม่', q: item.improvedQuestion });
+            if (item.improvedQuestionB) sources.push({ key: 'b', label: 'B', q: item.improvedQuestionB });
+            if (item.mergedQuestion) sources.push({ key: 'merge', label: 'ผสม', q: item.mergedQuestion });
+
+            // One row per DISTINCT option text: the same distractor surviving a rewrite would
+            // otherwise appear two or three times and the admin could tick it twice.
+            const norm = t => String(t == null ? '' : t).replace(/\s+/g, ' ').trim();
+            const pool = [];
+            sources.forEach(s => {
+                ((s.q || {}).options || []).forEach((opt, i) => {
+                    const text = String(opt == null ? '' : opt);
+                    if (!norm(text)) return;
+                    const isKey = Array.isArray(s.q.correct) && s.q.correct.includes(i);
+                    const hit = pool.find(p => norm(p.text) === norm(text));
+                    if (hit) {
+                        if (!hit.from.includes(s.label)) hit.from.push(s.label);
+                        if (isKey && !hit.keyIn.includes(s.label)) hit.keyIn.push(s.label);
+                        return;
+                    }
+                    pool.push({ id: pool.length, text, from: [s.label], keyIn: isKey ? [s.label] : [], checked: false });
+                });
+            });
+            if (!pool.length) return alert('ไม่มีตัวเลือกให้ประกอบ (โจทย์นี้ไม่ใช่แบบตัวเลือก)');
+
+            // Seed from the version under review so the work is swapping single options in
+            // and out, not rebuilding from zero.
+            const seed = sources.find(s => s.key === 'improved') || sources[0];
+            pool.forEach(p => { p.checked = p.from.includes(seed.label); });
+            const correctIds = new Set(pool.filter(p => p.checked && p.keyIn.includes(seed.label)).map(p => p.id));
+            window._mergeBuilder = { index, arrIdx, sources, pool, correctIds, stemKey: seed.key };
+
+            const overlay = document.createElement('div');
+            overlay.id = 'merge-builder-overlay';
+            overlay.className = 'lang-no-toggle'; // Thai user-content — shield from lang-toggle.js auto-wrap
+            overlay.style = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.88); backdrop-filter:blur(8px); z-index:20010; display:flex; align-items:center; justify-content:center; padding:20px;';
+            overlay.innerHTML = `
+                <div style="width:100%; max-width:760px; background:#f8fafc; border-radius:28px; overflow:hidden; box-shadow:0 25px 70px rgba(0,0,0,0.5); display:flex; flex-direction:column; max-height:90vh;">
+                    <div style="padding:18px 26px; background:#fff; border-bottom:1.5px solid #edf2f7; display:flex; justify-content:space-between; align-items:center; gap:12px;">
+                        <div>
+                            <h3 style="margin:0; font-size:1.15em; color:#1e293b;">🧩 ประกอบโจทย์เอง — Q${index + 1}</h3>
+                            <div style="font-size:0.75em; color:#64748b; margin-top:4px;">ติ๊ก ☑ เลือกตัวเลือกที่จะเก็บ · กด ⚪ หน้าตัวเลือกเพื่อตั้งเป็นเฉลย</div>
+                        </div>
+                        <button onclick="closeMergeBuilder()" style="width:36px; height:36px; min-height:0; border-radius:50%; border:none; background:#f1f5f9; color:#64748b; cursor:pointer; font-size:1.2em; flex-shrink:0;">✕</button>
+                    </div>
+                    <div id="merge-builder-body" style="padding:22px 26px; overflow-y:auto; flex:1; background:linear-gradient(to bottom right,#f8fafc,#eff6ff);"></div>
+                    <div id="merge-builder-footer" style="padding:16px 26px; background:#fff; border-top:1.5px solid #edf2f7; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;"></div>
+                </div>`;
+            document.body.appendChild(overlay);
+            window.renderMergeBuilder();
+        };
+
+        window.renderMergeBuilder = function() {
+            const st = window._mergeBuilder;
+            const body = document.getElementById('merge-builder-body');
+            const footer = document.getElementById('merge-builder-footer');
+            if (!st || !body || !footer) return;
+            const stemSrc = st.sources.find(s => s.key === st.stemKey) || st.sources[0];
+            const chosen = st.pool.filter(p => p.checked);
+            const keyLetters = chosen.map((p, i) => st.correctIds.has(p.id) ? String.fromCharCode(65 + i) : null).filter(Boolean);
+
+            const stemChips = st.sources.map(s => `<div class="glass-toggle-item${s.key === st.stemKey ? ' active' : ''}" onclick="setMergeBuilderStem('${s.key}')" style="font-size:0.72em; font-weight:800; padding:4px 12px; border-radius:8px; color:#475569;">${s.label}</div>`).join('');
+
+            const rows = st.pool.map(p => {
+                const pos = p.checked ? chosen.indexOf(p) : -1;
+                const isKey = st.correctIds.has(p.id);
+                const badges = `<span style="font-size:0.68em; font-weight:800; color:#64748b; white-space:nowrap;">${escapeHtml(p.from.join('/'))}${p.keyIn.length ? ` · <span style="color:#15803d;">เฉลยของ ${escapeHtml(p.keyIn.join('/'))}</span>` : ''}</span>`;
+                return `<div style="display:flex; gap:9px; align-items:flex-start; padding:9px 11px; border-radius:12px; margin-bottom:6px; border:1px solid ${isKey ? 'rgba(34,197,94,0.35)' : p.checked ? '#dbeafe' : '#e2e8f0'}; background:${isKey ? 'rgba(34,197,94,0.09)' : p.checked ? '#fff' : '#f8fafc'}; opacity:${p.checked ? '1' : '0.62'};">
+                    <button onclick="toggleMergeBuilderOption(${p.id})" title="ใส่ / เอาออกจากโจทย์" style="width:26px; height:26px; min-height:0; padding:0; flex-shrink:0; border-radius:7px; border:1.5px solid ${p.checked ? '#2563eb' : '#cbd5e1'}; background:${p.checked ? '#2563eb' : '#fff'}; color:#fff; cursor:pointer; font-size:0.8em; line-height:1;">${p.checked ? '✓' : ''}</button>
+                    <button onclick="toggleMergeBuilderKey(${p.id})" title="ตั้ง / ยกเลิกเป็นเฉลย" style="width:26px; height:26px; min-height:0; padding:0; flex-shrink:0; border-radius:50%; border:1.5px solid ${isKey ? '#16a34a' : '#cbd5e1'}; background:${isKey ? '#16a34a' : '#fff'}; color:#fff; cursor:pointer; font-size:0.78em; line-height:1;">${isKey ? '✓' : ''}</button>
+                    <span style="flex:1; font-size:0.86em; color:#1e293b; line-height:1.45;">${pos >= 0 ? `<b style="color:#2563eb;">${String.fromCharCode(65 + pos)})</b> ` : ''}${escapeHtml(p.text)}</span>
+                    ${badges}
+                </div>`;
+            }).join('');
+
+            body.innerHTML = `
+                <div style="font-size:0.75em; font-weight:900; color:#475569; letter-spacing:0.4px; margin-bottom:7px;">โจทย์ — ใช้ของฉบับไหน</div>
+                <div class="glass-toggle-container" style="margin:0 0 10px; display:inline-flex; background:rgba(0,0,0,0.05); border:1px solid rgba(0,0,0,0.06); padding:3px; border-radius:10px; gap:3px;">${stemChips}</div>
+                <div style="padding:12px 14px; border-radius:12px; background:#fff; border:1px solid #e2e8f0; font-size:0.9em; font-weight:600; color:#1e293b; line-height:1.5; margin-bottom:18px;">${escapeHtml((stemSrc.q || {}).q || '') || '<span style="color:#94a3b8; font-style:italic;">(ไม่มีข้อความโจทย์)</span>'}</div>
+                <div style="font-size:0.75em; font-weight:900; color:#475569; letter-spacing:0.4px; margin-bottom:7px;">ตัวเลือก — รวมจากทุกฉบับ (${st.pool.length} แบบ)</div>
+                ${rows}
+                <div style="margin-top:12px; font-size:0.72em; color:#64748b; line-height:1.6;">
+                    ตัวอักษร A) B) C) คือลำดับจริงที่จะบันทึก — เฉลยถูกนับใหม่จากลำดับนี้ ไม่ได้ก๊อปมาจากฉบับใดฉบับหนึ่ง<br>
+                    คำอธิบายกับเวลาจะใช้ของฉบับที่เลือกเป็นโจทย์ (ถ้าข้อนี้มีคำอธิบายเดิมอยู่แล้ว ระบบยังคงเก็บของเดิมไว้ตามกติกาเดิม)
+                </div>`;
+
+            const ready = chosen.length >= 2 && keyLetters.length > 0;
+            const summary = `<span style="font-size:0.8em; font-weight:800; color:${ready ? '#15803d' : '#b45309'};">${chosen.length < 2 ? '⚠️ เลือกอย่างน้อย 2 ตัวเลือก' : !keyLetters.length ? '⚠️ ยังไม่ได้ตั้งเฉลย' : `✅ ${chosen.length} ตัวเลือก · เฉลยข้อ ${keyLetters.join(', ')}`}</span>`;
+            const dis = ready ? '' : 'disabled';
+            footer.innerHTML = `${summary}
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <button class="btn btn-secondary" onclick="closeMergeBuilder()" style="padding:9px 18px; border-radius:11px; font-weight:700; font-size:0.82em;">ยกเลิก</button>
+                    <button class="btn" ${dis} onclick="applyMergeBuilder(true)" style="padding:9px 18px; border-radius:11px; font-weight:800; font-size:0.82em; background:${ready ? '#0ea5e9' : '#e2e8f0'}; color:${ready ? '#fff' : '#94a3b8'}; border:none; cursor:${ready ? 'pointer' : 'not-allowed'};">➕ เพิ่มเป็นข้อใหม่</button>
+                    <button class="btn" ${dis} onclick="applyMergeBuilder(false)" style="padding:9px 20px; border-radius:11px; font-weight:800; font-size:0.82em; background:${ready ? '#22c55e' : '#cbd5e1'}; color:${ready ? '#fff' : '#64748b'}; border:none; cursor:${ready ? 'pointer' : 'not-allowed'};">✅ ใช้ฉบับประกอบนี้</button>
+                </div>`;
+        };
+
+        window.setMergeBuilderStem = function(key) {
+            if (!window._mergeBuilder) return;
+            window._mergeBuilder.stemKey = key;
+            window.renderMergeBuilder();
+        };
+        window.toggleMergeBuilderOption = function(id) {
+            const st = window._mergeBuilder; if (!st) return;
+            const p = st.pool.find(x => x.id === id); if (!p) return;
+            p.checked = !p.checked;
+            if (!p.checked) st.correctIds.delete(id); // an option that isn't in the question can't be its answer
+            window.renderMergeBuilder();
+        };
+        window.toggleMergeBuilderKey = function(id) {
+            const st = window._mergeBuilder; if (!st) return;
+            const p = st.pool.find(x => x.id === id); if (!p) return;
+            if (st.correctIds.has(id)) st.correctIds.delete(id);
+            else { p.checked = true; st.correctIds.add(id); }
+            window.renderMergeBuilder();
+        };
+        window.closeMergeBuilder = function() {
+            const o = document.getElementById('merge-builder-overlay');
+            if (o) o.remove();
+            window._mergeBuilder = null;
+        };
+
+        window.applyMergeBuilder = async function(addAsNew) {
+            const st = window._mergeBuilder; if (!st) return;
+            const stemSrc = st.sources.find(s => s.key === st.stemKey) || st.sources[0];
+            const srcQ = stemSrc.q || {};
+            if (!String(srcQ.q || '').trim()) return alert('ฉบับที่เลือกเป็นโจทย์ไม่มีข้อความ');
+            const chosen = st.pool.filter(p => p.checked);
+            if (chosen.length < 2) return alert('เลือกตัวเลือกอย่างน้อย 2 ข้อ');
+            // Recomputed from the ticked order — the whole point of this panel.
+            const correct = chosen.map((p, i) => st.correctIds.has(p.id) ? i : -1).filter(i => i >= 0);
+            if (!correct.length) return alert('ยังไม่ได้ตั้งเฉลย — กดวงกลมหน้าตัวเลือกที่ถูก');
+
+            const built = { ...srcQ, q: srcQ.q, type: srcQ.type || 'choice', options: chosen.map(p => p.text), correct };
+            const compareOverlay = () => document.getElementById('ai-compare-overlay');
+            if (addAsNew) {
+                // addSingleAiAsNewQuestion can bail (too-similar, or the admin cancels the
+                // insert-position picker) without a return value — compare the count so a
+                // cancelled insert doesn't throw away a hand-assembled question.
+                const before = (getQuizFormData().questions || []).length;
+                await addSingleAiAsNewQuestion(st.index, built);
+                if ((getQuizFormData().questions || []).length <= before) return;
+                window.closeMergeBuilder();
+                const ov = compareOverlay(); if (ov) ov.remove();
+                return;
+            }
+            if (!applySingleAiFix(st.index, built, st.arrIdx, 'Manual')) return; // keep the builder open on cancel
+            window.closeMergeBuilder();
+            const ov = compareOverlay(); if (ov) ov.remove();
+        };
+
         // green-add word diff (improved vs original) — standalone copy used by the 3-col renderer
         window._renderAddDiff = function(orig, improved) {
             const aw = (orig || '').split(/(\s+)/), bw = (improved || '').split(/(\s+)/);
@@ -52463,6 +52627,7 @@ RULES:
                                 ${improvedB ? '' : `
                                 <input id="ai-merge-instruction" type="text" value="${escapeHtml(item.mergeInstruction || '')}" placeholder="สั่งการผสม เช่น เก็บสำนวนเดิม ใช้ตัวเลือกใหม่" title="ว่างไว้ได้ — AI จะใช้กติกาผสมมาตรฐาน: เก็บสำนวนของเดิม รับความลึกของฉบับปรับปรุง" style="width:210px; padding:9px 12px; border-radius:12px; border:1px solid #e2e8f0; background:#f8fafc; font-size:0.78em; font-family:inherit; color:#334155;">
                                 <button class="btn" onclick="mergeAiVersions(${index}, ${arrIdx}, this)" title="ให้ AI ผสม ORIGINAL + IMPROVED เป็นฉบับเดียว แล้วแสดงเป็นคอลัมน์ที่ 3. ใช้ token" style="padding:10px 18px; border-radius:12px; font-weight:800; font-size:0.82em; background:linear-gradient(135deg,#db2777,#9d174d); color:white; border:none; box-shadow:0 4px 12px rgba(219,39,119,0.3); display:flex; align-items:center; gap:6px;">🧬 ${mergedQV ? 'ผสมใหม่' : 'ผสมสองฉบับ'}</button>`}
+                                <button class="btn" onclick="openMergeBuilder(${index}, ${arrIdx})" title="ติ๊กเลือกตัวเลือกจากทุกฉบับเอง แล้วตั้งเฉลย — ไม่ใช้ AI ไม่เสีย token" style="padding:10px 18px; border-radius:12px; font-weight:800; font-size:0.82em; background:#fff; color:#9d174d; border:1.5px solid #fbcfe8; display:flex; align-items:center; gap:6px;">🧩 ประกอบเอง</button>
                             </div>
                             <div style="display:flex; gap:12px; align-items:center;">
                                 <button class="btn btn-secondary" onclick="document.getElementById('ai-compare-overlay').remove()" style="padding:10px 22px; border-radius:12px; font-weight:700;">Keep Original</button>
