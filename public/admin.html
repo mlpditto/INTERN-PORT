@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.28</title>
+    <title>Nika V97.29</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -51934,6 +51934,89 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             }
         };
 
+        // ── V97.29: 🧬 merge ORIGINAL + IMPROVED into one question ───────────────────────
+        // Neither column is usually the right answer on its own: the original carries the
+        // human's Thai phrasing and its distractors are calibrated against real learners,
+        // while the AI rewrite carries the clinical depth. This asks for a single blend,
+        // optionally steered by a one-line admin instruction, and renders it as a third
+        // column with its own Apply — reusing the 2-model column plumbing.
+        // Merge always blends ORIGINAL + proposal A, so the control is hidden while the
+        // 2-model (B) view is open, keeping the modal at three columns.
+        window.mergeAiVersions = async function(qIdx, arrIdx, btn) {
+            const oldHtml = btn ? btn.innerHTML : null;
+            try {
+                const item = (window._aiAnalysisItems || [])[arrIdx];
+                if (!item || !item.improvedQuestion) return alert('No improvement data found.');
+                const originalQ = (getQuizFormData().questions || [])[qIdx];
+                if (!originalQ) return alert('Question index out of sync.');
+                const instrEl = document.getElementById('ai-merge-instruction');
+                const instruction = (instrEl ? instrEl.value : (item.mergeInstruction || '')).trim();
+                if (btn) { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังผสม…'; btn.disabled = true; }
+
+                const prompt = `You are merging TWO versions of the SAME multiple-choice question into ONE. Version A is the question as it stands today, written by a human; Version B is an AI rewrite of it. Produce a single question that takes the strongest parts of each — not a copy of either.
+
+VERSION A — ORIGINAL:
+${JSON.stringify(originalQ)}
+
+VERSION B — IMPROVED:
+${JSON.stringify(item.improvedQuestion)}
+${instruction ? `
+ADMIN'S MERGE INSTRUCTION — highest priority, follow it literally:
+${instruction}
+` : ''}
+DEFAULT MERGE POLICY (applies wherever the instruction above is silent):
+- Keep A's wording, tone and terminology wherever it reads naturally to the target learner.
+- Take B's clinical depth and its more plausible distractors wherever they genuinely raise difficulty.
+- Drop any option that is a giveaway, a joke, or "none of the above".
+
+HARD RULES:
+- "correct" holds ZERO-BASED INDEXES into the "options" array YOU output. Assemble the options first, then count the index of the correct one — a merged question with a mis-indexed answer key is worse than no merge at all.
+- Write every field in <<<the same language as VERSION A's question text>>>.
+- Keep the same question type as A.
+- The result must differ from BOTH A and B.
+- "explanation" is shown to LEARNERS after they submit — concise teaching, not critique. "suggestion" is admin-facing: one line naming what you took from A and what from B.
+
+OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
+{"q":"...","options":["..."],"correct":[0],"explanation":"...","suggestion":"..."}`;
+
+                const model = document.getElementById('ai-analyzer-model-val')?.value || window._aiAnalysisModel || 'gemini-3.6-flash';
+                let parsed = null, actual = model, raw = '';
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    const r = await callUniversalAI(model, prompt, true, null, '', { feature: 'quiz_merge_versions', maxOutputTokens: 8192 });
+                    raw = r.text; actual = r.model || model;
+                    parsed = safeJsonParse(raw);
+                    if (parsed) break;
+                    if (attempt === 1) console.warn('[mergeAiVersions] attempt 1 non-JSON, retrying. Snippet:', String(raw || '').slice(0, 200));
+                }
+                if (!parsed) throw new Error('Merge returned invalid JSON. First 200 chars: ' + String(raw || '').slice(0, 200));
+
+                // The answer key is the one thing a merge can silently corrupt — options come
+                // from two different arrays, so an index copied from either input can point
+                // at the wrong choice. Reject rather than apply a mis-keyed question.
+                const mergedOptions = Array.isArray(parsed.options) ? parsed.options.map(o => String(o == null ? '' : o)) : [];
+                const mergedCorrect = (Array.isArray(parsed.correct) ? parsed.correct : [parsed.correct])
+                    .map(Number).filter(n => Number.isInteger(n));
+                const typeIsChoice = (parsed.type || originalQ.type || 'choice') === 'choice';
+                if (typeIsChoice) {
+                    if (mergedOptions.length < 2) throw new Error('Merge returned fewer than 2 options — regenerate.');
+                    if (!mergedCorrect.length || mergedCorrect.some(i => i < 0 || i >= mergedOptions.length)) {
+                        throw new Error(`Merge returned an out-of-range answer key (correct=${JSON.stringify(parsed.correct)} for ${mergedOptions.length} options) — regenerate.`);
+                    }
+                }
+
+                item.mergedQuestion = { ...parsed, options: mergedOptions, correct: mergedCorrect };
+                item.mergedQuestionModel = actual;
+                item.mergeInstruction = instruction;
+                if (typeof recordAiEval === 'function') recordAiEval('quiz_merge', window._compareModelMeta(actual).label, 'suggested');
+                document.getElementById('ai-compare-overlay').remove();
+                window.previewAiFix(qIdx, arrIdx);
+            } catch (e) {
+                console.error('[mergeAiVersions]', e);
+                alert('ผสมไม่สำเร็จ: ' + e.message);
+                if (btn) { btn.innerHTML = oldHtml; btn.disabled = false; }
+            }
+        };
+
         // green-add word diff (improved vs original) — standalone copy used by the 3-col renderer
         window._renderAddDiff = function(orig, improved) {
             const aw = (orig || '').split(/(\s+)/), bw = (improved || '').split(/(\s+)/);
@@ -52015,11 +52098,19 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             let footer = '';
             if (isImproved) {
                 const jsonEsc = JSON.stringify(q || {}).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                const regenCall = o.slot === 'b' ? `generateAiProposalB(${o.qIdx}, ${o.arrIdx}, this)` : `regenerateSingleAiSuggestion(${o.qIdx}, ${o.arrIdx}, true, this)`;
+                // V97.29: slot 'merge' regenerates through the merge call, not the improve
+                // call — 🔄 on that column re-runs the blend with whatever instruction is
+                // currently typed in the footer, rather than throwing the blend away.
+                const regenCall = o.slot === 'b'
+                    ? `generateAiProposalB(${o.qIdx}, ${o.arrIdx}, this)`
+                    : o.slot === 'merge'
+                        ? `mergeAiVersions(${o.qIdx}, ${o.arrIdx}, this)`
+                        : `regenerateSingleAiSuggestion(${o.qIdx}, ${o.arrIdx}, true, this)`;
+                const applyLabel = o.applyLabel || meta.label;
                 footer = `<div style="display:flex; gap:6px; margin-top:14px; padding-top:12px; border-top:1px dashed #e2e8f0; flex-wrap:wrap; align-items:center;">
                     <button class="btn" title="Regenerate this column" onclick="${regenCall}" style="padding:7px 11px; border-radius:10px; font-weight:700; font-size:0.78em; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;">🔄</button>
                     <button class="btn" onclick="addSingleAiAsNewQuestion(${o.qIdx}, '${jsonEsc}'); document.getElementById('ai-compare-overlay').remove();" style="padding:7px 11px; border-radius:10px; font-weight:700; font-size:0.78em; background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;">➕ Add</button>
-                    <button class="btn" onclick="if(applySingleAiFix(${o.qIdx}, '${jsonEsc}', ${o.arrIdx}, '${meta.label}')) document.getElementById('ai-compare-overlay').remove();" style="padding:7px 14px; border-radius:10px; font-weight:800; font-size:0.78em; background:#22c55e; color:white; border:none; box-shadow:0 3px 10px rgba(34,197,94,0.3); margin-left:auto;">✅ Apply ${meta.label}</button>
+                    <button class="btn" onclick="if(applySingleAiFix(${o.qIdx}, '${jsonEsc}', ${o.arrIdx}, '${applyLabel}')) document.getElementById('ai-compare-overlay').remove();" style="padding:7px 14px; border-radius:10px; font-weight:800; font-size:0.78em; background:#22c55e; color:white; border:none; box-shadow:0 3px 10px rgba(34,197,94,0.3); margin-left:auto;">✅ Apply ${applyLabel}</button>
                 </div>`;
             }
             return `<div style="flex:1; min-width:280px; display:flex; flex-direction:column;">
@@ -52048,7 +52139,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         // (costs tokens), mirroring the same split Quiz Compare uses.
         const QUIZ_SET_DUP_THRESHOLD = 0.3; // containment scale — same as QUIZ_COMPARE_THRESHOLD
         const QUIZ_SET_DUP_STRONG = 0.6;    // red tier + the Add-as-New confirm gate
-        const QUIZ_SET_DUP_SIDE_TH = { original: 'เดิม', improved: 'ใหม่', b: 'B' };
+        const QUIZ_SET_DUP_SIDE_TH = { original: 'เดิม', improved: 'ใหม่', b: 'B', merge: 'ผสม' };
 
         // Peers = every OTHER question of the quiz being edited, each read as it will look
         // AFTER the AI queue is applied: a pending rewrite of Q17 is what Q14's rewrite
@@ -52197,6 +52288,7 @@ RULES:
                 if (!item || !item.improvedQuestion) return alert("No improvement data found.");
                 const improvedQ = item.improvedQuestion;
                 const improvedB = item.improvedQuestionB || null;
+                const mergedQV = (!improvedB && item.mergedQuestion) ? item.mergedQuestion : null; // V97.29
                 const currentQs = getQuizFormData().questions;
                 if (index < 0 || index >= currentQs.length) return alert("Question index out of sync.");
                 const currentQ = currentQs[index];
@@ -52280,7 +52372,8 @@ RULES:
                 const dupCandidates = [
                     { key: 'original', text: quizCompareStripMd(currentQ && currentQ.q) },
                     { key: 'improved', text: quizCompareStripMd(improvedQ && improvedQ.q) },
-                    { key: 'b', text: quizCompareStripMd(improvedB && improvedB.q) }
+                    { key: 'b', text: quizCompareStripMd(improvedB && improvedB.q) },
+                    { key: 'merge', text: quizCompareStripMd(mergedQV && mergedQV.q) }
                 ];
                 window._compareDupHits = window.scanQuizSetDup(index, dupCandidates);
                 const dupChipsHtml = window._quizSetDupChipsHtml(window._compareDupHits);
@@ -52351,6 +52444,10 @@ RULES:
                                 ${window._renderCompareCol(currentQ, { kind: 'original', label: 'ORIGINAL', color: '#64748b', qIdx: index })}
                                 ${window._renderCompareCol(improvedQ, { kind: 'improved', label: 'A', color: 'linear-gradient(135deg, #6366f1, #4338ca)', originalRef: currentQ, modelId: (window._aiAnalysisModel || ''), qIdx: index, arrIdx: arrIdx, slot: 'a' })}
                                 ${window._renderCompareCol(improvedB, { kind: 'improved', label: 'B', color: 'linear-gradient(135deg, #0891b2, #0e7490)', originalRef: currentQ, modelId: (item.improvedQuestionBModel || window._compareModelB()), qIdx: index, arrIdx: arrIdx, slot: 'b' })}
+                            ` : mergedQV ? `
+                                ${window._renderCompareCol(currentQ, { kind: 'original', label: 'ORIGINAL', color: '#64748b', qIdx: index })}
+                                ${window._renderCompareCol(improvedQ, { kind: 'improved', label: 'IMPROVED', color: 'linear-gradient(135deg, #6366f1, #4338ca)', originalRef: currentQ, modelId: (window._aiAnalysisModel || ''), qIdx: index, arrIdx: arrIdx, slot: 'a' })}
+                                ${window._renderCompareCol(mergedQV, { kind: 'improved', label: '🧬 MERGED', color: 'linear-gradient(135deg, #db2777, #9d174d)', originalRef: currentQ, modelId: (item.mergedQuestionModel || ''), qIdx: index, arrIdx: arrIdx, slot: 'merge', applyLabel: 'Merge' })}
                             ` : `
                                 ${renderQInner(currentQ, 'ORIGINAL', '#64748b', index, 'original')}
                                 <div style="display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:1.5em; flex-shrink:0;">➡️</div>
@@ -52361,12 +52458,15 @@ RULES:
                         <div style="padding:18px 30px; background:#fff; border-top:1.5px solid #edf2f7; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
                             <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                                 ${window._compareModelBPickerHtml()}
-                                ${improvedB ? '' : `<button class="btn" onclick="generateAiProposalB(${index}, ${arrIdx}, this)" style="padding:10px 18px; border-radius:12px; font-weight:800; font-size:0.82em; background:linear-gradient(135deg,#0891b2,#0e7490); color:white; border:none; box-shadow:0 4px 12px rgba(8,145,178,0.3); display:flex; align-items:center; gap:6px;">⚖️ Compare 2 models</button>`}
+                                ${(improvedB || mergedQV) ? '' : `<button class="btn" onclick="generateAiProposalB(${index}, ${arrIdx}, this)" style="padding:10px 18px; border-radius:12px; font-weight:800; font-size:0.82em; background:linear-gradient(135deg,#0891b2,#0e7490); color:white; border:none; box-shadow:0 4px 12px rgba(8,145,178,0.3); display:flex; align-items:center; gap:6px;">⚖️ Compare 2 models</button>`}
                                 <button class="btn" onclick="checkQuizSetDupAI(${index}, ${arrIdx}, this)" title="ถาม AI ว่าโจทย์นี้วัดความรู้ก้อนเดียวกับข้ออื่นในชุดหรือไม่ — ชิปเตือนด้านบนจับได้แค่ซ้ำเชิงถ้อยคำ. ใช้ token" style="padding:10px 18px; border-radius:12px; font-weight:800; font-size:0.82em; background:linear-gradient(135deg,#7c3aed,#a855f7); color:white; border:none; box-shadow:0 4px 12px rgba(124,58,237,0.3); display:flex; align-items:center; gap:6px;">🔎 เช็คซ้ำในชุด</button>
+                                ${improvedB ? '' : `
+                                <input id="ai-merge-instruction" type="text" value="${escapeHtml(item.mergeInstruction || '')}" placeholder="สั่งการผสม เช่น เก็บสำนวนเดิม ใช้ตัวเลือกใหม่" title="ว่างไว้ได้ — AI จะใช้กติกาผสมมาตรฐาน: เก็บสำนวนของเดิม รับความลึกของฉบับปรับปรุง" style="width:210px; padding:9px 12px; border-radius:12px; border:1px solid #e2e8f0; background:#f8fafc; font-size:0.78em; font-family:inherit; color:#334155;">
+                                <button class="btn" onclick="mergeAiVersions(${index}, ${arrIdx}, this)" title="ให้ AI ผสม ORIGINAL + IMPROVED เป็นฉบับเดียว แล้วแสดงเป็นคอลัมน์ที่ 3. ใช้ token" style="padding:10px 18px; border-radius:12px; font-weight:800; font-size:0.82em; background:linear-gradient(135deg,#db2777,#9d174d); color:white; border:none; box-shadow:0 4px 12px rgba(219,39,119,0.3); display:flex; align-items:center; gap:6px;">🧬 ${mergedQV ? 'ผสมใหม่' : 'ผสมสองฉบับ'}</button>`}
                             </div>
                             <div style="display:flex; gap:12px; align-items:center;">
                                 <button class="btn btn-secondary" onclick="document.getElementById('ai-compare-overlay').remove()" style="padding:10px 22px; border-radius:12px; font-weight:700;">Keep Original</button>
-                                ${improvedB ? '' : `<button class="btn" style="padding:10px 22px; border-radius:12px; font-weight:700; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; display:flex; align-items:center; gap:8px;" onclick="regenerateSingleAiSuggestion(${index}, ${arrIdx}, true, this)">🔄 Regenerate</button>${addButtonHtml}${applyButtonHtml}`}
+                                ${(improvedB || mergedQV) ? '' : `<button class="btn" style="padding:10px 22px; border-radius:12px; font-weight:700; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; display:flex; align-items:center; gap:8px;" onclick="regenerateSingleAiSuggestion(${index}, ${arrIdx}, true, this)">🔄 Regenerate</button>${addButtonHtml}${applyButtonHtml}`}
                             </div>
                         </div>
                     </div>
