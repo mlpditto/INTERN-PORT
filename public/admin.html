@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.27</title>
+    <title>Nika V97.28</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -52039,6 +52039,158 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             </div>`;
         };
 
+        // ── V97.28: in-set duplication check for the compare modal ──────────────────────
+        // The quiz-list 🔍 Compare (V97.05-07) answers "does this quiz overlap OTHER
+        // quizzes". Nothing answered "does this rewrite collide with a SIBLING question in
+        // the same set" — which is exactly what an AI rewrite can introduce, since each
+        // improvement is generated with only its own question in context. Free n-gram pass
+        // runs automatically on open; the concept-level AI pass is an opt-in button
+        // (costs tokens), mirroring the same split Quiz Compare uses.
+        const QUIZ_SET_DUP_THRESHOLD = 0.3; // containment scale — same as QUIZ_COMPARE_THRESHOLD
+        const QUIZ_SET_DUP_STRONG = 0.6;    // red tier + the Add-as-New confirm gate
+        const QUIZ_SET_DUP_SIDE_TH = { original: 'เดิม', improved: 'ใหม่', b: 'B' };
+
+        // Peers = every OTHER question of the quiz being edited, each read as it will look
+        // AFTER the AI queue is applied: a pending rewrite of Q17 is what Q14's rewrite
+        // would actually collide with, not the saved Q17 that's about to be replaced.
+        window.buildQuizSetPeerPool = function(excludeIdx) {
+            const qs = getQuizFormData().questions || [];
+            const pending = new Map();
+            (window._aiAnalysisItems || []).forEach((it, ai) => {
+                if (it && it.improvedQuestion) pending.set(window.getAiItemQIndex(ai), it.improvedQuestion);
+            });
+            const pool = [];
+            qs.forEach((q, i) => {
+                if (i === excludeIdx) return;
+                const p = pending.get(i);
+                const text = quizCompareStripMd((p && p.q) || q.q || '');
+                if (text) pool.push({ qIndex: i, text, pending: !!p });
+            });
+            return pool;
+        };
+
+        // Every candidate version is scanned, not just the rewrite: an ORIGINAL-only hit
+        // means the question was already a duplicate before the AI touched it (retire it,
+        // don't polish it); an IMPROVED-only hit means the rewrite introduced the collision.
+        window.scanQuizSetDup = function(index, candidates) {
+            const sides = (candidates || []).filter(c => c && c.text);
+            const byPeer = new Map();
+            window.buildQuizSetPeerPool(index).forEach(peer => {
+                sides.forEach(side => {
+                    const score = quizCompareSimilarity(side.text, peer.text);
+                    if (score < QUIZ_SET_DUP_THRESHOLD) return;
+                    const hit = byPeer.get(peer.qIndex)
+                        || { qIndex: peer.qIndex, text: peer.text, pending: peer.pending, score: 0, sides: [] };
+                    hit.score = Math.max(hit.score, score);
+                    if (!hit.sides.includes(side.key)) hit.sides.push(side.key);
+                    byPeer.set(peer.qIndex, hit);
+                });
+            });
+            return [...byPeer.values()].sort((a, b) => b.score - a.score);
+        };
+
+        window._quizSetDupChipsHtml = function(hits) {
+            return (hits || []).slice(0, 3).map(h => {
+                const pct = Math.round(h.score * 100);
+                const strong = h.score >= QUIZ_SET_DUP_STRONG;
+                const sideTag = h.sides.map(s => QUIZ_SET_DUP_SIDE_TH[s] || s).join('/');
+                const tip = `ฉบับ ${sideTag} ใกล้เคียง Q${h.qIndex + 1}${h.pending ? ' (ฉบับที่ AI เสนอ ยังไม่ apply)' : ''}:\n${h.text.slice(0, 240)}`;
+                return `<span title="${escapeHtml(tip)}" style="background:${strong ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.12)'}; color:${strong ? '#b91c1c' : '#92400e'}; padding:4px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid ${strong ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.30)'}; cursor:help;">⚠️ ซ้ำ Q${h.qIndex + 1} · ${pct}% · ${escapeHtml(sideTag)}</span>`;
+            }).join('');
+        };
+
+        // Concept-level pass. The n-gram pass structurally cannot see "same fact, other
+        // words" (the V97.06 lesson) — this one asks the model. ONE call: this question's
+        // versions vs the rest of the set, so cost stays flat regardless of set size.
+        window.checkQuizSetDupAI = async function(index, arrIdx, btn) {
+            const panel = document.getElementById('ai-dup-result');
+            const pool = window.buildQuizSetPeerPool(index);
+            if (!pool.length) return showToast('ชุดนี้ไม่มีข้ออื่นให้เทียบ');
+            const item = (window._aiAnalysisItems || [])[arrIdx] || {};
+            const originalQ = (getQuizFormData().questions || [])[index] || {};
+            const candidates = [
+                { key: 'original', label: 'ORIGINAL — the currently saved version', q: originalQ },
+                { key: 'improved', label: 'IMPROVED — the AI rewrite under review', q: item.improvedQuestion }
+            ];
+            if (item.improvedQuestionB) candidates.push({ key: 'b', label: 'IMPROVED-B — second model proposal', q: item.improvedQuestionB });
+            const usable = candidates.filter(c => quizCompareStripMd(c.q && c.q.q));
+
+            const oldHtml = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังเทียบ…'; }
+            if (panel) {
+                panel.style.display = 'block';
+                panel.innerHTML = '<span style="font-size:0.78em; color:#64748b;">🤖 AI กำลังตรวจความซ้ำซ้อนกับข้ออื่นในชุด…</span>';
+            }
+
+            const candBlock = usable.map(c => `[${c.key}] ${c.label}:\n${quizCompareStripMd(c.q.q).slice(0, 600)}`).join('\n\n');
+            const peerList = pool.map(p => `  Q${p.qIndex + 1}${p.pending ? ' (pending AI rewrite)' : ''}: ${p.text.slice(0, 400)}`).join('\n');
+            const prompt = `You are auditing ONE multiple-choice question against the OTHER questions of the SAME medical-education quiz, looking for CONCEPTUAL redundancy — questions that test the same underlying fact or decision point even when worded completely differently (a short direct question vs a long clinical vignette, for example). A plain text-similarity pass already caught literal overlap; find what it would miss.
+
+CANDIDATE VERSIONS OF Q${index + 1} (judge each separately):
+${candBlock}
+
+OTHER QUESTIONS IN THE SAME QUIZ:
+${peerList}
+
+OUTPUT FORMAT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
+{
+  "overlaps": [
+    { "q": <<<the number of the other question, exactly as labelled above>>>, "side": "<<<one of: ${usable.map(c => c.key).join(' | ')}>>>", "concept": "<<<one short phrase, Thai, naming the shared fact>>>", "confidence": "high|medium" }
+  ]
+}
+
+RULES:
+- "side" names which candidate version collides with that other question.
+- "confidence":"high" = a learner who answered one already knows the answer to the other. "medium" = same topic but a meaningfully different angle or depth — admin should judge.
+- Do NOT report a pair just because both mention the same drug or disease — a topical quiz is expected to.
+- Each other-question appears at most once; report its strongest colliding side.
+- If nothing overlaps, return {"overlaps": []}. An empty array is a valid, good answer.`;
+
+            try {
+                const selectedModel = document.getElementById('ai-analyzer-model-val')?.value || 'gemini-3.6-flash';
+                let raw = '', result = null;
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    const r = await callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 4096, feature: 'quiz_set_dup_check' });
+                    raw = r.text;
+                    result = safeJsonParse(raw);
+                    if (result) break;
+                    if (attempt === 1) console.warn('[checkQuizSetDupAI] attempt 1 non-JSON, retrying. Snippet:', String(raw || '').slice(0, 200));
+                }
+                if (!result || !Array.isArray(result.overlaps)) {
+                    throw new Error('AI ตอบไม่เป็น JSON หลังลอง 2 ครั้ง. 200 ตัวแรก:\n' + String(raw || '').slice(0, 200));
+                }
+                const rows = result.overlaps.filter(o => o && Number.isFinite(Number(o.q)));
+                if (!panel) return;
+                panel.innerHTML = rows.length
+                    ? `<div style="font-size:0.78em; font-weight:800; color:#0f172a; margin-bottom:4px;">🤖 AI พบซ้ำเชิงเนื้อหา ${rows.length} ข้อ</div>` + rows.map(o => {
+                        const high = String(o.confidence || '').toLowerCase() === 'high';
+                        const sideTag = QUIZ_SET_DUP_SIDE_TH[o.side] || o.side || '?';
+                        return `<div style="display:flex; align-items:center; gap:8px; padding:5px 10px; border-radius:8px; margin-top:4px; font-size:0.78em; background:${high ? '#fee2e2' : '#fef3c7'}; color:${high ? '#991b1b' : '#92400e'};">
+                            <b style="flex-shrink:0;">Q${Number(o.q)}</b>
+                            <span style="flex:1;">${escapeHtml(String(o.concept || ''))}</span>
+                            <span style="flex-shrink:0; opacity:0.85; font-weight:700;">ฉบับ ${escapeHtml(String(sideTag))} · ${high ? 'สูง' : 'กลาง'}</span>
+                        </div>`;
+                    }).join('')
+                    : '<span style="font-size:0.78em; font-weight:700; color:#15803d;">✅ AI ไม่พบความซ้ำซ้อนเชิงเนื้อหากับข้ออื่นในชุดนี้</span>';
+            } catch (e) {
+                console.error('[checkQuizSetDupAI]', e);
+                if (panel) panel.innerHTML = `<span style="font-size:0.78em; font-weight:700; color:#b91c1c;">❌ ${escapeHtml(e.message)}</span>`;
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
+            }
+        };
+
+        // Apply & Next stays warning-only (question count unchanged), but adding a
+        // near-duplicate as a NEW question grows the set — that one asks first.
+        window.confirmAddAiAsNewQuestion = function(index, improvedJson) {
+            const strong = (window._compareDupHits || [])
+                .find(h => h.score >= QUIZ_SET_DUP_STRONG && h.sides.includes('improved'));
+            if (strong && !confirm(`⚠️ โจทย์ที่จะเพิ่มใหม่ใกล้เคียงกับ Q${strong.qIndex + 1} ในชุดนี้ ${Math.round(strong.score * 100)}%\n\nยืนยันเพิ่มเป็นข้อใหม่?`)) return;
+            addSingleAiAsNewQuestion(index, improvedJson);
+            const overlay = document.getElementById('ai-compare-overlay');
+            if (overlay) overlay.remove();
+        };
+
         window.previewAiFix = function(index, arrIdx) {
             try {
                 const item = window._aiAnalysisItems[arrIdx];
@@ -52123,6 +52275,15 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 const diffState = window.getAiImprovementDiffState(currentQ, improvedQ);
                 const diffs = diffState.diffs;
                 const canApplyImprovement = diffState.hasMeaningfulDiff;
+                // V97.28: free in-set duplication pass — runs on every open, zero tokens,
+                // silent when clean. Stored on window so the Add-as-New guard can read it.
+                const dupCandidates = [
+                    { key: 'original', text: quizCompareStripMd(currentQ && currentQ.q) },
+                    { key: 'improved', text: quizCompareStripMd(improvedQ && improvedQ.q) },
+                    { key: 'b', text: quizCompareStripMd(improvedB && improvedB.q) }
+                ];
+                window._compareDupHits = window.scanQuizSetDup(index, dupCandidates);
+                const dupChipsHtml = window._quizSetDupChipsHtml(window._compareDupHits);
                 const diffHtml = diffs.map(d => `<span style="background:rgba(99,102,241,0.1); color:#4338ca; padding:4px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid rgba(99,102,241,0.2);">${d}</span>`).join('');
                 const statusHtml = canApplyImprovement
                     ? diffHtml
@@ -52149,7 +52310,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     .replace(/'/g, "\\'")
                     .replace(/"/g, '&quot;');
                 const addButtonHtml = canApplyImprovement
-                    ? `<button class="btn" onclick="addSingleAiAsNewQuestion(${index}, '${improvedJson}'); document.getElementById('ai-compare-overlay').remove();" style="padding:10px 22px; border-radius:12px; font-weight:700; background:#0ea5e9; color:white; border:none; box-shadow:0 4px 15px rgba(14,165,233,0.28);">➕ Add as New Question</button>`
+                    ? `<button class="btn" onclick="confirmAddAiAsNewQuestion(${index}, '${improvedJson}')" style="padding:10px 22px; border-radius:12px; font-weight:700; background:#0ea5e9; color:white; border:none; box-shadow:0 4px 15px rgba(14,165,233,0.28);">➕ Add as New Question</button>`
                     : `<button class="btn" disabled title="Regenerate until the improved version is meaningfully different." style="padding:10px 22px; border-radius:12px; font-weight:700; background:#e2e8f0; color:#64748b; border:none; cursor:not-allowed; box-shadow:none; opacity:0.95;">➕ Add as New Question</button>`;
                 const applyButtonHtml = canApplyImprovement
                     ? `<button class="btn btn-primary" onclick="applyAiFixAndAdvance(${index}, '${improvedJson}', ${arrIdx})" style="padding:10px 30px; border-radius:12px; font-weight:700; background:#22c55e; border:none; box-shadow:0 4px 15px rgba(34,197,94,0.3);">✅ ${arrIdx < ((window._aiAnalysisItems||[]).length - 1) ? 'Apply &amp; Next' : 'Apply This Fix'}</button>`
@@ -52176,7 +52337,8 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                         <div style="padding:20px 30px; background:white; border-bottom:1.5px solid #edf2f7; display:flex; justify-content:space-between; align-items:center;">
                             <div>
                                 <h3 style="margin:0; font-size:1.3em; color:#1e293b;">🛠️ Quality Improvement Comparison</h3>
-                                <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; align-items:center;">${statusHtml}${modelChipHtml ? `<span style="color:#cbd5e1; font-weight:800; margin:0 2px; user-select:none;">·</span>${modelChipHtml}` : ''}</div>
+                                <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; align-items:center;">${statusHtml}${modelChipHtml ? `<span style="color:#cbd5e1; font-weight:800; margin:0 2px; user-select:none;">·</span>${modelChipHtml}` : ''}${dupChipsHtml}</div>
+                                <div id="ai-dup-result" style="display:none; margin-top:8px; max-width:620px;"></div>
                             </div>
                             <div style="display:flex; align-items:center; gap:12px;">
                                 ${navHtml}
@@ -52200,6 +52362,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                             <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                                 ${window._compareModelBPickerHtml()}
                                 ${improvedB ? '' : `<button class="btn" onclick="generateAiProposalB(${index}, ${arrIdx}, this)" style="padding:10px 18px; border-radius:12px; font-weight:800; font-size:0.82em; background:linear-gradient(135deg,#0891b2,#0e7490); color:white; border:none; box-shadow:0 4px 12px rgba(8,145,178,0.3); display:flex; align-items:center; gap:6px;">⚖️ Compare 2 models</button>`}
+                                <button class="btn" onclick="checkQuizSetDupAI(${index}, ${arrIdx}, this)" title="ถาม AI ว่าโจทย์นี้วัดความรู้ก้อนเดียวกับข้ออื่นในชุดหรือไม่ — ชิปเตือนด้านบนจับได้แค่ซ้ำเชิงถ้อยคำ. ใช้ token" style="padding:10px 18px; border-radius:12px; font-weight:800; font-size:0.82em; background:linear-gradient(135deg,#7c3aed,#a855f7); color:white; border:none; box-shadow:0 4px 12px rgba(124,58,237,0.3); display:flex; align-items:center; gap:6px;">🔎 เช็คซ้ำในชุด</button>
                             </div>
                             <div style="display:flex; gap:12px; align-items:center;">
                                 <button class="btn btn-secondary" onclick="document.getElementById('ai-compare-overlay').remove()" style="padding:10px 22px; border-radius:12px; font-weight:700;">Keep Original</button>
