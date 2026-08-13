@@ -504,6 +504,18 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 tailoredPrompt += "\n\n(Respond in strictly valid JSON format)";
             }
 
+            // 2026-08-13: this was hardcoded to 4096 regardless of isJson or the caller's
+            // generationOptions.maxOutputTokens — every other provider branch (Gemini,
+            // Anthropic, OpenRouter) honors it, this one silently didn't. A large structured
+            // job (e.g. quiz_analyzer's 32768 request for a full-quiz Specialist/Audit run)
+            // got cut off mid-JSON by OpenAI itself at 4096, which the client then mislabeled
+            // as "Model returned prose instead of JSON" — same failure mode as the Claude/
+            // Gemini truncation bugs already fixed, just never patched for GPT. 32768 cap
+            // matches Gemini's (both cover the same quiz-analysis use case).
+            const openaiMaxTokens = Math.min(
+                Math.max(Number(generationOptions && generationOptions.maxOutputTokens) || 4096, 1024),
+                32768
+            );
             const body = {
                 model: actualModel,
                 messages: [{ role: "user", content: tailoredPrompt }],
@@ -512,7 +524,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 // 2026-05-25: GPT-5.x family also requires `max_completion_tokens` (same as o1/o3).
                 // The proxy rewrites legacy `gpt-4*` → `gpt-5.4-mini` at line ~336, so anything
                 // gpt-4 from the client lands here as gpt-5.x and would 400 with `max_tokens`.
-                [(actualModel.includes('o1') || actualModel.includes('gpt-5')) ? 'max_completion_tokens' : 'max_tokens']: isJson ? 4096 : 4096
+                [(actualModel.includes('o1') || actualModel.includes('gpt-5')) ? 'max_completion_tokens' : 'max_tokens']: openaiMaxTokens
             };
 
             const response = await postWithRetry("https://api.openai.com/v1/chat/completions", body, {
