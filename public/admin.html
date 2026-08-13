@@ -12168,6 +12168,7 @@
                             <div style="display:flex; gap:4px;">
                                 <button class="btn-sm" onclick="analyzeQuizAI(this)" title="Analyze Quiz (rewrite suggestions)" style="background:#7c3aed; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-brain"></i> Specialist</button>
                                 <button class="btn-sm" onclick="auditQuizAI(this)" title="Quality Audit — 5-dim scorecard per question (V93.88 Q3)" style="background:#0891b2; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-clipboard-check"></i> Audit</button>
+                                <button class="btn-sm" onclick="runFullReview(this)" title="Run Specialist + Audit together (parallel, faster than back-to-back clicks)" style="background:linear-gradient(135deg,#7c3aed,#0891b2); color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-layer-group"></i> Full Review</button>
                                 <button class="btn-sm" onclick="openPdfToQuizModal()" title="Import PDF" style="background:#0ea5e9; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                                 <button class="btn-sm" onclick="openSuggestMoreModal()" title="Expand" style="background:#f59e0b; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-sparkles"></i> Expand</button>
                             </div>
@@ -16676,6 +16677,41 @@ RULES:
                 alert('Audit error: ' + e.message);
             } finally {
                 if (auditProgressTimer) clearInterval(auditProgressTimer); // V96.45: stop the progress ticker
+                if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
+            }
+        };
+
+        // V97.31: "Full Review" — run Specialist (analyzeQuizAI) + Audit (auditQuizAI) in
+        // parallel from one click instead of two back-to-back button presses. Both AI calls
+        // are independent (different prompts, no shared data), so Promise.allSettled halves
+        // the wait vs sequential — and .allSettled (not .all) means a failure in one still
+        // lets the other's popup render, since each already alerts its own errors internally.
+        // Each function grabs a button for its own spinner/disable state (clickedBtn, or
+        // window.event's target as a fallback) — passing a detached dummy <button> keeps
+        // that off the real "Full Review" button, which we drive ourselves below.
+        window.runFullReview = async function(clickedBtn) {
+            const btn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
+            const oldText = btn ? btn.innerHTML : 'Full Review';
+            const formData = getQuizFormData();
+            if (!formData.questions || formData.questions.length < 1) return alert('Add at least 1 question to review.');
+            if (btn) { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Reviewing...'; btn.disabled = true; }
+            try {
+                await Promise.allSettled([
+                    window.analyzeQuizAI(document.createElement('button')),
+                    window.auditQuizAI(document.createElement('button'))
+                ]);
+                // Both popups render fixed-centered and would land exactly on top of each
+                // other — cascade them so both title bars (and close buttons) stay visible.
+                const specialistPopup = document.getElementById('ai-analysis-popup');
+                const auditPopup = document.getElementById('ai-audit-popup');
+                if (specialistPopup && auditPopup) {
+                    auditPopup.style.top = 'calc(50% - 36px)';
+                    auditPopup.style.left = 'calc(50% - 36px)';
+                    specialistPopup.style.top = 'calc(50% + 36px)';
+                    specialistPopup.style.left = 'calc(50% + 36px)';
+                    specialistPopup.style.zIndex = '10002';
+                }
+            } finally {
                 if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
             }
         };
