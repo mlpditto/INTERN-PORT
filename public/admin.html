@@ -16670,7 +16670,11 @@ RULES:
                 result.perQuestionAudit.forEach(a => { window._lastAuditScoresByQ[a.qNumber] = a.scores || {}; });
                 window._lastAuditQuizId = (document.getElementById('edit-quiz-id') || {}).value || null;
 
-                renderAuditScorecard(result, aiModel, aiTokens, bp);
+                // V97.33: full snapshot so auditDeleteQuestion can patch+re-render this
+                // SAME scorecard in place after a delete, instead of re-running the audit.
+                window._lastAuditFull = { result, aiModel, aiTokens, blueprint: bp, questions: formData.questions };
+
+                renderAuditScorecard(result, aiModel, aiTokens, bp, formData.questions);
 
             } catch (e) {
                 console.error('Audit error:', e);
@@ -16716,7 +16720,7 @@ RULES:
             }
         };
 
-        function renderAuditScorecard(result, aiModel, aiTokens, blueprint) {
+        function renderAuditScorecard(result, aiModel, aiTokens, blueprint, questions) {
             const blueprintBloom = (blueprint && blueprint.bloomLevel) || null;
             const stars = (n) => {
                 const v = Math.max(0, Math.min(5, Math.round(n)));
@@ -16753,11 +16757,30 @@ RULES:
                 }).join('');
                 const avg = Number(q.averageScore || 0).toFixed(1);
                 const headerBg = q.averageScore >= 4 ? '#dcfce7' : q.averageScore >= 3 ? '#fef9c3' : '#fee2e2';
+
+                // V97.33: collapsible preview of the actual question + options, and a
+                // delete button — both need the real question, looked up by qNumber
+                // from the `questions` snapshot passed alongside the audit result.
+                const question = (questions && questions[q.qNumber - 1]) || null;
+                const correctIdx = question ? (Array.isArray(question.correct) ? question.correct : [question.correct]) : [];
+                const previewHtml = question ? `
+                    <div id="audit-preview-${q.qNumber}" class="lang-no-toggle" style="display:none; margin-bottom:10px; padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; font-size:0.85em; color:#1e293b;">
+                        <div style="margin-bottom:8px; white-space:pre-wrap; line-height:1.5; font-weight:600;">${escapeHtml(question.q || '')}</div>
+                        ${(question.options || []).map((opt, i) => `<div style="display:flex; gap:8px; align-items:flex-start; padding:3px 0; ${correctIdx.includes(i) ? 'color:#15803d; font-weight:700;' : 'color:#475569;'}"><span>${correctIdx.includes(i) ? '✅' : '◯'}</span><span>${escapeHtml(opt)}</span></div>`).join('')}
+                    </div>` : '';
+
                 return `<div style="background:#fcfdff; border:1.5px solid #e2e8f0; border-radius:14px; padding:14px; margin-bottom:10px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding:6px 10px; background:${headerBg}; border-radius:8px;">
-                        <b style="color:#1e293b; font-size:1em;">Q${q.qNumber}</b>
-                        <span style="font-size:0.9em;">${stars(q.averageScore)} <b style="margin-left:6px;">avg ${avg}</b></span>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <b style="color:#1e293b; font-size:1em;">Q${q.qNumber}</b>
+                            ${question ? `<button id="audit-preview-btn-${q.qNumber}" onclick="toggleAuditPreview(${q.qNumber})" title="Show the actual question + options" style="background:rgba(15,23,42,0.06); border:none; border-radius:8px; padding:3px 9px; font-size:0.72em; font-weight:700; color:#475569; cursor:pointer; display:inline-flex; align-items:center; gap:4px;"><i class="fa-solid fa-eye"></i> Preview</button>` : ''}
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:0.9em;">${stars(q.averageScore)} <b style="margin-left:6px;">avg ${avg}</b></span>
+                            <button onclick="auditDeleteQuestion(${q.qNumber})" title="Delete this question from the form (not saved until Save Quiz)" style="width:26px; height:26px; padding:0; border-radius:7px; border:none; background:rgba(239,68,68,0.12); color:#dc2626; cursor:pointer; font-size:0.82em; display:flex; align-items:center; justify-content:center;">🗑️</button>
+                        </div>
                     </div>
+                    ${previewHtml}
                     ${dimRows}
                     ${q.rationale ? `<div class="lang-no-toggle" style="margin-top:10px; padding:8px 12px; background:#f8fafc; border-left:3px solid #0891b2; border-radius:6px; font-size:0.85em; color:#334155; line-height:1.55;"><i class="fa-solid fa-message" style="color:#0891b2; margin-right:6px;"></i>${escapeHtml(q.rationale)}</div>` : ''}
                     ${Number(q.averageScore) < 4 ? `<div style="margin-top:10px; text-align:right;">
@@ -16788,6 +16811,81 @@ RULES:
             `;
             document.body.appendChild(modal);
         }
+
+        // V97.33: expand/collapse a card's "Preview" block (the actual question + options,
+        // looked up from the questions snapshot renderAuditScorecard was given).
+        window.toggleAuditPreview = function(qNumber) {
+            const block = document.getElementById('audit-preview-' + qNumber);
+            const btn = document.getElementById('audit-preview-btn-' + qNumber);
+            if (!block) return;
+            const show = block.style.display === 'none';
+            block.style.display = show ? 'block' : 'none';
+            if (btn) btn.innerHTML = show ? '<i class="fa-solid fa-eye-slash"></i> Hide' : '<i class="fa-solid fa-eye"></i> Preview';
+        };
+
+        // V97.33: delete a question straight from the Audit scorecard. The quiz editor
+        // has no per-question delete anywhere yet — this removes the .quiz-q-item from
+        // the DOM (nothing reaches Firestore until the admin clicks Save Quiz) and patches
+        // the already-fetched audit result in place: renumbers qNumbers after the deleted
+        // one, recomputes overallScore, and rebuilds the two lookup globals auditSuggestFix
+        // and "AI Trim" (Split modal) read — then re-renders this SAME scorecard so nothing
+        // goes stale, without paying for a fresh AI audit call.
+        window.auditDeleteQuestion = function(qNumber) {
+            const items = document.querySelectorAll('.quiz-q-item');
+            if (items.length <= 1) { alert('Cannot delete — a quiz needs at least 1 question.'); return; }
+
+            const full = window._lastAuditFull;
+            if (full && Array.isArray(full.questions) && full.questions.length !== items.length) {
+                alert('The form has changed since this audit ran, so question numbers may no longer line up. Close this scorecard and run Audit again before deleting.');
+                return;
+            }
+
+            const item = items[qNumber - 1];
+            if (!item) { showToast('Question not found in the form.'); return; }
+            const qTextEl = item.querySelector('.q-text');
+            const stem = qTextEl ? String(qTextEl.value || '').trim() : '';
+            const preview = stem ? (stem.length > 60 ? stem.slice(0, 60) + '…' : stem) : '(no text)';
+            if (!confirm(`Delete Q${qNumber}: "${preview}" from this form?\n\nNothing is saved until you click Save Quiz — you can still back out.`)) return;
+
+            item.remove();
+            if (typeof updateQuizPagination === 'function') updateQuizPagination();
+            if (typeof triggerAutoSave === 'function') triggerAutoSave();
+
+            const popup = document.getElementById('ai-audit-popup');
+            const scrollTop = popup ? popup.scrollTop : 0;
+
+            if (!full || !full.result || !Array.isArray(full.result.perQuestionAudit)) {
+                if (popup) popup.remove();
+                showToast(`🗑️ Q${qNumber} removed from form`);
+                return;
+            }
+
+            full.result.perQuestionAudit = full.result.perQuestionAudit
+                .filter(a => a.qNumber !== qNumber)
+                .map(a => a.qNumber > qNumber ? Object.assign({}, a, { qNumber: a.qNumber - 1 }) : a);
+            full.questions = full.questions.filter((_, i) => i !== qNumber - 1);
+            if (full.result.perQuestionAudit.length) {
+                const avgs = full.result.perQuestionAudit.map(a => Number(a.averageScore) || 0);
+                full.result.overallScore = Math.round((avgs.reduce((s, v) => s + v, 0) / avgs.length) * 10) / 10;
+            }
+
+            window._lastAuditByQ = {};
+            window._lastAuditScoresByQ = {};
+            full.result.perQuestionAudit.forEach(a => {
+                const scores = a.scores || {};
+                let weakestDim = null, weakestVal = 99;
+                Object.keys(scores).forEach(k => { const v = Number(scores[k]); if (!isNaN(v) && v < weakestVal) { weakestVal = v; weakestDim = k; } });
+                window._lastAuditByQ[a.qNumber] = { rationale: a.rationale || '', weakestDim, weakestVal: weakestVal === 99 ? null : weakestVal };
+                window._lastAuditScoresByQ[a.qNumber] = scores;
+            });
+
+            if (popup) popup.remove();
+            renderAuditScorecard(full.result, full.aiModel, full.aiTokens, full.blueprint, full.questions);
+            const newPopup = document.getElementById('ai-audit-popup');
+            if (newPopup) newPopup.scrollTop = scrollTop;
+
+            showToast(`🗑️ Q${qNumber} removed from form`);
+        };
 
         // V97.16: auditSuggestFix used to permanently destroy the Audit scorecard
         // (.remove()) with no way back — admins who fixed one question and closed
