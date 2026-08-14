@@ -2088,18 +2088,48 @@ exports.notifyQuizSubmitted = onCall(
 // notifyQuizDigest  (the default channel)
 // ------------------------------------------------------------
 // 20:00 Asia/Bangkok daily. One Flex per target:
-//   · "Done today" — every non-practice attempt submitted in the last
-//     24h, one line per intern (group copy omits the score).
+//   · "Done today" — non-practice attempts from the last 24h, folded to
+//     ONE line per intern (V97.51: was one line per attempt, so a person
+//     who did 2 quizzes appeared twice). Group copy omits the score.
 //   · "Not done yet" — for each ACTIVE quiz whose deadline is still in
 //     the future, the eligible interns with no attempt. Eligibility
 //     mirrors the intern app: `assignedUsers` when set, otherwise
-//     everyone whose `group` matches `targetGroup` (Public = everyone).
+//     everyone whose `group` matches `targetGroup` (Public = everyone) —
+//     BUT V97.51 narrows that pool to the active cohort first, see
+//     DIGEST_ACTIVE_DAYS. Sorted soonest-deadline-first; only quizzes due
+//     within DIGEST_URGENT_DAYS list names, the rest collapse to one line.
 // Both sections empty = no push at all (no daily noise, no quota burn).
 //
 // Region us-central1 like the rest of the codebase; the Firestore reads
 // cross regions (db is asia-southeast3), which only costs latency here.
 // ============================================================
 const DIGEST_MAX_ROWS = 12;
+
+// V97.51 (A): the "not done yet" denominator used to be EVERY doc in `users`,
+// because most quizzes are targetGroup:'Public' and eligibleForQuiz() returns
+// everyone for those. That swept in admin/test accounts, phone-number-named
+// throwaways and one-time visitors — reported as "/29" when the real cohort is
+// far smaller. `users/{uid}.lastSeen` is written on every intern LIFF open
+// (public/index.html), so it's an already-populated activity signal. A user with
+// no lastSeen at all is treated as inactive; the footer always prints how many
+// were hidden so the filter can never silently shrink the cohort unnoticed.
+const DIGEST_ACTIVE_DAYS = 30;
+// Excluded from the nag list on Public quizzes — they aren't the audience being
+// chased. Non-Public quizzes are already scoped by targetGroup.
+const DIGEST_EXCLUDE_GROUPS = ['staff', 'preceptor'];
+// (B) Only quizzes due within this many days get a full name list; everything
+// else collapses to one summary line so the message stays skimmable.
+const DIGEST_URGENT_DAYS = 3;
+
+// (C) LINE display names often carry a trailing decoration run ("ชัญญาญ์ญา ❤️❤️💠🍀🦋✨").
+// Strip it for the digest only — the stored profile is untouched. \u escapes on
+// purpose: a literal emoji/invisible char inside a regex literal has broken this
+// codebase before (V91.95 SyntaxError incident).
+const DIGEST_NAME_TAIL_RE = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{200D}\s]+$/u;
+function digestCleanName(raw) {
+    const cleaned = String(raw || '').replace(DIGEST_NAME_TAIL_RE, '').trim();
+    return cleaned || String(raw || '').trim();
+}
 
 exports.notifyQuizDigest = onSchedule({
     schedule: '0 20 * * *',
@@ -2119,20 +2149,38 @@ exports.notifyQuizDigest = onSchedule({
     const cutoff = admin.firestore.Timestamp.fromMillis(now.toMillis() - 24 * 60 * 60 * 1000);
 
     // --- users: name lookup + eligibility source ---
+    // V97.51 (A): `users` (all docs) still backs the name lookup, but only
+    // `activeUsers` feeds the "not done yet" denominator. Split deliberately —
+    // someone who submitted today must still render by name even if their
+    // lastSeen never got written.
     const userNames = new Map();
     const users = [];
+    let activeUsers = [];
     try {
+        const activeCutoffMs = now.toMillis() - DIGEST_ACTIVE_DAYS * 24 * 60 * 60 * 1000;
         const snap = await db.collection('users').get();
         snap.forEach(doc => {
             const u = doc.data() || {};
-            const name = (String(u.displayName || '').trim() || doc.id.slice(0, 8)).slice(0, 40);
+            const rawName = String(u.displayName || '').trim() || doc.id.slice(0, 8);
+            const name = digestCleanName(rawName).slice(0, 40);
             userNames.set(doc.id, name);
-            users.push({ id: doc.id, name: name, group: u.group || 'Public' });
+            const lastSeenMs = u.lastSeen && typeof u.lastSeen.toMillis === 'function'
+                ? u.lastSeen.toMillis()
+                : (u.lastSeen ? Date.parse(u.lastSeen) : NaN);
+            users.push({
+                id: doc.id,
+                name: name,
+                group: u.group || 'Public',
+                active: Number.isFinite(lastSeenMs) && lastSeenMs >= activeCutoffMs
+            });
         });
+        activeUsers = users.filter(u => u.active && !DIGEST_EXCLUDE_GROUPS.includes(u.group));
     } catch (err) {
         console.error('[notifyQuizDigest] users read failed:', err.message);
         return;
     }
+    const hiddenUserCount = users.length - activeUsers.length;
+    console.log(`[notifyQuizDigest] cohort: ${activeUsers.length} active / ${users.length} total (hidden ${hiddenUserCount}, window ${DIGEST_ACTIVE_DAYS}d)`);
 
     // --- section 1: submitted in the last 24h ---
     const doneRows = [];
@@ -2151,7 +2199,7 @@ exports.notifyQuizDigest = onSchedule({
             if (!quizTitleCache.has(quizId)) {
                 try {
                     const qDoc = await db.collection('quizzes').doc(quizId).get();
-                    quizTitleCache.set(quizId, qDoc.exists ? String((qDoc.data() || {}).title || 'Quiz').slice(0, 40) : 'Quiz');
+                    quizTitleCache.set(quizId, qDoc.exists ? String((qDoc.data() || {}).title || 'Quiz').slice(0, 60) : 'Quiz');
                 } catch (err) {
                     quizTitleCache.set(quizId, 'Quiz');
                 }
@@ -2169,6 +2217,24 @@ exports.notifyQuizDigest = onSchedule({
         return;
     }
 
+    // V97.51 (C): doneRows is one entry per ATTEMPT, so someone who finished two
+    // quizzes rendered as two near-identical lines under the same name. Fold to
+    // one entry per person, keeping their quizzes/scores for the detailed copy.
+    const donePeople = [];
+    {
+        const byName = new Map();
+        doneRows.forEach(r => {
+            if (!byName.has(r.name)) {
+                const entry = { name: r.name, quizzes: [], scores: [] };
+                byName.set(r.name, entry);
+                donePeople.push(entry);
+            }
+            const e = byName.get(r.name);
+            e.quizzes.push(r.quiz);
+            e.scores.push(r.score);
+        });
+    }
+
     // --- section 2: still pending on deadline-bound active quizzes ---
     const pendingBlocks = [];
     try {
@@ -2180,7 +2246,11 @@ exports.notifyQuizDigest = onSchedule({
                 : (q.deadline ? Date.parse(q.deadline) : NaN);
             if (!deadlineMs || isNaN(deadlineMs) || deadlineMs <= now.toMillis()) continue;
 
-            const eligible = eligibleForQuiz(q, users);
+            // V97.51 (A): active cohort only — see DIGEST_ACTIVE_DAYS. NOTE this
+            // narrows the digest's denominator ONLY; notifyQuizSubmitted's
+            // milestone "✅ N/N" still counts every user, so the two can disagree
+            // until that's deliberately reconciled.
+            const eligible = eligibleForQuiz(q, activeUsers);
             if (!eligible.length) continue;
 
             // Attempt ids are prefixed with the quiz id, so a documentId
@@ -2201,14 +2271,21 @@ exports.notifyQuizDigest = onSchedule({
 
             const missing = eligible.filter(u => !doneIds.has(u.id));
             if (!missing.length) continue;
+            // doneIds counts every submitter; intersect with the active cohort so
+            // "done/total" can't read like 9/6 once the denominator is narrowed.
+            const doneActive = eligible.filter(u => doneIds.has(u.id)).length;
             pendingBlocks.push({
-                quiz: String(q.title || 'Quiz').slice(0, 40),
+                quiz: String(q.title || 'Quiz').slice(0, 60),
+                deadlineMs: deadlineMs,
                 deadline: new Date(deadlineMs).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: 'short' }),
                 names: missing.map(u => u.name),
-                doneCount: doneIds.size,
+                doneCount: doneActive,
                 totalCount: eligible.length
             });
         }
+        // (B) Soonest deadline first — the old order was whatever Firestore
+        // returned, so a quiz due in 2 days could sit below one due in 5.
+        pendingBlocks.sort((a, b) => a.deadlineMs - b.deadlineMs);
     } catch (err) {
         // Non-fatal — still send the "done today" half.
         console.error('[notifyQuizDigest] pending scan failed:', err.message);
@@ -2219,22 +2296,36 @@ exports.notifyQuizDigest = onSchedule({
         return;
     }
 
+    // (B) Only the near-deadline quizzes get a full name list; the rest collapse
+    // to a single line. Previously all 8+ blocks rendered in full, so the nag
+    // list was ~80% of the message and the urgent items had no visual priority.
+    const urgentCutoffMs = now.toMillis() + DIGEST_URGENT_DAYS * 24 * 60 * 60 * 1000;
+    const urgentBlocks = pendingBlocks.filter(b => b.deadlineMs <= urgentCutoffMs);
+    const laterBlocks = pendingBlocks.filter(b => b.deadlineMs > urgentCutoffMs);
+
     const buildFlex = (target) => {
         const body = [];
-        body.push({ type: 'text', text: `✅ Done today · ${doneRows.length}`, size: 'xs', weight: 'bold', color: '#059669' });
-        if (doneRows.length) {
-            doneRows.slice(0, DIGEST_MAX_ROWS).forEach(r => {
-                const line = target.withScores ? `${r.name} · ${r.quiz} · ${r.score}` : `${r.name} · ${r.quiz}`;
+        body.push({ type: 'text', text: `✅ Done today · ${donePeople.length}`, size: 'xs', weight: 'bold', color: '#059669' });
+        if (donePeople.length) {
+            donePeople.slice(0, DIGEST_MAX_ROWS).forEach(p => {
+                let line;
+                if (p.quizzes.length === 1) {
+                    line = target.withScores ? `${p.name} · ${p.quizzes[0]} · ${p.scores[0]}` : `${p.name} · ${p.quizzes[0]}`;
+                } else {
+                    line = target.withScores
+                        ? `${p.name} · ${p.quizzes.length} ชุด · ${p.scores.join(', ')}`
+                        : `${p.name} · ${p.quizzes.length} ชุด`;
+                }
                 body.push({ type: 'text', text: line, size: 'sm', color: '#1f2937', wrap: true, margin: 'xs' });
             });
-            if (doneRows.length > DIGEST_MAX_ROWS) {
-                body.push({ type: 'text', text: `+${doneRows.length - DIGEST_MAX_ROWS} more`, size: 'xs', color: '#94a3b8', margin: 'xs' });
+            if (donePeople.length > DIGEST_MAX_ROWS) {
+                body.push({ type: 'text', text: `+${donePeople.length - DIGEST_MAX_ROWS} more`, size: 'xs', color: '#94a3b8', margin: 'xs' });
             }
         } else {
             body.push({ type: 'text', text: 'No submissions today', size: 'sm', color: '#94a3b8', margin: 'xs' });
         }
 
-        pendingBlocks.forEach(blk => {
+        urgentBlocks.forEach(blk => {
             body.push({ type: 'separator', margin: 'md' });
             body.push({ type: 'text', text: `⏳ ${blk.quiz} · due ${blk.deadline} · ${blk.doneCount}/${blk.totalCount}`, size: 'xs', weight: 'bold', color: '#b45309', margin: 'md', wrap: true });
             const shown = blk.names.slice(0, DIGEST_MAX_ROWS).join(', ');
@@ -2242,9 +2333,32 @@ exports.notifyQuizDigest = onSchedule({
             body.push({ type: 'text', text: `${shown}${overflow}`, size: 'sm', color: '#1f2937', wrap: true, margin: 'xs' });
         });
 
+        if (laterBlocks.length) {
+            const span = laterBlocks.length === 1
+                ? laterBlocks[0].deadline
+                : `${laterBlocks[0].deadline}-${laterBlocks[laterBlocks.length - 1].deadline}`;
+            body.push({ type: 'separator', margin: 'md' });
+            body.push({
+                type: 'text',
+                text: `📌 อีก ${laterBlocks.length} ชุด due ${span} · ดูในแอป`,
+                size: 'xs', color: '#64748b', margin: 'md', wrap: true
+            });
+        }
+
+        // Never let the active-cohort filter shrink things silently — if this
+        // number looks wrong, that's the signal to retune DIGEST_ACTIVE_DAYS.
+        if (hiddenUserCount > 0) {
+            body.push({ type: 'separator', margin: 'md' });
+            body.push({
+                type: 'text',
+                text: `นับเฉพาะผู้ใช้งานใน ${DIGEST_ACTIVE_DAYS} วัน · ${activeUsers.length}/${users.length} คน (ซ่อน ${hiddenUserCount})`,
+                size: 'xxs', color: '#94a3b8', margin: 'md', wrap: true
+            });
+        }
+
         return {
             type: 'flex',
-            altText: `📊 Quiz digest — ${doneRows.length} done today`.slice(0, 400),
+            altText: `📊 Quiz digest — ${donePeople.length} done today`.slice(0, 400),
             contents: {
                 type: 'bubble',
                 size: 'kilo',
@@ -2260,5 +2374,5 @@ exports.notifyQuizDigest = onSchedule({
         };
     };
 
-    await pushLineFlex('notifyQuizDigest', targets, buildFlex, `done=${doneRows.length}  pendingQuizzes=${pendingBlocks.length}`);
+    await pushLineFlex('notifyQuizDigest', targets, buildFlex, `donePeople=${donePeople.length} (attempts=${doneRows.length})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  cohort=${activeUsers.length}/${users.length}`);
 });
