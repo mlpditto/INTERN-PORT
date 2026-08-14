@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.40</title>
+    <title>Nika V97.41</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4234,6 +4234,8 @@
             };
             window.analyzeQuizAI = window.analyzeQuizAI || warnInit;
             window.viewSavedAiAnalysis = window.viewSavedAiAnalysis || warnInit;
+            window.auditQuizAI = window.auditQuizAI || warnInit;
+            window.viewSavedAiAudit = window.viewSavedAiAudit || warnInit;
             window.aiEnhanceCurrentQuestion = window.aiEnhanceCurrentQuestion || warnInit;
             window.autoTagQuizAI = window.autoTagQuizAI || warnInit;
             window.callUniversalAI = window.callUniversalAI || async function() { throw new Error("AI core not loaded yet."); };
@@ -12168,8 +12170,9 @@
                             <input type="hidden" id="ai-analyzer-model-val" value="gemini-3.6-flash">
                             <div style="display:flex; gap:4px;">
                                 <button class="btn-sm" onclick="analyzeQuizAI(this)" title="Analyze Quiz (rewrite suggestions)" style="background:#7c3aed; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-brain"></i> Specialist</button>
-                                <button class="btn-sm" onclick="viewSavedAiAnalysis(this)" title="Reopen the last saved analysis for this quiz — no tokens spent" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-clock-rotate-left"></i> Last</button>
+                                <button class="btn-sm" onclick="viewSavedAiAnalysis(this)" title="Reopen the last saved Specialist analysis for this quiz — no tokens spent" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; padding:0; width:32px; height:32px; border-radius:10px; font-weight:700; font-size:0.72em; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="fa-solid fa-clock-rotate-left"></i></button>
                                 <button class="btn-sm" onclick="auditQuizAI(this)" title="Quality Audit — 5-dim scorecard per question (V93.88 Q3)" style="background:#0891b2; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-clipboard-check"></i> Audit</button>
+                                <button class="btn-sm" onclick="viewSavedAiAudit(this)" title="Reopen the last saved Audit for this quiz — no tokens spent" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; padding:0; width:32px; height:32px; border-radius:10px; font-weight:700; font-size:0.72em; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="fa-solid fa-clock-rotate-left"></i></button>
                                 <button class="btn-sm" onclick="runFullReview(this)" title="Run Specialist + Audit together (parallel, faster than back-to-back clicks)" style="background:linear-gradient(135deg,#7c3aed,#0891b2); color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-layer-group"></i> Full Review</button>
                                 <button class="btn-sm" onclick="openPdfToQuizModal()" title="Import PDF" style="background:#0ea5e9; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                                 <button class="btn-sm" onclick="openSuggestMoreModal()" title="Expand" style="background:#f59e0b; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-sparkles"></i> Expand</button>
@@ -16493,6 +16496,10 @@
                                                         onclick="applySingleAiFix(${qIdx}, '${improvedJson}', ${arrIdx})" id="btn-fix-ai-${arrIdx}">
                                                         Fix
                                                     </button>
+                                                    <button class="btn-sm" style="background:rgba(239,68,68,0.12); color:#dc2626; border:none; padding:6px 10px; border-radius:8px; font-weight:bold; font-size:0.75em; cursor: pointer;"
+                                                        onclick="deleteAiImprovementQuestion(${qIdx}, ${arrIdx})" title="Delete this question from the form — for a word-for-word duplicate, deleting beats rewriting">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                    </button>
                                                 </div>
                                             </div>
                                             <div style="font-size:0.95em; color:#4a5568; margin-bottom:10px; line-height: 1.5;">
@@ -16643,7 +16650,7 @@
             const quizId = (document.getElementById('edit-quiz-id') || {}).value || null;
             if (!quizId) { showToast('Save this quiz first — nothing to load yet.'); return; }
 
-            if (btn) { btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Loading`; btn.disabled = true; }
+            if (btn) { btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`; btn.disabled = true; }
             let saved = null;
             try {
                 const snap = await db.collection('quizzes').doc(quizId).get();
@@ -16669,11 +16676,77 @@
             });
         };
 
+        // V97.41: 🗑️ on an "Individual Improvement" card — for a word-for-word duplicate
+        // (the exact case this was built for), deleting beats rewriting. Mirrors
+        // auditDeleteQuestion's approach (remove from DOM, nothing hits Firestore until Save
+        // Quiz, guard rails against a stale form) but re-renders through analyzeQuizAI's
+        // cachedResult path (V97.39) instead of a bespoke re-render — no AI call needed.
+        window.deleteAiImprovementQuestion = function(qIdx, arrIdx) {
+            const items = window._aiAnalysisItems || [];
+            const item = items[arrIdx];
+            if (!item) { showToast('Item not found.'); return; }
+
+            const formItems = document.querySelectorAll('.quiz-q-item');
+            if (formItems.length <= 1) { alert('Cannot delete — a quiz needs at least 1 question.'); return; }
+
+            // Stale-form guard: the analysis was run against a snapshot of N questions
+            // (window._aiOriginalQsJson) — if the form's count has since changed, qIdx
+            // values can't be trusted to line up. Same rule auditDeleteQuestion uses.
+            let snapshotLen = null;
+            try { snapshotLen = JSON.parse(window._aiOriginalQsJson || '[]').length; } catch (e) { /* ignore */ }
+            if (snapshotLen !== null && snapshotLen !== formItems.length) {
+                alert('The form has changed since this analysis ran, so question numbers may no longer line up. Close this popup and run 🪄 Specialist again before deleting.');
+                return;
+            }
+
+            const domItem = formItems[qIdx];
+            if (!domItem) { showToast('Question not found in the form.'); return; }
+            const qTextEl = domItem.querySelector('.q-text');
+            const stem = qTextEl ? String(qTextEl.value || '').trim() : '';
+            const preview = stem ? (stem.length > 60 ? stem.slice(0, 60) + '…' : stem) : '(no text)';
+            if (!confirm(`Delete Q${qIdx + 1}: "${preview}" from this form?\n\nNothing is saved until you click Save Quiz — you can still back out.`)) return;
+
+            domItem.remove();
+            if (typeof updateQuizPagination === 'function') updateQuizPagination();
+            if (typeof triggerAutoSave === 'function') triggerAutoSave();
+
+            // Drop the deleted item, renumber every OTHER item that pointed past it so
+            // qIdx keeps lining up with the now-shifted question list.
+            const patched = items
+                .filter((it, i) => i !== arrIdx)
+                .map(it => {
+                    const clone = Object.assign({}, it);
+                    if (clone.qNumber !== undefined && clone.qNumber - 1 > qIdx) clone.qNumber -= 1;
+                    else if (clone.index !== undefined && clone.index > qIdx) clone.index -= 1;
+                    return clone;
+                });
+            window._aiAnalysisItems = patched;
+            window._aiOriginalQsJson = JSON.stringify(getQuizFormData().questions);
+
+            // Keep the Firestore record in sync so 🕑 Last doesn't resurrect the deleted
+            // question next time it's opened. Patches just the items sub-field.
+            const quizId = (document.getElementById('edit-quiz-id') || {}).value || null;
+            if (quizId) {
+                db.collection('quizzes').doc(quizId).update({ 'lastAiAnalysis.items': patched })
+                    .catch(e => console.warn('Failed to sync AI analysis after delete:', e));
+            }
+
+            const popup = document.getElementById('ai-analysis-popup');
+            if (popup) popup.remove();
+            showToast(`🗑️ Q${qIdx + 1} removed from form`);
+
+            analyzeQuizAI(null, {
+                cachedResult: { analysisText: window._aiAnalysisText, items: patched, suggestedTitles: window._aiAnalysisSuggestedTitles },
+                cachedModel: window._aiAnalysisModel,
+                cachedTokens: 0
+            });
+        };
+
         // V93.88 Quiz Quality Q3: 5-dimension scorecard audit. Sibling to analyzeQuizAI ("Specialist")
         // but conceptually different — Specialist proposes rewrites, Audit judges each question on a
         // fixed rubric and surfaces raw scores so admin can prioritise fixes. 1-pass for now;
         // self-confirmation bias monitored, 2nd critic pass deferred.
-        window.auditQuizAI = async function(clickedBtn) {
+        window.auditQuizAI = async function(clickedBtn, opts = {}) {
             const oldModal = document.getElementById('ai-audit-popup');
             if (oldModal) oldModal.remove();
 
@@ -16689,23 +16762,9 @@
             let auditProgressTimer = null;
 
             const bp = formData.blueprint || {};
-            const bpLines = [];
-            if (bp.difficulty) bpLines.push(`- intended difficulty: ${bp.difficulty}/5`);
-            if (bp.bloomLevel) bpLines.push(`- intended Bloom level: ${bp.bloomLevel}`);
-            if (bp.learningObjective) bpLines.push(`- learning objective: ${bp.learningObjective}`);
-            const blueprintBlock = bpLines.length
-                ? `\n\nBLUEPRINT CONTEXT (admin's stated intent — judge each Q against this):\n${bpLines.join('\n')}\n`
-                : '\n\nNote: no blueprint set — judge each Q on absolute merit; for "bloomLevel" use detected demand only.\n';
-
-            const qList = formData.questions.map((q, i) => {
-                const opts = (q.options || []).map((o, oi) => `    ${String.fromCharCode(65 + oi)}. ${o}`).join('\n');
-                const correctIdx = Array.isArray(q.correct) ? q.correct : [q.correct];
-                const correctLabels = correctIdx.map(c => String.fromCharCode(65 + c)).join(',');
-                return `Q${i + 1} (${q.type}): ${q.q}\n${opts}\n  correct: ${correctLabels}`;
-            }).join('\n\n');
 
             try {
-                if (btn) {
+                if (btn && !(opts && opts.cachedResult)) {
                     let pct = 0;
                     btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Auditing 0%`;
                     btn.disabled = true;
@@ -16715,7 +16774,33 @@
                     }, 350);
                 }
 
-                const prompt = `You are a Quality Auditor for medical-education multiple-choice questions.
+                const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-3.6-flash';
+                let resultRaw = '', aiTokens = 0, aiModel = '', result = null;
+
+                // V97.41: "🕑" next to Audit reopens a previously-saved audit (Firestore
+                // quizzes/{id}.lastAiAudit) through this SAME render path, zero tokens spent —
+                // mirrors the cachedResult branch analyzeQuizAI got in V97.39.
+                if (opts && opts.cachedResult) {
+                    result = opts.cachedResult;
+                    aiModel = opts.cachedModel || 'saved';
+                    aiTokens = opts.cachedTokens || 0;
+                } else {
+                    const bpLines = [];
+                    if (bp.difficulty) bpLines.push(`- intended difficulty: ${bp.difficulty}/5`);
+                    if (bp.bloomLevel) bpLines.push(`- intended Bloom level: ${bp.bloomLevel}`);
+                    if (bp.learningObjective) bpLines.push(`- learning objective: ${bp.learningObjective}`);
+                    const blueprintBlock = bpLines.length
+                        ? `\n\nBLUEPRINT CONTEXT (admin's stated intent — judge each Q against this):\n${bpLines.join('\n')}\n`
+                        : '\n\nNote: no blueprint set — judge each Q on absolute merit; for "bloomLevel" use detected demand only.\n';
+
+                    const qList = formData.questions.map((q, i) => {
+                        const optsList = (q.options || []).map((o, oi) => `    ${String.fromCharCode(65 + oi)}. ${o}`).join('\n');
+                        const correctIdx = Array.isArray(q.correct) ? q.correct : [q.correct];
+                        const correctLabels = correctIdx.map(c => String.fromCharCode(65 + c)).join(',');
+                        return `Q${i + 1} (${q.type}): ${q.q}\n${optsList}\n  correct: ${correctLabels}`;
+                    }).join('\n\n');
+
+                    const prompt = `You are a Quality Auditor for medical-education multiple-choice questions.
 
 RUBRIC — score each question on 5 dimensions, INTEGER 1-5 (1 = poor, 5 = excellent):
   1. clarity             — Is the stem unambiguous, well-worded, free of double-barrel?
@@ -16753,22 +16838,20 @@ RULES:
 - "detectedBloomName" is one of: Remember, Understand, Apply, Analyze, Evaluate, Create (descriptive label of the bloomLevel score).
 - Return one entry per question in input order. Do NOT skip any.`;
 
-                const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-3.6-flash';
-
-                let resultRaw = '', aiTokens = 0, aiModel = '', result = null;
-                for (let attempt = 1; attempt <= 2; attempt++) {
-                    // V95.16: same truncation guard as analyze — a full-quiz audit
-                    // (per-question scorecard) can overrun the 8192 default and truncate.
-                    const aiResp = await callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'quiz_audit' });
-                    resultRaw = aiResp.text;
-                    aiTokens = aiResp.tokens;
-                    aiModel = aiResp.model;
-                    result = safeJsonParse(resultRaw);
-                    if (result) break;
-                    if (attempt === 1) console.warn('[auditQuizAI] attempt 1 non-JSON, retrying. Snippet:', String(resultRaw || '').slice(0, 200));
-                }
-                if (!result || !Array.isArray(result.perQuestionAudit)) {
-                    throw new Error('AI returned invalid JSON after 2 attempts. First 300 chars:\n\n' + String(resultRaw || '').slice(0, 300));
+                    for (let attempt = 1; attempt <= 2; attempt++) {
+                        // V95.16: same truncation guard as analyze — a full-quiz audit
+                        // (per-question scorecard) can overrun the 8192 default and truncate.
+                        const aiResp = await callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'quiz_audit' });
+                        resultRaw = aiResp.text;
+                        aiTokens = aiResp.tokens;
+                        aiModel = aiResp.model;
+                        result = safeJsonParse(resultRaw);
+                        if (result) break;
+                        if (attempt === 1) console.warn('[auditQuizAI] attempt 1 non-JSON, retrying. Snippet:', String(resultRaw || '').slice(0, 200));
+                    }
+                    if (!result || !Array.isArray(result.perQuestionAudit)) {
+                        throw new Error('AI returned invalid JSON after 2 attempts. First 300 chars:\n\n' + String(resultRaw || '').slice(0, 300));
+                    }
                 }
 
                 // V96.49 Phase 2-full: stash per-Q findings (Thai rationale + weakest
@@ -16794,7 +16877,24 @@ RULES:
                 // SAME scorecard in place after a delete, instead of re-running the audit.
                 window._lastAuditFull = { result, aiModel, aiTokens, blueprint: bp, questions: formData.questions };
 
-                renderAuditScorecard(result, aiModel, aiTokens, bp, formData.questions);
+                // V97.41: auto-save so 🕑 next to Audit can reopen this later at zero token
+                // cost — mirrors analyzeQuizAI's lastAiAnalysis save. Skipped for a cachedResult
+                // replay (nothing new to save) or an unsaved quiz (no doc to attach it to).
+                if (!(opts && opts.cachedResult)) {
+                    const _quizIdForSave = (document.getElementById('edit-quiz-id') || {}).value || null;
+                    if (_quizIdForSave) {
+                        db.collection('quizzes').doc(_quizIdForSave).update({
+                            lastAiAudit: {
+                                result,
+                                model: aiModel || selectedModel || null,
+                                tokens: aiTokens || 0,
+                                savedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            }
+                        }).catch(e => console.warn('Failed to save AI audit to quiz doc:', e));
+                    }
+                }
+
+                renderAuditScorecard(result, aiModel, aiTokens, bp, formData.questions, (opts && opts.cachedSavedAtLabel) || null);
 
             } catch (e) {
                 console.error('Audit error:', e);
@@ -16803,6 +16903,41 @@ RULES:
                 if (auditProgressTimer) clearInterval(auditProgressTimer); // V96.45: stop the progress ticker
                 if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
             }
+        };
+
+        // V97.41: "🕑" next to Audit — reopen the audit saved on this quiz's own doc
+        // (quizzes/{id}.lastAiAudit) through the SAME render path as a live run, at zero
+        // token cost. Mirrors viewSavedAiAnalysis (V97.39).
+        window.viewSavedAiAudit = async function(clickedBtn) {
+            const btn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
+            const oldHtml = btn ? btn.innerHTML : null;
+            const quizId = (document.getElementById('edit-quiz-id') || {}).value || null;
+            if (!quizId) { showToast('Save this quiz first — nothing to load yet.'); return; }
+
+            if (btn) { btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`; btn.disabled = true; }
+            let saved = null;
+            try {
+                const snap = await db.collection('quizzes').doc(quizId).get();
+                saved = snap.exists ? (snap.data() || {}).lastAiAudit : null;
+            } catch (e) {
+                console.error('Failed to load saved AI audit:', e);
+                showToast('Could not load saved audit.', 'error');
+                return;
+            } finally {
+                if (btn) { btn.innerHTML = oldHtml; btn.disabled = false; }
+            }
+            if (!saved) { showToast('No saved audit for this quiz yet — run ✅ Audit first.'); return; }
+
+            let savedAtLabel = '';
+            if (saved.savedAt && typeof saved.savedAt.toDate === 'function') {
+                savedAtLabel = saved.savedAt.toDate().toLocaleString();
+            }
+            auditQuizAI(null, {
+                cachedResult: saved.result,
+                cachedModel: saved.model,
+                cachedTokens: saved.tokens,
+                cachedSavedAtLabel: savedAtLabel
+            });
         };
 
         // V97.31: "Full Review" — run Specialist (analyzeQuizAI) + Audit (auditQuizAI) in
@@ -16840,7 +16975,7 @@ RULES:
             }
         };
 
-        function renderAuditScorecard(result, aiModel, aiTokens, blueprint, questions) {
+        function renderAuditScorecard(result, aiModel, aiTokens, blueprint, questions, savedAtLabel) {
             const blueprintBloom = (blueprint && blueprint.bloomLevel) || null;
             const stars = (n) => {
                 const v = Math.max(0, Math.min(5, Math.round(n)));
@@ -16914,11 +17049,20 @@ RULES:
             modal.id = 'ai-audit-popup';
             modal.className = 'lang-no-toggle';
             modal.style = 'position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:92%; max-width:780px; max-height:85vh; background:white; padding:26px; border-radius:24px; box-shadow:0 20px 60px rgba(0,0,0,0.3); z-index:10001; overflow-y:auto; font-family:Inter, sans-serif;';
+            // V97.41: banner when this render came from a saved audit instead of a fresh
+            // AI call — mirrors analyzeQuizAI's savedBannerHtml (V97.39).
+            const savedBannerHtml = savedAtLabel !== null && savedAtLabel !== undefined ? `
+                <div style="background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; padding:10px 16px; border-radius:12px; margin-bottom:16px; font-size:0.85em; display:flex; align-items:center; gap:8px;">
+                    <i class="fa-solid fa-clock-rotate-left"></i> Showing a saved audit${savedAtLabel ? ` from ${savedAtLabel}` : ''} — no tokens spent. Click ✅ Audit for a fresh run.
+                </div>
+            ` : '';
+
             modal.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f1f5f9; padding-bottom:14px; margin-bottom:18px;">
                     <h2 style="margin:0; color:#0891b2; font-size:1.4em;"><i class="fa-solid fa-clipboard-check"></i> Quality Audit</h2>
                     <button onclick="document.getElementById('ai-audit-popup').remove()" style="border:none; background:#f1f5f9; color:#64748b; width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:1.1em;">✕</button>
                 </div>
+                ${savedBannerHtml}
                 <div style="background:${overallBg}; padding:18px; border-radius:14px; margin-bottom:18px; text-align:center;">
                     <div style="font-size:0.75em; color:${overallColor}; font-weight:800; letter-spacing:0.8px; text-transform:uppercase; margin-bottom:6px;">Overall Quality</div>
                     <div style="font-size:1.6em; color:${overallColor}; font-weight:900;">${stars(result.overallScore)} ${overall} / 5</div>
