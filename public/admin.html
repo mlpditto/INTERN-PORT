@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.41</title>
+    <title>Nika V97.42</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16894,7 +16894,11 @@ RULES:
                     }
                 }
 
-                renderAuditScorecard(result, aiModel, aiTokens, bp, formData.questions, (opts && opts.cachedSavedAtLabel) || null);
+                // V97.42: computed fresh from the CURRENT form regardless of cachedResult —
+                // duplication depends on the live question set, not on whether the audit
+                // scores themselves were just generated or reopened from a saved run.
+                const dupMap = window.computeQuizSetDuplicatesAll(formData.questions);
+                renderAuditScorecard(result, aiModel, aiTokens, bp, formData.questions, (opts && opts.cachedSavedAtLabel) || null, dupMap);
 
             } catch (e) {
                 console.error('Audit error:', e);
@@ -16975,7 +16979,7 @@ RULES:
             }
         };
 
-        function renderAuditScorecard(result, aiModel, aiTokens, blueprint, questions, savedAtLabel) {
+        function renderAuditScorecard(result, aiModel, aiTokens, blueprint, questions, savedAtLabel, dupMap) {
             const blueprintBloom = (blueprint && blueprint.bloomLevel) || null;
             const stars = (n) => {
                 const v = Math.max(0, Math.min(5, Math.round(n)));
@@ -17024,6 +17028,15 @@ RULES:
                         ${(question.options || []).map((opt, i) => `<div style="display:flex; gap:8px; align-items:flex-start; padding:3px 0; ${correctIdx.includes(i) ? 'color:#15803d; font-weight:700;' : 'color:#475569;'}"><span>${correctIdx.includes(i) ? '✅' : '◯'}</span><span>${escapeHtml(opt)}</span></div>`).join('')}
                     </div>` : '';
 
+                // V97.42: free n-gram dup check (see computeQuizSetDuplicatesAll) — flags
+                // this question if it overlaps another one in the SAME set. Audit judges
+                // each question in isolation otherwise, so this was previously invisible
+                // here even though the sibling Compare modal already surfaces it.
+                const dupHits = dupMap ? (dupMap.get(q.qNumber - 1) || []) : [];
+                const dupChipsHtml = dupHits.length
+                    ? `<div style="margin-bottom:10px; display:flex; flex-wrap:wrap; gap:6px;">${window._auditDupChipsHtml(dupHits)}</div>`
+                    : '';
+
                 return `<div style="background:#fcfdff; border:1.5px solid #e2e8f0; border-radius:14px; padding:14px; margin-bottom:10px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding:6px 10px; background:${headerBg}; border-radius:8px;">
                         <div style="display:flex; align-items:center; gap:8px;">
@@ -17036,6 +17049,7 @@ RULES:
                             <button onclick="auditDeleteQuestion(${q.qNumber})" title="Delete this question from the form (not saved until Save Quiz)" style="width:26px; height:26px; padding:0; border-radius:7px; border:none; background:rgba(239,68,68,0.12); color:#dc2626; cursor:pointer; font-size:0.82em; display:flex; align-items:center; justify-content:center;">🗑️</button>
                         </div>
                     </div>
+                    ${dupChipsHtml}
                     ${previewHtml}
                     ${dimRows}
                     ${q.rationale ? `<div class="lang-no-toggle" style="margin-top:10px; padding:8px 12px; background:#f8fafc; border-left:3px solid #0891b2; border-radius:6px; font-size:0.85em; color:#334155; line-height:1.55;"><i class="fa-solid fa-message" style="color:#0891b2; margin-right:6px;"></i>${escapeHtml(q.rationale)}</div>` : ''}
@@ -17145,7 +17159,7 @@ RULES:
             });
 
             if (popup) popup.remove();
-            renderAuditScorecard(full.result, full.aiModel, full.aiTokens, full.blueprint, full.questions);
+            renderAuditScorecard(full.result, full.aiModel, full.aiTokens, full.blueprint, full.questions, null, window.computeQuizSetDuplicatesAll(full.questions));
             const newPopup = document.getElementById('ai-audit-popup');
             if (newPopup) newPopup.scrollTop = scrollTop;
 
@@ -52815,6 +52829,38 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
                 const pendingTag = h.pending ? ' · เทียบกับฉบับ AI เสนอ' : '';
                 const tip = `ฉบับ ${sideTag} ใกล้เคียง Q${h.qIndex + 1}${h.pending ? ' (ฉบับที่ AI เสนอ ยังไม่ apply — ไม่ใช่ฉบับเดิมที่บันทึกไว้)' : ''}:\n${h.text.slice(0, 240)}`;
                 return `<span title="${escapeHtml(tip)}" style="background:${strong ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.12)'}; color:${strong ? '#b91c1c' : '#92400e'}; padding:4px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid ${strong ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.30)'}; cursor:help;">⚠️ ซ้ำ Q${h.qIndex + 1} · ${pct}% · ${escapeHtml(sideTag)}${pendingTag}</span>`;
+            }).join('');
+        };
+
+        // V97.42: same free n-gram engine, but for the Quality Audit scorecard — plain
+        // ORIGINAL-vs-ORIGINAL across the CURRENT saved question set (no "pending AI
+        // rewrite" substitution like buildQuizSetPeerPool does; Audit judges the quiz as it
+        // stands right now, not a compare-flow). Runs automatically alongside every audit
+        // (fresh or 🕑 cached), zero tokens — pure local computation.
+        window.computeQuizSetDuplicatesAll = function(questions) {
+            const texts = (questions || []).map(q => quizCompareStripMd((q && q.q) || ''));
+            const byIdx = new Map();
+            for (let i = 0; i < texts.length; i++) {
+                if (!texts[i]) continue;
+                for (let j = i + 1; j < texts.length; j++) {
+                    if (!texts[j]) continue;
+                    const score = quizCompareSimilarity(texts[i], texts[j]);
+                    if (score < QUIZ_SET_DUP_THRESHOLD) continue;
+                    if (!byIdx.has(i)) byIdx.set(i, []);
+                    if (!byIdx.has(j)) byIdx.set(j, []);
+                    byIdx.get(i).push({ qIndex: j, score });
+                    byIdx.get(j).push({ qIndex: i, score });
+                }
+            }
+            byIdx.forEach(list => list.sort((a, b) => b.score - a.score));
+            return byIdx;
+        };
+
+        window._auditDupChipsHtml = function(hits) {
+            return (hits || []).slice(0, 3).map(h => {
+                const pct = Math.round(h.score * 100);
+                const strong = h.score >= QUIZ_SET_DUP_STRONG;
+                return `<span title="ใกล้เคียง Q${h.qIndex + 1} · ${pct}%" style="background:${strong ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.12)'}; color:${strong ? '#b91c1c' : '#92400e'}; padding:2px 10px; border-radius:20px; font-size:0.7em; font-weight:800; border:1px solid ${strong ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.30)'}; cursor:help;">⚠️ ซ้ำ Q${h.qIndex + 1} · ${pct}%</span>`;
             }).join('');
         };
 
