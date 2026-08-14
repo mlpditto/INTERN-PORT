@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.38</title>
+    <title>Nika V97.39</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4233,6 +4233,7 @@
                 if (typeof showToast === 'function') showToast("⏳ AI engine still initializing. Please wait 1-2 seconds."); 
             };
             window.analyzeQuizAI = window.analyzeQuizAI || warnInit;
+            window.viewSavedAiAnalysis = window.viewSavedAiAnalysis || warnInit;
             window.aiEnhanceCurrentQuestion = window.aiEnhanceCurrentQuestion || warnInit;
             window.autoTagQuizAI = window.autoTagQuizAI || warnInit;
             window.callUniversalAI = window.callUniversalAI || async function() { throw new Error("AI core not loaded yet."); };
@@ -12167,6 +12168,7 @@
                             <input type="hidden" id="ai-analyzer-model-val" value="gemini-3.6-flash">
                             <div style="display:flex; gap:4px;">
                                 <button class="btn-sm" onclick="analyzeQuizAI(this)" title="Analyze Quiz (rewrite suggestions)" style="background:#7c3aed; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-brain"></i> Specialist</button>
+                                <button class="btn-sm" onclick="viewSavedAiAnalysis(this)" title="Reopen the last saved analysis for this quiz — no tokens spent" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-clock-rotate-left"></i> Last</button>
                                 <button class="btn-sm" onclick="auditQuizAI(this)" title="Quality Audit — 5-dim scorecard per question (V93.88 Q3)" style="background:#0891b2; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-clipboard-check"></i> Audit</button>
                                 <button class="btn-sm" onclick="runFullReview(this)" title="Run Specialist + Audit together (parallel, faster than back-to-back clicks)" style="background:linear-gradient(135deg,#7c3aed,#0891b2); color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-layer-group"></i> Full Review</button>
                                 <button class="btn-sm" onclick="openPdfToQuizModal()" title="Import PDF" style="background:#0ea5e9; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-file-pdf"></i> PDF</button>
@@ -16339,65 +16341,74 @@
                     }, 350);
                 }
                 
-                const prompt = buildQuizAnalyzePrompt(promptQuestions, formData.tags, (opts && opts.auditNote) || null);
-                
                 const selectedModel = document.getElementById('ai-analyzer-model-val').value || 'gemini-3.6-flash';
-
-                // V93.42: auto-retry once if the AI returns non-JSON. GPT/Claude/Gemini
-                // occasionally wrap output in prose ("Here is the JSON:") or markdown
-                // notes despite the "MANDATORY JSON" instruction — a single fresh
-                // sample usually resolves it. On second failure, surface the first
-                // 300 chars of the raw response in the error so admin can see what
-                // the model actually returned instead of a generic "try again" hint.
-                // Matches the diagnostic pattern used by sibling AI calls at
-                // admin.html:12777, 12932, 13014, 14542, 20161, 36003.
                 let resultRaw = '', aiTokens = 0, aiModel = '', result = null;
-                for (let attempt = 1; attempt <= 2; attempt++) {
-                    // V95.16: a full-quiz analysis (titles + per-question rewrites in Thai)
-                    // can exceed the proxy's default 8192-token cap and truncate mid-JSON,
-                    // surfacing as a false "prose instead of JSON" banner. Request a larger
-                    // output budget (proxy caps it server-side).
-                    const aiResp = await withTimeout(callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'quiz_analyzer' }), 120000);
-                    resultRaw = aiResp.text;
-                    aiTokens = aiResp.tokens;
-                    aiModel = aiResp.model;
-                    result = safeJsonParse(resultRaw);
-                    if (result) break;
-                    if (attempt === 1) {
-                        console.warn('[analyzeQuizAI] attempt 1 returned non-JSON, retrying. Snippet:', String(resultRaw || '').slice(0, 200));
+
+                // V97.39: "🕑 Last" reopens a previously-saved analysis (Firestore
+                // quizzes/{id}.lastAiAnalysis) through this SAME render path, at zero
+                // token cost, instead of duplicating the whole rendering block below.
+                if (opts && opts.cachedResult) {
+                    result = opts.cachedResult;
+                    aiModel = opts.cachedModel || 'saved';
+                    aiTokens = opts.cachedTokens || 0;
+                } else {
+                    const prompt = buildQuizAnalyzePrompt(promptQuestions, formData.tags, (opts && opts.auditNote) || null);
+
+                    // V93.42: auto-retry once if the AI returns non-JSON. GPT/Claude/Gemini
+                    // occasionally wrap output in prose ("Here is the JSON:") or markdown
+                    // notes despite the "MANDATORY JSON" instruction — a single fresh
+                    // sample usually resolves it. On second failure, surface the first
+                    // 300 chars of the raw response in the error so admin can see what
+                    // the model actually returned instead of a generic "try again" hint.
+                    // Matches the diagnostic pattern used by sibling AI calls at
+                    // admin.html:12777, 12932, 13014, 14542, 20161, 36003.
+                    for (let attempt = 1; attempt <= 2; attempt++) {
+                        // V95.16: a full-quiz analysis (titles + per-question rewrites in Thai)
+                        // can exceed the proxy's default 8192-token cap and truncate mid-JSON,
+                        // surfacing as a false "prose instead of JSON" banner. Request a larger
+                        // output budget (proxy caps it server-side).
+                        const aiResp = await withTimeout(callUniversalAI(selectedModel, prompt, true, null, '', { maxOutputTokens: 32768, feature: 'quiz_analyzer' }), 120000);
+                        resultRaw = aiResp.text;
+                        aiTokens = aiResp.tokens;
+                        aiModel = aiResp.model;
+                        result = safeJsonParse(resultRaw);
+                        if (result) break;
+                        if (attempt === 1) {
+                            console.warn('[analyzeQuizAI] attempt 1 returned non-JSON, retrying. Snippet:', String(resultRaw || '').slice(0, 200));
+                        }
                     }
-                }
-                if (!result) {
-                    // V93.93: graceful prose fallback. When the model ignores the JSON
-                    // contract entirely (essay mode, no `{...}` anywhere), don't lose
-                    // the admin's work — render the prose in the same modal shell with
-                    // a warning banner + Retry button. Beats alert-and-die per
-                    // feedback_hotfix_first_pattern.md.
-                    console.error('JSON Parse Error (after 2 attempts):', resultRaw);
-                    const fallbackDiv = document.createElement('div');
-                    fallbackDiv.id = "ai-analysis-popup";
-                    fallbackDiv.className = "lang-no-toggle";
-                    fallbackDiv.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:850px; max-height:85vh; background:white; padding:30px; border-radius:30px; box-shadow:0 20px 60px rgba(0,0,0,0.3); z-index:10001; overflow-y:auto; font-family:'Inter', sans-serif; border: 1px solid #eee;";
-                    fallbackDiv.innerHTML = `
-                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f8f9fa; padding-bottom:15px; margin-bottom:15px;">
-                            <h2 style="margin:0; color:var(--primary); font-size:1.5em;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Quiz Analysis</h2>
-                            <button onclick="this.parentElement.parentElement.remove(); restoreAuditPopupIfHidden();" style="border:none; background:#f8f9fa; color:#666; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">✕</button>
-                        </div>
-                        <div style="background:#fef3c7; border:1px solid #fcd34d; color:#92400e; padding:14px 18px; border-radius:14px; margin-bottom:18px; font-size:0.95em; line-height:1.5;">
-                            <b><i class="fa-solid fa-triangle-exclamation"></i> Model returned prose instead of JSON.</b><br>
-                            The per-question Fix / Compare actions are unavailable, but the model's narrative analysis is shown below. Try <b>Analyze</b> again, or switch to a different model (Flash / Pro usually return strict JSON).
-                        </div>
-                        <div style="white-space:pre-wrap; line-height:1.8; color:#333; font-size:1em; margin-bottom:20px; background:#fafafa; padding:20px; border-radius:20px; border:1px solid #f0f0f0;">${escapeHtml(String(resultRaw || ''))}</div>
-                        <div style="text-align:right; display:flex; gap:10px; justify-content:flex-end;">
-                            <button class="btn-sm" style="background:#4361ee; color:white; border:none; padding:8px 22px; border-radius:10px; font-weight:600; cursor:pointer;" onclick="this.parentElement.parentElement.remove(); analyzeQuizAI();"><i class="fa-solid fa-arrows-rotate"></i> Retry</button>
-                            <button class="btn-sm btn-dark" onclick="this.parentElement.parentElement.remove(); restoreAuditPopupIfHidden();" style="padding:8px 25px; border-radius:10px;">Close</button>
-                        </div>
-                        <div style="margin-top:20px; padding-top:15px; border-top:1px solid #eee; font-size:0.7em; color:#999;">
-                            🚀 Model: <b>${escapeHtml(aiModel || selectedModel || 'unknown')}</b> | 💡 Tokens: <b>${(aiTokens || 0).toLocaleString()}</b> | Mode: prose-fallback
-                        </div>
-                    `;
-                    document.body.appendChild(fallbackDiv);
-                    return;
+                    if (!result) {
+                        // V93.93: graceful prose fallback. When the model ignores the JSON
+                        // contract entirely (essay mode, no `{...}` anywhere), don't lose
+                        // the admin's work — render the prose in the same modal shell with
+                        // a warning banner + Retry button. Beats alert-and-die per
+                        // feedback_hotfix_first_pattern.md.
+                        console.error('JSON Parse Error (after 2 attempts):', resultRaw);
+                        const fallbackDiv = document.createElement('div');
+                        fallbackDiv.id = "ai-analysis-popup";
+                        fallbackDiv.className = "lang-no-toggle";
+                        fallbackDiv.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:850px; max-height:85vh; background:white; padding:30px; border-radius:30px; box-shadow:0 20px 60px rgba(0,0,0,0.3); z-index:10001; overflow-y:auto; font-family:'Inter', sans-serif; border: 1px solid #eee;";
+                        fallbackDiv.innerHTML = `
+                            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f8f9fa; padding-bottom:15px; margin-bottom:15px;">
+                                <h2 style="margin:0; color:var(--primary); font-size:1.5em;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Quiz Analysis</h2>
+                                <button onclick="this.parentElement.parentElement.remove(); restoreAuditPopupIfHidden();" style="border:none; background:#f8f9fa; color:#666; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">✕</button>
+                            </div>
+                            <div style="background:#fef3c7; border:1px solid #fcd34d; color:#92400e; padding:14px 18px; border-radius:14px; margin-bottom:18px; font-size:0.95em; line-height:1.5;">
+                                <b><i class="fa-solid fa-triangle-exclamation"></i> Model returned prose instead of JSON.</b><br>
+                                The per-question Fix / Compare actions are unavailable, but the model's narrative analysis is shown below. Try <b>Analyze</b> again, or switch to a different model (Flash / Pro usually return strict JSON).
+                            </div>
+                            <div style="white-space:pre-wrap; line-height:1.8; color:#333; font-size:1em; margin-bottom:20px; background:#fafafa; padding:20px; border-radius:20px; border:1px solid #f0f0f0;">${escapeHtml(String(resultRaw || ''))}</div>
+                            <div style="text-align:right; display:flex; gap:10px; justify-content:flex-end;">
+                                <button class="btn-sm" style="background:#4361ee; color:white; border:none; padding:8px 22px; border-radius:10px; font-weight:600; cursor:pointer;" onclick="this.parentElement.parentElement.remove(); analyzeQuizAI();"><i class="fa-solid fa-arrows-rotate"></i> Retry</button>
+                                <button class="btn-sm btn-dark" onclick="this.parentElement.parentElement.remove(); restoreAuditPopupIfHidden();" style="padding:8px 25px; border-radius:10px;">Close</button>
+                            </div>
+                            <div style="margin-top:20px; padding-top:15px; border-top:1px solid #eee; font-size:0.7em; color:#999;">
+                                🚀 Model: <b>${escapeHtml(aiModel || selectedModel || 'unknown')}</b> | 💡 Tokens: <b>${(aiTokens || 0).toLocaleString()}</b> | Mode: prose-fallback
+                            </div>
+                        `;
+                        document.body.appendChild(fallbackDiv);
+                        return;
+                    }
                 }
 
                 // V96.46: single-question scope sees only one question, so the model returns
@@ -16423,10 +16434,33 @@
                 // from callUniversalAI's actual resolution (may differ from selectedModel if
                 // the proxy fell back); selectedModel is the chip choice as final fallback.
                 window._aiAnalysisModel = aiModel || selectedModel || null;
+                // V97.39: kept alongside the other _aiAnalysis* globals so 💾 Export can read
+                // the suggested titles too, not just the analysis text + per-question items.
+                window._aiAnalysisSuggestedTitles = result.suggestedTitles || null;
                 // V96.51: quality signal — one 'suggested' per proposed item, tagged by model.
                 if (result.items && result.items.length && typeof recordAiEval === 'function') {
                     const _m = window._compareModelMeta ? window._compareModelMeta(aiModel || selectedModel).label : (aiModel || selectedModel || 'AI');
                     recordAiEval('quiz_improve', _m, 'suggested', result.items.length);
+                }
+                // V97.39: auto-save the analysis to the quiz doc so it survives a page
+                // refresh and can be reopened later via 🕑 Last without spending tokens
+                // again. Skip when THIS render came from a cached record (nothing new to
+                // save) or the quiz hasn't been saved yet (no doc to attach it to).
+                // Fire-and-forget — a failed save shouldn't block showing the result.
+                if (!(opts && opts.cachedResult)) {
+                    const _quizIdForSave = (document.getElementById('edit-quiz-id') || {}).value || null;
+                    if (_quizIdForSave) {
+                        db.collection('quizzes').doc(_quizIdForSave).update({
+                            lastAiAnalysis: {
+                                analysisText: analysis,
+                                items: result.items || [],
+                                suggestedTitles: result.suggestedTitles || null,
+                                model: aiModel || selectedModel || null,
+                                tokens: aiTokens || 0,
+                                savedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            }
+                        }).catch(e => console.warn('Failed to save AI analysis to quiz doc:', e));
+                    }
                 }
 
                 let improvementsHtml = "";
@@ -16493,12 +16527,25 @@
                     </div>
                 ` : '';
 
+                // V97.39: banner when this render came from a saved record instead of a
+                // fresh AI call — so the admin knows the Fix/Compare buttons below are
+                // still live-actionable, but the analysis text itself is not brand new.
+                const savedBannerHtml = (opts && opts.cachedResult) ? `
+                    <div style="background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; padding:10px 16px; border-radius:12px; margin-bottom:16px; font-size:0.85em; display:flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-clock-rotate-left"></i> Showing a saved analysis${opts.cachedSavedAtLabel ? ` from ${opts.cachedSavedAtLabel}` : ''} — no tokens spent. Click 🪄 Specialist for a fresh run.
+                    </div>
+                ` : '';
+
                 resultDiv.innerHTML = `
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f8f9fa; padding-bottom:15px; margin-bottom:15px;">
                         <h2 style="margin:0; color:var(--primary); font-size:1.5em;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Quiz Analysis</h2>
-                        <button onclick="this.parentElement.parentElement.remove(); restoreAuditPopupIfHidden();" style="border:none; background:#f8f9fa; color:#666; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">✕</button>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <button onclick="exportAiAnalysisMd()" title="Download this analysis as a Markdown file" style="border:1px solid #e2e8f0; background:#f8fafc; color:#475569; padding:0 14px; height:36px; border-radius:10px; cursor:pointer; font-size:0.8em; font-weight:700; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-download"></i> Export</button>
+                            <button onclick="document.getElementById('ai-analysis-popup').remove(); restoreAuditPopupIfHidden();" style="border:none; background:#f8f9fa; color:#666; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">✕</button>
+                        </div>
                     </div>
-                    
+
+                    ${savedBannerHtml}
                     ${titleSection}
 
                     <div style="white-space:pre-wrap; line-height:1.8; color:#333; font-size:1em; margin-bottom:20px; background:#fafafa; padding:20px; border-radius:20px; border:1px solid #f0f0f0;">${analysis.replace(/### 🎯 Suggested Titles[\s\S]*?(?=###|$)/i, '')}</div>
@@ -16547,6 +16594,79 @@
                 }
             }
 
+        };
+
+        // V97.39: download the current AI Quiz Analysis (titles + narrative + all
+        // per-question issue/suggestion cards) as a Markdown file — a local, permanent
+        // record independent of Firestore. Reads the same _aiAnalysis* globals the
+        // Quality Improvement Comparison modal already relies on.
+        window.exportAiAnalysisMd = function() {
+            const items = window._aiAnalysisItems || [];
+            const titles = window._aiAnalysisSuggestedTitles || null;
+            const text = window._aiAnalysisText || '';
+            if (!items.length && !text && !titles) { showToast('No analysis to export.'); return; }
+
+            const quizTitle = (document.getElementById('quiz-title') || {}).value || 'Untitled Quiz';
+            const lines = [`# AI Quiz Analysis — ${quizTitle}`, ''];
+            lines.push(`_Model: ${window._aiAnalysisModel || 'unknown'} · Exported: ${new Date().toLocaleString()}_`, '');
+            if (titles) {
+                lines.push('## Suggested Titles', `- Full: ${titles.full || ''}`, `- Short: ${titles.short || ''}`, '');
+            }
+            if (text) {
+                lines.push('## Analysis', text, '');
+            }
+            if (items.length) {
+                lines.push(`## Individual Improvements (${items.length})`, '');
+                items.forEach((item, i) => {
+                    const qNum = (item.qNumber !== undefined) ? item.qNumber : (item.index !== undefined ? item.index + 1 : i + 1);
+                    lines.push(`### Question ${qNum}`, `**Issue:** ${item.issue || ''}`, `**Suggestion:** ${item.suggestion || ''}`, '');
+                });
+            }
+
+            const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `AI_Quiz_Analysis_${quizTitle.replace(/[^\w฀-๿]+/g, '_')}_${new Date().toISOString().slice(0, 10)}.md`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('📥 Analysis exported as Markdown.');
+        };
+
+        // V97.39: "🕑 Last" — reopen the analysis saved on this quiz's own doc
+        // (quizzes/{id}.lastAiAnalysis, written by analyzeQuizAI on every fresh run)
+        // through the SAME render path as a live run, at zero token cost. Reads the
+        // quiz doc fresh rather than trusting the possibly-stale quizzesData cache.
+        window.viewSavedAiAnalysis = async function(clickedBtn) {
+            const btn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
+            const oldText = btn ? btn.innerHTML : null;
+            const quizId = (document.getElementById('edit-quiz-id') || {}).value || null;
+            if (!quizId) { showToast('Save this quiz first — nothing to load yet.'); return; }
+
+            if (btn) { btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Loading`; btn.disabled = true; }
+            let saved = null;
+            try {
+                const snap = await db.collection('quizzes').doc(quizId).get();
+                saved = snap.exists ? (snap.data() || {}).lastAiAnalysis : null;
+            } catch (e) {
+                console.error('Failed to load saved AI analysis:', e);
+                showToast('Could not load saved analysis.', 'error');
+                return;
+            } finally {
+                if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
+            }
+            if (!saved) { showToast('No saved analysis for this quiz yet — run 🪄 Specialist first.'); return; }
+
+            let savedAtLabel = '';
+            if (saved.savedAt && typeof saved.savedAt.toDate === 'function') {
+                savedAtLabel = saved.savedAt.toDate().toLocaleString();
+            }
+            analyzeQuizAI(null, {
+                cachedResult: { analysisText: saved.analysisText, items: saved.items || [], suggestedTitles: saved.suggestedTitles || null },
+                cachedModel: saved.model,
+                cachedTokens: saved.tokens,
+                cachedSavedAtLabel: savedAtLabel
+            });
         };
 
         // V93.88 Quiz Quality Q3: 5-dimension scorecard audit. Sibling to analyzeQuizAI ("Specialist")
