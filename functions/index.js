@@ -1906,6 +1906,32 @@ async function pushLineFlex(tag, targets, buildFlex, logSuffix) {
 // ============================================================
 const QUIZ_NOTIFY_STATE = 'quiz_notify_state';
 
+// ---- shared "active cohort" definition (V97.51 digest, V97.52 milestone) ----
+// `users` accumulates every account that ever opened the app, including admin
+// and staff logins, test accounts and one-time visitors. Counting those makes
+// "N/N" and the digest's nag list wrong in the same way, so both features now
+// narrow to the same cohort through the helpers below — one definition, so the
+// two notification paths can't drift apart again.
+// `users/{uid}.lastSeen` is written on every intern LIFF open
+// (public/index.html), so it is an already-populated activity signal. No
+// lastSeen at all = treated as inactive.
+const NOTIFY_ACTIVE_DAYS = 30;
+// Not the audience being chased on Public quizzes. Non-Public quizzes are
+// already scoped by targetGroup, so this only bites on Public.
+const NOTIFY_EXCLUDE_GROUPS = ['staff', 'preceptor'];
+
+function userLastSeenMs(u) {
+    if (u && u.lastSeen && typeof u.lastSeen.toMillis === 'function') return u.lastSeen.toMillis();
+    if (u && u.lastSeen) return Date.parse(u.lastSeen);
+    return NaN;
+}
+
+// Expects the `active` flag already computed (loadUsersLite / the digest's own
+// reader both set it) so this stays a pure, cheap filter.
+function activeCohort(users) {
+    return (users || []).filter(u => u.active && !NOTIFY_EXCLUDE_GROUPS.includes(u.group));
+}
+
 // Eligibility mirrors the intern app: assignedUsers when set, else
 // everyone whose group matches targetGroup ("Public" = everyone).
 function eligibleForQuiz(quizData, users) {
@@ -1918,12 +1944,15 @@ function eligibleForQuiz(quizData, users) {
 async function loadUsersLite(db) {
     const snap = await db.collection('users').get();
     const users = [];
+    const activeCutoffMs = Date.now() - NOTIFY_ACTIVE_DAYS * 24 * 60 * 60 * 1000;
     snap.forEach(doc => {
         const u = doc.data() || {};
+        const lastSeenMs = userLastSeenMs(u);
         users.push({
             id: doc.id,
             name: (String(u.displayName || '').trim() || doc.id.slice(0, 8)).slice(0, 40),
-            group: u.group || 'Public'
+            group: u.group || 'Public',
+            active: Number.isFinite(lastSeenMs) && lastSeenMs >= activeCutoffMs
         });
     });
     return users;
@@ -2034,9 +2063,22 @@ exports.notifyQuizSubmitted = onCall(
             if (submittedCount === 1) {
                 milestone = 'first';
             } else if (submittedCount > 1) {
+                // V97.52: count against the SAME active cohort the digest uses, so
+                // "N/N" and the digest's "done/total" agree.
+                //
+                // Both sides must narrow together. Narrowing only the denominator
+                // would make 'complete' fire EARLY: submitters includes stale and
+                // staff accounts, so e.g. 8 raw submitters vs a 5-person active
+                // cohort satisfies `>=` while real actives are still missing.
+                // Intersecting first keeps the comparison like-for-like.
                 const users = await loadUsersLite(db);
-                eligibleCount = eligibleForQuiz(quizData, users).length;
-                if (eligibleCount > 0 && submittedCount >= eligibleCount) milestone = 'complete';
+                const eligible = eligibleForQuiz(quizData, activeCohort(users));
+                eligibleCount = eligible.length;
+                const submittedActive = eligible.filter(u => submitters.has(u.id)).length;
+                if (eligibleCount > 0 && submittedActive >= eligibleCount) {
+                    milestone = 'complete';
+                    submittedCount = submittedActive;   // what the message renders
+                }
             }
         } catch (err) {
             console.error(`[notifyQuizSubmitted] milestone scan failed quiz=${quizId}:`, err.message);
@@ -2096,7 +2138,7 @@ exports.notifyQuizSubmitted = onCall(
 //     mirrors the intern app: `assignedUsers` when set, otherwise
 //     everyone whose `group` matches `targetGroup` (Public = everyone) —
 //     BUT V97.51 narrows that pool to the active cohort first, see
-//     DIGEST_ACTIVE_DAYS. Sorted soonest-deadline-first; only quizzes due
+//     NOTIFY_ACTIVE_DAYS. Sorted soonest-deadline-first; only quizzes due
 //     within DIGEST_URGENT_DAYS list names, the rest collapse to one line.
 // Both sections empty = no push at all (no daily noise, no quota burn).
 //
@@ -2109,14 +2151,11 @@ const DIGEST_MAX_ROWS = 12;
 // because most quizzes are targetGroup:'Public' and eligibleForQuiz() returns
 // everyone for those. That swept in admin/test accounts, phone-number-named
 // throwaways and one-time visitors — reported as "/29" when the real cohort is
-// far smaller. `users/{uid}.lastSeen` is written on every intern LIFF open
-// (public/index.html), so it's an already-populated activity signal. A user with
-// no lastSeen at all is treated as inactive; the footer always prints how many
-// were hidden so the filter can never silently shrink the cohort unnoticed.
-const DIGEST_ACTIVE_DAYS = 30;
-// Excluded from the nag list on Public quizzes — they aren't the audience being
-// chased. Non-Public quizzes are already scoped by targetGroup.
-const DIGEST_EXCLUDE_GROUPS = ['staff', 'preceptor'];
+// far smaller. The cohort rule now lives in NOTIFY_ACTIVE_DAYS / activeCohort()
+// near eligibleForQuiz (V97.52) because notifyQuizSubmitted's milestone counts
+// share it — one definition so the two paths can't drift apart. The footer
+// always prints how many were hidden, so the filter can never silently shrink
+// the cohort unnoticed.
 // (B) Only quizzes due within this many days get a full name list; everything
 // else collapses to one summary line so the message stays skimmable.
 const DIGEST_URGENT_DAYS = 3;
@@ -2157,16 +2196,14 @@ exports.notifyQuizDigest = onSchedule({
     const users = [];
     let activeUsers = [];
     try {
-        const activeCutoffMs = now.toMillis() - DIGEST_ACTIVE_DAYS * 24 * 60 * 60 * 1000;
+        const activeCutoffMs = now.toMillis() - NOTIFY_ACTIVE_DAYS * 24 * 60 * 60 * 1000;
         const snap = await db.collection('users').get();
         snap.forEach(doc => {
             const u = doc.data() || {};
             const rawName = String(u.displayName || '').trim() || doc.id.slice(0, 8);
             const name = digestCleanName(rawName).slice(0, 40);
             userNames.set(doc.id, name);
-            const lastSeenMs = u.lastSeen && typeof u.lastSeen.toMillis === 'function'
-                ? u.lastSeen.toMillis()
-                : (u.lastSeen ? Date.parse(u.lastSeen) : NaN);
+            const lastSeenMs = userLastSeenMs(u);
             users.push({
                 id: doc.id,
                 name: name,
@@ -2174,13 +2211,13 @@ exports.notifyQuizDigest = onSchedule({
                 active: Number.isFinite(lastSeenMs) && lastSeenMs >= activeCutoffMs
             });
         });
-        activeUsers = users.filter(u => u.active && !DIGEST_EXCLUDE_GROUPS.includes(u.group));
+        activeUsers = activeCohort(users);
     } catch (err) {
         console.error('[notifyQuizDigest] users read failed:', err.message);
         return;
     }
     const hiddenUserCount = users.length - activeUsers.length;
-    console.log(`[notifyQuizDigest] cohort: ${activeUsers.length} active / ${users.length} total (hidden ${hiddenUserCount}, window ${DIGEST_ACTIVE_DAYS}d)`);
+    console.log(`[notifyQuizDigest] cohort: ${activeUsers.length} active / ${users.length} total (hidden ${hiddenUserCount}, window ${NOTIFY_ACTIVE_DAYS}d)`);
 
     // --- section 1: submitted in the last 24h ---
     const doneRows = [];
@@ -2246,10 +2283,9 @@ exports.notifyQuizDigest = onSchedule({
                 : (q.deadline ? Date.parse(q.deadline) : NaN);
             if (!deadlineMs || isNaN(deadlineMs) || deadlineMs <= now.toMillis()) continue;
 
-            // V97.51 (A): active cohort only — see DIGEST_ACTIVE_DAYS. NOTE this
-            // narrows the digest's denominator ONLY; notifyQuizSubmitted's
-            // milestone "✅ N/N" still counts every user, so the two can disagree
-            // until that's deliberately reconciled.
+            // V97.51 (A): active cohort only — see NOTIFY_ACTIVE_DAYS.
+            // V97.52: notifyQuizSubmitted's milestone counts now use the same
+            // cohort, so "N/N" there and "done/total" here agree.
             const eligible = eligibleForQuiz(q, activeUsers);
             if (!eligible.length) continue;
 
@@ -2346,12 +2382,12 @@ exports.notifyQuizDigest = onSchedule({
         }
 
         // Never let the active-cohort filter shrink things silently — if this
-        // number looks wrong, that's the signal to retune DIGEST_ACTIVE_DAYS.
+        // number looks wrong, that's the signal to retune NOTIFY_ACTIVE_DAYS.
         if (hiddenUserCount > 0) {
             body.push({ type: 'separator', margin: 'md' });
             body.push({
                 type: 'text',
-                text: `นับเฉพาะผู้ใช้งานใน ${DIGEST_ACTIVE_DAYS} วัน · ${activeUsers.length}/${users.length} คน (ซ่อน ${hiddenUserCount})`,
+                text: `นับเฉพาะผู้ใช้งานใน ${NOTIFY_ACTIVE_DAYS} วัน · ${activeUsers.length}/${users.length} คน (ซ่อน ${hiddenUserCount})`,
                 size: 'xxs', color: '#94a3b8', margin: 'md', wrap: true
             });
         }
