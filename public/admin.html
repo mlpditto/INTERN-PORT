@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.39</title>
+    <title>Nika V97.40</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16897,6 +16897,7 @@ RULES:
                         </div>
                         <div style="display:flex; align-items:center; gap:8px;">
                             <span style="font-size:0.9em;">${stars(q.averageScore)} <b style="margin-left:6px;">avg ${avg}</b></span>
+                            ${question ? `<button onclick="_copyCompareQ('${JSON.stringify(question).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;')}', this)" title="Copy this question (Q+options, no answer key)" style="width:26px; height:26px; padding:0; border-radius:7px; border:none; background:rgba(37,99,235,0.10); color:#2563eb; cursor:pointer; font-size:0.82em; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-copy"></i></button>` : ''}
                             <button onclick="auditDeleteQuestion(${q.qNumber})" title="Delete this question from the form (not saved until Save Quiz)" style="width:26px; height:26px; padding:0; border-radius:7px; border:none; background:rgba(239,68,68,0.12); color:#dc2626; cursor:pointer; font-size:0.82em; display:flex; align-items:center; justify-content:center;">🗑️</button>
                         </div>
                     </div>
@@ -52486,13 +52487,10 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
         // matches bulkPasteCopyQuestion (A) B) C) prefixes, no answer key).
         // V96.87: full=true also appends the answer key + explanation, since an
         // explanation that argues "why B is correct" is unreadable without the key.
-        window._copyCompareQ = function(jsonStr, btn, full) {
-            let q;
-            try {
-                q = JSON.parse(String(jsonStr).replace(/&quot;/g, '"').replace(/&#39;/g, "'"));
-            } catch (e) {
-                return showToast("Copy failed — could not read question data");
-            }
+        // V97.40: text-building split out of _copyCompareQ so 📋 Copy ALL Original /
+        // Copy ALL Improved (below) can build the exact same per-question text without
+        // duplicating the format (A) B) C) prefixes, answer key, explanation).
+        window._compareQText = function(q, full) {
             const opts = Array.isArray(q.options) ? q.options : [];
             let text = (q.q || '') + (opts.length ? '\n' + opts.map((o, i) => String.fromCharCode(65 + i) + ') ' + o).join('\n') : '');
             if (full) {
@@ -52503,7 +52501,45 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
                 const exp = String(q.explanation || '').trim();
                 if (exp) text += (keys.length ? '\n' : '\n\n') + 'คำอธิบาย: ' + exp;
             }
-            unifiedCopyToClipboard(text, btn);
+            return text;
+        };
+
+        window._copyCompareQ = function(jsonStr, btn, full) {
+            let q;
+            try {
+                q = JSON.parse(String(jsonStr).replace(/&quot;/g, '"').replace(/&#39;/g, "'"));
+            } catch (e) {
+                return showToast("Copy failed — could not read question data");
+            }
+            unifiedCopyToClipboard(window._compareQText(q, full), btn);
+        };
+
+        // V97.40: 📋 Copy ALL Original / 📋 Copy ALL Improved — the compare modal steps
+        // through AI-proposed fixes one question at a time, so copying every original (or
+        // every improved) question meant clicking through all of them one by one. Walks
+        // window._aiAnalysisItems (the same set the Prev/Next nav and 👁️ Preview read from)
+        // and joins each question's text (same format _copyCompareQ uses) with a blank line.
+        window.copyAllCompareOriginals = function() {
+            const items = window._aiAnalysisItems || [];
+            if (!items.length) return showToast('No questions to copy.');
+            const qs = getQuizFormData().questions || [];
+            const blocks = items.map((it, ai) => {
+                const qIdx = window.getAiItemQIndex(ai);
+                const q = qs[qIdx];
+                return q ? `Q${qIdx + 1}\n${window._compareQText(q)}` : null;
+            }).filter(Boolean);
+            if (!blocks.length) return showToast('No questions to copy.');
+            unifiedCopyToClipboard(blocks.join('\n\n'));
+        };
+        window.copyAllCompareImproved = function() {
+            const items = window._aiAnalysisItems || [];
+            if (!items.length) return showToast('No questions to copy.');
+            const blocks = items.map((it, ai) => {
+                const qIdx = window.getAiItemQIndex(ai);
+                return (it && it.improvedQuestion) ? `Q${qIdx + 1}\n${window._compareQText(it.improvedQuestion)}` : null;
+            }).filter(Boolean);
+            if (!blocks.length) return showToast('No improved questions to copy yet.');
+            unifiedCopyToClipboard(blocks.join('\n\n'));
         };
 
         window._compareCopyBtnHtml = function(q) {
@@ -52625,8 +52661,16 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
                 const pct = Math.round(h.score * 100);
                 const strong = h.score >= QUIZ_SET_DUP_STRONG;
                 const sideTag = h.sides.map(s => QUIZ_SET_DUP_SIDE_TH[s] || s).join('/');
-                const tip = `ฉบับ ${sideTag} ใกล้เคียง Q${h.qIndex + 1}${h.pending ? ' (ฉบับที่ AI เสนอ ยังไม่ apply)' : ''}:\n${h.text.slice(0, 240)}`;
-                return `<span title="${escapeHtml(tip)}" style="background:${strong ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.12)'}; color:${strong ? '#b91c1c' : '#92400e'}; padding:4px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid ${strong ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.30)'}; cursor:help;">⚠️ ซ้ำ Q${h.qIndex + 1} · ${pct}% · ${escapeHtml(sideTag)}</span>`;
+                // V97.40: buildQuizSetPeerPool compares against Q{h.qIndex+1}'s PENDING AI
+                // rewrite when one exists (by design — see that function's comment), not its
+                // saved original. Two visually-identical ORIGINAL stems can therefore show a
+                // surprisingly low %, because one side of the comparison is actually a
+                // different, already-reworded text. That used to be flagged only in the hover
+                // tooltip — now it's visible on the chip itself so the % isn't misread as
+                // "these two saved originals are only N% alike".
+                const pendingTag = h.pending ? ' · เทียบกับฉบับ AI เสนอ' : '';
+                const tip = `ฉบับ ${sideTag} ใกล้เคียง Q${h.qIndex + 1}${h.pending ? ' (ฉบับที่ AI เสนอ ยังไม่ apply — ไม่ใช่ฉบับเดิมที่บันทึกไว้)' : ''}:\n${h.text.slice(0, 240)}`;
+                return `<span title="${escapeHtml(tip)}" style="background:${strong ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.12)'}; color:${strong ? '#b91c1c' : '#92400e'}; padding:4px 12px; border-radius:20px; font-size:0.75em; font-weight:800; border:1px solid ${strong ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.30)'}; cursor:help;">⚠️ ซ้ำ Q${h.qIndex + 1} · ${pct}% · ${escapeHtml(sideTag)}${pendingTag}</span>`;
             }).join('');
         };
 
@@ -52867,6 +52911,8 @@ RULES:
                             </div>
                             <div style="display:flex; align-items:center; gap:12px;">
                                 <button onclick="showFullQuizPreview()" title="Preview all current questions in one page" style="padding:8px 14px; border-radius:12px; font-weight:800; font-size:0.78em; background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;">👁️ Preview</button>
+                                <button onclick="copyAllCompareOriginals()" title="Copy every ORIGINAL question in this analysis (Q+options, no answer key)" style="padding:8px 14px; border-radius:12px; font-weight:800; font-size:0.78em; background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;">📋 All Original</button>
+                                <button onclick="copyAllCompareImproved()" title="Copy every IMPROVED question proposed so far (Q+options, no answer key)" style="padding:8px 14px; border-radius:12px; font-weight:800; font-size:0.78em; background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;">📋 All Improved</button>
                                 ${navHtml}
                                 <button onclick="document.getElementById('ai-compare-overlay').remove()" style="width:40px; height:40px; border-radius:50%; border:none; background:#f1f5f9; color:#64748b; cursor:pointer; font-size:1.3em; display:flex; align-items:center; justify-content:center; transition:0.2s; flex-shrink:0;" onmouseover="this.style.background='#e2e8f0'; this.style.color='#0f172a'">✕</button>
                             </div>
