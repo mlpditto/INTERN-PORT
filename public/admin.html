@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.37</title>
+    <title>Nika V97.38</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -28868,6 +28868,12 @@ ${JSON.stringify(sourceObj)}`;
         const QUIZ_COMPARE_THRESHOLD = 0.3; // below this, treat as unrelated — tune if too noisy/quiet
         function quizCompareShingles(text) {
             const clean = String(text || '')
+                // V97.38: zero-width chars (common in Thai text pasted from web sources as
+                // word-break hints) are invisible to \s and to the eye, but shift every shingle
+                // boundary after them — one stray char can cascade a truly-identical stem down
+                // to a suppressed containment score. Use \u escapes, not literal chars — a
+                // literal invisible char in source caused a hard SyntaxError before (V91.95).
+                .replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, '')
                 .replace(/[#*_`>\[\]()!]/g, '')  // strip common markdown syntax
                 .replace(/\s+/g, ' ')
                 .trim()
@@ -28887,7 +28893,9 @@ ${JSON.stringify(sourceObj)}`;
             return inter / Math.min(sa.size, sb.size); // containment, not Jaccard — see comment above
         }
         function quizCompareStripMd(s) {
-            return String(s || '').replace(/[#*_`>\[\]()]/g, '').replace(/\s+/g, ' ').trim();
+            // V97.38: strip zero-width chars too (see quizCompareShingles) so display
+            // text and AI-prompt text built from this helper don't carry invisible artifacts.
+            return String(s || '').replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, '').replace(/[#*_`>\[\]()]/g, '').replace(/\s+/g, ' ').trim();
         }
 
         function openQuizCompareModal() {
