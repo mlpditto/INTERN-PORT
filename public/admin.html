@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.42</title>
+    <title>Nika V97.44</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -4233,9 +4233,7 @@
                 if (typeof showToast === 'function') showToast("⏳ AI engine still initializing. Please wait 1-2 seconds."); 
             };
             window.analyzeQuizAI = window.analyzeQuizAI || warnInit;
-            window.viewSavedAiAnalysis = window.viewSavedAiAnalysis || warnInit;
             window.auditQuizAI = window.auditQuizAI || warnInit;
-            window.viewSavedAiAudit = window.viewSavedAiAudit || warnInit;
             window.aiEnhanceCurrentQuestion = window.aiEnhanceCurrentQuestion || warnInit;
             window.autoTagQuizAI = window.autoTagQuizAI || warnInit;
             window.callUniversalAI = window.callUniversalAI || async function() { throw new Error("AI core not loaded yet."); };
@@ -12169,10 +12167,8 @@
                             </div>
                             <input type="hidden" id="ai-analyzer-model-val" value="gemini-3.6-flash">
                             <div style="display:flex; gap:4px;">
-                                <button class="btn-sm" onclick="analyzeQuizAI(this)" title="Analyze Quiz (rewrite suggestions)" style="background:#7c3aed; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-brain"></i> Specialist</button>
-                                <button class="btn-sm" onclick="viewSavedAiAnalysis(this)" title="Reopen the last saved Specialist analysis for this quiz — no tokens spent" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; padding:0; width:32px; height:32px; border-radius:10px; font-weight:700; font-size:0.72em; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="fa-solid fa-clock-rotate-left"></i></button>
-                                <button class="btn-sm" onclick="auditQuizAI(this)" title="Quality Audit — 5-dim scorecard per question (V93.88 Q3)" style="background:#0891b2; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-clipboard-check"></i> Audit</button>
-                                <button class="btn-sm" onclick="viewSavedAiAudit(this)" title="Reopen the last saved Audit for this quiz — no tokens spent" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; padding:0; width:32px; height:32px; border-radius:10px; font-weight:700; font-size:0.72em; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="fa-solid fa-clock-rotate-left"></i></button>
+                                <button class="btn-sm" onclick="analyzeQuizAI(this)" title="Opens a saved analysis for free if one exists, otherwise runs fresh (rewrite suggestions)" style="background:#7c3aed; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-brain"></i> Specialist</button>
+                                <button class="btn-sm" onclick="auditQuizAI(this)" title="Opens a saved audit for free if one exists, otherwise runs fresh — 5-dim scorecard per question (V93.88 Q3)" style="background:#0891b2; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-clipboard-check"></i> Audit</button>
                                 <button class="btn-sm" onclick="runFullReview(this)" title="Run Specialist + Audit together (parallel, faster than back-to-back clicks)" style="background:linear-gradient(135deg,#7c3aed,#0891b2); color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-layer-group"></i> Full Review</button>
                                 <button class="btn-sm" onclick="openPdfToQuizModal()" title="Import PDF" style="background:#0ea5e9; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                                 <button class="btn-sm" onclick="openSuggestMoreModal()" title="Expand" style="background:#f59e0b; color:white; border:none; padding:4px 14px; border-radius:10px; font-weight:700; font-size:0.68em; display:flex; align-items:center; gap:3px; height:32px;"><i class="fa-solid fa-sparkles"></i> Expand</button>
@@ -16306,6 +16302,41 @@
             const formData = getQuizFormData();
             if (formData.questions.length < 1) return alert("Add at least 1 question to analyze.");
 
+            // V97.44: Specialist now defaults to "show me what's already there" — if a saved
+            // analysis exists for this quiz, open it at zero token cost instead of spending a
+            // fresh call every click. opts.forceNew (🔄 Regenerate, inside the popup) and
+            // opts.cachedResult (already resolved — e.g. a delete-triggered re-render) both
+            // skip this check; opts.onlyQNumber (Audit's "Suggest fix", a scoped 1-question
+            // ask) always wants a fresh answer for that specific question, never a stale save.
+            if (!(opts && (opts.cachedResult || opts.forceNew || opts.onlyQNumber))) {
+                const quizId = (document.getElementById('edit-quiz-id') || {}).value || null;
+                if (quizId) {
+                    // Immediate feedback for the Firestore round-trip below — the spinner set
+                    // further down only covers the (skippable) fresh-AI branch.
+                    const preBtn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
+                    const preOldHtml = preBtn ? preBtn.innerHTML : null;
+                    if (preBtn) { preBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`; preBtn.disabled = true; }
+                    try {
+                        const snap = await db.collection('quizzes').doc(quizId).get();
+                        const saved = snap.exists ? (snap.data() || {}).lastAiAnalysis : null;
+                        if (saved) {
+                            let savedAtLabel = '';
+                            if (saved.savedAt && typeof saved.savedAt.toDate === 'function') savedAtLabel = saved.savedAt.toDate().toLocaleString();
+                            return await analyzeQuizAI(clickedBtn, {
+                                cachedResult: { analysisText: saved.analysisText, items: saved.items || [], suggestedTitles: saved.suggestedTitles || null },
+                                cachedModel: saved.model,
+                                cachedTokens: saved.tokens,
+                                cachedSavedAtLabel: savedAtLabel
+                            });
+                        }
+                    } catch (e) {
+                        console.warn('Could not check for a saved analysis, running fresh:', e);
+                    } finally {
+                        if (preBtn) { preBtn.innerHTML = preOldHtml; preBtn.disabled = false; }
+                    }
+                }
+            }
+
             // V96.46: optional single-question scope (used by the Quality Audit "Suggest fix"
             // button). Analyzing one question instead of the whole quiz keeps the AI output
             // tiny so a large (e.g. 40-Q) quiz can't overflow the token budget and truncate
@@ -16334,7 +16365,10 @@
             ]);
 
             try {
-                if (btn) {
+                // V97.44: skip the spinner for a cachedResult replay — that path is now the
+                // DEFAULT flow (Specialist opens a saved analysis first when one exists), and
+                // it never awaits an AI call, so a "0%" flash would just be visual noise.
+                if (btn && !(opts && opts.cachedResult)) {
                     let pct = 0;
                     btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analyzing 0%`;
                     btn.disabled = true;
@@ -16547,6 +16581,7 @@
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f8f9fa; padding-bottom:15px; margin-bottom:15px;">
                         <h2 style="margin:0; color:var(--primary); font-size:1.5em;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Quiz Analysis</h2>
                         <div style="display:flex; align-items:center; gap:8px;">
+                            <button onclick="analyzeQuizAI(null, { forceNew: true })" title="Run a fresh Specialist analysis (spends tokens) — Specialist itself now opens a saved analysis for free when one exists" style="border:1px solid #e2e8f0; background:#f8fafc; color:#475569; padding:0 14px; height:36px; border-radius:10px; cursor:pointer; font-size:0.8em; font-weight:700; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-arrows-rotate"></i> Regenerate</button>
                             <button onclick="exportAiAnalysisMd()" title="Download this analysis as a Markdown file" style="border:1px solid #e2e8f0; background:#f8fafc; color:#475569; padding:0 14px; height:36px; border-radius:10px; cursor:pointer; font-size:0.8em; font-weight:700; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-download"></i> Export</button>
                             <button onclick="document.getElementById('ai-analysis-popup').remove(); restoreAuditPopupIfHidden();" style="border:none; background:#f8f9fa; color:#666; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center;">✕</button>
                         </div>
@@ -16640,42 +16675,6 @@
             showToast('📥 Analysis exported as Markdown.');
         };
 
-        // V97.39: "🕑 Last" — reopen the analysis saved on this quiz's own doc
-        // (quizzes/{id}.lastAiAnalysis, written by analyzeQuizAI on every fresh run)
-        // through the SAME render path as a live run, at zero token cost. Reads the
-        // quiz doc fresh rather than trusting the possibly-stale quizzesData cache.
-        window.viewSavedAiAnalysis = async function(clickedBtn) {
-            const btn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
-            const oldText = btn ? btn.innerHTML : null;
-            const quizId = (document.getElementById('edit-quiz-id') || {}).value || null;
-            if (!quizId) { showToast('Save this quiz first — nothing to load yet.'); return; }
-
-            if (btn) { btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`; btn.disabled = true; }
-            let saved = null;
-            try {
-                const snap = await db.collection('quizzes').doc(quizId).get();
-                saved = snap.exists ? (snap.data() || {}).lastAiAnalysis : null;
-            } catch (e) {
-                console.error('Failed to load saved AI analysis:', e);
-                showToast('Could not load saved analysis.', 'error');
-                return;
-            } finally {
-                if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
-            }
-            if (!saved) { showToast('No saved analysis for this quiz yet — run 🪄 Specialist first.'); return; }
-
-            let savedAtLabel = '';
-            if (saved.savedAt && typeof saved.savedAt.toDate === 'function') {
-                savedAtLabel = saved.savedAt.toDate().toLocaleString();
-            }
-            analyzeQuizAI(null, {
-                cachedResult: { analysisText: saved.analysisText, items: saved.items || [], suggestedTitles: saved.suggestedTitles || null },
-                cachedModel: saved.model,
-                cachedTokens: saved.tokens,
-                cachedSavedAtLabel: savedAtLabel
-            });
-        };
-
         // V97.41: 🗑️ on an "Individual Improvement" card — for a word-for-word duplicate
         // (the exact case this was built for), deleting beats rewriting. Mirrors
         // auditDeleteQuestion's approach (remove from DOM, nothing hits Firestore until Save
@@ -16752,6 +16751,38 @@
 
             const formData = getQuizFormData();
             if (!formData.questions || formData.questions.length < 1) return alert('Add at least 1 question to audit.');
+
+            // V97.44: Audit now defaults to "show me what's already there" — mirrors the
+            // same change on analyzeQuizAI (V97.44). opts.forceNew (🔄 Regenerate, inside
+            // the popup) and opts.cachedResult (already resolved) both skip this check.
+            if (!(opts && (opts.cachedResult || opts.forceNew))) {
+                const quizId = (document.getElementById('edit-quiz-id') || {}).value || null;
+                if (quizId) {
+                    // Immediate feedback for the Firestore round-trip below — the spinner set
+                    // further down only covers the (skippable) fresh-AI branch.
+                    const preBtn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
+                    const preOldHtml = preBtn ? preBtn.innerHTML : null;
+                    if (preBtn) { preBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`; preBtn.disabled = true; }
+                    try {
+                        const snap = await db.collection('quizzes').doc(quizId).get();
+                        const saved = snap.exists ? (snap.data() || {}).lastAiAudit : null;
+                        if (saved) {
+                            let savedAtLabel = '';
+                            if (saved.savedAt && typeof saved.savedAt.toDate === 'function') savedAtLabel = saved.savedAt.toDate().toLocaleString();
+                            return await auditQuizAI(clickedBtn, {
+                                cachedResult: saved.result,
+                                cachedModel: saved.model,
+                                cachedTokens: saved.tokens,
+                                cachedSavedAtLabel: savedAtLabel
+                            });
+                        }
+                    } catch (e) {
+                        console.warn('Could not check for a saved audit, running fresh:', e);
+                    } finally {
+                        if (preBtn) { preBtn.innerHTML = preOldHtml; preBtn.disabled = false; }
+                    }
+                }
+            }
 
             const btn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
             const oldText = btn ? btn.innerHTML : 'Audit';
@@ -16909,41 +16940,6 @@ RULES:
             }
         };
 
-        // V97.41: "🕑" next to Audit — reopen the audit saved on this quiz's own doc
-        // (quizzes/{id}.lastAiAudit) through the SAME render path as a live run, at zero
-        // token cost. Mirrors viewSavedAiAnalysis (V97.39).
-        window.viewSavedAiAudit = async function(clickedBtn) {
-            const btn = clickedBtn || (event && event.target ? event.target.closest('button') : null);
-            const oldHtml = btn ? btn.innerHTML : null;
-            const quizId = (document.getElementById('edit-quiz-id') || {}).value || null;
-            if (!quizId) { showToast('Save this quiz first — nothing to load yet.'); return; }
-
-            if (btn) { btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`; btn.disabled = true; }
-            let saved = null;
-            try {
-                const snap = await db.collection('quizzes').doc(quizId).get();
-                saved = snap.exists ? (snap.data() || {}).lastAiAudit : null;
-            } catch (e) {
-                console.error('Failed to load saved AI audit:', e);
-                showToast('Could not load saved audit.', 'error');
-                return;
-            } finally {
-                if (btn) { btn.innerHTML = oldHtml; btn.disabled = false; }
-            }
-            if (!saved) { showToast('No saved audit for this quiz yet — run ✅ Audit first.'); return; }
-
-            let savedAtLabel = '';
-            if (saved.savedAt && typeof saved.savedAt.toDate === 'function') {
-                savedAtLabel = saved.savedAt.toDate().toLocaleString();
-            }
-            auditQuizAI(null, {
-                cachedResult: saved.result,
-                cachedModel: saved.model,
-                cachedTokens: saved.tokens,
-                cachedSavedAtLabel: savedAtLabel
-            });
-        };
-
         // V97.31: "Full Review" — run Specialist (analyzeQuizAI) + Audit (auditQuizAI) in
         // parallel from one click instead of two back-to-back button presses. Both AI calls
         // are independent (different prompts, no shared data), so Promise.allSettled halves
@@ -17074,7 +17070,10 @@ RULES:
             modal.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f1f5f9; padding-bottom:14px; margin-bottom:18px;">
                     <h2 style="margin:0; color:#0891b2; font-size:1.4em;"><i class="fa-solid fa-clipboard-check"></i> Quality Audit</h2>
-                    <button onclick="document.getElementById('ai-audit-popup').remove()" style="border:none; background:#f1f5f9; color:#64748b; width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:1.1em;">✕</button>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <button onclick="auditQuizAI(null, { forceNew: true })" title="Run a fresh Audit (spends tokens) — Audit itself now opens a saved audit for free when one exists" style="border:1px solid #e2e8f0; background:#f8fafc; color:#475569; padding:0 12px; height:34px; border-radius:10px; cursor:pointer; font-size:0.78em; font-weight:700; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-arrows-rotate"></i> Regenerate</button>
+                        <button onclick="document.getElementById('ai-audit-popup').remove()" style="border:none; background:#f1f5f9; color:#64748b; width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:1.1em;">✕</button>
+                    </div>
                 </div>
                 ${savedBannerHtml}
                 <div style="background:${overallBg}; padding:18px; border-radius:14px; margin-bottom:18px; text-align:center;">
