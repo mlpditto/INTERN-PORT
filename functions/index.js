@@ -1828,3 +1828,30 @@ exports.lineWebhook = onRequest({ cors: false, timeoutSeconds: 15, memory: "128M
     }
     res.status(200).send('OK');
 });
+
+// ============================================================
+// lineWhoAmI (2026-08-14) — TEMPORARY, delete with lineWebhook
+// ------------------------------------------------------------
+// Two LINE OAs share the display name "MLP INTERN PORT Noti"
+// (@872hzjcl and @929souhr), so the webhook could easily be wired to
+// the wrong channel. This calls GET /v2/bot/info with the stored
+// LINE_CHANNEL_ACCESS_TOKEN and reports which OA that token belongs
+// to. Returns the OA identity only — never the token itself.
+//
+//   firebase functions:delete lineWhoAmI --region us-central1
+// ============================================================
+exports.lineWhoAmI = onRequest({ cors: false, secrets: ["LINE_CHANNEL_ACCESS_TOKEN"], timeoutSeconds: 15, memory: "128MiB" }, async (req, res) => {
+    try {
+        const r = await axios.get("https://api.line.me/v2/bot/info", {
+            headers: { Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}` },
+            timeout: 8000
+        });
+        const d = r.data || {};
+        console.log(`[lineWhoAmI] basicId=${d.basicId} displayName=${d.displayName} chatMode=${d.chatMode}`);
+        res.status(200).json({ basicId: d.basicId, displayName: d.displayName, chatMode: d.chatMode, markAsReadMode: d.markAsReadMode });
+    } catch (err) {
+        const status = err && err.response ? err.response.status : null;
+        console.error(`[lineWhoAmI] FAILED status=${status}`);
+        res.status(200).json({ ok: false, status: status });
+    }
+});
