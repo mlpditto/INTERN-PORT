@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.36</title>
+    <title>Nika V97.37</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -52738,6 +52738,7 @@ RULES:
                                 <div id="ai-dup-result" style="display:none; margin-top:8px; max-width:620px;"></div>
                             </div>
                             <div style="display:flex; align-items:center; gap:12px;">
+                                <button onclick="showFullQuizPreview()" title="Preview all current questions in one page" style="padding:8px 14px; border-radius:12px; font-weight:800; font-size:0.78em; background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;">👁️ Preview</button>
                                 ${navHtml}
                                 <button onclick="document.getElementById('ai-compare-overlay').remove()" style="width:40px; height:40px; border-radius:50%; border:none; background:#f1f5f9; color:#64748b; cursor:pointer; font-size:1.3em; display:flex; align-items:center; justify-content:center; transition:0.2s; flex-shrink:0;" onmouseover="this.style.background='#e2e8f0'; this.style.color='#0f172a'">✕</button>
                             </div>
@@ -52781,6 +52782,41 @@ RULES:
                 console.error("AI Compare Error:", err);
                 alert("Comparison failed: " + err.message);
             }
+        };
+
+        // V97.37: "👁️ Preview" in the Quality Improvement Comparison modal — the compare
+        // flow steps through one question at a time (e.g. "20/20"), which makes it hard
+        // to see the whole quiz's current state. Reads live from the editor DOM (same
+        // source getQuizFormData() feeds the compare cards themselves, i.e. "ORIGINAL")
+        // and lists every question + options on one scrollable page. Read-only, no AI call.
+        window.showFullQuizPreview = function() {
+            const qs = (getQuizFormData().questions || []);
+            if (!qs.length) { showToast('No questions to preview.'); return; }
+            const rowsHtml = qs.map((q, i) => {
+                const isChoice = (q.type || 'choice') === 'choice';
+                const correctIdx = (Array.isArray(q.correct) ? q.correct : (q.correct !== undefined && q.correct !== null ? [q.correct] : [])).map(String);
+                const optsHtml = isChoice && Array.isArray(q.options) && q.options.length
+                    ? q.options.map((opt, oi) => `<div style="display:flex; gap:8px; align-items:flex-start; padding:3px 0; ${correctIdx.includes(String(oi)) ? 'color:#15803d; font-weight:700;' : 'color:#475569;'}"><span>${correctIdx.includes(String(oi)) ? '✅' : '◯'}</span><span>${window.renderMdInline(opt || '')}</span></div>`).join('')
+                    : '';
+                return `<div style="background:#fcfdff; border:1.5px solid #e2e8f0; border-radius:14px; padding:14px; margin-bottom:10px;">
+                    <div style="font-weight:800; color:#1e293b; font-size:0.95em; margin-bottom:8px;">Q${i + 1}: ${window.renderMdInline(q.q || '')}</div>
+                    ${optsHtml}
+                </div>`;
+            }).join('');
+
+            const overlay = document.createElement('div');
+            overlay.id = 'full-quiz-preview-overlay';
+            overlay.className = 'lang-no-toggle'; // shield Thai user-content from lang-toggle.js auto-wrap
+            overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.85); backdrop-filter:blur(8px); z-index:20050; display:flex; align-items:center; justify-content:center; padding:20px;';
+            overlay.innerHTML = `
+                <div style="width:100%; max-width:760px; background:#f8fafc; border-radius:24px; overflow:hidden; box-shadow:0 25px 70px rgba(0,0,0,0.5); display:flex; flex-direction:column; max-height:90vh;">
+                    <div style="padding:16px 24px; background:white; border-bottom:1.5px solid #edf2f7; display:flex; justify-content:space-between; align-items:center;">
+                        <h3 style="margin:0; font-size:1.15em; color:#1e293b;">👁️ Current Quiz Preview <span style="color:#94a3b8; font-weight:600; font-size:0.75em;">(${qs.length} questions)</span></h3>
+                        <button onclick="document.getElementById('full-quiz-preview-overlay').remove()" style="width:36px; height:36px; border-radius:50%; border:none; background:#f1f5f9; color:#64748b; cursor:pointer; font-size:1.2em; display:flex; align-items:center; justify-content:center; flex-shrink:0;">✕</button>
+                    </div>
+                    <div style="padding:20px 24px; overflow-y:auto; flex:1;">${rowsHtml}</div>
+                </div>`;
+            document.body.appendChild(overlay);
         };
 
         function getImprovedQuestionPayload(index, improvedArg) {
