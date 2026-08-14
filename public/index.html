@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="syLgdgORPm2eIZz88fwciLOfHFvx6kzX1XQl_QtwbHc" />
-    <title>Internship Portfolio (V96.33)</title>
+    <title>Internship Portfolio (V96.34)</title>
     <!-- V94.04: Restore V97.01 sub-tabs + de79eca History removal + apply Phase 3 markdown rendering -->
     <!-- Release: 2026-04-28 22:00 UTC+7 -->
 
@@ -9954,6 +9954,21 @@
                         }
                     } catch (e) {
                         console.warn('[adjustQuizDeadline] non-critical:', (e && e.message) || e);
+                    }
+
+                    // C. LINE notify for quizzes the admin flagged `notifyGroup`.
+                    // Gated here so ordinary quizzes never pay for a function call;
+                    // the function re-reads the flag server-side anyway (the client
+                    // only passes an attempt id, never the announced content).
+                    // Best-effort like the deadline call above: submission must
+                    // never fail because of it.
+                    try {
+                        if (currentQuiz.notifyGroup === true && typeof firebase !== 'undefined' && firebase.functions) {
+                            firebase.functions().httpsCallable('notifyQuizSubmitted')({ attemptId: attemptRef.id })
+                                .catch(e => console.warn('[notifyQuizSubmitted] non-critical:', (e && e.message) || e));
+                        }
+                    } catch (e) {
+                        console.warn('[notifyQuizSubmitted] non-critical:', (e && e.message) || e);
                     }
                 }
 

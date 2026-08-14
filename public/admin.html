@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.46</title>
+    <title>Nika V97.47</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -12020,6 +12020,9 @@
                                     <label class="logic-chip" style="background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); color:#fbbf24;" title="Multi-answer questions award partial points: (correct − wrong) / total correct, min 0. Single-answer unaffected.">
                                         <input type="checkbox" id="quiz-partial-credit"> <span>Partial Credit (multi-answer)</span>
                                     </label>
+                                    <label class="logic-chip" style="background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.3); color:#22d3ee;" title="Push a LINE message the moment an intern submits this quiz (group copy shows the name only, the admin 1:1 copy shows the score). Off = this quiz still appears in the daily 20:00 digest.">
+                                        <input type="checkbox" id="quiz-notify-group"> <span>Notify LINE on submit</span>
+                                    </label>
                                 </div>
                                 <style>
                                     .logic-chip { display:flex; align-items:center; gap:6px; cursor:pointer; padding:6px 12px; border-radius:10px; font-size:0.75em; font-weight:700; transition:all 0.2s; user-select:none; }
@@ -20987,6 +20990,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-total-timer').value = q.totalTimer || 300;
             document.getElementById('quiz-shuffle-choices').checked = q.shuffleChoices !== undefined ? q.shuffleChoices : true;
             { const pc = document.getElementById('quiz-partial-credit'); if (pc) pc.checked = !!q.partialCredit; }
+            { const ng = document.getElementById('quiz-notify-group'); if (ng) ng.checked = !!q.notifyGroup; }
             toggleTimerModeUI();
             toggleHomeworkUI();
             // Load assigned users
@@ -21074,6 +21078,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-total-timer').value = 300;
             document.getElementById('quiz-shuffle-choices').checked = true;
             { const pc = document.getElementById('quiz-partial-credit'); if (pc) pc.checked = false; }
+            { const ng = document.getElementById('quiz-notify-group'); if (ng) ng.checked = false; }
             toggleTimerModeUI();
             toggleHomeworkUI();
             document.getElementById('quiz-type').value = "standard";
@@ -21409,6 +21414,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const totalTimer = parseInt(document.getElementById('quiz-total-timer').value) || 300;
             const shuffleChoices = document.getElementById('quiz-shuffle-choices').checked;
             const partialCredit = document.getElementById('quiz-partial-credit')?.checked || false;
+            // V97.47: opt-in instant LINE push on submit (notifyQuizSubmitted).
+            const notifyGroup = document.getElementById('quiz-notify-group')?.checked || false;
             const quizType = document.getElementById('quiz-type').value;
             const feedbackLimit = parseInt(document.getElementById('quiz-feedback-limit').value) || 280;
             const caseContent = document.getElementById('quiz-case-content').value;
@@ -21451,7 +21458,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             });
 
             return {
-                title, shortTitle, targetGroup, unlockScore, description, tags, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, partialCredit, quizType, feedbackLimit, caseContent, questions, blueprint,
+                title, shortTitle, targetGroup, unlockScore, description, tags, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, partialCredit, notifyGroup, quizType, feedbackLimit, caseContent, questions, blueprint,
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
             };
@@ -24105,6 +24112,7 @@ ${JSON.stringify(sourceObj)}`;
                 totalTimer: formData.totalTimer || 300,
                 shuffleChoices: formData.shuffleChoices !== undefined ? formData.shuffleChoices : true,
                 partialCredit: formData.partialCredit || false,
+                notifyGroup: formData.notifyGroup || false,
                 quizType: formData.quizType || 'standard',
                 feedbackLimit: formData.feedbackLimit || 280,
                 questions: validQuestions,

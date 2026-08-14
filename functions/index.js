@@ -1787,3 +1787,368 @@ exports.notifyPurgeDigest = onSchedule({
 // 2026-10-20 (email 2026-07-29), so there is nothing left to keep alive.
 // Deployed function removed via `firebase functions:delete
 // pingRestrictedGeminiModels --region us-central1`.
+
+// ============================================================
+// LINE group quiz visibility (2026-08-14)
+// ------------------------------------------------------------
+// Two functions, both pushing to the same targets as
+// notifyAdminOnNewCase (ADMIN_LINE_USER_ID 1:1 + optional
+// ADMIN_LINE_GROUP_ID group):
+//
+//   notifyQuizDigest    — scheduled 20:00 Asia/Bangkok. "Who did a
+//                         quiz today" + "who still hasn't" for active
+//                         quizzes whose deadline hasn't passed.
+//   notifyQuizSubmitted — callable, fires per submission but ONLY for
+//                         quizzes the admin flagged `notifyGroup:true`
+//                         (Quiz Engine checkbox). Keeping the instant
+//                         channel opt-in is what stops the OA's shared
+//                         monthly message quota being spent on routine
+//                         submissions.
+//
+// Privacy split (user decision 2026-08-14): the GROUP copy never shows
+// a score — only "name · quiz". The admin 1:1 copy carries the score.
+// Both come from one builder switched by `target.withScores`.
+//
+// No Firestore trigger — asia-southeast3 has no Eventarc support, see
+// memory feedback_firestore_trigger_region_limitation.
+// ============================================================
+const QUIZ_SUBMITTED_STATUSES = ['pending', 'completed', 'graded', 'approved'];
+
+// Push targets shared by both functions. Empty = nothing configured,
+// caller no-ops (so the deploy is safe before the group secret exists).
+function resolveLineTargets(tag) {
+    const adminLineId = process.env.ADMIN_LINE_USER_ID;
+    const adminGroupId = process.env.ADMIN_LINE_GROUP_ID;
+    const targets = [];
+    if (adminLineId && typeof adminLineId === 'string' && adminLineId.startsWith('U')) {
+        targets.push({ to: adminLineId, label: 'admin-1on1', withScores: true });
+    }
+    if (adminGroupId && typeof adminGroupId === 'string' && /^[CR]/.test(adminGroupId)) {
+        targets.push({ to: adminGroupId, label: 'group', withScores: false });
+    }
+    if (!targets.length) console.warn(`[${tag}] no valid push target (ADMIN_LINE_USER_ID / ADMIN_LINE_GROUP_ID) — skipping`);
+    return targets;
+}
+
+// Attempt doc ids are `${quizId}_${userId}` and quiz ids never contain
+// "_" (Firestore auto-ids are alphanumeric) — same assumption the admin
+// UI already makes with `attemptId.split('_')[0]`.
+function splitAttemptId(attemptId) {
+    const sep = String(attemptId || '').indexOf('_');
+    if (sep <= 0) return { quizId: '', userId: '' };
+    return { quizId: attemptId.slice(0, sep), userId: attemptId.slice(sep + 1) };
+}
+
+// Push one Flex per target, each built independently so the group copy
+// can differ from the 1:1 copy. A failure on one target never blocks
+// the other (e.g. OA kicked from the group).
+async function pushLineFlex(tag, targets, buildFlex, logSuffix) {
+    const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    const results = [];
+    for (const target of targets) {
+        try {
+            await axios.post('https://api.line.me/v2/bot/message/push', {
+                to: target.to,
+                messages: [buildFlex(target)]
+            }, {
+                headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                timeout: 8000
+            });
+            console.log(`[${tag}] PUSHED  target=${target.label}  ${logSuffix}`);
+            results.push({ target: target.label, ok: true });
+        } catch (err) {
+            const status = err && err.response ? err.response.status : null;
+            const lineMessage = (err && err.response && err.response.data && err.response.data.message) || (err && err.message) || 'unknown';
+            let code;
+            if (status === 400) code = 'invalid';
+            else if (status === 401) code = 'token';
+            else if (status === 403) code = 'no-friend';
+            else if (status === 404) code = 'invalid-user';
+            else if (status === 429) code = 'rate-limit';
+            else if (status >= 500 && status < 600) code = 'transient';
+            else code = 'network';
+            console.error(`[${tag}] PUSH_FAILED  target=${target.label}  code=${code}  status=${status || 'no-response'}  ${logSuffix}  message=${JSON.stringify(lineMessage)}`);
+            results.push({ target: target.label, ok: false, code, status: status || null });
+        }
+    }
+    return results;
+}
+
+// ============================================================
+// notifyQuizSubmitted  (opt-in instant push)
+// ------------------------------------------------------------
+// Caller: public/index.html submitQuiz(), fire-and-forget after the
+// attempt write. Everything announced is re-read server-side — the
+// client only says WHICH attempt to look at.
+//
+// Input:  { attemptId: string }   (`${quizId}_${userId}`)
+// Auth:   any signed-in user (the intern submitting)
+// Gate:   quizzes/{quizId}.notifyGroup === true, else skipped
+// ============================================================
+exports.notifyQuizSubmitted = onCall(
+    { secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID'] },
+    async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'Login required');
+    }
+    const attemptId = String((request.data || {}).attemptId || '').trim();
+    const { quizId, userId } = splitAttemptId(attemptId);
+    if (!quizId || !userId) {
+        throw new HttpsError('invalid-argument', 'attemptId must look like quizId_userId');
+    }
+    if (!process.env.LINE_CHANNEL_ACCESS_TOKEN) {
+        console.warn(`[notifyQuizSubmitted] LINE_CHANNEL_ACCESS_TOKEN missing — skipping attempt=${attemptId}`);
+        return { skipped: true, reason: 'token-missing' };
+    }
+
+    const db = admin.firestore();
+    let quizData, attemptData;
+    try {
+        const [quizDoc, attemptDoc] = await Promise.all([
+            db.collection('quizzes').doc(quizId).get(),
+            db.collection('quiz_attempts').doc(attemptId).get()
+        ]);
+        if (!quizDoc.exists) return { skipped: true, reason: 'quiz-not-found' };
+        if (!attemptDoc.exists) return { skipped: true, reason: 'attempt-not-found' };
+        quizData = quizDoc.data() || {};
+        attemptData = attemptDoc.data() || {};
+    } catch (err) {
+        console.error(`[notifyQuizSubmitted] Firestore read failed for ${attemptId}:`, err.message);
+        throw new HttpsError('internal', 'failed to read quiz/attempt');
+    }
+
+    // Opt-in gate + never announce practice runs.
+    if (quizData.notifyGroup !== true) return { skipped: true, reason: 'notify-off' };
+    if (attemptData.isPractice === true) return { skipped: true, reason: 'practice' };
+
+    const targets = resolveLineTargets('notifyQuizSubmitted');
+    if (!targets.length) return { skipped: true, reason: 'no-target' };
+
+    let displayName = 'Unknown';
+    try {
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (userDoc.exists) displayName = String((userDoc.data() || {}).displayName || 'Unknown');
+    } catch (err) {
+        console.warn(`[notifyQuizSubmitted] user read failed for ${userId}:`, err.message);
+    }
+    displayName = displayName.slice(0, 60);
+
+    const quizTitle = String(quizData.title || quizData.shortTitle || 'Quiz').slice(0, 80);
+    const totalQ = Number(attemptData.totalQuestions || 0);
+    const correct = Number(attemptData.correctCount || 0);
+    const scoreText = attemptData.isPoll === true
+        ? 'Poll submitted'
+        : (totalQ > 0 ? `${Math.round(correct * 10) / 10}/${totalQ}` : 'awaiting grading');
+
+    const buildFlex = (target) => {
+        const rows = [
+            { type: 'text', text: `📚 ${quizTitle}`, size: 'sm', weight: 'bold', color: '#1f2937', wrap: true }
+        ];
+        if (target.withScores) {
+            rows.push({ type: 'text', text: `🎯 ${scoreText}`, size: 'sm', color: '#4338ca', margin: 'sm', wrap: true });
+        }
+        return {
+            type: 'flex',
+            altText: `✅ ${displayName} finished ${quizTitle}`.slice(0, 400),
+            contents: {
+                type: 'bubble',
+                size: 'kilo',
+                header: {
+                    type: 'box', layout: 'vertical', backgroundColor: '#6366f1', paddingAll: '12px',
+                    contents: [
+                        { type: 'text', text: '✅ Quiz Submitted', weight: 'bold', size: 'sm', color: '#ffffff' },
+                        { type: 'text', text: displayName, size: 'xs', color: '#e0e7ff', margin: 'xs', wrap: true }
+                    ]
+                },
+                body: { type: 'box', layout: 'vertical', paddingAll: '16px', contents: rows }
+            }
+        };
+    };
+
+    const results = await pushLineFlex('notifyQuizSubmitted', targets, buildFlex, `attempt=${attemptId}  user=${displayName}`);
+    const pushedCount = results.filter(r => r.ok).length;
+    return { ok: pushedCount > 0, pushedCount, results, attemptId };
+});
+
+// ============================================================
+// notifyQuizDigest  (the default channel)
+// ------------------------------------------------------------
+// 20:00 Asia/Bangkok daily. One Flex per target:
+//   · "Done today" — every non-practice attempt submitted in the last
+//     24h, one line per intern (group copy omits the score).
+//   · "Not done yet" — for each ACTIVE quiz whose deadline is still in
+//     the future, the eligible interns with no attempt. Eligibility
+//     mirrors the intern app: `assignedUsers` when set, otherwise
+//     everyone whose `group` matches `targetGroup` (Public = everyone).
+// Both sections empty = no push at all (no daily noise, no quota burn).
+//
+// Region us-central1 like the rest of the codebase; the Firestore reads
+// cross regions (db is asia-southeast3), which only costs latency here.
+// ============================================================
+const DIGEST_MAX_ROWS = 12;
+
+exports.notifyQuizDigest = onSchedule({
+    schedule: '0 20 * * *',
+    timeZone: 'Asia/Bangkok',
+    region: 'us-central1',
+    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID']
+}, async (event) => {
+    if (!process.env.LINE_CHANNEL_ACCESS_TOKEN) {
+        console.warn('[notifyQuizDigest] LINE_CHANNEL_ACCESS_TOKEN missing — skipping');
+        return;
+    }
+    const targets = resolveLineTargets('notifyQuizDigest');
+    if (!targets.length) return;
+
+    const db = admin.firestore();
+    const now = admin.firestore.Timestamp.now();
+    const cutoff = admin.firestore.Timestamp.fromMillis(now.toMillis() - 24 * 60 * 60 * 1000);
+
+    // --- users: name lookup + eligibility source ---
+    const userNames = new Map();
+    const users = [];
+    try {
+        const snap = await db.collection('users').get();
+        snap.forEach(doc => {
+            const u = doc.data() || {};
+            const name = (String(u.displayName || '').trim() || doc.id.slice(0, 8)).slice(0, 40);
+            userNames.set(doc.id, name);
+            users.push({ id: doc.id, name: name, group: u.group || 'Public' });
+        });
+    } catch (err) {
+        console.error('[notifyQuizDigest] users read failed:', err.message);
+        return;
+    }
+
+    // --- section 1: submitted in the last 24h ---
+    const doneRows = [];
+    try {
+        const snap = await db.collection('quiz_attempts')
+            .where('timestamp', '>=', cutoff)
+            .orderBy('timestamp', 'asc')
+            .get();
+        const quizTitleCache = new Map();
+        for (const doc of snap.docs) {
+            const a = doc.data() || {};
+            if (a.isPractice === true) continue;
+            if (!QUIZ_SUBMITTED_STATUSES.includes(a.status)) continue;
+            const { quizId, userId } = splitAttemptId(doc.id);
+            if (!quizId || !userId) continue;
+            if (!quizTitleCache.has(quizId)) {
+                try {
+                    const qDoc = await db.collection('quizzes').doc(quizId).get();
+                    quizTitleCache.set(quizId, qDoc.exists ? String((qDoc.data() || {}).title || 'Quiz').slice(0, 40) : 'Quiz');
+                } catch (err) {
+                    quizTitleCache.set(quizId, 'Quiz');
+                }
+            }
+            const totalQ = Number(a.totalQuestions || 0);
+            const correct = Number(a.correctCount || 0);
+            doneRows.push({
+                name: userNames.get(userId) || userId.slice(0, 8),
+                quiz: quizTitleCache.get(quizId),
+                score: a.isPoll === true ? 'poll' : (totalQ > 0 ? `${Math.round(correct * 10) / 10}/${totalQ}` : '—')
+            });
+        }
+    } catch (err) {
+        console.error('[notifyQuizDigest] quiz_attempts read failed:', err.message);
+        return;
+    }
+
+    // --- section 2: still pending on deadline-bound active quizzes ---
+    const pendingBlocks = [];
+    try {
+        const quizSnap = await db.collection('quizzes').where('isActive', '==', true).get();
+        for (const qDoc of quizSnap.docs) {
+            const q = qDoc.data() || {};
+            const deadlineMs = q.deadline && typeof q.deadline.toMillis === 'function'
+                ? q.deadline.toMillis()
+                : (q.deadline ? Date.parse(q.deadline) : NaN);
+            if (!deadlineMs || isNaN(deadlineMs) || deadlineMs <= now.toMillis()) continue;
+
+            const assigned = Array.isArray(q.assignedUsers) ? q.assignedUsers.filter(Boolean) : [];
+            const targetGroup = q.targetGroup || 'Public';
+            const eligible = assigned.length
+                ? users.filter(u => assigned.includes(u.id))
+                : users.filter(u => targetGroup === 'Public' || u.group === targetGroup);
+            if (!eligible.length) continue;
+
+            // Attempt ids are prefixed with the quiz id, so a documentId
+            // range read returns exactly this quiz's attempts. The upper
+            // bound is the quiz id + ` (0x60), the character right after
+            // _ (0x5F), so every quizId_* doc id sorts inside the range.
+            const attemptSnap = await db.collection('quiz_attempts')
+                .where(admin.firestore.FieldPath.documentId(), '>=', `${qDoc.id}_`)
+                .where(admin.firestore.FieldPath.documentId(), '<', qDoc.id + '`')
+                .get();
+            const doneIds = new Set();
+            attemptSnap.forEach(aDoc => {
+                const a = aDoc.data() || {};
+                if (a.isPractice === true) return;
+                if (!QUIZ_SUBMITTED_STATUSES.includes(a.status)) return;
+                doneIds.add(splitAttemptId(aDoc.id).userId);
+            });
+
+            const missing = eligible.filter(u => !doneIds.has(u.id));
+            if (!missing.length) continue;
+            pendingBlocks.push({
+                quiz: String(q.title || 'Quiz').slice(0, 40),
+                deadline: new Date(deadlineMs).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: 'short' }),
+                names: missing.map(u => u.name),
+                doneCount: doneIds.size,
+                totalCount: eligible.length
+            });
+        }
+    } catch (err) {
+        // Non-fatal — still send the "done today" half.
+        console.error('[notifyQuizDigest] pending scan failed:', err.message);
+    }
+
+    if (!doneRows.length && !pendingBlocks.length) {
+        console.log('[notifyQuizDigest] nothing to report — no push');
+        return;
+    }
+
+    const buildFlex = (target) => {
+        const body = [];
+        body.push({ type: 'text', text: `✅ Done today · ${doneRows.length}`, size: 'xs', weight: 'bold', color: '#059669' });
+        if (doneRows.length) {
+            doneRows.slice(0, DIGEST_MAX_ROWS).forEach(r => {
+                const line = target.withScores ? `${r.name} · ${r.quiz} · ${r.score}` : `${r.name} · ${r.quiz}`;
+                body.push({ type: 'text', text: line, size: 'sm', color: '#1f2937', wrap: true, margin: 'xs' });
+            });
+            if (doneRows.length > DIGEST_MAX_ROWS) {
+                body.push({ type: 'text', text: `+${doneRows.length - DIGEST_MAX_ROWS} more`, size: 'xs', color: '#94a3b8', margin: 'xs' });
+            }
+        } else {
+            body.push({ type: 'text', text: 'No submissions today', size: 'sm', color: '#94a3b8', margin: 'xs' });
+        }
+
+        pendingBlocks.forEach(blk => {
+            body.push({ type: 'separator', margin: 'md' });
+            body.push({ type: 'text', text: `⏳ ${blk.quiz} · due ${blk.deadline} · ${blk.doneCount}/${blk.totalCount}`, size: 'xs', weight: 'bold', color: '#b45309', margin: 'md', wrap: true });
+            const shown = blk.names.slice(0, DIGEST_MAX_ROWS).join(', ');
+            const overflow = blk.names.length > DIGEST_MAX_ROWS ? ` +${blk.names.length - DIGEST_MAX_ROWS} more` : '';
+            body.push({ type: 'text', text: `${shown}${overflow}`, size: 'sm', color: '#1f2937', wrap: true, margin: 'xs' });
+        });
+
+        return {
+            type: 'flex',
+            altText: `📊 Quiz digest — ${doneRows.length} done today`.slice(0, 400),
+            contents: {
+                type: 'bubble',
+                size: 'kilo',
+                header: {
+                    type: 'box', layout: 'vertical', backgroundColor: '#0f766e', paddingAll: '12px',
+                    contents: [
+                        { type: 'text', text: '📊 Daily Quiz Digest', weight: 'bold', size: 'sm', color: '#ffffff' },
+                        { type: 'text', text: new Date(now.toMillis()).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', weekday: 'short', day: '2-digit', month: 'short' }), size: 'xs', color: '#ccfbf1', margin: 'xs' }
+                    ]
+                },
+                body: { type: 'box', layout: 'vertical', paddingAll: '16px', spacing: 'none', contents: body }
+            }
+        };
+    };
+
+    await pushLineFlex('notifyQuizDigest', targets, buildFlex, `done=${doneRows.length}  pendingQuizzes=${pendingBlocks.length}`);
+});
