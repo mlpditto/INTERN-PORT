@@ -1787,3 +1787,44 @@ exports.notifyPurgeDigest = onSchedule({
 // 2026-10-20 (email 2026-07-29), so there is nothing left to keep alive.
 // Deployed function removed via `firebase functions:delete
 // pingRestrictedGeminiModels --region us-central1`.
+
+// ============================================================
+// lineWebhook (2026-08-14) — TEMPORARY group-id probe
+// ------------------------------------------------------------
+// Why this exists: the V95.66 `?lgid=1` LIFF screen turned out to
+// report a UUID (e.g. 56460123-58c1-4317-…), not a `C…` id. LIFF
+// context ids are issued per LINE Login channel and live in a
+// different namespace from the Messaging API — they cannot be used
+// as a push target. The only source of the real group id is a
+// webhook event's `source.groupId`, which LINE sends when the OA is
+// a member of the group and someone posts in it.
+//
+// Setup (LINE Developers Console → Messaging API channel):
+//   Webhook URL   = this function's URL
+//   Use webhook   = ON
+// then post any message in the target group and read:
+//   firebase functions:log --only lineWebhook
+//
+// DELETE AFTER USE:
+//   firebase functions:delete lineWebhook --region us-central1
+//
+// Logs ids and event types ONLY — never message text, never the
+// sender's user id. Always answers 200 so LINE keeps the webhook
+// enabled (a non-200 makes LINE disable it after repeated failures).
+// ============================================================
+exports.lineWebhook = onRequest({ cors: false, timeoutSeconds: 15, memory: "128MiB" }, async (req, res) => {
+    try {
+        const events = (req.body && Array.isArray(req.body.events)) ? req.body.events : [];
+        if (!events.length) {
+            // LINE's "Verify" button sends an empty events array.
+            console.log('[lineWebhook] handshake / empty events — endpoint reachable');
+        }
+        events.forEach(ev => {
+            const s = ev.source || {};
+            console.log(`[lineWebhook] event=${ev.type || '?'}  sourceType=${s.type || '?'}  groupId=${s.groupId || '-'}  roomId=${s.roomId || '-'}`);
+        });
+    } catch (err) {
+        console.error('[lineWebhook] handler error:', err.message);
+    }
+    res.status(200).send('OK');
+});
