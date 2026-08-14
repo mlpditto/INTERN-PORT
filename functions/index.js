@@ -1875,16 +1875,97 @@ async function pushLineFlex(tag, targets, buildFlex, logSuffix) {
 }
 
 // ============================================================
-// notifyQuizSubmitted  (opt-in instant push)
+// notifyQuizSubmitted  (milestone push)
 // ------------------------------------------------------------
 // Caller: public/index.html submitQuiz(), fire-and-forget after the
-// attempt write. Everything announced is re-read server-side — the
-// client only says WHICH attempt to look at.
+// attempt write, for every non-practice submission. Everything
+// announced is re-read server-side — the client only says WHICH
+// attempt to look at.
 //
 // Input:  { attemptId: string }   (`${quizId}_${userId}`)
 // Auth:   any signed-in user (the intern submitting)
-// Gate:   quizzes/{quizId}.notifyGroup === true, else skipped
+//
+// What actually gets pushed (user decision 2026-08-14): announcing
+// every submission would cost one message per intern per quiz, and the
+// OA's free plan carries 300 messages/month shared with the case /
+// review / digest pushes — a single PharmCamp-sized run (10 quizzes ×
+// 18 interns) would blow the month's budget on its own. So an ACTIVE
+// quiz announces two moments only:
+//
+//   first     — the first intern submits  → "someone has started"
+//   complete  — every eligible intern has submitted → "N/N done"
+//
+// = 2 messages per quiz no matter how many people take it. The daily
+// digest already carries the per-person detail.
+//
+// quizzes.notifyGroup === true keeps the old per-submission behaviour
+// as an explicit override for quizzes worth watching live.
+//
+// Milestones are claimed in a transaction on quiz_notify_state/{quizId}
+// so two interns submitting in the same second can't double-post.
 // ============================================================
+const QUIZ_NOTIFY_STATE = 'quiz_notify_state';
+
+// Eligibility mirrors the intern app: assignedUsers when set, else
+// everyone whose group matches targetGroup ("Public" = everyone).
+function eligibleForQuiz(quizData, users) {
+    const assigned = Array.isArray(quizData.assignedUsers) ? quizData.assignedUsers.filter(Boolean) : [];
+    if (assigned.length) return users.filter(u => assigned.includes(u.id));
+    const targetGroup = quizData.targetGroup || 'Public';
+    return users.filter(u => targetGroup === 'Public' || u.group === targetGroup);
+}
+
+async function loadUsersLite(db) {
+    const snap = await db.collection('users').get();
+    const users = [];
+    snap.forEach(doc => {
+        const u = doc.data() || {};
+        users.push({
+            id: doc.id,
+            name: (String(u.displayName || '').trim() || doc.id.slice(0, 8)).slice(0, 40),
+            group: u.group || 'Public'
+        });
+    });
+    return users;
+}
+
+// Every distinct user with a real (non-practice) submission for a quiz.
+// Attempt ids are `${quizId}_${userId}`, so a documentId range read
+// returns exactly this quiz's attempts — upper bound is the quiz id +
+// "`" (0x60), the character right after "_" (0x5F).
+async function submittersForQuiz(db, quizId) {
+    const snap = await db.collection('quiz_attempts')
+        .where(admin.firestore.FieldPath.documentId(), '>=', `${quizId}_`)
+        .where(admin.firestore.FieldPath.documentId(), '<', quizId + '`')
+        .get();
+    const ids = new Set();
+    snap.forEach(doc => {
+        const a = doc.data() || {};
+        if (a.isPractice === true) return;
+        if (!QUIZ_SUBMITTED_STATUSES.includes(a.status)) return;
+        const { userId } = splitAttemptId(doc.id);
+        if (userId) ids.add(userId);
+    });
+    return ids;
+}
+
+// Returns true if THIS call won the right to announce the milestone.
+async function claimQuizMilestone(db, quizId, milestone) {
+    const ref = db.collection(QUIZ_NOTIFY_STATE).doc(quizId);
+    try {
+        return await db.runTransaction(async tx => {
+            const doc = await tx.get(ref);
+            const data = doc.exists ? (doc.data() || {}) : {};
+            if (data[milestone]) return false;
+            tx.set(ref, { [milestone]: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+            return true;
+        });
+    } catch (err) {
+        console.error(`[notifyQuizSubmitted] milestone claim failed quiz=${quizId} milestone=${milestone}:`, err.message);
+        return false;
+    }
+}
+
 exports.notifyQuizSubmitted = onCall(
     { secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID'] },
     async (request) => {
@@ -1917,9 +1998,12 @@ exports.notifyQuizSubmitted = onCall(
         throw new HttpsError('internal', 'failed to read quiz/attempt');
     }
 
-    // Opt-in gate + never announce practice runs.
-    if (quizData.notifyGroup !== true) return { skipped: true, reason: 'notify-off' };
     if (attemptData.isPractice === true) return { skipped: true, reason: 'practice' };
+
+    const alwaysNotify = quizData.notifyGroup === true;
+    // Milestone mode only watches quizzes that are live; the override
+    // stays usable on a quiz the admin has already closed.
+    if (!alwaysNotify && quizData.isActive !== true) return { skipped: true, reason: 'inactive' };
 
     const targets = resolveLineTargets('notifyQuizSubmitted');
     if (!targets.length) return { skipped: true, reason: 'no-target' };
@@ -1940,24 +2024,54 @@ exports.notifyQuizSubmitted = onCall(
         ? 'Poll submitted'
         : (totalQ > 0 ? `${Math.round(correct * 10) / 10}/${totalQ}` : 'awaiting grading');
 
+    // ---- decide whether this submission is worth a message ----
+    let milestone = null;          // 'first' | 'complete' | null
+    let submittedCount = 0, eligibleCount = 0;
+    if (!alwaysNotify) {
+        try {
+            const submitters = await submittersForQuiz(db, quizId);
+            submittedCount = submitters.size;
+            if (submittedCount === 1) {
+                milestone = 'first';
+            } else if (submittedCount > 1) {
+                const users = await loadUsersLite(db);
+                eligibleCount = eligibleForQuiz(quizData, users).length;
+                if (eligibleCount > 0 && submittedCount >= eligibleCount) milestone = 'complete';
+            }
+        } catch (err) {
+            console.error(`[notifyQuizSubmitted] milestone scan failed quiz=${quizId}:`, err.message);
+            return { skipped: true, reason: 'scan-failed' };
+        }
+        if (!milestone) return { skipped: true, reason: 'no-milestone', submittedCount };
+        const won = await claimQuizMilestone(db, quizId, milestone);
+        if (!won) return { skipped: true, reason: 'already-announced', milestone };
+    }
+
+    const headline = milestone === 'first'
+        ? '🎬 เริ่มมีคนทำแล้ว'
+        : (milestone === 'complete' ? '✅ ทำครบทุกคนแล้ว' : '✅ Quiz Submitted');
+    const headerColor = milestone === 'complete' ? '#0f766e' : '#6366f1';
+
     const buildFlex = (target) => {
         const rows = [
             { type: 'text', text: `📚 ${quizTitle}`, size: 'sm', weight: 'bold', color: '#1f2937', wrap: true }
         ];
-        if (target.withScores) {
+        if (milestone === 'complete') {
+            rows.push({ type: 'text', text: `👥 ${submittedCount}/${eligibleCount} คน`, size: 'sm', color: '#0f766e', margin: 'sm', wrap: true });
+        } else if (target.withScores) {
             rows.push({ type: 'text', text: `🎯 ${scoreText}`, size: 'sm', color: '#4338ca', margin: 'sm', wrap: true });
         }
         return {
             type: 'flex',
-            altText: `✅ ${displayName} finished ${quizTitle}`.slice(0, 400),
+            altText: `${headline} — ${quizTitle}`.slice(0, 400),
             contents: {
                 type: 'bubble',
                 size: 'kilo',
                 header: {
-                    type: 'box', layout: 'vertical', backgroundColor: '#6366f1', paddingAll: '12px',
+                    type: 'box', layout: 'vertical', backgroundColor: headerColor, paddingAll: '12px',
                     contents: [
-                        { type: 'text', text: '✅ Quiz Submitted', weight: 'bold', size: 'sm', color: '#ffffff' },
-                        { type: 'text', text: displayName, size: 'xs', color: '#e0e7ff', margin: 'xs', wrap: true }
+                        { type: 'text', text: headline, weight: 'bold', size: 'sm', color: '#ffffff' },
+                        { type: 'text', text: milestone === 'complete' ? quizTitle : displayName, size: 'xs', color: '#e0e7ff', margin: 'xs', wrap: true }
                     ]
                 },
                 body: { type: 'box', layout: 'vertical', paddingAll: '16px', contents: rows }
@@ -1965,9 +2079,9 @@ exports.notifyQuizSubmitted = onCall(
         };
     };
 
-    const results = await pushLineFlex('notifyQuizSubmitted', targets, buildFlex, `attempt=${attemptId}  user=${displayName}`);
+    const results = await pushLineFlex('notifyQuizSubmitted', targets, buildFlex, `attempt=${attemptId}  milestone=${milestone || 'override'}  user=${displayName}`);
     const pushedCount = results.filter(r => r.ok).length;
-    return { ok: pushedCount > 0, pushedCount, results, attemptId };
+    return { ok: pushedCount > 0, pushedCount, results, attemptId, milestone: milestone || 'override' };
 });
 
 // ============================================================
@@ -2066,11 +2180,7 @@ exports.notifyQuizDigest = onSchedule({
                 : (q.deadline ? Date.parse(q.deadline) : NaN);
             if (!deadlineMs || isNaN(deadlineMs) || deadlineMs <= now.toMillis()) continue;
 
-            const assigned = Array.isArray(q.assignedUsers) ? q.assignedUsers.filter(Boolean) : [];
-            const targetGroup = q.targetGroup || 'Public';
-            const eligible = assigned.length
-                ? users.filter(u => assigned.includes(u.id))
-                : users.filter(u => targetGroup === 'Public' || u.group === targetGroup);
+            const eligible = eligibleForQuiz(q, users);
             if (!eligible.length) continue;
 
             // Attempt ids are prefixed with the quiz id, so a documentId
