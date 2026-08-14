@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.48</title>
+    <title>Nika V97.49</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -28524,6 +28524,17 @@ ${JSON.stringify(sourceObj)}`;
                 // V95.44: หมวด chips mirroring the Dashboard Quiz Coverage widget. Click
                 // opens the same per-system list modal (works from any tab — the modal is
                 // static and covByQuiz guarantees _qcovBuckets is fresh this render).
+                // V97.49: LINE notify badge. Milestone announcements (first submitter /
+                // everyone finished) run automatically on any quiz with isActive, so the
+                // badge says which mode this row is in and flips the per-submission
+                // override in one click — same pattern as the V95.43 TEMPLATE badge.
+                // Keyed off q.isActive (not the section) to match what the Cloud Function
+                // actually gates on.
+                const notifyLabel = q.isActive === true
+                    ? (q.notifyGroup
+                        ? `<span class="badge" title="แจ้ง LINE ทุกครั้งที่มีคนส่ง (1 ข้อความ/คน) — คลิกเพื่อกลับไปโหมดหมุดหมาย" style="background:#0891b2; color:white; margin-left:5px; cursor:pointer;" onclick="event.stopPropagation(); toggleQuizNotify('${q.id}', true)">🔔 ทุกครั้ง</span>`
+                        : `<span class="badge" title="โหมดหมุดหมาย: ประกาศเข้ากลุ่ม LINE เมื่อคนแรกส่ง และเมื่อครบทุกคน (2 ข้อความ/ชุด) — คลิกเพื่อเปลี่ยนเป็นแจ้งทุกครั้ง" style="background:#ecfeff; color:#0e7490; border:1px solid #a5f3fc; margin-left:5px; cursor:pointer;" onclick="event.stopPropagation(); toggleQuizNotify('${q.id}', false)">🔔 หมุดหมาย</span>`)
+                    : '';
                 const _covList = covByQuiz[q.id] || [];
                 const systemLabel = _covList.length
                     ? _covList.map(s => `<span class="badge" title="หมวดตาม Quiz Coverage — คลิกดู quiz ในหมวดนี้" style="background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe; margin-left:5px; cursor:pointer;" onclick="event.stopPropagation(); window.openQuizCoverageList('${s.key}', '${q.id}')">${s.emoji} ${escapeHtml(s.label.en)}</span>`).join('')
@@ -28579,7 +28590,7 @@ ${JSON.stringify(sourceObj)}`;
                             </div>
                             <div style="display:flex; flex-wrap:wrap; gap:3px; align-items:center;">
                                 ${_liveTag} ${modeLabel} ${oneTimeLabel} ${homeworkLabel}
-                                ${pollLabel} ${subjLabel} ${orderingLabel} ${flashcardLabel} ${templateLabel} ${targetGroupLabel} ${unlockLabel} ${materialsLabel} ${clicksLabel} ${systemLabel}
+                                ${pollLabel} ${subjLabel} ${orderingLabel} ${flashcardLabel} ${templateLabel} ${targetGroupLabel} ${unlockLabel} ${materialsLabel} ${clicksLabel} ${notifyLabel} ${systemLabel}
                             </div>
                             <div style="margin-top:4px;"><small style="color:#999;">(${q.shortTitle || '-'})</small></div>
                         </td>
@@ -29429,6 +29440,18 @@ RULES:
                 <div style="font-size:0.85em; color:#1e293b; margin-bottom:6px; white-space:pre-wrap;">${escapeHtml(quizCompareStripMd(question.q))}</div>
                 ${opts}
             </div>`;
+        }
+
+        // V97.49: flip quizzes.notifyGroup from the list row. OFF = milestone mode
+        // (the Cloud Function announces the first submitter and the "everyone done"
+        // moment on its own); ON = one LINE message per submission.
+        async function toggleQuizNotify(id, current) {
+            try {
+                await db.collection("quizzes").doc(id).update({ notifyGroup: !current });
+                showToast(!current ? '🔔 แจ้ง LINE ทุกครั้งที่มีคนส่ง' : '🔔 กลับไปโหมดหมุดหมาย (คนแรก + ครบทุกคน)');
+            } catch (e) {
+                alert("Error: " + e.message);
+            }
         }
 
         async function toggleTemplateStatus(id, current) {
