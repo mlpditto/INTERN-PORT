@@ -1795,9 +1795,13 @@ exports.notifyPurgeDigest = onSchedule({
 // notifyAdminOnNewCase (ADMIN_LINE_USER_ID 1:1 + optional
 // ADMIN_LINE_GROUP_ID group):
 //
-//   notifyQuizDigest    — scheduled 20:00 Asia/Bangkok. "Who did a
+//   notifyQuizDigest    — scheduled 16:00 Asia/Bangkok (was 20:00 until
+//                         2026-08-15). "What went live today" + "who did a
 //                         quiz today" + "who still hasn't" for active
-//                         quizzes whose deadline hasn't passed.
+//                         quizzes whose deadline hasn't passed. The window
+//                         is a rolling 24h, not midnight-to-now, so moving
+//                         the hour shifts the frame without leaving a gap
+//                         or double-reporting anyone.
 //   notifyQuizSubmitted — callable, fires per submission but ONLY for
 //                         quizzes the admin flagged `notifyGroup:true`
 //                         (Quiz Engine checkbox). Keeping the instant
@@ -2165,7 +2169,14 @@ exports.notifyQuizSubmitted = onCall(
 // ============================================================
 // notifyQuizDigest  (the default channel)
 // ------------------------------------------------------------
-// 20:00 Asia/Bangkok daily. One Flex per target:
+// 16:00 Asia/Bangkok daily. One Flex per target:
+//   · "Went live today" — quizzes that became available inside the same 24h
+//     window, so the group learns about a new quiz from the digest instead
+//     of only from the app. Uses `lastLiveAt` (stamped at every go-live
+//     path in admin.html since V95.62) and falls back to `createdAt`,
+//     because a freshly created quiz is born isActive:true without ever
+//     passing through the toggle that writes lastLiveAt. Editing an old
+//     quiz bumps `updatedAt` only, so edits deliberately do NOT show here.
 //   · "Done today" — non-practice attempts from the last 24h, folded to
 //     ONE line per intern (V97.51: was one line per attempt, so a person
 //     who did 2 quizzes appeared twice). Group copy omits the score.
@@ -2206,8 +2217,24 @@ function digestCleanName(raw) {
     return cleaned || String(raw || '').trim();
 }
 
+// When a quiz became available. lastLiveAt is written by every go-live path
+// (toggleQuizStatus, bulk activate, force-active); createdAt covers quizzes
+// born active from the editor, which never touch those paths. Docs that went
+// live before V95.62 have neither backfilled — they are not "new today"
+// anyway, so returning NaN is the right answer for them.
+function digestWentLiveMs(q) {
+    for (const v of [q && q.lastLiveAt, q && q.createdAt]) {
+        if (v && typeof v.toMillis === 'function') return v.toMillis();
+        if (v) {
+            const parsed = Date.parse(v);
+            if (!isNaN(parsed)) return parsed;
+        }
+    }
+    return NaN;
+}
+
 exports.notifyQuizDigest = onSchedule({
-    schedule: '0 20 * * *',
+    schedule: '0 16 * * *',
     timeZone: 'Asia/Bangkok',
     region: 'us-central1',
     secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID']
@@ -2309,7 +2336,11 @@ exports.notifyQuizDigest = onSchedule({
     }
 
     // --- section 2: still pending on deadline-bound active quizzes ---
+    // newlyLive is collected in the same pass but BEFORE the filters below —
+    // a quiz that just went live may have no deadline, or already be finished
+    // by everyone, and it should still be announced in both cases.
     const pendingBlocks = [];
+    const newlyLive = [];
     try {
         const quizSnap = await db.collection('quizzes').where('isActive', '==', true).get();
         for (const qDoc of quizSnap.docs) {
@@ -2317,6 +2348,18 @@ exports.notifyQuizDigest = onSchedule({
             const deadlineMs = q.deadline && typeof q.deadline.toMillis === 'function'
                 ? q.deadline.toMillis()
                 : (q.deadline ? Date.parse(q.deadline) : NaN);
+
+            const wentLiveMs = digestWentLiveMs(q);
+            if (!isNaN(wentLiveMs) && wentLiveMs >= cutoff.toMillis()) {
+                const dueSoon = deadlineMs && !isNaN(deadlineMs) && deadlineMs > now.toMillis();
+                newlyLive.push({
+                    quiz: String(q.title || 'Quiz').slice(0, 60),
+                    deadline: dueSoon
+                        ? new Date(deadlineMs).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: 'short' })
+                        : ''
+                });
+            }
+
             if (!deadlineMs || isNaN(deadlineMs) || deadlineMs <= now.toMillis()) continue;
 
             // V97.51 (A): active cohort only — see NOTIFY_ACTIVE_DAYS.
@@ -2363,7 +2406,7 @@ exports.notifyQuizDigest = onSchedule({
         console.error('[notifyQuizDigest] pending scan failed:', err.message);
     }
 
-    if (!doneRows.length && !pendingBlocks.length) {
+    if (!doneRows.length && !pendingBlocks.length && !newlyLive.length) {
         console.log('[notifyQuizDigest] nothing to report — no push');
         return;
     }
@@ -2377,7 +2420,26 @@ exports.notifyQuizDigest = onSchedule({
 
     const buildFlex = (target) => {
         const body = [];
-        body.push({ type: 'text', text: `✅ Done today · ${donePeople.length}`, size: 'xs', weight: 'bold', color: '#059669' });
+
+        // Leads the message: a quiz opening is the one item here that needs
+        // action rather than review, and it is short enough not to push the
+        // roster down. Same for both targets — no scores involved.
+        if (newlyLive.length) {
+            body.push({ type: 'text', text: `🆕 Went live today · ${newlyLive.length}`, size: 'xs', weight: 'bold', color: '#4338ca' });
+            newlyLive.slice(0, DIGEST_MAX_ROWS).forEach(n => {
+                body.push({
+                    type: 'text',
+                    text: n.deadline ? `${n.quiz} · due ${n.deadline}` : n.quiz,
+                    size: 'sm', color: '#1f2937', wrap: true, margin: 'xs'
+                });
+            });
+            if (newlyLive.length > DIGEST_MAX_ROWS) {
+                body.push({ type: 'text', text: `+${newlyLive.length - DIGEST_MAX_ROWS} more`, size: 'xs', color: '#94a3b8', margin: 'xs' });
+            }
+            body.push({ type: 'separator', margin: 'md' });
+        }
+
+        body.push({ type: 'text', text: `✅ Done today · ${donePeople.length}`, size: 'xs', weight: 'bold', color: '#059669', margin: newlyLive.length ? 'md' : 'none' });
         if (donePeople.length) {
             donePeople.slice(0, DIGEST_MAX_ROWS).forEach(p => {
                 let line;
@@ -2430,7 +2492,7 @@ exports.notifyQuizDigest = onSchedule({
 
         return {
             type: 'flex',
-            altText: `📊 Quiz digest — ${donePeople.length} done today`.slice(0, 400),
+            altText: `📊 Quiz digest — ${newlyLive.length ? `${newlyLive.length} new · ` : ''}${donePeople.length} done today`.slice(0, 400),
             contents: {
                 type: 'bubble',
                 size: 'kilo',
@@ -2446,5 +2508,5 @@ exports.notifyQuizDigest = onSchedule({
         };
     };
 
-    await pushLineFlex('notifyQuizDigest', targets, buildFlex, `donePeople=${donePeople.length} (attempts=${doneRows.length})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  cohort=${activeUsers.length}/${users.length}`);
+    await pushLineFlex('notifyQuizDigest', targets, buildFlex, `newlyLive=${newlyLive.length}  donePeople=${donePeople.length} (attempts=${doneRows.length})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  cohort=${activeUsers.length}/${users.length}`);
 });
