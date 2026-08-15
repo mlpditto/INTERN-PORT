@@ -1966,10 +1966,18 @@ function userLastSeenMs(u) {
     return NaN;
 }
 
-// Expects the `active` flag already computed (loadUsersLite / the digest's own
-// reader both set it) so this stays a pure, cheap filter.
+// Expects `active` and `ignored` already computed (loadUsersLite / the digest's
+// own reader both set them) so this stays a pure, cheap filter.
+//
+// `ignored` is the admin's own call, made in User Hub (toggleIgnoreUser writes
+// users.isIgnored). Until 2026-08-15 the notify paths never read it, so the
+// only thing keeping anyone out was a stale lastSeen — which meant accounts the
+// admin uses daily (their own admin login, phone-number test users) could never
+// be excluded, while genuinely retired interns would silently reappear the
+// moment they opened the app once. Recency and intent are different questions;
+// this filter now asks both.
 function activeCohort(users) {
-    return (users || []).filter(u => u.active && !NOTIFY_EXCLUDE_GROUPS.includes(u.group));
+    return (users || []).filter(u => u.active && !u.ignored && !NOTIFY_EXCLUDE_GROUPS.includes(u.group));
 }
 
 // Eligibility mirrors the intern app: assignedUsers when set, else
@@ -1992,7 +2000,8 @@ async function loadUsersLite(db) {
             id: doc.id,
             name: (String(u.displayName || '').trim() || doc.id.slice(0, 8)).slice(0, 40),
             group: u.group || 'Public',
-            active: Number.isFinite(lastSeenMs) && lastSeenMs >= activeCutoffMs
+            active: Number.isFinite(lastSeenMs) && lastSeenMs >= activeCutoffMs,
+            ignored: u.isIgnored === true
         });
     });
     return users;
@@ -2271,7 +2280,8 @@ exports.notifyQuizDigest = onSchedule({
                 id: doc.id,
                 name: name,
                 group: u.group || 'Public',
-                active: Number.isFinite(lastSeenMs) && lastSeenMs >= activeCutoffMs
+                active: Number.isFinite(lastSeenMs) && lastSeenMs >= activeCutoffMs,
+                ignored: u.isIgnored === true
             });
         });
         activeUsers = activeCohort(users);
@@ -2280,7 +2290,12 @@ exports.notifyQuizDigest = onSchedule({
         return;
     }
     const hiddenUserCount = users.length - activeUsers.length;
-    console.log(`[notifyQuizDigest] cohort: ${activeUsers.length} active / ${users.length} total (hidden ${hiddenUserCount}, window ${NOTIFY_ACTIVE_DAYS}d)`);
+    // Break the hidden count down by reason — "hidden 21" alone can't tell you
+    // whether to retune NOTIFY_ACTIVE_DAYS or to go flip someone in User Hub.
+    const hiddenStale = users.filter(u => !u.active).length;
+    const hiddenIgnored = users.filter(u => u.active && u.ignored).length;
+    const hiddenGroup = users.filter(u => u.active && !u.ignored && NOTIFY_EXCLUDE_GROUPS.includes(u.group)).length;
+    console.log(`[notifyQuizDigest] cohort: ${activeUsers.length} active / ${users.length} total (hidden ${hiddenUserCount} = ${hiddenStale} stale + ${hiddenIgnored} ignored + ${hiddenGroup} excluded-group, window ${NOTIFY_ACTIVE_DAYS}d)`);
 
     // --- section 1: submitted in the last 24h ---
     const doneRows = [];
@@ -2485,7 +2500,7 @@ exports.notifyQuizDigest = onSchedule({
             body.push({ type: 'separator', margin: 'md' });
             body.push({
                 type: 'text',
-                text: `นับเฉพาะผู้ใช้งานใน ${NOTIFY_ACTIVE_DAYS} วัน · ${activeUsers.length}/${users.length} คน (ซ่อน ${hiddenUserCount})`,
+                text: `นับเฉพาะผู้ใช้งานใน ${NOTIFY_ACTIVE_DAYS} วัน ที่ไม่ได้ซ่อนไว้ · ${activeUsers.length}/${users.length} คน (ซ่อน ${hiddenUserCount})`,
                 size: 'xxs', color: '#94a3b8', margin: 'md', wrap: true
             });
         }
