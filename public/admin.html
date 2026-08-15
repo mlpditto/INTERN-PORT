@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.52</title>
+    <title>Nika V97.53</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -6334,6 +6334,25 @@
                         </summary>
                         <div id="qcov-grid" style="padding:12px 14px; border-top:1px solid #eef2ff; display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px;"></div>
                     </details>
+
+                    <!-- V97.53: LINE push quota for the current Bangkok month, read from
+                         line_usage/{YYYY-MM} (written by pushLineFlex via the Admin SDK).
+                         The OA free plan carries 300 pushes/month shared by the quiz digest,
+                         milestone announcements and case notifications — milestone mode exists
+                         to protect that cap, so the cap belongs on the dashboard next to it.
+                         Hidden entirely until the first push of the month is recorded.
+                         lang-no-toggle: the Thai labels must survive admin's EN-default toggle. -->
+                    <div id="line-usage-panel" class="lang-no-toggle" style="display:none; margin-top:10px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; padding:12px 14px;">
+                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <span style="font-weight:700; color:var(--primary);"><i class="fa-solid fa-paper-plane"></i> LINE เดือนนี้</span>
+                            <span id="line-usage-count" style="font-weight:800; font-size:0.95em;"></span>
+                            <span id="line-usage-breakdown" style="font-size:0.78em; color:#64748b; margin-left:auto;"></span>
+                        </div>
+                        <div style="margin-top:8px; height:8px; background:#eef2f7; border-radius:999px; overflow:hidden;">
+                            <div id="line-usage-bar" style="height:100%; width:0%; border-radius:999px; background:#22c55e; transition:width 0.3s;"></div>
+                        </div>
+                        <div id="line-usage-note" style="margin-top:6px; font-size:0.72em; color:#94a3b8;"></div>
+                    </div>
 
                     <!-- 🔥 Relocated Review Sections inside Dashboard Kanban area -->
                     <div id="review-sections-container" style="margin-top:10px;">
@@ -20732,6 +20751,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             loadData();
             initKanban();
             startCodexDraftBadges(); // V95.67: surface pending Drug/Disease drafts on the Dashboard
+            if (window.loadLineUsage) window.loadLineUsage(); // V97.53: LINE push quota card
             setInterval(updateRealtimeTimers, 1000);
             setInterval(updateQuizCountdown, 1000); // Quiz Countdown
             document.addEventListener('keydown', (e) => { if (e.key === "Escape") document.querySelectorAll('.modal').forEach(m => { m.setAttribute('style','display:none;'); }); });
@@ -30628,6 +30648,68 @@ RULES:
                 });
                 window._qcovBuckets = buckets;
                 return buckets;
+            };
+
+            // V97.53: LINE push quota card. Reads line_usage/{YYYY-MM} (written by
+            // pushLineFlex via the Admin SDK; rules give admin read-only). The OA free
+            // plan allows 300 pushes/month shared by digest + milestone + case notify —
+            // milestone mode exists to protect that cap, so surface the cap itself.
+            // One doc read per dashboard load, no listener: the number moves a handful
+            // of times a day, so live-streaming it would cost more than it's worth.
+            const LINE_MONTHLY_QUOTA = 300;
+            const LINE_TAG_LABELS = {
+                notifyQuizDigest: 'digest',
+                notifyQuizSubmitted: 'milestone',
+                notifyAdminOnNewCase: 'case',
+                notifyQuizReminder: 'reminder'
+            };
+            window.loadLineUsage = async function () {
+                const panel = document.getElementById('line-usage-panel');
+                if (!panel) return;
+                try {
+                    // Bangkok month — must match the key recordLinePush writes, otherwise
+                    // the card silently reads a doc that will never exist near month end.
+                    const month = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(0, 7);
+                    const snap = await db.collection('line_usage').doc(month).get();
+                    if (!snap.exists) { panel.style.display = 'none'; return; }
+                    const d = snap.data() || {};
+                    const total = Number(d.total || 0);
+                    if (!total) { panel.style.display = 'none'; return; }
+
+                    const pct = Math.min(100, Math.round((total / LINE_MONTHLY_QUOTA) * 100));
+                    const color = pct >= 90 ? '#dc2626' : (pct >= 70 ? '#f59e0b' : '#22c55e');
+
+                    const countEl = document.getElementById('line-usage-count');
+                    if (countEl) {
+                        countEl.textContent = `${total}/${LINE_MONTHLY_QUOTA}`;
+                        countEl.style.color = color;
+                    }
+                    const bar = document.getElementById('line-usage-bar');
+                    if (bar) { bar.style.width = pct + '%'; bar.style.background = color; }
+
+                    const byTag = d.byTag || {};
+                    const parts = Object.keys(byTag)
+                        .filter(k => Number(byTag[k]) > 0)
+                        .sort((a, b) => Number(byTag[b]) - Number(byTag[a]))
+                        .map(k => `${LINE_TAG_LABELS[k] || k} ${byTag[k]}`);
+                    const breakdown = document.getElementById('line-usage-breakdown');
+                    if (breakdown) breakdown.textContent = parts.join(' · ');
+
+                    // The counter only starts at deploy time, so an early month would
+                    // otherwise read as "we barely sent anything" when really we just
+                    // weren't counting yet. Say so rather than imply a complete figure.
+                    const note = document.getElementById('line-usage-note');
+                    if (note) {
+                        note.textContent = pct >= 90
+                            ? '⚠️ ใกล้เต็มโควตาเดือนนี้ — ระวังการยิงเพิ่ม'
+                            : `นับเฉพาะ push ที่สำเร็จ · เริ่มนับตั้งแต่ V97.53 (ก่อนหน้านั้นไม่ได้เก็บ)`;
+                    }
+                    panel.style.display = 'block';
+                } catch (e) {
+                    // Never let an observability widget break the dashboard.
+                    console.warn('loadLineUsage failed:', e && e.message);
+                    panel.style.display = 'none';
+                }
             };
 
             window.renderQuizCoverage = function () {
