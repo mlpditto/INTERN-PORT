@@ -2298,6 +2298,9 @@ exports.notifyQuizDigest = onSchedule({
     console.log(`[notifyQuizDigest] cohort: ${activeUsers.length} active / ${users.length} total (hidden ${hiddenUserCount} = ${hiddenStale} stale + ${hiddenIgnored} ignored + ${hiddenGroup} excluded-group, window ${NOTIFY_ACTIVE_DAYS}d)`);
 
     // --- section 1: submitted in the last 24h ---
+    // The window is `now - 24h`, so a 16:00 run reports 16:00 yesterday through
+    // 16:00 today — exactly the day boundary the admin thinks in.
+    const activeIds = new Set(activeUsers.map(u => u.id));
     const doneRows = [];
     try {
         const snap = await db.collection('quiz_attempts')
@@ -2322,8 +2325,10 @@ exports.notifyQuizDigest = onSchedule({
             const totalQ = Number(a.totalQuestions || 0);
             const correct = Number(a.correctCount || 0);
             doneRows.push({
+                quizId: quizId,
                 name: userNames.get(userId) || userId.slice(0, 8),
                 quiz: quizTitleCache.get(quizId),
+                inCohort: activeIds.has(userId),
                 score: a.isPoll === true ? 'poll' : (totalQ > 0 ? `${Math.round(correct * 10) / 10}/${totalQ}` : '—')
             });
         }
@@ -2332,23 +2337,31 @@ exports.notifyQuizDigest = onSchedule({
         return;
     }
 
-    // V97.51 (C): doneRows is one entry per ATTEMPT, so someone who finished two
-    // quizzes rendered as two near-identical lines under the same name. Fold to
-    // one entry per person, keeping their quizzes/scores for the detailed copy.
-    const donePeople = [];
+    // V97.51 (C) folded one entry per ATTEMPT into one per PERSON. 2026-08-15
+    // pivots again, to one entry per QUIZ (user request): the rest of the digest
+    // is quiz-shaped — what went live, what is due — so "who did what" reads
+    // better in the same shape, and a quiz worked on by three people is one line
+    // instead of three. The person count is kept in the header so productivity
+    // is still visible at a glance.
+    //
+    // Non-cohort submitters (stale or hidden in User Hub) are counted as
+    // "+N others" rather than dropped: the cohort filter decides who gets
+    // CHASED, but real activity must never silently vanish from the report.
+    const doneQuizzes = [];
     {
-        const byName = new Map();
+        const byQuiz = new Map();
         doneRows.forEach(r => {
-            if (!byName.has(r.name)) {
-                const entry = { name: r.name, quizzes: [], scores: [] };
-                byName.set(r.name, entry);
-                donePeople.push(entry);
+            if (!byQuiz.has(r.quizId)) {
+                const entry = { quiz: r.quiz, people: [], others: 0 };
+                byQuiz.set(r.quizId, entry);
+                doneQuizzes.push(entry);
             }
-            const e = byName.get(r.name);
-            e.quizzes.push(r.quiz);
-            e.scores.push(r.score);
+            const e = byQuiz.get(r.quizId);
+            if (r.inCohort) e.people.push({ name: r.name, score: r.score });
+            else e.others++;
         });
     }
+    const donePeopleCount = new Set(doneRows.filter(r => r.inCohort).map(r => r.name)).size;
 
     // --- section 2: still pending on deadline-bound active quizzes ---
     // newlyLive is collected in the same pass but BEFORE the filters below —
@@ -2454,21 +2467,25 @@ exports.notifyQuizDigest = onSchedule({
             body.push({ type: 'separator', margin: 'md' });
         }
 
-        body.push({ type: 'text', text: `✅ Done today · ${donePeople.length}`, size: 'xs', weight: 'bold', color: '#059669', margin: newlyLive.length ? 'md' : 'none' });
-        if (donePeople.length) {
-            donePeople.slice(0, DIGEST_MAX_ROWS).forEach(p => {
-                let line;
-                if (p.quizzes.length === 1) {
-                    line = target.withScores ? `${p.name} · ${p.quizzes[0]} · ${p.scores[0]}` : `${p.name} · ${p.quizzes[0]}`;
-                } else {
-                    line = target.withScores
-                        ? `${p.name} · ${p.quizzes.length} ชุด · ${p.scores.join(', ')}`
-                        : `${p.name} · ${p.quizzes.length} ชุด`;
-                }
-                body.push({ type: 'text', text: line, size: 'sm', color: '#1f2937', wrap: true, margin: 'xs' });
+        const doneHeader = doneQuizzes.length
+            ? `✅ Done today · ${doneQuizzes.length} ${doneQuizzes.length === 1 ? 'quiz' : 'quizzes'} · ${donePeopleCount} ${donePeopleCount === 1 ? 'person' : 'people'}`
+            : '✅ Done today · 0';
+        body.push({ type: 'text', text: doneHeader, size: 'xs', weight: 'bold', color: '#059669', margin: newlyLive.length ? 'md' : 'none' });
+        if (doneQuizzes.length) {
+            doneQuizzes.slice(0, DIGEST_MAX_ROWS).forEach(q => {
+                const who = q.people.map(p => target.withScores ? `${p.name} ${p.score}` : p.name);
+                if (q.others) who.push(`+${q.others} ${q.others === 1 ? 'other' : 'others'}`);
+                // `who` can only be empty if a quiz had no rows at all, which can't
+                // happen — but an empty text node is a hard LINE API error, so the
+                // title alone is the fallback rather than a dangling separator.
+                body.push({
+                    type: 'text',
+                    text: who.length ? `${q.quiz} · ${who.join(', ')}` : q.quiz,
+                    size: 'sm', color: '#1f2937', wrap: true, margin: 'xs'
+                });
             });
-            if (donePeople.length > DIGEST_MAX_ROWS) {
-                body.push({ type: 'text', text: `+${donePeople.length - DIGEST_MAX_ROWS} more`, size: 'xs', color: '#94a3b8', margin: 'xs' });
+            if (doneQuizzes.length > DIGEST_MAX_ROWS) {
+                body.push({ type: 'text', text: `+${doneQuizzes.length - DIGEST_MAX_ROWS} more`, size: 'xs', color: '#94a3b8', margin: 'xs' });
             }
         } else {
             body.push({ type: 'text', text: 'No submissions today', size: 'sm', color: '#94a3b8', margin: 'xs' });
@@ -2489,7 +2506,7 @@ exports.notifyQuizDigest = onSchedule({
             body.push({ type: 'separator', margin: 'md' });
             body.push({
                 type: 'text',
-                text: `📌 อีก ${laterBlocks.length} ชุด due ${span} · ดูในแอป`,
+                text: `📌 ${laterBlocks.length} more due ${span} · see the app`,
                 size: 'xs', color: '#64748b', margin: 'md', wrap: true
             });
         }
@@ -2500,14 +2517,14 @@ exports.notifyQuizDigest = onSchedule({
             body.push({ type: 'separator', margin: 'md' });
             body.push({
                 type: 'text',
-                text: `นับเฉพาะผู้ใช้งานใน ${NOTIFY_ACTIVE_DAYS} วัน ที่ไม่ได้ซ่อนไว้ · ${activeUsers.length}/${users.length} คน (ซ่อน ${hiddenUserCount})`,
+                text: `Active in ${NOTIFY_ACTIVE_DAYS}d and not hidden · ${activeUsers.length}/${users.length} people · ${hiddenUserCount} hidden`,
                 size: 'xxs', color: '#94a3b8', margin: 'md', wrap: true
             });
         }
 
         return {
             type: 'flex',
-            altText: `📊 Quiz digest — ${newlyLive.length ? `${newlyLive.length} new · ` : ''}${donePeople.length} done today`.slice(0, 400),
+            altText: `📊 Quiz digest — ${newlyLive.length ? `${newlyLive.length} new · ` : ''}${doneQuizzes.length} done today`.slice(0, 400),
             contents: {
                 type: 'bubble',
                 size: 'kilo',
@@ -2523,5 +2540,5 @@ exports.notifyQuizDigest = onSchedule({
         };
     };
 
-    await pushLineFlex('notifyQuizDigest', targets, buildFlex, `newlyLive=${newlyLive.length}  donePeople=${donePeople.length} (attempts=${doneRows.length})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  cohort=${activeUsers.length}/${users.length}`);
+    await pushLineFlex('notifyQuizDigest', targets, buildFlex, `newlyLive=${newlyLive.length}  doneQuizzes=${doneQuizzes.length} donePeople=${donePeopleCount} (attempts=${doneRows.length})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  cohort=${activeUsers.length}/${users.length}`);
 });
