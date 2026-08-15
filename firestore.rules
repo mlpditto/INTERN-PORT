@@ -377,6 +377,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // 32c. LINE push quota counter (V97.53 observability) — one doc per Bangkok
+    // MONTH, line_usage/{YYYY-MM}, written ONLY by pushLineFlex via the Admin SDK
+    // (which bypasses these rules). Backs the dashboard's "X/300 this month"
+    // quota card. Admin-only read; no client write, so the quota figure the
+    // admin relies on can't be tampered with from a browser.
+    match /line_usage/{monthId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // 32b. AI quality/eval metrics (V96.05 Evaluation pillar) — one doc per
     // Bangkok day, ai_evals/{YYYY-MM-DD}. UNLIKE ai_usage, the accept/reject
     // signals originate in the admin UI (Apply / dismiss / save), so the client

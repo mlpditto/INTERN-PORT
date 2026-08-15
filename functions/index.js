@@ -1842,6 +1842,40 @@ function splitAttemptId(attemptId) {
 // Push one Flex per target, each built independently so the group copy
 // can differ from the 1:1 copy. A failure on one target never blocks
 // the other (e.g. OA kicked from the group).
+// V97.53: observability — LINE push quota counter. Until now every push was
+// recorded ONLY as a console.log line, which the admin browser cannot read
+// (Cloud Logging needs a service account + the Logging API), so there was no way
+// to answer "how many digests went out this month" or "how close are we to the
+// OA's 300-messages/month free-tier cap" — the cap that milestone mode exists to
+// protect. One doc per Bangkok MONTH in line_usage/{YYYY-MM}; atomic
+// FieldValue.increment keeps it a cheap read-free merge, same shape as
+// recordAiUsage's ai_usage/{YYYY-MM-DD}.
+//
+// Counts SUCCESSFUL pushes only — a failed push never reaches LINE and so never
+// bills against the quota. Counts PER TARGET, because a run that pushes to both
+// the group and the admin 1:1 spends two messages, not one.
+// Best-effort: a counter write must never break the notification itself.
+async function recordLinePush(tag, okCount) {
+    if (!okCount) return;
+    try {
+        const now = new Date();
+        const month = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(0, 7); // YYYY-MM
+        const day = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });               // YYYY-MM-DD
+        const inc = (n) => admin.firestore.FieldValue.increment(n);
+        // Firestore map keys can't contain . ~ * / [ ] — sanitize like recordAiUsage.
+        const safeTag = String(tag || 'unknown').replace(/[~*/\[\].]/g, '_').slice(0, 60) || 'unknown';
+        await admin.firestore().collection('line_usage').doc(month).set({
+            month: month,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            total: inc(okCount),
+            byTag: { [safeTag]: inc(okCount) },
+            byDay: { [day]: inc(okCount) }
+        }, { merge: true });
+    } catch (e) {
+        console.warn('recordLinePush failed:', e && e.message);
+    }
+}
+
 async function pushLineFlex(tag, targets, buildFlex, logSuffix) {
     const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     const results = [];
@@ -1871,6 +1905,8 @@ async function pushLineFlex(tag, targets, buildFlex, logSuffix) {
             results.push({ target: target.label, ok: false, code, status: status || null });
         }
     }
+    // One counter write per run, not per target — the increment carries the count.
+    await recordLinePush(tag, results.filter(r => r.ok).length);
     return results;
 }
 
