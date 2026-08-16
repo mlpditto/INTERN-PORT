@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika V97.60</title>
+    <title>Nika V97.61</title>
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -2150,6 +2150,21 @@
             font-size: 0.85em;
             font-weight: 900;
             opacity: 0.85;
+        }
+
+        /* V97.61: side-by-side pane for the Quality Audit duplicate compare. The audit
+           modal caps at 780px, so two columns fit; below that the pair stacks rather
+           than squeezing two unreadable columns. */
+        .audit-dup-cmp-grid {
+            display: flex;
+            gap: 10px;
+            align-items: stretch;
+        }
+
+        @media (max-width: 700px) {
+            .audit-dup-cmp-grid {
+                flex-direction: column;
+            }
         }
 
         .alabasta-action-btn {
@@ -17158,9 +17173,11 @@ RULES:
                 // this question if it overlaps another one in the SAME set. Audit judges
                 // each question in isolation otherwise, so this was previously invisible
                 // here even though the sibling Compare modal already surfaces it.
+                // V97.61: each chip now expands a side-by-side panel, so the renderer
+                // needs this question's number and the questions snapshot to build it.
                 const dupHits = dupMap ? (dupMap.get(q.qNumber - 1) || []) : [];
                 const dupChipsHtml = dupHits.length
-                    ? `<div style="margin-bottom:10px; display:flex; flex-wrap:wrap; gap:6px;">${window._auditDupChipsHtml(dupHits)}</div>`
+                    ? `<div style="margin-bottom:10px; display:flex; flex-wrap:wrap; gap:6px;">${window._auditDupChipsHtml(dupHits, q.qNumber, questions)}</div>`
                     : '';
 
                 return `<div style="background:#fcfdff; border:1.5px solid #e2e8f0; border-radius:14px; padding:14px; margin-bottom:10px;">
@@ -53517,11 +53534,138 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
             return byIdx;
         };
 
-        window._auditDupChipsHtml = function(hits) {
+        // V97.61: the same cleaning quizCompareShingles does, but recording where each
+        // surviving character came from in the ORIGINAL string. That index map is what
+        // lets the compare panel highlight the matched regions on readable original text
+        // instead of the lowercased, punctuation-stripped text the scorer actually sees.
+        window._auditCleanWithMap = function(text) {
+            const src = String(text || '');
+            let clean = '';
+            const map = [];
+            for (let i = 0; i < src.length; i++) {
+                const ch = src[i];
+                // Zero-width chars, by code point. A literal invisible char in a regex
+                // class here is unreadable and has caused a hard SyntaxError before (V91.95).
+                const cc = ch.charCodeAt(0);
+                if (cc === 0x200B || cc === 0x200C || cc === 0x200D || cc === 0x2060 || cc === 0xFEFF) continue;
+                if (/[#*_`>\[\]()!]/.test(ch)) continue;                     // markdown syntax
+                if (/\s/.test(ch)) {
+                    if (clean.length === 0 || clean[clean.length - 1] === ' ') continue;  // collapse
+                    clean += ' ';
+                    map.push(i);
+                    continue;
+                }
+                const lower = ch.toLowerCase();
+                clean += (lower.length === 1 ? lower : ch);   // keep the map 1:1
+                map.push(i);
+            }
+            // trim, keeping the map aligned
+            let start = 0, end = clean.length;
+            while (start < end && clean[start] === ' ') start++;
+            while (end > start && clean[end - 1] === ' ') end--;
+            return { clean: clean.slice(start, end), map: map.slice(start, end) };
+        };
+
+        // Mark every ORIGINAL-string index covered by a 5-gram that also occurs in the
+        // peer — i.e. exactly the overlap that produced the score. At a low percentage
+        // this is the fastest way to see the pair only shares a term like "vitamin k"
+        // and is not a real duplicate.
+        window._auditHighlightShared = function(text, peerText) {
+            const { clean, map } = window._auditCleanWithMap(text);
+            const peer = window._auditCleanWithMap(peerText).clean;
+            const N = 5;   // QUIZ_COMPARE_NGRAM
+            const marked = new Array(clean.length).fill(false);
+            if (clean.length >= N && peer.length >= N) {
+                const peerGrams = new Set();
+                for (let i = 0; i <= peer.length - N; i++) peerGrams.add(peer.slice(i, i + N));
+                for (let i = 0; i <= clean.length - N; i++) {
+                    if (peerGrams.has(clean.slice(i, i + N))) {
+                        for (let k = i; k < i + N; k++) marked[k] = true;
+                    }
+                }
+            }
+            const src = String(text || '');
+            const markedSrc = new Array(src.length).fill(false);
+            for (let i = 0; i < marked.length; i++) if (marked[i]) markedSrc[map[i]] = true;
+
+            let out = '', run = '', runOn = false;
+            const flush = () => {
+                if (!run) return;
+                out += runOn
+                    ? `<mark style="background:#fde68a; color:#78350f; padding:0 1px; border-radius:3px;">${escapeHtml(run)}</mark>`
+                    : escapeHtml(run);
+                run = '';
+            };
+            for (let i = 0; i < src.length; i++) {
+                if (markedSrc[i] !== runOn) { flush(); runOn = markedSrc[i]; }
+                run += src[i];
+            }
+            flush();
+            return out;
+        };
+
+        // One side of the compare panel. Deliberately renders the stem AND the options:
+        // two stems can read differently while the option sets give the answer away as
+        // the same item.
+        window._auditDupSideHtml = function(question, qNumber, peerText, accent) {
+            if (!question) {
+                return `<div style="flex:1; min-width:0; padding:12px; border:1px dashed #e2e8f0; border-radius:10px; color:#94a3b8; font-size:0.82em;">Q${qNumber} not available in this snapshot</div>`;
+            }
+            const correctIdx = Array.isArray(question.correct) ? question.correct : [question.correct];
+            const optionsHtml = (question.options || []).map((opt, i) => `
+                <div style="display:flex; gap:6px; align-items:flex-start; padding:2px 0; ${correctIdx.includes(i) ? 'color:#15803d; font-weight:700;' : 'color:#475569;'}">
+                    <span>${correctIdx.includes(i) ? '✅' : '◯'}</span><span>${window._auditHighlightShared(opt, peerText)}</span>
+                </div>`).join('');
+            return `<div style="flex:1; min-width:0; padding:12px; background:#fff; border:1.5px solid ${accent}; border-radius:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
+                    <b style="color:${accent}; font-size:0.9em;">Q${qNumber}</b>
+                    <button onclick="auditDeleteQuestion(${qNumber})" title="Delete Q${qNumber} from the form (not saved until Save Quiz)"
+                        style="padding:3px 10px; border-radius:7px; border:none; background:rgba(239,68,68,0.12); color:#dc2626; cursor:pointer; font-size:0.7em; font-weight:800;">🗑️ ลบ Q${qNumber}</button>
+                </div>
+                <div style="white-space:pre-wrap; line-height:1.5; font-weight:600; font-size:0.84em; color:#1e293b; margin-bottom:8px;">${window._auditHighlightShared(question.q || '', peerText)}</div>
+                <div style="font-size:0.8em;">${optionsHtml}</div>
+            </div>`;
+        };
+
+        window.toggleAuditDupCompare = function(panelId, btn) {
+            const panel = document.getElementById(panelId);
+            if (!panel) return;
+            const show = panel.style.display === 'none';
+            panel.style.display = show ? 'block' : 'none';
+            if (btn) btn.setAttribute('aria-expanded', show ? 'true' : 'false');
+        };
+
+        // V97.61: chips are now buttons that expand a side-by-side panel. Panels are
+        // built here, inside the audit card, rather than as a floating overlay — the
+        // scorecard re-renders itself after auditDeleteQuestion renumbers the questions,
+        // so anything detached would immediately show stale Q numbers.
+        window._auditDupChipsHtml = function(hits, qNumber, questions) {
+            const self = (questions && questions[qNumber - 1]) || null;
             return (hits || []).slice(0, 3).map(h => {
+                const peerNumber = h.qIndex + 1;
                 const pct = Math.round(h.score * 100);
                 const strong = h.score >= QUIZ_SET_DUP_STRONG;
-                return `<span title="ใกล้เคียง Q${h.qIndex + 1} · ${pct}%" style="background:${strong ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.12)'}; color:${strong ? '#b91c1c' : '#92400e'}; padding:2px 10px; border-radius:20px; font-size:0.7em; font-weight:800; border:1px solid ${strong ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.30)'}; cursor:help;">⚠️ ซ้ำ Q${h.qIndex + 1} · ${pct}%</span>`;
+                const accent = strong ? '#b91c1c' : '#92400e';
+                const panelId = `audit-dup-cmp-${qNumber}-${peerNumber}`;
+                const peer = (questions && questions[h.qIndex]) || null;
+                const selfText = (self && self.q) || '';
+                const peerText = (peer && peer.q) || '';
+
+                const chip = `<button type="button" onclick="toggleAuditDupCompare('${panelId}', this)" aria-expanded="false"
+                    title="เทียบ Q${qNumber} กับ Q${peerNumber} แบบเคียงข้าง"
+                    style="background:${strong ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.12)'}; color:${accent}; padding:2px 10px; border-radius:20px; font-size:0.7em; font-weight:800; border:1px solid ${strong ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.30)'}; cursor:pointer; width:auto; min-height:0;">⚠️ ซ้ำ Q${peerNumber} · ${pct}% ⇄</button>`;
+
+                const panel = `<div id="${panelId}" class="lang-no-toggle" style="display:none; width:100%; margin-top:8px; padding:12px; background:#fffbeb; border:1px solid ${strong ? 'rgba(239,68,68,0.30)' : '#fcd34d'}; border-radius:12px;">
+                    <div style="font-size:0.75em; color:${accent}; font-weight:700; margin-bottom:10px; line-height:1.5;">
+                        ตรงกัน ${pct}% · <mark style="background:#fde68a; color:#78350f; padding:0 3px; border-radius:3px;">ไฮไลต์</mark> คือส่วนที่ทำให้ระบบมองว่าซ้ำ — ถ้าซ้ำแค่ศัพท์เฉพาะ แปลว่าไม่ใช่ข้อซ้ำจริง
+                    </div>
+                    <div class="audit-dup-cmp-grid">
+                        ${window._auditDupSideHtml(self, qNumber, peerText, '#0f766e')}
+                        ${window._auditDupSideHtml(peer, peerNumber, selfText, accent)}
+                    </div>
+                </div>`;
+
+                return chip + panel;
             }).join('');
         };
 
